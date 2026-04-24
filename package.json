@@ -1,0 +1,18 @@
+{
+  "name": "@erp/root",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "dev:api": "pnpm --filter @erp/api dev",
+    "dev:backoffice": "pnpm --filter @erp/backoffice-web dev",
+    "dev:pos": "pnpm --filter @erp/pos-web dev",
+    "test:e2e": "pnpm --filter @erp/api test:e2e",
+    "contract:check": "npx ts-node scripts/contract-check.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.18.1"
+}

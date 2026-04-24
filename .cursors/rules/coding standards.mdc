@@ -1,0 +1,4 @@
+---
+alwaysApply: false
+---
+Should have corresponding unit tests / e2e tests with cases for each function with differrent scenerio defined in the docs (data flow diagrams)

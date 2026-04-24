@@ -1,0 +1,19 @@
+{
+  "name": "@erp/shared-kafka-client",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "echo lint",
+    "test": "echo test"
+  },
+  "dependencies": {
+    "@erp/shared-interfaces": "workspace:*",
+    "kafkajs": "^2.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

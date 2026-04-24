@@ -1,0 +1,38 @@
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  session: SessionInfo;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface SessionInfo {
+  userId: string;
+  organizationId: string;
+  roles: string[];
+  branchIds: string[];
+}
+
+export interface JwtPayload {
+  userId: string;
+  organizationId: string;
+  roles: string[];
+  branchIds: string[];
+  jti: string;
+  iat: number;
+  exp: number;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@erp/backoffice-web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "echo lint",
+    "test": "echo test",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@erp/shared-interfaces": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^6.0.0"
+  }
+}

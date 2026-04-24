@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+- Using zustand for global state
+- Evaluate memmory leaks and potential interval state updates to prevent it as best
+- Using shacdn and tailwind to custom the UI
+- Should have common components like search box, form inputs, large text input, date time input (can using native one), select dropdown with multi options, tags input, fullscreen extendable and closable modals with options (save, cancel, close, full-screen)
