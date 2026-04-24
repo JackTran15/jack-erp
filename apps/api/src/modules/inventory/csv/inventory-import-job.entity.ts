@@ -9,32 +9,33 @@ export enum ImportJobType {
   ADJUSTMENTS = 'ADJUSTMENTS',
 }
 
+/** Tracks a bulk CSV import operation for items, opening balances, or adjustments. Enforces idempotency. */
 @Entity('inventory_import_jobs')
 @Unique(['organizationId', 'type', 'idempotencyKey'])
 @Index(['organizationId', 'status'])
 export class InventoryImportJobEntity extends BaseEntity {
-  @Column({ type: 'enum', enum: ImportJobType })
+  @Column({ type: 'enum', enum: ImportJobType, comment: 'What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS)' })
   type: ImportJobType;
 
-  @Column({ name: 'file_name' })
+  @Column({ name: 'file_name', comment: 'Original uploaded CSV file name' })
   fileName: string;
 
-  @Column({ name: 'file_checksum' })
+  @Column({ name: 'file_checksum', comment: 'SHA-256 hash of the file content for integrity verification' })
   fileChecksum: string;
 
-  @Column({ name: 'idempotency_key' })
+  @Column({ name: 'idempotency_key', comment: 'Client-provided key to prevent duplicate submissions' })
   idempotencyKey: string;
 
-  @Column({ type: 'enum', enum: ImportJobStatus, default: ImportJobStatus.VALIDATING })
+  @Column({ type: 'enum', enum: ImportJobStatus, default: ImportJobStatus.VALIDATING, comment: 'Current processing state' })
   status: ImportJobStatus;
 
-  @Column({ name: 'total_rows', type: 'int', default: 0 })
+  @Column({ name: 'total_rows', type: 'int', default: 0, comment: 'Total number of data rows in the CSV' })
   totalRows: number;
 
-  @Column({ name: 'valid_rows', type: 'int', default: 0 })
+  @Column({ name: 'valid_rows', type: 'int', default: 0, comment: 'Count of rows that passed validation' })
   validRows: number;
 
-  @Column({ name: 'error_rows', type: 'int', default: 0 })
+  @Column({ name: 'error_rows', type: 'int', default: 0, comment: 'Count of rows that failed validation' })
   errorRows: number;
 
   @OneToMany(() => InventoryImportJobRowEntity, (row) => row.job)

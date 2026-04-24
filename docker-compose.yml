@@ -47,7 +47,6 @@ services:
       - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
       - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
       - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
-      - --advertise-schema-registry-addr internal://redpanda:8081,external://localhost:18081
       - --rpc-addr redpanda:33145
       - --advertise-rpc-addr redpanda:33145
       - --smp 1
@@ -77,18 +76,23 @@ services:
         condition: service_healthy
     ports:
       - "18080:8080"
+    volumes:
+      - ./docker/redpanda-console-config.yml:/tmp/config.yml:ro
     environment:
       CONFIG_FILEPATH: /tmp/config.yml
-      CONSOLE_CONFIG_FILE: |
-        kafka:
-          brokers: ["redpanda:9093"]
-          schemaRegistry:
-            enabled: true
-            urls: ["http://redpanda:8081"]
-        redpanda:
-          adminApi:
-            enabled: true
-            urls: ["http://redpanda:9644"]
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: erp-adminer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "18088:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
     restart: unless-stopped
 
 volumes:

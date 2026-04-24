@@ -1,4 +1,4 @@
 ---
-alwaysApply: false
+alwaysApply: true
 ---
 Should using mermaid uml for every diagrams and remember to always wrap element labels/texts in double quotes ""

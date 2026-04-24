@@ -1,0 +1,3142 @@
+{
+  "generatedAt": "2026-04-24T19:21:37.314Z",
+  "totalEntities": 44,
+  "entities": [
+    {
+      "className": "AccountEntity",
+      "tableName": "accounts",
+      "filePath": "apps/api/src/modules/accounting/coa/account.entity.ts",
+      "extendsBase": true,
+      "comment": "Node in the Chart of Accounts tree. Categorized by type (Asset, Liability, Equity, Revenue, Expense).",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Alphanumeric account code (e.g. 1010, 5200); unique per org",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Account name (e.g. Cash on Hand, Cost of Goods Sold)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Fundamental accounting type (ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "parentAccountId",
+          "dbColumn": "parent_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to accounts — creates hierarchy (e.g. Cash under Current Assets)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Inactive accounts cannot be used in new journal entries",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "parentAccount",
+          "kind": "ManyToOne",
+          "target": "AccountEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_account_org_code', ['organizationId', 'code'], { unique: true }",
+        "'idx_account_org_type', ['organizationId', 'type']",
+        "'idx_account_parent', ['parentAccountId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "BranchEntity",
+      "tableName": "branches",
+      "filePath": "apps/api/src/modules/branch/branch.entity.ts",
+      "extendsBase": true,
+      "comment": "Physical store, warehouse, or logical division within an organization. Supports tree hierarchy via parentBranchId.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Display name of the branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "address",
+          "dbColumn": "address",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Physical address of the branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "phone",
+          "dbColumn": "phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Branch phone number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "email",
+          "dbColumn": "email",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Branch contact email",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "BranchStatus.ACTIVE",
+          "comment": "Branch lifecycle status (ACTIVE, SUSPENDED, ARCHIVED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isMainBranch",
+          "dbColumn": "is_main_branch",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "If true, this is the organizations primary/headquarters branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "parentBranchId",
+          "dbColumn": "parent_branch_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to branches — enables hierarchical branch structures",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "parentBranch",
+          "kind": "ManyToOne",
+          "target": "BranchEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'name']"
+      ]
+    },
+    {
+      "className": "CashAccountEntity",
+      "tableName": "cash_accounts",
+      "filePath": "apps/api/src/modules/accounting/cash/cash-account.entity.ts",
+      "extendsBase": true,
+      "comment": "Physical or logical cash drawer/register/petty cash fund at a branch. Linked to a COA account.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Display name (e.g. Register 1, Petty Cash)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "balance",
+          "dbColumn": "balance",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Current cash balance; updated in real-time with each movement",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Corresponding general ledger account in the COA",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'idx_cash_account_org_branch', ['organizationId', 'branchId']",
+        "'idx_cash_account_ledger', ['accountId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "CashMovementEntity",
+      "tableName": "cash_movements",
+      "filePath": "apps/api/src/modules/accounting/cash/cash-movement.entity.ts",
+      "extendsBase": true,
+      "comment": "Records each deposit, withdrawal, transfer, or adjustment on a cash account. Triggers journal entries.",
+      "columns": [
+        {
+          "property": "cashAccountId",
+          "dbColumn": "cash_account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The cash account affected",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Nature of the cash movement (DEPOSIT, WITHDRAWAL, TRANSFER, ADJUSTMENT)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Movement amount (always positive; direction determined by type)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reference",
+          "dbColumn": "reference",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "External reference (receipt number, bank slip, etc.)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "cashAccount",
+          "kind": "ManyToOne",
+          "target": "CashAccountEntity"
+        }
+      ],
+      "indexes": [
+        "'idx_cash_movement_account', ['cashAccountId']",
+        "'idx_cash_movement_org_branch', ['organizationId', 'branchId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "CustomerEntity",
+      "tableName": "customers",
+      "filePath": "apps/api/src/modules/customer/customer.entity.ts",
+      "extendsBase": true,
+      "comment": "Customer who purchases goods. Supports deduplication via merge workflow.",
+      "columns": [
+        {
+          "property": "firstName",
+          "dbColumn": "first_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Customers given name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lastName",
+          "dbColumn": "last_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Customers family name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "email",
+          "dbColumn": "email",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Email address; optional but unique within org when provided",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "phone",
+          "dbColumn": "phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Phone number for contact or lookup at POS",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "address",
+          "dbColumn": "address",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Mailing or billing address",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "CustomerStatus.ACTIVE",
+          "comment": "Customer lifecycle status (ACTIVE, INACTIVE, MERGED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "mergedIntoId",
+          "dbColumn": "merged_into_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to customers — points to surviving customer after a merge",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "mergedInto",
+          "kind": "ManyToOne",
+          "target": "CustomerEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_customer_org_email', ['organizationId', 'email'], {\n  unique: true,\n  where: '\"email\" IS NOT NULL',\n}",
+        "'idx_customer_org_status', ['organizationId', 'status']",
+        "'idx_customer_org_phone', ['organizationId', 'phone']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "DocumentNumberCounterEntity",
+      "tableName": "document_number_counters",
+      "filePath": "apps/api/src/modules/document-numbering/document-number-counter.entity.ts",
+      "extendsBase": false,
+      "comment": "Tracks the current sequence value for a numbering rule per reset period. Atomically incremented when generating document numbers.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "ruleId",
+          "dbColumn": "rule_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The numbering rule this counter belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Organization scope",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Branch scope (mirrors the rules branch scope)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "currentValue",
+          "dbColumn": "current_value",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0",
+          "comment": "Last used sequence number; next document gets currentValue + 1",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "resetKey",
+          "dbColumn": "reset_key",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Period identifier (e.g. 2026, 202604, or GLOBAL for NEVER)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "rule",
+          "kind": "ManyToOne",
+          "target": "DocumentNumberRuleEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "'UQ_rule_reset_key', ['ruleId', 'resetKey']"
+      ]
+    },
+    {
+      "className": "DocumentNumberRuleEntity",
+      "tableName": "document_number_rules",
+      "filePath": "apps/api/src/modules/document-numbering/document-number-rule.entity.ts",
+      "extendsBase": true,
+      "comment": "Defines how document numbers are formatted for a specific document type. Pattern: {prefix}{date?}{sequence}{suffix?}.",
+      "columns": [
+        {
+          "property": "documentType",
+          "dbColumn": "document_type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "The type of document this rule applies to (SALE, INVOICE, etc.)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "prefix",
+          "dbColumn": "prefix",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Fixed string prepended to the number (e.g. INV-, SAL-)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "suffix",
+          "dbColumn": "suffix",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional fixed string appended after the sequence",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "includeDate",
+          "dbColumn": "include_date",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Whether to embed a date segment in the number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "dateFormat",
+          "dbColumn": "date_format",
+          "type": "varchar",
+          "nullable": false,
+          "default": "'YYYYMMDD'",
+          "comment": "Date format string used when includeDate is true",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sequenceLength",
+          "dbColumn": "sequence_length",
+          "type": "smallint",
+          "nullable": false,
+          "default": "5",
+          "comment": "Number of digits for the sequence portion, zero-padded",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "resetPolicy",
+          "dbColumn": "reset_policy",
+          "type": "enum",
+          "nullable": false,
+          "default": "ResetPolicy.NEVER",
+          "comment": "When to reset the counter back to 1 (NEVER, DAILY, MONTHLY, YEARLY)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Whether this rule is currently in use",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "'UQ_active_rule_scope', [\n  'organizationId',\n  'branchId',\n  'documentType',\n  'isActive',\n]"
+      ]
+    },
+    {
+      "className": "ExpenseEntity",
+      "tableName": "expenses",
+      "filePath": "apps/api/src/modules/accounting/expenses/expense.entity.ts",
+      "extendsBase": true,
+      "comment": "Operational expense record. Workflow: DRAFT → APPROVED → POSTED. Posting auto-creates a journal entry.",
+      "columns": [
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "text",
+          "nullable": false,
+          "comment": "What the expense is for (e.g. Office rent for April 2026)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Expense amount",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The expense account to debit in the COA",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "payableId",
+          "dbColumn": "payable_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to payables — if this expense created a vendor obligation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "ExpenseStatus.DRAFT",
+          "comment": "Workflow status (DRAFT, APPROVED, POSTED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who approved the expense",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When approved",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When posted and journal entry created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who posted",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'idx_expense_org_status', ['organizationId', 'status']",
+        "'idx_expense_org_branch', ['organizationId', 'branchId']",
+        "'idx_expense_account', ['accountId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "InventoryImportJobEntity",
+      "tableName": "inventory_import_jobs",
+      "filePath": "apps/api/src/modules/inventory/csv/inventory-import-job.entity.ts",
+      "extendsBase": true,
+      "comment": "Tracks a bulk CSV import operation for items, opening balances, or adjustments. Enforces idempotency.",
+      "columns": [
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "fileName",
+          "dbColumn": "file_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Original uploaded CSV file name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "fileChecksum",
+          "dbColumn": "file_checksum",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "SHA-256 hash of the file content for integrity verification",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "idempotencyKey",
+          "dbColumn": "idempotency_key",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Client-provided key to prevent duplicate submissions",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "ImportJobStatus.VALIDATING",
+          "comment": "Current processing state",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "totalRows",
+          "dbColumn": "total_rows",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total number of data rows in the CSV",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validRows",
+          "dbColumn": "valid_rows",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Count of rows that passed validation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "errorRows",
+          "dbColumn": "error_rows",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Count of rows that failed validation",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "rows",
+          "kind": "OneToMany",
+          "target": "InventoryImportJobRowEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": [
+        "['organizationId', 'type', 'idempotencyKey']"
+      ]
+    },
+    {
+      "className": "InventoryImportJobRowEntity",
+      "tableName": "inventory_import_job_rows",
+      "filePath": "apps/api/src/modules/inventory/csv/inventory-import-job-row.entity.ts",
+      "extendsBase": false,
+      "comment": "Individual row from a CSV import job. Stores raw data, validation status, and errors.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "jobId",
+          "dbColumn": "job_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent import job",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "rowNumber",
+          "dbColumn": "row_number",
+          "type": "int",
+          "nullable": false,
+          "comment": "1-based row index from the CSV file",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "rawData",
+          "dbColumn": "raw_data",
+          "type": "jsonb",
+          "nullable": false,
+          "comment": "Parsed CSV row as a key-value object",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Row processing status (VALID, ERROR, COMMITTED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "errorMessages",
+          "dbColumn": "error_messages",
+          "type": "jsonb",
+          "nullable": true,
+          "comment": "Array of { column?, code, message } objects describing validation failures",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "job",
+          "kind": "ManyToOne",
+          "target": "InventoryImportJobEntity"
+        }
+      ],
+      "indexes": [
+        "['jobId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ItemEntity",
+      "tableName": "items",
+      "filePath": "apps/api/src/modules/inventory/location/item.entity.ts",
+      "extendsBase": true,
+      "comment": "A stockable product or material tracked in inventory. Identified by unique code per organization.",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Short alphanumeric identifier (SKU) for the item",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable product name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Detailed description or specifications",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unit",
+          "dbColumn": "unit",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Unit of measure (e.g. pcs, kg, box)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "category",
+          "dbColumn": "category",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Grouping label for filtering and reporting (e.g. Electronics, Furniture)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "When false, item cannot be used in new transactions",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'code']"
+      ]
+    },
+    {
+      "className": "JournalEntryEntity",
+      "tableName": "journal_entries",
+      "filePath": "apps/api/src/modules/accounting/journal/journal-entry.entity.ts",
+      "extendsBase": true,
+      "comment": "Double-entry journal entry with balanced debit/credit lines. Auto or manually created. Supports reversal.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Auto-generated journal number (e.g. JNL-20260425-00001)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "source",
+          "dbColumn": "source",
+          "type": "enum",
+          "nullable": false,
+          "comment": "System module that created this entry (SALE, RETURN, MANUAL, etc.)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceReferenceId",
+          "dbColumn": "source_reference_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to originating document (sale, expense, etc.)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "text",
+          "nullable": true,
+          "comment": "Human-readable description of the transaction",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "comment": "Internal notes not shown in reports",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "JournalStatus.POSTED",
+          "comment": "Whether this entry is active or has been reversed",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "Financial posting date (may differ from createdAt)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "User who posted the entry",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reversedByJournalId",
+          "dbColumn": "reversed_by_journal_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to journal_entries — the reversing entry (if reversed)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reversalOfJournalId",
+          "dbColumn": "reversal_of_journal_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to journal_entries — the original entry (if this is a reversal)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "JournalLineEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_journal_doc_number', ['organizationId', 'documentNumber'], {\n  unique: true,\n}",
+        "'idx_journal_org_source', ['organizationId', 'source']",
+        "'idx_journal_org_status', ['organizationId', 'status']",
+        "'idx_journal_org_branch', ['organizationId', 'branchId']",
+        "'idx_journal_posted_at', ['postedAt']",
+        "'idx_journal_source_ref', ['sourceReferenceId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "JournalLineEntity",
+      "tableName": "journal_lines",
+      "filePath": "apps/api/src/modules/accounting/journal/journal-line.entity.ts",
+      "extendsBase": true,
+      "comment": "Single debit or credit line within a journal entry. Sum of debits must equal sum of credits.",
+      "columns": [
+        {
+          "property": "journalEntryId",
+          "dbColumn": "journal_entry_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent journal entry",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The ledger account affected",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "debitAmount",
+          "dbColumn": "debit_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Amount debited to this account (0 if this is a credit line)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "creditAmount",
+          "dbColumn": "credit_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Amount credited to this account (0 if this is a debit line)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "text",
+          "nullable": true,
+          "comment": "Per-line description (e.g. Revenue from sale SAL-001)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineOrder",
+          "dbColumn": "line_order",
+          "type": "int",
+          "nullable": false,
+          "comment": "Display order of lines within the entry (1-based)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "journalEntry",
+          "kind": "ManyToOne",
+          "target": "JournalEntryEntity"
+        }
+      ],
+      "indexes": [
+        "'idx_journal_line_entry', ['journalEntryId']",
+        "'idx_journal_line_account', ['accountId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "LocationEntity",
+      "tableName": "locations",
+      "filePath": "apps/api/src/modules/inventory/location/location.entity.ts",
+      "extendsBase": true,
+      "comment": "Specific slot within a storage (shelf, rack, bin, zone). Finest granularity for stock tracking.",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Short identifier for the location (e.g. A-01-03)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable name (e.g. Aisle A, Rack 1, Shelf 3)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "storageId",
+          "dbColumn": "storage_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to storages — the storage this location belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Physical type of the location (SHELF, RACK, BIN, ZONE)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Inactive locations cannot receive new stock",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "storage",
+          "kind": "ManyToOne",
+          "target": "StorageEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['storageId', 'code']"
+      ]
+    },
+    {
+      "className": "OrganizationEntity",
+      "tableName": "organizations",
+      "filePath": "apps/api/src/modules/organization/organization.entity.ts",
+      "extendsBase": true,
+      "comment": "Top-level tenant entity. All business data is scoped to one organization.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Legal or trading name of the business; globally unique",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "contactEmail",
+          "dbColumn": "contact_email",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Primary contact email for the organization",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "contactPhone",
+          "dbColumn": "contact_phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional phone number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "mainBranchId",
+          "dbColumn": "main_branch_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to branches — the default/headquarters branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "OrganizationStatus.ACTIVE",
+          "comment": "Current lifecycle status; SUSPENDED blocks all access",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['name']"
+      ]
+    },
+    {
+      "className": "PayableEntity",
+      "tableName": "payables",
+      "filePath": "apps/api/src/modules/accounting/payables/payable.entity.ts",
+      "extendsBase": true,
+      "comment": "Amount owed to a vendor/supplier. Lifecycle: DRAFT → POSTED → PARTIALLY_SETTLED → SETTLED.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated or manually assigned reference number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "vendorName",
+          "dbColumn": "vendor_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Name of the vendor/supplier (free text; no vendor master yet)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Total amount owed to the vendor",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "currency",
+          "dbColumn": "currency",
+          "type": "varchar",
+          "nullable": false,
+          "default": "'USD'",
+          "comment": "ISO 4217 currency code",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "dueDate",
+          "dbColumn": "due_date",
+          "type": "date",
+          "nullable": false,
+          "comment": "Payment deadline",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "PayableStatus.DRAFT",
+          "comment": "Current lifecycle status (DRAFT, POSTED, PARTIALLY_SETTLED, SETTLED, VOIDED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Expense or liability account to debit",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "settledAmount",
+          "dbColumn": "settled_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Running total of all payments made against this payable",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the payable was posted to the books",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who posted",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "settlements",
+          "kind": "OneToMany",
+          "target": "PayableSettlementEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_payable_doc_number', ['organizationId', 'documentNumber'], {\n  unique: true,\n}",
+        "'idx_payable_org_status', ['organizationId', 'status']",
+        "'idx_payable_org_branch', ['organizationId', 'branchId']",
+        "'idx_payable_due_date', ['dueDate']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "PayableSettlementEntity",
+      "tableName": "payable_settlements",
+      "filePath": "apps/api/src/modules/accounting/payables/payable-settlement.entity.ts",
+      "extendsBase": true,
+      "comment": "Records a single payment event against a payable. Multiple settlements for partial payments.",
+      "columns": [
+        {
+          "property": "payableId",
+          "dbColumn": "payable_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The payable being paid",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Amount of this payment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "settlementDate",
+          "dbColumn": "settlement_date",
+          "type": "date",
+          "nullable": false,
+          "comment": "Date the payment was made",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "method",
+          "dbColumn": "method",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Payment method (e.g. CASH, BANK_TRANSFER, CHECK)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reference",
+          "dbColumn": "reference",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "External reference (bank txn ID, check number, etc.)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "payable",
+          "kind": "ManyToOne",
+          "target": "PayableEntity"
+        }
+      ],
+      "indexes": [
+        "'idx_payable_settlement_payable', ['payableId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "PaymentEntity",
+      "tableName": "pos_payments",
+      "filePath": "apps/api/src/modules/pos/entities/payment.entity.ts",
+      "extendsBase": true,
+      "comment": "Payment tendered against a POS sale. Supports split tender (multiple payments per sale).",
+      "columns": [
+        {
+          "property": "saleId",
+          "dbColumn": "sale_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The sale this payment applies to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "method",
+          "dbColumn": "method",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Payment method used (CASH, CARD, CREDIT, OTHER)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Amount tendered",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reference",
+          "dbColumn": "reference",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "External reference (card auth code, credit account ID, etc.)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "sale",
+          "kind": "ManyToOne",
+          "target": "SaleEntity"
+        }
+      ],
+      "indexes": [
+        "['saleId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "PermissionEntity",
+      "tableName": "permissions",
+      "filePath": "apps/api/src/modules/auth/permission.entity.ts",
+      "extendsBase": false,
+      "comment": "Atomic permission seeded at startup (e.g. inventory.item.create). Global, not org-scoped.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "key",
+          "dbColumn": "key",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Machine-readable permission key following module.resource.action convention",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Human-readable explanation of what this permission allows",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "module",
+          "dbColumn": "module",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Logical module grouping for UI display (e.g. inventory, accounting, pos)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": []
+    },
+    {
+      "className": "PosSessionEntity",
+      "tableName": "pos_sessions",
+      "filePath": "apps/api/src/modules/pos/entities/pos-session.entity.ts",
+      "extendsBase": true,
+      "comment": "Cashier's working shift on a POS terminal. Must be opened before recording sales. Lifecycle: OPEN → ACTIVE_SALES → CLOSING → CLOSED.",
+      "columns": [
+        {
+          "property": "terminalId",
+          "dbColumn": "terminal_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Optional reference to a physical terminal/register device",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "SessionStatus.OPEN",
+          "comment": "Current session lifecycle state (OPEN, ACTIVE_SALES, CLOSING, CLOSED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "openedBy",
+          "dbColumn": "opened_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Cashier who opened the session",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "openedAt",
+          "dbColumn": "opened_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "When the session was opened",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "closedBy",
+          "dbColumn": "closed_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who closed the session",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "closedAt",
+          "dbColumn": "closed_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the session was closed",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "openingCashAmount",
+          "dbColumn": "opening_cash_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Cash amount in the register at session start (float/seed money)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'branchId', 'status']",
+        "['organizationId', 'openedBy', 'createdAt']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ReceivableEntity",
+      "tableName": "receivables",
+      "filePath": "apps/api/src/modules/accounting/receivables/receivable.entity.ts",
+      "extendsBase": true,
+      "comment": "Amount owed by a customer to the organization. Supports partial settlement and write-offs.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Reference number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The customer who owes the amount",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Total amount owed by the customer",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "currency",
+          "dbColumn": "currency",
+          "type": "varchar",
+          "nullable": false,
+          "default": "'USD'",
+          "comment": "ISO 4217 currency code",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "dueDate",
+          "dbColumn": "due_date",
+          "type": "date",
+          "nullable": false,
+          "comment": "Payment deadline",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "ReceivableStatus.DRAFT",
+          "comment": "Current lifecycle status",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Revenue or asset account to credit",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "settledAmount",
+          "dbColumn": "settled_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Running total of all payments received from the customer",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When posted to the books",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who posted",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "writeOffReason",
+          "dbColumn": "write_off_reason",
+          "type": "text",
+          "nullable": true,
+          "comment": "Explanation when the receivable is written off as uncollectible",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "settlements",
+          "kind": "OneToMany",
+          "target": "ReceivableSettlementEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_receivable_doc_number', ['organizationId', 'documentNumber'], {\n  unique: true,\n}",
+        "'idx_receivable_org_status', ['organizationId', 'status']",
+        "'idx_receivable_org_branch', ['organizationId', 'branchId']",
+        "'idx_receivable_due_date', ['dueDate']",
+        "'idx_receivable_customer', ['customerId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ReceivableSettlementEntity",
+      "tableName": "receivable_settlements",
+      "filePath": "apps/api/src/modules/accounting/receivables/receivable-settlement.entity.ts",
+      "extendsBase": true,
+      "comment": "Records a single payment received from a customer against a receivable.",
+      "columns": [
+        {
+          "property": "receivableId",
+          "dbColumn": "receivable_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The receivable being paid",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Payment amount received",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "settlementDate",
+          "dbColumn": "settlement_date",
+          "type": "date",
+          "nullable": false,
+          "comment": "Date payment was received",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "method",
+          "dbColumn": "method",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Payment method (e.g. CASH, BANK_TRANSFER)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reference",
+          "dbColumn": "reference",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "External reference",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "receivable",
+          "kind": "ManyToOne",
+          "target": "ReceivableEntity"
+        }
+      ],
+      "indexes": [
+        "'idx_receivable_settlement_receivable', ['receivableId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "RegistrationRequestEntity",
+      "tableName": "registration_requests",
+      "filePath": "apps/api/src/modules/registration/registration-request.entity.ts",
+      "extendsBase": true,
+      "comment": "Self-service registration workflow for new organizations or branches.",
+      "columns": [
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Whether this is an organization or branch registration",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "requestData",
+          "dbColumn": "request_data",
+          "type": "jsonb",
+          "nullable": false,
+          "comment": "Freeform JSON containing submitted registration details (org name, owner email, etc.)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "RegistrationStatus.PENDING_APPROVAL",
+          "comment": "Current state in the approval workflow",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reviewedBy",
+          "dbColumn": "reviewed_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Admin who approved or rejected the request",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reviewedAt",
+          "dbColumn": "reviewed_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the review decision was made",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "rejectionReason",
+          "dbColumn": "rejection_reason",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Explanation provided when the request is rejected",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": []
+    },
+    {
+      "className": "ReturnEntity",
+      "tableName": "pos_returns",
+      "filePath": "apps/api/src/modules/pos/entities/return.entity.ts",
+      "extendsBase": true,
+      "comment": "Return transaction against a previously completed sale. Triggers stock restoration and updates sale status.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Auto-generated return receipt number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "originalSaleId",
+          "dbColumn": "original_sale_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The original sale being returned against",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The current POS session processing the return",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "subtotal",
+          "dbColumn": "subtotal",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Sum of return line totals before tax",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "taxAmount",
+          "dbColumn": "tax_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total tax refunded",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "totalAmount",
+          "dbColumn": "total_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total refund amount",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reason",
+          "dbColumn": "reason",
+          "type": "text",
+          "nullable": false,
+          "comment": "Stated reason for the return",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "returnDate",
+          "dbColumn": "return_date",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "When the return was processed",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "ReturnLineEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_return_doc_number', ['organizationId', 'documentNumber'], {\n  unique: true,\n}",
+        "['organizationId', 'originalSaleId']",
+        "['organizationId', 'sessionId']",
+        "['organizationId', 'branchId', 'returnDate']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ReturnLineEntity",
+      "tableName": "pos_return_lines",
+      "filePath": "apps/api/src/modules/pos/entities/return-line.entity.ts",
+      "extendsBase": true,
+      "comment": "Single item line in a return. References the original sale line. Stock added back to location.",
+      "columns": [
+        {
+          "property": "returnId",
+          "dbColumn": "return_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent return document",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "originalSaleLineId",
+          "dbColumn": "original_sale_line_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The original sale line being returned",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The item being returned",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Location where returned stock is placed back",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Quantity being returned (always positive)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Unit price at time of original sale",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineTotal",
+          "dbColumn": "line_total",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Total refund for this line (quantity x unitPrice)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "returnDoc",
+          "kind": "ManyToOne",
+          "target": "ReturnEntity"
+        }
+      ],
+      "indexes": [
+        "['returnId']",
+        "['originalSaleLineId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "RoleEntity",
+      "tableName": "roles",
+      "filePath": "apps/api/src/modules/auth/role.entity.ts",
+      "extendsBase": false,
+      "comment": "Named authorization role scoped to an organization (e.g. Admin, Cashier).",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Tenant that owns this role",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable role name, unique per org",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional longer explanation of the roles purpose",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isSystem",
+          "dbColumn": "is_system",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "comment": "If true, role was auto-created during org setup and cannot be deleted",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'name']"
+      ]
+    },
+    {
+      "className": "RolePermissionEntity",
+      "tableName": "role_permissions",
+      "filePath": "apps/api/src/modules/auth/role-permission.entity.ts",
+      "extendsBase": false,
+      "comment": "Join table linking a role to a permission. Determines which API actions a role can perform.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "roleId",
+          "dbColumn": "role_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The role receiving the permission",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "permissionId",
+          "dbColumn": "permission_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The permission being granted",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['roleId', 'permissionId']"
+      ]
+    },
+    {
+      "className": "SaleEntity",
+      "tableName": "pos_sales",
+      "filePath": "apps/api/src/modules/pos/entities/sale.entity.ts",
+      "extendsBase": true,
+      "comment": "Completed POS sale transaction with line items and payments. Can be fully or partially returned.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Auto-generated receipt number (e.g. SAL-20260425-00001)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The POS session this sale belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Optional customer linkage for loyalty/receivables",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "subtotal",
+          "dbColumn": "subtotal",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Sum of all line totals before tax",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "taxAmount",
+          "dbColumn": "tax_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total tax amount across all lines",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "totalAmount",
+          "dbColumn": "total_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Final amount after tax (subtotal + taxAmount)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "SaleStatus.COMPLETED",
+          "comment": "Current sale status (COMPLETED, RETURNED, PARTIALLY_RETURNED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "saleDate",
+          "dbColumn": "sale_date",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "Timestamp of the sale",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "SaleLineEntity"
+        },
+        {
+          "property": "payments",
+          "kind": "OneToMany",
+          "target": "PaymentEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_sale_doc_number', ['organizationId', 'documentNumber'], {\n  unique: true,\n}",
+        "['organizationId', 'sessionId']",
+        "['organizationId', 'branchId', 'saleDate']",
+        "['organizationId', 'customerId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "SaleLineEntity",
+      "tableName": "pos_sale_lines",
+      "filePath": "apps/api/src/modules/pos/entities/sale-line.entity.ts",
+      "extendsBase": true,
+      "comment": "Single item line in a POS sale. Stock deducted from the specified location on completion.",
+      "columns": [
+        {
+          "property": "saleId",
+          "dbColumn": "sale_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent sale transaction",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The product sold",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Inventory location from which stock was deducted",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Quantity sold",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Price per unit at time of sale",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineTotal",
+          "dbColumn": "line_total",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Total for this line (quantity x unitPrice)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "taxAmount",
+          "dbColumn": "tax_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Tax amount for this line",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "sale",
+          "kind": "ManyToOne",
+          "target": "SaleEntity"
+        }
+      ],
+      "indexes": [
+        "['saleId']",
+        "['itemId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "SalesManagerAssignmentEntity",
+      "tableName": "sales_manager_assignments",
+      "filePath": "apps/api/src/modules/sales-hierarchy/sales-manager-assignment.entity.ts",
+      "extendsBase": false,
+      "comment": "Links a user (sales manager) to a branch where they have managerial authority over sales.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The user assigned as sales manager",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The branch under this managers authority",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Organization scope",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedAt",
+          "dbColumn": "assigned_at",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "When the assignment was created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedBy",
+          "dbColumn": "assigned_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Who made the assignment",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['userId', 'branchId']"
+      ]
+    },
+    {
+      "className": "SalesmanAssignmentEntity",
+      "tableName": "salesman_assignments",
+      "filePath": "apps/api/src/modules/sales-hierarchy/salesman-assignment.entity.ts",
+      "extendsBase": false,
+      "comment": "Links a user (salesperson) to a branch where they are authorized to conduct sales.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The user assigned as a salesperson",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The branch where the user operates",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Organization scope for tenant isolation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedAt",
+          "dbColumn": "assigned_at",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Timestamp of assignment creation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedBy",
+          "dbColumn": "assigned_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Admin or manager who created this assignment",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['userId', 'branchId']"
+      ]
+    },
+    {
+      "className": "SessionReconciliationEntity",
+      "tableName": "pos_session_reconciliations",
+      "filePath": "apps/api/src/modules/pos/entities/session-reconciliation.entity.ts",
+      "extendsBase": true,
+      "comment": "End-of-session cash count reconciliation. Compares expected vs actual cash. Variance requires manager approval.",
+      "columns": [
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The session being reconciled",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "expectedCash",
+          "dbColumn": "expected_cash",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "System-calculated expected cash in the register",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "actualCash",
+          "dbColumn": "actual_cash",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Actual counted cash reported by the cashier",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "variance",
+          "dbColumn": "variance",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Difference: actualCash minus expectedCash (positive = over, negative = short)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "varianceApproved",
+          "dbColumn": "variance_approved",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "comment": "Whether a manager has approved the variance",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Manager who approved the variance",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the variance was approved",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "comment": "Explanation for the variance",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'sessionId'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ShowroomEntity",
+      "tableName": "showrooms",
+      "filePath": "apps/api/src/modules/inventory/location/showroom.entity.ts",
+      "extendsBase": true,
+      "comment": "Display/sales floor area linked to a branch and backed by a storage.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Showroom display name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "storageId",
+          "dbColumn": "storage_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to storages — the storage backing this showrooms inventory",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isMainShowroom",
+          "dbColumn": "is_main_showroom",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "If true, this is the branchs primary showroom",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "storage",
+          "kind": "ManyToOne",
+          "target": "StorageEntity"
+        },
+        {
+          "property": "branch",
+          "kind": "ManyToOne",
+          "target": "BranchEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['branchId', 'name']"
+      ]
+    },
+    {
+      "className": "StockAdjustmentEntity",
+      "tableName": "stock_adjustments",
+      "filePath": "apps/api/src/modules/inventory/adjustment/stock-adjustment.entity.ts",
+      "extendsBase": true,
+      "comment": "Document for correcting stock quantities at a location. Workflow: DRAFT → PENDING_APPROVAL → POSTED.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated document number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The location being adjusted",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reasonCode",
+          "dbColumn": "reason_code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Machine-readable reason (e.g. DAMAGE, RECOUNT, THEFT)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reasonDescription",
+          "dbColumn": "reason_description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Human-readable explanation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "AdjustmentStatus.DRAFT",
+          "comment": "Current workflow status (DRAFT, PENDING_APPROVAL, POSTED, CANCELLED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who approved the adjustment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When approved",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who posted the adjustment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When posted and ledger entries created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Additional notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "StockAdjustmentLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "StockAdjustmentLineEntity",
+      "tableName": "stock_adjustment_lines",
+      "filePath": "apps/api/src/modules/inventory/adjustment/stock-adjustment-line.entity.ts",
+      "extendsBase": false,
+      "comment": "Single item line in a stock adjustment. Quantity is signed: positive = increase, negative = decrease.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "adjustmentId",
+          "dbColumn": "adjustment_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent adjustment document",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The item being adjusted",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Signed quantity change: positive = increase, negative = decrease",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Per-line notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "adjustment",
+          "kind": "ManyToOne",
+          "target": "StockAdjustmentEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
+    },
+    {
+      "className": "StockBalanceEntity",
+      "tableName": "stock_balances",
+      "filePath": "apps/api/src/modules/inventory/ledger/stock-balance.entity.ts",
+      "extendsBase": true,
+      "comment": "Denormalized current stock quantity per item per location. Updated on every ledger posting.",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The item being tracked",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The location holding the stock",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Current on-hand quantity; can be negative in rare adjustment scenarios",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lastMovementAt",
+          "dbColumn": "last_movement_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "Timestamp of the most recent stock movement affecting this balance",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'branchId']"
+      ],
+      "uniques": [
+        "['organizationId', 'itemId', 'locationId']"
+      ]
+    },
+    {
+      "className": "StockLedgerEntryEntity",
+      "tableName": "stock_ledger_entries",
+      "filePath": "apps/api/src/modules/inventory/ledger/stock-ledger-entry.entity.ts",
+      "extendsBase": true,
+      "comment": "Immutable audit log of every stock movement. Append-only; corrections are offsetting entries.",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The item affected by this movement",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The location affected by this movement",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "movementType",
+          "dbColumn": "movement_type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Categorizes the reason for the stock change",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Signed quantity: positive = stock in, negative = stock out",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "referenceType",
+          "dbColumn": "reference_type",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Source document type (e.g. SALE, TRANSFER, ADJUSTMENT)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "referenceId",
+          "dbColumn": "reference_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "UUID of the source document",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional human-readable note",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "When this movement was financially posted",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'itemId', 'locationId']",
+        "['organizationId', 'branchId', 'createdAt']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "StockTransferEntity",
+      "tableName": "stock_transfers",
+      "filePath": "apps/api/src/modules/inventory/transfer/stock-transfer.entity.ts",
+      "extendsBase": true,
+      "comment": "Document authorizing movement of inventory between locations/branches. Workflow: DRAFT → APPROVED → POSTED.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated document number via DocumentNumberRule",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceLocationId",
+          "dbColumn": "source_location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Location from which stock is being sent",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "destinationLocationId",
+          "dbColumn": "destination_location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Location receiving the stock",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceBranchId",
+          "dbColumn": "source_branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Branch of the source location",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "destinationBranchId",
+          "dbColumn": "destination_branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Branch of the destination location",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "TransferStatus.DRAFT",
+          "comment": "Current workflow status (DRAFT, APPROVED, POSTED, CANCELLED)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who approved the transfer",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the transfer was approved",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "User who posted (finalized) the transfer",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "When the transfer was posted and ledger entries created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Free-text notes about the transfer",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "StockTransferLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "StockTransferLineEntity",
+      "tableName": "stock_transfer_lines",
+      "filePath": "apps/api/src/modules/inventory/transfer/stock-transfer-line.entity.ts",
+      "extendsBase": false,
+      "comment": "Single item line within a stock transfer document.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "transferId",
+          "dbColumn": "transfer_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent transfer document",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The item being transferred",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Quantity to transfer (always positive)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Per-line notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "transfer",
+          "kind": "ManyToOne",
+          "target": "StockTransferEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
+    },
+    {
+      "className": "StorageEntity",
+      "tableName": "storages",
+      "filePath": "apps/api/src/modules/inventory/location/storage.entity.ts",
+      "extendsBase": true,
+      "comment": "Physical warehouse or storage area within a branch. Contains multiple Locations.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Storage name (e.g. Main Warehouse, Back Storage)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isMainStorage",
+          "dbColumn": "is_main_storage",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "If true, this is the branchs default storage for receiving goods",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "branch",
+          "kind": "ManyToOne",
+          "target": "BranchEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['branchId', 'name']"
+      ]
+    },
+    {
+      "className": "StorageManagerAssignmentEntity",
+      "tableName": "storage_manager_assignments",
+      "filePath": "apps/api/src/modules/inventory/location/storage-manager-assignment.entity.ts",
+      "extendsBase": false,
+      "comment": "Assigns a user as a manager of a specific storage within a branch.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The user being assigned as storage manager",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The branch containing the storage",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "storageId",
+          "dbColumn": "storage_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The storage being managed",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Organization scope",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedAt",
+          "dbColumn": "assigned_at",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "When the assignment was created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedBy",
+          "dbColumn": "assigned_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Who made the assignment",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['userId', 'storageId']"
+      ]
+    },
+    {
+      "className": "UserBranchAssignmentEntity",
+      "tableName": "user_branch_assignments",
+      "filePath": "apps/api/src/modules/branch/user-branch-assignment.entity.ts",
+      "extendsBase": false,
+      "comment": "Associates a user with a branch they are authorized to operate in.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The user being assigned to a branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The target branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Organization scope for tenant isolation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedAt",
+          "dbColumn": "assigned_at",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "When the assignment was created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedBy",
+          "dbColumn": "assigned_by",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Admin user who made the assignment",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['userId', 'branchId']"
+      ]
+    },
+    {
+      "className": "UserEntity",
+      "tableName": "users",
+      "filePath": "apps/api/src/modules/auth/user.entity.ts",
+      "extendsBase": false,
+      "comment": "Human operator who can authenticate and perform actions in the system.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Tenant the user belongs to; used for row-level security filtering",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "email",
+          "dbColumn": "email",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Login email address; unique within the organization",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "passwordHash",
+          "dbColumn": "password_hash",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Bcrypt hash of the users password; never exposed via API",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "firstName",
+          "dbColumn": "first_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Users given name, shown in UI and reports",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lastName",
+          "dbColumn": "last_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Users family name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "comment": "When false the user cannot log in or perform any action; acts as a soft-delete",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lastLoginAt",
+          "dbColumn": "last_login_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "Timestamp of the users most recent successful authentication",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['email', 'organizationId']"
+      ]
+    },
+    {
+      "className": "UserRoleEntity",
+      "tableName": "user_roles",
+      "filePath": "apps/api/src/modules/auth/user-role.entity.ts",
+      "extendsBase": false,
+      "comment": "Join table linking a user to a role within an organization.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The user receiving the role",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "roleId",
+          "dbColumn": "role_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The role being assigned",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Organization context for this assignment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedAt",
+          "dbColumn": "assigned_at",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "When the role was assigned",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['userId', 'roleId', 'organizationId']"
+      ]
+    }
+  ]
+}

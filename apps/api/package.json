@@ -10,9 +10,13 @@
     "lint": "echo lint",
     "test": "jest",
     "test:e2e": "jest --config ./test/e2e/jest-e2e.config.ts",
-    "migration:generate": "typeorm migration:generate",
-    "migration:run": "typeorm migration:run",
-    "migration:revert": "typeorm migration:revert"
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
+    "migration:create": "typeorm migration:create",
+    "schema:sync": "typeorm-ts-node-commonjs schema:sync -d src/database/data-source.ts",
+    "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/database/data-source.ts"
   },
   "dependencies": {
     "@erp/shared-interfaces": "workspace:*",

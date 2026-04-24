@@ -42,6 +42,21 @@ This folder contains the enterprise-ready blueprint for building an ERP system w
 - [Realtime WebSocket Service](./20-realtime-websocket-service.md)
 - [Generic CRUD Platform](./21-generic-crud-platform.md)
 
+### Entity Schema Reference
+
+Comprehensive per-field documentation of all 45 TypeORM entities, designed for
+code-generation agents and developers:
+
+- **[Entity Docs Index](./entities/README.md)** — overview, ER diagram, conventions
+- [Auth Entities](./entities/01-auth.md) — User, Role, Permission, UserRole, RolePermission
+- [Organization & Branch](./entities/02-organization-branch.md) — Organization, Branch, UserBranchAssignment, RegistrationRequest
+- [Customer](./entities/03-customer.md) — Customer (with merge workflow)
+- [Sales Hierarchy](./entities/04-sales-hierarchy.md) — SalesmanAssignment, SalesManagerAssignment
+- [Document Numbering](./entities/05-document-numbering.md) — DocumentNumberRule, DocumentNumberCounter
+- [Inventory](./entities/06-inventory.md) — Item, Storage, Showroom, Location, StockBalance, StockLedgerEntry, StockTransfer, StockAdjustment, ImportJob
+- [Accounting](./entities/07-accounting.md) — Account, JournalEntry, JournalLine, CashAccount, CashMovement, Payable, Receivable, Expense
+- [POS](./entities/08-pos.md) — PosSession, Sale, SaleLine, Payment, Return, ReturnLine, SessionReconciliation
+
 ## Documentation Conventions
 
 - `branchId` is mandatory for branch-scoped operational data.

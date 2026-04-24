@@ -9,10 +9,26 @@
     "dev:backoffice": "pnpm --filter @erp/backoffice-web dev",
     "dev:pos": "pnpm --filter @erp/pos-web dev",
     "test:e2e": "pnpm --filter @erp/api test:e2e",
-    "contract:check": "npx ts-node scripts/contract-check.ts"
+    "migration:generate": "cd apps/api && npx typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
+    "migration:run": "pnpm --filter @erp/api migration:run",
+    "migration:revert": "pnpm --filter @erp/api migration:revert",
+    "migration:show": "pnpm --filter @erp/api migration:show",
+    "migration:create": "cd apps/api && npx typeorm-ts-node-commonjs migration:create",
+    "schema:sync": "pnpm --filter @erp/api schema:sync",
+    "schema:drop": "pnpm --filter @erp/api schema:drop",
+    "contract:check": "npx ts-node scripts/contract-check.ts",
+    "docs:entities:manifest": "npx ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/generate-entity-docs.ts",
+    "docs:entities:markdown": "node scripts/generate-entity-markdown.js",
+    "docs:entities": "pnpm docs:entities:manifest && pnpm docs:entities:markdown",
+    "entity:visual": "typeorm-visual create",
+    "entity:visual:generate": "typeorm-visual generate"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@10.18.1"
+  "packageManager": "pnpm@10.18.1",
+  "devDependencies": {
+    "typeorm-visual": "^1.0.0",
+    "typescript": "^5.9.3"
+  }
 }
