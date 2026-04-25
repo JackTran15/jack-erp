@@ -1,28 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import type {
   CrudEntityConfig,
-  PaginatedResponse,
   FieldDefinition,
 } from "@erp/shared-interfaces";
-import { useCrudApi } from "./useCrudApi";
+import { Button, Input } from "@erp/ui";
+import {
+  useCrudConfig,
+  useCrudRecords,
+  useCrudCreate,
+  useCrudUpdate,
+  useCrudDelete,
+} from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
 import { CrudDetailView } from "./CrudDetailView";
+import { formatCustomerStatus } from "../../lib/customer-display";
 
 export function CrudListPage() {
   const { entityKey } = useParams<{ entityKey: string }>();
-  const {
-    config,
-    loading: configLoading,
-    error: configError,
-    fetchRecords,
-    createRecord,
-    updateRecord,
-    deleteRecord,
-  } = useCrudApi(entityKey!);
 
-  const [records, setRecords] = useState<PaginatedResponse<Record<string, unknown>> | null>(null);
-  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [sortBy, setSortBy] = useState<string | undefined>();
@@ -35,31 +31,23 @@ export function CrudListPage() {
   const [editingRecord, setEditingRecord] = useState<Record<string, unknown> | null>(null);
   const [detailRecord, setDetailRecord] = useState<Record<string, unknown> | null>(null);
 
-  const reload = useCallback(async () => {
-    if (!config) return;
-    setLoading(true);
-    try {
-      const result = await fetchRecords({
-        page,
-        pageSize,
-        sortBy,
-        sortOrder,
-        search,
-        filters,
-      });
-      setRecords(result);
-    } finally {
-      setLoading(false);
-    }
-  }, [config, fetchRecords, page, pageSize, sortBy, sortOrder, search, filters]);
+  const { data: config, isLoading: configLoading, error: configError } = useCrudConfig(entityKey!);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  const {
+    data: records,
+    isLoading: loading,
+  } = useCrudRecords(
+    entityKey!,
+    { page, pageSize, sortBy, sortOrder, search, filters },
+    !!config,
+  );
+
+  const createMutation = useCrudCreate(entityKey!);
+  const updateMutation = useCrudUpdate(entityKey!);
+  const deleteMutation = useCrudDelete(entityKey!);
 
   useEffect(() => {
     setPage(1);
-    setRecords(null);
     setSortBy(undefined);
     setSortOrder("desc");
     setSearch("");
@@ -67,9 +55,9 @@ export function CrudListPage() {
     setFilters({});
   }, [entityKey]);
 
-  if (configLoading) return <PageShell><p>Loading configuration…</p></PageShell>;
-  if (configError) return <PageShell><p style={{ color: "var(--danger)" }}>Error: {configError}</p></PageShell>;
-  if (!config) return <PageShell><p>Entity not found.</p></PageShell>;
+  if (configLoading) return <PageShell><p>Đang tải cấu hình…</p></PageShell>;
+  if (configError) return <PageShell><p className="text-destructive">Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}</p></PageShell>;
+  if (!config) return <PageShell><p>Không tìm thấy thực thể.</p></PageShell>;
 
   const totalPages = records ? Math.ceil(records.total / pageSize) : 0;
 
@@ -100,19 +88,20 @@ export function CrudListPage() {
 
   const handleDelete = async (rec: Record<string, unknown>) => {
     const id = String(rec[config.idField]);
-    if (!window.confirm(`Delete this ${config.displayName}?`)) return;
-    await deleteRecord(id);
-    reload();
+    if (!window.confirm(`Xoá ${config.displayName} này?`)) return;
+    await deleteMutation.mutateAsync(id);
   };
 
   const handleFormSubmit = async (data: Record<string, unknown>) => {
     if (editingRecord) {
-      await updateRecord(String(editingRecord[config.idField]), data);
+      await updateMutation.mutateAsync({
+        id: String(editingRecord[config.idField]),
+        body: data,
+      });
     } else {
-      await createRecord(data);
+      await createMutation.mutateAsync(data);
     }
     setFormOpen(false);
-    reload();
   };
 
   const handleFilterChange = (key: string, value: unknown) => {
@@ -130,40 +119,38 @@ export function CrudListPage() {
 
   return (
     <PageShell>
-      <div style={styles.header}>
-        <h1 style={styles.title}>{config.displayName}</h1>
-        <button style={styles.btnPrimary} onClick={handleCreate}>
-          + New
-        </button>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{config.displayName}</h1>
+        <Button onClick={handleCreate}>+ Thêm mới</Button>
       </div>
 
       {/* Search */}
-      <form onSubmit={handleSearchSubmit} style={styles.searchRow}>
-        <input
-          style={styles.searchInput}
+      <form onSubmit={handleSearchSubmit} className="mb-3 flex gap-2">
+        <Input
+          className="flex-1"
           type="text"
-          placeholder={`Search ${config.displayName}…`}
+          placeholder={`Tìm ${config.displayName}…`}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
-        <button type="submit" style={styles.btnSecondary}>
-          Search
-        </button>
+        <Button type="submit" variant="outline">
+          Tìm
+        </Button>
       </form>
 
       {/* Filters */}
       {config.filterDefinitions.length > 0 && (
-        <div style={styles.filterRow}>
+        <div className="mb-4 flex flex-wrap gap-3">
           {config.filterDefinitions.map((fd) => (
-            <label key={fd.key} style={styles.filterLabel}>
+            <label key={fd.key} className="flex flex-col gap-1 text-xs">
               {fd.label}
               {fd.type === "select" && fd.options ? (
                 <select
-                  style={styles.filterSelect}
+                  className="rounded border border-input px-2 py-1.5 text-sm"
                   value={String(filters[fd.key] ?? "")}
                   onChange={(e) => handleFilterChange(fd.key, e.target.value)}
                 >
-                  <option value="">All</option>
+                  <option value="">Tất cả</option>
                   {fd.options.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -172,17 +159,17 @@ export function CrudListPage() {
                 </select>
               ) : fd.type === "boolean" ? (
                 <select
-                  style={styles.filterSelect}
+                  className="rounded border border-input px-2 py-1.5 text-sm"
                   value={String(filters[fd.key] ?? "")}
                   onChange={(e) => handleFilterChange(fd.key, e.target.value)}
                 >
-                  <option value="">All</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
+                  <option value="">Tất cả</option>
+                  <option value="true">Có</option>
+                  <option value="false">Không</option>
                 </select>
               ) : (
-                <input
-                  style={styles.filterInput}
+                <Input
+                  className="h-8 w-36 text-sm"
                   type="text"
                   value={String(filters[fd.key] ?? "")}
                   onChange={(e) => handleFilterChange(fd.key, e.target.value)}
@@ -194,52 +181,56 @@ export function CrudListPage() {
       )}
 
       {/* Table */}
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
               {config.fields.map((f) => (
                 <Th key={f.key} field={f} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
               ))}
-              <th style={styles.th}>Actions</th>
+              <th className="whitespace-nowrap border-b-2 border-border bg-muted/50 px-3 py-2.5 text-left text-xs font-semibold">
+                Thao tác
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={config.fields.length + 1} style={styles.tdCenter}>
-                  Loading…
+                <td colSpan={config.fields.length + 1} className="px-3 py-6 text-center text-muted-foreground">
+                  Đang tải…
                 </td>
               </tr>
             )}
             {!loading && records && records.data.length === 0 && (
               <tr>
-                <td colSpan={config.fields.length + 1} style={styles.tdCenter}>
-                  No records found.
+                <td colSpan={config.fields.length + 1} className="px-3 py-6 text-center text-muted-foreground">
+                  Không có bản ghi.
                 </td>
               </tr>
             )}
             {!loading &&
               records?.data.map((rec) => (
-                <tr key={String(rec[config.idField])} style={styles.tr}>
+                <tr key={String(rec[config.idField])} className="border-b border-border/50">
                   {config.fields.map((f) => (
-                    <td key={f.key} style={styles.td}>
+                    <td key={f.key} className="px-3 py-2.5 align-middle">
                       {formatCell(rec[f.key], f)}
                     </td>
                   ))}
-                  <td style={styles.td}>
-                    <button style={styles.btnLink} onClick={() => setDetailRecord(rec)}>
-                      View
-                    </button>
-                    <button style={styles.btnLink} onClick={() => handleEdit(rec)}>
-                      Edit
-                    </button>
-                    <button
-                      style={{ ...styles.btnLink, color: "var(--danger, #d32f2f)" }}
+                  <td className="px-3 py-2.5 align-middle">
+                    <Button variant="link" size="sm" className="h-auto px-1 py-0" onClick={() => setDetailRecord(rec)}>
+                      Xem
+                    </Button>
+                    <Button variant="link" size="sm" className="h-auto px-1 py-0" onClick={() => handleEdit(rec)}>
+                      Sửa
+                    </Button>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto px-1 py-0 text-destructive"
                       onClick={() => handleDelete(rec)}
                     >
-                      Delete
-                    </button>
+                      Xoá
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -249,24 +240,26 @@ export function CrudListPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={styles.pagination}>
-          <button
-            style={styles.btnSecondary}
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            Prev
-          </button>
-          <span style={styles.pageInfo}>
-            Page {page} of {totalPages} ({records?.total} records)
+            Trước
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Trang {page} / {totalPages} ({records?.total} bản ghi)
           </span>
-          <button
-            style={styles.btnSecondary}
+          <Button
+            variant="outline"
+            size="sm"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
-            Next
-          </button>
+            Sau
+          </Button>
         </div>
       )}
 
@@ -293,7 +286,7 @@ export function CrudListPage() {
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div style={styles.page}>{children}</div>;
+  return <div className="mx-auto max-w-[1200px] px-4 py-6">{children}</div>;
 }
 
 function Th({
@@ -309,8 +302,11 @@ function Th({
 }) {
   const active = sortBy === field.key;
   return (
-    <th style={styles.th} onClick={() => onSort(field.key)}>
-      <span style={{ cursor: "pointer", userSelect: "none" }}>
+    <th
+      className="whitespace-nowrap border-b-2 border-border bg-muted/50 px-3 py-2.5 text-left text-xs font-semibold"
+      onClick={() => onSort(field.key)}
+    >
+      <span className="cursor-pointer select-none">
         {field.label}
         {active ? (sortOrder === "asc" ? " ▲" : " ▼") : ""}
       </span>
@@ -318,100 +314,26 @@ function Th({
   );
 }
 
-function formatCell(value: unknown, field: FieldDefinition): string {
+function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
   if (value === null || value === undefined) return "—";
-  if (field.type === "boolean") return value ? "Yes" : "No";
+  if (field.type === "boolean") {
+    return (
+      <input
+        type="checkbox"
+        checked={Boolean(value)}
+        disabled
+        readOnly
+        className="h-5 w-5 rounded border-2 border-input accent-primary cursor-default disabled:opacity-70"
+      />
+    );
+  }
+  if (field.key === "status") return formatCustomerStatus(value);
   if (field.type === "date") {
     try {
-      return new Date(String(value)).toLocaleDateString();
+      return new Date(String(value)).toLocaleDateString("vi-VN");
     } catch {
       return String(value);
     }
   }
   return String(value);
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "24px 16px",
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  title: { margin: 0, fontSize: 24, fontWeight: 600 },
-  searchRow: { display: "flex", gap: 8, marginBottom: 12 },
-  searchInput: {
-    flex: 1,
-    padding: "8px 12px",
-    fontSize: 14,
-    border: "1px solid #d0d5dd",
-    borderRadius: 6,
-    outline: "none",
-  },
-  filterRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 16,
-  },
-  filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, gap: 4 },
-  filterSelect: { padding: "6px 8px", borderRadius: 4, border: "1px solid #d0d5dd" },
-  filterInput: { padding: "6px 8px", borderRadius: 4, border: "1px solid #d0d5dd", width: 140 },
-  tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
-  th: {
-    textAlign: "left",
-    padding: "10px 12px",
-    borderBottom: "2px solid #e4e7ec",
-    background: "#f9fafb",
-    fontWeight: 600,
-    fontSize: 13,
-    whiteSpace: "nowrap",
-  },
-  tr: { borderBottom: "1px solid #f2f4f7" },
-  td: { padding: "10px 12px", verticalAlign: "middle" },
-  tdCenter: { padding: "24px 12px", textAlign: "center", color: "#667085" },
-  pagination: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    marginTop: 16,
-  },
-  pageInfo: { fontSize: 13, color: "#667085" },
-  btnPrimary: {
-    padding: "8px 16px",
-    background: "#1570ef",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  btnSecondary: {
-    padding: "6px 14px",
-    background: "#fff",
-    color: "#344054",
-    border: "1px solid #d0d5dd",
-    borderRadius: 6,
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  btnLink: {
-    background: "none",
-    border: "none",
-    color: "#1570ef",
-    fontSize: 13,
-    cursor: "pointer",
-    padding: "2px 6px",
-    textDecoration: "underline",
-  },
-};

@@ -15,6 +15,8 @@ export interface FieldDefinition {
   label: string;
   type: 'string' | 'number' | 'boolean' | 'date' | 'enum' | 'relation';
   required?: boolean;
+  /** When true, value is shown in tables but omitted from create/edit forms. */
+  readOnly?: boolean;
   enumValues?: string[];
   relationEntity?: string;
 }

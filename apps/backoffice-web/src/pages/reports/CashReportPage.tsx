@@ -1,11 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
-import type { CashReconciliation } from "@erp/shared-interfaces";
+import { useState } from "react";
+import { useCashReconciliation } from "../../hooks/useReportData";
 
 export function CashReportPage() {
-  const [data, setData] = useState<CashReconciliation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -16,33 +12,15 @@ export function CashReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (branchId) params.set("branchId", branchId);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      const qs = params.toString();
-      const result = await http.get<CashReconciliation[]>(
-        `/reports/cash-reconciliation${qs ? `?${qs}` : ""}`,
-      );
-      setData(result);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId, startDate, endDate]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data = [], isLoading: loading, error, refetch } = useCashReconciliation({
+    branchId: branchId || undefined,
+    startDate,
+    endDate,
+  });
 
   const handleExportCsv = () => {
     if (data.length === 0) return;
-    const headers = ["Session ID", "Branch", "Expected", "Actual", "Discrepancy", "Reconciled At"];
+    const headers = ["Phiên", "Chi nhánh", "Dự kiến", "Thực tế", "Chênh lệch", "Đối soát lúc"];
     const rows = data.map((r) => [
       r.sessionId,
       r.branchId,
@@ -66,32 +44,32 @@ export function CashReportPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Cash Reconciliation</h1>
+        <h1 style={styles.title}>Đối soát quỹ</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={data.length === 0}>
-          Export CSV
+          Xuất CSV
         </button>
       </div>
 
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
-          Branch ID
-          <input style={styles.input} type="text" placeholder="All branches" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          ID chi nhánh
+          <input style={styles.input} type="text" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={styles.filterLabel}>
-          Start Date
+          Từ ngày
           <input style={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </label>
         <label style={styles.filterLabel}>
-          End Date
+          Đến ngày
           <input style={styles.input} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </label>
-        <button style={styles.btn} onClick={fetchData}>Refresh</button>
+        <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {loading && <p style={styles.muted}>Loading…</p>}
+      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
+      {loading && <p style={styles.muted}>Đang tải…</p>}
 
-      {!loading && data.length === 0 && <p style={styles.muted}>No reconciliation records found.</p>}
+      {!loading && data.length === 0 && <p style={styles.muted}>Không có bản ghi đối soát.</p>}
 
       {data.length > 0 && (
         <>
@@ -99,12 +77,12 @@ export function CashReportPage() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Session ID</th>
-                  <th style={styles.th}>Branch</th>
-                  <th style={styles.thRight}>Expected</th>
-                  <th style={styles.thRight}>Actual</th>
-                  <th style={styles.thRight}>Variance</th>
-                  <th style={styles.th}>Reconciled At</th>
+                  <th style={styles.th}>ID phiên</th>
+                  <th style={styles.th}>Chi nhánh</th>
+                  <th style={styles.thRight}>Dự kiến</th>
+                  <th style={styles.thRight}>Thực tế</th>
+                  <th style={styles.thRight}>Chênh lệch</th>
+                  <th style={styles.th}>Đối soát lúc</th>
                 </tr>
               </thead>
               <tbody>
@@ -124,7 +102,7 @@ export function CashReportPage() {
                       {fmt(row.discrepancy)}
                     </td>
                     <td style={styles.td}>
-                      {new Date(row.reconciledAt).toLocaleString()}
+                      {new Date(row.reconciledAt).toLocaleString("vi-VN")}
                     </td>
                   </tr>
                 ))}
@@ -132,7 +110,7 @@ export function CashReportPage() {
               <tfoot>
                 <tr style={{ background: "#f9fafb" }}>
                   <td colSpan={4} style={{ ...styles.td, fontWeight: 700 }}>
-                    Total Variance
+                    Tổng chênh lệch
                   </td>
                   <td
                     style={{
@@ -155,7 +133,7 @@ export function CashReportPage() {
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "USD" }).format(n);
 }
 
 const styles: Record<string, React.CSSProperties> = {

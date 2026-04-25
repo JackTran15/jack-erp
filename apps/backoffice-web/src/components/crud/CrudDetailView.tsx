@@ -1,4 +1,7 @@
-import type { CrudEntityConfig } from "@erp/shared-interfaces";
+import type React from "react";
+import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
+import { Button } from "@erp/ui";
+import { formatCustomerStatus } from "../../lib/customer-display";
 
 interface CrudDetailViewProps {
   config: CrudEntityConfig;
@@ -12,20 +15,33 @@ export function CrudDetailView({
   onClose,
 }: CrudDetailViewProps) {
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.header}>
-          <h2 style={styles.title}>{config.displayName} Detail</h2>
-          <button style={styles.closeBtn} onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/40 pt-20"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[80vh] w-full max-w-[600px] overflow-y-auto rounded-xl bg-background px-7 py-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Chi tiết {config.displayName}</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            onClick={onClose}
+          >
             ×
-          </button>
+          </Button>
         </div>
 
-        <dl style={styles.list}>
+        <dl className="m-0">
           {config.fields.map((f) => (
-            <div key={f.key} style={styles.row}>
-              <dt style={styles.dt}>{f.label}</dt>
-              <dd style={styles.dd}>{formatValue(record[f.key], f.type)}</dd>
+            <div key={f.key} className="flex border-b border-border/50 py-2.5">
+              <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">
+                {f.label}
+              </dt>
+              <dd className="m-0 text-sm text-foreground">{formatValue(record[f.key], f)}</dd>
             </div>
           ))}
         </dl>
@@ -34,67 +50,26 @@ export function CrudDetailView({
   );
 }
 
-function formatValue(value: unknown, type: string): string {
+function formatValue(value: unknown, field: FieldDefinition): React.ReactNode {
   if (value === null || value === undefined) return "—";
-  if (type === "boolean") return value ? "Yes" : "No";
-  if (type === "date") {
+  if (field.key === "status") return formatCustomerStatus(value);
+  if (field.type === "boolean") {
+    return (
+      <input
+        type="checkbox"
+        checked={Boolean(value)}
+        disabled
+        readOnly
+        className="h-5 w-5 rounded border-2 border-input accent-primary cursor-default disabled:opacity-70"
+      />
+    );
+  }
+  if (field.type === "date") {
     try {
-      return new Date(String(value)).toLocaleString();
+      return new Date(String(value)).toLocaleString("vi-VN");
     } catch {
       return String(value);
     }
   }
   return String(value);
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.4)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    paddingTop: 80,
-    zIndex: 1000,
-  },
-  dialog: {
-    background: "#fff",
-    borderRadius: 12,
-    padding: "24px 28px",
-    width: "100%",
-    maxWidth: 600,
-    maxHeight: "80vh",
-    overflowY: "auto",
-    boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  title: { margin: 0, fontSize: 20, fontWeight: 600 },
-  closeBtn: {
-    background: "none",
-    border: "none",
-    fontSize: 24,
-    cursor: "pointer",
-    color: "#667085",
-    lineHeight: 1,
-  },
-  list: { margin: 0 },
-  row: {
-    display: "flex",
-    padding: "10px 0",
-    borderBottom: "1px solid #f2f4f7",
-  },
-  dt: {
-    width: 180,
-    flexShrink: 0,
-    fontWeight: 500,
-    fontSize: 13,
-    color: "#667085",
-  },
-  dd: { margin: 0, fontSize: 14, color: "#101828" },
-};

@@ -1,52 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
-import type { AgingReport } from "@erp/shared-interfaces";
+import { useState } from "react";
+import { useReceivablesAging, usePayablesAging } from "../../hooks/useReportData";
 
 type ReportType = "receivables" | "payables";
 
 export function AgingReportPage() {
   const [reportType, setReportType] = useState<ReportType>("receivables");
-  const [data, setData] = useState<AgingReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (branchId) params.set("branchId", branchId);
-      const qs = params.toString();
-      const endpoint =
-        reportType === "receivables"
-          ? "receivables-aging"
-          : "payables-aging";
-      const result = await http.get<AgingReport>(
-        `/reports/${endpoint}${qs ? `?${qs}` : ""}`,
-      );
-      setData(result);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [reportType, branchId]);
+  const params = { branchId: branchId || undefined };
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const receivables = useReceivablesAging(params);
+  const payables = usePayablesAging(params);
+  const active = reportType === "receivables" ? receivables : payables;
+
+  const { data, isLoading: loading, error, refetch } = active;
 
   const handleExportCsv = () => {
     if (!data) return;
-    const headers = ["Bucket", "Amount"];
+    const headers = ["Kỳ", "Số tiền"];
     const rows = [
-      ["Current", data.current],
-      ["1-30 days", data.days30],
-      ["31-60 days", data.days60],
-      ["61-90 days", data.days90],
-      ["Over 90 days", data.over90],
-      ["Total", data.total],
+      ["Hiện hành", data.current],
+      ["1-30 ngày", data.days30],
+      ["31-60 ngày", data.days60],
+      ["61-90 ngày", data.days90],
+      ["Trên 90 ngày", data.over90],
+      ["Tổng", data.total],
     ];
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -61,66 +39,66 @@ export function AgingReportPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Aging Report</h1>
+        <h1 style={styles.title}>Báo cáo tuổi nợ</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={!data}>
-          Export CSV
+          Xuất CSV
         </button>
       </div>
 
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
-          Type
+          Loại
           <select
             style={styles.input}
             value={reportType}
             onChange={(e) => setReportType(e.target.value as ReportType)}
           >
-            <option value="receivables">Receivables</option>
-            <option value="payables">Payables</option>
+            <option value="receivables">Phải thu</option>
+            <option value="payables">Phải trả</option>
           </select>
         </label>
         <label style={styles.filterLabel}>
-          Branch ID
-          <input style={styles.input} type="text" placeholder="All branches" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          ID chi nhánh
+          <input style={styles.input} type="text" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
-        <button style={styles.btn} onClick={fetchData}>Refresh</button>
+        <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {loading && <p style={styles.muted}>Loading…</p>}
+      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
+      {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Aging Bucket</th>
-                <th style={styles.thRight}>Amount</th>
+                <th style={styles.th}>Kỳ nợ</th>
+                <th style={styles.thRight}>Số tiền</th>
               </tr>
             </thead>
             <tbody>
               <tr style={styles.tr}>
-                <td style={styles.td}>Current (not yet due)</td>
+                <td style={styles.td}>Hiện hành (chưa đến hạn)</td>
                 <td style={styles.tdRight}>{fmt(data.current)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>1 – 30 days overdue</td>
+                <td style={styles.td}>Quá hạn 1 – 30 ngày</td>
                 <td style={styles.tdRight}>{fmt(data.days30)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>31 – 60 days overdue</td>
+                <td style={styles.td}>Quá hạn 31 – 60 ngày</td>
                 <td style={styles.tdRight}>{fmt(data.days60)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>61 – 90 days overdue</td>
+                <td style={styles.td}>Quá hạn 61 – 90 ngày</td>
                 <td style={styles.tdRight}>{fmt(data.days90)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Over 90 days overdue</td>
+                <td style={styles.td}>Quá hạn trên 90 ngày</td>
                 <td style={styles.tdRight}>{fmt(data.over90)}</td>
               </tr>
               <tr style={{ ...styles.tr, background: "#f9fafb" }}>
-                <td style={{ ...styles.td, fontWeight: 700 }}>Total Outstanding</td>
+                <td style={{ ...styles.td, fontWeight: 700 }}>Tổng còn nợ</td>
                 <td style={{ ...styles.tdRight, fontWeight: 700 }}>{fmt(data.total)}</td>
               </tr>
             </tbody>
@@ -130,8 +108,8 @@ export function AgingReportPage() {
 
       {data && (
         <p style={styles.generatedAt}>
-          Generated at: {new Date(data.generatedAt).toLocaleString()}
-          {data.branchId ? ` | Branch: ${data.branchId}` : " | Consolidated"}
+          Tạo lúc: {new Date(data.generatedAt).toLocaleString("vi-VN")}
+          {data.branchId ? ` | Chi nhánh: ${data.branchId}` : " | Gộp toàn hệ thống"}
         </p>
       )}
     </div>
@@ -139,7 +117,7 @@ export function AgingReportPage() {
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "USD" }).format(n);
 }
 
 const styles: Record<string, React.CSSProperties> = {

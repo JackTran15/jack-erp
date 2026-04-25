@@ -1,5 +1,6 @@
-import { Entity, Column, Unique } from 'typeorm';
+import { Entity, Column, Unique, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
+import { ProviderEntity } from './provider.entity';
 
 /** A stockable product or material tracked in inventory. Identified by unique code per organization. */
 @Entity('items')
@@ -22,4 +23,17 @@ export class ItemEntity extends BaseEntity {
 
   @Column({ name: 'is_active', default: true, comment: 'When false, item cannot be used in new transactions' })
   isActive: boolean;
+
+  @Column({ name: 'purchase_price', type: 'decimal', precision: 18, scale: 2, default: 0, comment: 'Default purchase (cost) price per unit' })
+  purchasePrice: number;
+
+  @Column({ name: 'selling_price', type: 'decimal', precision: 18, scale: 2, default: 0, comment: 'Default selling price per unit' })
+  sellingPrice: number;
+
+  @Column({ name: 'provider_id', type: 'uuid', comment: 'FK to inventory_providers — the supplier for this item' })
+  providerId: string;
+
+  @ManyToOne(() => ProviderEntity, { nullable: false })
+  @JoinColumn({ name: 'provider_id' })
+  provider?: ProviderEntity;
 }

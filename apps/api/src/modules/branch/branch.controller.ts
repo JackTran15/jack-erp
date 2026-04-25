@@ -8,15 +8,23 @@ import {
   Body,
   Query,
   ParseUUIDPipe,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
-import { PaginationQuery } from '@erp/shared-interfaces';
+import { PaginationQuery, RegistrationStatus } from '@erp/shared-interfaces';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { BranchService } from './branch.service';
 import { CreateBranchDto, UpdateBranchDto } from './dto';
+import { RegistrationService } from '../registration/registration.service';
+import { RegistrationType } from '../registration/registration-request.entity';
 
 @Controller('branches')
 export class BranchController {
-  constructor(private readonly branchService: BranchService) {}
+  constructor(
+    private readonly branchService: BranchService,
+    @Inject(forwardRef(() => RegistrationService))
+    private readonly registrationService: RegistrationService,
+  ) {}
 
   @Post()
   create(
@@ -46,6 +54,33 @@ export class BranchController {
   @Get('main')
   findMainBranch(@Actor() actor: ActorContext) {
     return this.branchService.findMainBranch(actor);
+  }
+
+  /** Must be before @Get(':id') so "registration-requests" is not parsed as a UUID. */
+  @Get('registration-requests')
+  listBranchRegistrationRequests(
+    @Query() query: PaginationQuery & { status?: RegistrationStatus },
+    @Actor() actor: ActorContext,
+  ) {
+    return this.registrationService.list(
+      {
+        page: Number(query.page) || 1,
+        pageSize: Number(query.pageSize) || 20,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+        status: query.status,
+        type: RegistrationType.BRANCH,
+      },
+      actor,
+    );
+  }
+
+  @Get('users/:userId/branches')
+  getUserBranches(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.branchService.getUserBranches(userId, actor);
   }
 
   @Get(':id')
@@ -97,13 +132,5 @@ export class BranchController {
     @Actor() actor: ActorContext,
   ) {
     return this.branchService.unassignUser(branchId, userId, actor);
-  }
-
-  @Get('users/:userId/branches')
-  getUserBranches(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.branchService.getUserBranches(userId, actor);
   }
 }

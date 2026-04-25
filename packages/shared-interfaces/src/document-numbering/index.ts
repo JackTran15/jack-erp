@@ -7,6 +7,8 @@ export enum DocumentType {
   JOURNAL = 'JOURNAL',
   PAYABLE = 'PAYABLE',
   RECEIVABLE = 'RECEIVABLE',
+  PURCHASE_ORDER = 'PURCHASE_ORDER',
+  GOODS_ISSUE = 'GOODS_ISSUE',
 }
 
 export interface DocumentNumberRule {

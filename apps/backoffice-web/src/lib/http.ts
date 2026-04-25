@@ -1,3 +1,6 @@
+import { AxiosError } from "axios";
+import { apiClient } from "./api-axios";
+
 export interface ApiError {
   status: number;
   code: string;
@@ -12,52 +15,33 @@ export class HttpError extends Error {
   }
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
-
-function getAuthToken(): string | null {
-  return localStorage.getItem("access_token");
+function toHttpError(err: unknown): never {
+  if (err instanceof AxiosError && err.response) {
+    const body = err.response.data;
+    const apiErr: ApiError =
+      body && typeof body === "object" && "message" in body
+        ? (body as ApiError)
+        : {
+            status: err.response.status,
+            code: "UNKNOWN",
+            message: err.response.statusText || `HTTP ${err.response.status}`,
+          };
+    throw new HttpError(apiErr);
+  }
+  throw err;
 }
 
-function uuid(): string {
-  return crypto.randomUUID();
-}
-
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-Request-Id": uuid(),
-  };
-
-  const token = getAuthToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  try {
+    const res = await apiClient.request<T>({
+      method,
+      url: path,
+      data: body,
+    });
+    return res.data;
+  } catch (err) {
+    toHttpError(err);
   }
-
-  if (method !== "GET") {
-    headers["X-Idempotency-Key"] = uuid();
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  if (!res.ok) {
-    const error: ApiError = await res.json().catch(() => ({
-      status: res.status,
-      code: "UNKNOWN",
-      message: res.statusText,
-    }));
-    throw new HttpError(error);
-  }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 export const http = {

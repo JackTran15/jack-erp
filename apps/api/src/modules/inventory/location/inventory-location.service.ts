@@ -11,6 +11,7 @@ import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
 import { ItemEntity } from './item.entity';
+import { ProviderEntity } from './provider.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
 import { LocationEntity } from './location.entity';
@@ -35,6 +36,8 @@ export class InventoryLocationService {
   constructor(
     @InjectRepository(ItemEntity)
     private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(ProviderEntity)
+    private readonly providerRepo: Repository<ProviderEntity>,
     @InjectRepository(StorageEntity)
     private readonly storageRepo: Repository<StorageEntity>,
     @InjectRepository(ShowroomEntity)
@@ -55,6 +58,8 @@ export class InventoryLocationService {
     if (existing) {
       throw new ConflictException(`Item with code "${dto.code}" already exists`);
     }
+
+    await this.validateProvider(dto.providerId, actor);
 
     const item = this.itemRepo.create({
       ...dto,
@@ -95,8 +100,44 @@ export class InventoryLocationService {
     actor: ActorContext,
   ): Promise<ItemEntity> {
     const item = await this.getItemById(id, actor);
+    if (dto.providerId) {
+      await this.validateProvider(dto.providerId, actor);
+    }
     Object.assign(item, dto);
     return this.itemRepo.save(item);
+  }
+
+  /** Resolve a provider by code within the actor's organization. */
+  async resolveProviderByCode(
+    code: string,
+    actor: ActorContext,
+  ): Promise<ProviderEntity> {
+    const provider = await this.providerRepo.findOne({
+      where: { organizationId: actor.organizationId, code },
+    });
+    if (!provider) {
+      throw new NotFoundException(`Provider with code "${code}" not found`);
+    }
+    return provider;
+  }
+
+  private async validateProvider(
+    providerId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const provider = await this.providerRepo.findOne({
+      where: { id: providerId, organizationId: actor.organizationId },
+    });
+    if (!provider) {
+      throw new BadRequestException(
+        `Provider ${providerId} not found in this organization`,
+      );
+    }
+    if (!provider.isActive) {
+      throw new BadRequestException(
+        `Provider "${provider.name}" is inactive and cannot be assigned to items`,
+      );
+    }
   }
 
   // ─── Storages ────────────────────────────────────────────────────────

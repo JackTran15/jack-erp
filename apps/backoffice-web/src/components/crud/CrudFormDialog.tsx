@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
+import { AppModal, FormField, Input } from "@erp/ui";
+import { formatCustomerStatus } from "../../lib/customer-display";
 
 interface CrudFormDialogProps {
   config: CrudEntityConfig;
@@ -19,6 +21,8 @@ export function CrudFormDialog({
     (f) => f.key !== config.idField && f.key !== "createdAt" && f.key !== "updatedAt",
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     if (record) return { ...record };
     const initial: Record<string, unknown> = {};
@@ -35,7 +39,7 @@ export function CrudFormDialog({
     const next: Record<string, string> = {};
     editableFields.forEach((f) => {
       if (f.required && (values[f.key] === "" || values[f.key] === undefined || values[f.key] === null)) {
-        next[f.key] = `${f.label} is required`;
+        next[f.key] = `${f.label} là bắt buộc`;
       }
     });
     setErrors(next);
@@ -66,35 +70,35 @@ export function CrudFormDialog({
     }
   };
 
+  const handleSave = () => {
+    formRef.current?.requestSubmit();
+  };
+
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
-        <h2 style={styles.dialogTitle}>
-          {isEdit ? "Edit" : "Create"} {config.displayName}
-        </h2>
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {editableFields.map((f) => (
-            <FieldInput
-              key={f.key}
-              field={f}
-              value={values[f.key]}
-              error={errors[f.key]}
-              onChange={(v) => handleChange(f.key, v)}
-            />
-          ))}
-
-          <div style={styles.actions}>
-            <button type="button" style={styles.btnCancel} onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" style={styles.btnSubmit} disabled={submitting}>
-              {submitting ? "Saving…" : isEdit ? "Update" : "Create"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AppModal
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={`${isEdit ? "Sửa" : "Thêm"} ${config.displayName}`}
+      onSave={handleSave}
+      onCancel={onClose}
+      saveLabel={submitting ? "Đang lưu…" : isEdit ? "Cập nhật" : "Tạo"}
+      cancelLabel="Huỷ"
+      saveDisabled={submitting}
+    >
+      <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {editableFields.map((f) => (
+          <FieldInput
+            key={f.key}
+            field={f}
+            value={values[f.key]}
+            error={errors[f.key]}
+            onChange={(v) => handleChange(f.key, v)}
+          />
+        ))}
+      </form>
+    </AppModal>
   );
 }
 
@@ -111,123 +115,76 @@ function FieldInput({
 }) {
   const id = `field-${field.key}`;
 
-  return (
-    <div style={styles.fieldGroup}>
-      <label htmlFor={id} style={styles.label}>
-        {field.label}
-        {field.required && <span style={{ color: "#d32f2f" }}> *</span>}
-      </label>
-
-      {field.type === "boolean" ? (
+  if (field.type === "boolean") {
+    return (
+      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
         <input
           id={id}
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
+          className="h-5 w-5 rounded border-2 border-input accent-primary cursor-pointer"
         />
-      ) : field.type === "enum" && field.enumValues ? (
+      </FormField>
+    );
+  }
+
+  if (field.type === "enum" && field.enumValues) {
+    return (
+      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
         <select
           id={id}
-          style={styles.input}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="">— select —</option>
+          <option value="">— Chọn —</option>
           {field.enumValues.map((ev) => (
             <option key={ev} value={ev}>
-              {ev}
+              {field.key === "status" ? formatCustomerStatus(ev) : ev}
             </option>
           ))}
         </select>
-      ) : field.type === "number" ? (
-        <input
+      </FormField>
+    );
+  }
+
+  if (field.type === "number") {
+    return (
+      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+        <Input
           id={id}
-          style={styles.input}
           type="number"
           value={value === undefined || value === null ? "" : String(value)}
           onChange={(e) =>
             onChange(e.target.value === "" ? "" : Number(e.target.value))
           }
         />
-      ) : field.type === "date" ? (
-        <input
+      </FormField>
+    );
+  }
+
+  if (field.type === "date") {
+    return (
+      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+        <Input
           id={id}
-          style={styles.input}
           type="date"
           value={value ? String(value).slice(0, 10) : ""}
           onChange={(e) => onChange(e.target.value)}
         />
-      ) : (
-        <input
-          id={id}
-          style={styles.input}
-          type="text"
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      )}
+      </FormField>
+    );
+  }
 
-      {error && <span style={styles.error}>{error}</span>}
-    </div>
+  return (
+    <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+      <Input
+        id={id}
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </FormField>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.4)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    paddingTop: 80,
-    zIndex: 1000,
-  },
-  dialog: {
-    background: "#fff",
-    borderRadius: 12,
-    padding: "24px 28px",
-    width: "100%",
-    maxWidth: 560,
-    maxHeight: "80vh",
-    overflowY: "auto",
-    boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-  },
-  dialogTitle: { margin: "0 0 20px", fontSize: 20, fontWeight: 600 },
-  form: { display: "flex", flexDirection: "column", gap: 16 },
-  fieldGroup: { display: "flex", flexDirection: "column", gap: 4 },
-  label: { fontSize: 13, fontWeight: 500, color: "#344054" },
-  input: {
-    padding: "8px 12px",
-    fontSize: 14,
-    border: "1px solid #d0d5dd",
-    borderRadius: 6,
-    outline: "none",
-  },
-  error: { fontSize: 12, color: "#d32f2f" },
-  actions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 8,
-  },
-  btnCancel: {
-    padding: "8px 16px",
-    background: "#fff",
-    color: "#344054",
-    border: "1px solid #d0d5dd",
-    borderRadius: 6,
-    fontSize: 14,
-    cursor: "pointer",
-  },
-  btnSubmit: {
-    padding: "8px 16px",
-    background: "#1570ef",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-};

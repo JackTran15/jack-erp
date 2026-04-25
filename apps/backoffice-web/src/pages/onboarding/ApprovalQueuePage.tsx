@@ -15,10 +15,10 @@ const PERMISSIONS = [
 ];
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "Pending Approval",
-  [RegistrationStatus.APPROVED]: "Approved",
-  [RegistrationStatus.REJECTED]: "Rejected",
-  [RegistrationStatus.RESUBMITTED]: "Resubmitted",
+  [RegistrationStatus.PENDING_APPROVAL]: "Chờ phê duyệt",
+  [RegistrationStatus.APPROVED]: "Đã duyệt",
+  [RegistrationStatus.REJECTED]: "Đã từ chối",
+  [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
 const STATUS_COLORS: Record<RegistrationStatus, string> = {
@@ -29,8 +29,8 @@ const STATUS_COLORS: Record<RegistrationStatus, string> = {
 };
 
 const TYPE_LABELS: Record<RegistrationType, string> = {
-  [RegistrationType.ORGANIZATION]: "Organization",
-  [RegistrationType.BRANCH]: "Branch",
+  [RegistrationType.ORGANIZATION]: "Tổ chức",
+  [RegistrationType.BRANCH]: "Chi nhánh",
 };
 
 type TypeFilter = "all" | "org" | "branch";
@@ -61,7 +61,7 @@ export function ApprovalQueuePage() {
       const res = await listRegistrations(filters);
       setData(res.data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : "Tải dữ liệu thất bại");
     } finally {
       setLoading(false);
     }
@@ -74,9 +74,9 @@ export function ApprovalQueuePage() {
   if (!hasAnyPermission(...PERMISSIONS)) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Approval Queue</h2>
+        <h2>Hàng đợi phê duyệt</h2>
         <p style={{ color: "#c62828" }}>
-          You do not have permission to view the approval queue.
+          Bạn không có quyền xem hàng đợi phê duyệt.
         </p>
       </div>
     );
@@ -92,7 +92,7 @@ export function ApprovalQueuePage() {
       await approveRegistration(record.id, record.type);
       await fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Approve failed");
+      setError(err instanceof Error ? err.message : "Phê duyệt thất bại");
     } finally {
       setActionLoading(null);
     }
@@ -110,7 +110,7 @@ export function ApprovalQueuePage() {
       setRejectReason("");
       await fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Reject failed");
+      setError(err instanceof Error ? err.message : "Từ chối thất bại");
     } finally {
       setActionLoading(null);
     }
@@ -118,28 +118,28 @@ export function ApprovalQueuePage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Approval Queue</h2>
+      <h2>Hàng đợi phê duyệt</h2>
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
         <label>
-          Type:{" "}
+          Loại:{" "}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
           >
-            <option value="all">All</option>
-            <option value="org">Organization</option>
-            <option value="branch">Branch</option>
+            <option value="all">Tất cả</option>
+            <option value="org">Tổ chức</option>
+            <option value="branch">Chi nhánh</option>
           </select>
         </label>
 
         <label>
-          Status:{" "}
+          Trạng thái:{" "}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
-            <option value="all">All</option>
+            <option value="all">Tất cả</option>
             {Object.entries(STATUS_LABELS).map(([val, label]) => (
               <option key={val} value={val}>
                 {label}
@@ -154,9 +154,9 @@ export function ApprovalQueuePage() {
       )}
 
       {loading ? (
-        <p>Loading…</p>
+        <p>Đang tải…</p>
       ) : data.length === 0 ? (
-        <p>No registration requests found.</p>
+        <p>Không có yêu cầu đăng ký.</p>
       ) : (
         <table
           style={{
@@ -167,11 +167,11 @@ export function ApprovalQueuePage() {
         >
           <thead>
             <tr style={{ borderBottom: "2px solid #ccc" }}>
-              <th style={{ padding: 8 }}>Type</th>
-              <th style={{ padding: 8 }}>Name</th>
-              <th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}>Submitted</th>
-              <th style={{ padding: 8 }}>Actions</th>
+              <th style={{ padding: 8 }}>Loại</th>
+              <th style={{ padding: 8 }}>Tên</th>
+              <th style={{ padding: 8 }}>Trạng thái</th>
+              <th style={{ padding: 8 }}>Gửi lúc</th>
+              <th style={{ padding: 8 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -203,7 +203,7 @@ export function ApprovalQueuePage() {
                     </span>
                   </td>
                   <td style={{ padding: 8 }}>
-                    {new Date(row.createdAt).toLocaleDateString()}
+                    {new Date(row.createdAt).toLocaleDateString("vi-VN")}
                   </td>
                   <td
                     style={{ padding: 8 }}
@@ -226,7 +226,7 @@ export function ApprovalQueuePage() {
                         >
                           {actionLoading === row.id
                             ? "…"
-                            : "Approve"}
+                            : "Duyệt"}
                         </button>
                         <button
                           type="button"
@@ -240,7 +240,7 @@ export function ApprovalQueuePage() {
                             borderRadius: 4,
                           }}
                         >
-                          Reject
+                          Từ chối
                         </button>
                       </div>
                     )}
@@ -272,10 +272,10 @@ export function ApprovalQueuePage() {
               minWidth: 360,
             }}
           >
-            <h3 style={{ marginTop: 0 }}>Reject Registration</h3>
+            <h3 style={{ marginTop: 0 }}>Từ chối đăng ký</h3>
             <label>
               <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-                Reason (required, min 5 characters)
+                Lý do (bắt buộc, tối thiểu 5 ký tự)
               </span>
               <textarea
                 value={rejectReason}
@@ -301,7 +301,7 @@ export function ApprovalQueuePage() {
                   borderRadius: 4,
                 }}
               >
-                {actionLoading === rejectingId ? "Rejecting…" : "Confirm Reject"}
+                {actionLoading === rejectingId ? "Đang từ chối…" : "Xác nhận từ chối"}
               </button>
               <button
                 type="button"
@@ -317,7 +317,7 @@ export function ApprovalQueuePage() {
                   background: "none",
                 }}
               >
-                Cancel
+                Huỷ
               </button>
             </div>
           </div>

@@ -1,0 +1,12 @@
+---
+description: Backoffice UI copy and Cursor agent language defaults for this repo
+alwaysApply: true
+---
+
+# Giao diện tiếng Việt (ERP Backoffice)
+
+- **Chuỗi hiển thị trên UI** trong `apps/backoffice-web` (tiêu đề trang, nút, nhãn form, placeholder, thông báo lỗi/thành công do frontend tạo, văn bản bảng/bộ lọc) phải viết bằng **tiếng Việt** tự nhiên, nhất quán (xưng hô trung lập, thuật ngữ ERP thông dụng).
+- **API keys / id / enum gửi lên server** giữ nguyên (UUID, `ACTIVE`, v.v.); chỉ bản dịch **nhãn hiển thị** cho người dùng.
+- **Metadata CRUD** (`displayName`, `label` trong `CrudEntityConfig` cho các thực thể mà backoffice dùng) nên tiếng Việt nếu chúng render trực tiếp trên UI.
+- **Tiền tệ / số**: dùng `Intl` với locale `vi-VN` khi format số tiền/ngày cho người dùng trừ khi có yêu cầu khác.
+- Khi thêm màn hình hoặc component mới trong backoffice, **mặc định thêm chuỗi tiếng Việt**; không thêm chuỗi tiếng Anh cho copy UI trừ khi là thuật ngữ bắt buộc (tên API, mã lỗi kỹ thuật).

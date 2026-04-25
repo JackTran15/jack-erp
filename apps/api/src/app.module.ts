@@ -23,6 +23,8 @@ import { StockAdjustmentModule } from './modules/inventory/adjustment/stock-adju
 import { InventoryCsvModule } from './modules/inventory/csv/inventory-csv.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
+import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
+import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
 
 @Module({
   imports: [
@@ -67,6 +69,8 @@ import { ReportingModule } from './modules/reporting/reporting.module';
     InventoryCsvModule,
     PosModule,
     ReportingModule,
+    PurchaseOrderModule,
+    GoodsIssueModule,
   ],
 })
 export class AppModule {}

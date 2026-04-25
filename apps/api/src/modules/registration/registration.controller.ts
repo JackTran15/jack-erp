@@ -1,16 +1,6 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Query,
-  ParseUUIDPipe,
-} from '@nestjs/common';
-import { PaginationQuery, RegistrationStatus } from '@erp/shared-interfaces';
+import { Controller, Post, Param, Body, ParseUUIDPipe } from '@nestjs/common';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { RegistrationService } from './registration.service';
-import { RegistrationType } from './registration-request.entity';
 import {
   SubmitOrgRegistrationDto,
   SubmitBranchRegistrationDto,
@@ -35,42 +25,6 @@ export class RegistrationController {
     @Actor() actor: ActorContext,
   ) {
     return this.registrationService.submitBranchRequest(dto, actor);
-  }
-
-  @Get('organizations/registration-requests')
-  listOrgRequests(
-    @Query() query: PaginationQuery & { status?: RegistrationStatus },
-    @Actor() actor: ActorContext,
-  ) {
-    return this.registrationService.list(
-      {
-        page: Number(query.page) || 1,
-        pageSize: Number(query.pageSize) || 20,
-        sortBy: query.sortBy,
-        sortOrder: query.sortOrder,
-        status: query.status,
-        type: RegistrationType.ORGANIZATION,
-      },
-      actor,
-    );
-  }
-
-  @Get('branches/registration-requests')
-  listBranchRequests(
-    @Query() query: PaginationQuery & { status?: RegistrationStatus },
-    @Actor() actor: ActorContext,
-  ) {
-    return this.registrationService.list(
-      {
-        page: Number(query.page) || 1,
-        pageSize: Number(query.pageSize) || 20,
-        sortBy: query.sortBy,
-        sortOrder: query.sortOrder,
-        status: query.status,
-        type: RegistrationType.BRANCH,
-      },
-      actor,
-    );
   }
 
   @Post('organizations/registration-requests/:id/approve')

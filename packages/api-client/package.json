@@ -1,0 +1,28 @@
+{
+  "name": "@erp/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "node ./scripts/generate-openapi.mjs",
+    "build": "tsc",
+    "lint": "echo lint",
+    "test": "echo test"
+  },
+  "dependencies": {
+    "axios": "^1.15.2"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0",
+    "typescript": "^5.4.0"
+  }
+}

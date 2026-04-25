@@ -10,10 +10,10 @@ import {
 const PERMISSION = "org.registration.submit";
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "Pending Approval",
-  [RegistrationStatus.APPROVED]: "Approved",
-  [RegistrationStatus.REJECTED]: "Rejected",
-  [RegistrationStatus.RESUBMITTED]: "Resubmitted",
+  [RegistrationStatus.PENDING_APPROVAL]: "Chờ phê duyệt",
+  [RegistrationStatus.APPROVED]: "Đã duyệt",
+  [RegistrationStatus.REJECTED]: "Đã từ chối",
+  [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
 const STATUS_COLORS: Record<RegistrationStatus, string> = {
@@ -40,9 +40,9 @@ export function OrgRegistrationPage() {
   if (!hasPermission(PERMISSION)) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Organization Registration</h2>
+        <h2>Đăng ký tổ chức</h2>
         <p style={{ color: "#c62828" }}>
-          You do not have permission to submit organization registrations.
+          Bạn không có quyền gửi đăng ký tổ chức.
         </p>
       </div>
     );
@@ -62,7 +62,7 @@ export function OrgRegistrationPage() {
       const res = await submitOrgRegistration(data);
       setResult(res);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Submission failed");
+      setError(err instanceof Error ? err.message : "Gửi thất bại");
     } finally {
       setSubmitting(false);
     }
@@ -71,7 +71,7 @@ export function OrgRegistrationPage() {
   if (result) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Organization Registration</h2>
+        <h2>Đăng ký tổ chức</h2>
         <div
           style={{
             border: "1px solid #ccc",
@@ -80,19 +80,19 @@ export function OrgRegistrationPage() {
             maxWidth: 500,
           }}
         >
-          <h3>Request Submitted</h3>
+          <h3>Đã gửi yêu cầu</h3>
           <p>
-            <strong>ID:</strong> {result.id}
+            <strong>Mã:</strong> {result.id}
           </p>
           <p>
-            <strong>Status:</strong>{" "}
+            <strong>Trạng thái:</strong>{" "}
             <span style={{ color: STATUS_COLORS[result.status], fontWeight: 600 }}>
               {STATUS_LABELS[result.status]}
             </span>
           </p>
           <p>
-            <strong>Submitted:</strong>{" "}
-            {new Date(result.createdAt).toLocaleString()}
+            <strong>Gửi lúc:</strong>{" "}
+            {new Date(result.createdAt).toLocaleString("vi-VN")}
           </p>
           <button
             type="button"
@@ -108,7 +108,7 @@ export function OrgRegistrationPage() {
             }}
             style={{ marginTop: 12, padding: "8px 16px", cursor: "pointer" }}
           >
-            Submit Another
+            Gửi thêm yêu cầu
           </button>
         </div>
       </div>
@@ -117,7 +117,7 @@ export function OrgRegistrationPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Organization Registration</h2>
+      <h2>Đăng ký tổ chức</h2>
       <form
         onSubmit={handleSubmit}
         style={{
@@ -129,7 +129,7 @@ export function OrgRegistrationPage() {
       >
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Organization Name *
+            Tên tổ chức *
           </span>
           <input
             type="text"
@@ -144,7 +144,7 @@ export function OrgRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Contact Email *
+            Email liên hệ *
           </span>
           <input
             type="email"
@@ -157,7 +157,7 @@ export function OrgRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Contact Phone
+            Điện thoại liên hệ
           </span>
           <input
             type="tel"
@@ -170,7 +170,7 @@ export function OrgRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Owner Name *
+            Tên chủ sở hữu *
           </span>
           <input
             type="text"
@@ -184,7 +184,7 @@ export function OrgRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Owner Email *
+            Email chủ sở hữu *
           </span>
           <input
             type="email"
@@ -206,7 +206,7 @@ export function OrgRegistrationPage() {
             fontWeight: 600,
           }}
         >
-          {submitting ? "Submitting…" : "Submit Registration"}
+          {submitting ? "Đang gửi…" : "Gửi đăng ký"}
         </button>
       </form>
     </div>

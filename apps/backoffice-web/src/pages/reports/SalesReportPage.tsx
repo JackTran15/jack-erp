@@ -1,11 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
-import type { SalesSummary } from "@erp/shared-interfaces";
+import { useState } from "react";
+import { useSalesSummary } from "../../hooks/useReportData";
 
 export function SalesReportPage() {
-  const [data, setData] = useState<SalesSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -16,93 +12,75 @@ export function SalesReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (branchId) params.set("branchId", branchId);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      const qs = params.toString();
-      const result = await http.get<SalesSummary>(
-        `/reports/sales-summary${qs ? `?${qs}` : ""}`,
-      );
-      setData(result);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId, startDate, endDate]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data, isLoading: loading, error, refetch } = useSalesSummary({
+    branchId: branchId || undefined,
+    startDate,
+    endDate,
+  });
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>Sales Summary</h1>
+      <h1 style={styles.title}>Tổng hợp bán hàng</h1>
 
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
-          Branch ID
-          <input style={styles.input} type="text" placeholder="All branches" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          ID chi nhánh
+          <input style={styles.input} type="text" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={styles.filterLabel}>
-          Start Date
+          Từ ngày
           <input style={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </label>
         <label style={styles.filterLabel}>
-          End Date
+          Đến ngày
           <input style={styles.input} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </label>
-        <button style={styles.btn} onClick={fetchData}>Refresh</button>
+        <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {loading && <p style={styles.muted}>Loading…</p>}
+      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
+      {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Metric</th>
-                <th style={styles.th}>Value</th>
+                <th style={styles.th}>Chỉ tiêu</th>
+                <th style={styles.th}>Giá trị</th>
               </tr>
             </thead>
             <tbody>
               <tr style={styles.tr}>
-                <td style={styles.td}>Period</td>
+                <td style={styles.td}>Kỳ</td>
                 <td style={styles.td}>
-                  {new Date(data.periodStart).toLocaleDateString()} – {new Date(data.periodEnd).toLocaleDateString()}
+                  {new Date(data.periodStart).toLocaleDateString("vi-VN")} – {new Date(data.periodEnd).toLocaleDateString("vi-VN")}
                 </td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Total Sales</td>
+                <td style={styles.td}>Tổng bán</td>
                 <td style={styles.td}>{fmt(data.totalSales)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Sale Count</td>
+                <td style={styles.td}>Số đơn bán</td>
                 <td style={styles.td}>{data.saleCount}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Total Returns</td>
+                <td style={styles.td}>Tổng trả hàng</td>
                 <td style={styles.td}>{fmt(data.totalReturns)}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Return Count</td>
+                <td style={styles.td}>Số đơn trả</td>
                 <td style={styles.td}>{data.returnCount}</td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Net Revenue</td>
+                <td style={styles.td}>Doanh thu ròng</td>
                 <td style={{ ...styles.td, fontWeight: 700, color: "#2e7d32" }}>
                   {fmt(data.netRevenue)}
                 </td>
               </tr>
               <tr style={styles.tr}>
-                <td style={styles.td}>Average Sale Value</td>
+                <td style={styles.td}>Giá trị đơn bán trung bình</td>
                 <td style={styles.td}>{fmt(data.averageSaleValue)}</td>
               </tr>
             </tbody>
@@ -114,7 +92,7 @@ export function SalesReportPage() {
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "USD" }).format(n);
 }
 
 const styles: Record<string, React.CSSProperties> = {

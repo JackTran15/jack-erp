@@ -70,9 +70,11 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
       const prototype = Object.getPrototypeOf(instance);
       if (!prototype) continue;
 
-      const methodNames = Object.getOwnPropertyNames(prototype).filter(
-        (name) => name !== 'constructor' && typeof prototype[name] === 'function',
-      );
+      const methodNames = Object.getOwnPropertyNames(prototype).filter((name) => {
+        if (name === 'constructor') return false;
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+        return typeof descriptor?.value === 'function';
+      });
 
       for (const methodName of methodNames) {
         const meta = this.reflector.get<DomainEventMetadata | undefined>(

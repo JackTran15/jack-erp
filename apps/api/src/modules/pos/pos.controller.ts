@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Query,
   Body,
   ParseUUIDPipe,
   UseInterceptors,
@@ -13,13 +14,20 @@ import { RequirePermission, RequireBranchScope } from '../auth/decorators';
 import { PermissionGuard } from '../rbac/permission.guard';
 import { BranchScopeGuard } from '../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../crud/audit.interceptor';
-import { PosSessionService, CheckoutService, ReturnService, ExchangeService } from './services';
+import {
+  PosSessionService,
+  CheckoutService,
+  ReturnService,
+  ExchangeService,
+  PosCatalogService,
+} from './services';
 import {
   OpenSessionDto,
   CheckoutDto,
   ProcessReturnDto,
   ProcessExchangeDto,
   SubmitReconciliationDto,
+  PosCatalogQueryDto,
 } from './dto';
 
 @Controller('pos')
@@ -32,7 +40,18 @@ export class PosController {
     private readonly checkoutService: CheckoutService,
     private readonly returnService: ReturnService,
     private readonly exchangeService: ExchangeService,
+    private readonly catalogService: PosCatalogService,
   ) {}
+
+  @Get('branches/:branchId/catalog')
+  @RequirePermission('pos.sale.create')
+  getCatalog(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @Query() query: PosCatalogQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.catalogService.getCatalog(branchId, actor, query.search);
+  }
 
   @Post('sessions/open')
   @RequirePermission('pos.session.manage')

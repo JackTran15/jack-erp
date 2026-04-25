@@ -1,7 +1,9 @@
 ---
 alwaysApply: true
 ---
-- Using zustand for global state
+- Using zustand for global state (client-only UI state such as sidebar, preferences, POS branch)
+- Using @tanstack/react-query for all API / server data fetching and mutations (caching, refetching, optimistic updates)
 - Evaluate memmory leaks and potential interval state updates to prevent it as best
-- Using shacdn and tailwind to custom the UI
+- Using shadcn and tailwind CSS
 - Should have common components like search box, form inputs, large text input, date time input (can using native one), select dropdown with multi options, tags input, fullscreen extendable and closable modals with options (save, cancel, close, full-screen)
+- Vertical panel + multi sections sub menu navigation for backoffice layout

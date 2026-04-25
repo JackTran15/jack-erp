@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RegistrationModule } from '../registration/registration.module';
 import { OrganizationEntity } from './organization.entity';
 import { OrganizationService } from './organization.service';
 import { OrganizationController } from './organization.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([OrganizationEntity])],
+  imports: [
+    TypeOrmModule.forFeature([OrganizationEntity]),
+    forwardRef(() => RegistrationModule),
+  ],
   controllers: [OrganizationController],
   providers: [OrganizationService],
   exports: [OrganizationService],

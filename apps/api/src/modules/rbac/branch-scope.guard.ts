@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { resolveExplicitBranchId } from '../../common/utils/branch-request.util';
 import { REQUIRE_BRANCH_SCOPE_KEY } from '../auth/decorators';
 
 @Injectable()
@@ -23,16 +24,19 @@ export class BranchScopeGuard implements CanActivate {
     if (!requireBranchScope) return true;
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const user = request.user as
+      | {
+          userId?: string;
+          organizationId?: string;
+          branchIds?: string[];
+        }
+      | undefined;
 
     if (!user?.userId || !user?.organizationId) {
       throw new ForbiddenException('Authentication context missing');
     }
 
-    const branchId =
-      request.body?.branchId ??
-      request.params?.branchId ??
-      request.query?.branchId;
+    const branchId = resolveExplicitBranchId(request);
 
     if (!branchId) {
       throw new ForbiddenException('branchId is required for this operation');

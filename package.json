@@ -16,10 +16,13 @@
     "migration:create": "cd apps/api && npx typeorm-ts-node-commonjs migration:create",
     "schema:sync": "pnpm --filter @erp/api schema:sync",
     "schema:drop": "pnpm --filter @erp/api schema:drop",
+    "seed:inventory": "pnpm --filter @erp/api seed:inventory",
+    "seed:dev-admin": "pnpm --filter @erp/api seed:dev-admin",
     "contract:check": "npx ts-node scripts/contract-check.ts",
     "docs:entities:manifest": "npx ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/generate-entity-docs.ts",
     "docs:entities:markdown": "node scripts/generate-entity-markdown.js",
     "docs:entities": "pnpm docs:entities:manifest && pnpm docs:entities:markdown",
+    "openapi:generate": "pnpm --filter @erp/api-client run generate",
     "entity:visual": "typeorm-visual create",
     "entity:visual:generate": "typeorm-visual generate"
   },

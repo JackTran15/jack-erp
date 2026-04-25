@@ -267,6 +267,9 @@ export class CsvImportService {
     if (!row.uom?.trim()) {
       errors.push({ column: 'uom', code: 'REQUIRED', message: 'uom is required' });
     }
+    if (!row.providerCode?.trim()) {
+      errors.push({ column: 'providerCode', code: 'REQUIRED', message: 'providerCode is required' });
+    }
     if (row.isActive !== undefined && row.isActive !== '') {
       const lower = row.isActive.toLowerCase();
       if (!['true', 'false', '1', '0'].includes(lower)) {
@@ -399,6 +402,11 @@ export class CsvImportService {
         ? true
         : ['true', '1'].includes(data.isActive.toLowerCase());
 
+    const provider = await this.locationService.resolveProviderByCode(
+      data.providerCode,
+      actor,
+    );
+
     try {
       await this.locationService.createItem(
         {
@@ -407,6 +415,7 @@ export class CsvImportService {
           unit: data.uom,
           category: data.category || undefined,
           isActive,
+          providerId: provider.id,
         },
         actor,
       );
@@ -428,6 +437,7 @@ export class CsvImportService {
               unit: data.uom,
               category: data.category || undefined,
               isActive,
+              providerId: provider.id,
             },
             actor,
           );

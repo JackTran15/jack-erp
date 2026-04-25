@@ -8,9 +8,25 @@ export enum StockMovementType {
   ADJUSTMENT_INCREASE = 'ADJUSTMENT_INCREASE',
   ADJUSTMENT_DECREASE = 'ADJUSTMENT_DECREASE',
   PURCHASE_RECEIPT = 'PURCHASE_RECEIPT',
+  GOODS_ISSUE = 'GOODS_ISSUE',
 }
 
 export enum TransferStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  POSTED = 'POSTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum PurchaseOrderStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  RECEIVING = 'RECEIVING',
+  RECEIVED = 'RECEIVED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum GoodsIssueStatus {
   DRAFT = 'DRAFT',
   APPROVED = 'APPROVED',
   POSTED = 'POSTED',
@@ -35,6 +51,20 @@ export enum LocationType {
   ZONE = 'ZONE',
 }
 
+export interface Provider {
+  id: string;
+  organizationId: string;
+  code: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
 export interface Item {
   id: string;
   organizationId: string;
@@ -44,6 +74,12 @@ export interface Item {
   unit: string;
   category?: string;
   isActive: boolean;
+  purchasePrice: number;
+  sellingPrice: number;
+  providerId: string;
+  /** Present on admin list rows when joined from the linked provider. */
+  providerName?: string;
+  providerCode?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -106,6 +142,11 @@ export interface StockBalance {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  /** Present on admin list rows when joined from the linked item. */
+  itemName?: string;
+  itemCode?: string;
+  /** Category, unit, and description summary from the linked item. */
+  itemVariants?: string;
 }
 
 export interface StockLedgerEntry {
@@ -184,4 +225,59 @@ export interface ImportJobRow {
   data: Record<string, unknown>;
   error?: string;
   status: 'PENDING' | 'SUCCESS' | 'ERROR';
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  purchaseOrderId: string;
+  itemId: string;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  unitPrice: number;
+  notes?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  organizationId: string;
+  branchId?: string;
+  documentNumber?: string;
+  providerId: string;
+  locationId: string;
+  status: PurchaseOrderStatus;
+  expectedDate?: string;
+  notes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  lines: PurchaseOrderLine[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface GoodsIssueLine {
+  id: string;
+  goodsIssueId: string;
+  itemId: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface GoodsIssue {
+  id: string;
+  organizationId: string;
+  branchId?: string;
+  documentNumber?: string;
+  locationId: string;
+  reason: string;
+  status: GoodsIssueStatus;
+  notes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  postedBy?: string;
+  postedAt?: string;
+  lines: GoodsIssueLine[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
 }

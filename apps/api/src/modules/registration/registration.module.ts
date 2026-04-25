@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganizationModule } from '../organization/organization.module';
 import { BranchModule } from '../branch/branch.module';
@@ -9,8 +9,8 @@ import { RegistrationController } from './registration.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([RegistrationRequestEntity]),
-    OrganizationModule,
-    BranchModule,
+    forwardRef(() => OrganizationModule),
+    forwardRef(() => BranchModule),
   ],
   controllers: [RegistrationController],
   providers: [RegistrationService],

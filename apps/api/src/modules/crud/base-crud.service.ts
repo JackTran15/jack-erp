@@ -44,6 +44,7 @@ export abstract class BaseCrudService<
   ): Promise<PaginatedResponse<TEntity>> {
     const alias = 'entity';
     const qb = this.repository.createQueryBuilder(alias);
+    this.configureListQuery(qb, alias);
 
     this.applyScoping(qb, alias, actor);
     this.applySearch(qb, alias, query.search);
@@ -56,12 +57,18 @@ export abstract class BaseCrudService<
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data, total, page, pageSize };
+    return {
+      data: this.transformListResults(data) as TEntity[],
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async getById(id: string, actor: ActorContext): Promise<TEntity> {
     const entity = await this.repository.findOne({
       where: this.buildScopedWhere(id, actor),
+      relations: this.getByIdRelations(),
     });
     if (!entity) {
       throw new NotFoundException(`Record ${id} not found`);
@@ -197,11 +204,27 @@ export abstract class BaseCrudService<
     _actor: ActorContext,
   ): Promise<void> {}
 
+  /** Optional joins or selects before scoping/search (e.g. eager relations for list). */
+  protected configureListQuery(
+    _qb: SelectQueryBuilder<TEntity>,
+    _alias: string,
+  ): void {}
+
+  /** Map list rows before returning (e.g. flatten joined relations). */
+  protected transformListResults(data: TEntity[]): unknown[] {
+    return data;
+  }
+
+  /** Relations to load in getById; override when configureListQuery adds joins. */
+  protected getByIdRelations(): string[] {
+    return [];
+  }
+
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------
 
-  private applyScoping(
+  protected applyScoping(
     qb: SelectQueryBuilder<TEntity>,
     alias: string,
     actor: ActorContext,
@@ -222,7 +245,7 @@ export abstract class BaseCrudService<
     }
   }
 
-  private applySearch(
+  protected applySearch(
     qb: SelectQueryBuilder<TEntity>,
     alias: string,
     search?: string,
@@ -237,7 +260,7 @@ export abstract class BaseCrudService<
     qb.andWhere(`(${conditions})`, { search: `%${search}%` });
   }
 
-  private applyFilters(
+  protected applyFilters(
     qb: SelectQueryBuilder<TEntity>,
     alias: string,
     filters: Record<string, any>,
@@ -255,7 +278,7 @@ export abstract class BaseCrudService<
     }
   }
 
-  private applySorting(
+  protected applySorting(
     qb: SelectQueryBuilder<TEntity>,
     alias: string,
     sortBy?: string,
@@ -266,7 +289,7 @@ export abstract class BaseCrudService<
     qb.orderBy(`${alias}.${field}`, order);
   }
 
-  private buildScopedWhere(
+  protected buildScopedWhere(
     id: string,
     actor: ActorContext,
   ): FindOptionsWhere<TEntity> {

@@ -1,11 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly dataSource: DataSource) {}
 
   @Get()
+  @ApiOperation({ summary: 'Liveness probe' })
   check() {
     return {
       status: 'ok',
@@ -14,6 +17,7 @@ export class HealthController {
   }
 
   @Get('db')
+  @ApiOperation({ summary: 'Database connectivity check' })
   async checkDb() {
     try {
       await this.dataSource.query('SELECT 1');

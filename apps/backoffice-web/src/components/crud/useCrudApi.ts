@@ -1,81 +1,117 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   CrudEntityConfig,
   PaginatedResponse,
 } from "@erp/shared-interfaces";
+import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
 
-export function useCrudApi(entityKey: string) {
-  const [config, setConfig] = useState<CrudEntityConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface FetchRecordsParams {
+  page: number;
+  pageSize: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+  filters?: Record<string, unknown>;
+}
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    http
-      .get<CrudEntityConfig>(`/admin/entities/${entityKey}`)
-      .then(setConfig)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [entityKey]);
-
-  const fetchRecords = useCallback(
-    async (params: {
-      page: number;
-      pageSize: number;
-      sortBy?: string;
-      sortOrder?: "asc" | "desc";
-      search?: string;
-      filters?: Record<string, unknown>;
-    }) => {
-      const qs = new URLSearchParams();
-      qs.set("page", String(params.page));
-      qs.set("pageSize", String(params.pageSize));
-      if (params.sortBy) qs.set("sortBy", params.sortBy);
-      if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
-      if (params.search) qs.set("search", params.search);
-      if (params.filters && Object.keys(params.filters).length) {
-        qs.set("filters", JSON.stringify(params.filters));
-      }
-      return http.get<PaginatedResponse<Record<string, unknown>>>(
-        `/admin/entities/${entityKey}/records?${qs}`,
-      );
-    },
-    [entityKey],
-  );
-
-  const createRecord = useCallback(
-    (body: Record<string, unknown>) =>
-      http.post<Record<string, unknown>>(
-        `/admin/entities/${entityKey}/records`,
-        body,
-      ),
-    [entityKey],
-  );
-
-  const updateRecord = useCallback(
-    (id: string, body: Record<string, unknown>) =>
-      http.patch<Record<string, unknown>>(
-        `/admin/entities/${entityKey}/records/${id}`,
-        body,
-      ),
-    [entityKey],
-  );
-
-  const deleteRecord = useCallback(
-    (id: string) =>
-      http.delete<void>(`/admin/entities/${entityKey}/records/${id}`),
-    [entityKey],
-  );
-
-  return {
-    config,
-    loading,
-    error,
-    fetchRecords,
-    createRecord,
-    updateRecord,
-    deleteRecord,
+function buildRecordsQuery(
+  params: FetchRecordsParams,
+): Record<string, string | number | undefined> {
+  const q: Record<string, string | number | undefined> = {
+    page: params.page,
+    pageSize: params.pageSize,
   };
+  if (params.sortBy) q.sortBy = params.sortBy;
+  if (params.sortOrder) q.sortOrder = params.sortOrder;
+  if (params.search) q.search = params.search;
+  if (params.filters && Object.keys(params.filters).length) {
+    q.filters = JSON.stringify(params.filters);
+  }
+  return q;
+}
+
+export function useCrudConfig(entityKey: string) {
+  return useQuery({
+    queryKey: ["crud", entityKey, "config"],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<CrudEntityConfig>("/admin/entities/{entityKey}", {
+          params: { path: { entityKey } },
+        }),
+      ),
+  });
+}
+
+export function useCrudRecords(
+  entityKey: string,
+  params: FetchRecordsParams,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["crud", entityKey, "records", params],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
+          "/admin/entities/{entityKey}/records",
+          {
+            params: { path: { entityKey }, query: buildRecordsQuery(params) },
+          },
+        ),
+      ),
+    enabled,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCrudCreate(entityKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: Record<string, unknown>) =>
+      requireErpData(
+        await erpApi.POST<Record<string, unknown>>(
+          "/admin/entities/{entityKey}/records",
+          { params: { path: { entityKey } }, body },
+        ),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+    },
+  });
+}
+
+export function useCrudUpdate(entityKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Record<string, unknown>;
+    }) =>
+      requireErpData(
+        await erpApi.PATCH<Record<string, unknown>>(
+          "/admin/entities/{entityKey}/records/{id}",
+          { params: { path: { entityKey, id } }, body },
+        ),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+    },
+  });
+}
+
+export function useCrudDelete(entityKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      requireErpSuccess(
+        await erpApi.DELETE("/admin/entities/{entityKey}/records/{id}", {
+          params: { path: { entityKey, id } },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+    },
+  });
 }

@@ -16,7 +16,9 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
     "migration:create": "typeorm migration:create",
     "schema:sync": "typeorm-ts-node-commonjs schema:sync -d src/database/data-source.ts",
-    "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/database/data-source.ts"
+    "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/database/data-source.ts",
+    "seed:inventory": "ts-node src/database/seeds/inventory.seed.ts",
+    "seed:dev-admin": "ts-node src/database/seeds/inventory.seed.ts"
   },
   "dependencies": {
     "@erp/shared-interfaces": "workspace:*",
@@ -26,6 +28,7 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/platform-socket.io": "^11.0.0",
+    "@nestjs/swagger": "^11.4.1",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.0.0",
     "@socket.io/redis-adapter": "^8.3.0",

@@ -10,6 +10,13 @@ import {
   NotFoundException,
   UseInterceptors,
 } from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ModuleRef } from '@nestjs/core';
 import { ActorContext, Actor } from '../../common/decorators/actor-context.decorator';
 import { EntityRegistryService } from './entity-registry.service';
@@ -17,6 +24,7 @@ import { BaseCrudService } from './base-crud.service';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { AuditInterceptor } from './audit.interceptor';
 
+@ApiTags('admin')
 @Controller('admin/entities')
 @UseInterceptors(AuditInterceptor)
 export class CrudController {
@@ -31,6 +39,14 @@ export class CrudController {
   }
 
   @Get(':entityKey')
+  @ApiOkResponse({
+    description: 'Entity CRUD configuration',
+    content: {
+      'application/json': {
+        schema: { type: 'object', additionalProperties: true },
+      },
+    },
+  })
   getEntityConfig(@Param('entityKey') entityKey: string) {
     const config = this.registry.getEntityConfig(entityKey);
     if (!config) {
@@ -40,6 +56,25 @@ export class CrudController {
   }
 
   @Get(':entityKey/records')
+  @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1, default: 1 } })
+  @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } })
+  @ApiQuery({ name: 'sortBy', required: false, schema: { type: 'string' } })
+  @ApiQuery({ name: 'sortOrder', required: false, schema: { type: 'string', enum: ['asc', 'desc'] } })
+  @ApiQuery({ name: 'search', required: false, schema: { type: 'string' } })
+  @ApiQuery({
+    name: 'filters',
+    required: false,
+    description: 'JSON-encoded filter object',
+    schema: { type: 'string' },
+  })
+  @ApiOkResponse({
+    description: 'Paginated records',
+    content: {
+      'application/json': {
+        schema: { type: 'object', additionalProperties: true },
+      },
+    },
+  })
   async listRecords(
     @Param('entityKey') entityKey: string,
     @Query() query: PaginationQueryDto,
@@ -52,6 +87,18 @@ export class CrudController {
   }
 
   @Post(':entityKey/records')
+  @ApiBody({
+    schema: { type: 'object', additionalProperties: true },
+    description: 'Record fields',
+  })
+  @ApiCreatedResponse({
+    description: 'Created record',
+    content: {
+      'application/json': {
+        schema: { type: 'object', additionalProperties: true },
+      },
+    },
+  })
   async createRecord(
     @Param('entityKey') entityKey: string,
     @Body() body: Record<string, any>,
@@ -62,6 +109,18 @@ export class CrudController {
   }
 
   @Patch(':entityKey/records/:id')
+  @ApiBody({
+    schema: { type: 'object', additionalProperties: true },
+    description: 'Record fields to update',
+  })
+  @ApiOkResponse({
+    description: 'Updated record',
+    content: {
+      'application/json': {
+        schema: { type: 'object', additionalProperties: true },
+      },
+    },
+  })
   async updateRecord(
     @Param('entityKey') entityKey: string,
     @Param('id') id: string,

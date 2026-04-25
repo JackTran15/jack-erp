@@ -243,20 +243,26 @@ export class CustomerService extends BaseCrudService<
 // Entity config for the generic CRUD registry
 // ---------------------------------------------------------------------------
 
+const CUSTOMER_STATUS_FILTER_LABELS: Record<CustomerStatus, string> = {
+  [CustomerStatus.ACTIVE]: 'Hoạt động',
+  [CustomerStatus.INACTIVE]: 'Ngừng hoạt động',
+  [CustomerStatus.MERGED]: 'Đã gộp',
+};
+
 export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'customers',
-  displayName: 'Customer',
+  displayName: 'Khách hàng',
   apiResource: 'customers',
   idField: 'id',
   fields: [
-    { key: 'firstName', label: 'First Name', type: 'string', required: true },
-    { key: 'lastName', label: 'Last Name', type: 'string', required: true },
+    { key: 'lastName', label: 'Họ', type: 'string', required: true },
+    { key: 'firstName', label: 'Tên', type: 'string', required: true },
     { key: 'email', label: 'Email', type: 'string' },
-    { key: 'phone', label: 'Phone', type: 'string' },
-    { key: 'address', label: 'Address', type: 'string' },
+    { key: 'phone', label: 'Điện thoại', type: 'string' },
+    { key: 'address', label: 'Địa chỉ', type: 'string' },
     {
       key: 'status',
-      label: 'Status',
+      label: 'Trạng thái',
       type: 'enum',
       enumValues: Object.values(CustomerStatus),
     },
@@ -265,14 +271,14 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
   filterDefinitions: [
     {
       key: 'status',
-      label: 'Status',
+      label: 'Trạng thái',
       type: 'select',
       options: Object.values(CustomerStatus).map((s) => ({
-        label: s,
+        label: CUSTOMER_STATUS_FILTER_LABELS[s],
         value: s,
       })),
     },
-    { key: 'branchId', label: 'Branch', type: 'text' },
+    { key: 'branchId', label: 'Chi nhánh', type: 'text' },
   ],
   permissions: {
     create: 'customer.write',

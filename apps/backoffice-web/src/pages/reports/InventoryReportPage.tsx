@@ -1,38 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
-import type { InventoryValuation } from "@erp/shared-interfaces";
+import { useState } from "react";
+import { useInventoryValuation } from "../../hooks/useReportData";
 
 export function InventoryReportPage() {
-  const [data, setData] = useState<InventoryValuation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (branchId) params.set("branchId", branchId);
-      const qs = params.toString();
-      const result = await http.get<InventoryValuation[]>(
-        `/reports/inventory-valuation${qs ? `?${qs}` : ""}`,
-      );
-      setData(result);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data = [], isLoading: loading, error, refetch } = useInventoryValuation({
+    branchId: branchId || undefined,
+  });
 
   const handleExportCsv = () => {
     if (data.length === 0) return;
-    const headers = ["Item ID", "SKU", "Item Name", "Branch", "Qty on Hand", "Unit Cost", "Total Value"];
+    const headers = ["ID mặt hàng", "SKU", "Tên mặt hàng", "Chi nhánh", "SL tồn", "Giá vốn", "Giá trị"];
     const rows = data.map((r) => [r.itemId, r.sku, r.itemName, r.branchId ?? "", r.quantityOnHand, r.unitCost, r.totalValue]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -47,35 +25,35 @@ export function InventoryReportPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Inventory Valuation</h1>
+        <h1 style={styles.title}>Định giá tồn kho</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={data.length === 0}>
-          Export CSV
+          Xuất CSV
         </button>
       </div>
 
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
-          Branch ID
-          <input style={styles.input} type="text" placeholder="All branches" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          ID chi nhánh
+          <input style={styles.input} type="text" placeholder="Tất cả chi nhánh" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
-        <button style={styles.btn} onClick={fetchData}>Refresh</button>
+        <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {loading && <p style={styles.muted}>Loading…</p>}
+      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
+      {loading && <p style={styles.muted}>Đang tải…</p>}
 
-      {!loading && data.length === 0 && <p style={styles.muted}>No inventory data found.</p>}
+      {!loading && data.length === 0 && <p style={styles.muted}>Không có dữ liệu tồn kho.</p>}
 
       {data.length > 0 && (
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Item ID</th>
-                <th style={styles.th}>Branch</th>
-                <th style={styles.thRight}>Qty on Hand</th>
-                <th style={styles.thRight}>Unit Cost</th>
-                <th style={styles.thRight}>Total Value</th>
+                <th style={styles.th}>ID mặt hàng</th>
+                <th style={styles.th}>Chi nhánh</th>
+                <th style={styles.thRight}>Tồn kho</th>
+                <th style={styles.thRight}>Giá vốn</th>
+                <th style={styles.thRight}>Giá trị</th>
               </tr>
             </thead>
             <tbody>
@@ -97,7 +75,7 @@ export function InventoryReportPage() {
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "USD" }).format(n);
 }
 
 const styles: Record<string, React.CSSProperties> = {

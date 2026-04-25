@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
+import { formatClientError } from "@erp/api-client";
+import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
 
 interface Assignment {
   id: string;
@@ -32,10 +33,18 @@ export function SalesHierarchyPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    http
-      .get<BranchListResponse>("/api/v1/branches?pageSize=200")
-      .then((res) => setBranches(res.data))
-      .catch(() => setError("Failed to load branches"));
+    (async () => {
+      const r = await erpApi.GET<BranchListResponse>("/branches", {
+        params: { query: { pageSize: 200, page: 1 } },
+      });
+      if (r.error) {
+        setError(
+          `Không tải được danh sách chi nhánh: ${formatClientError(r.error)}`,
+        );
+        return;
+      }
+      if (r.data) setBranches(r.data.data);
+    })();
   }, []);
 
   const reload = useCallback(async () => {
@@ -44,15 +53,25 @@ export function SalesHierarchyPage() {
     setError(null);
     try {
       const [s, m] = await Promise.all([
-        http.get<Assignment[]>(`/api/v1/branches/${selectedBranchId}/salesmen`),
-        http.get<Assignment[]>(
-          `/api/v1/branches/${selectedBranchId}/sales-managers`
+        requireErpData(
+          await erpApi.GET<Assignment[]>(
+            "/branches/{id}/salesmen",
+            { params: { path: { id: selectedBranchId } } },
+          ),
+        ),
+        requireErpData(
+          await erpApi.GET<Assignment[]>(
+            "/branches/{id}/sales-managers",
+            { params: { path: { id: selectedBranchId } } },
+          ),
         ),
       ]);
       setSalesmen(s);
       setManagers(m);
-    } catch {
-      setError("Failed to load assignments");
+    } catch (err) {
+      setError(
+        `Không tải được phân công: ${err instanceof Error ? err.message : formatClientError(err)}`,
+      );
     } finally {
       setLoading(false);
     }
@@ -66,13 +85,16 @@ export function SalesHierarchyPage() {
     if (!salesmanUserId.trim() || !selectedBranchId) return;
     setError(null);
     try {
-      await http.post(`/api/v1/branches/${selectedBranchId}/salesmen/assign`, {
-        userId: salesmanUserId.trim(),
-      });
+      await requireErpData(
+        await erpApi.POST("/branches/{id}/salesmen/assign", {
+          params: { path: { id: selectedBranchId } },
+          body: { userId: salesmanUserId.trim() },
+        }),
+      );
       setSalesmanUserId("");
       reload();
     } catch (err: any) {
-      setError(err?.error?.message ?? "Failed to assign salesman");
+      setError(err?.error?.message ?? "Gán nhân viên kinh doanh thất bại");
     }
   };
 
@@ -80,13 +102,15 @@ export function SalesHierarchyPage() {
     if (!selectedBranchId) return;
     setError(null);
     try {
-      await http.post(
-        `/api/v1/branches/${selectedBranchId}/salesmen/unassign`,
-        { userId }
+      requireErpSuccess(
+        await erpApi.POST("/branches/{id}/salesmen/unassign", {
+          params: { path: { id: selectedBranchId } },
+          body: { userId },
+        }),
       );
       reload();
     } catch (err: any) {
-      setError(err?.error?.message ?? "Failed to unassign salesman");
+      setError(err?.error?.message ?? "Bỏ gán nhân viên thất bại");
     }
   };
 
@@ -94,14 +118,16 @@ export function SalesHierarchyPage() {
     if (!managerUserId.trim() || !selectedBranchId) return;
     setError(null);
     try {
-      await http.post(
-        `/api/v1/branches/${selectedBranchId}/sales-managers/assign`,
-        { userId: managerUserId.trim() }
+      await requireErpData(
+        await erpApi.POST("/branches/{id}/sales-managers/assign", {
+          params: { path: { id: selectedBranchId } },
+          body: { userId: managerUserId.trim() },
+        }),
       );
       setManagerUserId("");
       reload();
     } catch (err: any) {
-      setError(err?.error?.message ?? "Failed to assign sales manager");
+      setError(err?.error?.message ?? "Gán quản lý kinh doanh thất bại");
     }
   };
 
@@ -109,28 +135,30 @@ export function SalesHierarchyPage() {
     if (!selectedBranchId) return;
     setError(null);
     try {
-      await http.post(
-        `/api/v1/branches/${selectedBranchId}/sales-managers/unassign`,
-        { userId }
+      requireErpSuccess(
+        await erpApi.POST("/branches/{id}/sales-managers/unassign", {
+          params: { path: { id: selectedBranchId } },
+          body: { userId },
+        }),
       );
       reload();
     } catch (err: any) {
-      setError(err?.error?.message ?? "Failed to unassign sales manager");
+      setError(err?.error?.message ?? "Bỏ gán quản lý thất bại");
     }
   };
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>Sales Hierarchy Management</h1>
+      <h1 style={styles.title}>Quản lý cấp bậc kinh doanh</h1>
 
       <div style={styles.branchSelector}>
-        <label style={styles.label}>Branch</label>
+        <label style={styles.label}>Chi nhánh</label>
         <select
           style={styles.select}
           value={selectedBranchId}
           onChange={(e) => setSelectedBranchId(e.target.value)}
         >
-          <option value="">Select a branch…</option>
+          <option value="">Chọn chi nhánh…</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -143,41 +171,41 @@ export function SalesHierarchyPage() {
 
       {!selectedBranchId && (
         <p style={styles.placeholder}>
-          Select a branch to manage its sales hierarchy.
+          Chọn một chi nhánh để quản lý cấp bậc kinh doanh.
         </p>
       )}
 
-      {selectedBranchId && loading && <p style={styles.loading}>Loading…</p>}
+      {selectedBranchId && loading && <p style={styles.loading}>Đang tải…</p>}
 
       {selectedBranchId && !loading && (
         <div style={styles.sections}>
           {/* Salesmen Section */}
           <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>Salesmen</h2>
+            <h2 style={styles.sectionTitle}>Nhân viên kinh doanh</h2>
 
             <div style={styles.assignRow}>
               <input
                 style={styles.input}
                 type="text"
-                placeholder="User ID to assign"
+                placeholder="ID người dùng cần gán"
                 value={salesmanUserId}
                 onChange={(e) => setSalesmanUserId(e.target.value)}
               />
               <button style={styles.btnPrimary} onClick={handleAssignSalesman}>
-                Assign
+                Gán
               </button>
             </div>
 
             {salesmen.length === 0 ? (
-              <p style={styles.empty}>No salesmen assigned to this branch.</p>
+              <p style={styles.empty}>Chưa có nhân viên kinh doanh tại chi nhánh này.</p>
             ) : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>User ID</th>
-                    <th style={styles.th}>Assigned At</th>
-                    <th style={styles.th}>Assigned By</th>
-                    <th style={styles.th}>Actions</th>
+                    <th style={styles.th}>ID người dùng</th>
+                    <th style={styles.th}>Gán lúc</th>
+                    <th style={styles.th}>Người gán</th>
+                    <th style={styles.th}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -197,7 +225,7 @@ export function SalesHierarchyPage() {
                           style={styles.btnDanger}
                           onClick={() => handleUnassignSalesman(s.userId)}
                         >
-                          Unassign
+                          Bỏ gán
                         </button>
                       </td>
                     </tr>
@@ -209,33 +237,33 @@ export function SalesHierarchyPage() {
 
           {/* Sales Managers Section */}
           <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>Sales Managers</h2>
+            <h2 style={styles.sectionTitle}>Quản lý kinh doanh</h2>
 
             <div style={styles.assignRow}>
               <input
                 style={styles.input}
                 type="text"
-                placeholder="User ID to assign"
+                placeholder="ID người dùng cần gán"
                 value={managerUserId}
                 onChange={(e) => setManagerUserId(e.target.value)}
               />
               <button style={styles.btnPrimary} onClick={handleAssignManager}>
-                Assign
+                Gán
               </button>
             </div>
 
             {managers.length === 0 ? (
               <p style={styles.empty}>
-                No sales managers assigned to this branch.
+                Chưa có quản lý kinh doanh tại chi nhánh này.
               </p>
             ) : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>User ID</th>
-                    <th style={styles.th}>Assigned At</th>
-                    <th style={styles.th}>Assigned By</th>
-                    <th style={styles.th}>Actions</th>
+                    <th style={styles.th}>ID người dùng</th>
+                    <th style={styles.th}>Gán lúc</th>
+                    <th style={styles.th}>Người gán</th>
+                    <th style={styles.th}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -255,7 +283,7 @@ export function SalesHierarchyPage() {
                           style={styles.btnDanger}
                           onClick={() => handleUnassignManager(m.userId)}
                         >
-                          Unassign
+                          Bỏ gán
                         </button>
                       </td>
                     </tr>

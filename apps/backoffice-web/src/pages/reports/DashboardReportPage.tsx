@@ -1,11 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { http } from "../../lib/http";
-import type { DashboardSummary } from "@erp/shared-interfaces";
+import { useState } from "react";
+import { useDashboard } from "../../hooks/useReportData";
 
 export function DashboardReportPage() {
-  const [data, setData] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState("");
   const [startDate, setStartDate] = useState(() =>
     new Date().toISOString().slice(0, 10),
@@ -14,47 +10,29 @@ export function DashboardReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (branchId) params.set("branchId", branchId);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      const qs = params.toString();
-      const result = await http.get<DashboardSummary>(
-        `/reports/dashboard${qs ? `?${qs}` : ""}`,
-      );
-      setData(result);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard");
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId, startDate, endDate]);
-
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  const { data, isLoading: loading, error, refetch } = useDashboard({
+    branchId: branchId || undefined,
+    startDate,
+    endDate,
+  });
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>Dashboard</h1>
+      <h1 style={styles.title}>Bảng điều khiển báo cáo</h1>
 
       <div style={styles.filters}>
         <label style={styles.filterLabel}>
-          Branch ID
+          ID chi nhánh
           <input
             style={styles.input}
             type="text"
-            placeholder="Leave empty for consolidated"
+            placeholder="Để trống = gộp toàn hệ thống"
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
           />
         </label>
         <label style={styles.filterLabel}>
-          Start Date
+          Từ ngày
           <input
             style={styles.input}
             type="date"
@@ -63,7 +41,7 @@ export function DashboardReportPage() {
           />
         </label>
         <label style={styles.filterLabel}>
-          End Date
+          Đến ngày
           <input
             style={styles.input}
             type="date"
@@ -71,30 +49,30 @@ export function DashboardReportPage() {
             onChange={(e) => setEndDate(e.target.value)}
           />
         </label>
-        <button style={styles.btn} onClick={fetchDashboard}>
-          Refresh
+        <button style={styles.btn} onClick={() => void refetch()}>
+          Làm mới
         </button>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {loading && <p style={styles.muted}>Loading…</p>}
+      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Không tải được bảng điều khiển"}</p>}
+      {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
         <div style={styles.cardGrid}>
-          <SummaryCard label="Total Sales" value={fmt(data.totalSalesToday)} color="#1570ef" />
-          <SummaryCard label="Total Returns" value={fmt(data.totalReturnsToday)} color="#d32f2f" />
-          <SummaryCard label="Net Revenue" value={fmt(data.netRevenue)} color="#2e7d32" />
-          <SummaryCard label="Open POS Sessions" value={String(data.openPosSessionCount)} color="#6941c6" />
-          <SummaryCard label="Low Stock Items" value={String(data.lowStockItemCount)} color="#dc6803" />
-          <SummaryCard label="Pending AR" value={fmt(data.pendingReceivables)} color="#1570ef" />
-          <SummaryCard label="Pending AP" value={fmt(data.pendingPayables)} color="#c4320a" />
+          <SummaryCard label="Tổng bán hôm nay" value={fmt(data.totalSalesToday)} color="#1570ef" />
+          <SummaryCard label="Tổng trả hàng hôm nay" value={fmt(data.totalReturnsToday)} color="#d32f2f" />
+          <SummaryCard label="Doanh thu ròng" value={fmt(data.netRevenue)} color="#2e7d32" />
+          <SummaryCard label="Phiên POS đang mở" value={String(data.openPosSessionCount)} color="#6941c6" />
+          <SummaryCard label="Mặt hàng sắp hết" value={String(data.lowStockItemCount)} color="#dc6803" />
+          <SummaryCard label="Công nợ phải thu" value={fmt(data.pendingReceivables)} color="#1570ef" />
+          <SummaryCard label="Công nợ phải trả" value={fmt(data.pendingPayables)} color="#c4320a" />
         </div>
       )}
 
       {data && (
         <p style={styles.generatedAt}>
-          Generated at: {new Date(data.generatedAt).toLocaleString()}
-          {data.branchId ? ` | Branch: ${data.branchId}` : " | Consolidated"}
+          Tạo lúc: {new Date(data.generatedAt).toLocaleString("vi-VN")}
+          {data.branchId ? ` | Chi nhánh: ${data.branchId}` : " | Gộp toàn hệ thống"}
         </p>
       )}
     </div>
@@ -119,7 +97,7 @@ function SummaryCard({
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "USD",
   }).format(n);

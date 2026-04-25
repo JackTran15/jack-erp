@@ -10,10 +10,10 @@ import {
 const PERMISSION = "branch.registration.submit";
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "Pending Approval",
-  [RegistrationStatus.APPROVED]: "Approved",
-  [RegistrationStatus.REJECTED]: "Rejected",
-  [RegistrationStatus.RESUBMITTED]: "Resubmitted",
+  [RegistrationStatus.PENDING_APPROVAL]: "Chờ phê duyệt",
+  [RegistrationStatus.APPROVED]: "Đã duyệt",
+  [RegistrationStatus.REJECTED]: "Đã từ chối",
+  [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
 const STATUS_COLORS: Record<RegistrationStatus, string> = {
@@ -40,9 +40,9 @@ export function BranchRegistrationPage() {
   if (!hasPermission(PERMISSION)) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Branch Registration</h2>
+        <h2>Đăng ký chi nhánh</h2>
         <p style={{ color: "#c62828" }}>
-          You do not have permission to submit branch registrations.
+          Bạn không có quyền gửi đăng ký chi nhánh.
         </p>
       </div>
     );
@@ -67,7 +67,7 @@ export function BranchRegistrationPage() {
       );
       setResult(res);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Submission failed");
+      setError(err instanceof Error ? err.message : "Gửi thất bại");
     } finally {
       setSubmitting(false);
     }
@@ -76,7 +76,7 @@ export function BranchRegistrationPage() {
   if (result) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Branch Registration</h2>
+        <h2>Đăng ký chi nhánh</h2>
         <div
           style={{
             border: "1px solid #ccc",
@@ -85,19 +85,19 @@ export function BranchRegistrationPage() {
             maxWidth: 500,
           }}
         >
-          <h3>Request Submitted</h3>
+          <h3>Đã gửi yêu cầu</h3>
           <p>
-            <strong>ID:</strong> {result.id}
+            <strong>Mã:</strong> {result.id}
           </p>
           <p>
-            <strong>Status:</strong>{" "}
+            <strong>Trạng thái:</strong>{" "}
             <span style={{ color: STATUS_COLORS[result.status], fontWeight: 600 }}>
               {STATUS_LABELS[result.status]}
             </span>
           </p>
           <p>
-            <strong>Submitted:</strong>{" "}
-            {new Date(result.createdAt).toLocaleString()}
+            <strong>Gửi lúc:</strong>{" "}
+            {new Date(result.createdAt).toLocaleString("vi-VN")}
           </p>
           <button
             type="button"
@@ -113,7 +113,7 @@ export function BranchRegistrationPage() {
             }}
             style={{ marginTop: 12, padding: "8px 16px", cursor: "pointer" }}
           >
-            Submit Another
+            Gửi thêm yêu cầu
           </button>
         </div>
       </div>
@@ -122,7 +122,7 @@ export function BranchRegistrationPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Branch Registration</h2>
+      <h2>Đăng ký chi nhánh</h2>
       <form
         onSubmit={handleSubmit}
         style={{
@@ -134,7 +134,7 @@ export function BranchRegistrationPage() {
       >
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Branch Name *
+            Tên chi nhánh *
           </span>
           <input
             type="text"
@@ -149,7 +149,7 @@ export function BranchRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Address
+            Địa chỉ
           </span>
           <input
             type="text"
@@ -162,7 +162,7 @@ export function BranchRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Phone
+            Điện thoại
           </span>
           <input
             type="tel"
@@ -175,7 +175,7 @@ export function BranchRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Email
+            Email liên hệ
           </span>
           <input
             type="email"
@@ -187,11 +187,11 @@ export function BranchRegistrationPage() {
 
         <label>
           <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Parent Branch ID
+            ID chi nhánh cha
           </span>
           <input
             type="text"
-            placeholder="UUID of parent branch (optional)"
+            placeholder="UUID chi nhánh cha (tuỳ chọn)"
             value={form.parentBranchId}
             onChange={(e) => handleChange("parentBranchId", e.target.value)}
             style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
@@ -209,7 +209,7 @@ export function BranchRegistrationPage() {
             fontWeight: 600,
           }}
         >
-          {submitting ? "Submitting…" : "Submit Registration"}
+          {submitting ? "Đang gửi…" : "Gửi đăng ký"}
         </button>
       </form>
     </div>

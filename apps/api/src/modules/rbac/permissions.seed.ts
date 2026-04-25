@@ -28,6 +28,11 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.location.write', description: 'Create and update location records', module: 'inventory' },
   { key: 'inventory.transfer.approve', description: 'Approve inventory transfers', module: 'inventory' },
   { key: 'inventory.adjustment.approve', description: 'Approve inventory adjustments', module: 'inventory' },
+  { key: 'inventory.purchase-order.read', description: 'View purchase orders', module: 'inventory' },
+  { key: 'inventory.purchase-order.create', description: 'Create purchase orders', module: 'inventory' },
+  { key: 'inventory.purchase-order.approve', description: 'Approve purchase orders', module: 'inventory' },
+  { key: 'inventory.purchase-order.receive', description: 'Receive goods for purchase orders', module: 'inventory' },
+  { key: 'inventory.purchase-order.cancel', description: 'Cancel purchase orders', module: 'inventory' },
 
   // POS
   { key: 'pos.sale.create', description: 'Create POS sales', module: 'pos' },

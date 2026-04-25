@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { http } from "../lib/http";
+import { erpApi, requireErpData } from "../lib/erp-api";
 
 export enum RegistrationStatus {
   PENDING_APPROVAL = "PENDING_APPROVAL",
@@ -56,54 +56,72 @@ export interface RegistrationFilters {
   pageSize?: number;
 }
 
-function buildQuery(filters: RegistrationFilters): string {
-  const qs = new URLSearchParams();
-  qs.set("page", String(filters.page ?? 1));
-  qs.set("pageSize", String(filters.pageSize ?? 20));
-  if (filters.status) qs.set("status", filters.status);
-  return qs.toString();
+function listQuery(
+  filters: RegistrationFilters,
+): { page: number; pageSize: number; status?: RegistrationStatus } {
+  return {
+    page: filters.page ?? 1,
+    pageSize: filters.pageSize ?? 20,
+    ...(filters.status ? { status: filters.status } : {}),
+  };
 }
 
 export function useRegistration() {
   const submitOrgRegistration = useCallback(
-    (data: SubmitOrgRegistrationData) =>
-      http.post<RegistrationRequestRecord>(
-        "/organizations/registration-requests",
-        data,
+    async (data: SubmitOrgRegistrationData) =>
+      requireErpData(
+        await erpApi.POST<RegistrationRequestRecord>(
+          "/organizations/registration-requests",
+          { body: data },
+        ),
       ),
     [],
   );
 
   const submitBranchRegistration = useCallback(
-    (data: SubmitBranchRegistrationData) =>
-      http.post<RegistrationRequestRecord>(
-        "/branches/registration-requests",
-        data,
+    async (data: SubmitBranchRegistrationData) =>
+      requireErpData(
+        await erpApi.POST<RegistrationRequestRecord>(
+          "/branches/registration-requests",
+          { body: data },
+        ),
       ),
     [],
   );
 
   const listRegistrations = useCallback(
     async (filters: RegistrationFilters = {}) => {
-      const q = buildQuery(filters);
+      const q = listQuery(filters);
 
       if (filters.type === "org") {
-        return http.get<PaginatedRegistrations>(
-          `/organizations/registration-requests?${q}`,
+        return requireErpData(
+          await erpApi.GET<PaginatedRegistrations>(
+            "/organizations/registration-requests",
+            { params: { query: q } },
+          ),
         );
       }
       if (filters.type === "branch") {
-        return http.get<PaginatedRegistrations>(
-          `/branches/registration-requests?${q}`,
+        return requireErpData(
+          await erpApi.GET<PaginatedRegistrations>(
+            "/branches/registration-requests",
+            { params: { query: q } },
+          ),
         );
       }
 
       const [orgs, branches] = await Promise.all([
-        http.get<PaginatedRegistrations>(
-          `/organizations/registration-requests?${q}`,
+        requireErpData(
+          await erpApi.GET<PaginatedRegistrations>(
+            "/organizations/registration-requests",
+            { params: { query: q } },
+          ),
         ),
-        http.get<PaginatedRegistrations>(
-          `/branches/registration-requests?${q}`,
+        requireErpData(
+          await erpApi.GET<PaginatedRegistrations>(
+            "/branches/registration-requests",
+            { params: { query: q } },
+          ),
         ),
       ]);
 
@@ -125,10 +143,14 @@ export function useRegistration() {
       id: string,
       type: RegistrationType,
     ): Promise<RegistrationRequestRecord> => {
-      const prefix =
-        type === RegistrationType.ORGANIZATION ? "organizations" : "branches";
-      const list = await http.get<PaginatedRegistrations>(
-        `/${prefix}/registration-requests?page=1&pageSize=100`,
+      const listPath =
+        type === RegistrationType.ORGANIZATION
+          ? "/organizations/registration-requests"
+          : "/branches/registration-requests";
+      const list = await requireErpData(
+        await erpApi.GET<PaginatedRegistrations>(listPath, {
+          params: { query: { page: 1, pageSize: 100 } },
+        }),
       );
       const found = list.data.find((r) => r.id === id);
       if (!found) throw new Error("Registration request not found");
@@ -138,23 +160,40 @@ export function useRegistration() {
   );
 
   const approveRegistration = useCallback(
-    (id: string, type: RegistrationType) => {
-      const prefix =
-        type === RegistrationType.ORGANIZATION ? "organizations" : "branches";
-      return http.post<RegistrationRequestRecord>(
-        `/${prefix}/registration-requests/${id}/approve`,
+    async (id: string, type: RegistrationType) => {
+      if (type === RegistrationType.ORGANIZATION) {
+        return requireErpData(
+          await erpApi.POST<RegistrationRequestRecord>(
+            "/organizations/registration-requests/{id}/approve",
+            { params: { path: { id } } },
+          ),
+        );
+      }
+      return requireErpData(
+        await erpApi.POST<RegistrationRequestRecord>(
+          "/branches/registration-requests/{id}/approve",
+          { params: { path: { id } } },
+        ),
       );
     },
     [],
   );
 
   const rejectRegistration = useCallback(
-    (id: string, reason: string, type: RegistrationType) => {
-      const prefix =
-        type === RegistrationType.ORGANIZATION ? "organizations" : "branches";
-      return http.post<RegistrationRequestRecord>(
-        `/${prefix}/registration-requests/${id}/reject`,
-        { reason },
+    async (id: string, reason: string, type: RegistrationType) => {
+      if (type === RegistrationType.ORGANIZATION) {
+        return requireErpData(
+          await erpApi.POST<RegistrationRequestRecord>(
+            "/organizations/registration-requests/{id}/reject",
+            { params: { path: { id } }, body: { reason } },
+          ),
+        );
+      }
+      return requireErpData(
+        await erpApi.POST<RegistrationRequestRecord>(
+          "/branches/registration-requests/{id}/reject",
+          { params: { path: { id } }, body: { reason } },
+        ),
       );
     },
     [],

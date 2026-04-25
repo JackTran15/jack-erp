@@ -33,14 +33,19 @@ export class CsvExportService {
     query: ExportQuery,
     actor: ActorContext,
   ): Promise<string> {
-    const where: Record<string, unknown> = {
-      organizationId: actor.organizationId,
-    };
-    if (query.category) where.category = query.category;
+    const qb = this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.provider', 'provider')
+      .where('item.organizationId = :orgId', { orgId: actor.organizationId });
 
-    const items = await this.itemRepo.find({ where, order: { code: 'ASC' } });
+    if (query.category) {
+      qb.andWhere('item.category = :category', { category: query.category });
+    }
+    qb.orderBy('item.code', 'ASC');
 
-    const headers = ['itemCode', 'itemName', 'uom', 'category', 'isActive'];
+    const items = await qb.getMany();
+
+    const headers = ['itemCode', 'itemName', 'uom', 'category', 'isActive', 'providerCode', 'providerName'];
     const rows = items.map((item) =>
       [
         this.escapeCsv(item.code),
@@ -48,6 +53,8 @@ export class CsvExportService {
         this.escapeCsv(item.unit),
         this.escapeCsv(item.category ?? ''),
         item.isActive ? 'true' : 'false',
+        this.escapeCsv(item.provider?.code ?? ''),
+        this.escapeCsv(item.provider?.name ?? ''),
       ].join(','),
     );
 

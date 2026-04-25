@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Input, Label, DateTimeField } from "@erp/ui";
 
 interface DateRange {
   startDate: string;
@@ -32,41 +33,37 @@ export function ReportFilters({
   onDateRangeChange,
 }: ReportFiltersProps) {
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-      <label>
-        Branch:
-        <input
+    <div className="flex gap-3 items-center mb-4 flex-wrap">
+      <div className="flex items-center gap-1.5">
+        <Label>Chi nhánh:</Label>
+        <Input
           type="text"
-          placeholder="All (consolidated)"
+          placeholder="Tất cả (gộp)"
           value={branchId}
           onChange={(e) => onBranchChange(e.target.value)}
-          style={{ marginLeft: 4, padding: "4px 8px" }}
+          className="w-44"
         />
-      </label>
+      </div>
       {showDateRange && (
         <>
-          <label>
-            From:
-            <input
-              type="date"
+          <div className="flex items-center gap-1.5">
+            <Label>Từ:</Label>
+            <DateTimeField
               value={dateRange.startDate}
               onChange={(e) =>
                 onDateRangeChange({ ...dateRange, startDate: e.target.value })
               }
-              style={{ marginLeft: 4, padding: "4px 8px" }}
             />
-          </label>
-          <label>
-            To:
-            <input
-              type="date"
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label>Đến:</Label>
+            <DateTimeField
               value={dateRange.endDate}
               onChange={(e) =>
                 onDateRangeChange({ ...dateRange, endDate: e.target.value })
               }
-              style={{ marginLeft: 4, padding: "4px 8px" }}
             />
-          </label>
+          </div>
         </>
       )}
     </div>

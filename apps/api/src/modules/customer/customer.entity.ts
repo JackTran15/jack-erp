@@ -9,7 +9,10 @@ import { BaseEntity } from '../../database/entities/base.entity';
   where: '"email" IS NOT NULL',
 })
 @Index('idx_customer_org_status', ['organizationId', 'status'])
-@Index('idx_customer_org_phone', ['organizationId', 'phone'])
+@Index('uq_customer_org_phone', ['organizationId', 'phone'], {
+  unique: true,
+  where: '"phone" IS NOT NULL',
+})
 export class CustomerEntity extends BaseEntity {
   @Column({ name: 'first_name', comment: 'Customers given name' })
   firstName: string;
@@ -20,7 +23,10 @@ export class CustomerEntity extends BaseEntity {
   @Column({ nullable: true, comment: 'Email address; optional but unique within org when provided' })
   email?: string;
 
-  @Column({ nullable: true, comment: 'Phone number for contact or lookup at POS' })
+  @Column({
+    nullable: true,
+    comment: 'Phone number for contact or lookup at POS; unique within organization when set',
+  })
   phone?: string;
 
   @Column({ nullable: true, comment: 'Mailing or billing address' })

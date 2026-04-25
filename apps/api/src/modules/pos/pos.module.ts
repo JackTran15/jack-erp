@@ -18,6 +18,7 @@ import {
   CheckoutService,
   ReturnService,
   ExchangeService,
+  PosCatalogService,
 } from './services';
 import { PosController } from './pos.controller';
 
@@ -43,6 +44,7 @@ import { PosController } from './pos.controller';
     CheckoutService,
     ReturnService,
     ExchangeService,
+    PosCatalogService,
   ],
   exports: [
     PosSessionService,

@@ -8,3 +8,4 @@ export {
   ExchangeSettlementDto,
 } from './exchange.dto';
 export { SubmitReconciliationDto } from './reconciliation.dto';
+export { PosCatalogQueryDto } from './pos-catalog.query.dto';

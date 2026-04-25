@@ -14,10 +14,10 @@ const APPROVE_PERMISSIONS = [
 ];
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "Pending Approval",
-  [RegistrationStatus.APPROVED]: "Approved",
-  [RegistrationStatus.REJECTED]: "Rejected",
-  [RegistrationStatus.RESUBMITTED]: "Resubmitted",
+  [RegistrationStatus.PENDING_APPROVAL]: "Chờ phê duyệt",
+  [RegistrationStatus.APPROVED]: "Đã duyệt",
+  [RegistrationStatus.REJECTED]: "Đã từ chối",
+  [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
 const STATUS_COLORS: Record<RegistrationStatus, string> = {
@@ -62,12 +62,12 @@ export function RegistrationDetailPage() {
           if (found) {
             setRecord(found);
           } else {
-            setError("Registration request not found");
+            setError("Không tìm thấy yêu cầu đăng ký");
           }
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load");
+          setError(err instanceof Error ? err.message : "Tải dữ liệu thất bại");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -81,7 +81,7 @@ export function RegistrationDetailPage() {
   if (loading) {
     return (
       <div style={{ padding: 24 }}>
-        <p>Loading…</p>
+        <p>Đang tải…</p>
       </div>
     );
   }
@@ -89,10 +89,10 @@ export function RegistrationDetailPage() {
   if (error || !record) {
     return (
       <div style={{ padding: 24 }}>
-        <h2>Registration Detail</h2>
-        <p style={{ color: "#c62828" }}>{error ?? "Not found"}</p>
+        <h2>Chi tiết đăng ký</h2>
+        <p style={{ color: "#c62828" }}>{error ?? "Không tìm thấy"}</p>
         <button type="button" onClick={() => navigate(-1)} style={{ cursor: "pointer" }}>
-          Back
+          Quay lại
         </button>
       </div>
     );
@@ -111,7 +111,7 @@ export function RegistrationDetailPage() {
       const updated = await approveRegistration(record.id, record.type);
       setRecord(updated);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Approve failed");
+      setError(err instanceof Error ? err.message : "Phê duyệt thất bại");
     } finally {
       setActionLoading(false);
     }
@@ -131,23 +131,23 @@ export function RegistrationDetailPage() {
       setRejectMode(false);
       setRejectReason("");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Reject failed");
+      setError(err instanceof Error ? err.message : "Từ chối thất bại");
     } finally {
       setActionLoading(false);
     }
   };
 
   const typeName =
-    record.type === RegistrationType.ORGANIZATION ? "Organization" : "Branch";
+    record.type === RegistrationType.ORGANIZATION ? "Tổ chức" : "Chi nhánh";
 
   const requestDataEntries = Object.entries(record.requestData);
 
   const timeline: { label: string; date: string }[] = [
-    { label: "Submitted", date: record.createdAt },
+    { label: "Đã gửi", date: record.createdAt },
   ];
   if (record.reviewedAt) {
     const action =
-      record.status === RegistrationStatus.APPROVED ? "Approved" : "Rejected";
+      record.status === RegistrationStatus.APPROVED ? "Đã duyệt" : "Đã từ chối";
     timeline.push({ label: action, date: record.reviewedAt });
   }
 
@@ -158,10 +158,10 @@ export function RegistrationDetailPage() {
         onClick={() => navigate(-1)}
         style={{ marginBottom: 16, cursor: "pointer" }}
       >
-        &larr; Back
+        &larr; Quay lại
       </button>
 
-      <h2>{typeName} Registration Detail</h2>
+      <h2>Chi tiết đăng ký {typeName}</h2>
 
       <div
         style={{
@@ -172,13 +172,13 @@ export function RegistrationDetailPage() {
         }}
       >
         <p>
-          <strong>ID:</strong> {record.id}
+          <strong>Mã:</strong> {record.id}
         </p>
         <p>
-          <strong>Type:</strong> {typeName}
+          <strong>Loại:</strong> {typeName}
         </p>
         <p>
-          <strong>Status:</strong>{" "}
+          <strong>Trạng thái:</strong>{" "}
           <span
             style={{ color: STATUS_COLORS[record.status], fontWeight: 600 }}
           >
@@ -187,11 +187,11 @@ export function RegistrationDetailPage() {
         </p>
         {record.rejectionReason && (
           <p>
-            <strong>Rejection Reason:</strong> {record.rejectionReason}
+            <strong>Lý do từ chối:</strong> {record.rejectionReason}
           </p>
         )}
 
-        <h3>Request Data</h3>
+        <h3>Dữ liệu đăng ký</h3>
         <table style={{ borderCollapse: "collapse", width: "100%" }}>
           <tbody>
             {requestDataEntries.map(([key, value]) => (
@@ -216,7 +216,7 @@ export function RegistrationDetailPage() {
           marginBottom: 20,
         }}
       >
-        <h3 style={{ marginTop: 0 }}>Timeline</h3>
+        <h3 style={{ marginTop: 0 }}>Dòng thời gian</h3>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {timeline.map((event) => (
             <li
@@ -231,7 +231,7 @@ export function RegistrationDetailPage() {
               <strong>{event.label}</strong>
               <br />
               <span style={{ fontSize: 14, color: "#555" }}>
-                {new Date(event.date).toLocaleString()}
+                {new Date(event.date).toLocaleString("vi-VN")}
               </span>
             </li>
           ))}
@@ -256,7 +256,7 @@ export function RegistrationDetailPage() {
               fontWeight: 600,
             }}
           >
-            {actionLoading ? "Approving…" : "Approve"}
+            {actionLoading ? "Đang duyệt…" : "Duyệt"}
           </button>
           <button
             type="button"
@@ -271,7 +271,7 @@ export function RegistrationDetailPage() {
               fontWeight: 600,
             }}
           >
-            Reject
+            Từ chối
           </button>
         </div>
       )}
@@ -284,12 +284,12 @@ export function RegistrationDetailPage() {
             padding: 20,
           }}
         >
-          <h3 style={{ marginTop: 0 }}>Reject Registration</h3>
+          <h3 style={{ marginTop: 0 }}>Từ chối đăng ký</h3>
           <label>
             <span
               style={{ display: "block", marginBottom: 4, fontWeight: 500 }}
             >
-              Reason (required, min 5 characters)
+              Lý do (bắt buộc, tối thiểu 5 ký tự)
             </span>
             <textarea
               value={rejectReason}
@@ -313,7 +313,7 @@ export function RegistrationDetailPage() {
                 borderRadius: 4,
               }}
             >
-              {actionLoading ? "Rejecting…" : "Confirm Reject"}
+              {actionLoading ? "Đang từ chối…" : "Xác nhận từ chối"}
             </button>
             <button
               type="button"
@@ -329,7 +329,7 @@ export function RegistrationDetailPage() {
                 background: "none",
               }}
             >
-              Cancel
+              Huỷ
             </button>
           </div>
         </div>
