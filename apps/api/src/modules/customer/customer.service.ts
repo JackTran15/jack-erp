@@ -255,8 +255,7 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'customers',
   idField: 'id',
   fields: [
-    { key: 'lastName', label: 'Họ', type: 'string', required: true },
-    { key: 'firstName', label: 'Tên', type: 'string', required: true },
+    { key: 'name', label: 'Tên khách hàng', type: 'string', required: true },
     { key: 'email', label: 'Email', type: 'string' },
     { key: 'phone', label: 'Điện thoại', type: 'string' },
     { key: 'address', label: 'Địa chỉ', type: 'string' },
@@ -267,7 +266,7 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
       enumValues: Object.values(CustomerStatus),
     },
   ],
-  searchableFields: ['firstName', 'lastName', 'email', 'phone'],
+  searchableFields: ['name', 'email', 'phone'],
   filterDefinitions: [
     {
       key: 'status',

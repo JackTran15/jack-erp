@@ -1,15 +1,17 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   createCustomer,
+  phoneDigitsOnly,
   type CustomerRow,
 } from "../lib/customerApi";
 
-type Props = {
+export type CustomerCreateDialogProps = {
   open: boolean;
   onClose: () => void;
   onCreated: (customer: CustomerRow) => void;
-  defaultPhone: string;
+  defaultQuery: string;
 };
+type Props = CustomerCreateDialogProps;
 
 function userFacingError(err: unknown): string {
   if (err instanceof Error) {
@@ -25,20 +27,16 @@ export function CustomerCreateDialog({
   open,
   onClose,
   onCreated,
-  defaultPhone,
-}: Props) {
+  defaultQuery,
+}: CustomerCreateDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const lastNameId = useId();
-  const firstNameId = useId();
+  const nameId = useId();
   const phoneId = useId();
   const emailId = useId();
-  const addressId = useId();
 
-  const [formLastName, setFormLastName] = useState("");
-  const [formFirstName, setFormFirstName] = useState("");
+  const [formName, setFormName] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formAddress, setFormAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -47,17 +45,18 @@ export function CustomerCreateDialog({
     if (!el) return;
     if (open && !el.open) {
       el.showModal();
-      setFormLastName("");
-      setFormFirstName("");
-      setFormPhone(defaultPhone.trim());
+      const seed = defaultQuery.trim();
+      const digits = phoneDigitsOnly(seed);
+      const isPhoneLike = digits.length >= 6 && digits.length >= seed.length - 1;
+      setFormName(isPhoneLike ? "" : seed);
+      setFormPhone(isPhoneLike ? seed : "");
       setFormEmail("");
-      setFormAddress("");
       setError("");
       setLoading(false);
     } else if (!open && el.open) {
       el.close();
     }
-  }, [open, defaultPhone]);
+  }, [open, defaultQuery]);
 
   useEffect(() => {
     const el = dialogRef.current;
@@ -72,21 +71,16 @@ export function CustomerCreateDialog({
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    const lastName = formLastName.trim();
-    const firstName = formFirstName.trim();
-    const phone = formPhone.trim();
-    if (!phone) { setError("Số điện thoại bắt buộc."); return; }
-    if (!lastName) { setError("Họ bắt buộc."); return; }
-    if (!firstName) { setError("Tên bắt buộc."); return; }
+    const name = formName.trim();
+    const phone = formPhone.trim() || undefined;
+    if (!name) { setError("Tên khách hàng bắt buộc."); return; }
     setError("");
     setLoading(true);
     try {
       const created = await createCustomer({
-        lastName,
-        firstName,
+        name,
         phone,
         email: formEmail.trim() || undefined,
-        address: formAddress.trim() || undefined,
       });
       onCreated(created);
     } catch (err) {
@@ -129,49 +123,31 @@ export function CustomerCreateDialog({
           >
             <div className="pos-create-customer-form__field">
               <label htmlFor={phoneId}>
-                Số điện thoại <span className="pos-required">*</span>
+                Số điện thoại (tuỳ chọn)
               </label>
               <input
                 id={phoneId}
                 className="pos-input"
                 type="tel"
-                inputMode="numeric"
+                inputMode="tel"
                 autoComplete="tel"
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
               />
-              <p className="pos-hint pos-mt-0">
-                Từ ô tìm — chỉnh sửa được.
-              </p>
             </div>
 
-            <div className="pos-create-customer-form__row">
-              <div className="pos-create-customer-form__field">
-                <label htmlFor={lastNameId}>
-                  Họ <span className="pos-required">*</span>
-                </label>
-                <input
-                  id={lastNameId}
-                  className="pos-input"
-                  type="text"
-                  autoComplete="family-name"
-                  value={formLastName}
-                  onChange={(e) => setFormLastName(e.target.value)}
-                />
-              </div>
-              <div className="pos-create-customer-form__field">
-                <label htmlFor={firstNameId}>
-                  Tên <span className="pos-required">*</span>
-                </label>
-                <input
-                  id={firstNameId}
-                  className="pos-input"
-                  type="text"
-                  autoComplete="given-name"
-                  value={formFirstName}
-                  onChange={(e) => setFormFirstName(e.target.value)}
-                />
-              </div>
+            <div className="pos-create-customer-form__field">
+              <label htmlFor={nameId}>
+                Tên khách hàng <span className="pos-required">*</span>
+              </label>
+              <input
+                id={nameId}
+                className="pos-input"
+                type="text"
+                autoComplete="name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
             </div>
 
             <div className="pos-create-customer-form__field">
@@ -183,19 +159,6 @@ export function CustomerCreateDialog({
                 autoComplete="email"
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="pos-create-customer-form__field">
-              <label htmlFor={addressId}>Địa chỉ</label>
-              <textarea
-                id={addressId}
-                className="pos-input"
-                autoComplete="street-address"
-                rows={2}
-                value={formAddress}
-                onChange={(e) => setFormAddress(e.target.value)}
-                style={{ minHeight: "3rem", padding: "0.5rem" }}
               />
             </div>
 
@@ -212,7 +175,7 @@ export function CustomerCreateDialog({
                 className="pos-btn pos-btn--primary"
                 disabled={loading}
               >
-                {loading ? "Đang lưu…" : "Lưu và chọn"}
+                {loading ? "Đang lưu…" : "Lưu và chọn khách này"}
               </button>
             </div>
           </form>

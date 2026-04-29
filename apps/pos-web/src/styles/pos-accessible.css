@@ -1127,3 +1127,125 @@ a:focus:not(:focus-visible) {
 .pos-required {
   color: var(--pos-danger);
 }
+
+/* ============ SearchSelectInput (pos-ss) ============ */
+.pos-ss {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pos-ss__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+
+.pos-ss__row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.pos-ss__row .pos-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+}
+
+.pos-ss__hint {
+  margin-top: 0.15rem;
+}
+
+/* ============ SearchSelectModal (pos-dialog) ============ */
+.pos-dialog {
+  border: none;
+  border-radius: var(--pos-radius);
+  padding: 0;
+  width: min(95vw, 32rem);
+  max-height: 90vh;
+  background: var(--pos-surface);
+  box-shadow: var(--pos-shadow-lg);
+}
+
+.pos-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.pos-dialog__inner {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.pos-dialog__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--pos-border);
+}
+
+.pos-dialog__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.pos-dialog__close {
+  flex-shrink: 0;
+}
+
+.pos-dialog__body {
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pos-dialog__alert {
+  background: #fef2f2;
+  color: var(--pos-danger);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--pos-radius-sm);
+  font-size: 0.8125rem;
+}
+
+.pos-ss-modal__search {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.pos-ss-modal__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.pos-ss-modal__result-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--pos-radius-sm);
+  font-size: 0.875rem;
+  transition: background 0.05s;
+}
+
+.pos-ss-modal__result-btn:hover,
+.pos-ss-modal__result-btn:focus-visible {
+  background: var(--pos-primary-light);
+}
+
+.pos-ss-modal__create {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--pos-border);
+}

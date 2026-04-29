@@ -9,9 +9,10 @@ import {
 } from "react";
 import { CustomerCreateDialog } from "../components/CustomerCreateDialog";
 import { CustomerSelectDialog } from "../components/CustomerSelectDialog";
+import { SearchSelectInput } from "../components/SearchSelectInput";
+import type { SearchSelectSuggestion } from "../components/SearchSelectInput";
 import {
   formatCustomerDisplay,
-  phoneNumbersMatch,
   searchCustomers,
   type CustomerRow,
 } from "../lib/customerApi";
@@ -70,18 +71,13 @@ function locationQtyFor(product: PosCatalogLine): number {
 }
 
 export function CheckoutPage() {
-  const searchId = useId();
-  const customerPhoneId = useId();
   const liveTotalId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
-  const searchWrapRef = useRef<HTMLDivElement>(null);
-  const customerPhoneRef = useRef<HTMLInputElement>(null);
+  const customerSearchRef = useRef<HTMLInputElement>(null);
   const cashInputRef = useRef<HTMLInputElement>(null);
   const branchId = usePosBranchStore((s) => s.branchId)!;
 
   const [query, setQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [highlightIdx, setHighlightIdx] = useState(-1);
   const [catalog, setCatalog] = useState<PosCatalogLine[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
@@ -97,17 +93,9 @@ export function CheckoutPage() {
   );
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [createDefaultPhone, setCreateDefaultPhone] = useState("");
+  const [createDefaultQuery, setCreateDefaultQuery] = useState("");
   const [customerPhoneQuery, setCustomerPhoneQuery] = useState("");
-  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [customerFieldError, setCustomerFieldError] = useState("");
-  const [customerMatchCandidates, setCustomerMatchCandidates] = useState<
-    CustomerRow[]
-  >([]);
-  const [customerPhoneFocused, setCustomerPhoneFocused] = useState(false);
-  const [customerHighlightIdx, setCustomerHighlightIdx] = useState(-1);
-  const customerPhoneWrapRef = useRef<HTMLDivElement>(null);
-  const customerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadCatalog = useCallback(async () => {
     setCatalogError("");
@@ -141,30 +129,33 @@ export function CheckoutPage() {
     );
   }, [catalog, query]);
 
-  const showSuggestions = searchFocused && query.trim().length > 0;
-  const suggestions = showSuggestions ? filteredProducts.slice(0, 8) : [];
+  // ---- Generic search callbacks for SearchSelectInput ----
 
-  useEffect(() => {
-    setHighlightIdx(-1);
-  }, [query]);
+  /** Customer search → returns suggestions for SearchSelectInput. */
+  const customerSearch = useCallback(
+    async (q: string): Promise<SearchSelectSuggestion<CustomerRow>[]> => {
+      const res = await searchCustomers(q);
+      return res.data.slice(0, 8).map((c) => ({ item: c }));
+    },
+    [],
+  );
 
-  useEffect(() => {
-    if (!showSuggestions) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        searchWrapRef.current &&
-        !searchWrapRef.current.contains(e.target as Node)
-      ) {
-        setSearchFocused(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showSuggestions]);
-
-  const handleSearchKeyDownRef = useRef<
-    ((e: React.KeyboardEvent<HTMLInputElement>) => void) | null
-  >(null);
+  /** Product search → local filter on catalog, returns suggestions. */
+  const productSearch = useCallback(
+    async (q: string): Promise<SearchSelectSuggestion<PosCatalogLine>[]> => {
+      const lower = q.toLowerCase();
+      const matched = catalog.filter(
+        (p) =>
+          p.name.toLowerCase().includes(lower) ||
+          p.code.toLowerCase().includes(lower),
+      );
+      return matched.slice(0, 8).map((p) => ({
+        item: p,
+        disabled: locationQtyFor(p) < 1,
+      }));
+    },
+    [catalog],
+  );
 
   const grandTotal = useMemo(
     () => cart.reduce((sum, line) => sum + lineTotal(line), 0),
@@ -177,11 +168,8 @@ export function CheckoutPage() {
   const pickCustomer = useCallback(
     (c: CustomerRow, announceMessage?: string) => {
       setSelectedCustomer(c);
-      setCustomerMatchCandidates([]);
       setCustomerFieldError("");
-      setCustomerPhoneFocused(false);
-      setCustomerHighlightIdx(-1);
-      setCustomerPhoneQuery(c.phone?.trim() ?? "");
+      setCustomerPhoneQuery(c.name?.trim() ?? "");
       announce(
         announceMessage ?? `Đã chọn khách ${formatCustomerDisplay(c)}.`,
       );
@@ -189,147 +177,36 @@ export function CheckoutPage() {
     [announce],
   );
 
-  // Live-search customers as user types (debounced 350ms)
-  const runCustomerLiveSearch = useCallback(
-    async (q: string) => {
-      if (q.length < 2) {
-        setCustomerMatchCandidates([]);
-        return;
-      }
-      try {
-        const res = await searchCustomers(q);
-        setCustomerMatchCandidates(res.data.slice(0, 8));
-      } catch {
-        setCustomerMatchCandidates([]);
-      }
-    },
-    [],
-  );
-
-  const handleCustomerPhoneChange = useCallback(
-    (value: string) => {
-      setCustomerPhoneQuery(value);
-      setCustomerFieldError("");
-      setCustomerHighlightIdx(-1);
-      setCustomerPhoneFocused(true);
-      if (customerDebounceRef.current) clearTimeout(customerDebounceRef.current);
-      const q = value.trim();
-      if (q.length < 2) {
-        setCustomerMatchCandidates([]);
-        return;
-      }
-      customerDebounceRef.current = setTimeout(() => {
-        void runCustomerLiveSearch(q);
-      }, 350);
-    },
-    [runCustomerLiveSearch],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (customerDebounceRef.current) clearTimeout(customerDebounceRef.current);
-    };
-  }, []);
-
-  const showCustomerSuggestions =
-    customerPhoneFocused &&
-    customerPhoneQuery.trim().length >= 2 &&
-    customerMatchCandidates.length > 0;
-
-  useEffect(() => {
-    if (!showCustomerSuggestions) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        customerPhoneWrapRef.current &&
-        !customerPhoneWrapRef.current.contains(e.target as Node)
-      ) {
-        setCustomerPhoneFocused(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showCustomerSuggestions]);
-
-  const handleCustomerPhoneKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (showCustomerSuggestions) {
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setCustomerHighlightIdx((i) =>
-            (i + 1) % customerMatchCandidates.length,
-          );
-          return;
-        case "ArrowUp":
-          e.preventDefault();
-          setCustomerHighlightIdx((i) =>
-            i <= 0 ? customerMatchCandidates.length - 1 : i - 1,
-          );
-          return;
-        case "Escape":
-          e.preventDefault();
-          setCustomerPhoneFocused(false);
-          return;
-        case "Enter":
-          if (
-            customerHighlightIdx >= 0 &&
-            customerHighlightIdx < customerMatchCandidates.length
-          ) {
-            e.preventDefault();
-            pickCustomer(customerMatchCandidates[customerHighlightIdx]!);
-            return;
-          }
-          break;
-      }
-    }
-  };
-
-  const handleCustomerPhoneSubmit = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      const raw = customerPhoneQuery.trim();
-      setCustomerFieldError("");
-      setCustomerMatchCandidates([]);
+  /** Called when user presses Enter with no highlighted suggestion. */
+  const handleCustomerSubmitQuery = useCallback(
+    (raw: string): boolean => {
       if (raw.length < 2) {
         setCustomerFieldError("Nhập ít nhất 2 ký tự.");
-        return;
+        return true;
       }
-      setCustomerSearchLoading(true);
-      try {
-        const res = await searchCustomers(raw);
-        const rows = res.data;
+      setCustomerFieldError("");
+      void (async () => {
+        try {
+          const res = await searchCustomers(raw);
+          const rows = res.data;
+          if (rows.length === 1) {
+            pickCustomer(rows[0]!);
+            return;
+          }
+          if (rows.length > 1) {
+            setCustomerFieldError("Nhiều kết quả — chọn từ gợi ý bên dưới.");
+            return;
+          }
 
-        const exactByPhone = rows.filter((c) =>
-          phoneNumbersMatch(c.phone, raw),
-        );
-
-        if (exactByPhone.length === 1) {
-          pickCustomer(exactByPhone[0]!);
-          return;
+          setCreateDefaultQuery(raw);
+          setCreateCustomerOpen(true);
+        } catch (err) {
+          setCustomerFieldError(customerSearchErrorMessage(err));
         }
-        if (exactByPhone.length > 1) {
-          setCustomerMatchCandidates(exactByPhone.slice(0, 8));
-          setCustomerFieldError(
-            "Nhiều khách trùng SĐT — chọn một dòng bên dưới.",
-          );
-          return;
-        }
-
-        if (rows.length === 1 && rows[0]!.phone && phoneNumbersMatch(rows[0]!.phone, raw)) {
-          pickCustomer(rows[0]!);
-          return;
-        }
-
-        setCreateDefaultPhone(raw);
-        setCreateCustomerOpen(true);
-      } catch (err) {
-        setCustomerFieldError(customerSearchErrorMessage(err));
-      } finally {
-        setCustomerSearchLoading(false);
-      }
+      })();
+      return true;
     },
-    [customerPhoneQuery, pickCustomer],
+    [pickCustomer],
   );
 
   const addProduct = useCallback(
@@ -372,13 +249,12 @@ export function CheckoutPage() {
     [announce],
   );
 
-  const selectSuggestion = useCallback(
+  const handleProductSelect = useCallback(
     (p: PosCatalogLine) => {
       const atDef = locationQtyFor(p);
       if (atDef >= 1) {
         addProduct(p);
         setQuery("");
-        setSearchFocused(false);
         searchRef.current?.focus();
       } else {
         setCartError("Hết tồn.");
@@ -386,30 +262,6 @@ export function CheckoutPage() {
     },
     [addProduct],
   );
-
-  handleSearchKeyDownRef.current = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions || suggestions.length === 0) return;
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setHighlightIdx((i) => (i + 1) % suggestions.length);
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setHighlightIdx((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
-        break;
-      case "Enter":
-        if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
-          e.preventDefault();
-          selectSuggestion(suggestions[highlightIdx]!);
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        setSearchFocused(false);
-        break;
-    }
-  };
 
   const updateUnitPrice = (lineId: string, raw: string) => {
     const n = Math.max(0, Number.parseFloat(raw.replace(",", ".")) || 0);
@@ -449,19 +301,6 @@ export function CheckoutPage() {
     announce(`Đã xóa ${line.name} khỏi giỏ hàng.`);
   };
 
-  const handleSearchSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (filteredProducts.length === 1) {
-      addProduct(filteredProducts[0]!);
-      setQuery("");
-      searchRef.current?.focus();
-    } else if (filteredProducts.length === 0) {
-      setCartError("Không tìm thấy hàng phù hợp.");
-    } else {
-      setCartError("Nhiều kết quả — chọn hàng bên dưới hoặc thu hẹp từ khóa.");
-    }
-  };
-
   const handleCheckout = (e: FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -486,27 +325,32 @@ export function CheckoutPage() {
     setCart([]);
     setSelectedCustomer(null);
     setCustomerPhoneQuery("");
-    setCustomerMatchCandidates([]);
     setCustomerFieldError("");
-    setCustomerPhoneFocused(false);
-    setCustomerHighlightIdx(-1);
     setCashReceived("");
   };
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        if (e.key === "F1") {
+        if (e.key === "F3") {
           e.preventDefault();
           searchRef.current?.focus();
+        }
+        if (e.key === "F4") {
+          e.preventDefault();
+          customerSearchRef.current?.focus();
         }
         return;
       }
 
       switch (e.key) {
-        case "F1":
+        case "F3":
           e.preventDefault();
           searchRef.current?.focus();
+          break;
+        case "F4":
+          e.preventDefault();
+          customerSearchRef.current?.focus();
           break;
         case "F9":
           e.preventDefault();
@@ -540,7 +384,7 @@ export function CheckoutPage() {
       <CustomerCreateDialog
         open={createCustomerOpen}
         onClose={() => setCreateCustomerOpen(false)}
-        defaultPhone={createDefaultPhone}
+        defaultQuery={createDefaultQuery}
         onCreated={(c) => {
           setCreateCustomerOpen(false);
           pickCustomer(
@@ -562,87 +406,47 @@ export function CheckoutPage() {
       <div className="pos-checkout-grid">
         {/* ====== CỘT TRÁI: Tìm kiếm + Sản phẩm ====== */}
         <div className="pos-left-col">
-          {/* Ô tìm kiếm + autocomplete */}
+          {/* Ô tìm kiếm sản phẩm — SearchSelectInput */}
           <section className="pos-panel pos-search-panel" aria-labelledby="pos-search-heading">
-            <div ref={searchWrapRef} className="pos-autocomplete">
-              <form onSubmit={handleSearchSubmit} className="pos-search-bar">
-                <input
-                  ref={searchRef}
-                  id={searchId}
-                  className="pos-input pos-search-bar__input"
-                  type="search"
-                  autoComplete="off"
-                  placeholder="Tìm tên hoặc mã hàng… (F1)"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setCartError("");
-                    setSearchFocused(true);
-                  }}
-                  onFocus={() => setSearchFocused(true)}
-                  onKeyDown={(e) => handleSearchKeyDownRef.current?.(e)}
-                  disabled={catalogLoading}
-                  role="combobox"
-                  aria-expanded={showSuggestions && suggestions.length > 0}
-                  aria-autocomplete="list"
-                  aria-controls="pos-search-listbox"
-                  aria-activedescendant={
-                    highlightIdx >= 0 ? `pos-sg-${highlightIdx}` : undefined
-                  }
-                />
-                <button
-                  type="submit"
-                  className="pos-btn pos-btn--primary"
-                  disabled={catalogLoading}
-                >
-                  Thêm
-                </button>
-              </form>
-
-              {showSuggestions && suggestions.length > 0 ? (
-                <ul
-                  id="pos-search-listbox"
-                  className="pos-autocomplete__list"
-                  role="listbox"
-                >
-                  {suggestions.map((p, idx) => {
-                    const atDef = locationQtyFor(p);
-                    const canAdd = atDef >= 1;
-                    return (
-                      <li
-                        key={p.itemId}
-                        id={`pos-sg-${idx}`}
-                        role="option"
-                        aria-selected={idx === highlightIdx}
-                        className={`pos-autocomplete__item${idx === highlightIdx ? " pos-autocomplete__item--active" : ""}${!canAdd ? " pos-autocomplete__item--disabled" : ""}`}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectSuggestion(p);
-                        }}
-                        onMouseEnter={() => setHighlightIdx(idx)}
-                      >
-                        <span className="pos-autocomplete__name">{p.name}</span>
-                        <span className="pos-autocomplete__meta">
-                          {p.code} · Tồn {formatOnHand(p.quantityOnHand, p.unit)}
-                          {!canAdd && " · Hết"}
-                        </span>
-                      </li>
-                    );
-                  })}
-                  {filteredProducts.length > 8 && (
-                    <li className="pos-autocomplete__more">
-                      +{filteredProducts.length - 8} kết quả khác
-                    </li>
-                  )}
-                </ul>
-              ) : null}
-
-              {showSuggestions && query.trim().length > 0 && suggestions.length === 0 ? (
-                <div className="pos-autocomplete__list pos-autocomplete__empty">
-                  Không tìm thấy hàng phù hợp.
-                </div>
-              ) : null}
-            </div>
+            <SearchSelectInput<PosCatalogLine>
+              inputRef={searchRef}
+              value={query}
+              onValueChange={(v) => {
+                setQuery(v);
+                setCartError("");
+              }}
+              onSelect={handleProductSelect}
+              search={productSearch}
+              itemKey={(p) => p.itemId}
+              renderItem={(p) => p.name}
+              renderMeta={(p) => {
+                const atDef = locationQtyFor(p);
+                return (
+                  <>
+                    {p.code} · Tồn {formatOnHand(p.quantityOnHand, p.unit)}
+                    {atDef < 1 && " · Hết"}
+                  </>
+                );
+              }}
+              placeholder="Tìm tên hoặc mã hàng… (F3)"
+              inputType="search"
+              debounceMs={150}
+              minChars={1}
+              maxSuggestions={8}
+              disabled={catalogLoading}
+              onSubmitQuery={(q) => {
+                if (filteredProducts.length === 1) {
+                  addProduct(filteredProducts[0]!);
+                  setQuery("");
+                  searchRef.current?.focus();
+                } else if (filteredProducts.length === 0) {
+                  setCartError("Không tìm thấy hàng phù hợp.");
+                } else {
+                  setCartError("Nhiều kết quả — chọn hàng bên dưới hoặc thu hẹp từ khóa.");
+                }
+                return true;
+              }}
+            />
           </section>
 
           {/* Product grid */}
@@ -718,89 +522,48 @@ export function CheckoutPage() {
             <h3 id="pos-customer-label" className="pos-section-title">
               Khách hàng
             </h3>
-            <form
-              onSubmit={handleCustomerPhoneSubmit}
-              className="pos-customer-phone-block"
-            >
-              <label className="pos-cash-section__label" htmlFor={customerPhoneId}>
-                Số điện thoại
-              </label>
-              <div ref={customerPhoneWrapRef} className="pos-autocomplete">
-                <div className="pos-customer-phone-row">
-                  <input
-                    ref={customerPhoneRef}
-                    id={customerPhoneId}
-                    className="pos-input"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="Nhập SĐT…"
-                    value={customerPhoneQuery}
-                    onChange={(e) => handleCustomerPhoneChange(e.target.value)}
-                    onFocus={() => {
-                      setCustomerPhoneFocused(true);
-                      if (customerPhoneQuery.trim().length >= 2 && customerMatchCandidates.length === 0) {
-                        void runCustomerLiveSearch(customerPhoneQuery.trim());
-                      }
-                    }}
-                    onKeyDown={handleCustomerPhoneKeyDown}
-                    role="combobox"
-                    aria-expanded={showCustomerSuggestions}
-                    aria-autocomplete="list"
-                    aria-controls="pos-customer-listbox"
-                    aria-activedescendant={
-                      customerHighlightIdx >= 0 ? `pos-cust-${customerHighlightIdx}` : undefined
-                    }
-                  />
-                  <button
-                    type="submit"
-                    className="pos-btn pos-btn--secondary pos-btn--sm"
-                    disabled={customerSearchLoading}
-                  >
-                    {customerSearchLoading ? "…" : "Tìm"}
-                  </button>
-                </div>
-
-                {showCustomerSuggestions ? (
-                  <ul
-                    id="pos-customer-listbox"
-                    className="pos-autocomplete__list"
-                    role="listbox"
-                  >
-                    {customerMatchCandidates.map((c, idx) => (
-                      <li
-                        key={c.id}
-                        id={`pos-cust-${idx}`}
-                        role="option"
-                        aria-selected={idx === customerHighlightIdx}
-                        className={`pos-autocomplete__item${idx === customerHighlightIdx ? " pos-autocomplete__item--active" : ""}`}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          pickCustomer(c);
-                        }}
-                        onMouseEnter={() => setCustomerHighlightIdx(idx)}
-                      >
-                        <span className="pos-autocomplete__name">
-                          {formatCustomerDisplay(c)}
-                        </span>
-                        <span className="pos-autocomplete__meta">
-                          {c.phone ?? "—"}
-                          {c.email ? ` · ${c.email}` : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-              <p id="pos-customer-phone-hint" className="pos-hint" style={{ marginTop: "0.25rem" }}>
-                Gõ để tìm · Enter: chọn hoặc tạo mới.
+            <SearchSelectInput<CustomerRow>
+              inputRef={customerSearchRef}
+              value={customerPhoneQuery}
+              onValueChange={(v) => {
+                setCustomerPhoneQuery(v);
+                setCustomerFieldError("");
+              }}
+              onSelect={pickCustomer}
+              search={customerSearch}
+              itemKey={(c) => c.id}
+              renderItem={(c) => formatCustomerDisplay(c)}
+              renderMeta={(c) => (
+                <>
+                  {c.phone ?? "—"}
+                  {c.email ? ` · ${c.email}` : ""}
+                </>
+              )}
+              label="Tìm khách hàng"
+              placeholder="Tìm theo tên, SĐT… (F4)"
+              inputType="search"
+              hint="Gõ tên hoặc SĐT · Enter: chọn hoặc tạo mới."
+              debounceMs={350}
+              minChars={2}
+              maxSuggestions={8}
+              onSubmitQuery={handleCustomerSubmitQuery}
+              createAction={{
+                label: "Tạo khách mới",
+                onTrigger: (q) => {
+                  setCreateDefaultQuery(q);
+                  setCreateCustomerOpen(true);
+                },
+              }}
+              listAction={{
+                label: "Tìm theo tên / nâng cao",
+                onTrigger: () => setCustomerDialogOpen(true),
+              }}
+            />
+            {customerFieldError ? (
+              <p className="pos-customer-field-error" role="alert">
+                {customerFieldError}
               </p>
-              {customerFieldError ? (
-                <p className="pos-customer-field-error" role="alert">
-                  {customerFieldError}
-                </p>
-              ) : null}
-            </form>
+            ) : null}
 
             {selectedCustomer ? (
               <div className="pos-customer-selected">
@@ -818,13 +581,6 @@ export function CheckoutPage() {
             )}
 
             <div className="pos-customer-secondary-actions">
-              <button
-                type="button"
-                className="pos-btn pos-btn--secondary pos-btn--sm"
-                onClick={() => setCustomerDialogOpen(true)}
-              >
-                Tìm theo tên / nâng cao
-              </button>
               {selectedCustomer ? (
                 <button
                   type="button"
@@ -832,10 +588,7 @@ export function CheckoutPage() {
                   onClick={() => {
                     setSelectedCustomer(null);
                     setCustomerPhoneQuery("");
-                    setCustomerMatchCandidates([]);
                     setCustomerFieldError("");
-                    setCustomerPhoneFocused(false);
-                    setCustomerHighlightIdx(-1);
                     announce("Khách lẻ.");
                   }}
                 >

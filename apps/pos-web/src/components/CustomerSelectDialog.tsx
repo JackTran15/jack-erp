@@ -38,8 +38,7 @@ function userFacingError(err: unknown): string {
 
 export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
   const searchInputId = useId();
-  const lastNameId = useId();
-  const firstNameId = useId();
+  const nameId = useId();
   const phoneId = useId();
   const emailId = useId();
 
@@ -48,8 +47,7 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
   const [searchLoading, setSearchLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [formLastName, setFormLastName] = useState("");
-  const [formFirstName, setFormFirstName] = useState("");
+  const [formName, setFormName] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [error, setError] = useState("");
@@ -61,8 +59,7 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
     setSearchLoading(false);
     setCreateLoading(false);
     setCreateOpen(false);
-    setFormLastName("");
-    setFormFirstName("");
+    setFormName("");
     setFormPhone("");
     setFormEmail("");
     setError("");
@@ -99,10 +96,9 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    const lastName = formLastName.trim();
-    const firstName = formFirstName.trim();
-    if (!lastName || !firstName) {
-      setError("Họ và tên khách là bắt buộc.");
+    const name = formName.trim();
+    if (!name) {
+      setError("Tên khách hàng là bắt buộc.");
       return;
     }
     setError("");
@@ -111,8 +107,7 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
       const phone = formPhone.trim() || undefined;
       const email = formEmail.trim() || undefined;
       const created = await createCustomer({
-        lastName,
-        firstName,
+        name,
         phone,
         email,
       });
@@ -147,7 +142,7 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
 
         <form onSubmit={handleSearch} className="space-y-2">
           <FormField
-            label="Tìm theo họ tên, email hoặc số điện thoại"
+            label="Tìm theo tên, email hoặc số điện thoại"
             htmlFor={searchInputId}
             hint="Tối thiểu 2 ký tự. Kết quả lấy từ máy chủ (quyền customer.read)."
           >
@@ -218,23 +213,13 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
             <section className="mt-4 space-y-3" aria-label="Tạo khách hàng mới">
               <h3 className="text-base font-bold">Thông tin khách mới</h3>
               <form onSubmit={handleCreate} noValidate className="space-y-3">
-                <FormField label="Họ" htmlFor={lastNameId} required>
+                <FormField label="Tên khách hàng" htmlFor={nameId} required>
                   <Input
-                    id={lastNameId}
+                    id={nameId}
                     type="text"
-                    autoComplete="family-name"
-                    value={formLastName}
-                    onChange={(e) => setFormLastName(e.target.value)}
-                    required
-                  />
-                </FormField>
-                <FormField label="Tên" htmlFor={firstNameId} required>
-                  <Input
-                    id={firstNameId}
-                    type="text"
-                    autoComplete="given-name"
-                    value={formFirstName}
-                    onChange={(e) => setFormFirstName(e.target.value)}
+                    autoComplete="name"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
                     required
                   />
                 </FormField>

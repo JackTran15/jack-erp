@@ -9,13 +9,8 @@ import {
 export class CreateCustomerDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(100)
-  firstName: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
-  lastName: string;
+  @MaxLength(200)
+  name: string;
 
   @IsOptional()
   @IsEmail()

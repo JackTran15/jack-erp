@@ -2099,16 +2099,14 @@ export interface components {
             assignedBy: string;
         };
         CreateCustomerDto: {
-            firstName: string;
-            lastName: string;
+            name: string;
             /** Format: email */
             email?: string;
             phone?: string;
             address?: string;
         };
         CustomerEntity: {
-            firstName: string;
-            lastName: string;
+            name: string;
             email?: string;
             phone?: string;
             address?: string;
@@ -2129,8 +2127,7 @@ export interface components {
             createdBy: string;
         };
         UpdateCustomerDto: {
-            firstName?: string;
-            lastName?: string;
+            name?: string;
             /** Format: email */
             email?: string;
             phone?: string;

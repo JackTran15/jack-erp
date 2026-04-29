@@ -14,11 +14,8 @@ import { BaseEntity } from '../../database/entities/base.entity';
   where: '"phone" IS NOT NULL',
 })
 export class CustomerEntity extends BaseEntity {
-  @Column({ name: 'first_name', comment: 'Customers given name' })
-  firstName: string;
-
-  @Column({ name: 'last_name', comment: 'Customers family name' })
-  lastName: string;
+  @Column({ comment: 'Customers full name' })
+  name: string;
 
   @Column({ nullable: true, comment: 'Email address; optional but unique within org when provided' })
   email?: string;

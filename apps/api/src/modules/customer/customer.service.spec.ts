@@ -24,8 +24,7 @@ const customerStub = (overrides: Partial<CustomerEntity> = {}): CustomerEntity =
     id: 'cust-1',
     organizationId: 'org-1',
     branchId: 'branch-1',
-    firstName: 'John',
-    lastName: 'Doe',
+    name: 'John Doe',
     email: 'john@example.com',
     phone: '555-0001',
     status: CustomerStatus.ACTIVE,
@@ -105,7 +104,7 @@ describe('CustomerService', () => {
 
       await expect(
         (service as any).beforeCreate(
-          { firstName: 'Jane', lastName: 'Doe', email: 'john@example.com' },
+          { name: 'Jane Doe', email: 'john@example.com' },
           actor,
         ),
       ).rejects.toThrow(ConflictException);
@@ -115,7 +114,7 @@ describe('CustomerService', () => {
       customerRepo.findOne.mockResolvedValue(null);
 
       const result = await (service as any).beforeCreate(
-        { firstName: 'Jane', lastName: 'Doe', email: 'unique@example.com' },
+        { name: 'Jane Doe', email: 'unique@example.com' },
         actor,
       );
 
@@ -212,7 +211,7 @@ describe('CustomerService', () => {
       await expect(
         (service as any).beforeUpdate(
           'cust-1',
-          { firstName: 'Updated' },
+          { name: 'Updated' },
           actor,
         ),
       ).rejects.toThrow(BadRequestException);
@@ -225,11 +224,11 @@ describe('CustomerService', () => {
 
       const result = await (service as any).beforeUpdate(
         'cust-1',
-        { firstName: 'Updated' },
+        { name: 'Updated' },
         actor,
       );
 
-      expect(result.firstName).toBe('Updated');
+      expect(result.name).toBe('Updated');
     });
   });
 });

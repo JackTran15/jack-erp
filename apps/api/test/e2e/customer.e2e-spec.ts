@@ -37,16 +37,14 @@ describe('Customer (E2E)', () => {
         .post('/customers')
         .set(headers())
         .send({
-          firstName: 'John',
-          lastName: 'Doe',
+          name: 'John Doe',
           email: 'john.doe@example.com',
           phone: '+1234567890',
         })
         .expect(201);
 
       customerId = res.body.id;
-      expect(res.body.firstName).toBe('John');
-      expect(res.body.lastName).toBe('Doe');
+      expect(res.body.name).toBe('John Doe');
     });
 
     it('should list customers', async () => {
@@ -75,10 +73,10 @@ describe('Customer (E2E)', () => {
       const res = await request(app.getHttpServer())
         .patch(`/customers/${customerId}`)
         .set(headers())
-        .send({ firstName: 'Jane' })
+        .send({ name: 'Jane Doe' })
         .expect(200);
 
-      expect(res.body.firstName).toBe('Jane');
+      expect(res.body.name).toBe('Jane Doe');
     });
 
     it('should delete a customer', async () => {
@@ -86,8 +84,7 @@ describe('Customer (E2E)', () => {
         .post('/customers')
         .set(headers())
         .send({
-          firstName: 'Temp',
-          lastName: 'User',
+          name: 'Temp User',
           phone: '+0000000000',
         })
         .expect(201);
@@ -107,8 +104,7 @@ describe('Customer (E2E)', () => {
         .post('/customers')
         .set(headers())
         .send({
-          firstName: 'Dup',
-          lastName: 'Test',
+          name: 'Dup Test',
           email: 'unique-dup-test@example.com',
         })
         .expect(201);
@@ -117,8 +113,7 @@ describe('Customer (E2E)', () => {
         .post('/customers')
         .set(headers())
         .send({
-          firstName: 'Another',
-          lastName: 'Person',
+          name: 'Another Person',
           email: 'unique-dup-test@example.com',
         })
         .expect(409);
@@ -135,14 +130,14 @@ describe('Customer (E2E)', () => {
       const sourceRes = await request(app.getHttpServer())
         .post('/customers')
         .set(headers())
-        .send({ firstName: 'Source', lastName: 'Customer', phone: '+1111111111' })
+        .send({ name: 'Source Customer', phone: '+1111111111' })
         .expect(201);
       sourceId = sourceRes.body.id;
 
       const targetRes = await request(app.getHttpServer())
         .post('/customers')
         .set(headers())
-        .send({ firstName: 'Target', lastName: 'Customer', phone: '+2222222222' })
+        .send({ name: 'Target Customer', phone: '+2222222222' })
         .expect(201);
       targetId = targetRes.body.id;
     });
@@ -161,7 +156,7 @@ describe('Customer (E2E)', () => {
       await request(app.getHttpServer())
         .patch(`/customers/${sourceId}`)
         .set(headers())
-        .send({ firstName: 'Renamed' })
+        .send({ name: 'Renamed Customer' })
         .expect((res) => {
           expect([400, 403, 409, 422]).toContain(res.status);
         });

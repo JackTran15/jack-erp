@@ -22,8 +22,7 @@ export function phoneNumbersMatch(
 /** Bản ghi khách từ GET /customers (camelCase). */
 export type CustomerRow = {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone?: string | null;
   email?: string | null;
 };
@@ -35,8 +34,8 @@ export type PaginatedCustomers = {
   pageSize: number;
 };
 
-export function formatCustomerDisplay(c: Pick<CustomerRow, "firstName" | "lastName">): string {
-  return [c.lastName, c.firstName].filter(Boolean).join(" ").trim() || "Khách";
+export function formatCustomerDisplay(c: Pick<CustomerRow, "name">): string {
+  return c.name?.trim() || "Khách";
 }
 
 export async function searchCustomers(search: string): Promise<PaginatedCustomers> {
@@ -49,8 +48,7 @@ export async function searchCustomers(search: string): Promise<PaginatedCustomer
 }
 
 export type CreateCustomerBody = {
-  firstName: string;
-  lastName: string;
+  name: string;
   email?: string;
   phone?: string;
   address?: string;

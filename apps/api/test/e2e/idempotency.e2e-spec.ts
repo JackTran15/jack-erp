@@ -35,8 +35,7 @@ describe('Idempotency (E2E)', () => {
   };
 
   const customerPayload = {
-    firstName: 'Idemp',
-    lastName: 'Test',
+  name: 'Idemp Test',
     phone: '+9999999999',
   };
 
@@ -78,8 +77,7 @@ describe('Idempotency (E2E)', () => {
         .post('/customers')
         .set(headers(key))
         .send({
-          firstName: 'Conflict',
-          lastName: 'First',
+          name: 'Conflict First',
           phone: '+8888888888',
         })
         .expect(201);
@@ -90,8 +88,7 @@ describe('Idempotency (E2E)', () => {
         .post('/customers')
         .set(headers(key))
         .send({
-          firstName: 'Conflict',
-          lastName: 'Different',
+          name: 'Conflict Different',
           phone: '+7777777777',
         })
         .expect(409);
@@ -111,8 +108,7 @@ describe('Idempotency (E2E)', () => {
         .post('/customers')
         .set(headers(key1))
         .send({
-          firstName: 'KeyA',
-          lastName: 'Test',
+          name: 'KeyA Test',
           phone: '+1010101010',
         })
         .expect(201);
@@ -121,8 +117,7 @@ describe('Idempotency (E2E)', () => {
         .post('/customers')
         .set(headers(key2))
         .send({
-          firstName: 'KeyB',
-          lastName: 'Test',
+          name: 'KeyB Test',
           phone: '+2020202020',
         })
         .expect(201);
@@ -139,8 +134,7 @@ describe('Idempotency (E2E)', () => {
         .post('/customers')
         .set(headers())
         .send({
-          firstName: 'NoKey',
-          lastName: 'Test',
+          name: 'NoKey Test',
           phone: '+3030303030',
         })
         .expect(201);
