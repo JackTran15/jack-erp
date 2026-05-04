@@ -46,3 +46,28 @@ export { DateTimeField, type DateTimeFieldProps } from "./components/date-time-f
 export { TagsInput, type TagsInputProps } from "./components/tags-input";
 export { MultiSelect, type MultiSelectOption, type MultiSelectProps } from "./components/multi-select";
 export { AppModal, type AppModalProps } from "./components/app-modal";
+
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+} from "./components/dropdown-menu";
+
+export { Avatar, type AvatarProps } from "./components/avatar";
+
+export {
+  PageToolbar,
+  type PageToolbarProps,
+  type ToolbarItem,
+  type ToolbarAction,
+  type ToolbarSeparator,
+} from "./components/page-toolbar";

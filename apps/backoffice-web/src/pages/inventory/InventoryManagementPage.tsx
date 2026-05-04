@@ -6,11 +6,14 @@ import type {
   PaginatedResponse,
 } from "@erp/shared-interfaces";
 import { formatClientError } from "@erp/api-client";
-import { Button, Input, FormField } from "@erp/ui";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { Button, Input, FormField, type ToolbarItem } from "@erp/ui";
 import { erpApi } from "../../lib/erp-api";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../components/table/PaginationControls";
+import { TableActionHeader } from "../../components/layout/TableActionHeader";
+import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -165,23 +168,26 @@ export function InventoryManagementPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-6">
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Quản lý kho</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Quản lý kho lưu trữ, mặt hàng và tồn kho với thao tác thêm, sửa, xoá từng dòng.
           </p>
         </div>
-        <Button
-          onClick={() => {
+      </div>
+
+      <TableActionHeader
+        className="mb-4"
+        breadcrumbs={resolveBackofficeBreadcrumbs("/inventory-management")}
+        items={buildInventoryToolbarItems({
+          canCreate: Boolean(config),
+          onCreate: () => {
             setEditingRecord(null);
             setFormOpen(true);
-          }}
-          disabled={!config}
-        >
-          + Thêm dòng
-        </Button>
-      </div>
+          },
+        })}
+      />
 
       <div className="mb-4 flex gap-3">
         <select
@@ -284,6 +290,21 @@ export function InventoryManagementPage() {
       )}
     </div>
   );
+}
+
+function buildInventoryToolbarItems({
+  canCreate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+}): ToolbarItem[] {
+  return [
+    { id: "create", label: "Thêm dòng", icon: Plus, onClick: onCreate, disabled: !canCreate },
+    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
+    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
+    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
+  ];
 }
 
 function InventoryRecordFormModal({
