@@ -322,6 +322,8 @@ export function InventoryItemCreateForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         {editableFields.map((field) => {
+          if (field.key === "isActive") return null;
+
           if (field.key === "providerId") {
             return (
               <FormField
@@ -380,6 +382,27 @@ export function InventoryItemCreateForm({
                       <X className="h-4 w-4" />
                     </button>
                   )}
+                  <label
+                    htmlFor="create-is-active"
+                    className="ml-2 flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium"
+                  >
+                    <input
+                      id="create-is-active"
+                      type="checkbox"
+                      checked={Boolean(values.isActive)}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setValues((prev) => ({ ...prev, isActive: checked }));
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.isActive;
+                          return next;
+                        });
+                      }}
+                      className="h-4 w-4 rounded border border-input accent-primary"
+                    />
+                    Đang hoạt động
+                  </label>
                 </div>
               </FormField>
             );

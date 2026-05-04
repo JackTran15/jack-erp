@@ -181,15 +181,35 @@ function FieldInput({
 
   if (field.type === "boolean") {
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
-        <input
-          id={id}
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-5 w-5 rounded border-2 border-input accent-primary cursor-pointer"
-        />
-      </FormField>
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-3">
+          <input
+            id={id}
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-error` : undefined}
+          />
+          <label
+            htmlFor={id}
+            className="cursor-pointer select-none text-sm font-medium leading-snug text-foreground"
+          >
+            {field.label}
+            {field.required ? (
+              <span className="ml-0.5 text-destructive" aria-hidden>
+                *
+              </span>
+            ) : null}
+          </label>
+        </div>
+        {error ? (
+          <p id={`${id}-error`} className="text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
     );
   }
 

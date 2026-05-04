@@ -38,17 +38,40 @@ export function CrudFieldInput({
 
   if (field.type === "boolean") {
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
-        <ControlRow trailing={trailing}>
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-3">
           <input
             id={inputId}
             type="checkbox"
             checked={Boolean(value)}
             onChange={(event) => onChange(event.target.checked)}
-            className="h-5 w-5 rounded border-2 border-input accent-primary"
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${inputId}-error` : undefined}
           />
-        </ControlRow>
-      </FormField>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            <label
+              htmlFor={inputId}
+              className="cursor-pointer select-none text-sm font-medium leading-snug text-foreground"
+            >
+              {field.label}
+              {field.required ? (
+                <span className="ml-0.5 text-destructive" aria-hidden>
+                  *
+                </span>
+              ) : null}
+            </label>
+            {trailing ? (
+              <div className="flex shrink-0 items-center gap-0.5">{trailing}</div>
+            ) : null}
+          </div>
+        </div>
+        {error ? (
+          <p id={`${inputId}-error`} className="text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
     );
   }
 
