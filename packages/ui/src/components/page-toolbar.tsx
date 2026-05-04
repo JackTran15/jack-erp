@@ -25,7 +25,7 @@ export interface PageToolbarProps {
   /** Slot rendered flush to the right (e.g. filters, date pickers) */
   trailing?: ReactNode;
   className?: string;
-  tone?: "default" | "misa";
+  tone?: "default" | "primary";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ export function PageToolbar({
       aria-label="Hành động trang"
       className={cn(
         "flex items-center gap-0.5 border-b px-2 py-1",
-        tone === "misa"
+        tone === "primary"
           ? "rounded-md border-[#1f2d8a] bg-[#1f2d8a] text-white"
           : "bg-white",
         className,
@@ -78,7 +78,7 @@ export function PageToolbar({
               aria-orientation="vertical"
               className={cn(
                 "mx-1.5 h-5 w-px shrink-0",
-                tone === "misa" ? "bg-white/30" : "bg-border",
+                tone === "primary" ? "bg-white/30" : "bg-border",
               )}
             />
           );
@@ -98,7 +98,7 @@ export function PageToolbar({
 
 interface ToolbarButtonProps {
   action: ToolbarAction;
-  tone: "default" | "misa";
+  tone: "default" | "primary";
 }
 
 function ToolbarButton({ action, tone }: ToolbarButtonProps) {
@@ -112,10 +112,10 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       className={cn(
         "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        tone === "misa"
+        tone === "primary"
           ? "disabled:pointer-events-none disabled:opacity-40"
           : "disabled:pointer-events-none disabled:opacity-40",
-        tone === "misa"
+        tone === "primary"
           ? action.variant === "danger"
             ? "text-[#ffd6d6] hover:bg-white/10 hover:text-white"
             : "text-white hover:bg-white/10"

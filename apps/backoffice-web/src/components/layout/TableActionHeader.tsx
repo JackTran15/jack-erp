@@ -47,7 +47,7 @@ export function TableActionHeader({
         })}
       </nav>
 
-      <PageToolbar tone="misa" items={items} />
+      <PageToolbar tone="primary" items={items} />
     </div>
   );
 }

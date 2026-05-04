@@ -89,7 +89,7 @@ const toolbarItems: ToolbarItem[] = [
 `PageToolbar` props:
 - `items: ToolbarItem[]` — buttons and separators
 - `trailing?: ReactNode` — right-aligned slot (filters, date pickers, export button)
-- `tone?: "default" | "misa"` — `"misa"` renders the dark blue MISA-style toolbar
+- `tone?: "default" | "primary"` — `"primary"` renders the dark blue toolbar style
 
 ---
 
@@ -108,7 +108,7 @@ const toolbarItems: ToolbarItem[] = [
 <div className="bg-white text-gray-900" />
 ```
 
-**Exception**: The sidebar and header use intentional gray-900 for the dark MISA-style chrome:
+**Exception**: The sidebar and header use intentional gray-900 for the dark chrome style:
 ```tsx
 // Sidebar / Header — dark chrome, intentional
 <aside className="bg-gray-900 text-white border-gray-700" />

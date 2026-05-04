@@ -81,7 +81,6 @@ export function CrudListPage() {
 
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  /** Bản sao dòng đã chọn để mở dialog Nhân bản (MISA). */
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<string, unknown> | null>(null);
 
   const { data: config, isLoading: configLoading, error: configError } = useCrudConfig(entityKey!);
