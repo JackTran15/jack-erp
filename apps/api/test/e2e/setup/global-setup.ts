@@ -1,10 +1,21 @@
 import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { config as loadEnv } from 'dotenv';
 
 /**
  * Runs once before the entire E2E suite.
  * Ensures the test database exists and migrations are applied.
+ *
+ * Jest does not load apps/api/.env automatically (unlike Nest ConfigModule).
+ * Load it here so DB_* match docker-compose / local dev credentials.
  */
 export default async function globalSetup() {
+  const envPath = path.resolve(__dirname, '../../../.env');
+  if (fs.existsSync(envPath)) {
+    loadEnv({ path: envPath });
+  }
+
   const dbHost = process.env.DB_HOST || 'localhost';
   const dbPort = process.env.DB_PORT || '5432';
   const dbUser = process.env.DB_USER || 'postgres';

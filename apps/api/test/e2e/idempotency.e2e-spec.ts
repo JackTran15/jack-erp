@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 import {
   createTestApp,
