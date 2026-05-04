@@ -2,10 +2,12 @@
   "name": "@erp/root",
   "private": true,
   "scripts": {
+    "build:shared": "pnpm --filter @erp/shared-interfaces build && pnpm --filter @erp/shared-kafka-client build",
+    "postinstall": "pnpm run build:shared",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "dev:api": "pnpm --filter @erp/api dev",
+    "dev:api": "pnpm run build:shared && pnpm --filter @erp/api dev",
     "dev:backoffice": "pnpm --filter @erp/backoffice-web dev",
     "dev:pos": "pnpm --filter @erp/pos-web dev",
     "test:e2e": "pnpm --filter @erp/api test:e2e",
@@ -18,8 +20,8 @@
     "schema:drop": "pnpm --filter @erp/api schema:drop",
     "seed:inventory": "pnpm --filter @erp/api seed:inventory",
     "seed:dev-admin": "pnpm --filter @erp/api seed:dev-admin",
-    "contract:check": "npx ts-node scripts/contract-check.ts",
-    "docs:entities:manifest": "npx ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/generate-entity-docs.ts",
+    "contract:check": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/contract-check.ts",
+    "docs:entities:manifest": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/generate-entity-docs.ts",
     "docs:entities:markdown": "node scripts/generate-entity-markdown.js",
     "docs:entities": "pnpm docs:entities:manifest && pnpm docs:entities:markdown",
     "openapi:generate": "pnpm --filter @erp/api-client run generate",
@@ -31,6 +33,7 @@
   },
   "packageManager": "pnpm@10.18.1",
   "devDependencies": {
+    "ts-node": "^10.9.2",
     "typeorm-visual": "^1.0.0",
     "typescript": "^5.9.3"
   }

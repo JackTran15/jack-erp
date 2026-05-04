@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -30,7 +31,11 @@ import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.mo
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '.env.example'],
+      // Resolve from this package root so `pnpm dev:api` from monorepo root still loads apps/api/.env
+      envFilePath: [
+        join(__dirname, '..', '.env'),
+        join(__dirname, '..', '.env.example'),
+      ],
     }),
 
     TypeOrmModule.forRootAsync({
@@ -38,10 +43,10 @@ import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.mo
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 5432),
+        port: config.get<number>('DB_PORT', 5433),
         database: config.get<string>('DB_NAME', 'erp_dev'),
-        username: config.get<string>('DB_USER', 'postgres'),
-        password: config.get<string>('DB_PASS', 'postgres'),
+        username: config.get<string>('DB_USER', 'erp_user'),
+        password: config.get<string>('DB_PASS', 'erp_secret'),
         autoLoadEntities: true,
         synchronize: false,
       }),

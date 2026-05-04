@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
 import { AppModal, FormField, Input } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
@@ -6,31 +6,73 @@ import { formatCustomerStatus } from "../../lib/customer-display";
 interface CrudFormDialogProps {
   config: CrudEntityConfig;
   record: Record<string, unknown> | null;
+  duplicateSource?: Record<string, unknown> | null;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
+}
+
+function fieldsForFormState(
+  config: CrudEntityConfig,
+  record: Record<string, unknown> | null,
+  duplicateSource: Record<string, unknown> | null | undefined,
+): FieldDefinition[] {
+  const notIdOrAudit = (f: FieldDefinition) =>
+    f.key !== config.idField && f.key !== "createdAt" && f.key !== "updatedAt";
+  if (duplicateSource && !record) {
+    return config.fields.filter((f) => notIdOrAudit(f) && !f.readOnly);
+  }
+  return config.fields.filter(notIdOrAudit);
+}
+
+function buildInitialValues(
+  fields: FieldDefinition[],
+  record: Record<string, unknown> | null,
+  duplicateSource: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  if (record) return { ...record };
+  if (duplicateSource) {
+    const initial: Record<string, unknown> = {};
+    fields.forEach((f) => {
+      const v = duplicateSource[f.key];
+      if (v === undefined || v === null) {
+        initial[f.key] = f.type === "boolean" ? false : "";
+      } else {
+        initial[f.key] = v;
+      }
+    });
+    return initial;
+  }
+  const initial: Record<string, unknown> = {};
+  fields.forEach((f) => {
+    initial[f.key] = f.type === "boolean" ? false : "";
+  });
+  return initial;
 }
 
 export function CrudFormDialog({
   config,
   record,
+  duplicateSource = null,
   onSubmit,
   onClose,
 }: CrudFormDialogProps) {
   const isEdit = record !== null;
-  const editableFields = config.fields.filter(
-    (f) => f.key !== config.idField && f.key !== "createdAt" && f.key !== "updatedAt",
+  const isDuplicate = Boolean(duplicateSource) && !isEdit;
+
+  const editableFields = useMemo(
+    () => fieldsForFormState(config, record, duplicateSource),
+    [config, record, duplicateSource],
   );
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [values, setValues] = useState<Record<string, unknown>>(() => {
-    if (record) return { ...record };
-    const initial: Record<string, unknown> = {};
-    editableFields.forEach((f) => {
-      initial[f.key] = f.type === "boolean" ? false : "";
-    });
-    return initial;
-  });
+  const [values, setValues] = useState<Record<string, unknown>>(() =>
+    buildInitialValues(
+      fieldsForFormState(config, record, duplicateSource),
+      record,
+      duplicateSource,
+    ),
+  );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +80,10 @@ export function CrudFormDialog({
   const validate = (): boolean => {
     const next: Record<string, string> = {};
     editableFields.forEach((f) => {
-      if (f.required && (values[f.key] === "" || values[f.key] === undefined || values[f.key] === null)) {
+      if (
+        f.required &&
+        (values[f.key] === "" || values[f.key] === undefined || values[f.key] === null)
+      ) {
         next[f.key] = `${f.label} là bắt buộc`;
       }
     });
@@ -64,6 +109,10 @@ export function CrudFormDialog({
       editableFields.forEach((f) => {
         payload[f.key] = values[f.key];
       });
+      // Không gửi id / audit khi tạo hoặc nhân bản
+      delete payload[config.idField];
+      delete payload.createdAt;
+      delete payload.updatedAt;
       await onSubmit(payload);
     } finally {
       setSubmitting(false);
@@ -74,16 +123,31 @@ export function CrudFormDialog({
     formRef.current?.requestSubmit();
   };
 
+  const title = isDuplicate
+    ? `Nhân bản ${config.displayName}`
+    : `${isEdit ? "Sửa" : "Thêm mới"} ${config.displayName}`;
+
+  const saveLabel = submitting
+    ? "Đang lưu…"
+    : isEdit
+      ? "Cập nhật"
+      : "Lưu";
+
   return (
     <AppModal
       open
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title={`${isEdit ? "Sửa" : "Thêm"} ${config.displayName}`}
+      title={title}
+      description={
+        isDuplicate
+          ? "Dữ liệu đã được sao chép từ bản ghi đã chọn. Hãy chỉnh các trường bắt buộc (ví dụ mã, SKU) nếu trùng trước khi lưu."
+          : undefined
+      }
       onSave={handleSave}
       onCancel={onClose}
-      saveLabel={submitting ? "Đang lưu…" : isEdit ? "Cập nhật" : "Tạo"}
+      saveLabel={saveLabel}
       cancelLabel="Huỷ"
       saveDisabled={submitting}
     >
@@ -117,15 +181,35 @@ function FieldInput({
 
   if (field.type === "boolean") {
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
-        <input
-          id={id}
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-5 w-5 rounded border-2 border-input accent-primary cursor-pointer"
-        />
-      </FormField>
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-3">
+          <input
+            id={id}
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-error` : undefined}
+          />
+          <label
+            htmlFor={id}
+            className="cursor-pointer select-none text-sm font-medium leading-snug text-foreground"
+          >
+            {field.label}
+            {field.required ? (
+              <span className="ml-0.5 text-destructive" aria-hidden>
+                *
+              </span>
+            ) : null}
+          </label>
+        </div>
+        {error ? (
+          <p id={`${id}-error`} className="text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
     );
   }
 

@@ -20,8 +20,9 @@ export class RedisIoAdapter extends IoAdapter {
 
   async connectToRedis(): Promise<void> {
     const host = this.config.get<string>('REDIS_HOST', 'localhost')!;
-    const port = this.config.get<number>('REDIS_PORT', 6379)!;
-    const password = this.config.get<string>('REDIS_PASSWORD') || undefined;
+    const port = this.config.get<number>('REDIS_PORT', 6380)!;
+    const password =
+      this.config.get<string>('REDIS_PASSWORD', 'erp_redis_secret') || undefined;
     const db = this.config.get<number>('REDIS_DB', 0)!;
 
     this.pubClient = new Redis({

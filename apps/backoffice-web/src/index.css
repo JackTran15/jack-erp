@@ -37,11 +37,26 @@
 }
 
 @layer base {
+  :root {
+    --header-height: 3.5rem;
+    --sidebar-width: 15rem;
+    --sidebar-width-collapsed: 3.75rem;
+  }
+
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
     font-family: system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

@@ -55,6 +55,24 @@ export class CrudController {
     return config;
   }
 
+  @Get(':entityKey/records/:id')
+  @ApiOkResponse({
+    description: 'Single record',
+    content: {
+      'application/json': {
+        schema: { type: 'object', additionalProperties: true },
+      },
+    },
+  })
+  async getRecord(
+    @Param('entityKey') entityKey: string,
+    @Param('id') id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    const service = this.resolveService(entityKey);
+    return service.getById(id, actor);
+  }
+
   @Get(':entityKey/records')
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1, default: 1 } })
   @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } })

@@ -7,6 +7,9 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { TenantSetupPage } from "./pages/setup/TenantSetupPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CrudListPage } from "./components/crud/CrudListPage";
+import { CrudCreatePage } from "./components/crud/CrudCreatePage";
+import { CrudDetailPage } from "./components/crud/CrudDetailPage";
+import { CrudEditPage } from "./components/crud/CrudEditPage";
 import { SalesHierarchyPage } from "./pages/branch-management/SalesHierarchyPage";
 import { OrgRegistrationPage } from "./pages/onboarding/OrgRegistrationPage";
 import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPage";
@@ -41,6 +44,9 @@ export function App() {
             <Route element={<RequireAuth />}>
               <Route element={<BackofficeLayout />}>
                 <Route path="/" element={<DashboardPage />} />
+                <Route path="/admin/:entityKey/new" element={<CrudCreatePage />} />
+                <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
+                <Route path="/admin/:entityKey/:id" element={<CrudDetailPage />} />
                 <Route path="/admin/:entityKey" element={<CrudListPage />} />
                 <Route
                   path="/branch-management/sales-hierarchy"

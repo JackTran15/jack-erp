@@ -90,7 +90,7 @@ jobs:
         run: pnpm -r test
 
       - name: Contract drift check
-        run: npx ts-node scripts/contract-check.ts
+        run: pnpm run contract:check
 
       - name: E2E tests
         run: pnpm --filter @erp/api test:e2e
