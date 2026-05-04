@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Generated files — do not read or edit directly
+packages/api-client/src/generated/
+openapi.snapshot.json
+openapi-stub.json
+
+# Lock files — too large, no useful context
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Database artefacts
+apps/api/src/database/migrations/
+
+# Static assets
+apps/backoffice-web/public/
+apps/pos-web/public/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+
+# IDE / OS
+.git/
+.DS_Store
+*.swp
+*.swo
+
+# Docker
+docker/

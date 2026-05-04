@@ -1,0 +1,195 @@
+---
+description: Data fetching patterns — @erp/api-client, erpApi, TanStack Query, error handling, and CRUD hooks.
+globs: apps/backoffice-web/src/hooks/**, apps/backoffice-web/src/lib/**, apps/pos-web/src/hooks/**
+alwaysApply: false
+---
+
+# Data Fetching Patterns
+
+## The API client
+
+File: `apps/backoffice-web/src/lib/erp-api.ts`
+
+```ts
+import { erpApi, requireErpData, requireErpSuccess } from "../lib/erp-api";
+```
+
+`erpApi` is a typed client built from the OpenAPI spec (`@erp/api-client`).
+It injects `Authorization`, `X-Branch-Id`, `X-Request-Id`, and `X-Idempotency-Key` headers automatically.
+
+### Reading data
+
+```ts
+// requireErpData — throws HttpError on API error, returns T on success
+const data = requireErpData(
+  await erpApi.GET("/inventory/items", {
+    params: { query: { page: 1, pageSize: 20 } },
+  })
+);
+```
+
+### Mutating data (create / update / delete)
+
+```ts
+// requireErpSuccess — throws on error, returns void (for operations with no body)
+requireErpSuccess(
+  await erpApi.DELETE("/inventory/items/{id}", {
+    params: { path: { id: itemId } },
+  })
+);
+
+// requireErpData — for mutations that return a body
+const created = requireErpData(
+  await erpApi.POST("/inventory/items", { body: dto })
+);
+```
+
+---
+
+## TanStack Query patterns
+
+### Query (read)
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+import { erpApi, requireErpData } from "../lib/erp-api";
+
+function useInventoryItems(page: number, search: string) {
+  return useQuery({
+    queryKey: ["inventory-items", page, search],   // include all variables
+    queryFn: () =>
+      requireErpData(
+        erpApi.GET("/admin/entities/inventory-items/records", {
+          params: { query: { page, pageSize: 20, search } },
+        })
+      ),
+    staleTime: 30_000,    // match the global default
+    placeholderData: (prev) => prev,   // keep previous data while fetching next page
+  });
+}
+```
+
+### Mutation (create / update / delete)
+
+```tsx
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+function useDeleteItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      requireErpSuccess(
+        erpApi.DELETE("/inventory/items/{id}", { params: { path: { id } } })
+      ),
+    onSuccess: () => {
+      // Invalidate related queries so UI refreshes automatically
+      void qc.invalidateQueries({ queryKey: ["inventory-items"] });
+    },
+  });
+}
+
+// Usage
+const { mutate: deleteItem, isPending } = useDeleteItem();
+<Button onClick={() => deleteItem(selectedId)} disabled={isPending}>Xóa</Button>
+```
+
+### QueryKey conventions
+
+Always use an array. First element = resource name, rest = filters/IDs:
+
+```ts
+["inventory-items"]                    // list (all)
+["inventory-items", page, search]      // list with filters
+["inventory-items", "detail", id]      // single record
+["customers", orgId]                   // scoped by org
+```
+
+Invalidate with prefix to bust all related queries:
+```ts
+qc.invalidateQueries({ queryKey: ["inventory-items"] });
+```
+
+---
+
+## Generic CRUD hooks (admin entity platform)
+
+The backoffice has pre-built hooks for any entity registered in the CrudModule:
+
+```ts
+import {
+  useCrudConfig,
+  useCrudRecords,
+  useCrudCreate,
+  useCrudUpdate,
+  useCrudDelete,
+} from "../components/crud/useCrudApi";
+
+// entity key = the entityKey registered on the server (e.g. "inventory-items")
+const { data: config } = useCrudConfig("inventory-items");
+const { data, isLoading } = useCrudRecords("inventory-items", { page, pageSize: 20, search });
+const { mutate: create } = useCrudCreate("inventory-items");
+const { mutate: update } = useCrudUpdate("inventory-items");
+const { mutate: remove } = useCrudDelete("inventory-items");
+```
+
+Use `CrudListPage` (at `/admin/:entityKey`) for basic table views — no custom page needed.
+
+---
+
+## Error handling
+
+### HttpError
+
+```ts
+import { HttpError } from "../lib/http";
+
+try {
+  await someApiCall();
+} catch (err) {
+  if (err instanceof HttpError) {
+    toast.error(err.error.message);   // Vietnamese message from API
+  }
+}
+```
+
+### In mutations (TanStack Query)
+
+```tsx
+useMutation({
+  mutationFn: ...,
+  onError: (err) => {
+    const msg = err instanceof HttpError
+      ? err.error.message
+      : "Đã có lỗi xảy ra. Vui lòng thử lại.";
+    // show toast / set error state
+  },
+});
+```
+
+---
+
+## Auth & session
+
+```ts
+import { useAuth } from "../hooks/useAuth";
+
+const { isAuthenticated, login, logout } = useAuth();
+```
+
+`isAuthenticated` is derived from the access token + Redis session check.
+Access token: in-memory only (not localStorage). Refresh token: `localStorage("refresh_token")`.
+The `erpApi` client reads the token via `getAccessToken()` automatically.
+
+---
+
+## OpenAPI client regeneration
+
+After adding/changing API endpoints:
+```bash
+# API must be running on :4000
+pnpm openapi:generate
+# Commit the updated openapi.snapshot.json
+```
+
+The generated types are in `packages/api-client/src/generated/schema.ts`.
+Never hand-edit that file.

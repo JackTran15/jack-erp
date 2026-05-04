@@ -4,7 +4,7 @@ API_FILTER := @erp/api
 BACKOFFICE_FILTER := @erp/backoffice-web
 POS_FILTER := @erp/pos-web
 
-.PHONY: help install openapi-generate dev build start dev-api dev-backoffice dev-pos build-api build-backoffice build-pos start-api start-backoffice start-pos dev-all build-all start-all seed-inventory seed-dev-admin
+.PHONY: help install openapi-generate dev build start build-shared-packages dev-api dev-backoffice dev-pos build-api build-backoffice build-pos start-api start-backoffice start-pos dev-all build-all start-all seed-inventory seed-dev-admin
 
 help:
 	@echo "ERP workspace make targets"
@@ -35,6 +35,9 @@ help:
 install:
 	$(PNPM) install
 
+build-shared-packages:
+	$(PNPM) run build:shared
+
 openapi-generate:
 	$(PNPM) openapi:generate
 
@@ -59,7 +62,7 @@ start:
 	elif [ "$(SERVICE)" = "pos" ]; then $(MAKE) start-pos; \
 	else echo "Unknown SERVICE=$(SERVICE). Use api|backoffice|pos"; exit 1; fi
 
-dev-api:
+dev-api: build-shared-packages
 	$(PNPM) --filter $(API_FILTER) dev
 
 dev-backoffice:
@@ -68,7 +71,7 @@ dev-backoffice:
 dev-pos:
 	$(PNPM) --filter $(POS_FILTER) dev
 
-build-api:
+build-api: build-shared-packages
 	$(PNPM) --filter $(API_FILTER) build
 
 build-backoffice:
