@@ -2,10 +2,12 @@
   "name": "@erp/root",
   "private": true,
   "scripts": {
+    "build:shared": "pnpm --filter @erp/shared-interfaces build && pnpm --filter @erp/shared-kafka-client build",
+    "postinstall": "pnpm run build:shared",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "dev:api": "pnpm --filter @erp/api dev",
+    "dev:api": "pnpm run build:shared && pnpm --filter @erp/api dev",
     "dev:backoffice": "pnpm --filter @erp/backoffice-web dev",
     "dev:pos": "pnpm --filter @erp/pos-web dev",
     "test:e2e": "pnpm --filter @erp/api test:e2e",
