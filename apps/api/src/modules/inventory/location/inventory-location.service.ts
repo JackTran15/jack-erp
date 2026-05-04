@@ -60,7 +60,9 @@ export class InventoryLocationService {
       throw new ConflictException(`Item with code "${dto.code}" already exists`);
     }
 
-    await this.validateProvider(dto.providerId, actor);
+    if (dto.providerId) {
+      await this.validateProvider(dto.providerId, actor);
+    }
 
     const item = this.itemRepo.create({
       ...dto,

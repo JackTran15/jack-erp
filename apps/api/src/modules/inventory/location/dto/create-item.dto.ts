@@ -40,6 +40,7 @@ export class CreateItemDto {
   @Min(0)
   sellingPrice?: number;
 
+  @IsOptional()
   @IsUUID()
-  providerId: string;
+  providerId?: string;
 }

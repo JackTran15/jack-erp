@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { AppModule } from '../../../../src/app.module';
+import { AppModule } from '../../../src/app.module';
 import { DataSource } from 'typeorm';
-import * as request from 'supertest';
+import * as bcrypt from 'bcryptjs';
+import request from 'supertest';
 
 export interface SeedResult {
   organizationId: string;
@@ -67,40 +68,40 @@ export async function seedBaseData(
   const roleId = 'd0000000-0000-4000-8000-000000000001';
 
   await ds.query(`
-    INSERT INTO organizations (id, name, slug, created_at, updated_at)
-    VALUES ($1, 'Test Org', 'test-org', NOW(), NOW())
+    INSERT INTO organizations (id, organization_id, name, contact_email, status, created_by, created_at, updated_at)
+    VALUES ($1::uuid, $1::uuid, 'Test Org', 'admin@test.com', 'ACTIVE', $2::uuid, NOW(), NOW())
     ON CONFLICT (id) DO NOTHING
-  `, [orgId]);
+  `, [orgId, userId]);
 
   await ds.query(`
-    INSERT INTO branches (id, organization_id, name, code, is_active, created_at, updated_at)
-    VALUES ($1, $2, 'Main Branch', 'MAIN', true, NOW(), NOW())
+    INSERT INTO branches (id, organization_id, name, status, is_main_branch, created_by, created_at, updated_at)
+    VALUES ($1::uuid, $2::uuid, 'Main Branch', 'ACTIVE', true, $3::uuid, NOW(), NOW())
     ON CONFLICT (id) DO NOTHING
-  `, [branchId, orgId]);
+  `, [branchId, orgId, userId]);
 
-  const passwordHash = '$2a$10$QJE9NvGkVzsnJCQgJOO7muK7E.OVvHc7F1JD3D4N1Q1qKeE/z3VYa'; // "password123"
+  const passwordHash = await bcrypt.hash('password123', 10);
 
   await ds.query(`
     INSERT INTO users (id, organization_id, email, password_hash, first_name, last_name, is_active, created_at, updated_at)
-    VALUES ($1, $2, 'admin@test.com', $3, 'Admin', 'User', true, NOW(), NOW())
-    ON CONFLICT (id) DO NOTHING
+    VALUES ($1::uuid, $2::uuid, 'admin@test.com', $3, 'Admin', 'User', true, NOW(), NOW())
+    ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash
   `, [userId, orgId, passwordHash]);
 
   await ds.query(`
     INSERT INTO roles (id, organization_id, name, description, created_at, updated_at)
-    VALUES ($1, $2, 'admin', 'Full access role', NOW(), NOW())
+    VALUES ($1::uuid, $2::uuid, 'admin', 'Full access role', NOW(), NOW())
     ON CONFLICT (id) DO NOTHING
   `, [roleId, orgId]);
 
   await ds.query(`
-    INSERT INTO user_roles (id, user_id, role_id, organization_id, created_at, updated_at)
-    VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+    INSERT INTO user_roles (id, user_id, role_id, organization_id)
+    VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid)
     ON CONFLICT DO NOTHING
   `, [userId, roleId, orgId]);
 
   await ds.query(`
-    INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, created_at, updated_at)
-    VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+    INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, assigned_by)
+    VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid, $1::uuid)
     ON CONFLICT DO NOTHING
   `, [userId, branchId, orgId]);
 
@@ -124,17 +125,36 @@ export async function seedBaseData(
     'reporting.dashboard.branch.read', 'reporting.dashboard.consolidated.read',
   ];
 
+  // Seed an active document numbering rule for every DocumentType so that
+  // services depending on `DocumentNumberingService.generate(...)` can produce
+  // numbers during E2E flows. The production app seeds these via the
+  // numbering admin UI; tests need them ready up-front.
+  const documentTypes = [
+    'INVOICE', 'SALE', 'RETURN', 'TRANSFER', 'ADJUSTMENT',
+    'JOURNAL', 'PAYABLE', 'RECEIVABLE', 'PURCHASE_ORDER', 'GOODS_ISSUE',
+  ];
+  for (const documentType of documentTypes) {
+    await ds.query(
+      `INSERT INTO document_number_rules
+         (id, organization_id, document_type, prefix, include_date, date_format,
+          sequence_length, reset_policy, is_active, created_by, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1::uuid, $2, $3, true, 'YYYYMMDD', 5, 'NEVER', true, $4::uuid, NOW(), NOW())
+       ON CONFLICT DO NOTHING`,
+      [orgId, documentType, `${documentType.slice(0, 3)}-`, userId],
+    );
+  }
+
   for (const perm of allPermissions) {
     await ds.query(`
-      INSERT INTO permissions (id, code, description, created_at, updated_at)
-      VALUES (gen_random_uuid(), $1, $1, NOW(), NOW())
+      INSERT INTO permissions (id, key, description, module)
+      VALUES (gen_random_uuid(), $1, $1, $2)
       ON CONFLICT DO NOTHING
-    `, [perm]);
+    `, [perm, perm.split('.')[0]]);
 
     await ds.query(`
-      INSERT INTO role_permissions (id, role_id, permission_id, created_at, updated_at)
-      SELECT gen_random_uuid(), $1, p.id, NOW(), NOW()
-      FROM permissions p WHERE p.code = $2
+      INSERT INTO role_permissions (id, role_id, permission_id)
+      SELECT gen_random_uuid(), $1::uuid, p.id
+      FROM permissions p WHERE p.key = $2
       ON CONFLICT DO NOTHING
     `, [roleId, perm]);
   }

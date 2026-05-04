@@ -8,6 +8,7 @@ const config: Config = {
     '^.+\\.ts$': 'ts-jest',
   },
   testEnvironment: 'node',
+  maxWorkers: 1,
   moduleNameMapper: {
     '^@erp/shared-interfaces$': '<rootDir>/../../../../packages/shared-interfaces/src',
     '^@erp/shared-kafka-client$': '<rootDir>/../../../../packages/shared-kafka-client/src',

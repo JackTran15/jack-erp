@@ -6,7 +6,7 @@ import {
   Logger,
   ConflictException,
 } from '@nestjs/common';
-import { Observable, of, tap } from 'rxjs';
+import { Observable, of, mergeMap } from 'rxjs';
 import { Request, Response } from 'express';
 import { IdempotencyStatus } from '@erp/shared-interfaces';
 import { IdempotencyStore } from '../../modules/redis/idempotency.store';
@@ -78,7 +78,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap(async (responseBody) => {
+      mergeMap(async (responseBody) => {
         try {
           await this.idempotencyStore.store(
             idempotencyKey,
@@ -97,6 +97,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
             (err as Error).message,
           );
         }
+        return responseBody;
       }),
     );
   }

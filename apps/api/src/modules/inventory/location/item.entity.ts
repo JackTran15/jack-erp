@@ -31,10 +31,10 @@ export class ItemEntity extends BaseEntity {
   @Column({ name: 'selling_price', type: 'decimal', precision: 18, scale: 2, default: 0, comment: 'Default selling price per unit' })
   sellingPrice: number;
 
-  @Column({ name: 'provider_id', type: 'uuid', comment: 'FK to inventory_providers — the supplier for this item' })
-  providerId: string;
+  @Column({ name: 'provider_id', type: 'uuid', nullable: true, comment: 'FK to inventory_providers — the supplier for this item' })
+  providerId?: string;
 
-  @ManyToOne(() => ProviderEntity, { nullable: false })
+  @ManyToOne(() => ProviderEntity, { nullable: true })
   @JoinColumn({ name: 'provider_id' })
   provider?: ProviderEntity;
 
