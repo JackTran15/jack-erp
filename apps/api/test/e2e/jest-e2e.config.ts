@@ -14,7 +14,7 @@ const config: Config = {
   },
   globalSetup: '<rootDir>/setup/global-setup.ts',
   globalTeardown: '<rootDir>/setup/global-teardown.ts',
-  setupFilesAfterSetup: ['<rootDir>/setup/jest-setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/setup/jest-setup.ts'],
   testTimeout: 30_000,
 };
 
