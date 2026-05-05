@@ -268,13 +268,6 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         keepWhenSelected: false,
       },
       {
-        key: "receipts",
-        ariaLabel: "Lịch sử mua hàng",
-        icon: <ReceiptIcon size={16} />,
-        onClick: onOpenCustomerDirectory,
-        keepWhenSelected: true,
-      },
-      {
         key: "voucher",
         ariaLabel: "Voucher / quà tặng",
         icon: <GiftIcon size={16} />,

@@ -204,7 +204,6 @@ export function CheckoutPageV2() {
   const [customerFieldError, setCustomerFieldError] = useState("");
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [createDefaultQuery, setCreateDefaultQuery] = useState("");
-  const [customerDirectoryOpen, setCustomerDirectoryOpen] = useState(false);
   const [editCustomerOpen, setEditCustomerOpen] = useState(false);
 
   // Payment
@@ -741,15 +740,6 @@ export function CheckoutPageV2() {
         }}
       />
 
-      <CustomerSelectDialog
-        open={customerDirectoryOpen}
-        onClose={() => setCustomerDirectoryOpen(false)}
-        onSelected={(c) => {
-          pickCustomer(c);
-          setCustomerDirectoryOpen(false);
-        }}
-      />
-
       <InvoiceTabBar
         tabs={tabs}
         activeTabId={activeTabId}
@@ -867,7 +857,6 @@ export function CheckoutPageV2() {
           )}
           onSubmitCustomerQuery={handleCustomerSubmitQuery}
           onAddCustomer={handleAddCustomer}
-          onOpenCustomerDirectory={() => setCustomerDirectoryOpen(true)}
           selectedCustomerLabel={
             selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null
           }
