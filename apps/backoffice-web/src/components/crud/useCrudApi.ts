@@ -63,6 +63,22 @@ export function useCrudRecords(
   });
 }
 
+export function useCrudRecord(entityKey: string, id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["crud", entityKey, "record", id],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<Record<string, unknown>>(
+          "/admin/entities/{entityKey}/records/{id}",
+          {
+            params: { path: { entityKey, id: id! } },
+          },
+        ),
+      ),
+    enabled: enabled && Boolean(id),
+  });
+}
+
 export function useCrudCreate(entityKey: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -75,6 +91,7 @@ export function useCrudCreate(entityKey: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
     },
   });
 }
@@ -97,6 +114,7 @@ export function useCrudUpdate(entityKey: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
     },
   });
 }
@@ -112,6 +130,7 @@ export function useCrudDelete(entityKey: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
+      void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
     },
   });
 }

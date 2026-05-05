@@ -4,6 +4,7 @@ export { CrudDetailView } from "./CrudDetailView";
 export {
   useCrudConfig,
   useCrudRecords,
+  useCrudRecord,
   useCrudCreate,
   useCrudUpdate,
   useCrudDelete,

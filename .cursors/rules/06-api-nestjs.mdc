@@ -1,0 +1,147 @@
+---
+description: NestJS API patterns — modules, controllers, services, guards, decorators, and entity registration for the generic CRUD platform.
+globs: apps/api/src/**/*.ts
+alwaysApply: false
+---
+
+# NestJS API Patterns
+
+## Module structure
+
+Every feature follows this layout:
+
+```
+modules/my-feature/
+  my-feature.module.ts     — NestJS @Module, OnModuleInit for entity registration
+  my-feature.controller.ts — REST endpoints
+  my-feature.service.ts    — business logic
+  my-feature.entity.ts     — TypeORM entity
+  dto/
+    create-my-feature.dto.ts
+    update-my-feature.dto.ts
+```
+
+## Controllers
+
+```ts
+@ApiTags("my-feature")
+@Controller("my-feature")
+@UseGuards(AuthGuard, PermissionGuard)   // applied at class level
+export class MyFeatureController {
+
+  @Get()
+  @RequirePermission("my_feature.read")
+  findAll(@Actor() actor: ActorContext) { ... }
+
+  @Post()
+  @RequirePermission("my_feature.create")
+  create(@Actor() actor: ActorContext, @Body() dto: CreateDto) { ... }
+}
+```
+
+## Auth decorators
+
+| Decorator | Location | Effect |
+|---|---|---|
+| `@Public()` | method | skips AuthGuard (no JWT required) |
+| `@RequirePermission("x.y")` | method | checked by PermissionGuard |
+| `@RequireBranchScope()` | method | enforces X-Branch-Id header |
+| `@Actor()` | parameter | injects `ActorContext` from JWT + header |
+
+## ActorContext shape
+
+```ts
+interface ActorContext {
+  userId: string;
+  organizationId: string;
+  branchId?: string;      // resolved from X-Branch-Id header or JWT
+  roles: string[];
+}
+```
+
+Always pass `actor.organizationId` / `actor.branchId` when scoping DB queries.
+
+## DTOs
+
+```ts
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+
+export class CreateItemDto {
+  @ApiProperty({ example: "Áo thun" })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  sellingPrice?: number;
+}
+```
+
+All DTOs validated by the global `ValidationPipe` (whitelist + transform + forbidNonWhitelisted).
+
+## Generic CRUD entity registration
+
+To expose an entity through the generic admin platform (`/admin/entities/:entityKey`):
+
+```ts
+// 1. Implement BaseCrudService<Entity, CreateDto, UpdateDto>
+@Injectable()
+export class MyEntityCrudService extends BaseCrudService<MyEntity, CreateDto, UpdateDto> {
+  static readonly ENTITY_CONFIG: CrudEntityConfig = {
+    entityKey: "my-entities",
+    displayName: "Thực thể của tôi",
+    apiResource: "/admin/entities/my-entities",
+    idField: "id",
+    fields: [
+      { key: "name", label: "Tên", type: "string", required: true },
+    ],
+    searchableFields: ["name"],
+    filterDefinitions: [],
+    permissions: { read: "my_entity.read", create: "my_entity.create", ... },
+    scopingPolicy: ScopingPolicy.ORGANIZATION,
+    deletionPolicy: DeletionPolicy.SOFT,
+  };
+  // implement abstract methods: findAll, findOne, create, update, remove
+}
+
+// 2. Register in OnModuleInit
+export class MyFeatureModule implements OnModuleInit {
+  constructor(private registry: EntityRegistryService, private service: MyEntityCrudService) {}
+  onModuleInit() {
+    this.registry.registerEntity(
+      MyEntityCrudService.ENTITY_CONFIG,
+      MY_ENTITY_SERVICE_TOKEN,
+    );
+  }
+}
+```
+
+The entity is then accessible at `/admin/entities/my-entities/records` and the backoffice route `/admin/my-entities` auto-renders a CRUD list page.
+
+## Database rules
+
+- `synchronize: false` always — never let TypeORM auto-sync in any environment
+- All schema changes go through TypeORM migrations: `pnpm migration:generate`
+- Monetary fields: `@Column({ type: "numeric", precision: 18, scale: 2 })`
+- Soft-delete: `@DeleteDateColumn()` + `SoftDeleteEntity` base
+- IDs: `@PrimaryGeneratedColumn("uuid")`
+- Timestamps: `@CreateDateColumn()`, `@UpdateDateColumn()` (stored UTC)
+
+## Events (Kafka/Redpanda)
+
+```ts
+// Inject EventPublisher (global provider)
+constructor(private events: EventPublisher) {}
+
+// Publish a typed event
+await this.events.publish("inventory.item.created", {
+  itemId: item.id,
+  organizationId: actor.organizationId,
+});
+```
+
+Topics are initialized in `TopicInitializer` on app start.

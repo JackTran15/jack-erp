@@ -1,0 +1,213 @@
+---
+description: Navigation architecture, navConfig structure, how to add modules/sections/children, sidebar patterns, and PageToolbar placement.
+globs: apps/backoffice-web/src/components/layout/**, apps/backoffice-web/src/App.tsx
+alwaysApply: false
+---
+
+# Layout & Navigation Architecture
+
+## Layout structure
+
+```
+BackofficeLayout (BackofficeLayout.tsx)
+├── LayoutContext.Provider  — shares { sidebarCollapsed, toggleSidebar }
+├── AppHeader               — fixed, h-14, z-50, bg-gray-900
+│   ├── Brand (logo link)
+│   └── UserMenu (Avatar + DropdownMenu logout)
+├── AppSidebar              — fixed left-0 top-14, dark bg-gray-900
+│   ├── All NavModules as a vertical list
+│   │   ├── CollapsedModuleRow  (icon-only when w-[60px])
+│   │   ├── DirectNavRow        (module has 1 child)
+│   │   ├── AccordionModuleRow  (module has 2+ children, Collapsible)
+│   │   └── FlyoutModuleRow     (module.flyout === true → chevron-right)
+│   └── CollapseToggle button
+├── MegaMenuPanel           — fixed overlay right of sidebar (only when flyout active)
+└── <main>                  — flex-1, ml-60 (or ml-[60px] collapsed), Outlet
+```
+
+## navConfig — the single source of truth
+
+File: `apps/backoffice-web/src/components/layout/navConfig.ts`
+
+### Type hierarchy
+
+```ts
+NavModule        // one entry = one row in the sidebar
+  .id            // unique string key
+  .label         // Vietnamese display name
+  .icon          // lucide-react ComponentType
+  .defaultPath   // navigate here when collapsed or when module tab is clicked
+  .flyout?       // true → renders MegaMenuPanel instead of accordion
+  .sections[]    // NavSection[]
+
+NavSection       // collapsible group (shown in accordion or mega-menu column)
+  .id
+  .label?        // optional group heading (uppercase, shown in accordion/mega-menu)
+  .children[]    // NavChild[]
+
+NavChild         // individual route link
+  .to            // route path
+  .label         // Vietnamese link text
+  .end?          // pass to NavLink `end` prop (exact match)
+  .icon?         // optional lucide icon shown beside the label
+```
+
+### Adding a new top-level module
+
+```ts
+// In navConfig.ts, add to the navConfig array:
+{
+  id: "accounting",
+  label: "Kế toán",
+  icon: BookOpen,
+  defaultPath: "/accounting/journals",
+  sections: [
+    {
+      id: "accounting-main",
+      children: [
+        { to: "/accounting/journals",  label: "Nhật ký kế toán", icon: FileText },
+        { to: "/accounting/accounts",  label: "Tài khoản",       icon: Layers },
+      ],
+    },
+  ],
+},
+```
+
+No other files need to change — the sidebar reads navConfig automatically.
+
+### Adding children to an existing module
+
+```ts
+// Add a child to an existing section:
+{ to: "/inventory/stock-take", label: "Kiểm kê kho", icon: ClipboardList }
+
+// Or add a new named section to an existing module:
+{
+  id: "inventory-returns",
+  label: "TRẢ HÀNG",
+  children: [
+    { to: "/inventory/returns", label: "Phiếu trả hàng", icon: CornerUpLeft },
+  ],
+}
+```
+
+### Adding a flyout module (like Danh mục)
+
+```ts
+{
+  id: "my-flyout",
+  label: "My Flyout",
+  icon: Grid,
+  defaultPath: "/admin/my-entity",
+  flyout: true,             // ← this triggers MegaMenuPanel
+  sections: [
+    {
+      id: "group-a",
+      label: "NHÓM A",       // uppercase heading in the mega-menu column
+      children: [
+        { to: "/admin/entity-a", label: "Thực thể A" },
+      ],
+    },
+  ],
+},
+```
+
+---
+
+## LayoutContext
+
+File: `apps/backoffice-web/src/components/layout/LayoutContext.tsx`
+
+```tsx
+import { useLayout } from "../layout/LayoutContext";
+
+function MyComponent() {
+  const { sidebarCollapsed, toggleSidebar } = useLayout();
+  // use sidebarCollapsed to adapt layout to sidebar width
+}
+```
+
+Available anywhere inside `BackofficeLayout`.
+
+---
+
+## Adding a new route
+
+1. Add the route in `apps/backoffice-web/src/App.tsx` inside the `<RequireAuth>` / `<BackofficeLayout>` block:
+
+```tsx
+<Route path="/my-new-page" element={<MyNewPage />} />
+```
+
+2. Add the corresponding `NavChild` in `navConfig.ts`.
+
+Both steps are always needed together.
+
+---
+
+## PageToolbar placement
+
+Place `PageToolbar` **inside the page component**, at the top of the content, before filters and the table:
+
+```tsx
+// MyListPage.tsx
+export function MyListPage() {
+  const [selected, setSelected] = useState<string | null>(null);
+
+  return (
+    <div>
+      {/* 1. Toolbar */}
+      <PageToolbar
+        items={[
+          { id: "add",    label: "Thêm mới", icon: Plus,   onClick: handleAdd },
+          { id: "edit",   label: "Sửa",      icon: Pencil, onClick: handleEdit, disabled: !selected },
+          { id: "sep",    type: "separator" },
+          { id: "delete", label: "Xóa",      icon: Trash2, onClick: handleDelete, variant: "danger", disabled: !selected },
+        ]}
+        trailing={<SearchInput value={search} onChange={setSearch} placeholder="Tìm kiếm..." />}
+      />
+
+      {/* 2. Filters (optional) */}
+      <div className="flex gap-3 px-4 py-3 border-b">
+        {/* date range, dropdowns, etc. */}
+      </div>
+
+      {/* 3. Table */}
+      <BaseDataTable ... />
+      <PaginationControls ... />
+    </div>
+  );
+}
+```
+
+`PageToolbar` does NOT go in the layout — it is page-specific.
+
+---
+
+## MegaMenuPanel
+
+File: `apps/backoffice-web/src/components/layout/MegaMenuPanel.tsx`
+
+- Automatically positioned flush to the right of the sidebar (accounts for collapsed state)
+- Renders `module.sections` as a 2-column grid
+- Dark bg-gray-900, active item highlighted in blue-600
+- Only shown when the active module has `flyout: true` and the flyout is open
+
+Do not render `MegaMenuPanel` manually — it is driven by `AppSidebar` state.
+
+---
+
+## Sidebar color reference
+
+| Element | Class |
+|---|---|
+| Sidebar background | `bg-gray-900` |
+| Module row — inactive | `text-gray-300 hover:bg-gray-800` |
+| Module row — active | `bg-gray-700 text-white font-medium` |
+| Accordion sub-item — inactive | `text-gray-400 hover:bg-gray-800 hover:text-white` |
+| Accordion sub-item — active | `bg-blue-600 text-white font-medium` |
+| Separator | `bg-gray-700` |
+| Collapse toggle | `text-gray-400 hover:bg-gray-800 hover:text-white` |
+| MegaMenu section header | `bg-gray-800 text-gray-400` |
+| MegaMenu item — active | `bg-blue-600 text-white` |
+| Header background | `bg-gray-900 border-gray-700` |

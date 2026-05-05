@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatClientError } from "@erp/api-client";
-import { AppModal, Button, formatMoneyInteger, Input, MoneyInput } from "@erp/ui";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  AppModal,
+  Button,
+  formatMoneyInteger,
+  Input,
+  MoneyInput,
+  type ToolbarItem,
+} from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
+import { TableActionHeader } from "../../components/layout/TableActionHeader";
+import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -186,15 +196,22 @@ export function PurchaseOrdersPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-6">
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Phiếu đặt hàng</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Quản lý phiếu đặt hàng từ nhà cung cấp. Hàng chỉ được nhập kho khi có phiếu đặt hàng đã duyệt.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>+ Tạo phiếu đặt hàng</Button>
       </div>
+
+      <TableActionHeader
+        className="mb-4"
+        breadcrumbs={resolveBackofficeBreadcrumbs("/inventory/purchase-orders")}
+        items={buildPurchaseOrderToolbarItems({
+          onCreate: () => setShowCreateForm(true),
+        })}
+      />
 
       <div className="mb-4 flex gap-3">
         <select
@@ -315,6 +332,19 @@ export function PurchaseOrdersPage() {
       )}
     </div>
   );
+}
+
+function buildPurchaseOrderToolbarItems({
+  onCreate,
+}: {
+  onCreate: () => void;
+}): ToolbarItem[] {
+  return [
+    { id: "create", label: "Thêm mới", icon: Plus, onClick: onCreate },
+    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
+    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
+    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
+  ];
 }
 
 // ─── Create Purchase Order Modal ───────────────────────────────────────────────

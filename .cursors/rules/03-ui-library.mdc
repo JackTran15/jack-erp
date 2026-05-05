@@ -1,0 +1,238 @@
+---
+description: @erp/ui component library usage, shadcn patterns, Tailwind CSS conventions, and when/how to add new shared components.
+globs: apps/**/*.tsx, packages/ui/src/**/*.tsx, apps/**/*.css
+alwaysApply: false
+---
+
+# UI Library — @erp/ui
+
+## Import rule
+
+**Always import from `@erp/ui`**, never from Radix UI or sub-packages directly in app code:
+
+```tsx
+// ✓ correct
+import { Button, cn, ScrollArea, Tooltip, TooltipTrigger, TooltipContent } from @erp/ui";
+
+// ✗ wrong — bypass the shared library
+import * as Tooltip from "@radix-ui/react-tooltip";
+```
+
+## Available components
+
+### Primitives
+| Export | Use for |
+|---|---|
+| `Button` | All interactive buttons. Variants: `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`. Sizes: `default`, `sm`, `lg`, `icon` |
+| `Input` | Single-line text inputs |
+| `Textarea` | Multi-line inputs |
+| `Label` | Form labels (wraps Radix Label) |
+| `Badge` | Status chips. Variants: `default`, `secondary`, `destructive`, `outline` |
+| `Separator` | Horizontal/vertical dividers |
+
+### Layout & overlay
+| Export | Use for |
+|---|---|
+| `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | Contained content blocks |
+| `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription` | Modal dialogs |
+| `AppModal` | Pre-built modal with save/cancel buttons and optional fullscreen toggle |
+| `ScrollArea`, `ScrollBar` | Custom scrollable containers |
+| `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` | Expand/collapse sections |
+| `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` | Hover tooltips |
+| `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuLabel`, `DropdownMenuSeparator` | Dropdown menus |
+
+### Form helpers
+| Export | Use for |
+|---|---|
+| `FormField` | Wrapper: label + input + error + hint |
+| `SearchInput` | Text input with clear button and search icon |
+| `DateTimeField` | Date or datetime input (controlled by `includeTime` prop) |
+| `LargeTextInput` | Textarea with min-height 160px |
+| `TagsInput` | Inline tag input (Enter to add, Backspace to remove) |
+| `MultiSelect` | Popover-based multi-select with checkboxes |
+
+### Display / identity
+| Export | Use for |
+|---|---|
+| `Avatar` | Initials-based avatar. Props: `name`, `size` (`sm`/`md`/`lg`) |
+| `PageToolbar` | Action bar for list pages. See dedicated section below |
+
+### Utilities
+| Export | Use for |
+|---|---|
+| `cn(...classes)` | Merge Tailwind classes (clsx + tailwind-merge). Always use instead of manual string concat |
+| `buttonVariants` | Apply button styles without the `<Button>` wrapper |
+
+---
+
+## PageToolbar
+
+Use at the top of every list/table page for CRUD actions:
+
+```tsx
+import { PageToolbar, type ToolbarItem } from "@erp/ui";
+import { Plus, Copy, Pencil, Trash2, RefreshCw } from "lucide-react";
+
+const toolbarItems: ToolbarItem[] = [
+  { id: "add",    label: "Thêm mới", icon: Plus,       onClick: handleAdd },
+  { id: "clone",  label: "Nhân bản", icon: Copy,       onClick: handleClone,  disabled: !selected },
+  { id: "edit",   label: "Sửa",      icon: Pencil,     onClick: handleEdit,   disabled: !selected },
+  { id: "sep1",   type: "separator" },
+  { id: "delete", label: "Xóa",      icon: Trash2,     onClick: handleDelete, variant: "danger", disabled: !selected },
+  { id: "sep2",   type: "separator" },
+  { id: "reload", label: "Nạp",      icon: RefreshCw,  onClick: handleReload },
+];
+
+<PageToolbar items={toolbarItems} trailing={<SearchInput ... />} />
+```
+
+`PageToolbar` props:
+- `items: ToolbarItem[]` — buttons and separators
+- `trailing?: ReactNode` — right-aligned slot (filters, date pickers, export button)
+- `tone?: "default" | "primary"` — `"primary"` renders the dark blue toolbar style
+
+---
+
+## Tailwind CSS conventions
+
+### Use CSS custom properties for semantic colors — never raw hex in className
+
+```tsx
+// ✓ semantic tokens
+<div className="bg-background text-foreground border-border" />
+<p className="text-muted-foreground" />
+<span className="text-primary bg-accent" />
+<button className="text-destructive hover:bg-destructive/10" />
+
+// ✗ hardcoded colors in app components
+<div className="bg-white text-gray-900" />
+```
+
+**Exception**: The sidebar and header use intentional gray-900 for the dark chrome style:
+```tsx
+// Sidebar / Header — dark chrome, intentional
+<aside className="bg-gray-900 text-white border-gray-700" />
+```
+
+### Available CSS custom properties (defined in index.css)
+
+```
+--background / --foreground
+--primary / --primary-foreground
+--secondary / --secondary-foreground
+--muted / --muted-foreground
+--accent / --accent-foreground
+--destructive / --destructive-foreground
+--border / --input / --ring / --radius
+--header-height: 3.5rem
+--sidebar-width: 15rem
+--sidebar-width-collapsed: 3.75rem
+```
+
+### `cn()` — always use for conditional classes
+
+```tsx
+// ✓
+className={cn(
+  "flex items-center rounded-md px-3 py-2 text-sm",
+  isActive && "bg-accent text-primary font-medium",
+  disabled && "opacity-50 pointer-events-none",
+)}
+
+// ✗ string concatenation
+className={"flex " + (isActive ? "bg-accent" : "")}
+```
+
+---
+
+## Adding a new component to @erp/ui
+
+Use when: the component is needed in ≥2 apps (backoffice-web, pos-web) or is a pure presentational primitive.
+
+1. Create `packages/ui/src/components/my-component.tsx`
+2. Follow the `button.tsx` pattern: `forwardRef` + `CVA` + `cn()` + named exports
+3. Export from `packages/ui/src/index.ts`
+
+### CVA pattern for variant components
+
+```tsx
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/utils";
+
+const chipVariants = cva(
+  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground",
+        success: "bg-green-100 text-green-800",
+        warning: "bg-yellow-100 text-yellow-800",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  },
+);
+
+export interface ChipProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof chipVariants> {}
+
+export function Chip({ className, variant, ...props }: ChipProps) {
+  return <span className={cn(chipVariants({ variant }), className)} {...props} />;
+}
+```
+
+### Wrapping a Radix primitive
+
+```tsx
+import * as RadixPrimitive from "@radix-ui/react-primitive";
+import { cn } from "../lib/utils";
+
+function PrimitivePart({ className, ...props }: React.ComponentPropsWithoutRef<typeof RadixPrimitive.Part>) {
+  return <RadixPrimitive.Part className={cn("base-classes", className)} {...props} />;
+}
+export { PrimitivePart };
+```
+
+---
+
+## Icons
+
+Always use `lucide-react` (already a dep of `@erp/ui` and both apps):
+
+```tsx
+import { Plus, Pencil, Trash2, Package, ChevronDown } from "lucide-react";
+
+// Standard sizes
+<Plus className="h-4 w-4" />        // in buttons, list items
+<Package className="h-5 w-5" />     // in sidebar module rows
+<ChevronDown className="h-3.5 w-3.5" />  // in accordion triggers
+```
+
+Never import icon sets other than lucide-react.
+
+---
+
+## BaseDataTable
+
+For data tables inside pages use `BaseDataTable` from `apps/backoffice-web/src/components/table/`:
+
+```tsx
+import { BaseDataTable, type TableColumn } from "../table/BaseDataTable";
+import { PaginationControls } from "../table/PaginationControls";
+
+const columns: TableColumn<Item>[] = [
+  { key: "name",  label: "Tên hàng hóa", render: (r) => r.name },
+  { key: "price", label: "Đơn giá",      render: (r) => r.sellingPrice.toLocaleString("vi-VN") },
+];
+
+<BaseDataTable
+  columns={columns}
+  rows={items}
+  loading={isLoading}
+  emptyLabel="Chưa có hàng hóa"
+  getRowKey={(r) => r.id}
+  renderActions={(r) => <RowActions item={r} />}
+/>
+<PaginationControls page={page} pageSize={20} total={total} onPageChange={setPage} />
+```

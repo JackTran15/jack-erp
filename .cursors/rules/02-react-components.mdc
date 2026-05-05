@@ -1,0 +1,115 @@
+---
+description: React component patterns, TypeScript conventions, file structure, and naming rules for backoffice-web and pos-web.
+globs: apps/**/*.tsx, apps/**/*.ts, packages/ui/src/**/*.tsx
+alwaysApply: false
+---
+
+# React Component Patterns
+
+## Component structure (order matters)
+
+```tsx
+// 1. Imports — external, then internal, then types
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
+import { cn, Button } from "@erp/ui";
+import { useLayout } from "./LayoutContext";
+import type { NavModule } from "./navConfig";
+
+// 2. Types / interfaces (before the component)
+interface Props {
+  module: NavModule;
+  isActive: boolean;
+}
+
+// 3. Exported component (PascalCase, named export — no default exports)
+export function MyComponent({ module, isActive }: Props) {
+  // hooks first
+  const { sidebarCollapsed } = useLayout();
+  const [open, setOpen] = useState(false);
+
+  // derived values
+  const Icon = module.icon;
+
+  // handlers (prefix with handle)
+  const handleClick = () => setOpen((p) => !p);
+
+  // JSX
+  return <div />;
+}
+
+// 4. Sub-components below the main export (PascalCase, not exported)
+function SubPart() { return null; }
+```
+
+## Key rules
+
+- **No default exports** — always named exports
+- **No inline prop types** — define a separate `interface Props`
+- **`forwardRef` only when the parent needs a DOM ref** — don't add it preemptively
+- **One component per file** when the component is complex; small helpers can be co-located below
+- **Sub-components** that are only used by one parent live in the same file, below the main export
+- **Don't memo prematurely** — add `React.memo` / `useMemo` / `useCallback` only when profiling shows a real bottleneck
+
+## Naming conventions
+
+| Thing | Convention | Example |
+|---|---|---|
+| Components | PascalCase | `PageToolbar` |
+| Hooks | `use` prefix | `useLayout`, `useAuth` |
+| Event handlers | `handle` prefix | `handleDelete` |
+| Boolean props | `is` / `has` prefix | `isActive`, `hasError` |
+| Type/interface | PascalCase | `ToolbarAction` |
+| Files | kebab-case for pages, PascalCase for components | `DashboardPage.tsx`, `AppSidebar.tsx` |
+
+## TypeScript
+
+- Always type props explicitly — no implicit `any`
+- Use `type` for unions/intersections, `interface` for object shapes
+- Prefer `ComponentType<{ className?: string }>` for icon prop types
+- Use `ReactNode` for children/slot props
+- Export types alongside their components: `export type { ToolbarAction }`
+
+## Hooks
+
+- Custom hooks live in `src/hooks/` or co-located with the component they serve
+- Keep hooks focused — one concern per hook
+- TanStack Query hooks: one `useQuery` / `useMutation` per data operation
+
+```tsx
+// Good — focused hook
+function useInventoryItems(page: number, search: string) {
+  return useQuery({
+    queryKey: ["inventory-items", page, search],
+    queryFn: () => requireErpData(
+      erpApi.GET("/admin/entities/inventory-items/records", { params: { query: { page, search } } })
+    ),
+    staleTime: 30_000,
+  });
+}
+```
+
+## State management
+
+- **Server state** → TanStack Query (`useQuery`, `useMutation`)
+- **UI / ephemeral state** → `useState` / `useReducer` in the component
+- **Cross-component UI state** → React Context (see `LayoutContext`) or Zustand store
+- Do NOT put server data into Zustand
+
+## Error boundaries & suspense
+
+- Pages do not need Suspense wrappers — TanStack Query manages loading states
+- Show loading state inline: `if (isLoading) return <LoadingSkeleton />`
+- Show errors inline: `if (error) return <ErrorMessage message={...} />`
+
+## Vietnamese labels
+
+All user-facing strings must be Vietnamese:
+```tsx
+// ✓
+<Button>Thêm mới</Button>
+<p>Đang tải dữ liệu...</p>
+
+// ✗
+<Button>Add new</Button>
+```

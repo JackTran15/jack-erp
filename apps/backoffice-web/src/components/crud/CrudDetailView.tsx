@@ -9,6 +9,27 @@ interface CrudDetailViewProps {
   onClose: () => void;
 }
 
+export function CrudDetailBody({
+  config,
+  record,
+}: {
+  config: CrudEntityConfig;
+  record: Record<string, unknown>;
+}) {
+  return (
+    <dl className="m-0">
+      {config.fields.map((f) => (
+        <div key={f.key} className="flex border-b border-border/50 py-2.5">
+          <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">
+            {f.label}
+          </dt>
+          <dd className="m-0 text-sm text-foreground">{formatValue(record[f.key], f)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function CrudDetailView({
   config,
   record,
@@ -35,16 +56,7 @@ export function CrudDetailView({
           </Button>
         </div>
 
-        <dl className="m-0">
-          {config.fields.map((f) => (
-            <div key={f.key} className="flex border-b border-border/50 py-2.5">
-              <dt className="w-[180px] shrink-0 text-xs font-medium text-muted-foreground">
-                {f.label}
-              </dt>
-              <dd className="m-0 text-sm text-foreground">{formatValue(record[f.key], f)}</dd>
-            </div>
-          ))}
-        </dl>
+        <CrudDetailBody config={config} record={record} />
       </div>
     </div>
   );

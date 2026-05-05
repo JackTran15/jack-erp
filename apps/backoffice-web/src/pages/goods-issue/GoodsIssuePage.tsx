@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatClientError } from "@erp/api-client";
-import { AppModal, Button, Input } from "@erp/ui";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { AppModal, Button, Input, type ToolbarItem } from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
+import { TableActionHeader } from "../../components/layout/TableActionHeader";
+import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -188,15 +191,22 @@ export function GoodsIssuePage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-6">
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Phiếu xuất hàng</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Quản lý phiếu xuất hàng khỏi kho. Hàng chỉ được xuất khi có phiếu xuất hàng đã được duyệt và đăng.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>+ Tạo phiếu xuất hàng</Button>
       </div>
+
+      <TableActionHeader
+        className="mb-4"
+        breadcrumbs={resolveBackofficeBreadcrumbs("/inventory/goods-issues")}
+        items={buildGoodsIssueToolbarItems({
+          onCreate: () => setShowCreateForm(true),
+        })}
+      />
 
       <div className="mb-4 flex gap-3">
         <select
@@ -322,6 +332,19 @@ export function GoodsIssuePage() {
       )}
     </div>
   );
+}
+
+function buildGoodsIssueToolbarItems({
+  onCreate,
+}: {
+  onCreate: () => void;
+}): ToolbarItem[] {
+  return [
+    { id: "create", label: "Thêm mới", icon: Plus, onClick: onCreate },
+    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
+    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
+    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
+  ];
 }
 
 // ─── Create Goods Issue Modal ──────────────────────────────────────────────────

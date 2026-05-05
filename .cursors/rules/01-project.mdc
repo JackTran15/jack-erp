@@ -1,0 +1,55 @@
+---
+description: Project overview, monorepo structure, package names, stack. Always apply.
+alwaysApply: true
+---
+
+# ERP Backoffice — Project Overview
+
+## Monorepo layout (pnpm workspaces)
+
+```
+apps/
+  api/             NestJS backend (port 4000)
+  backoffice-web/  React admin SPA (port 3000)
+  pos-web/         React POS SPA (port 3001)
+packages/
+  ui/              @erp/ui — shared component library (shadcn/ui pattern)
+  api-client/      @erp/api-client — generated OpenAPI TypeScript client
+  shared-interfaces/ @erp/shared-interfaces — shared TypeScript types
+  shared-kafka-client/ @erp/shared-kafka-client — Kafka/Redpanda wrapper
+```
+
+## Commands
+
+```bash
+pnpm install            # install all workspaces
+make dev-api            # start NestJS API
+make dev-backoffice     # start backoffice at :3000
+make dev-pos            # start POS at :3001
+pnpm openapi:generate   # regenerate @erp/api-client from running API
+pnpm migration:run      # run TypeORM migrations
+pnpm seed:inventory     # seed demo data
+```
+
+## Stack
+
+- **Frontend**: React 19, TypeScript 5, Vite 6, React Router v7, TanStack Query v5, Zustand v5
+- **UI**: Tailwind CSS 3 + Radix UI primitives (via `@erp/ui`)
+- **Backend**: NestJS 11, TypeORM, PostgreSQL, Redis, Redpanda (Kafka-compatible)
+- **Language**: Vietnamese UI labels throughout
+
+## Multi-tenant model
+
+Every operational record scoped by `organizationId` (company) + `branchId` (branch).
+- JWT payload: `{ userId, organizationId, roles[], branchIds[], jti }`
+- Active branch passed via `X-Branch-Id` header
+- `@Actor` param decorator in controllers resolves the active actor context
+
+## Key conventions
+
+- IDs are UUID v4
+- Monetary values: `NUMERIC(18,2)` in DB
+- All timestamps stored in UTC
+- Vietnamese labels in UI (`label: "Tên hàng hóa"`)
+- `synchronize: false` — all schema changes via TypeORM migrations
+- Business transactions (stock ledger, journals) are immutable after posting
