@@ -1,5 +1,12 @@
-import { forwardRef } from "react";
-import type { CashSuggestion, PaymentMethodOption } from "../types";
+import { forwardRef, type ReactNode } from "react";
+import { formatVnd } from "@erp/ui";
+import type { SearchSuggestion } from "../common/SearchPopover";
+import type {
+  CashSuggestion,
+  PaymentMethod,
+  PaymentMethodOption,
+} from "../types";
+import { AlertBar } from "../common/AlertBar";
 import { CashSuggestionList } from "./CashSuggestionList";
 import { CustomerInputRow } from "./CustomerInputRow";
 import { DebtCheckRow } from "./DebtCheckRow";
@@ -11,135 +18,231 @@ import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
 import { PrintAndOrderRow } from "./PrintAndOrderRow";
 import { QrPaymentButton } from "./QrPaymentButton";
 import { SummaryRow } from "./SummaryRow";
-import { formatVnd } from "@erp/ui";
 
-export interface PaymentPanelState {
-  customerQuery: string;
+export interface PaymentSummaryPanelProps<TCustomer> {
+  // Sub-topbar
+  datetime: string;
   saleMode: string;
+  onPickSaleMode?: () => void;
+
+  // Customer search
+  customerQuery: string;
+  onCustomerQueryChange: (q: string) => void;
+  customerSearch: (q: string) => Promise<SearchSuggestion<TCustomer>[]>;
+  onSelectCustomer: (c: TCustomer) => void;
+  customerItemKey: (c: TCustomer) => string;
+  customerRenderItem: (c: TCustomer) => ReactNode;
+  customerRenderMeta?: (c: TCustomer) => ReactNode;
+  onSubmitCustomerQuery?: (q: string) => boolean | void;
+  onAddCustomer: () => void;
+  onOpenCustomerDirectory?: () => void;
+  selectedCustomerLabel?: string | null;
+  onClearCustomer?: () => void;
+  customerFieldError?: string;
+
+  // Summary
   itemCount: number;
   total: number;
   deposit: number;
+
+  // Payment method
+  methods: readonly PaymentMethodOption[];
   paymentMethod: PaymentMethodOption;
   paidAmount: number;
+  amountReadOnly?: boolean;
+  onChangeMethod: (m: PaymentMethod) => void;
+  onChangePaidAmount: (raw: string) => void;
   changeAmount: number;
+  shortageAmount: number;
+
+  // Debt
   debt: boolean;
   debtAmount: number;
-  note: string;
-  printInvoice: boolean;
-  preorder: boolean;
-  selectedSuggestionId: string | null;
-}
-
-export interface PaymentSummaryPanelProps {
-  datetime: string;
-  state: PaymentPanelState;
-  suggestions: CashSuggestion[];
-  onCustomerQueryChange: (q: string) => void;
-  onPickSaleMode?: () => void;
-  onAddCustomer?: () => void;
-  onScanQr?: () => void;
-  onPickMethod?: () => void;
   onDebtChange: (next: boolean) => void;
-  onNoteChange: (note: string) => void;
+
+  // Note
+  note: string;
+  onNoteChange: (n: string) => void;
+
+  // QR
+  onPrintQr?: () => void;
+
+  // Footer
+  printInvoice: boolean;
   onPrintInvoiceChange: (next: boolean) => void;
+  preorder: boolean;
   onPreorderChange: (next: boolean) => void;
+  suggestions: CashSuggestion[];
+  selectedSuggestionId: string | null;
   onPickSuggestion: (s: CashSuggestion) => void;
   onSaveDraft: () => void;
   onCollect: () => void;
-  onPrintQr?: () => void;
   collectDisabled?: boolean;
 }
 
 /**
  * Right-hand sticky panel containing the entire payment / customer summary.
- * Pure composition over the smaller payment-* atoms.
+ * The outer ref forwards to the customer search input so the page-level
+ * F4 shortcut can focus it.
  */
-export const PaymentSummaryPanel = forwardRef<
-  HTMLInputElement,
-  PaymentSummaryPanelProps
->(function PaymentSummaryPanel(props, customerInputRef) {
+export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
+  TCustomer,
+>(
+  props: PaymentSummaryPanelProps<TCustomer>,
+  customerInputRef: React.Ref<HTMLInputElement>,
+) {
   const {
     datetime,
-    state,
-    suggestions,
-    onCustomerQueryChange,
+    saleMode,
     onPickSaleMode,
+    customerQuery,
+    onCustomerQueryChange,
+    customerSearch,
+    onSelectCustomer,
+    customerItemKey,
+    customerRenderItem,
+    customerRenderMeta,
+    onSubmitCustomerQuery,
     onAddCustomer,
-    onScanQr,
-    onPickMethod,
+    onOpenCustomerDirectory,
+    selectedCustomerLabel,
+    onClearCustomer,
+    customerFieldError,
+    itemCount,
+    total,
+    deposit,
+    methods,
+    paymentMethod,
+    paidAmount,
+    amountReadOnly,
+    onChangeMethod,
+    onChangePaidAmount,
+    changeAmount,
+    shortageAmount,
+    debt,
+    debtAmount,
     onDebtChange,
+    note,
     onNoteChange,
+    onPrintQr,
+    printInvoice,
     onPrintInvoiceChange,
+    preorder,
     onPreorderChange,
+    suggestions,
+    selectedSuggestionId,
     onPickSuggestion,
     onSaveDraft,
     onCollect,
-    onPrintQr,
     collectDisabled,
   } = props;
 
-  const amountDue = Math.max(0, state.total - state.deposit);
+  const amountDue = Math.max(0, total - deposit);
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 flex-col gap-3 border-l border-gray-200 bg-white px-4 py-3">
+    <aside className="flex h-full w-[320px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-gray-200 bg-white px-4 py-3">
       <PaymentSubTopBar
         datetime={datetime}
-        saleMode={state.saleMode}
+        saleMode={saleMode}
         onPickSaleMode={onPickSaleMode}
       />
 
-      <CustomerInputRow
+      <CustomerInputRow<TCustomer>
         ref={customerInputRef}
-        value={state.customerQuery}
+        value={customerQuery}
         onChange={onCustomerQueryChange}
+        search={customerSearch}
+        onSelect={onSelectCustomer}
+        itemKey={customerItemKey}
+        renderItem={customerRenderItem}
+        renderMeta={customerRenderMeta}
+        onSubmitQuery={onSubmitCustomerQuery}
         onAddCustomer={onAddCustomer}
-        onScanQr={onScanQr}
+        onOpenReceipts={onOpenCustomerDirectory}
+        emptyAction={{
+          label: "Tạo khách mới",
+          onClick: () => onAddCustomer(),
+        }}
       />
 
+      {customerFieldError ? (
+        <p className="text-[12px] text-red-600" role="alert">
+          {customerFieldError}
+        </p>
+      ) : selectedCustomerLabel ? (
+        <div className="flex items-center justify-between text-[13px]">
+          <span className="font-medium text-gray-900">
+            {selectedCustomerLabel}
+          </span>
+          {onClearCustomer ? (
+            <button
+              type="button"
+              onClick={onClearCustomer}
+              className="text-[12px] text-gray-500 hover:text-red-600"
+            >
+              Bỏ khách
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-[12px] text-gray-400">Chưa chọn — bán lẻ.</p>
+      )}
+
       <PaymentSummaryBlock
-        itemCount={state.itemCount}
-        total={state.total}
-        deposit={state.deposit}
+        itemCount={itemCount}
+        total={total}
+        deposit={deposit}
         amountDue={amountDue}
       />
 
       <PaymentMethodRow
-        method={state.paymentMethod}
-        amount={state.paidAmount}
-        onPickMethod={onPickMethod}
+        method={paymentMethod}
+        amount={paidAmount}
+        amountReadOnly={amountReadOnly}
+        methods={methods}
+        onChangeMethod={onChangeMethod}
+        onChangeAmount={onChangePaidAmount}
       />
 
       <SummaryRow
         label="Trả lại khách"
         value={
           <span className="font-bold text-gray-900">
-            {formatVnd(state.changeAmount)}
+            {formatVnd(changeAmount)}
           </span>
         }
       />
 
+      {shortageAmount > 0 ? (
+        <AlertBar variant="error" className="rounded-md">
+          Còn thiếu {formatVnd(shortageAmount)}
+        </AlertBar>
+      ) : null}
+
       <DebtCheckRow
-        checked={state.debt}
+        checked={debt}
         onChange={onDebtChange}
-        amount={state.debtAmount}
+        amount={debtAmount}
       />
 
-      <NoteInput value={state.note} onChange={onNoteChange} />
+      <NoteInput value={note} onChange={onNoteChange} />
 
       <QrPaymentButton onClick={onPrintQr} />
 
       <div className="mt-auto space-y-3">
         <PrintAndOrderRow
-          printInvoice={state.printInvoice}
+          printInvoice={printInvoice}
           onPrintInvoiceChange={onPrintInvoiceChange}
-          preorder={state.preorder}
+          preorder={preorder}
           onPreorderChange={onPreorderChange}
         />
-        <CashSuggestionList
-          suggestions={suggestions}
-          selectedId={state.selectedSuggestionId}
-          onPick={onPickSuggestion}
-        />
+        {suggestions.length > 0 ? (
+          <CashSuggestionList
+            suggestions={suggestions}
+            selectedId={selectedSuggestionId}
+            onPick={onPickSuggestion}
+          />
+        ) : null}
         <PaymentCTAButtons
           onSaveDraft={onSaveDraft}
           onCollect={onCollect}
@@ -148,4 +251,8 @@ export const PaymentSummaryPanel = forwardRef<
       </div>
     </aside>
   );
-});
+}) as <TCustomer>(
+  props: PaymentSummaryPanelProps<TCustomer> & {
+    ref?: React.Ref<HTMLInputElement>;
+  },
+) => ReturnType<React.FC>;

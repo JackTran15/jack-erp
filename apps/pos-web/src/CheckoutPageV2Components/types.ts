@@ -1,6 +1,11 @@
 /**
  * Shared types for CheckoutPageV2.
  * Kept framework-agnostic so the components can be reused outside the page.
+ *
+ * `CartLine` and `PaymentMethod` mirror the shapes used by the legacy
+ * CheckoutPage — keeping the shapes identical means handlers/validators
+ * port over without translation. Only field renames or additions are made
+ * when the V2 UI genuinely needs them.
  */
 
 export interface InvoiceTabItem {
@@ -9,14 +14,19 @@ export interface InvoiceTabItem {
   isDraft?: boolean;
 }
 
-export interface InvoiceLineItem {
-  id: string;
-  sku: string;
+export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
+
+/** Single line in the active invoice cart. Identical to legacy CheckoutPage. */
+export interface CartLine {
+  lineId: string;
+  itemId: string;
   name: string;
-  qty: number;
+  code: string;
   unit: string;
   unitPrice: number;
-  hasWarning?: boolean;
+  qty: number;
+  locationId: string;
+  maxQty: number;
 }
 
 export interface CatalogProduct {
@@ -26,14 +36,8 @@ export interface CatalogProduct {
 }
 
 export interface PaymentMethodOption {
-  value: string;
+  value: PaymentMethod;
   label: string;
-}
-
-export interface CustomerInfo {
-  id: string;
-  name: string;
-  phone?: string;
 }
 
 export interface CashSuggestion {
