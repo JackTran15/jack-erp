@@ -7,11 +7,15 @@ import type {
   PaymentMethodOption,
 } from "../types";
 import { AlertBar } from "../common/AlertBar";
+import type { InvoicePrinter } from "../printing/InvoicePrinter";
 import { CashSuggestionList } from "./CashSuggestionList";
 import { CustomerInputRow } from "./CustomerInputRow";
 import { DebtCheckRow } from "./DebtCheckRow";
 import { NoteInput } from "./NoteInput";
-import { PaymentCTAButtons } from "./PaymentCTAButtons";
+import {
+  PaymentCTAButtons,
+  type InvoicePayloadInput,
+} from "./PaymentCTAButtons";
 import { PaymentMethodRow } from "./PaymentMethodRow";
 import { PaymentSubTopBar } from "./PaymentSubTopBar";
 import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
@@ -78,6 +82,11 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onSaveDraft: () => void;
   onCollect: () => void;
   collectDisabled?: boolean;
+
+  /** Optional invoice payload (or factory) — when set, "Thu tiền" prints first. */
+  invoice?: InvoicePayloadInput;
+  /** Per-call printer override forwarded to `PaymentCTAButtons`. */
+  invoicePrinter?: InvoicePrinter;
 }
 
 /**
@@ -135,6 +144,8 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onSaveDraft,
     onCollect,
     collectDisabled,
+    invoice,
+    invoicePrinter,
   } = props;
 
   const amountDue = Math.max(0, total - deposit);
@@ -247,6 +258,8 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           onSaveDraft={onSaveDraft}
           onCollect={onCollect}
           collectDisabled={collectDisabled}
+          invoice={invoice}
+          printer={invoicePrinter}
         />
       </div>
     </aside>

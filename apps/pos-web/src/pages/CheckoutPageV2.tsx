@@ -26,6 +26,7 @@ import { InvoiceLineItemTable } from "../CheckoutPageV2Components/invoice/Invoic
 import { PaymentSummaryPanel } from "../CheckoutPageV2Components/payment/PaymentSummaryPanel";
 import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
+import type { InvoicePayload } from "../CheckoutPageV2Components/printing/types";
 import type {
   CartLine,
   CashSuggestion,
@@ -115,6 +116,29 @@ function buildSuggestions(amountDue: number): CashSuggestion[] {
     { id: "plus-10k", amount: amountDue + 10_000 },
   ];
 }
+
+/** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
+function generateInvoiceNumber(d: Date): string {
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const seq = String(Math.floor(Math.random() * 10_000)).padStart(4, "0");
+  return `${yy}${mm}${dd}${seq}`;
+}
+
+/** Static store info — receipts always print under this branch identity. */
+const STORE_INFO = {
+  name: "Giày MT Cần Thơ",
+  address: "95-97 Nguyễn Trãi, Ninh Kiều, Cần Thơ",
+  phone: "0834561317",
+} as const;
+
+const RETURN_POLICY = {
+  title: "QUY ĐỊNH ĐỔI TRẢ",
+  body: "Đổi giày đẹp trong 7 ngày (giá trị đổi phải bằng hoặc cao hơn giá sản phẩm trước). Riêng mẫu vớ kiên tất xách, vớ, dây đã không đổi trả. Sản phẩm đổi trả phải còn tem và chưa qua sử dụng.",
+} as const;
+
+const CLOSING_MESSAGE = "Giày MT hân hạnh phục vụ quý khách!";
 
 // ---------------------------------------------------------------------------
 // Page
@@ -613,6 +637,43 @@ export function CheckoutPageV2() {
 
   const debtAmount = debt ? shortageAmount : 0;
 
+  // ---- Invoice payload factory (printed on "Thu tiền") ----
+  // Closure captures the *current* render's state so the receipt reflects
+  // the cart/customer/totals before `handleCheckout` clears them.
+  const buildInvoicePayload = (): InvoicePayload | null => {
+    if (!printInvoice) return null;
+    if (cart.length === 0) return null;
+    const totalQty = cart.reduce((sum, l) => sum + l.qty, 0);
+    const subtotal = grandTotal;
+    const paid =
+      paymentMethod === "CASH"
+        ? cashReceivedNum > 0
+          ? cashReceivedNum
+          : grandTotal
+        : grandTotal;
+    return {
+      store: STORE_INFO,
+      invoiceNumber: generateInvoiceNumber(new Date()),
+      issuedAt: new Date(),
+      lines: cart.map((l, i) => ({
+        index: i + 1,
+        name: l.name,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+      })),
+      totals: {
+        totalQty,
+        subtotal,
+        grandTotal,
+        paid,
+        change: Math.max(0, paid - grandTotal),
+      },
+      paymentMethodLabel: currentMethod.label,
+      policy: RETURN_POLICY,
+      closingMessage: CLOSING_MESSAGE,
+    };
+  };
+
   return (
     <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
       <div
@@ -798,6 +859,7 @@ export function CheckoutPageV2() {
           onSaveDraft={handleSaveDraft}
           onCollect={() => handleCheckout({ preventDefault: () => {} })}
           collectDisabled={cart.length === 0}
+          invoice={buildInvoicePayload}
         />
       </div>
     </div>
