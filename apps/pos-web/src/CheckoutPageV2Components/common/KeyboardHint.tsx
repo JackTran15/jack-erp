@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cx } from "../utils";
+import { cn } from "@erp/ui";
 
 export interface KeyboardHintProps {
   children: ReactNode;
@@ -12,7 +12,7 @@ export interface KeyboardHintProps {
  */
 export function KeyboardHint({ children, className }: KeyboardHintProps) {
   return (
-    <span className={cx("text-gray-400 font-normal", className)}>
+    <span className={cn("text-gray-400 font-normal", className)}>
       {children}
     </span>
   );

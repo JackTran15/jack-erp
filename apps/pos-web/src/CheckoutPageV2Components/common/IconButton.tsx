@@ -1,5 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { cx } from "../utils";
+import { cn } from "@erp/ui";
 
 export interface IconButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -25,7 +25,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         type={type}
         aria-label={ariaLabel}
-        className={cx(
+        className={cn(
           "inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors",
           "hover:bg-gray-100 hover:text-gray-700",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40",

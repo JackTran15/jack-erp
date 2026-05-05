@@ -3,7 +3,6 @@
 // same primitives without reaching into deep paths.
 
 export * from "./types";
-export * from "./utils";
 
 export * from "./common/ToggleSwitch";
 export * from "./common/PriceBadge";

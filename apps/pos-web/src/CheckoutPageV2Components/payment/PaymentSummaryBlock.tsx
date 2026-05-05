@@ -1,5 +1,5 @@
+import { formatVnd } from "@erp/ui";
 import { CountBadge } from "../common/CountBadge";
-import { formatVnd } from "../utils";
 import { SummaryRow } from "./SummaryRow";
 
 export interface PaymentSummaryBlockProps {

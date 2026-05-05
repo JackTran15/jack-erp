@@ -1,4 +1,4 @@
-import { formatVnd } from "../utils";
+import { formatVnd } from "@erp/ui";
 import type { CashSuggestion } from "../types";
 
 export interface CashSuggestionListProps {

@@ -1,5 +1,5 @@
+import { formatVnd } from "@erp/ui";
 import { ChevronDownIcon, PlusCircleIcon } from "../icons/Icon";
-import { formatVnd } from "../utils";
 import type { PaymentMethodOption } from "../types";
 
 export interface PaymentMethodRowProps {

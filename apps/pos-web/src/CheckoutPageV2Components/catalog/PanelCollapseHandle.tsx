@@ -1,5 +1,5 @@
 import { ChevronDownIcon } from "../icons/Icon";
-import { cx } from "../utils";
+import { cn } from "@erp/ui";
 
 export interface PanelCollapseHandleProps {
   collapsed: boolean;
@@ -24,7 +24,7 @@ export function PanelCollapseHandle({
     >
       <ChevronDownIcon
         size={14}
-        className={cx(
+        className={cn(
           "text-gray-400 transition-transform",
           collapsed && "rotate-180",
         )}
