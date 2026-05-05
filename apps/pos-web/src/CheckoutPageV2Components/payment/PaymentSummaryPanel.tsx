@@ -16,6 +16,8 @@ import {
 import type { InvoicePrinter } from "../printing/InvoicePrinter";
 import { CashSuggestionList } from "./CashSuggestionList";
 import type { CustomerActionItem } from "./CustomerActions";
+import { CustomerDetailDialog } from "./customerDetail/CustomerDetailDialog";
+import type { CustomerDetailData } from "./customerDetail/types";
 import { CustomerInputRow } from "./CustomerInputRow";
 import { DebtCheckRow } from "./DebtCheckRow";
 import { KeepChangeRow } from "./KeepChangeRow";
@@ -69,6 +71,19 @@ export interface PaymentSummaryPanelProps<TCustomer> {
    * the panel doesn't need new props for every new action.
    */
   customerExtraActions?: CustomerActionItem[];
+
+  /**
+   * Detail data shown when the user clicks the selected-customer chip.
+   * When omitted, the panel synthesises a minimal payload from
+   * `selectedCustomerLabel` + `customerDebt` so the dialog still opens.
+   */
+  customerDetail?: CustomerDetailData;
+  /** Tab footer callbacks — forwarded to `CustomerDetailDialog`. */
+  onConfirmCustomerDetail?: () => void;
+  onEditCustomer?: () => void;
+  onCollectCustomerDebt?: () => void;
+  onChangeCustomerCard?: () => void;
+  onRefreshCustomerPoints?: () => void;
 
   // Summary
   itemCount: number;
@@ -154,6 +169,12 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onPickPromoOption,
     onScanCustomerQr,
     customerExtraActions,
+    customerDetail,
+    onConfirmCustomerDetail,
+    onEditCustomer,
+    onCollectCustomerDebt,
+    onChangeCustomerCard,
+    onRefreshCustomerPoints,
     itemCount,
     total,
     deposit,
@@ -196,6 +217,25 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const handlePromoSelect = (option: PromoMenuOption) => {
     onPickPromoOption?.(option);
   };
+
+  // Customer detail dialog — opened by clicking the selected-customer chip.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const dialogData: CustomerDetailData = useMemo(() => {
+    if (customerDetail) return customerDetail;
+    // Fallback: build a minimal payload from what the panel already knows.
+    return {
+      identity: { name: selectedCustomerLabel ?? "" },
+      stats:
+        typeof customerDebt === "number"
+          ? {
+              totalSpent: 0,
+              invoiceCount: 0,
+              debtTotal: customerDebt,
+              debtDocumentCount: 0,
+            }
+          : undefined,
+    };
+  }, [customerDetail, selectedCustomerLabel, customerDebt]);
 
   /**
    * Source of truth for the customer-area action icons.
@@ -290,6 +330,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
               debt={customerDebt}
               onClear={onClearCustomer ?? (() => {})}
               actions={customerActions}
+              onClick={() => setDetailOpen(true)}
             />
           ) : (
             <CustomerInputRow<TCustomer>
@@ -418,6 +459,17 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           printer={invoicePrinter}
         />
       </div>
+
+      <CustomerDetailDialog
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        data={dialogData}
+        onConfirm={onConfirmCustomerDetail}
+        onEdit={onEditCustomer}
+        onCollectDebt={onCollectCustomerDebt}
+        onChangeCard={onChangeCustomerCard}
+        onRefreshPoints={onRefreshCustomerPoints}
+      />
     </aside>
   );
 }) as <TCustomer>(
