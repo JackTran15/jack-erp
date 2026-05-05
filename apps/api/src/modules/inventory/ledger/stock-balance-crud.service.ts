@@ -40,6 +40,7 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
     alias: string,
   ): void {
     qb.leftJoinAndSelect(`${alias}.item`, 'item');
+    qb.leftJoinAndSelect('item.product', 'product');
   }
 
   protected override applySearch(
@@ -58,9 +59,22 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
             search: `%${search}%`,
           })
           .orWhere('item.name ILIKE :search', { search: `%${search}%` })
-          .orWhere('item.code ILIKE :search', { search: `%${search}%` });
+          .orWhere('item.code ILIKE :search', { search: `%${search}%` })
+          .orWhere('product.name ILIKE :search', { search: `%${search}%` });
       }),
     );
+  }
+
+  protected override applyFilters(
+    qb: SelectQueryBuilder<StockBalanceEntity>,
+    alias: string,
+    filters: Record<string, any>,
+  ): void {
+    const { productId, ...rest } = filters;
+    super.applyFilters(qb, alias, rest);
+    if (productId) {
+      qb.andWhere('item.productId = :productId', { productId });
+    }
   }
 
   protected override transformListResults(
@@ -92,6 +106,8 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
       itemName: item?.name ?? '',
       itemCode: item?.code ?? '',
       itemVariants: formatItemVariantSummary(item),
+      productName: item?.product?.name ?? '',
+      variantLabel: item?.variantLabel ?? formatItemVariantSummary(item),
     };
   }
 }
@@ -101,6 +117,8 @@ function stripDerivedItemFields<T extends Record<string, any>>(payload: T): T {
   delete next.itemName;
   delete next.itemCode;
   delete next.itemVariants;
+  delete next.productName;
+  delete next.variantLabel;
   delete next.item;
   return next;
 }
@@ -142,6 +160,18 @@ export const INVENTORY_STOCK_BALANCE_ENTITY_CONFIG: CrudEntityConfig = {
       type: 'string',
       readOnly: true,
     },
+    {
+      key: 'productName',
+      label: 'Tên sản phẩm',
+      type: 'string',
+      readOnly: true,
+    },
+    {
+      key: 'variantLabel',
+      label: 'Biến thể',
+      type: 'string',
+      readOnly: true,
+    },
     { key: 'itemId', label: 'ID mặt hàng', type: 'string', required: true },
     {
       key: 'locationId',
@@ -153,11 +183,12 @@ export const INVENTORY_STOCK_BALANCE_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'quantity', label: 'Số lượng', type: 'number' },
     { key: 'lastMovementAt', label: 'Phát sinh gần nhất', type: 'date' },
   ],
-  searchableFields: ['itemId', 'locationId', 'branchId', 'itemName', 'itemCode'],
+  searchableFields: ['itemId', 'locationId', 'branchId', 'itemName', 'itemCode', 'productName'],
   filterDefinitions: [
     { key: 'itemId', label: 'ID mặt hàng', type: 'text' },
     { key: 'locationId', label: 'ID vị trí', type: 'text' },
     { key: 'branchId', label: 'ID chi nhánh', type: 'text' },
+    { key: 'productId', label: 'ID sản phẩm', type: 'text' },
   ],
   permissions: {
     create: 'inventory.write',

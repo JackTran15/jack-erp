@@ -24,6 +24,8 @@ import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPa
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
+import { ProductsPage } from "./pages/products/ProductsPage";
+import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +55,8 @@ export function App() {
                   path="/branch-management/sales-hierarchy"
                   element={<SalesHierarchyPage />}
                 />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route
                   path="/inventory-management"
                   element={<InventoryManagementPage />}

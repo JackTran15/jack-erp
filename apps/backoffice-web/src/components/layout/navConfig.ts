@@ -25,6 +25,7 @@ import {
   FileText,
   DollarSign,
   Hash,
+  Layers,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -80,6 +81,7 @@ export const navConfig: NavModule[] = [
         id: "inventory-main",
         children: [
           { to: "/inventory-management", label: "Quản lý kho", icon: Package },
+          { to: "/products", label: "Sản phẩm", icon: Layers },
           { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", icon: ShoppingCart },
           { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", icon: PackageMinus },
         ],

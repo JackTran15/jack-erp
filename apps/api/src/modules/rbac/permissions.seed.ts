@@ -48,6 +48,10 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.adjustment.post', description: 'Post inventory adjustments', module: 'inventory' },
   { key: 'inventory.adjustment.cancel', description: 'Cancel inventory adjustments', module: 'inventory' },
 
+  // Product
+  { key: 'product.read', description: 'View product records', module: 'product' },
+  { key: 'product.write', description: 'Create, update and delete product records', module: 'product' },
+
   // POS
   { key: 'pos.sale.create', description: 'Create POS sales', module: 'pos' },
   { key: 'pos.return.create', description: 'Create POS returns', module: 'pos' },
