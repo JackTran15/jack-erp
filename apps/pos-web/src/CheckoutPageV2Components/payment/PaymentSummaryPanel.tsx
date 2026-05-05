@@ -271,7 +271,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     typeof onKeepChangeChange === "function";
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
+    <aside className="flex h-full w-[26dvw] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
       <div className="flex-1 overflow-y-auto">
         {/* 4.1 TopBar — datetime + sale mode picker */}
         <div className="px-4">
