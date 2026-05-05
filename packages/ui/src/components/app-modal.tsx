@@ -24,6 +24,7 @@ export interface AppModalProps {
   cancelLabel?: string;
   saveDisabled?: boolean;
   allowFullscreen?: boolean;
+  showFooter?: boolean;
   className?: string;
 }
 
@@ -38,7 +39,8 @@ function AppModal({
   saveLabel = "Lưu",
   cancelLabel = "Huỷ",
   saveDisabled,
-  allowFullscreen = false,
+  allowFullscreen = true,
+  showFooter = true,
   className,
 }: AppModalProps) {
   const [fullscreen, setFullscreen] = React.useState(false);
@@ -52,47 +54,51 @@ function AppModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         fullscreen={fullscreen}
-        className={cn("flex flex-col max-h-[90vh]", fullscreen && "max-h-full", className)}
+        className={cn(
+          "flex flex-col max-h-[90vh]",
+          fullscreen && "h-screen w-screen max-h-none",
+          !fullscreen && className,
+        )}
       >
         <DialogHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-1 flex-1">
-              <DialogTitle>{title}</DialogTitle>
-              {description ? (
-                <DialogDescription>{description}</DialogDescription>
-              ) : null}
-            </div>
-            {allowFullscreen ? (
-              <button
-                type="button"
-                className="rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => setFullscreen((f) => !f)}
-                aria-label={fullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-              >
-                {fullscreen ? (
-                  <Minimize2 className="h-4 w-4" />
-                ) : (
-                  <Maximize2 className="h-4 w-4" />
-                )}
-              </button>
+          <div className="space-y-1 pr-16">
+            <DialogTitle>{title}</DialogTitle>
+            {description ? (
+              <DialogDescription>{description}</DialogDescription>
             ) : null}
           </div>
         </DialogHeader>
+        {allowFullscreen ? (
+          <button
+            type="button"
+            className="absolute right-12 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            onClick={() => setFullscreen((f) => !f)}
+            aria-label={fullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+          >
+            {fullscreen ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+          </button>
+        ) : null}
         <div className="flex-1 overflow-auto py-2">{children}</div>
-        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2">
-          {onCancel || !onSave ? (
-            <DialogClose asChild>
-              <Button variant="outline" onClick={handleCancel}>
-                {cancelLabel}
+        {showFooter ? (
+          <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2">
+            {onCancel || !onSave ? (
+              <DialogClose asChild>
+                <Button variant="outline" onClick={handleCancel}>
+                  {cancelLabel}
+                </Button>
+              </DialogClose>
+            ) : null}
+            {onSave ? (
+              <Button onClick={onSave} disabled={saveDisabled}>
+                {saveLabel}
               </Button>
-            </DialogClose>
-          ) : null}
-          {onSave ? (
-            <Button onClick={onSave} disabled={saveDisabled}>
-              {saveLabel}
-            </Button>
-          ) : null}
-        </DialogFooter>
+            ) : null}
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

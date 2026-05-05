@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatClientError } from "@erp/api-client";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, type ToolbarItem } from "@erp/ui";
+import { AppModal, Button, Input, type ToolbarItem } from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { SearchListingInput } from "../../components/forms/SearchListingInput";
 import { TableActionHeader } from "../../components/layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
@@ -42,6 +43,20 @@ interface PaginatedResponse<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+interface InventoryLocation {
+  id: string;
+  name: string;
+  code: string;
+  storageId: string;
+}
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  code: string;
+  unit: string;
 }
 
 const STATUS_LABEL: Record<GoodsIssueStatus, string> = {
@@ -342,21 +357,51 @@ function CreateGoodsIssueModal({
   onCreated: () => Promise<void>;
 }) {
   const [locationId, setLocationId] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState([{ itemId: "", quantity: 1, notes: "" }]);
+  const [lines, setLines] = useState([{ itemId: "", itemLabel: "", quantity: 1, notes: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const addLine = () =>
-    setLines((prev) => [...prev, { itemId: "", quantity: 1, notes: "" }]);
+    setLines((prev) => [...prev, { itemId: "", itemLabel: "", quantity: 1, notes: "" }]);
   const removeLine = (idx: number) =>
     setLines((prev) => prev.filter((_, i) => i !== idx));
   const updateLine = (idx: number, field: string, value: unknown) =>
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
 
+  const searchLocations = useCallback(async (query: string) => {
+    const params = new URLSearchParams({
+      page: "1",
+      pageSize: "8",
+      search: query.trim(),
+    });
+    const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+      `/inventory/locations?${params}`,
+    );
+    return data.data;
+  }, []);
+
+  const searchItems = useCallback(async (query: string) => {
+    const params = new URLSearchParams({
+      page: "1",
+      pageSize: "8",
+      search: query.trim(),
+    });
+    const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
+      `/inventory/items?${params}`,
+    );
+    return data.data;
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!locationId || lines.some((l) => !l.itemId)) {
+      setError("Vui lòng chọn vị trí kho và mặt hàng hợp lệ.");
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.post("/inventory/goods-issues", {
@@ -378,25 +423,42 @@ function CreateGoodsIssueModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[1100] flex items-start justify-center bg-black/40 pt-[60px]"
-      onClick={onCancel}
+    <AppModal
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      title="Tạo phiếu xuất hàng"
+      onCancel={onCancel}
+      onSave={() => formRef.current?.requestSubmit()}
+      saveLabel={saving ? "Đang lưu…" : "Tạo phiếu"}
+      saveDisabled={saving}
+      className="max-w-[640px]"
     >
-      <div
-        className="max-h-[85vh] w-full max-w-[640px] overflow-y-auto rounded-xl bg-background p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
+      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+      <form
+        ref={formRef}
+        className="flex flex-col gap-4"
+        onSubmit={(e) => void handleSubmit(e)}
       >
-        <h2 className="mb-4 text-xl font-semibold">Tạo phiếu xuất hàng</h2>
-        {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-        <form className="flex flex-col gap-4" onSubmit={(e) => void handleSubmit(e)}>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">ID vị trí kho xuất *</label>
-              <input
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="UUID vị trí kho"
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
+              <SearchListingInput
+                label="Vị trí kho xuất"
+                placeholder="Tìm theo mã hoặc tên vị trí"
+                value={locationQuery}
+                onValueChange={(val) => {
+                  setLocationQuery(val);
+                  setLocationId("");
+                }}
+                onSelect={(location) => {
+                  setLocationId(location.id);
+                  setLocationQuery(`${location.code} · ${location.name}`);
+                }}
+                search={searchLocations}
+                itemKey={(location) => location.id}
+                renderItem={(location) => location.name}
+                renderMeta={(location) => `${location.code} · ${location.storageId}`}
                 required
               />
             </div>
@@ -428,65 +490,75 @@ function CreateGoodsIssueModal({
                 + Thêm dòng
               </Button>
             </div>
-            <div className="flex flex-col gap-2">
-              {lines.map((line, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_80px_1fr_32px] gap-2 items-end">
-                  <div className="flex flex-col gap-1">
-                    {idx === 0 && <span className="text-xs text-muted-foreground">ID mặt hàng *</span>}
-                    <input
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                      placeholder="UUID"
-                      value={line.itemId}
-                      onChange={(e) => updateLine(idx, "itemId", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {idx === 0 && <span className="text-xs text-muted-foreground">Số lượng</span>}
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                      value={line.quantity}
-                      onChange={(e) => updateLine(idx, "quantity", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {idx === 0 && <span className="text-xs text-muted-foreground">Ghi chú</span>}
-                    <input
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                      value={line.notes}
-                      onChange={(e) => updateLine(idx, "notes", e.target.value)}
-                    />
-                  </div>
-                  <div className={idx === 0 ? "pt-5" : ""}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-destructive"
-                      onClick={() => removeLine(idx)}
-                      disabled={lines.length === 1}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            <div className="rounded-md border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                    <th className="px-3 py-2 text-left">Mặt hàng</th>
+                    <th className="px-3 py-2 text-right">Số lượng</th>
+                    <th className="px-3 py-2 text-left">Ghi chú</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line, idx) => (
+                    <tr key={idx} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 align-top">
+                        <SearchListingInput
+                          placeholder="Tìm mã hoặc tên hàng"
+                          value={line.itemLabel}
+                          onValueChange={(val) => {
+                            updateLine(idx, "itemLabel", val);
+                            updateLine(idx, "itemId", "");
+                          }}
+                          onSelect={(item) => {
+                            updateLine(idx, "itemId", item.id);
+                            updateLine(idx, "itemLabel", `${item.code} · ${item.name}`);
+                          }}
+                          search={searchItems}
+                          itemKey={(item) => item.id}
+                          renderItem={(item) => item.name}
+                          renderMeta={(item) => `${item.code} · ${item.unit}`}
+                          required
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          className="text-right"
+                          value={line.quantity}
+                          onChange={(e) => updateLine(idx, "quantity", e.target.value)}
+                          required
+                        />
+                      </td>
+                      <td className="px-3 py-2 align-top">
+                        <Input
+                          value={line.notes}
+                          onChange={(e) => updateLine(idx, "notes", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-center align-top">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive"
+                          onClick={() => removeLine(idx)}
+                          disabled={lines.length === 1}
+                        >
+                          ×
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>Huỷ</Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Đang lưu…" : "Tạo phiếu"}
-            </Button>
-          </div>
         </form>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 
@@ -508,24 +580,22 @@ function GoodsIssueDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-[1100] flex items-start justify-center bg-black/40 pt-[60px]"
-      onClick={onClose}
+    <AppModal
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={`Phiếu xuất hàng ${issue.documentNumber ?? "(chưa xuất kho)"}`}
+      showFooter={false}
+      className="max-w-[640px]"
     >
-      <div
-        className="max-h-[85vh] w-full max-w-[640px] overflow-y-auto rounded-xl bg-background p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
-            Phiếu xuất hàng {issue.documentNumber ?? "(chưa xuất kho)"}
-          </h2>
-          <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[issue.status]}`}
-          >
-            {STATUS_LABEL[issue.status]}
-          </span>
-        </div>
+      <div className="mb-4 flex items-center justify-between">
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[issue.status]}`}
+        >
+          {STATUS_LABEL[issue.status]}
+        </span>
+      </div>
 
         <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
@@ -595,7 +665,6 @@ function GoodsIssueDetailModal({
             Đóng
           </Button>
         </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }

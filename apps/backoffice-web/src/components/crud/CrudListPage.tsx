@@ -25,6 +25,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  formatMoneyInteger,
   Input,
   type ToolbarItem,
 } from "@erp/ui";
@@ -693,6 +694,10 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
     } catch {
       return String(value);
     }
+  }
+  if (field.type === "number" && field.numberFormat === "money") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatMoneyInteger(n) : String(value);
   }
   return String(value);
 }

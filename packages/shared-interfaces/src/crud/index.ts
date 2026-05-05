@@ -14,6 +14,8 @@ export interface FieldDefinition {
   key: string;
   label: string;
   type: 'string' | 'number' | 'boolean' | 'date' | 'enum' | 'relation';
+  /** Với `type: 'number'`: hiển thị/nhập theo nhóm hàng nghìn (tiền VND). */
+  numberFormat?: 'default' | 'money';
   required?: boolean;
   /** When true, value is shown in tables but omitted from create/edit forms. */
   readOnly?: boolean;

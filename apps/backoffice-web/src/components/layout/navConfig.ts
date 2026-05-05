@@ -24,6 +24,7 @@ import {
   Receipt,
   FileText,
   DollarSign,
+  Hash,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -200,6 +201,7 @@ export const navConfig: NavModule[] = [
         id: "settings-main",
         children: [
           { to: "/setup", label: "Thiết lập chung", icon: Settings },
+          { to: "/settings/document-numbering", label: "Đánh số chứng từ", icon: Hash },
         ],
       },
     ],

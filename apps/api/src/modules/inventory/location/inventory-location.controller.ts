@@ -75,6 +75,26 @@ export class InventoryLocationController {
     return this.service.updateItem(id, dto, actor);
   }
 
+  // ─── Providers (org-scoped, no branch required) ──────────────────────
+
+  @Get('providers')
+  @RequirePermission('inventory.read')
+  listProviders(
+    @Query() query: PaginationQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.listProviders(query, actor);
+  }
+
+  @Get('providers/:id')
+  @RequirePermission('inventory.read')
+  getProviderById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getProviderById(id, actor);
+  }
+
   // ─── Storages (branch-scoped) ─────────────────────────────────────
 
   @Post('storages')

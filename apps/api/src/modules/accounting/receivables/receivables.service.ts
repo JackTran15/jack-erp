@@ -309,7 +309,13 @@ export const RECEIVABLE_ENTITY_CONFIG: CrudEntityConfig = {
       required: true,
       relationEntity: 'customers',
     },
-    { key: 'amount', label: 'Amount', type: 'number', required: true },
+    {
+      key: 'amount',
+      label: 'Amount',
+      type: 'number',
+      numberFormat: 'money',
+      required: true,
+    },
     { key: 'currency', label: 'Currency', type: 'string' },
     { key: 'dueDate', label: 'Due Date', type: 'date', required: true },
     {
@@ -325,7 +331,12 @@ export const RECEIVABLE_ENTITY_CONFIG: CrudEntityConfig = {
       required: true,
       relationEntity: 'accounts',
     },
-    { key: 'settledAmount', label: 'Settled Amount', type: 'number' },
+    {
+      key: 'settledAmount',
+      label: 'Settled Amount',
+      type: 'number',
+      numberFormat: 'money',
+    },
   ],
   searchableFields: ['documentNumber'],
   filterDefinitions: [

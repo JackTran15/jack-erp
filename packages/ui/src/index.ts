@@ -2,6 +2,11 @@ export { cn } from "./lib/utils";
 
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input } from "./components/input";
+export { MoneyInput, type MoneyInputProps } from "./components/money-input";
+export {
+  formatMoneyInteger,
+  parseMoneyIntegerString,
+} from "./lib/money-format";
 export { Textarea } from "./components/textarea";
 export { Label } from "./components/label";
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge";

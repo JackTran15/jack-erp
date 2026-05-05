@@ -76,37 +76,37 @@ export class GoodsIssueController {
   constructor(private readonly service: GoodsIssueService) {}
 
   @Post()
-  @RequirePermission('inventory.goods-issue.create')
+  @RequirePermission('inventory.write')
   create(@Body() dto: CreateGoodsIssueDto, @Actor() actor: ActorContext) {
     return this.service.create(dto, actor);
   }
 
   @Get()
-  @RequirePermission('inventory.goods-issue.read')
+  @RequirePermission('inventory.read')
   list(@Query() query: GoodsIssueQueryDto, @Actor() actor: ActorContext) {
     return this.service.list({ ...query, organizationId: actor.organizationId });
   }
 
   @Get(':id')
-  @RequirePermission('inventory.goods-issue.read')
+  @RequirePermission('inventory.read')
   getById(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.getById(id, actor.organizationId);
   }
 
   @Post(':id/approve')
-  @RequirePermission('inventory.goods-issue.approve')
+  @RequirePermission('inventory.write')
   approve(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.approve(id, actor);
   }
 
   @Post(':id/post')
-  @RequirePermission('inventory.goods-issue.post')
+  @RequirePermission('inventory.write')
   post(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.post(id, actor);
   }
 
   @Post(':id/cancel')
-  @RequirePermission('inventory.goods-issue.cancel')
+  @RequirePermission('inventory.write')
   cancel(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.cancel(id, actor);
   }
