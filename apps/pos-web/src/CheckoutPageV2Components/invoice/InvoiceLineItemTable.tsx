@@ -1,12 +1,16 @@
-import type { InvoiceLineItem } from "../types";
+import type { CartLine } from "../types";
 import { InvoiceLineItemRow } from "./InvoiceLineItemRow";
 
 export interface InvoiceLineItemTableProps {
-  lines: InvoiceLineItem[];
+  lines: CartLine[];
   selectedId?: string | null;
-  onSelect: (id: string) => void;
-  onRemove: (id: string) => void;
-  onChangeQty: (id: string, qty: number) => void;
+  /** Predicate to flag a row with the red warning dot. */
+  isLineWarning?: (line: CartLine) => boolean;
+  onSelect: (lineId: string) => void;
+  onRemove: (lineId: string) => void;
+  onChangeQty: (lineId: string, raw: string) => void;
+  onBumpQty?: (lineId: string, delta: number) => void;
+  onChangeUnitPrice: (lineId: string, raw: string) => void;
 }
 
 const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
@@ -28,9 +32,12 @@ const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
 export function InvoiceLineItemTable({
   lines,
   selectedId,
+  isLineWarning,
   onSelect,
   onRemove,
   onChangeQty,
+  onBumpQty,
+  onChangeUnitPrice,
 }: InvoiceLineItemTableProps) {
   return (
     <div className="flex-1 overflow-auto bg-white">
@@ -67,13 +74,16 @@ export function InvoiceLineItemTable({
           ) : (
             lines.map((line, i) => (
               <InvoiceLineItemRow
-                key={line.id}
+                key={line.lineId}
                 index={i + 1}
                 line={line}
-                selected={selectedId === line.id}
+                selected={selectedId === line.lineId}
+                hasWarning={isLineWarning?.(line)}
                 onSelect={onSelect}
                 onRemove={onRemove}
                 onChangeQty={onChangeQty}
+                onBumpQty={onBumpQty}
+                onChangeUnitPrice={onChangeUnitPrice}
               />
             ))
           )}
