@@ -26,6 +26,7 @@ import { InvoiceLineItemTable } from "../CheckoutPageV2Components/invoice/Invoic
 import { PaymentSummaryPanel } from "../CheckoutPageV2Components/payment/PaymentSummaryPanel";
 import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
+import type { PromoMenuOption } from "../CheckoutPageV2Components/payment/PromoMenu";
 import type { InvoicePayload } from "../CheckoutPageV2Components/printing/types";
 import type {
   CartLine,
@@ -75,6 +76,19 @@ function paymentLabel(m: PaymentMethod): string {
       return "chuyển khoản";
     default:
       return m;
+  }
+}
+
+function promoOptionLabel(option: PromoMenuOption): string {
+  switch (option) {
+    case "promo":
+      return "mã ưu đãi";
+    case "voucher":
+      return "voucher";
+    case "discount":
+      return "khuyến mãi";
+    default:
+      return option;
   }
 }
 
@@ -195,6 +209,7 @@ export function CheckoutPageV2() {
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [cashReceived, setCashReceived] = useState("");
+  const [keepChange, setKeepChange] = useState(false);
   const [debt, setDebt] = useState(false);
   const [note, setNote] = useState("");
   const [printInvoice, setPrintInvoice] = useState(true);
@@ -260,7 +275,9 @@ export function CheckoutPageV2() {
   );
 
   const cashReceivedNum = Number.parseFloat(cashReceived) || 0;
-  const changeAmount = Math.max(0, cashReceivedNum - grandTotal);
+  const rawChangeAmount = Math.max(0, cashReceivedNum - grandTotal);
+  // "Khách không lấy tiền thừa" — when checked, change owed is forfeited.
+  const changeAmount = keepChange ? 0 : rawChangeAmount;
   const shortageAmount = Math.max(0, grandTotal - cashReceivedNum);
   const isCashShort =
     paymentMethod === "CASH" && cashReceivedNum > 0 && shortageAmount > 0;
@@ -310,6 +327,9 @@ export function CheckoutPageV2() {
       setSelectedCustomer(c);
       setCustomerFieldError("");
       setCustomerQuery(c.name?.trim() ?? "");
+      // "Khách không lấy tiền thừa" is hidden when a customer is selected;
+      // reset the flag so it doesn't silently affect change calculation.
+      setKeepChange(false);
       announce(
         announceMessage ?? `Đã chọn khách ${formatCustomerDisplay(c)}.`,
       );
@@ -530,6 +550,8 @@ export function CheckoutPageV2() {
       setCashReceived("");
       setSelectedSuggestionId(null);
       setNote("");
+      setKeepChange(false);
+      setDebt(false);
     },
     [
       announce,
@@ -828,8 +850,12 @@ export function CheckoutPageV2() {
           selectedCustomerLabel={
             selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null
           }
+          customerDebt={null}
           onClearCustomer={selectedCustomer ? handleClearCustomer : undefined}
           customerFieldError={customerFieldError}
+          onPickPromoOption={(option) =>
+            announce(`Đã chọn ${promoOptionLabel(option)}.`)
+          }
           itemCount={cart.length}
           total={grandTotal}
           deposit={0}
@@ -844,6 +870,8 @@ export function CheckoutPageV2() {
           onChangePaidAmount={handleChangePaidAmount}
           changeAmount={changeAmount}
           shortageAmount={isCashShort ? shortageAmount : 0}
+          keepChange={keepChange}
+          onKeepChangeChange={setKeepChange}
           debt={debt}
           debtAmount={debtAmount}
           onDebtChange={setDebt}

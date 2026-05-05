@@ -7,7 +7,11 @@ export interface PrintAndOrderRowProps {
   onPreorderChange: (next: boolean) => void;
 }
 
-/** "In hóa đơn" toggle + "Đặt hàng" checkbox shown above the cash hints. */
+/**
+ * "In hóa đơn" toggle + "Đặt hàng" checkbox — sticky-bar style row pinned
+ * above the cash-hint chips. Background `#F5F5F5` per spec 4.10.3 to nudge
+ * the eye toward the chips/CTAs underneath.
+ */
 export function PrintAndOrderRow({
   printInvoice,
   onPrintInvoiceChange,
@@ -15,7 +19,7 @@ export function PrintAndOrderRow({
   onPreorderChange,
 }: PrintAndOrderRowProps) {
   return (
-    <div className="flex items-center justify-between gap-3 text-[13px] text-gray-700">
+    <div className="flex h-11 items-center justify-between gap-3 bg-[#F5F5F5] px-4 text-[14px] text-gray-900">
       <ToggleField
         label="In hóa đơn"
         checked={printInvoice}
@@ -26,7 +30,7 @@ export function PrintAndOrderRow({
           type="checkbox"
           checked={preorder}
           onChange={(e) => onPreorderChange(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
+          className="h-4 w-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
         />
         Đặt hàng
       </label>

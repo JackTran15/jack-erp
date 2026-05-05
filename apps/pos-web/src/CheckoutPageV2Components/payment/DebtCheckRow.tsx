@@ -7,22 +7,23 @@ export interface DebtCheckRowProps {
 }
 
 /**
- * "Tính vào công nợ" row — small native checkbox + label + amount.
- * Amount uses the indigo accent (#6366F1) to call attention.
+ * "Tính vào công nợ" row — checkbox + label + amount.
+ * Amount uses the indigo accent (#3B5BDB) to call attention.
+ * Sized 40px tall to match `KeepChangeRow` so checkbox rows line up.
  */
 export function DebtCheckRow({ checked, onChange, amount }: DebtCheckRowProps) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 py-1.5 text-[13px] text-gray-700">
+    <label className="flex h-10 cursor-pointer items-center justify-between gap-3 text-[14px] text-gray-900">
       <span className="inline-flex items-center gap-2">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
+          className="h-4 w-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
         />
         Tính vào công nợ
       </span>
-      <span className="font-medium text-indigo-500">{formatVnd(amount)}</span>
+      <span className="font-semibold text-[#3B5BDB]">{formatVnd(amount)}</span>
     </label>
   );
 }
