@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useSalesSummary } from "../../hooks/useReportData";
+import { useQueryToast } from "../../hooks/useQueryToast";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 export function SalesReportPage() {
   const [branchId, setBranchId] = useState("");
@@ -12,14 +14,25 @@ export function SalesReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const { data, isLoading: loading, error, refetch } = useSalesSummary({
+  const {
+    data,
+    isLoading: loading,
+    error,
+    errorUpdatedAt,
+    refetch,
+  } = useSalesSummary({
     branchId: branchId || undefined,
     startDate,
     endDate,
   });
 
+  useQueryToast(error ? { variant: "error", error } : null, {
+    toastId: "report-sales-summary",
+    updatedAt: errorUpdatedAt,
+  });
+
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <h1 style={styles.title}>Tổng hợp bán hàng</h1>
 
       <div style={styles.filters}>
@@ -38,7 +51,6 @@ export function SalesReportPage() {
         <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
       {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
@@ -87,7 +99,7 @@ export function SalesReportPage() {
           </table>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 
@@ -102,7 +114,6 @@ const styles: Record<string, React.CSSProperties> = {
   filterLabel: { display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 500, gap: 4, color: "#344054" },
   input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
   btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
-  error: { color: "#c62828", marginBottom: 12 },
   muted: { color: "#667085" },
   tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },

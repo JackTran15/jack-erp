@@ -1,22 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
-  CrudEntityConfig,
   FieldDefinition,
 } from "@erp/shared-interfaces";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Copy,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
 import {
   Button,
   Dialog,
@@ -26,8 +12,21 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-  type ToolbarItem,
 } from "@erp/ui";
+import { buildCrudEntityToolbarSpecs, buildListToolbar } from "../../lib/list-toolbar";
+import { isNotFoundHttpError } from "../../lib/not-found-http-error";
+import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
+import {
+  applyColumnFilter,
+  DEFAULT_COLUMN_FILTER_MODE,
+  resolveColumnWidthVariant,
+  TABLE_COLUMN_WIDTH_PX,
+  toComparableText,
+  type ColumnFilter,
+  type ColumnFilterMode,
+} from "../table/pagination.dto";
+import { BaseDataTable, type TableColumn } from "../table/BaseDataTable";
+import { PaginationControls } from "../table/PaginationControls";
 import {
   useCrudConfig,
   useCrudRecords,
@@ -36,32 +35,9 @@ import {
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
 import { formatCustomerStatus } from "../../lib/customer-display";
+import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
-
-type ColumnFilterMode =
-  | "contains"
-  | "equals"
-  | "startsWith"
-  | "endsWith"
-  | "notContains";
-
-interface ColumnFilter {
-  mode: ColumnFilterMode;
-  value: string;
-}
-
-const DEFAULT_FILTER_MODE: ColumnFilterMode = "contains";
-
-const COLUMN_FILTER_MODE_OPTIONS: Array<{ value: ColumnFilterMode; label: string }> = [
-  { value: "contains", label: "Chứa" },
-  { value: "equals", label: "Bằng" },
-  { value: "startsWith", label: "Bắt đầu bằng" },
-  { value: "endsWith", label: "Kết thúc bằng" },
-  { value: "notContains", label: "Không chứa" },
-];
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 export function CrudListPage() {
   const { entityKey } = useParams<{ entityKey: string }>();
@@ -74,7 +50,6 @@ export function CrudListPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [filters, setFilters] = useState<Record<string, unknown>>({});
   const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilter>>(
     {},
   );
@@ -91,7 +66,7 @@ export function CrudListPage() {
     refetch: refetchRecords,
   } = useCrudRecords(
     entityKey!,
-    { page, pageSize, sortBy, sortOrder, search, filters },
+    { page, pageSize, sortBy, sortOrder, search, filters: {} },
     !!config,
   );
 
@@ -105,7 +80,6 @@ export function CrudListPage() {
     setSortOrder("desc");
     setSearch("");
     setSearchInput("");
-    setFilters({});
     setColumnFilters({});
     setSelectedRecordIds(new Set());
     setDuplicateSnapshot(null);
@@ -148,14 +122,53 @@ export function CrudListPage() {
     });
   }, [filteredRecords, config?.idField]);
 
-  if (configLoading) return <PageShell><p>Đang tải cấu hình…</p></PageShell>;
-  if (configError) return <PageShell><p className="text-destructive">Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}</p></PageShell>;
-  if (!config) return <PageShell><p>Không tìm thấy thực thể.</p></PageShell>;
+  const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
+    () =>
+      (config?.fields ?? []).map((field) => {
+        const widthVariant = resolveColumnWidthVariant(entityKey!, field);
+        const widthPx = TABLE_COLUMN_WIDTH_PX[widthVariant];
+        return {
+          key: field.key,
+          label: field.label,
+          width: widthPx,
+          headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
+          className: `max-w-[${widthPx}px]`,
+          render: (row) => formatCell(row[field.key], field),
+        };
+      }),
+    [config?.fields, entityKey],
+  );
 
-  const total = records?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = total === 0 ? 0 : Math.min(page * pageSize, total);
+  if (configLoading) {
+    return (
+      <AdminPageShell>
+        <p>Đang tải cấu hình…</p>
+      </AdminPageShell>
+    );
+  }
+  if (configError) {
+    if (isNotFoundHttpError(configError)) {
+      return (
+        <AdminPageShell>
+          <HttpErrorView code={404} />
+        </AdminPageShell>
+      );
+    }
+    return (
+      <AdminPageShell>
+        <p className="text-destructive">
+          Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}
+        </p>
+      </AdminPageShell>
+    );
+  }
+  if (!config) {
+    return (
+      <AdminPageShell>
+        <p>Không tìm thấy thực thể.</p>
+      </AdminPageShell>
+    );
+  }
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -176,19 +189,6 @@ export function CrudListPage() {
     navigate(`/admin/${entityKey}/new`);
   };
 
-  const handleFilterChange = (key: string, value: unknown) => {
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (value === "" || value === undefined) {
-        delete next[key];
-      } else {
-        next[key] = value;
-      }
-      return next;
-    });
-    setPage(1);
-  };
-
   const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setColumnFilters((prev) => ({
       ...prev,
@@ -203,7 +203,7 @@ export function CrudListPage() {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
-        mode: prev[fieldKey]?.mode ?? DEFAULT_FILTER_MODE,
+        mode: prev[fieldKey]?.mode ?? DEFAULT_COLUMN_FILTER_MODE,
         value,
       },
     }));
@@ -243,332 +243,110 @@ export function CrudListPage() {
     setDeleteDialogOpen(false);
   };
 
-  const toolbarItems: ToolbarItem[] = [
-    { id: "create", label: "Thêm mới", icon: Plus, onClick: handleCreate },
-    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: openDuplicateDialog, disabled: !selectedRecord },
-    {
-      id: "edit",
-      label: "Sửa",
-      icon: Pencil,
-      onClick: () =>
-        selectedRecord &&
-        navigate(`/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`),
-      disabled: !selectedRecord,
-    },
-    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => void handleDeleteSelected(), disabled: selectedRows.length === 0, variant: "danger" },
-  ];
+  const toolbarItems = buildListToolbar(
+    buildCrudEntityToolbarSpecs(
+      entityKey!,
+      {
+        handleCreate,
+        openDuplicateDialog,
+        handleEdit: () => {
+          if (!selectedRecord) return;
+          void navigate(`/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`);
+        },
+        handleDeleteSelected: () => void handleDeleteSelected(),
+        refetchRecords,
+        navigate: (to) => void navigate(to),
+      },
+      {
+        selectedRecord,
+        selectedCount: selectedRows.length,
+      },
+    ),
+  );
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname);
 
   return (
-    <PageShell>
-      <div className="mb-2">
+    <AdminPageShell>
+      <div className="mb-2 shrink-0">
         <h1 className="text-2xl font-semibold">{config.displayName}</h1>
       </div>
 
       <TableActionHeader
-        className="mb-3"
+        className="mb-3 shrink-0"
         breadcrumbs={breadcrumbs}
         items={toolbarItems}
       />
 
-      {/* Search */}
-      <form onSubmit={handleSearchSubmit} className="mb-3 flex gap-2">
-        <Input
-          className="flex-1"
-          type="text"
-          placeholder={`Tìm ${config.displayName}…`}
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <Button type="submit" variant="outline">
-          Tìm
-        </Button>
-      </form>
-
-      {/* Filters */}
-      {config.filterDefinitions.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-3">
-          {config.filterDefinitions.map((fd) => (
-            <label key={fd.key} className="flex flex-col gap-1 text-xs">
-              {fd.label}
-              {fd.type === "select" && fd.options ? (
-                <select
-                  className="rounded border border-input px-2 py-1.5 text-sm"
-                  value={String(filters[fd.key] ?? "")}
-                  onChange={(e) => handleFilterChange(fd.key, e.target.value)}
-                >
-                  <option value="">Tất cả</option>
-                  {fd.options.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              ) : fd.type === "boolean" ? (
-                <select
-                  className="rounded border border-input px-2 py-1.5 text-sm"
-                  value={String(filters[fd.key] ?? "")}
-                  onChange={(e) => handleFilterChange(fd.key, e.target.value)}
-                >
-                  <option value="">Tất cả</option>
-                  <option value="true">Có</option>
-                  <option value="false">Không</option>
-                </select>
-              ) : (
-                <Input
-                  className="h-8 w-36 text-sm"
-                  type="text"
-                  value={String(filters[fd.key] ?? "")}
-                  onChange={(e) => handleFilterChange(fd.key, e.target.value)}
-                />
-              )}
-            </label>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-background">
-        <div className="max-h-[65vh] overflow-auto">
-          <table className="w-full border-collapse text-base [&_td]:border [&_td]:border-border [&_th]:border [&_th]:border-border">
-          <thead>
-            <tr>
-              <th className="sticky top-0 z-20 w-10 border-b-2 border-border bg-muted px-2 py-2.5 text-center">
-                <input
-                  type="checkbox"
-                  aria-label="Chọn tất cả"
-                  checked={areAllVisibleSelected}
-                  onChange={(event) => {
-                    if (event.target.checked) {
-                      setSelectedRecordIds(
-                        new Set(filteredRecords.map((record) => String(record[config.idField]))),
-                      );
-                    } else {
-                      setSelectedRecordIds(new Set());
-                    }
-                  }}
-                />
-              </th>
-              {config.fields.map((f) => (
-                <Th key={f.key} field={f} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
-              ))}
-            </tr>
-            <tr>
-              <th className="sticky top-12 z-20 border-b border-border bg-white px-2 py-1 text-left text-xs text-muted-foreground">
-                Chọn
-              </th>
-              {config.fields.map((field) => {
-                const activeFilter = columnFilters[field.key];
-                return (
-                  <th
-                    key={`${field.key}-filter`}
-                    className="sticky top-12 z-20 border-b border-border bg-white px-2 py-1 align-top"
-                  >
-                    <div className="flex min-w-[190px] items-center gap-1">
-                      <select
-                        className="h-7 w-[110px] rounded border border-input bg-background px-1 text-xs font-medium"
-                        value={activeFilter?.mode ?? DEFAULT_FILTER_MODE}
-                        onChange={(event) =>
-                          handleColumnFilterModeChange(
-                            field.key,
-                            event.target.value as ColumnFilterMode,
-                          )
-                        }
-                      >
-                        {COLUMN_FILTER_MODE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <Input
-                        className="h-7 min-w-0 flex-1 text-xs"
-                        placeholder="Giá trị..."
-                        value={activeFilter?.value ?? ""}
-                        onChange={(event) =>
-                          handleColumnFilterValueChange(field.key, event.target.value)
-                        }
-                      />
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={config.fields.length + 1} className="px-3 py-6 text-center text-muted-foreground">
-                  Đang tải…
-                </td>
-              </tr>
-            )}
-            {!loading && filteredRecords.length === 0 && (
-              <tr>
-                <td colSpan={config.fields.length + 1} className="px-3 py-6 text-center text-muted-foreground">
-                  Không có bản ghi.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              filteredRecords.map((rec) => (
-                <tr
-                  key={String(rec[config.idField])}
-                  className={
-                    selectedRecordIds.has(String(rec[config.idField]))
-                      ? "cursor-pointer bg-accent/40 hover:bg-accent/50"
-                      : "cursor-pointer hover:bg-accent/20"
-                  }
-                  onClick={() => navigate(`/admin/${entityKey}/${String(rec[config.idField])}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate(`/admin/${entityKey}/${String(rec[config.idField])}`);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={`Mở chi tiết bản ghi ${String(rec[config.idField])}`}
-                >
-                  <td
-                    className="px-2 py-2.5 text-center align-middle"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedRecordIds.has(String(rec[config.idField]))}
-                      onChange={(event) => {
-                        event.stopPropagation();
-                        const id = String(rec[config.idField]);
-                        setSelectedRecordIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(id)) next.delete(id);
-                          else next.add(id);
-                          return next;
-                        });
-                      }}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  </td>
-                  {config.fields.map((f) => (
-                    <td key={f.key} className="px-3 py-2.5 align-middle">
-                      {formatCell(rec[f.key], f)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-          </tbody>
-          </table>
-        </div>
-
-        {records && !loading && (
-          <div className="flex flex-col gap-1.5 border-t border-border bg-background px-3 py-2.5">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="flex items-center gap-0.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 shrink-0 rounded-sm p-0"
-                  disabled={page <= 1}
-                  onClick={() => setPage(1)}
-                  aria-label="Trang đầu"
-                >
-                  <ChevronsLeft className="h-4 w-4" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 shrink-0 rounded-sm p-0"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  aria-label="Trang trước"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
-              <div className="flex items-center gap-1.5 text-sm text-foreground">
-                <span>Trang</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={totalPages}
-                  aria-label="Số trang"
-                  className="h-8 w-12 rounded-sm border border-input bg-background px-1 text-center text-sm tabular-nums outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-                  value={page}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw === "") return;
-                    const next = Number.parseInt(raw, 10);
-                    if (!Number.isFinite(next)) return;
-                    setPage(Math.min(Math.max(1, next), totalPages));
-                  }}
-                />
-                <span className="text-muted-foreground">trên {totalPages}</span>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 shrink-0 rounded-sm p-0"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  aria-label="Trang sau"
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 shrink-0 rounded-sm p-0"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(totalPages)}
-                  aria-label="Trang cuối"
-                >
-                  <ChevronsRight className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 shrink-0 rounded-sm p-0"
-                onClick={() => void refetchRecords()}
-                aria-label="Tải lại danh sách"
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden />
-              </Button>
-              <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="sr-only">Số dòng mỗi trang</span>
-                <select
-                  className="h-8 rounded-sm border border-input bg-background px-2 text-sm font-medium tabular-nums"
-                  value={pageSize}
-                  onChange={(event) => {
-                    setPageSize(Number.parseInt(event.target.value, 10));
-                    setPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
+      <BaseDataTable
+        columns={tableColumns}
+        rows={filteredRecords}
+        loading={loading}
+        emptyLabel="Không có bản ghi."
+        getRowKey={(row) => String(row[config.idField])}
+        onRowClick={(row) => navigate(`/admin/${entityKey}/${String(row[config.idField])}`)}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        columnFilterControl={{
+          filters: columnFilters,
+          onModeChange: handleColumnFilterModeChange,
+          onValueChange: handleColumnFilterValueChange,
+        }}
+        leadingColumn={{
+          width: 40,
+          header: (
+            <input
+              type="checkbox"
+              aria-label="Chọn tất cả"
+              checked={areAllVisibleSelected}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  setSelectedRecordIds(
+                    new Set(filteredRecords.map((record) => String(record[config.idField]))),
+                  );
+                } else {
+                  setSelectedRecordIds(new Set());
+                }
+              }}
+            />
+          ),
+          cell: (row) => (
+            <div onClick={(event) => event.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={selectedRecordIds.has(String(row[config.idField]))}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  const id = String(row[config.idField]);
+                  setSelectedRecordIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  });
+                }}
+                onClick={(event) => event.stopPropagation()}
+              />
             </div>
-            <p className="text-right text-sm text-muted-foreground">
-              {total === 0
-                ? "Không có kết quả"
-                : `Hiển thị ${pageStart} - ${pageEnd} trên ${total.toLocaleString("vi-VN")} kết quả`}
-            </p>
-          </div>
-        )}
-      </div>
+          ),
+        }}
+        footer={
+          records && !loading ? (
+            <PaginationControls
+              page={page}
+              pageSize={pageSize}
+              total={records.total}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
+              onRefresh={() => void refetchRecords()}
+            />
+          ) : null
+        }
+      />
 
       {duplicateSnapshot && (
         <CrudFormDialog
@@ -599,78 +377,13 @@ export function CrudListPage() {
               disabled={deleteMutation.isPending}
               onClick={() => void confirmBulkDelete()}
             >
-              {deleteMutation.isPending ? "Đang xoá…" : "Xoá"}
+              {deleteMutation.isPending ? "Đang xoá..." : "Xoá"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageShell>
+    </AdminPageShell>
   );
-}
-
-function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="w-full px-2 py-6 sm:px-3 lg:px-4">{children}</div>;
-}
-
-function Th({
-  field,
-  sortBy,
-  sortOrder,
-  onSort,
-}: {
-  field: FieldDefinition;
-  sortBy?: string;
-  sortOrder: "asc" | "desc";
-  onSort: (key: string) => void;
-}) {
-  const active = sortBy === field.key;
-  return (
-    <th
-      className="sticky top-0 z-20 whitespace-nowrap border-b-2 border-border bg-muted px-3 py-2.5 text-left text-sm font-semibold"
-      aria-sort={active ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
-      onClick={() => onSort(field.key)}
-    >
-      <span className="inline-flex cursor-pointer select-none items-center gap-1.5">
-        {field.label}
-        {active ? (
-          sortOrder === "asc" ? (
-            <ArrowUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          ) : (
-            <ArrowDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          )
-        ) : null}
-      </span>
-    </th>
-  );
-}
-
-function toComparableText(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") return String(value);
-  if (value instanceof Date) return value.toISOString();
-  return String(value);
-}
-
-function applyColumnFilter(comparable: string, filter: ColumnFilter): boolean {
-  const haystack = comparable.toLowerCase();
-  const needle = filter.value.trim().toLowerCase();
-  if (!needle) return true;
-
-  switch (filter.mode) {
-    case "contains":
-      return haystack.includes(needle);
-    case "equals":
-      return haystack === needle;
-    case "startsWith":
-      return haystack.startsWith(needle);
-    case "endsWith":
-      return haystack.endsWith(needle);
-    case "notContains":
-      return !haystack.includes(needle);
-    default:
-      return true;
-  }
 }
 
 function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AuthProvider } from "./hooks/useAuth";
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { BackofficeLayout } from "./components/layout/BackofficeLayout";
@@ -23,6 +24,7 @@ import { CashReportPage } from "./pages/reports/CashReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
+import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +39,15 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster
+        position="bottom-right"
+        richColors
+        closeButton
+        expand={false}
+        visibleToasts={1} // only show one toast at a time
+        gap={16}
+        style={{ zIndex: 11000 }}
+      />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -84,6 +95,8 @@ export function App() {
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
                 <Route path="/setup" element={<TenantSetupPage />} />
+                <Route path="/error/:code" element={<HttpErrorPage />} />
+                <Route path="*" element={<HttpErrorView code={404} />} />
               </Route>
             </Route>
           </Routes>

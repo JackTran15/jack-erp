@@ -1,8 +1,61 @@
-import type { PaginationQuery } from "@erp/shared-interfaces";
+import type { FieldDefinition, PaginationQuery } from "@erp/shared-interfaces";
 
 export interface PaginationStateDto extends PaginationQuery {
   search?: string;
 }
+
+export const TABLE_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+export type ColumnFilterMode =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "notContains";
+
+export interface ColumnFilter {
+  mode: ColumnFilterMode;
+  value: string;
+}
+
+export const DEFAULT_COLUMN_FILTER_MODE: ColumnFilterMode = "contains";
+
+export const COLUMN_FILTER_MODE_OPTIONS: Array<{
+  value: ColumnFilterMode;
+  symbol: string;
+  label: string;
+}> = [
+  { value: "contains", symbol: "*", label: "Chứa" },
+  { value: "equals", symbol: "=", label: "Bằng" },
+  { value: "startsWith", symbol: "+", label: "Bắt đầu bằng" },
+  { value: "endsWith", symbol: "-", label: "Kết thúc bằng" },
+  { value: "notContains", symbol: "!", label: "Không chứa" },
+];
+
+export type ColumnWidthVariant = "small" | "medium" | "large";
+
+export const TABLE_COLUMN_WIDTH_PX: Record<ColumnWidthVariant, number> = {
+  small: 120,
+  medium: 180,
+  large: 260,
+};
+
+/** Ghi đè theo entityKey + fieldKey để kiểm soát độ rộng cột. */
+export const ENTITY_COLUMN_WIDTHS: Record<string, Record<string, ColumnWidthVariant>> = {
+  "inventory-items": {
+    code: "medium",
+    name: "large",
+    unit: "small",
+    category: "medium",
+    purchasePrice: "medium",
+    sellingPrice: "medium",
+    providerId: "large",
+    providerName: "medium",
+    providerCode: "small",
+    isActive: "small",
+    createdAt: "medium",
+  },
+};
 
 export const DEFAULT_PAGINATION: PaginationStateDto = {
   page: 1,
@@ -11,3 +64,70 @@ export const DEFAULT_PAGINATION: PaginationStateDto = {
   sortOrder: "desc",
   search: "",
 };
+
+export function clampPage(page: number, totalPages: number): number {
+  if (!Number.isFinite(page)) return 1;
+  return Math.min(Math.max(1, Math.trunc(page)), Math.max(1, totalPages));
+}
+
+export function describeFilterMode(mode: ColumnFilterMode): string {
+  const option = COLUMN_FILTER_MODE_OPTIONS.find((item) => item.value === mode);
+  return option ? `${option.symbol}: ${option.label}` : "Chứa";
+}
+
+export function toComparableText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+export function applyColumnFilter(comparable: string, filter: ColumnFilter): boolean {
+  const haystack = comparable.toLowerCase();
+  const needle = filter.value.trim().toLowerCase();
+  if (!needle) return true;
+
+  switch (filter.mode) {
+    case "contains":
+      return haystack.includes(needle);
+    case "equals":
+      return haystack === needle;
+    case "startsWith":
+      return haystack.startsWith(needle);
+    case "endsWith":
+      return haystack.endsWith(needle);
+    case "notContains":
+      return !haystack.includes(needle);
+    default:
+      return true;
+  }
+}
+
+export function resolveColumnWidthVariant(entityKey: string, field: FieldDefinition): ColumnWidthVariant {
+  const entityWidths = ENTITY_COLUMN_WIDTHS[entityKey];
+  const configuredWidth = entityWidths?.[field.key];
+  if (configuredWidth) {
+    return configuredWidth;
+  }
+
+  const key = field.key.toLowerCase();
+  if (
+    key.includes("name") ||
+    key.includes("description") ||
+    key.includes("address") ||
+    key.includes("providerid")
+  ) {
+    return "large";
+  }
+  if (
+    key.includes("unit") ||
+    key === "id" ||
+    key.endsWith("id") ||
+    key.includes("code") ||
+    field.type === "boolean"
+  ) {
+    return "small";
+  }
+  return "medium";
+}

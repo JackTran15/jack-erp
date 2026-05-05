@@ -1,11 +1,24 @@
 import { useState } from "react";
 import { useInventoryValuation } from "../../hooks/useReportData";
+import { useQueryToast } from "../../hooks/useQueryToast";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 export function InventoryReportPage() {
   const [branchId, setBranchId] = useState("");
 
-  const { data = [], isLoading: loading, error, refetch } = useInventoryValuation({
+  const {
+    data = [],
+    isLoading: loading,
+    error,
+    errorUpdatedAt,
+    refetch,
+  } = useInventoryValuation({
     branchId: branchId || undefined,
+  });
+
+  useQueryToast(error ? { variant: "error", error } : null, {
+    toastId: "report-inventory-valuation",
+    updatedAt: errorUpdatedAt,
   });
 
   const handleExportCsv = () => {
@@ -23,7 +36,7 @@ export function InventoryReportPage() {
   };
 
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <div style={styles.header}>
         <h1 style={styles.title}>Định giá tồn kho</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={data.length === 0}>
@@ -39,7 +52,6 @@ export function InventoryReportPage() {
         <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
       {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {!loading && data.length === 0 && <p style={styles.muted}>Không có dữ liệu tồn kho.</p>}
@@ -70,7 +82,7 @@ export function InventoryReportPage() {
           </table>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 
@@ -87,7 +99,6 @@ const styles: Record<string, React.CSSProperties> = {
   input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
   btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
   btnSecondary: { padding: "8px 16px", background: "#fff", color: "#344054", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, cursor: "pointer" },
-  error: { color: "#c62828", marginBottom: 12 },
   muted: { color: "#667085" },
   tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -16,6 +16,7 @@ import {
 import {
   navConfig,
   activeModuleFor,
+  isFlyoutEnabled,
   type NavChild,
   type NavModule,
   type NavSection,
@@ -30,15 +31,43 @@ export function AppSidebar() {
   const { sidebarCollapsed, toggleSidebar } = useLayout();
   const activeModule = activeModuleFor(location.pathname, navConfig) ?? navConfig[0];
 
+  const asideRef = useRef<HTMLElement>(null);
+  const megaMenuPanelRef = useRef<HTMLDivElement>(null);
+
   // Start with all menu groups collapsed and no flyout shown.
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const [openFlyoutModuleId, setOpenFlyoutModuleId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!activeModule.flyout) {
+    setOpenFlyoutModuleId(null);
+  }, [location.pathname]);
+
+  const openFlyoutModule =
+    openFlyoutModuleId &&
+    navConfig.find((m) => m.id === openFlyoutModuleId && isFlyoutEnabled(m));
+
+  useEffect(() => {
+    if (!openFlyoutModuleId || !openFlyoutModule) return;
+
+    const closeIfOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (asideRef.current?.contains(target)) return;
+      if (megaMenuPanelRef.current?.contains(target)) return;
       setOpenFlyoutModuleId(null);
-    }
-  }, [activeModule.flyout]);
+    };
+
+    document.addEventListener("mousedown", closeIfOutside);
+    return () => document.removeEventListener("mousedown", closeIfOutside);
+  }, [openFlyoutModuleId, openFlyoutModule]);
+
+  useEffect(() => {
+    if (!openFlyoutModuleId) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenFlyoutModuleId(null);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [openFlyoutModuleId]);
 
   const toggleOpen = (id: string) =>
     setOpenIds((prev) => {
@@ -51,6 +80,7 @@ export function AppSidebar() {
   return (
     <TooltipProvider delayDuration={200}>
       <aside
+        ref={asideRef}
         className={cn(
           "fixed left-0 top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-gray-700 bg-gray-900 text-white transition-all duration-200",
           sidebarCollapsed ? "w-[60px]" : "w-60",
@@ -62,7 +92,10 @@ export function AppSidebar() {
               <ModuleRow
                 key={module.id}
                 module={module}
-                isActive={module.id === activeModule.id}
+                activeModuleId={activeModule.id}
+                isActive={
+                  module.id === activeModule.id && openFlyoutModuleId === null
+                }
                 isOpen={openIds.has(module.id)}
                 onToggle={() => toggleOpen(module.id)}
                 isFlyoutOpen={openFlyoutModuleId === module.id}
@@ -71,9 +104,11 @@ export function AppSidebar() {
                     prev === module.id ? null : module.id,
                   )
                 }
-                onOpenFlyout={() => setOpenFlyoutModuleId(module.id)}
                 collapsed={sidebarCollapsed}
+                onCollapsedFlyoutOpen={(id) => setOpenFlyoutModuleId(id)}
                 pathname={location.pathname}
+                openFlyoutModuleId={openFlyoutModuleId}
+                suppressRouteActiveHighlight={openFlyoutModuleId !== null}
               />
             ))}
           </nav>
@@ -85,8 +120,8 @@ export function AppSidebar() {
       </aside>
 
       {/* Mega-menu panel — fixed overlay to the right of the sidebar */}
-      {activeModule.flyout && openFlyoutModuleId === activeModule.id && (
-        <MegaMenuPanel module={activeModule} />
+      {openFlyoutModule && (
+        <MegaMenuPanel ref={megaMenuPanelRef} module={openFlyoutModule} />
       )}
     </TooltipProvider>
   );
@@ -129,41 +164,58 @@ function CollapseToggle({
 
 interface ModuleRowProps {
   module: NavModule;
+  activeModuleId: string;
   isActive: boolean;
   isOpen: boolean;
   onToggle: () => void;
   isFlyoutOpen: boolean;
   onToggleFlyout: () => void;
-  onOpenFlyout: () => void;
   collapsed: boolean;
   pathname: string;
+  onCollapsedFlyoutOpen: (moduleId: string) => void;
+  openFlyoutModuleId: string | null;
+  /** When a flyout mega-menu is open, NavLink-based rows must not use URL match for “selected” styling. */
+  suppressRouteActiveHighlight: boolean;
 }
 
 function ModuleRow({
   module,
+  activeModuleId,
   isActive,
   isOpen,
   onToggle,
   isFlyoutOpen,
   onToggleFlyout,
-  onOpenFlyout,
   collapsed,
   pathname,
+  onCollapsedFlyoutOpen,
+  openFlyoutModuleId,
+  suppressRouteActiveHighlight,
 }: ModuleRowProps) {
   // In collapsed mode every module behaves the same: icon-only button → defaultPath
   if (collapsed) {
-    return <CollapsedModuleRow module={module} isActive={isActive} />;
+    const collapsedActive =
+      (module.id === activeModuleId && openFlyoutModuleId === null) ||
+      Boolean(isFlyoutEnabled(module) && openFlyoutModuleId === module.id);
+    return (
+      <CollapsedModuleRow
+        module={module}
+        isActive={collapsedActive}
+        onFlyoutOpen={
+          isFlyoutEnabled(module) ? () => onCollapsedFlyoutOpen(module.id) : undefined
+        }
+      />
+    );
   }
 
   // Flyout module (e.g. Danh mục) — no inline expansion, mega-menu handles navigation
-  if (module.flyout) {
+  if (isFlyoutEnabled(module)) {
     return (
       <FlyoutModuleRow
         module={module}
         isActive={isActive}
         isFlyoutOpen={isFlyoutOpen}
         onToggleFlyout={onToggleFlyout}
-        onOpenFlyout={onOpenFlyout}
       />
     );
   }
@@ -172,7 +224,13 @@ function ModuleRow({
 
   // Single child — direct NavLink
   if (allChildren.length === 1) {
-    return <DirectNavRow module={module} child={allChildren[0]} isActive={isActive} />;
+    return (
+      <DirectNavRow
+        module={module}
+        child={allChildren[0]}
+        suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+      />
+    );
   }
 
   // Multiple children — accordion with sub-items
@@ -183,6 +241,7 @@ function ModuleRow({
       isOpen={isOpen}
       onToggle={onToggle}
       pathname={pathname}
+      suppressRouteActiveHighlight={suppressRouteActiveHighlight}
     />
   );
 }
@@ -192,9 +251,11 @@ function ModuleRow({
 function CollapsedModuleRow({
   module,
   isActive,
+  onFlyoutOpen,
 }: {
   module: NavModule;
   isActive: boolean;
+  onFlyoutOpen?: () => void;
 }) {
   const navigate = useNavigate();
   const Icon = module.icon;
@@ -204,7 +265,13 @@ function CollapsedModuleRow({
       <TooltipTrigger asChild>
         <button
           type="button"
-          onClick={() => navigate(module.defaultPath)}
+          onClick={() => {
+            if (onFlyoutOpen) {
+              onFlyoutOpen();
+              return;
+            }
+            navigate(module.defaultPath);
+          }}
           className={cn(
             "flex h-10 w-full items-center justify-center rounded-md transition-colors",
             isActive
@@ -231,31 +298,21 @@ function FlyoutModuleRow({
   isActive,
   isFlyoutOpen,
   onToggleFlyout,
-  onOpenFlyout,
 }: {
   module: NavModule;
   isActive: boolean;
   isFlyoutOpen: boolean;
   onToggleFlyout: () => void;
-  onOpenFlyout: () => void;
 }) {
-  const navigate = useNavigate();
   const Icon = module.icon;
 
   return (
     <button
       type="button"
-      onClick={() => {
-        if (isActive) {
-          onToggleFlyout();
-          return;
-        }
-        navigate(module.defaultPath);
-        onOpenFlyout();
-      }}
+      onClick={() => onToggleFlyout()}
       className={cn(
         "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-        isActive && isFlyoutOpen
+        isFlyoutOpen
           ? "bg-gray-700 text-white font-medium"
           : isActive
             ? "text-white"
@@ -281,11 +338,11 @@ function FlyoutModuleRow({
 function DirectNavRow({
   module,
   child,
-  isActive,
+  suppressRouteActiveHighlight,
 }: {
   module: NavModule;
   child: NavChild;
-  isActive: boolean;
+  suppressRouteActiveHighlight: boolean;
 }) {
   const Icon = module.icon;
 
@@ -293,10 +350,10 @@ function DirectNavRow({
     <NavLink
       to={child.to}
       end={child.end}
-      className={({ isActive: active }) =>
+      className={({ isActive: routeActive }) =>
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-          active
+          routeActive && !suppressRouteActiveHighlight
             ? "bg-gray-700 text-white font-medium"
             : "text-gray-300 hover:bg-gray-800 hover:text-white",
         )
@@ -317,6 +374,7 @@ interface AccordionModuleRowProps {
   isOpen: boolean;
   onToggle: () => void;
   pathname: string;
+  suppressRouteActiveHighlight: boolean;
 }
 
 function AccordionModuleRow({
@@ -325,6 +383,7 @@ function AccordionModuleRow({
   isOpen,
   onToggle,
   pathname,
+  suppressRouteActiveHighlight,
 }: AccordionModuleRowProps) {
   const Icon = module.icon;
 
@@ -358,6 +417,7 @@ function AccordionModuleRow({
             key={section.id}
             section={section}
             pathname={pathname}
+            suppressRouteActiveHighlight={suppressRouteActiveHighlight}
           />
         ))}
       </CollapsibleContent>
@@ -370,9 +430,11 @@ function AccordionModuleRow({
 function AccordionSection({
   section,
   pathname,
+  suppressRouteActiveHighlight,
 }: {
   section: NavSection;
   pathname: string;
+  suppressRouteActiveHighlight: boolean;
 }) {
   return (
     <div>
@@ -384,7 +446,10 @@ function AccordionSection({
       <ul className="mb-1 ml-10 space-y-0.5 pr-2">
         {section.children.map((child) => (
           <li key={child.to}>
-            <AccordionItem child={child} pathname={pathname} />
+            <AccordionItem
+              child={child}
+              suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+            />
           </li>
         ))}
       </ul>
@@ -396,29 +461,32 @@ function AccordionSection({
 
 function AccordionItem({
   child,
+  suppressRouteActiveHighlight,
 }: {
   child: NavChild;
-  pathname: string;
+  suppressRouteActiveHighlight: boolean;
 }) {
   return (
     <NavLink
       to={child.to}
       end={child.end}
-      className={({ isActive }) =>
+      className={({ isActive: routeActive }) =>
         cn(
           "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-          isActive
+          routeActive && !suppressRouteActiveHighlight
             ? "bg-blue-600 text-white font-medium"
             : "text-gray-400 hover:bg-gray-800 hover:text-white",
         )
       }
     >
-      {({ isActive }) => (
+      {({ isActive: routeActive }) => (
         <>
           <span
             className={cn(
               "h-1.5 w-1.5 shrink-0 rounded-full",
-              isActive ? "bg-white" : "bg-gray-600",
+              routeActive && !suppressRouteActiveHighlight
+                ? "bg-white"
+                : "bg-gray-600",
             )}
           />
           <span className="truncate">{child.label}</span>

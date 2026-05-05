@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { formatClientError } from "@erp/api-client";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, type ToolbarItem } from "@erp/ui";
+import { toast } from "sonner";
+import { Button } from "@erp/ui";
+import { TOOLBAR_ACTION } from "../../constants";
+import { buildListToolbar } from "../../lib/list-toolbar";
 import { apiClient } from "../../lib/api-axios";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
@@ -12,6 +14,7 @@ import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
 
@@ -64,7 +67,6 @@ const STATUS_COLOR: Record<PurchaseOrderStatus, string> = {
 export function PurchaseOrdersPage() {
   const [records, setRecords] = useState<PaginatedResponse<PurchaseOrder> | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -87,9 +89,13 @@ export function PurchaseOrdersPage() {
         `/inventory/purchase-orders?${params}`,
       );
       setRecords(data);
-      setError(null);
+      toast.dismiss("purchase-orders-list");
     } catch (err: unknown) {
-      setError(formatClientError(err));
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "purchase-orders-list",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setLoading(false);
     }
@@ -111,7 +117,11 @@ export function PurchaseOrdersPage() {
         setSelectedOrder(data);
       }
     } catch (err: unknown) {
-      setError(formatClientError(err));
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "purchase-orders-action",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -125,7 +135,11 @@ export function PurchaseOrdersPage() {
       await loadRecords();
       if (selectedOrder?.id === order.id) setSelectedOrder(null);
     } catch (err: unknown) {
-      setError(formatClientError(err));
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "purchase-orders-action",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -167,7 +181,7 @@ export function PurchaseOrdersPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Phiếu đặt hàng</h1>
@@ -180,9 +194,9 @@ export function PurchaseOrdersPage() {
       <TableActionHeader
         className="mb-4"
         breadcrumbs={resolveBackofficeBreadcrumbs("/inventory/purchase-orders")}
-        items={buildPurchaseOrderToolbarItems({
-          onCreate: () => setShowCreateForm(true),
-        })}
+        items={buildListToolbar([
+          { action: TOOLBAR_ACTION.create, onClick: () => setShowCreateForm(true) },
+        ])}
       />
 
       <div className="mb-4 flex gap-3">
@@ -197,8 +211,6 @@ export function PurchaseOrdersPage() {
           ))}
         </select>
       </div>
-
-      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
 
       <BaseDataTable
         columns={columns}
@@ -249,13 +261,17 @@ export function PurchaseOrdersPage() {
             )}
           </div>
         )}
-      />
-
-      <PaginationControls
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={records?.total ?? 0}
-        onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+        footer={
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={records?.total ?? 0}
+            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageSizeChange={(nextPageSize) =>
+              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+            }
+          />
+        }
       />
 
       {showCreateForm && (
@@ -302,21 +318,8 @@ export function PurchaseOrdersPage() {
           onConfirm={() => void handleCancel(confirmCancel)}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
-}
-
-function buildPurchaseOrderToolbarItems({
-  onCreate,
-}: {
-  onCreate: () => void;
-}): ToolbarItem[] {
-  return [
-    { id: "create", label: "Thêm mới", icon: Plus, onClick: onCreate },
-    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
-    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
-    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
-  ];
 }
 
 // ─── Create Purchase Order Modal ───────────────────────────────────────────────
@@ -363,7 +366,7 @@ function CreatePurchaseOrderModal({
       });
       await onCreated();
     } catch (err: unknown) {
-      setError(formatClientError(err));
+      setError(getUserFacingApiErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -659,7 +662,7 @@ function ReceiveGoodsModal({
       await apiClient.post(`/inventory/purchase-orders/${order.id}/receive`, { lines });
       await onReceived();
     } catch (err: unknown) {
-      setError(formatClientError(err));
+      setError(getUserFacingApiErrorMessage(err));
     } finally {
       setSaving(false);
     }

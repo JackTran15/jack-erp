@@ -60,6 +60,7 @@ export {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "./components/dropdown-menu";
 
 export { Avatar, type AvatarProps } from "./components/avatar";

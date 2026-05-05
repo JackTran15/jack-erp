@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useReceivablesAging, usePayablesAging } from "../../hooks/useReportData";
+import { useQueryToast } from "../../hooks/useQueryToast";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 type ReportType = "receivables" | "payables";
 
@@ -13,7 +15,12 @@ export function AgingReportPage() {
   const payables = usePayablesAging(params);
   const active = reportType === "receivables" ? receivables : payables;
 
-  const { data, isLoading: loading, error, refetch } = active;
+  const { data, isLoading: loading, error, errorUpdatedAt, refetch } = active;
+
+  useQueryToast(error ? { variant: "error", error } : null, {
+    toastId: "report-aging",
+    updatedAt: errorUpdatedAt,
+  });
 
   const handleExportCsv = () => {
     if (!data) return;
@@ -37,7 +44,7 @@ export function AgingReportPage() {
   };
 
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <div style={styles.header}>
         <h1 style={styles.title}>Báo cáo tuổi nợ</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={!data}>
@@ -64,7 +71,6 @@ export function AgingReportPage() {
         <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
       {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
@@ -112,7 +118,7 @@ export function AgingReportPage() {
           {data.branchId ? ` | Chi nhánh: ${data.branchId}` : " | Gộp toàn hệ thống"}
         </p>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 
@@ -129,7 +135,6 @@ const styles: Record<string, React.CSSProperties> = {
   input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
   btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
   btnSecondary: { padding: "8px 16px", background: "#fff", color: "#344054", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, cursor: "pointer" },
-  error: { color: "#c62828", marginBottom: 12 },
   muted: { color: "#667085" },
   tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
