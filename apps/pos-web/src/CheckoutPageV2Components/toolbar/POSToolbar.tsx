@@ -59,19 +59,23 @@ export const POSToolbar = forwardRef(function POSToolbar<T>(
 
   return (
     <div className="flex h-[52px] items-center gap-2 border-b border-gray-200 bg-white px-3">
-      <ProductSearchInput<T>
-        ref={searchRef}
-        value={state.query}
-        onChange={onQueryChange}
-        search={productSearch}
-        onSelect={onSelectProduct}
-        itemKey={productItemKey}
-        renderItem={productRenderItem}
-        renderMeta={productRenderMeta}
-        onSubmitQuery={onSubmitProductQuery}
-        disabled={productSearchDisabled}
-      />
-      <QuantityInput value={state.qty} onChange={onQtyChange} />
+      <div className="flex grow gap-2">
+        <div className="grow">
+          <ProductSearchInput<T>
+            ref={searchRef}
+            value={state.query}
+            onChange={onQueryChange}
+            search={productSearch}
+            onSelect={onSelectProduct}
+            itemKey={productItemKey}
+            renderItem={productRenderItem}
+            renderMeta={productRenderMeta}
+            onSubmitQuery={onSubmitProductQuery}
+            disabled={productSearchDisabled}
+          />
+        </div>
+        <QuantityInput value={state.qty} onChange={onQtyChange} />
+      </div>
       <ToggleField
         label="Tách dòng"
         checked={state.splitLine}
