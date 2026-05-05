@@ -205,6 +205,7 @@ export function CheckoutPageV2() {
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [createDefaultQuery, setCreateDefaultQuery] = useState("");
   const [customerDirectoryOpen, setCustomerDirectoryOpen] = useState(false);
+  const [editCustomerOpen, setEditCustomerOpen] = useState(false);
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
@@ -720,6 +721,26 @@ export function CheckoutPageV2() {
         }}
       />
 
+      <CustomerCreateDialog
+        open={editCustomerOpen}
+        onClose={() => setEditCustomerOpen(false)}
+        mode="edit"
+        customer={
+          selectedCustomer
+            ? {
+                id: selectedCustomer.id,
+                name: selectedCustomer.name,
+                phone: selectedCustomer.phone,
+                email: selectedCustomer.email,
+              }
+            : undefined
+        }
+        onSubmitted={(c) => {
+          setEditCustomerOpen(false);
+          pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
+        }}
+      />
+
       <CustomerSelectDialog
         open={customerDirectoryOpen}
         onClose={() => setCustomerDirectoryOpen(false)}
@@ -856,6 +877,7 @@ export function CheckoutPageV2() {
           onPickPromoOption={(option) =>
             announce(`Đã chọn ${promoOptionLabel(option)}.`)
           }
+          onEditCustomer={() => setEditCustomerOpen(true)}
           itemCount={cart.length}
           total={grandTotal}
           deposit={0}

@@ -57,3 +57,15 @@ export type CreateCustomerBody = {
 export async function createCustomer(body: CreateCustomerBody): Promise<CustomerRow> {
   return http.post<CustomerRow>("/customers", body);
 }
+
+export type UpdateCustomerBody = Partial<CreateCustomerBody>;
+
+export async function updateCustomer(
+  id: string,
+  body: UpdateCustomerBody,
+): Promise<CustomerRow> {
+  return http.patch<CustomerRow>(
+    `/customers/${encodeURIComponent(id)}`,
+    body,
+  );
+}
