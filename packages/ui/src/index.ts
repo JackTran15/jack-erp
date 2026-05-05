@@ -6,6 +6,7 @@ export { MoneyInput, type MoneyInputProps } from "./components/money-input";
 export {
   formatMoneyInteger,
   parseMoneyIntegerString,
+  formatVnd,
 } from "./lib/money-format";
 export { Textarea } from "./components/textarea";
 export { Label } from "./components/label";

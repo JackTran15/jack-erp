@@ -1,5 +1,5 @@
 import { CloseIcon, FileTextIcon } from "../icons/Icon";
-import { cx } from "../utils";
+import { cn } from "@erp/ui";
 
 export interface InvoiceTabProps {
   label: string;
@@ -23,7 +23,7 @@ export function InvoiceTab({
 }: InvoiceTabProps) {
   return (
     <div
-      className={cx(
+      className={cn(
         "group relative flex h-9 items-center gap-1.5 rounded-t-md px-3 text-[14px] transition-colors",
         isActive
           ? "bg-white text-gray-900 font-medium shadow-[0_-1px_0_#E5E7EB_inset]"

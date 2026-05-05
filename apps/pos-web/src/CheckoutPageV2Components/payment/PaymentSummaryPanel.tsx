@@ -11,7 +11,7 @@ import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
 import { PrintAndOrderRow } from "./PrintAndOrderRow";
 import { QrPaymentButton } from "./QrPaymentButton";
 import { SummaryRow } from "./SummaryRow";
-import { formatVnd } from "../utils";
+import { formatVnd } from "@erp/ui";
 
 export interface PaymentPanelState {
   customerQuery: string;

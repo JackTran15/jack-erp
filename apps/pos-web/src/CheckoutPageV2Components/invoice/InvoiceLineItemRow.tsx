@@ -1,6 +1,7 @@
 import { CloseIcon, WarningDot } from "../icons/Icon";
-import { formatVnd, cx } from "../utils";
+import { cn } from "@erp/ui";
 import type { InvoiceLineItem } from "../types";
+import { formatVnd } from "@erp/ui";
 
 export interface InvoiceLineItemRowProps {
   index: number;
@@ -24,7 +25,7 @@ export function InvoiceLineItemRow({
   return (
     <tr
       onClick={() => onSelect(line.id)}
-      className={cx(
+      className={cn(
         "h-12 cursor-pointer text-[14px] text-gray-900 transition-colors",
         selected ? "bg-indigo-50" : "bg-white hover:bg-gray-50",
       )}

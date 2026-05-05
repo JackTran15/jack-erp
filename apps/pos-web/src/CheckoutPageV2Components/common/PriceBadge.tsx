@@ -1,4 +1,4 @@
-import { formatVnd } from "../utils";
+import { formatVnd } from "@erp/ui";
 
 export interface PriceBadgeProps {
   amount: number;

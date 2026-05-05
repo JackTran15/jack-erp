@@ -1,4 +1,4 @@
-import { cx } from "../utils";
+import { cn } from "@erp/ui";
 
 export interface ToggleSwitchProps {
   checked: boolean;
@@ -26,7 +26,7 @@ export function ToggleSwitch({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={cx(
+      className={cn(
         "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40",
         checked ? "bg-green-500" : "bg-gray-300",
@@ -34,7 +34,7 @@ export function ToggleSwitch({
       )}
     >
       <span
-        className={cx(
+        className={cn(
           "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
           checked ? "translate-x-[18px]" : "translate-x-[2px]",
         )}

@@ -19,3 +19,8 @@ export function formatMoneyInteger(value: number): string {
   if (!Number.isFinite(value)) return "";
   return moneyFormatter.format(Math.trunc(value));
 }
+
+/** Format integer VND (Vietnamese grouping with `.`), no currency symbol. */
+export function formatVnd(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(Math.round(amount));
+}
