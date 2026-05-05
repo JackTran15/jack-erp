@@ -70,23 +70,23 @@ export function PaymentCTAButtons({
   };
 
   return (
-    <div className="flex gap-2 pt-2">
+    <div className="flex h-14 items-stretch gap-2 px-4 py-2">
       <button
         type="button"
         onClick={onSaveDraft}
-        className="inline-flex h-12 basis-2/5 flex-col items-center justify-center rounded-md bg-gray-200 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+        className="inline-flex basis-[35%] flex-col items-center justify-center rounded-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         <span>Lưu tạm</span>
-        <KeyboardHint className="text-[11px] text-gray-500">(F10)</KeyboardHint>
+        <KeyboardHint className="text-[11px] text-white/80">(F10)</KeyboardHint>
       </button>
       <button
         type="button"
         onClick={handleCollect}
         disabled={collectDisabled || busy}
-        className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-md bg-green-500 text-[14px] font-semibold text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40"
+        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#22C55E] text-[15px] font-semibold text-white transition-colors hover:bg-[#16A34A] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
         Thu tiền
-        <KeyboardHint className="text-[12px] text-white/80">(F9)</KeyboardHint>
+        <KeyboardHint className="text-[13px] text-white/80">(F9)</KeyboardHint>
       </button>
     </div>
   );
