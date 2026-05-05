@@ -1,12 +1,12 @@
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CrudEntityConfig,
   FieldDefinition,
   PaginatedResponse,
 } from "@erp/shared-interfaces";
 import { formatClientError } from "@erp/api-client";
-import { Button, Input, FormField } from "@erp/ui";
+import { AppModal, Button, FormField, Input, MoneyInput, formatMoneyInteger } from "@erp/ui";
 import { erpApi } from "../../lib/erp-api";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
@@ -324,59 +324,54 @@ function InventoryRecordFormModal({
     return initial;
   });
 
+  const formRef = useRef<HTMLFormElement>(null);
+
   return (
-    <div
-      className="fixed inset-0 z-[1100] flex items-start justify-center bg-black/40 pt-[90px]"
-      onClick={onCancel}
+    <AppModal
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      title={`${record ? "Sửa" : "Thêm"} ${config.displayName}`}
+      onSave={() => formRef.current?.requestSubmit()}
+      onCancel={onCancel}
+      saveLabel={saving ? "Đang lưu…" : "Lưu"}
+      saveDisabled={saving}
+      className="max-w-[560px]"
     >
-      <div
-        className="max-h-[80vh] w-full max-w-[560px] overflow-y-auto rounded-xl bg-background p-6 shadow-lg"
-        onClick={(event) => event.stopPropagation()}
+      <form
+        ref={formRef}
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit(buildPayload(values, editableFields));
+        }}
       >
-        <h2 className="mb-4 text-xl font-semibold">
-          {record ? "Sửa" : "Thêm"} {config.displayName}
-        </h2>
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void onSubmit(buildPayload(values, editableFields));
-          }}
-        >
-          {readOnlyFields.length > 0 && (
-            <div className="mb-1 flex flex-col gap-2.5 border-b border-border pb-3">
-              {readOnlyFields.map((field) => (
-                <div key={field.key} className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
-                  <span className="text-sm text-foreground">
-                    {formatCell(record?.[field.key], field)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          {editableFields.map((field) => (
-            <FormField key={field.key} label={field.label}>
-              <FieldInput
-                field={field}
-                value={values[field.key]}
-                onChange={(value) =>
-                  setValues((prev) => ({ ...prev, [field.key]: value }))
-                }
-              />
-            </FormField>
-          ))}
-          <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Huỷ
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu"}
-            </Button>
+        {readOnlyFields.length > 0 && (
+          <div className="mb-1 flex flex-col gap-2.5 border-b border-border pb-3">
+            {readOnlyFields.map((field) => (
+              <div key={field.key} className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
+                <span className="text-sm text-foreground">
+                  {formatCell(record?.[field.key], field)}
+                </span>
+              </div>
+            ))}
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+        {editableFields.map((field) => (
+          <FormField key={field.key} label={field.label}>
+            <FieldInput
+              field={field}
+              value={values[field.key]}
+              onChange={(value) =>
+                setValues((prev) => ({ ...prev, [field.key]: value }))
+              }
+            />
+          </FormField>
+        ))}
+      </form>
+    </AppModal>
   );
 }
 
@@ -401,6 +396,18 @@ function FieldInput({
   }
 
   if (field.type === "number") {
+    if (field.numberFormat === "money") {
+      return (
+        <MoneyInput
+          value={
+            value === undefined || value === null || value === ""
+              ? ""
+              : Number(value)
+          }
+          onChange={(v) => onChange(v === "" ? "" : v)}
+        />
+      );
+    }
     return (
       <Input
         type="number"
@@ -448,6 +455,10 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
     } catch {
       return String(value);
     }
+  }
+  if (field.type === "number" && field.numberFormat === "money") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatMoneyInteger(n) : String(value);
   }
   return String(value);
 }

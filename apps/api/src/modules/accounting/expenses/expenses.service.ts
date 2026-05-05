@@ -141,7 +141,13 @@ export const EXPENSE_ENTITY_CONFIG: CrudEntityConfig = {
       type: 'string',
       required: true,
     },
-    { key: 'amount', label: 'Amount', type: 'number', required: true },
+    {
+      key: 'amount',
+      label: 'Amount',
+      type: 'number',
+      numberFormat: 'money',
+      required: true,
+    },
     {
       key: 'accountId',
       label: 'Account',

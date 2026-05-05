@@ -20,6 +20,7 @@ import { CashReportPage } from "./pages/reports/CashReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
+import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,10 @@ export function App() {
                 <Route path="/reports/inventory" element={<InventoryReportPage />} />
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
+                <Route
+                  path="/settings/document-numbering"
+                  element={<DocumentNumberingPage />}
+                />
                 <Route path="/setup" element={<TenantSetupPage />} />
               </Route>
             </Route>

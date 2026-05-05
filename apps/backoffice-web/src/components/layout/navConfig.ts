@@ -1,4 +1,4 @@
-import { LayoutDashboard, Settings, Warehouse, BarChart3, GitBranch, ClipboardCheck, Building2, Users } from "lucide-react";
+import { LayoutDashboard, Settings, Warehouse, BarChart3, GitBranch, ClipboardCheck, Users } from "lucide-react";
 import type { ComponentType } from "react";
 
 export interface NavChild {
@@ -76,6 +76,7 @@ export const navConfig: NavSection[] = [
     label: "Cấu hình",
     icon: Settings,
     children: [
+      { to: "/settings/document-numbering", label: "Đánh số chứng từ" },
       { to: "/setup", label: "Thiết lập chung" },
     ],
   },

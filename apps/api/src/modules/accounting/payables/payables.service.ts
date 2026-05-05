@@ -225,7 +225,13 @@ export const PAYABLE_ENTITY_CONFIG: CrudEntityConfig = {
   fields: [
     { key: 'documentNumber', label: 'Document #', type: 'string' },
     { key: 'vendorName', label: 'Vendor', type: 'string', required: true },
-    { key: 'amount', label: 'Amount', type: 'number', required: true },
+    {
+      key: 'amount',
+      label: 'Amount',
+      type: 'number',
+      numberFormat: 'money',
+      required: true,
+    },
     { key: 'currency', label: 'Currency', type: 'string' },
     { key: 'dueDate', label: 'Due Date', type: 'date', required: true },
     {
@@ -241,7 +247,12 @@ export const PAYABLE_ENTITY_CONFIG: CrudEntityConfig = {
       required: true,
       relationEntity: 'accounts',
     },
-    { key: 'settledAmount', label: 'Settled Amount', type: 'number' },
+    {
+      key: 'settledAmount',
+      label: 'Settled Amount',
+      type: 'number',
+      numberFormat: 'money',
+    },
   ],
   searchableFields: ['vendorName', 'documentNumber'],
   filterDefinitions: [

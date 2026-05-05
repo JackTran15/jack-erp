@@ -16,6 +16,7 @@ import {
   searchCustomers,
   type CustomerRow,
 } from "../lib/customerApi";
+import { MoneyInput } from "@erp/ui";
 import { formatCurrencyVnd } from "../lib/formatCurrency";
 import { usePosBranchStore } from "../stores/usePosBranchStore";
 import { fetchPosCatalog, type PosCatalogLine } from "../lib/posCatalogApi";
@@ -87,7 +88,7 @@ export function CheckoutPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [payment, setPayment] = useState<PaymentMethod>("CASH");
   const [cartError, setCartError] = useState("");
-  const [cashReceived, setCashReceived] = useState("");
+  const [cashReceived, setCashReceived] = useState<number | "">("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(
     null,
   );
@@ -162,7 +163,7 @@ export function CheckoutPage() {
     [cart],
   );
 
-  const cashReceivedNum = Number.parseFloat(cashReceived) || 0;
+  const cashReceivedNum = cashReceived === "" ? 0 : cashReceived;
   const changeAmount = cashReceivedNum - grandTotal;
 
   const pickCustomer = useCallback(
@@ -263,8 +264,8 @@ export function CheckoutPage() {
     [addProduct],
   );
 
-  const updateUnitPrice = (lineId: string, raw: string) => {
-    const n = Math.max(0, Number.parseFloat(raw.replace(",", ".")) || 0);
+  const updateUnitPrice = (lineId: string, value: number | "") => {
+    const n = value === "" ? 0 : Math.max(0, value);
     setCart((prev) =>
       prev.map((l) => (l.lineId === lineId ? { ...l, unitPrice: n } : l)),
     );
@@ -625,14 +626,10 @@ export function CheckoutPage() {
                       </button>
                     </div>
                     <div className="pos-sidebar-cart__row2">
-                      <input
+                      <MoneyInput
                         className="pos-input pos-sidebar-cart__price-input"
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        step={1000}
-                        value={line.unitPrice || ""}
-                        onChange={(e) => updateUnitPrice(line.lineId, e.target.value)}
+                        value={line.unitPrice > 0 ? line.unitPrice : ""}
+                        onChange={(v) => updateUnitPrice(line.lineId, v)}
                         placeholder="Đơn giá"
                         aria-label={`Đơn giá ${line.name}`}
                       />
@@ -725,16 +722,12 @@ export function CheckoutPage() {
                 <label htmlFor="cash-received" className="pos-cash-section__label">
                   Khách đưa
                 </label>
-                <input
+                <MoneyInput
                   ref={cashInputRef}
                   id="cash-received"
                   className="pos-input pos-cash-section__input"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1000}
                   value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
+                  onChange={setCashReceived}
                   placeholder="0"
                 />
                 <div className="pos-quick-amounts">
@@ -743,7 +736,7 @@ export function CheckoutPage() {
                       key={amt}
                       type="button"
                       className="pos-btn pos-btn--secondary pos-btn--sm"
-                      onClick={() => setCashReceived(String(amt))}
+                      onClick={() => setCashReceived(amt)}
                     >
                       {(amt / 1000).toLocaleString("vi-VN")}k
                     </button>
@@ -752,7 +745,7 @@ export function CheckoutPage() {
                     <button
                       type="button"
                       className="pos-btn pos-btn--secondary pos-btn--sm"
-                      onClick={() => setCashReceived(String(grandTotal))}
+                      onClick={() => setCashReceived(grandTotal)}
                     >
                       Đủ
                     </button>

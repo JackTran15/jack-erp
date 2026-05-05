@@ -4,7 +4,7 @@ import type {
   CrudEntityConfig,
   FieldDefinition,
 } from "@erp/shared-interfaces";
-import { Button, Input } from "@erp/ui";
+import { Button, formatMoneyInteger, Input } from "@erp/ui";
 import {
   useCrudConfig,
   useCrudRecords,
@@ -334,6 +334,10 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
     } catch {
       return String(value);
     }
+  }
+  if (field.type === "number" && field.numberFormat === "money") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatMoneyInteger(n) : String(value);
   }
   return String(value);
 }
