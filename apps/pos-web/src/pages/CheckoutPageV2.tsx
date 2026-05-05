@@ -1,18 +1,18 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  InvoiceLineItemTable,
-  InvoiceTabBar,
-  PaymentSummaryPanel,
-  POSToolbar,
-  PanelCollapseHandle,
-  ProductCatalogGrid,
-  ProductCatalogHeader,
-  type CashSuggestion,
-  type CatalogProduct,
-  type InvoiceLineItem,
-  type InvoiceTabItem,
-  type PaymentMethodOption,
-} from "../CheckoutPageV2Components";
+import { PanelCollapseHandle } from "../CheckoutPageV2Components/catalog/PanelCollapseHandle";
+import { ProductCatalogGrid } from "../CheckoutPageV2Components/catalog/ProductCatalogGrid";
+import { ProductCatalogHeader } from "../CheckoutPageV2Components/catalog/ProductCatalogHeader";
+import { InvoiceLineItemTable } from "../CheckoutPageV2Components/invoice/InvoiceLineItemTable";
+import { PaymentSummaryPanel } from "../CheckoutPageV2Components/payment/PaymentSummaryPanel";
+import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
+import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
+import type {
+  CashSuggestion,
+  CatalogProduct,
+  InvoiceLineItem,
+  InvoiceTabItem,
+  PaymentMethodOption,
+} from "../CheckoutPageV2Components/types";
 
 const PAYMENT_METHOD_CASH: PaymentMethodOption = {
   value: "CASH",
