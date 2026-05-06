@@ -218,6 +218,16 @@ export function QrIcon(props: IconProps) {
   );
 }
 
+export function LayersIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m12 2 9 4-9 4-9-4 9-4Z" />
+      <path d="m3 12 9 4 9-4" />
+      <path d="m3 17 9 4 9-4" />
+    </svg>
+  );
+}
+
 export function WarningDot(props: IconProps) {
   const { size = 8, ...rest } = props;
   return (
