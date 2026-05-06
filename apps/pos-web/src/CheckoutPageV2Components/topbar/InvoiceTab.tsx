@@ -6,6 +6,11 @@ export interface InvoiceTabProps {
   isActive: boolean;
   /** Drafts ("HĐ lưu tạm") show a document icon and no close button. */
   isDraft?: boolean;
+  /**
+   * Optional counter rendered as a small pill at the top-right of the tab.
+   * Hidden when undefined or `<= 0`.
+   */
+  badgeCount?: number;
   onSelect: () => void;
   onClose?: () => void;
 }
@@ -18,9 +23,11 @@ export function InvoiceTab({
   label,
   isActive,
   isDraft,
+  badgeCount,
   onSelect,
   onClose,
 }: InvoiceTabProps) {
+  const hasBadge = typeof badgeCount === "number" && badgeCount > 0;
   return (
     <div
       className={cn(
@@ -52,6 +59,18 @@ export function InvoiceTab({
       ) : null}
       {isActive ? (
         <span className="pointer-events-none absolute inset-x-2 -bottom-px h-[2px] rounded bg-indigo-500" />
+      ) : null}
+      {hasBadge ? (
+        <span
+          aria-label={`${badgeCount} mục`}
+          className={cn(
+            "pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center",
+            "rounded-full bg-indigo-500 px-1 text-[10px] font-semibold leading-none text-white",
+            "shadow-[0_0_0_2px_#F3F4F6]",
+          )}
+        >
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
       ) : null}
     </div>
   );

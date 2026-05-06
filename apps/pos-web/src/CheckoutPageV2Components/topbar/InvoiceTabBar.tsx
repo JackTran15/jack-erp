@@ -48,6 +48,7 @@ export function InvoiceTabBar({
             label={tab.label}
             isActive={tab.id === activeTabId}
             isDraft={tab.isDraft}
+            badgeCount={tab.badgeCount}
             onSelect={() => onSelectTab(tab.id)}
             onClose={() => onCloseTab(tab.id)}
           />
