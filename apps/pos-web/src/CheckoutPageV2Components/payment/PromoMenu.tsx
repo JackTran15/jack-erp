@@ -4,6 +4,10 @@ import {
   DiscountPointDialog,
   type DiscountPointDialogProps,
 } from "./discountPoint/DiscountPointDialog";
+import {
+  VoucherDialog,
+  type VoucherDialogProps,
+} from "./voucher/VoucherDialog";
 
 export type PromoMenuOption = "promo" | "voucher" | "discount";
 
@@ -18,6 +22,13 @@ export type PromoMenuDiscountPoint = Omit<
   "open" | "onClose"
 >;
 
+/**
+ * Wiring for the "Voucher" dialog mounted by `PromoMenu`. Clicking the
+ * "Voucher" entry opens this dialog automatically — the host feeds data /
+ * handlers (or omits `voucher` to use the empty-state form).
+ */
+export type PromoMenuVoucher = Omit<VoucherDialogProps, "open" | "onClose">;
+
 export interface PromoMenuProps {
   /** Visibility — caller (PaymentSummaryPanel) owns the open state. */
   open: boolean;
@@ -30,6 +41,11 @@ export interface PromoMenuProps {
    * omitted the dialog still opens but with placeholder member data.
    */
   discountPoint?: PromoMenuDiscountPoint;
+  /**
+   * Optional payload + handlers for the "Voucher" dialog. When omitted the
+   * dialog still opens with an empty form.
+   */
+  voucher?: PromoMenuVoucher;
 }
 
 interface MenuItem {
@@ -49,21 +65,25 @@ const ITEMS: MenuItem[] = [
  * State 4 in the spec. Caller positions / mounts this — internally it just
  * handles outside-click and Esc dismissal.
  *
- * The "Mã ưu đãi" entry is special-cased to open `DiscountPointDialog` (the
- * "Mã ưu đãi và điểm" modal). Selection still propagates via `onSelect` for
- * any side-effects the host wants to attach (announcements, analytics, …).
+ * Two entries are special-cased to open companion dialogs:
+ *   • "Mã ưu đãi" → `DiscountPointDialog` (membership + voucher search)
+ *   • "Voucher"   → `VoucherDialog` (apply voucher to invoice / items / groups)
+ * Selection still propagates via `onSelect` for any side-effects the host
+ * wants to attach (announcements, analytics, …).
  */
 export function PromoMenu({
   open,
   onClose,
   onSelect,
   discountPoint,
+  voucher,
 }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   // Dialog state lives inside the menu so the host doesn't need to wire it
-  // explicitly — the menu is the single owner of "click promo → show dialog".
+  // explicitly — the menu is the single owner of "click X → show dialog X".
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
+  const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -83,6 +103,7 @@ export function PromoMenu({
 
   const handlePick = (key: PromoMenuOption) => {
     if (key === "promo") setDiscountDialogOpen(true);
+    if (key === "voucher") setVoucherDialogOpen(true);
     onSelect(key);
     onClose();
   };
@@ -125,6 +146,12 @@ export function PromoMenu({
         open={discountDialogOpen}
         onClose={() => setDiscountDialogOpen(false)}
         {...discountPoint}
+      />
+
+      <VoucherDialog
+        open={voucherDialogOpen}
+        onClose={() => setVoucherDialogOpen(false)}
+        {...voucher}
       />
     </>
   );

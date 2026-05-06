@@ -35,6 +35,7 @@ import {
   PromoMenu,
   type PromoMenuDiscountPoint,
   type PromoMenuOption,
+  type PromoMenuVoucher,
 } from "./PromoMenu";
 import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
 import type { PromotionItem } from "./promotion/types";
@@ -97,6 +98,11 @@ export interface PaymentSummaryPanelProps<TCustomer> {
    * from the menu's "Mã ưu đãi" entry. Forwarded directly to `PromoMenu`.
    */
   discountPoint?: PromoMenuDiscountPoint;
+  /**
+   * Optional payload + handlers for the "Voucher" dialog opened from the
+   * menu's "Voucher" entry. Forwarded directly to `PromoMenu`.
+   */
+  voucher?: PromoMenuVoucher;
 
   /** Quick-action button: Quét QR khách. Omit to hide. */
   onScanCustomerQr?: () => void;
@@ -210,6 +216,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onPromotionSearchChange,
     onPickPromoOption,
     discountPoint,
+    voucher,
     onScanCustomerQr,
     customerExtraActions,
     customerDetail,
@@ -326,8 +333,15 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           <PromoMenu
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
-            onSelect={(opt) => onPickPromoOption?.(opt)}
+            onSelect={(opt) => {
+              // "Khuyến mãi" reuses the same PromotionSelectionModal mounted
+              // for the gift split-button — single source of truth for the
+              // promotion picker.
+              if (opt === "discount") setPromotionDialogOpen(true);
+              onPickPromoOption?.(opt);
+            }}
             discountPoint={discountPoint}
+            voucher={voucher}
           />
         ),
         keepWhenSelected: true,
@@ -351,6 +365,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onScanCustomerQr,
     onPickPromoOption,
     discountPoint,
+    voucher,
     promotionDialogOpen,
     promoMenuOpen,
     customerExtraActions,

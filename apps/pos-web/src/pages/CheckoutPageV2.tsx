@@ -892,6 +892,23 @@ export function CheckoutPageV2() {
             onSearchVoucher: (code) =>
               announce(`Đang tìm mã ưu đãi ${code}.`),
           }}
+          voucher={{
+            data: {
+              items: cart.map((l) => ({
+                id: l.lineId,
+                name: l.name,
+                qty: l.qty,
+                unitPrice: l.unitPrice,
+                lineTotal: lineTotal(l),
+              })),
+            },
+            onApply: (result) => {
+              const code = result.voucherCode || result.voucherId;
+              announce(
+                code ? `Đã áp dụng voucher ${code}.` : "Đã áp dụng voucher.",
+              );
+            },
+          }}
           onEditCustomer={() => setEditCustomerOpen(true)}
           itemCount={cart.length}
           total={grandTotal}
