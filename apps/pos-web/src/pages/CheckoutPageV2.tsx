@@ -39,6 +39,7 @@ import type {
   CashSuggestion,
   CatalogProduct,
   DraftInvoice,
+  DraftInvoicePayment,
   InvoiceTabItem,
   PaymentMethod,
   PaymentMethodOption,
@@ -331,6 +332,13 @@ export function CheckoutPageV2() {
     [primaryMethod],
   );
 
+  /** Resolve the human label for a `PaymentMethod`. Falls back to the raw value. */
+  const labelForMethod = useCallback(
+    (m: PaymentMethod): string =>
+      PAYMENT_METHODS.find((opt) => opt.value === m)?.label ?? String(m),
+    [],
+  );
+
   // ---- Search adapters for SearchPopover ----
   const productSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
@@ -604,6 +612,15 @@ export function CheckoutPageV2() {
     const invoiceNumber = `${yy}${mm}${dd}${seq}`;
 
     const total = cart.reduce((sum, line) => sum + lineTotal(line), 0);
+    // Persist only the lines that carry an amount — empty rows are noise and
+    // would re-appear as duplicates after restore.
+    const paymentsSnapshot: DraftInvoicePayment[] = paymentLines
+      .filter((l) => l.amount > 0)
+      .map((l) => ({
+        method: l.method,
+        label: labelForMethod(l.method),
+        amount: l.amount,
+      }));
     const snapshot: DraftInvoice = {
       id: crypto.randomUUID(),
       invoiceNumber,
@@ -616,6 +633,8 @@ export function CheckoutPageV2() {
       // Deep-clone lines so subsequent live edits don't mutate the snapshot.
       lines: cart.map((l) => ({ ...l })),
       total,
+      payments:
+        paymentsSnapshot.length > 0 ? paymentsSnapshot : undefined,
     };
 
     setDrafts((prev) => [snapshot, ...prev]);
@@ -632,12 +651,20 @@ export function CheckoutPageV2() {
     setNote("");
     setKeepChange(false);
     setDebt(false);
-  }, [announce, cart, selectedCustomer]);
+  }, [announce, cart, labelForMethod, paymentLines, selectedCustomer]);
 
   const handleRestoreDraft = useCallback(
     (draft: DraftInvoice) => {
       setCart(draft.lines.map((l) => ({ ...l })));
       setSelectedLineId(null);
+      // Restore the multi-line payment state. Older drafts (or drafts saved
+      // before any amount was entered) fall back to a single empty CASH row.
+      const restored: PaymentLine[] =
+        draft.payments && draft.payments.length > 0
+          ? draft.payments.map((p) => createPaymentLine(p.method, p.amount))
+          : [createPaymentLine("CASH")];
+      setPaymentLines(restored);
+      setSelectedSuggestionId(null);
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
       setCartError("");
       announce(`Đã mở hóa đơn lưu tạm ${draft.invoiceNumber}.`);
@@ -760,6 +787,18 @@ export function CheckoutPageV2() {
     // Fall back to the grand total when no amount has been entered yet — the
     // receipt should still print a sensible "đã trả" line.
     const paid = totalPaid > 0 ? totalPaid : grandTotal;
+    // One receipt row per payment method. When the cashier never typed an
+    // amount, synthesise a single fallback entry against the primary method
+    // so the receipt isn't blank in its summary block.
+    const payments =
+      totalPaid > 0
+        ? paymentLines
+            .filter((l) => l.amount > 0)
+            .map((l) => ({
+              label: labelForMethod(l.method),
+              amount: l.amount,
+            }))
+        : [{ label: primaryMethodLabel, amount: grandTotal }];
     return {
       store: STORE_INFO,
       invoiceNumber: generateInvoiceNumber(new Date()),
@@ -777,7 +816,7 @@ export function CheckoutPageV2() {
         paid,
         change: Math.max(0, paid - grandTotal),
       },
-      paymentMethodLabel: primaryMethodLabel,
+      payments,
       policy: RETURN_POLICY,
       closingMessage: CLOSING_MESSAGE,
     };

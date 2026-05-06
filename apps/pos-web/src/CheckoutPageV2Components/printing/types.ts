@@ -39,6 +39,19 @@ export interface InvoicePolicy {
   body: string;
 }
 
+/**
+ * One payment line on the receipt — mirrors a row from `PaymentMethodList`.
+ * The renderer prints one summary row per entry (label on the left, amount
+ * on the right). Always non-empty by construction; when the user hasn't
+ * entered any amount, the page synthesises a single fallback entry of the
+ * primary method covering the grand total.
+ */
+export interface InvoicePaymentEntry {
+  /** Human label shown on the receipt, e.g. "Tiền mặt". */
+  label: string;
+  amount: number;
+}
+
 export interface InvoicePayload {
   store: InvoiceStoreInfo;
   /** Receipt number, e.g. "2605010007". */
@@ -47,8 +60,8 @@ export interface InvoicePayload {
   issuedAt: Date;
   lines: InvoiceLineData[];
   totals: InvoiceTotals;
-  /** Human-readable label of the payment method, e.g. "Tiền mặt". */
-  paymentMethodLabel: string;
+  /** Per-method payment breakdown — one row per entry on the receipt. */
+  payments: InvoicePaymentEntry[];
   /** Discount note text after totals (empty = "HĐ đã được KM:" with no value). */
   discountNote?: string;
   policy: InvoicePolicy;
