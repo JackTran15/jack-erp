@@ -31,7 +31,11 @@ import { PaymentMethodRow } from "./PaymentMethodRow";
 import { PaymentSubTopBar } from "./PaymentSubTopBar";
 import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
 import { PrintAndOrderRow } from "./PrintAndOrderRow";
-import { PromoMenu, type PromoMenuOption } from "./PromoMenu";
+import {
+  PromoMenu,
+  type PromoMenuDiscountPoint,
+  type PromoMenuOption,
+} from "./PromoMenu";
 import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
 import type { PromotionItem } from "./promotion/types";
 import { QrPaymentButton } from "./QrPaymentButton";
@@ -88,6 +92,11 @@ export interface PaymentSummaryPanelProps<TCustomer> {
    * "discount". Omit to keep the menu silent.
    */
   onPickPromoOption?: (option: PromoMenuOption) => void;
+  /**
+   * Optional payload + handlers for the "Mã ưu đãi và điểm" dialog opened
+   * from the menu's "Mã ưu đãi" entry. Forwarded directly to `PromoMenu`.
+   */
+  discountPoint?: PromoMenuDiscountPoint;
 
   /** Quick-action button: Quét QR khách. Omit to hide. */
   onScanCustomerQr?: () => void;
@@ -200,6 +209,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     promotionSearchValue,
     onPromotionSearchChange,
     onPickPromoOption,
+    discountPoint,
     onScanCustomerQr,
     customerExtraActions,
     customerDetail,
@@ -317,6 +327,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
             onSelect={(opt) => onPickPromoOption?.(opt)}
+            discountPoint={discountPoint}
           />
         ),
         keepWhenSelected: true,
@@ -339,6 +350,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onOpenCustomerDirectory,
     onScanCustomerQr,
     onPickPromoOption,
+    discountPoint,
     promotionDialogOpen,
     promoMenuOpen,
     customerExtraActions,

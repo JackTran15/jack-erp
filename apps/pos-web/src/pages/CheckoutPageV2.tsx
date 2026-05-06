@@ -880,6 +880,18 @@ export function CheckoutPageV2() {
           onPickPromoOption={(option) =>
             announce(`Đã chọn ${promoOptionLabel(option)}.`)
           }
+          discountPoint={{
+            data: selectedCustomer
+              ? {
+                  member: {
+                    name: formatCustomerDisplay(selectedCustomer),
+                    cardNumber: selectedCustomer.id,
+                  },
+                }
+              : undefined,
+            onSearchVoucher: (code) =>
+              announce(`Đang tìm mã ưu đãi ${code}.`),
+          }}
           onEditCustomer={() => setEditCustomerOpen(true)}
           itemCount={cart.length}
           total={grandTotal}
