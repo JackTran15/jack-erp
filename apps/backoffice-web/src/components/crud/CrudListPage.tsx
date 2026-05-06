@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import type {
-  FieldDefinition,
-} from "@erp/shared-interfaces";
+import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
   Button,
   Dialog,
@@ -11,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
 } from "@erp/ui";
 import { buildCrudEntityToolbarSpecs, buildListToolbar } from "../../lib/list-toolbar";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";

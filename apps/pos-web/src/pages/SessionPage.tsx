@@ -5,20 +5,21 @@ import {
   CardContent,
   FormField,
   Input,
+  MoneyInput,
 } from "@erp/ui";
 import { formatCurrencyVnd } from "../lib/formatCurrency";
 
 export function SessionPage() {
   const openingCashId = useId();
   const noteId = useId();
-  const [openingCash, setOpeningCash] = useState("");
+  const [openingCash, setOpeningCash] = useState<number | "">("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
   const handleOpenSession = (e: FormEvent) => {
     e.preventDefault();
-    const amount = Number(openingCash.replace(/\s/g, "").replace(/,/g, ""));
+    const amount = openingCash === "" ? NaN : openingCash;
     if (!Number.isFinite(amount) || amount < 0) {
       setError("Nhập số tiền quỹ mở ca hợp lệ (không âm).");
       setStatus("");
@@ -63,16 +64,14 @@ export function SessionPage() {
                 hint="Nhập số tiền có trong ngăn kéo khi bắt đầu ca."
                 className="mb-4"
               >
-                <Input
+                <MoneyInput
                   id={openingCashId}
-                  type="text"
-                  inputMode="decimal"
                   autoComplete="off"
-                  placeholder="Ví dụ: 500000"
+                  placeholder="Ví dụ: 500.000"
                   className="max-w-md"
                   value={openingCash}
-                  onChange={(e) => {
-                    setOpeningCash(e.target.value);
+                  onChange={(v) => {
+                    setOpeningCash(v);
                     setError("");
                   }}
                   aria-describedby={`${openingCashId}-hint`}

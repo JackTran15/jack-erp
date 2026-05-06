@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
+import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
 import { ItemEntity } from './item.entity';
@@ -70,17 +71,29 @@ export class InventoryLocationService {
   }
 
   async listItems(
-    query: PaginationQuery,
+    query: PaginationQueryDto,
     actor: ActorContext,
   ): Promise<PaginatedResponse<ItemEntity>> {
-    const [data, total] = await this.itemRepo.findAndCount({
-      where: { organizationId: actor.organizationId },
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
-    });
+    const qb = this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.provider', 'provider')
+      .leftJoinAndSelect('item.product', 'product')
+      .where('item.organizationId = :orgId', { orgId: actor.organizationId });
+
+    if (query.search) {
+      qb.andWhere(
+        '(item.code ILIKE :s OR item.name ILIKE :s OR item.category ILIKE :s OR item.variantLabel ILIKE :s OR provider.name ILIKE :s)',
+        { s: `%${query.search}%` },
+      );
+    }
+
+    const field = query.sortBy ?? 'createdAt';
+    const order = (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
+    qb.orderBy(`item.${field}`, order);
+
+    qb.skip((query.page - 1) * query.pageSize).take(query.pageSize);
+
+    const [data, total] = await qb.getManyAndCount();
     return { data, total, page: query.page, pageSize: query.pageSize };
   }
 
@@ -138,6 +151,43 @@ export class InventoryLocationService {
         `Provider "${provider.name}" is inactive and cannot be assigned to items`,
       );
     }
+  }
+
+  // ─── Providers (org-scoped, no branch required) ─────────────────────
+
+  async listProviders(
+    query: PaginationQueryDto,
+    actor: ActorContext,
+  ): Promise<PaginatedResponse<ProviderEntity>> {
+    const qb = this.providerRepo
+      .createQueryBuilder('p')
+      .where('p.organizationId = :orgId', { orgId: actor.organizationId });
+
+    if (query.search) {
+      qb.andWhere(
+        '(p.code ILIKE :s OR p.name ILIKE :s OR p.email ILIKE :s OR p.phone ILIKE :s)',
+        { s: `%${query.search}%` },
+      );
+    }
+
+    const field = query.sortBy ?? 'createdAt';
+    const order = (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
+    qb.orderBy(`p.${field}`, order);
+
+    qb.skip((query.page - 1) * query.pageSize).take(query.pageSize);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  async getProviderById(id: string, actor: ActorContext): Promise<ProviderEntity> {
+    const provider = await this.providerRepo.findOne({
+      where: { id, organizationId: actor.organizationId },
+    });
+    if (!provider) {
+      throw new NotFoundException(`Provider ${id} not found`);
+    }
+    return provider;
   }
 
   // ─── Storages ────────────────────────────────────────────────────────

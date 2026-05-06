@@ -33,6 +33,24 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.purchase-order.approve', description: 'Approve purchase orders', module: 'inventory' },
   { key: 'inventory.purchase-order.receive', description: 'Receive goods for purchase orders', module: 'inventory' },
   { key: 'inventory.purchase-order.cancel', description: 'Cancel purchase orders', module: 'inventory' },
+  { key: 'inventory.goods-issue.read', description: 'View goods issues', module: 'inventory' },
+  { key: 'inventory.goods-issue.create', description: 'Create goods issues', module: 'inventory' },
+  { key: 'inventory.goods-issue.approve', description: 'Approve goods issues', module: 'inventory' },
+  { key: 'inventory.goods-issue.post', description: 'Post goods issues to ledger', module: 'inventory' },
+  { key: 'inventory.goods-issue.cancel', description: 'Cancel goods issues', module: 'inventory' },
+  { key: 'inventory.transfer.read', description: 'View inventory transfers', module: 'inventory' },
+  { key: 'inventory.transfer.create', description: 'Create inventory transfers', module: 'inventory' },
+  { key: 'inventory.transfer.post', description: 'Post inventory transfers', module: 'inventory' },
+  { key: 'inventory.transfer.cancel', description: 'Cancel inventory transfers', module: 'inventory' },
+  { key: 'inventory.adjustment.read', description: 'View inventory adjustments', module: 'inventory' },
+  { key: 'inventory.adjustment.create', description: 'Create inventory adjustments', module: 'inventory' },
+  { key: 'inventory.adjustment.submit', description: 'Submit inventory adjustments', module: 'inventory' },
+  { key: 'inventory.adjustment.post', description: 'Post inventory adjustments', module: 'inventory' },
+  { key: 'inventory.adjustment.cancel', description: 'Cancel inventory adjustments', module: 'inventory' },
+
+  // Product
+  { key: 'product.read', description: 'View product records', module: 'product' },
+  { key: 'product.write', description: 'Create, update and delete product records', module: 'product' },
 
   // POS
   { key: 'pos.sale.create', description: 'Create POS sales', module: 'pos' },

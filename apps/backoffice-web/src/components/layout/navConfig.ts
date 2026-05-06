@@ -6,6 +6,25 @@ import {
   GitBranch,
   ClipboardCheck,
   Users,
+  ShoppingCart,
+  PackageOpen,
+  PackageMinus,
+  TrendingUp,
+  Package,
+  CreditCard,
+  Banknote,
+  Building2,
+  CheckSquare,
+  PlusCircle,
+  Box,
+  Truck,
+  UserSquare,
+  BookOpen,
+  Receipt,
+  FileText,
+  DollarSign,
+  Hash,
+  Layers,
   LayoutGrid
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -67,6 +86,10 @@ export const navConfig: NavModule[] = [
       {
         id: "inventory-main",
         children: [
+          { to: "/inventory-management", label: "Quản lý kho", },
+          { to: "/products", label: "Sản phẩm", },
+          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
+          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
           { to: "/inventory-management", label: "Quản lý kho", },
           { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
           { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
@@ -223,6 +246,8 @@ export const navConfig: NavModule[] = [
       {
         id: "settings-main",
         children: [
+          { to: "/setup", label: "Thiết lập chung", },
+          { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
           { to: "/setup", label: "Thiết lập chung" },
         ],
       },

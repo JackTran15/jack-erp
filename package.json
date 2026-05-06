@@ -2,7 +2,8 @@
   "name": "@erp/root",
   "private": true,
   "scripts": {
-    "build:shared": "pnpm --filter @erp/shared-interfaces build && pnpm --filter @erp/shared-kafka-client build",
+    "clean": "pnpm -r exec -- sh -c 'rm -rf dist' && find . \\( -type f -name 'tsconfig.tsbuildinfo' -o -name '*.tsbuildinfo' \\) ! -path '*/node_modules/*' -delete 2>/dev/null; exit 0",
+    "build:shared": "pnpm --filter @erp/shared-interfaces build && pnpm --filter @erp/shared-kafka-client build && pnpm --filter @erp/api-client build && ",
     "postinstall": "pnpm run build:shared",
     "build": "pnpm -r build",
     "test": "pnpm -r test",

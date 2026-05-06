@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ConflictException,
   Logger,
@@ -141,15 +142,19 @@ export class DocumentNumberingService {
     branchId: string | undefined,
     actor: ActorContext,
   ): Promise<string> {
-    const rule = await this.resolveActiveRule(
+    let rule = await this.resolveActiveRule(
       documentType,
       branchId,
       actor.organizationId,
     );
 
     if (!rule) {
-      throw new NotFoundException(
-        `No active document numbering rule found for type ${documentType}`,
+      rule = await this.ensureDefaultActiveRule(documentType, actor);
+    }
+
+    if (!rule) {
+      throw new BadRequestException(
+        `Không thể khởi tạo quy tắc đánh số mặc định cho loại ${documentType}. Vui lòng thử lại hoặc cấu hình document numbering thủ công.`,
       );
     }
 
@@ -185,6 +190,59 @@ export class DocumentNumberingService {
         isActive: true,
       },
     });
+  }
+
+  private async ensureDefaultActiveRule(
+    documentType: DocumentType,
+    actor: ActorContext,
+  ): Promise<DocumentNumberRuleEntity | null> {
+    const defaultRule = this.ruleRepo.create({
+      organizationId: actor.organizationId,
+      branchId: undefined,
+      documentType,
+      prefix: this.getDefaultPrefix(documentType),
+      suffix: undefined,
+      includeDate: true,
+      dateFormat: 'YYYYMM',
+      sequenceLength: 5,
+      resetPolicy: ResetPolicy.MONTHLY,
+      isActive: true,
+      createdBy: actor.userId,
+    });
+
+    try {
+      const savedRule = await this.ruleRepo.save(defaultRule);
+      this.logger.warn(
+        `Auto-created default numbering rule for ${documentType} in organization ${actor.organizationId}`,
+      );
+      return savedRule;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to auto-create default rule for ${documentType}, re-checking active rule`,
+      );
+      return this.resolveActiveRule(
+        documentType,
+        undefined,
+        actor.organizationId,
+      );
+    }
+  }
+
+  private getDefaultPrefix(documentType: DocumentType): string {
+    const prefixMap: Record<DocumentType, string> = {
+      [DocumentType.INVOICE]: 'INV',
+      [DocumentType.SALE]: 'SAL',
+      [DocumentType.RETURN]: 'RTN',
+      [DocumentType.TRANSFER]: 'TRF',
+      [DocumentType.ADJUSTMENT]: 'ADJ',
+      [DocumentType.JOURNAL]: 'JNL',
+      [DocumentType.PAYABLE]: 'PAY',
+      [DocumentType.RECEIVABLE]: 'REC',
+      [DocumentType.PURCHASE_ORDER]: 'PO',
+      [DocumentType.GOODS_ISSUE]: 'GI',
+    };
+
+    return prefixMap[documentType];
   }
 
   private computeResetKey(policy: ResetPolicy, now: Date): string {

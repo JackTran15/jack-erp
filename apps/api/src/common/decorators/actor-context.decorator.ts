@@ -8,6 +8,7 @@ export interface ActorContext {
   branchId?: string;
   roles: string[];
   permissions?: string[];
+  search?: string;
 }
 
 export const Actor = createParamDecorator(

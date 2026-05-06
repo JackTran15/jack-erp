@@ -21,6 +21,7 @@ import { WebSocketEmitterService } from '../../websocket/websocket-emitter.servi
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { StockLedgerService } from '../../inventory/ledger/stock-ledger.service';
 import { JournalService } from '../../accounting/journal/journal.service';
+import { ItemEntity } from '../../inventory/location/item.entity';
 import { PosSessionEntity, SaleEntity, SaleLineEntity, PaymentEntity } from '../entities';
 import { CheckoutDto } from '../dto';
 
@@ -63,6 +64,7 @@ export class CheckoutService {
     }
 
     await this.validateStockAvailability(dto, actor);
+    await this.validateVariantIntegrity(dto);
 
     const documentNumber = await this.documentNumberingService.generate(
       DocumentType.SALE,
@@ -241,6 +243,28 @@ export class CheckoutService {
             `available=${available}, requested=${line.quantity}`,
         );
       }
+    }
+  }
+
+  private async validateVariantIntegrity(dto: CheckoutDto): Promise<void> {
+    const itemIds = [...new Set(dto.lines.map((l) => l.itemId))];
+    if (itemIds.length === 0) return;
+
+    const invalidVariants = await this.dataSource
+      .getRepository(ItemEntity)
+      .createQueryBuilder('item')
+      .select('item.id')
+      .where('item.id IN (:...itemIds)', { itemIds })
+      .andWhere('item.productId IS NOT NULL')
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM item_attribute_values iav WHERE iav.item_id = item.id)`,
+      )
+      .getMany();
+
+    if (invalidVariants.length > 0) {
+      throw new BadRequestException(
+        'Biến thể không hợp lệ: mặt hàng thuộc sản phẩm nhưng thiếu thuộc tính.',
+      );
     }
   }
 }

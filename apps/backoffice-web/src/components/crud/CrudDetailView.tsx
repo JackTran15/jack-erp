@@ -1,6 +1,6 @@
 import type React from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
-import { Button } from "@erp/ui";
+import { Button, formatMoneyInteger } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
 
 interface CrudDetailViewProps {
@@ -82,6 +82,10 @@ function formatValue(value: unknown, field: FieldDefinition): React.ReactNode {
     } catch {
       return String(value);
     }
+  }
+  if (field.type === "number" && field.numberFormat === "money") {
+    const n = Number(value);
+    return Number.isFinite(n) ? formatMoneyInteger(n) : String(value);
   }
   return String(value);
 }
