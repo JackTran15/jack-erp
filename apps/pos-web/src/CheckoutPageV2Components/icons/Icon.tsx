@@ -41,6 +41,14 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+export function MinusIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
