@@ -599,6 +599,25 @@ function InvoiceDetailPanel({ draft }: InvoiceDetailPanelProps) {
         )}
       </div>
 
+      {draft && draft.payments && draft.payments.length > 0 ? (
+        <div className="border-t border-[#E6E8EE] px-6 py-3">
+          <div className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-[#4B5163]">
+            Phương thức thanh toán
+          </div>
+          <ul className="flex flex-col gap-1">
+            {draft.payments.map((p, i) => (
+              <li
+                key={`${p.method}-${i}`}
+                className="flex items-center justify-between text-[14px] text-[#1F2233]"
+              >
+                <span>{p.label}</span>
+                <span className="tabular-nums">{formatVnd(p.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {draft ? (
         <div className="flex items-center justify-between border-t border-[#E6E8EE] px-6 py-4">
           <span className="text-[14px] font-medium text-[#4B5163]">Tổng tiền</span>

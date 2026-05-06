@@ -52,9 +52,21 @@ export interface CashSuggestion {
 }
 
 /**
+ * One payment entry inside a saved draft. Denormalized by design — we capture
+ * the human label at save time so a draft keeps its display string even if
+ * the live `PAYMENT_METHODS` table is later renamed.
+ */
+export interface DraftInvoicePayment {
+  method: PaymentMethod;
+  /** Human label, e.g. "Tiền mặt". */
+  label: string;
+  amount: number;
+}
+
+/**
  * A snapshot of an invoice saved via "Lưu tạm" (Draft Invoice). Shows up in
  * the "HĐ lưu tạm" picker dialog and can be restored back into the active
- * cart. Kept self-contained — `lines` is a deep-cloned copy of the `CartLine`s
+ * cart. Kept self-contained — `lines` and `payments` are deep-cloned copies
  * at save time, so subsequent edits to the live cart don't mutate the draft.
  */
 export interface DraftInvoice {
@@ -70,4 +82,9 @@ export interface DraftInvoice {
   lines: CartLine[];
   /** Pre-computed total (= sum of qty × unitPrice). */
   total: number;
+  /**
+   * Snapshot of the multi-line payment state (`PaymentMethodList`) at save
+   * time. Optional so older snapshots without payment data still load.
+   */
+  payments?: DraftInvoicePayment[];
 }

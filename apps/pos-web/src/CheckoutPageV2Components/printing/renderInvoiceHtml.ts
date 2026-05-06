@@ -43,8 +43,7 @@ function escapeHtml(s: string): string {
  * dropping into a server-side PDF renderer (the spec is print-friendly).
  */
 export function renderInvoiceHtml(invoice: InvoicePayload): string {
-  const { store, invoiceNumber, issuedAt, lines, totals, paymentMethodLabel } =
-    invoice;
+  const { store, invoiceNumber, issuedAt, lines, totals, payments } = invoice;
 
   const rows = lines
     .map(
@@ -56,6 +55,19 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           <td class="col-price">${formatVnd(l.unitPrice)}</td>
           <td class="col-total">${formatVnd(l.qty * l.unitPrice)}</td>
         </tr>`,
+    )
+    .join("");
+
+  // One summary row per payment method (Tiền mặt, Master debit, …). Multi-row
+  // when the cashier split the payment across methods; collapses to a single
+  // row when only one method was used.
+  const paymentRows = payments
+    .map(
+      (p) => `
+        <div class="summary-row">
+          <span>${escapeHtml(p.label)}</span>
+          <span class="value">${formatVnd(p.amount)}</span>
+        </div>`,
     )
     .join("");
 
@@ -224,10 +236,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           <span>Tổng thanh toán:</span>
           <span class="value">${formatVnd(totals.grandTotal)}</span>
         </div>
-        <div class="summary-row">
-          <span>${escapeHtml(paymentMethodLabel)}</span>
-          <span class="value">${formatVnd(totals.paid)}</span>
-        </div>
+        ${paymentRows}
         <div class="summary-row change">
           <span>Trả lại khách</span>
           <span class="value">${formatVnd(totals.change)}</span>
