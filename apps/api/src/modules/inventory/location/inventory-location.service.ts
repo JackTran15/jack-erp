@@ -71,17 +71,29 @@ export class InventoryLocationService {
   }
 
   async listItems(
-    query: PaginationQuery,
+    query: PaginationQueryDto,
     actor: ActorContext,
   ): Promise<PaginatedResponse<ItemEntity>> {
-    const [data, total] = await this.itemRepo.findAndCount({
-      where: { organizationId: actor.organizationId },
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
-    });
+    const qb = this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.provider', 'provider')
+      .leftJoinAndSelect('item.product', 'product')
+      .where('item.organizationId = :orgId', { orgId: actor.organizationId });
+
+    if (query.search) {
+      qb.andWhere(
+        '(item.code ILIKE :s OR item.name ILIKE :s OR item.category ILIKE :s OR item.variantLabel ILIKE :s OR provider.name ILIKE :s)',
+        { s: `%${query.search}%` },
+      );
+    }
+
+    const field = query.sortBy ?? 'createdAt';
+    const order = (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
+    qb.orderBy(`item.${field}`, order);
+
+    qb.skip((query.page - 1) * query.pageSize).take(query.pageSize);
+
+    const [data, total] = await qb.getManyAndCount();
     return { data, total, page: query.page, pageSize: query.pageSize };
   }
 

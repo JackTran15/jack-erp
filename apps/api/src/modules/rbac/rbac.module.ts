@@ -6,6 +6,7 @@ import { PermissionEntity } from '../auth/permission.entity';
 import { RbacService } from './rbac.service';
 import { PermissionGuard } from './permission.guard';
 import { BranchScopeGuard } from './branch-scope.guard';
+import { PermissionSyncService } from './permission-sync.service';
 
 @Global()
 @Module({
@@ -16,7 +17,7 @@ import { BranchScopeGuard } from './branch-scope.guard';
       PermissionEntity,
     ]),
   ],
-  providers: [RbacService, PermissionGuard, BranchScopeGuard],
+  providers: [RbacService, PermissionGuard, BranchScopeGuard, PermissionSyncService],
   exports: [RbacService, PermissionGuard, BranchScopeGuard],
 })
 export class RbacModule {}
