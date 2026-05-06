@@ -26,6 +26,7 @@ import { InvoiceLineItemTable } from "../CheckoutPageV2Components/invoice/Invoic
 import { PaymentSummaryPanel } from "../CheckoutPageV2Components/payment/PaymentSummaryPanel";
 import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
+import { DraftInvoicesDialog } from "../CheckoutPageV2Components/draftInvoices/DraftInvoicesDialog";
 import type { PromoMenuOption } from "../CheckoutPageV2Components/payment/PromoMenu";
 import type { PromotionItem } from "../CheckoutPageV2Components/payment/promotion/types";
 import type { InvoicePayload } from "../CheckoutPageV2Components/printing/types";
@@ -33,6 +34,7 @@ import type {
   CartLine,
   CashSuggestion,
   CatalogProduct,
+  DraftInvoice,
   InvoiceTabItem,
   PaymentMethod,
   PaymentMethodOption,
@@ -225,6 +227,21 @@ export function CheckoutPageV2() {
     null,
   );
   const promotions = useMemo<PromotionItem[]>(() => [], []);
+
+  // Draft invoices ("HĐ lưu tạm") — saved snapshots restored via picker dialog.
+  const [drafts, setDrafts] = useState<DraftInvoice[]>([]);
+  const [draftsDialogOpen, setDraftsDialogOpen] = useState(false);
+  const draftSeqRef = useRef(1);
+
+  // Inject the live draft count into the "HĐ lưu tạm" tab as a badge. Tabs
+  // without `isDraft` flow through unchanged.
+  const tabsWithBadges = useMemo<InvoiceTabItem[]>(
+    () =>
+      tabs.map((t) =>
+        t.isDraft ? { ...t, badgeCount: drafts.length } : t,
+      ),
+    [tabs, drafts.length],
+  );
 
   const { message: announcement, announce } = useAnnounce();
 
@@ -573,17 +590,62 @@ export function CheckoutPageV2() {
 
   const handleSaveDraft = useCallback(() => {
     if (cart.length === 0) return;
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.id === activeTabId
-          ? { ...t, isDraft: true, label: "HĐ lưu tạm" }
-          : t,
-      ),
-    );
-    announce("Đã lưu tạm hóa đơn.");
+    const now = new Date();
+    const yy = String(now.getFullYear() % 100).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const seq = String(draftSeqRef.current++).padStart(4, "0");
+    const invoiceNumber = `${yy}${mm}${dd}${seq}`;
+
+    const total = cart.reduce((sum, line) => sum + lineTotal(line), 0);
+    const snapshot: DraftInvoice = {
+      id: crypto.randomUUID(),
+      invoiceNumber,
+      customerId: selectedCustomer?.id ?? null,
+      customerName: selectedCustomer
+        ? formatCustomerDisplay(selectedCustomer)
+        : null,
+      customerPhone: selectedCustomer?.phone ?? null,
+      createdAt: now,
+      // Deep-clone lines so subsequent live edits don't mutate the snapshot.
+      lines: cart.map((l) => ({ ...l })),
+      total,
+    };
+
+    setDrafts((prev) => [snapshot, ...prev]);
+    announce(`Đã lưu tạm hóa đơn ${invoiceNumber}.`);
+
+    // Reset the live cart state so a fresh sale can start in the same tab.
     setCart([]);
     setSelectedLineId(null);
-  }, [activeTabId, announce, cart.length]);
+    setSelectedCustomer(null);
+    setCustomerQuery("");
+    setCustomerFieldError("");
+    setCashReceived("");
+    setSelectedSuggestionId(null);
+    setNote("");
+    setKeepChange(false);
+    setDebt(false);
+  }, [announce, cart, selectedCustomer]);
+
+  const handleRestoreDraft = useCallback(
+    (draft: DraftInvoice) => {
+      setCart(draft.lines.map((l) => ({ ...l })));
+      setSelectedLineId(null);
+      setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+      setCartError("");
+      announce(`Đã mở hóa đơn lưu tạm ${draft.invoiceNumber}.`);
+    },
+    [announce],
+  );
+
+  const handleDeleteDraft = useCallback(
+    (id: string) => {
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      announce("Đã xóa hóa đơn lưu tạm.");
+    },
+    [announce],
+  );
 
   // ---- Tabs ----
   const handleAddTab = useCallback(() => {
@@ -749,9 +811,19 @@ export function CheckoutPageV2() {
       />
 
       <InvoiceTabBar
-        tabs={tabs}
+        tabs={tabsWithBadges}
         activeTabId={activeTabId}
-        onSelectTab={setActiveTabId}
+        onSelectTab={(id) => {
+          // The "HĐ lưu tạm" tab is a launcher for the drafts picker, not a
+          // real cart tab — clicking it opens the dialog and leaves the
+          // active cart untouched.
+          const tab = tabs.find((t) => t.id === id);
+          if (tab?.isDraft) {
+            setDraftsDialogOpen(true);
+            return;
+          }
+          setActiveTabId(id);
+        }}
         onCloseTab={handleCloseTab}
         onAddTab={handleAddTab}
         location="Giầy MT Cần Thơ"
@@ -944,6 +1016,14 @@ export function CheckoutPageV2() {
           invoice={buildInvoicePayload}
         />
       </div>
+
+      <DraftInvoicesDialog
+        open={draftsDialogOpen}
+        onClose={() => setDraftsDialogOpen(false)}
+        drafts={drafts}
+        onConfirm={handleRestoreDraft}
+        onDelete={handleDeleteDraft}
+      />
     </div>
   );
 }
