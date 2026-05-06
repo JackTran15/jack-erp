@@ -1,13 +1,24 @@
 import type { ReactNode } from "react";
 import { IconButton } from "../common/IconButton";
 
+/** Trigger for a split-button's secondary slot — usually a dropdown chevron. */
+export interface CustomerActionSecondary {
+  icon: ReactNode;
+  ariaLabel: string;
+  onClick?: () => void;
+  isToggled?: boolean;
+  disabled?: boolean;
+}
+
 /**
  * One actionable button shown next to the customer field/chip.
  * The same item is rendered identically whether a customer is selected
  * (`SelectedCustomerCard`) or not (`CustomerInputRow`).
  *
  * Designed for extension — adding a future "đổi điểm", "tích điểm", or
- * "tặng quà" button is a one-line append to the consumer's array.
+ * "tặng quà" button is a one-line append to the consumer's array. To make
+ * an entry behave as a split-button, set `secondary` (and optionally
+ * `popover` for the menu it anchors).
  */
 export interface CustomerActionItem {
   /** Stable key for React reconciliation. */
@@ -21,6 +32,17 @@ export interface CustomerActionItem {
   isToggled?: boolean;
   /** Disables interaction without removing the button from the row. */
   disabled?: boolean;
+  /**
+   * Optional secondary trigger rendered immediately to the right, joined
+   * visually as a split-button (e.g. a chevron that opens "more options").
+   */
+  secondary?: CustomerActionSecondary;
+  /**
+   * Popover/menu node rendered inside the split-button's relative wrapper
+   * (e.g. a `PromoMenu` anchored to the secondary trigger). Ignored when
+   * `secondary` is not set.
+   */
+  popover?: ReactNode;
 }
 
 export interface CustomerActionsProps {
@@ -36,16 +58,45 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
   if (actions.length === 0) return null;
   return (
     <>
-      {actions.map((a) => (
-        <IconButton
-          key={a.key}
-          icon={a.icon}
-          ariaLabel={a.ariaLabel}
-          onClick={a.onClick}
-          disabled={a.disabled}
-          active={a.isToggled}
-        />
-      ))}
+      {actions.map((a) =>
+        a.secondary ? (
+          <div
+            key={a.key}
+            className="relative inline-flex items-center rounded-md"
+          >
+            <IconButton
+              icon={a.icon}
+              ariaLabel={a.ariaLabel}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              active={a.isToggled}
+              className="rounded-r-none"
+            />
+            <span
+              aria-hidden="true"
+              className="h-4 w-px bg-gray-200"
+            />
+            <IconButton
+              icon={a.secondary.icon}
+              ariaLabel={a.secondary.ariaLabel}
+              onClick={a.secondary.onClick}
+              disabled={a.secondary.disabled}
+              active={a.secondary.isToggled}
+              className="w-5 rounded-l-none"
+            />
+            {a.popover}
+          </div>
+        ) : (
+          <IconButton
+            key={a.key}
+            icon={a.icon}
+            ariaLabel={a.ariaLabel}
+            onClick={a.onClick}
+            disabled={a.disabled}
+            active={a.isToggled}
+          />
+        ),
+      )}
     </>
   );
 }

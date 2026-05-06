@@ -27,6 +27,7 @@ import { PaymentSummaryPanel } from "../CheckoutPageV2Components/payment/Payment
 import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
 import type { PromoMenuOption } from "../CheckoutPageV2Components/payment/PromoMenu";
+import type { PromotionItem } from "../CheckoutPageV2Components/payment/promotion/types";
 import type { InvoicePayload } from "../CheckoutPageV2Components/printing/types";
 import type {
   CartLine,
@@ -217,6 +218,13 @@ export function CheckoutPageV2() {
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<
     string | null
   >(null);
+
+  // Promotion / voucher selection — backend wiring lands later, so the page
+  // currently exposes an empty list (modal renders its empty state).
+  const [appliedPromotion, setAppliedPromotion] = useState<PromotionItem | null>(
+    null,
+  );
+  const promotions = useMemo<PromotionItem[]>(() => [], []);
 
   const { message: announcement, announce } = useAnnounce();
 
@@ -863,6 +871,12 @@ export function CheckoutPageV2() {
           customerDebt={null}
           onClearCustomer={selectedCustomer ? handleClearCustomer : undefined}
           customerFieldError={customerFieldError}
+          promotions={promotions}
+          appliedPromotionId={appliedPromotion?.id ?? null}
+          onApplyPromotion={(p) => {
+            setAppliedPromotion(p);
+            announce(p ? `Đã áp dụng ${p.name}.` : "Đã bỏ chương trình khuyến mãi.");
+          }}
           onPickPromoOption={(option) =>
             announce(`Đã chọn ${promoOptionLabel(option)}.`)
           }

@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { AlertBar } from "../common/AlertBar";
 import {
+  ChevronDownIcon,
   GiftIcon,
   PlusCircleIcon,
   QrIcon,
@@ -31,6 +32,8 @@ import { PaymentSubTopBar } from "./PaymentSubTopBar";
 import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
 import { PrintAndOrderRow } from "./PrintAndOrderRow";
 import { PromoMenu, type PromoMenuOption } from "./PromoMenu";
+import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
+import type { PromotionItem } from "./promotion/types";
 import { QrPaymentButton } from "./QrPaymentButton";
 import { SelectedCustomerCard } from "./SelectedCustomerCard";
 import { SummaryRow } from "./SummaryRow";
@@ -59,7 +62,31 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onClearCustomer?: () => void;
   customerFieldError?: string;
 
-  /** Optional callback invoked when the user picks a promo-menu option. */
+  /**
+   * Promotions shown inside the "Chương trình khuyến mãi" dialog. When
+   * omitted (or empty) the dialog renders its empty state.
+   */
+  promotions?: PromotionItem[];
+  /** Currently-applied promotion id (drives the highlighted row). */
+  appliedPromotionId?: string | null;
+  /** Fired when the user confirms a selection in the dialog. */
+  onApplyPromotion?: (promotion: PromotionItem | null) => void;
+  /**
+   * "Thêm khuyến mại" — outline CTA inside the dialog. Omit to hide the
+   * "Khuyến mại khác" section entirely.
+   */
+  onAddPromotion?: () => void;
+  /**
+   * Lift the dialog's search input (e.g. for server-side filtering with
+   * debounce). Leave both unset to use built-in in-memory filtering.
+   */
+  promotionSearchValue?: string;
+  onPromotionSearchChange?: (next: string) => void;
+  /**
+   * Optional callback for the legacy promo-menu (anchored to the chevron
+   * next to "Voucher / Quà tặng"). Receives one of "promo" | "voucher" |
+   * "discount". Omit to keep the menu silent.
+   */
   onPickPromoOption?: (option: PromoMenuOption) => void;
 
   /** Quick-action button: Quét QR khách. Omit to hide. */
@@ -166,6 +193,12 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     customerDebt,
     onClearCustomer,
     customerFieldError,
+    promotions,
+    appliedPromotionId,
+    onApplyPromotion,
+    onAddPromotion,
+    promotionSearchValue,
+    onPromotionSearchChange,
     onPickPromoOption,
     onScanCustomerQr,
     customerExtraActions,
@@ -211,12 +244,12 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const amountDue = Math.max(0, total - deposit);
   const hasCustomer = Boolean(selectedCustomerLabel);
 
-  // Promo menu (4.13) — open state lives here so the trigger can be wired
-  // through the shared customer-action group below.
-  const [promoOpen, setPromoOpen] = useState(false);
-  const handlePromoSelect = (option: PromoMenuOption) => {
-    onPickPromoOption?.(option);
-  };
+  // Split-button on the customer row:
+  //   • Gift icon ("Voucher / Quà tặng") → promotion-selection dialog.
+  //   • Chevron secondary trigger → legacy `PromoMenu` (3 quick options).
+  // Both states live here so `customerActions` below can wire each trigger.
+  const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
+  const [promoMenuOpen, setPromoMenuOpen] = useState(false);
 
   // Customer detail dialog — opened by clicking the selected-customer chip.
   const [detailOpen, setDetailOpen] = useState(false);
@@ -271,8 +304,21 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         key: "voucher",
         ariaLabel: "Voucher / quà tặng",
         icon: <GiftIcon size={16} />,
-        onClick: () => setPromoOpen((o) => !o),
-        isToggled: promoOpen,
+        onClick: () => setPromotionDialogOpen(true),
+        isToggled: promotionDialogOpen,
+        secondary: {
+          ariaLabel: "Mở danh sách ưu đãi nhanh",
+          icon: <ChevronDownIcon size={14} />,
+          onClick: () => setPromoMenuOpen((o) => !o),
+          isToggled: promoMenuOpen,
+        },
+        popover: (
+          <PromoMenu
+            open={promoMenuOpen}
+            onClose={() => setPromoMenuOpen(false)}
+            onSelect={(opt) => onPickPromoOption?.(opt)}
+          />
+        ),
         keepWhenSelected: true,
       },
       ...(customerExtraActions ?? []).map((a) => ({
@@ -292,7 +338,9 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onAddCustomer,
     onOpenCustomerDirectory,
     onScanCustomerQr,
-    promoOpen,
+    onPickPromoOption,
+    promotionDialogOpen,
+    promoMenuOpen,
     customerExtraActions,
   ]);
 
@@ -343,12 +391,6 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
               }}
             />
           )}
-
-          <PromoMenu
-            open={promoOpen}
-            onClose={() => setPromoOpen(false)}
-            onSelect={handlePromoSelect}
-          />
 
           {customerFieldError ? (
             <p className="mt-1 text-[12px] text-red-600" role="alert">
@@ -462,6 +504,17 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         onCollectDebt={onCollectCustomerDebt}
         onChangeCard={onChangeCustomerCard}
         onRefreshPoints={onRefreshCustomerPoints}
+      />
+
+      <PromotionSelectionModal
+        open={promotionDialogOpen}
+        onClose={() => setPromotionDialogOpen(false)}
+        promotions={promotions}
+        initialSelectedId={appliedPromotionId ?? null}
+        searchValue={promotionSearchValue}
+        onSearchChange={onPromotionSearchChange}
+        onConfirm={onApplyPromotion}
+        onAddPromotion={onAddPromotion}
       />
     </aside>
   );

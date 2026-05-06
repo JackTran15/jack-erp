@@ -118,11 +118,11 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         font-weight: 700;
         text-align: center;
       }
-      .product-table .col-idx { text-align: center; width: 32px; }
-      .product-table .col-name { text-align: left; }
-      .product-table .col-qty { text-align: center; width: 48px; }
-      .product-table .col-price { text-align: right; width: 96px; font-variant-numeric: tabular-nums; }
-      .product-table .col-total { text-align: right; width: 96px; font-variant-numeric: tabular-nums; }
+      .product-table .col-idx { text-align: center; width: 32px; color: #000; }
+      .product-table .col-name { text-align: left; color: #000; }
+      .product-table .col-qty { text-align: center; width: 48px; color: #000; }
+      .product-table .col-price { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
+      .product-table .col-total { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
 
       .summary {
         border-top: 1px solid #000;
