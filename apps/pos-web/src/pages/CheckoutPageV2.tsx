@@ -28,6 +28,10 @@ import { POSToolbar } from "../CheckoutPageV2Components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../CheckoutPageV2Components/topbar/InvoiceTabBar";
 import { DraftInvoicesDialog } from "../CheckoutPageV2Components/draftInvoices/DraftInvoicesDialog";
 import type { PromoMenuOption } from "../CheckoutPageV2Components/payment/PromoMenu";
+import {
+  createPaymentLine,
+  type PaymentLine,
+} from "../CheckoutPageV2Components/payment/PaymentMethodRow";
 import type { PromotionItem } from "../CheckoutPageV2Components/payment/promotion/types";
 import type { InvoicePayload } from "../CheckoutPageV2Components/printing/types";
 import type {
@@ -210,8 +214,9 @@ export function CheckoutPageV2() {
   const [editCustomerOpen, setEditCustomerOpen] = useState(false);
 
   // Payment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  const [cashReceived, setCashReceived] = useState("");
+  const [paymentLines, setPaymentLines] = useState<PaymentLine[]>(() => [
+    createPaymentLine("CASH"),
+  ]);
   const [keepChange, setKeepChange] = useState(false);
   const [debt, setDebt] = useState(false);
   const [note, setNote] = useState("");
@@ -299,13 +304,16 @@ export function CheckoutPageV2() {
     [cart],
   );
 
-  const cashReceivedNum = Number.parseFloat(cashReceived) || 0;
-  const rawChangeAmount = Math.max(0, cashReceivedNum - grandTotal);
+  // Sum of all payment lines — drives change / shortage rows.
+  const totalPaid = useMemo(
+    () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
+    [paymentLines],
+  );
+  const rawChangeAmount = Math.max(0, totalPaid - grandTotal);
   // "Khách không lấy tiền thừa" — when checked, change owed is forfeited.
   const changeAmount = keepChange ? 0 : rawChangeAmount;
-  const shortageAmount = Math.max(0, grandTotal - cashReceivedNum);
-  const isCashShort =
-    paymentMethod === "CASH" && cashReceivedNum > 0 && shortageAmount > 0;
+  const shortageAmount = Math.max(0, grandTotal - totalPaid);
+  const isShort = totalPaid > 0 && shortageAmount > 0;
 
   const suggestions = useMemo(
     () => buildSuggestions(grandTotal),
@@ -314,11 +322,13 @@ export function CheckoutPageV2() {
 
   const datetime = useMemo(() => formatDateTime(new Date()), []);
 
-  const currentMethod = useMemo(
+  // Methods used across all lines — drives the announce / invoice label.
+  const primaryMethod = paymentLines[0]?.method ?? "CASH";
+  const primaryMethodLabel = useMemo(
     () =>
-      PAYMENT_METHODS.find((m) => m.value === paymentMethod) ??
-      PAYMENT_METHODS[0]!,
-    [paymentMethod],
+      PAYMENT_METHODS.find((m) => m.value === primaryMethod)?.label ??
+      String(primaryMethod),
+    [primaryMethod],
   );
 
   // ---- Search adapters for SearchPopover ----
@@ -547,11 +557,7 @@ export function CheckoutPageV2() {
         setCartError("Nhập đơn giá > 0 cho từng dòng hàng.");
         return;
       }
-      if (
-        paymentMethod === "CASH" &&
-        cashReceivedNum > 0 &&
-        cashReceivedNum < grandTotal
-      ) {
+      if (totalPaid > 0 && totalPaid < grandTotal) {
         setCartError("Tiền khách đưa chưa đủ.");
         return;
       }
@@ -564,7 +570,7 @@ export function CheckoutPageV2() {
           style: "currency",
           currency: "VND",
           maximumFractionDigits: 0,
-        }).format(grandTotal)}, ${paymentLabel(paymentMethod)}.`,
+        }).format(grandTotal)}, ${paymentLabel(primaryMethod)}.`,
       );
       // reset
       setCart([]);
@@ -572,7 +578,7 @@ export function CheckoutPageV2() {
       setSelectedCustomer(null);
       setCustomerQuery("");
       setCustomerFieldError("");
-      setCashReceived("");
+      setPaymentLines([createPaymentLine("CASH")]);
       setSelectedSuggestionId(null);
       setNote("");
       setKeepChange(false);
@@ -581,10 +587,10 @@ export function CheckoutPageV2() {
     [
       announce,
       cart,
-      cashReceivedNum,
       grandTotal,
-      paymentMethod,
+      primaryMethod,
       selectedCustomer,
+      totalPaid,
     ],
   );
 
@@ -621,7 +627,7 @@ export function CheckoutPageV2() {
     setSelectedCustomer(null);
     setCustomerQuery("");
     setCustomerFieldError("");
-    setCashReceived("");
+    setPaymentLines([createPaymentLine("CASH")]);
     setSelectedSuggestionId(null);
     setNote("");
     setKeepChange(false);
@@ -716,14 +722,28 @@ export function CheckoutPageV2() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cart.length, handleCheckout, handleSaveDraft]);
 
-  // ---- Cash suggestion / amount handlers ----
-  const handlePickSuggestion = useCallback((s: CashSuggestion) => {
-    setSelectedSuggestionId(s.id);
-    setCashReceived(String(s.amount));
-  }, []);
+  // ---- Cash suggestion handler ----
+  // Fills the existing CASH line; if none is present (user removed it),
+  // re-adds it at the head with the picked amount.
+  const handlePickSuggestion = useCallback(
+    (s: CashSuggestion) => {
+      setSelectedSuggestionId(s.id);
+      setPaymentLines((prev) => {
+        const cashIdx = prev.findIndex((l) => l.method === "CASH");
+        if (cashIdx === -1) {
+          return [createPaymentLine("CASH", s.amount), ...prev];
+        }
+        return prev.map((l, i) =>
+          i === cashIdx ? { ...l, amount: s.amount } : l,
+        );
+      });
+    },
+    [],
+  );
 
-  const handleChangePaidAmount = useCallback((raw: string) => {
-    setCashReceived(raw);
+  const handleChangePaymentLines = useCallback((next: PaymentLine[]) => {
+    setPaymentLines(next);
+    // Any manual edit clears the highlighted suggestion chip.
     setSelectedSuggestionId(null);
   }, []);
 
@@ -737,12 +757,9 @@ export function CheckoutPageV2() {
     if (cart.length === 0) return null;
     const totalQty = cart.reduce((sum, l) => sum + l.qty, 0);
     const subtotal = grandTotal;
-    const paid =
-      paymentMethod === "CASH"
-        ? cashReceivedNum > 0
-          ? cashReceivedNum
-          : grandTotal
-        : grandTotal;
+    // Fall back to the grand total when no amount has been entered yet — the
+    // receipt should still print a sensible "đã trả" line.
+    const paid = totalPaid > 0 ? totalPaid : grandTotal;
     return {
       store: STORE_INFO,
       invoiceNumber: generateInvoiceNumber(new Date()),
@@ -760,7 +777,7 @@ export function CheckoutPageV2() {
         paid,
         change: Math.max(0, paid - grandTotal),
       },
-      paymentMethodLabel: currentMethod.label,
+      paymentMethodLabel: primaryMethodLabel,
       policy: RETURN_POLICY,
       closingMessage: CLOSING_MESSAGE,
     };
@@ -986,16 +1003,10 @@ export function CheckoutPageV2() {
           total={grandTotal}
           deposit={0}
           methods={PAYMENT_METHODS}
-          paymentMethod={currentMethod}
-          paidAmount={cashReceivedNum}
-          amountReadOnly={paymentMethod !== "CASH"}
-          onChangeMethod={(m) => {
-            setPaymentMethod(m);
-            if (m !== "CASH") setCashReceived("");
-          }}
-          onChangePaidAmount={handleChangePaidAmount}
+          paymentLines={paymentLines}
+          onChangePaymentLines={handleChangePaymentLines}
           changeAmount={changeAmount}
-          shortageAmount={isCashShort ? shortageAmount : 0}
+          shortageAmount={isShort ? shortageAmount : 0}
           keepChange={keepChange}
           onKeepChangeChange={setKeepChange}
           debt={debt}

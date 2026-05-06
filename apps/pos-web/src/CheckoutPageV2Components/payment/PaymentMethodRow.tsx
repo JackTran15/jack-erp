@@ -1,75 +1,231 @@
-import { forwardRef } from "react";
-import { ChevronDownIcon, PlusCircleIcon } from "../icons/Icon";
-import { formatVnd } from "@erp/ui";
+import { forwardRef, useId } from "react";
+import { cn } from "@erp/ui";
+import {
+  ChevronDownIcon,
+  CloseIcon,
+  PlusCircleIcon,
+} from "../icons/Icon";
 import type { PaymentMethod, PaymentMethodOption } from "../types";
 
-export interface PaymentMethodRowProps {
-  method: PaymentMethodOption;
-  /** Currently entered/selected paid amount. */
+/**
+ * One payment-method line: the user can split a sale across N methods, each
+ * line carrying its own selected method + amount.
+ */
+export interface PaymentLine {
+  /** Stable id (UUID) so React keys + remove handlers don't depend on index. */
+  id: string;
+  method: PaymentMethod;
   amount: number;
-  /** When true the amount is read-only (e.g. for non-cash methods that don't
-   *  track tendered cash). Defaults to editable. */
-  amountReadOnly?: boolean;
-  /** All available payment methods — clicking the label cycles through them. */
-  methods: readonly PaymentMethodOption[];
-  onChangeMethod: (method: PaymentMethod) => void;
-  onChangeAmount: (raw: string) => void;
 }
 
 /**
- * Single payment method line: leading "+" icon, link-styled method label
- * that cycles through `methods` on click, and the editable paid amount.
+ * Build a fresh `PaymentLine`. Exposed so hosts can seed initial state
+ * without duplicating the shape.
+ */
+export function createPaymentLine(
+  method: PaymentMethod,
+  amount = 0,
+): PaymentLine {
+  return { id: crypto.randomUUID(), method, amount };
+}
+
+// ---------------------------------------------------------------------------
+// Leaf row — single line, add / remove variants
+// ---------------------------------------------------------------------------
+
+export interface PaymentMethodRowProps {
+  line: PaymentLine;
+  /** All available payment methods (used to render the dropdown). */
+  methods: readonly PaymentMethodOption[];
+  /**
+   * Leading-icon variant. The first line in a list uses `add` (green plus
+   * that appends a new row); subsequent lines use `remove` (red × that
+   * deletes that row).
+   */
+  variant: "add" | "remove";
+  /** Lock the amount input. */
+  amountReadOnly?: boolean;
+  /**
+   * Methods already chosen by other lines — disabled in this row's dropdown
+   * to prevent duplicates. The row's own current method is always enabled.
+   */
+  unavailableMethods?: ReadonlyArray<PaymentMethod>;
+
+  onChangeMethod: (method: PaymentMethod) => void;
+  onChangeAmount: (amount: number) => void;
+  /** Triggered by the leading `+` icon — only when `variant="add"`. */
+  onAdd?: () => void;
+  /** Triggered by the leading `×` icon — only when `variant="remove"`. */
+  onRemove?: () => void;
+}
+
+/**
+ * One payment-method line: leading action icon (+ to add another row, × to
+ * remove this row) + native select with chevron + editable amount input.
+ *
+ * Native `<select>` is used on purpose — it's the cheapest accessible way to
+ * render a dropdown that works well on mobile + desktop, and matches the
+ * underline-style spec without a heavyweight popover library.
  */
 export const PaymentMethodRow = forwardRef<
   HTMLInputElement,
   PaymentMethodRowProps
 >(function PaymentMethodRow(
   {
-    method,
-    amount,
-    amountReadOnly,
+    line,
     methods,
+    variant,
+    amountReadOnly,
+    unavailableMethods,
     onChangeMethod,
     onChangeAmount,
+    onAdd,
+    onRemove,
   },
   amountInputRef,
 ) {
-  const cycle = () => {
-    const idx = methods.findIndex((m) => m.value === method.value);
-    const next = methods[(idx + 1) % methods.length];
-    if (next) onChangeMethod(next.value);
-  };
+  const selectId = useId();
+  const isAdd = variant === "add";
+  const unavailable = new Set(unavailableMethods ?? []);
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
+    <div className="grid grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
       <button
         type="button"
-        onClick={cycle}
-        aria-label={`Đổi hình thức thanh toán (đang là ${method.label})`}
-        className="inline-flex items-center gap-1.5 text-[14px] font-medium text-indigo-600 hover:text-indigo-700"
+        onClick={isAdd ? onAdd : onRemove}
+        aria-label={
+          isAdd ? "Thêm phương thức thanh toán" : "Xóa phương thức thanh toán"
+        }
+        className={cn(
+          "inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+          isAdd
+            ? "text-[#22C55E] hover:bg-[#DCFCE7]"
+            : "text-[#EF4444] hover:bg-[#FEE2E2]",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40",
+        )}
       >
-        <PlusCircleIcon size={16} className="text-green-500" />
-        {method.label}
-        <ChevronDownIcon size={14} className="text-indigo-600" />
+        {isAdd ? <PlusCircleIcon size={18} /> : <CloseIcon size={16} />}
       </button>
-      {amountReadOnly ? (
-        <span className="text-[14px] font-medium text-gray-900">
-          {formatVnd(amount)}
+
+      <div className="relative min-w-0">
+        <select
+          id={selectId}
+          value={line.method}
+          onChange={(e) => onChangeMethod(e.target.value as PaymentMethod)}
+          aria-label="Phương thức thanh toán"
+          className={cn(
+            "h-8 w-full appearance-none truncate bg-transparent pr-6 text-[14px] font-medium text-[#0F172A]",
+            "border-b border-[#E2E8F0] focus:border-[#6366F1] focus:outline-none",
+          )}
+        >
+          {methods.map((m) => (
+            <option
+              key={m.value}
+              value={m.value}
+              disabled={m.value !== line.method && unavailable.has(m.value)}
+            >
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#64748B]"
+        >
+          <ChevronDownIcon size={14} />
         </span>
-      ) : (
-        <input
-          ref={amountInputRef}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1000}
-          value={amount || ""}
-          onChange={(e) => onChangeAmount(e.target.value)}
-          aria-label={`Số tiền ${method.label}`}
-          placeholder="0"
-          className="h-8 w-[120px] rounded-md border border-transparent bg-transparent px-2 text-right text-[14px] font-medium text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
-      )}
+      </div>
+
+      <input
+        ref={amountInputRef}
+        type="text"
+        inputMode="numeric"
+        value={line.amount === 0 ? "" : String(line.amount)}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "");
+          onChangeAmount(digits === "" ? 0 : Number(digits));
+        }}
+        readOnly={amountReadOnly}
+        aria-label={`Số tiền ${line.method}`}
+        placeholder="0"
+        className={cn(
+          "h-8 w-full bg-transparent px-1 text-right text-[16px] font-semibold text-[#0F172A]",
+          "border-b border-[#E2E8F0] focus:border-[#6366F1] focus:outline-none",
+          amountReadOnly && "cursor-default",
+        )}
+      />
     </div>
   );
 });
+
+// ---------------------------------------------------------------------------
+// List orchestrator — owns the array, drives add/remove behavior
+// ---------------------------------------------------------------------------
+
+export interface PaymentMethodListProps {
+  lines: PaymentLine[];
+  methods: readonly PaymentMethodOption[];
+  /** Single source of truth — host owns the array. */
+  onChange: (lines: PaymentLine[]) => void;
+  /**
+   * Optional read-only predicate per line. Called with the line + index;
+   * return `true` to lock the amount input. Defaults to all editable.
+   */
+  amountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  /** Forwarded ref to the FIRST row's amount input (for F-key focus, etc.). */
+  amountInputRef?: React.Ref<HTMLInputElement>;
+}
+
+/**
+ * Stack of `PaymentMethodRow`s. The first row's leading icon adds a new line;
+ * subsequent rows show a remove (`×`) button. Methods already in use are
+ * disabled inside other rows' dropdowns, so users can't pick the same one
+ * twice. When the available methods are exhausted the add button is hidden.
+ */
+export function PaymentMethodList({
+  lines,
+  methods,
+  onChange,
+  amountReadOnly,
+  amountInputRef,
+}: PaymentMethodListProps) {
+  const used = new Set(lines.map((l) => l.method));
+
+  const handleChangeMethod = (id: string, next: PaymentMethod) => {
+    onChange(lines.map((l) => (l.id === id ? { ...l, method: next } : l)));
+  };
+  const handleChangeAmount = (id: string, next: number) => {
+    onChange(lines.map((l) => (l.id === id ? { ...l, amount: next } : l)));
+  };
+  const handleAdd = () => {
+    const free = methods.find((m) => !used.has(m.value));
+    if (!free) return;
+    onChange([...lines, createPaymentLine(free.value)]);
+  };
+  const handleRemove = (id: string) => {
+    if (lines.length <= 1) return;
+    onChange(lines.filter((l) => l.id !== id));
+  };
+
+  return (
+    <div className="flex flex-col">
+      {lines.map((line, idx) => (
+        <PaymentMethodRow
+          key={line.id}
+          ref={idx === 0 ? amountInputRef : undefined}
+          line={line}
+          methods={methods}
+          variant={idx === 0 ? "add" : "remove"}
+          unavailableMethods={Array.from(used)}
+          amountReadOnly={amountReadOnly?.(line, idx)}
+          onChangeMethod={(m) => handleChangeMethod(line.id, m)}
+          onChangeAmount={(amt) => handleChangeAmount(line.id, amt)}
+          onAdd={
+            idx === 0 && used.size < methods.length ? handleAdd : undefined
+          }
+          onRemove={idx > 0 ? () => handleRemove(line.id) : undefined}
+        />
+      ))}
+    </div>
+  );
+}

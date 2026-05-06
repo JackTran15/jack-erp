@@ -3,7 +3,6 @@ import { formatVnd } from "@erp/ui";
 import type { SearchSuggestion } from "../common/SearchPopover";
 import type {
   CashSuggestion,
-  PaymentMethod,
   PaymentMethodOption,
 } from "../types";
 import { AlertBar } from "../common/AlertBar";
@@ -27,7 +26,7 @@ import {
   PaymentCTAButtons,
   type InvoicePayloadInput,
 } from "./PaymentCTAButtons";
-import { PaymentMethodRow } from "./PaymentMethodRow";
+import { PaymentMethodList, type PaymentLine } from "./PaymentMethodRow";
 import { PaymentSubTopBar } from "./PaymentSubTopBar";
 import { PaymentSummaryBlock } from "./PaymentSummaryBlock";
 import { PrintAndOrderRow } from "./PrintAndOrderRow";
@@ -132,13 +131,12 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   total: number;
   deposit: number;
 
-  // Payment method
+  // Payment methods (multi-line — user can split a sale across N methods)
   methods: readonly PaymentMethodOption[];
-  paymentMethod: PaymentMethodOption;
-  paidAmount: number;
-  amountReadOnly?: boolean;
-  onChangeMethod: (m: PaymentMethod) => void;
-  onChangePaidAmount: (raw: string) => void;
+  paymentLines: PaymentLine[];
+  onChangePaymentLines: (lines: PaymentLine[]) => void;
+  /** Optional read-only predicate forwarded to `PaymentMethodList`. */
+  paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
   changeAmount: number;
   shortageAmount: number;
 
@@ -229,11 +227,9 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     total,
     deposit,
     methods,
-    paymentMethod,
-    paidAmount,
-    amountReadOnly,
-    onChangeMethod,
-    onChangePaidAmount,
+    paymentLines,
+    onChangePaymentLines,
+    paymentAmountReadOnly,
     changeAmount,
     shortageAmount,
     keepChange,
@@ -438,13 +434,11 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
 
         {/* 4.5 Payment method */}
         <div className="border-t border-gray-200 px-4">
-          <PaymentMethodRow
-            method={paymentMethod}
-            amount={paidAmount}
-            amountReadOnly={amountReadOnly}
+          <PaymentMethodList
+            lines={paymentLines}
             methods={methods}
-            onChangeMethod={onChangeMethod}
-            onChangeAmount={onChangePaidAmount}
+            onChange={onChangePaymentLines}
+            amountReadOnly={paymentAmountReadOnly}
           />
         </div>
 
