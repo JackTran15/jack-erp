@@ -1,41 +1,53 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   FormField,
   Input,
+  Textarea,
 } from "@erp/ui";
-import { ChevronDown, ImagePlus, Plus, Search, X } from "lucide-react";
+import {
+  Calculator,
+  ChevronDown,
+  ImagePlus,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { CrudFieldInput } from "../CrudFieldInput";
 import { useCrudCreate, useCrudRecords } from "../useCrudApi";
+import { getUserFacingApiErrorMessage } from "../../../lib/user-facing-api-error";
 
-const UNIT_PRESETS = ["Cái", "Hộp", "Thùng", "Chai", "Kg", "Lốc", "Tờ", "Bộ"];
-const GROUP_SUGGESTIONS = ["Điện tử", "Văn phòng phẩm", "Thực phẩm", "Gia dụng", "Thời trang"];
-const BRAND_SUGGESTIONS = ["Samsung", "LG", "Sony", "Deli", "Stabilo", "3M"];
-
-const MAX_IMAGE_COUNT = 10;
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-const IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp";
-
-interface Props {
-  editableFields: FieldDefinition[];
-  values: Record<string, unknown>;
-  setValues: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
-  errors: Record<string, string>;
-  setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  inventoryExtras: Record<string, string>;
-  setInventoryExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-}
+import {
+  BRAND_SUGGESTIONS,
+  COMMISSION_METHOD_OPTIONS,
+  COMMISSION_POSITION_OPTIONS,
+  DEFAULT_EXTRAS,
+  GROUP_SUGGESTIONS,
+  IMAGE_ACCEPT,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_COUNT,
+  TABS,
+  type TabId,
+  UNIT_PRESETS,
+} from "./item-create/constants";
+import { ConversionUnitsTable } from "./item-create/ConversionUnitsTable";
+import { ProvidersPlaceholderTable } from "./item-create/ProvidersPlaceholderTable";
+import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
+import { InventoryItemCreateDialogs } from "./item-create/InventoryItemCreateDialogs";
+import { InventoryItemTabsHeader } from "./item-create/InventoryItemTabsHeader";
+import type {
+  CommissionRow,
+  FormExtras,
+  InventoryItemCreateFormProps as Props,
+} from "./item-create/types";
 
 export function InventoryItemCreateForm({
   editableFields,
@@ -43,9 +55,15 @@ export function InventoryItemCreateForm({
   setValues,
   errors,
   setErrors,
-  inventoryExtras,
-  setInventoryExtras,
+  entityKey,
+  isSaving = false,
 }: Props) {
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState<TabId>("basic");
+  const [extras, setExtras] = useState<FormExtras>(DEFAULT_EXTRAS);
+  const [activeSubTab, setActiveSubTab] = useState<"conversion" | "providers">("conversion");
+
   const [categoryPickOpen, setCategoryPickOpen] = useState(false);
   const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
   const [quickCategoryDraft, setQuickCategoryDraft] = useState("");
@@ -71,21 +89,48 @@ export function InventoryItemCreateForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const previewsRef = useRef<string[]>([]);
 
+  const editableFieldsByKey = useMemo(
+    () => new Map(editableFields.map((f) => [f.key, f])),
+    [editableFields],
+  );
+
+  const renderedDynamicKeys = useRef(new Set<string>());
+
+  const categoryDialogsOpen = categoryPickOpen || quickCategoryOpen;
+
   const { data: categoryFetch } = useCrudRecords(
     "inventory-items",
-    { page: 1, pageSize: 300, sortBy: undefined, sortOrder: "desc", search: "", filters: {} },
+    { page: 1, pageSize: 100, sortBy: undefined, sortOrder: "desc", search: "", filters: {} },
     categoryPickOpen,
   );
 
+  const { data: categoryRegistryFetch } = useCrudRecords(
+    "inventory-item-categories",
+    {
+      page: 1,
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "asc",
+      search: "",
+      filters: {},
+    },
+    categoryDialogsOpen,
+  );
+
+  const createCategoryMutation = useCrudCreate("inventory-item-categories");
+
   const categoryOptions = useMemo(() => {
-    const raw = categoryFetch?.data ?? [];
     const set = new Set<string>();
-    for (const row of raw) {
+    for (const row of categoryRegistryFetch?.data ?? []) {
+      const n = row.name;
+      if (typeof n === "string" && n.trim()) set.add(n.trim());
+    }
+    for (const row of categoryFetch?.data ?? []) {
       const c = row.category;
       if (typeof c === "string" && c.trim()) set.add(c.trim());
     }
     return [...set].sort((a, b) => a.localeCompare(b, "vi"));
-  }, [categoryFetch?.data]);
+  }, [categoryRegistryFetch?.data, categoryFetch?.data]);
 
   const { data: providerFetch, isLoading: providersLoading } = useCrudRecords(
     "inventory-providers",
@@ -112,6 +157,10 @@ export function InventoryItemCreateForm({
     };
   }, []);
 
+  const updateExtras = <K extends keyof FormExtras>(key: K, value: FormExtras[K]) => {
+    setExtras((prev) => ({ ...prev, [key]: value }));
+  };
+
   const handlePickCategory = (label: string) => {
     setValues((prev) => ({ ...prev, category: label }));
     setErrors((prev) => {
@@ -120,6 +169,23 @@ export function InventoryItemCreateForm({
       return next;
     });
     setCategoryPickOpen(false);
+  };
+
+  const applyQuickCategory = async () => {
+    const name = quickCategoryDraft.trim();
+    if (!name) {
+      toast.warning("Vui lòng nhập tên danh mục.");
+      return;
+    }
+    try {
+      await createCategoryMutation.mutateAsync({ name });
+      handlePickCategory(name);
+      setQuickCategoryOpen(false);
+      setQuickCategoryDraft("");
+      toast.success("Đã tạo danh mục và áp dụng cho biểu mẫu.");
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   const handlePickProvider = (row: Record<string, unknown>) => {
@@ -187,6 +253,39 @@ export function InventoryItemCreateForm({
     setProductImages((prev) => prev.filter((_, i) => i !== index));
     setPreviews((prev) => prev.filter((_, i) => i !== index));
     setImageError(null);
+  };
+
+  const addCommissionRow = () => {
+    setExtras((prev) => ({
+      ...prev,
+      commissions: [
+        ...prev.commissions,
+        {
+          id: `commission-${Date.now()}`,
+          position: COMMISSION_POSITION_OPTIONS[0],
+          method: COMMISSION_METHOD_OPTIONS[0].value,
+          amount: "0",
+          discountLimit: "0",
+        },
+      ],
+    }));
+  };
+
+  const removeCommissionRow = (id: string) => {
+    setExtras((prev) => ({
+      ...prev,
+      commissions: prev.commissions.filter((c) => c.id !== id),
+    }));
+  };
+
+  const updateCommissionRow = (
+    id: string,
+    patch: Partial<Omit<CommissionRow, "id">>,
+  ) => {
+    setExtras((prev) => ({
+      ...prev,
+      commissions: prev.commissions.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    }));
   };
 
   const iconBtn =
@@ -258,7 +357,7 @@ export function InventoryItemCreateForm({
         className={iconBtn}
         aria-label="Nhập nhanh nhóm hàng"
         onClick={() => {
-          setQuickGroupDraft(inventoryExtras.itemType);
+          setQuickGroupDraft(String(values.itemType ?? ""));
           setQuickGroupOpen(true);
         }}
       >
@@ -282,7 +381,7 @@ export function InventoryItemCreateForm({
         className={iconBtn}
         aria-label="Nhập nhanh thương hiệu"
         onClick={() => {
-          setQuickBrandDraft(inventoryExtras.brand);
+          setQuickBrandDraft(String(values.brand ?? ""));
           setQuickBrandOpen(true);
         }}
       >
@@ -291,47 +390,117 @@ export function InventoryItemCreateForm({
     </>
   );
 
-  return (
+  // ─── Helpers render dynamic fields (left column of "Basic Information" tab) ─────
+
+  /** Render field theo `editableFields` nếu key tồn tại; fallback null. */
+  const renderDynamicField = (key: string, trailing?: ReactNode) => {
+    const field = editableFieldsByKey.get(key);
+    if (!field) return null;
+    renderedDynamicKeys.current.add(key);
+    return (
+      <CrudFieldInput
+        key={field.key}
+        inputIdPrefix="create"
+        field={field}
+        value={values[field.key]}
+        error={errors[field.key]}
+        trailing={trailing}
+        onChange={(nextValue) => {
+          setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next[field.key];
+            return next;
+          });
+        }}
+      />
+    );
+  };
+
+  /** Renders any editable field NOT already shown by an explicit slot (placeholder fields). */
+  const renderRemainingFields = () => {
+    const skip = renderedDynamicKeys.current;
+    return editableFields
+      .filter((f) => !skip.has(f.key) && f.key !== "isActive")
+      .map((field) => (
+        <CrudFieldInput
+          key={field.key}
+          inputIdPrefix="create"
+          field={field}
+          value={values[field.key]}
+          error={errors[field.key]}
+          onChange={(nextValue) => {
+            setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+            setErrors((prev) => {
+              const next = { ...prev };
+              delete next[field.key];
+              return next;
+            });
+          }}
+        />
+      ));
+  };
+
+  // ─── Tab contents ──────────────────────────────────────────────────────────
+
+  // Reset rendered keys each render-pass before computing tab basic.
+  renderedDynamicKeys.current = new Set();
+
+  const basicTab = (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b pb-3 text-xs">
-        <button type="button" className="rounded bg-primary px-3 py-1.5 text-primary-foreground">
-          Thông tin cơ bản
-        </button>
-        <button
-          type="button"
-          className="rounded border border-border px-3 py-1.5 text-muted-foreground"
-          disabled
-        >
-          Thông tin bổ sung
-        </button>
-        <button
-          type="button"
-          className="rounded border border-border px-3 py-1.5 text-muted-foreground"
-          disabled
-        >
-          Thông tin kho
-        </button>
-        <button
-          type="button"
-          className="rounded border border-border px-3 py-1.5 text-muted-foreground"
-          disabled
-        >
-          Hoa hồng
-        </button>
-      </div>
+      <section className="rounded-md border border-border bg-background p-4">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Thông tin
+        </h3>
+        <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            {renderDynamicField("name")}
+            {renderDynamicField("category", trailingCategory)}
+            {renderDynamicField("itemType", trailingGroup)}
+            {renderDynamicField("brand", trailingBrand)}
+            {renderDynamicField("sku")}
+            {renderDynamicField("barcode")}
+            {renderDynamicField("purchasePrice")}
+            {renderDynamicField("sellPrice", (
+              <button
+                type="button"
+                className={iconBtn}
+                aria-label="Tính giá bán"
+                title="Trợ lý tính giá (sắp ra mắt)"
+              >
+                <Calculator className="h-4 w-4" />
+              </button>
+            ))}
+            {renderDynamicField("unit", trailingUnit)}
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {editableFields.map((field) => {
-          if (field.key === "isActive") return null;
+          <div className="flex flex-col gap-3">
+            <FormField label="Tồn kho ban đầu" htmlFor="extra-initial-stock">
+              <Input
+                id="extra-initial-stock"
+                type="number"
+                value={extras.initialStock}
+                onChange={(e) => updateExtras("initialStock", e.target.value)}
+                inputMode="decimal"
+              />
+            </FormField>
+            <FormField label="Đơn giá nhập đầu kỳ" htmlFor="extra-initial-stock-price">
+              <Input
+                id="extra-initial-stock-price"
+                type="number"
+                value={extras.initialStockUnitPrice}
+                onChange={(e) => updateExtras("initialStockUnitPrice", e.target.value)}
+                inputMode="decimal"
+              />
+            </FormField>
 
-          if (field.key === "providerId") {
-            return (
+            {/* Nhà cung cấp + checkbox "Đang hoạt động" */}
+            {editableFieldsByKey.has("providerId") && (
               <FormField
-                key={field.key}
-                label={field.label}
+                label={editableFieldsByKey.get("providerId")!.label}
                 htmlFor="create-provider-id"
                 error={errors.providerId}
-                required={field.required}
+                required={editableFieldsByKey.get("providerId")!.required}
               >
                 <div className="flex items-start gap-1.5">
                   <div className="min-w-0 flex-1">
@@ -345,7 +514,7 @@ export function InventoryItemCreateForm({
                             ? String(values.providerId)
                             : ""
                       }
-                      placeholder="Chọn nhà cung cấp (tìm trong danh sách)…"
+                      placeholder="Chọn nhà cung cấp…"
                       className="bg-muted/30"
                     />
                   </div>
@@ -382,189 +551,75 @@ export function InventoryItemCreateForm({
                       <X className="h-4 w-4" />
                     </button>
                   )}
-                  <label
-                    htmlFor="create-is-active"
-                    className="ml-2 flex h-10 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium"
-                  >
-                    <input
-                      id="create-is-active"
-                      type="checkbox"
-                      checked={Boolean(values.isActive)}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setValues((prev) => ({ ...prev, isActive: checked }));
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.isActive;
-                          return next;
-                        });
-                      }}
-                      className="h-4 w-4 rounded border border-input accent-primary"
-                    />
-                    Đang hoạt động
-                  </label>
                 </div>
               </FormField>
-            );
-          }
+            )}
 
-          let trailing: ReactNode;
-          if (field.key === "category") trailing = trailingCategory;
-          else if (field.key === "unit") trailing = trailingUnit;
+            {editableFieldsByKey.has("isActive") && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(values.isActive)}
+                  onChange={(event) =>
+                    setValues((prev) => ({ ...prev, isActive: event.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border border-input accent-primary"
+                />
+                Đang hoạt động
+              </label>
+            )}
+          </div>
+        </div>
 
+        {/* Trường động còn lại (placeholder để không mất dữ liệu nếu config thay đổi) */}
+        {(() => {
+          const rest = renderRemainingFields();
+          if (rest.length === 0) return null;
           return (
-            <CrudFieldInput
-              key={field.key}
-              inputIdPrefix="create"
-              field={field}
-              value={values[field.key]}
-              error={errors[field.key]}
-              trailing={trailing}
-              onChange={(nextValue) => {
-                setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next[field.key];
-                  return next;
-                });
-              }}
-            />
+            <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2">
+              {rest}
+            </div>
           );
-        })}
+        })()}
+      </section>
 
-        <div className="md:col-span-2">
-          <FormField label="Nhóm hàng hóa" htmlFor="extra-item-type">
-            <div className="flex items-start gap-1.5">
-              <div className="min-w-0 flex-1">
-                <Input
-                  id="extra-item-type"
-                  type="text"
-                  value={inventoryExtras.itemType}
-                  onChange={(event) =>
-                    setInventoryExtras((prev) => ({ ...prev, itemType: event.target.value }))
-                  }
-                  placeholder="VD: Điện tử, Gia dụng…"
-                />
-              </div>
-              {trailingGroup}
-            </div>
-          </FormField>
+      {/* Sub-tabs: Đơn vị chuyển đổi / Nhà cung cấp */}
+      <section className="rounded-md border border-border bg-background">
+        <div className="flex items-center gap-1 border-b px-2 pt-2">
+          {([
+            { id: "conversion", label: "Đơn vị chuyển đổi" },
+            { id: "providers", label: "Nhà cung cấp" },
+          ] as const).map((sub) => (
+            <button
+              key={sub.id}
+              type="button"
+              onClick={() => setActiveSubTab(sub.id)}
+              className={
+                activeSubTab === sub.id
+                  ? "rounded-t border border-b-0 border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground"
+                  : "px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              }
+            >
+              {sub.label}
+            </button>
+          ))}
         </div>
-        <div className="md:col-span-2">
-          <FormField label="Thương hiệu" htmlFor="extra-brand">
-            <div className="flex items-start gap-1.5">
-              <div className="min-w-0 flex-1">
-                <Input
-                  id="extra-brand"
-                  type="text"
-                  value={inventoryExtras.brand}
-                  onChange={(event) =>
-                    setInventoryExtras((prev) => ({ ...prev, brand: event.target.value }))
-                  }
-                  placeholder="VD: Samsung, Deli…"
-                />
-              </div>
-              {trailingBrand}
-            </div>
-          </FormField>
-        </div>
-        <FormField label="Mã vạch" htmlFor="extra-barcode">
-          <Input
-            id="extra-barcode"
-            type="text"
-            value={inventoryExtras.barcode}
-            onChange={(event) =>
-              setInventoryExtras((prev) => ({ ...prev, barcode: event.target.value }))
-            }
-            placeholder="Để trống để hệ thống tự sinh (nếu có)"
-          />
-        </FormField>
-        <FormField label="Mô tả" htmlFor="extra-description" className="md:col-span-2">
-          <textarea
-            id="extra-description"
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            value={inventoryExtras.description}
-            onChange={(event) =>
-              setInventoryExtras((prev) => ({ ...prev, description: event.target.value }))
-            }
-            placeholder="Mô tả ngắn gọn…"
-          />
-        </FormField>
-      </div>
 
-      <div className="mt-5 border-t pt-4">
-        <h2 className="mb-2 text-sm font-semibold">Đơn vị chuyển đổi</h2>
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-2 py-2 text-left">Tên đơn vị tính</th>
-                <th className="px-2 py-2 text-left">Tỷ lệ quy đổi</th>
-                <th className="px-2 py-2 text-left">Giá mua</th>
-                <th className="px-2 py-2 text-left">Giá bán</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="px-2 py-2">
-                  <Input
-                    value={inventoryExtras.unitConversionName}
-                    onChange={(event) =>
-                      setInventoryExtras((prev) => ({
-                        ...prev,
-                        unitConversionName: event.target.value,
-                      }))
-                    }
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    value={inventoryExtras.conversionRate}
-                    onChange={(event) =>
-                      setInventoryExtras((prev) => ({
-                        ...prev,
-                        conversionRate: event.target.value,
-                      }))
-                    }
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    value={inventoryExtras.purchasePriceByUnit}
-                    onChange={(event) =>
-                      setInventoryExtras((prev) => ({
-                        ...prev,
-                        purchasePriceByUnit: event.target.value,
-                      }))
-                    }
-                  />
-                </td>
-                <td className="px-2 py-2">
-                  <Input
-                    type="number"
-                    value={inventoryExtras.sellPriceByUnit}
-                    onChange={(event) =>
-                      setInventoryExtras((prev) => ({
-                        ...prev,
-                        sellPriceByUnit: event.target.value,
-                      }))
-                    }
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="p-3">
+          {activeSubTab === "conversion" ? (
+            <ConversionUnitsTable />
+          ) : (
+            <ProvidersPlaceholderTable />
+          )}
         </div>
-      </div>
+      </section>
 
-      <div className="mt-6 border-t pt-4">
-        <h2 className="mb-1 text-sm font-semibold">Ảnh hàng hóa</h2>
+      {/* Ảnh hàng hóa + checkbox hiển thị POS */}
+      <section className="rounded-md border border-border bg-background p-4">
+        <h3 className="mb-1 text-sm font-semibold">Ảnh hàng hóa</h3>
         <p className="mb-3 text-xs text-muted-foreground">
-          Định dạng .jpg, .jpeg, .png, .gif, .webp — dung lượng tối đa 2MB mỗi ảnh, tối đa{" "}
-          {MAX_IMAGE_COUNT} ảnh. Ảnh chỉ lưu trên trình duyệt cho đến khi máy chủ hỗ trợ tải lên.
+          Định dạng .jpg, .jpeg, .png, .gif, .webp — tối đa 2MB mỗi ảnh, tối đa {MAX_IMAGE_COUNT}{" "}
+          ảnh. Ảnh chỉ lưu trên trình duyệt cho đến khi máy chủ hỗ trợ tải lên.
         </p>
         {imageError ? <p className="mb-2 text-sm text-destructive">{imageError}</p> : null}
         <div className="flex flex-wrap gap-3">
@@ -599,278 +654,332 @@ export function InventoryItemCreateForm({
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Dialog: chọn danh mục */}
-      <Dialog open={categoryPickOpen} onOpenChange={setCategoryPickOpen}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chọn danh mục</DialogTitle>
-            <DialogDescription>
-              Danh sách lấy từ các mặt hàng hiện có. Chọn một dòng để điền vào biểu mẫu.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
-            {categoryOptions.length === 0 ? (
-              <li className="text-sm text-muted-foreground">Chưa có danh mục nào trong hệ thống.</li>
-            ) : (
-              categoryOptions.map((c) => (
-                <li key={c}>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={extras.showOnPos}
+            onChange={(e) => updateExtras("showOnPos", e.target.checked)}
+            className="h-4 w-4 rounded border border-input accent-primary"
+          />
+          Hiển thị trên màn hình bán hàng
+        </label>
+      </section>
+
+      {/* THÔNG TIN THUỘC TÍNH */}
+      <section className="rounded-md border border-border bg-background p-4">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Thông tin thuộc tính
+        </h3>
+        <div className="grid gap-3 md:grid-cols-2">
+          <FormField label="Màu sắc" htmlFor="extra-attr-color">
+            <Input
+              id="extra-attr-color"
+              value={extras.attrColor}
+              onChange={(e) => updateExtras("attrColor", e.target.value)}
+              placeholder="VD: Xanh, Đỏ, Vàng…"
+            />
+          </FormField>
+          <FormField label="Size" htmlFor="extra-attr-size">
+            <Input
+              id="extra-attr-size"
+              value={extras.attrSize}
+              onChange={(e) => updateExtras("attrSize", e.target.value)}
+              placeholder="VD: S, M, L, XL…"
+            />
+          </FormField>
+        </div>
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={extras.manageBarcodePerUnit}
+            onChange={(e) => updateExtras("manageBarcodePerUnit", e.target.checked)}
+            className="h-4 w-4 rounded border border-input accent-primary"
+          />
+          Quản lý mã vạch theo từng đơn vị tính
+        </label>
+      </section>
+    </>
+  );
+
+  const additionalTab = (
+    <section className="rounded-md border border-border bg-background p-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        <FormField label="Trọng lượng gói hàng (g)" htmlFor="extra-weight">
+          <Input
+            id="extra-weight"
+            type="number"
+            inputMode="decimal"
+            value={extras.weightG}
+            onChange={(e) => updateExtras("weightG", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Kích thước đóng gói (cm)">
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              aria-label="Chiều dài"
+              placeholder="Chiều dài"
+              type="number"
+              inputMode="decimal"
+              value={extras.pkgLength}
+              onChange={(e) => updateExtras("pkgLength", e.target.value)}
+            />
+            <Input
+              aria-label="Chiều rộng"
+              placeholder="Chiều rộng"
+              type="number"
+              inputMode="decimal"
+              value={extras.pkgWidth}
+              onChange={(e) => updateExtras("pkgWidth", e.target.value)}
+            />
+            <Input
+              aria-label="Chiều cao"
+              placeholder="Chiều cao"
+              type="number"
+              inputMode="decimal"
+              value={extras.pkgHeight}
+              onChange={(e) => updateExtras("pkgHeight", e.target.value)}
+            />
+          </div>
+        </FormField>
+
+        <FormField label="Đầy size" htmlFor="extra-odd-size">
+          <Input
+            id="extra-odd-size"
+            value={extras.oddSize}
+            onChange={(e) => updateExtras("oddSize", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Năm sản xuất" htmlFor="extra-year-made">
+          <Input
+            id="extra-year-made"
+            type="number"
+            inputMode="numeric"
+            value={extras.yearMade}
+            onChange={(e) => updateExtras("yearMade", e.target.value)}
+            placeholder="VD: 2024"
+          />
+        </FormField>
+
+        <FormField label="Thành phần" htmlFor="extra-composition" className="md:col-span-2">
+          <Textarea
+            id="extra-composition"
+            rows={3}
+            value={extras.composition}
+            onChange={(e) => updateExtras("composition", e.target.value)}
+          />
+        </FormField>
+
+        <label className="flex cursor-pointer items-center gap-2 text-sm md:col-span-2">
+          <input
+            type="checkbox"
+            checked={extras.isGoldSilver}
+            onChange={(e) => updateExtras("isGoldSilver", e.target.checked)}
+            className="h-4 w-4 rounded border border-input accent-primary"
+          />
+          Là mặt hàng vàng bạc
+        </label>
+
+        <FormField label="Mô tả" htmlFor="extra-long-desc" className="md:col-span-2">
+          <Textarea
+            id="extra-long-desc"
+            rows={4}
+            value={extras.longDescription}
+            onChange={(e) => updateExtras("longDescription", e.target.value)}
+            placeholder="Mô tả chi tiết về mặt hàng…"
+          />
+        </FormField>
+      </div>
+    </section>
+  );
+
+  const warehouseTab = (
+    <section className="rounded-md border border-border bg-background p-4">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Định mức tồn kho
+      </h3>
+      <div className="grid gap-3 md:grid-cols-2 md:max-w-xl">
+        <FormField label="Tối thiểu" htmlFor="extra-min-stock">
+          <Input
+            id="extra-min-stock"
+            type="number"
+            inputMode="decimal"
+            value={extras.minStock}
+            onChange={(e) => updateExtras("minStock", e.target.value)}
+          />
+        </FormField>
+        <FormField label="Tối đa" htmlFor="extra-max-stock">
+          <Input
+            id="extra-max-stock"
+            type="number"
+            inputMode="decimal"
+            value={extras.maxStock}
+            onChange={(e) => updateExtras("maxStock", e.target.value)}
+          />
+        </FormField>
+      </div>
+      <p className="mt-3 text-xs italic text-muted-foreground">
+        Hệ thống cảnh báo khi tồn kho thực tế chạm các ngưỡng cấu hình ở đây.
+      </p>
+    </section>
+  );
+
+  const commissionTab = (
+    <section className="rounded-md border border-border bg-background p-4">
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2 text-left">Vị trí công việc</th>
+              <th className="px-3 py-2 text-left">Cách tính hoa hồng</th>
+              <th className="px-3 py-2 text-right">Mức tính</th>
+              <th className="px-3 py-2 text-right">
+                Giới hạn giảm giá được tính hoa hồng (%)
+              </th>
+              <th className="w-10 px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {extras.commissions.map((row) => (
+              <tr key={row.id} className="border-t border-border">
+                <td className="px-3 py-2">
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={row.position}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { position: e.target.value })
+                    }
+                  >
+                    {COMMISSION_POSITION_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={row.method}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { method: e.target.value })
+                    }
+                  >
+                    {COMMISSION_METHOD_OPTIONS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    className="text-right"
+                    value={row.amount}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { amount: e.target.value })
+                    }
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    className="text-right"
+                    value={row.discountLimit}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { discountLimit: e.target.value })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-2 text-right">
                   <button
                     type="button"
-                    className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                    onClick={() => handlePickCategory(c)}
+                    aria-label="Xóa dòng hoa hồng"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded text-destructive hover:bg-destructive/10"
+                    onClick={() => removeCommissionRow(row.id)}
                   >
-                    {c}
+                    <Trash2 className="h-4 w-4" />
                   </button>
-                </li>
-              ))
-            )}
-          </ul>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setCategoryPickOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={quickCategoryOpen} onOpenChange={setQuickCategoryOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Thêm nhanh danh mục</DialogTitle>
-            <DialogDescription>Nhập tên danh mục và lưu vào ô Danh mục trên biểu mẫu.</DialogDescription>
-          </DialogHeader>
-          <Input
-            value={quickCategoryDraft}
-            onChange={(e) => setQuickCategoryDraft(e.target.value)}
-            placeholder="Tên danh mục"
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQuickCategoryOpen(false)}>
-              Huỷ
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                handlePickCategory(quickCategoryDraft.trim());
-                setQuickCategoryOpen(false);
-              }}
-            >
-              Áp dụng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: chọn NCC */}
-      <Dialog open={providerPickOpen} onOpenChange={setProviderPickOpen}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Tìm nhà cung cấp</DialogTitle>
-            <DialogDescription>Tìm theo mã, tên hoặc email — chọn một NCC để gán.</DialogDescription>
-          </DialogHeader>
-          <Input
-            placeholder="Tìm kiếm…"
-            value={providerSearch}
-            onChange={(e) => setProviderSearch(e.target.value)}
-            className="mb-2"
-          />
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
-            {providersLoading ? (
-              <p className="p-4 text-sm text-muted-foreground">Đang tải…</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/80">
-                  <tr>
-                    <th className="px-2 py-2 text-left font-medium">Mã</th>
-                    <th className="px-2 py-2 text-left font-medium">Tên</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(providerFetch?.data ?? []).map((row) => (
-                    <tr
-                      key={String(row.id)}
-                      className="cursor-pointer border-t border-border hover:bg-accent/50"
-                      onClick={() => handlePickProvider(row)}
-                    >
-                      <td className="px-2 py-2">{String(row.code ?? "")}</td>
-                      <td className="px-2 py-2">{String(row.name ?? "")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setProviderPickOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={quickProviderOpen} onOpenChange={setQuickProviderOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Thêm nhà cung cấp mới</DialogTitle>
-            <DialogDescription>
-              Tạo NCC trong danh mục &quot;Nhà cung cấp&quot;, sau đó tự gán cho mặt hàng này.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <FormField label="Mã NCC" htmlFor="qp-code">
-              <Input
-                id="qp-code"
-                value={quickProviderCode}
-                onChange={(e) => setQuickProviderCode(e.target.value)}
-                required
-              />
-            </FormField>
-            <FormField label="Tên NCC" htmlFor="qp-name">
-              <Input
-                id="qp-name"
-                value={quickProviderName}
-                onChange={(e) => setQuickProviderName(e.target.value)}
-                required
-              />
-            </FormField>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQuickProviderOpen(false)}>
-              Huỷ
-            </Button>
-            <Button
-              type="button"
-              disabled={createProviderMutation.isPending || !quickProviderCode.trim() || !quickProviderName.trim()}
-              onClick={async () => {
-                const created = await createProviderMutation.mutateAsync({
-                  code: quickProviderCode.trim(),
-                  name: quickProviderName.trim(),
-                  isActive: true,
-                });
-                handlePickProvider(created as Record<string, unknown>);
-                setQuickProviderOpen(false);
-              }}
-            >
-              {createProviderMutation.isPending ? "Đang lưu…" : "Lưu và chọn"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Gợi ý nhóm / thương hiệu */}
-      <Dialog open={groupPickOpen} onOpenChange={setGroupPickOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Gợi ý nhóm hàng hóa</DialogTitle>
-          </DialogHeader>
-          <ul className="max-h-64 space-y-1 overflow-y-auto">
-            {GROUP_SUGGESTIONS.map((g) => (
-              <li key={g}>
-                <button
-                  type="button"
-                  className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  onClick={() => {
-                    setInventoryExtras((prev) => ({ ...prev, itemType: g }));
-                    setGroupPickOpen(false);
-                  }}
-                >
-                  {g}
-                </button>
-              </li>
+                </td>
+              </tr>
             ))}
-          </ul>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setGroupPickOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {extras.commissions.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Chưa có cấu hình hoa hồng.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3">
+        <Button type="button" variant="outline" size="sm" onClick={addCommissionRow}>
+          <Plus className="mr-1 h-4 w-4" /> Thêm dòng
+        </Button>
+      </div>
+    </section>
+  );
 
-      <Dialog open={quickGroupOpen} onOpenChange={setQuickGroupOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nhập nhanh nhóm hàng</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={quickGroupDraft}
-            onChange={(e) => setQuickGroupDraft(e.target.value)}
-            placeholder="Tên nhóm"
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQuickGroupOpen(false)}>
-              Huỷ
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setInventoryExtras((prev) => ({ ...prev, itemType: quickGroupDraft.trim() }));
-                setQuickGroupOpen(false);
-              }}
-            >
-              Áp dụng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  // ─── JSX ───────────────────────────────────────────────────────────────────
 
-      <Dialog open={brandPickOpen} onOpenChange={setBrandPickOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Gợi ý thương hiệu</DialogTitle>
-          </DialogHeader>
-          <ul className="max-h-64 space-y-1 overflow-y-auto">
-            {BRAND_SUGGESTIONS.map((b) => (
-              <li key={b}>
-                <button
-                  type="button"
-                  className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  onClick={() => {
-                    setInventoryExtras((prev) => ({ ...prev, brand: b }));
-                    setBrandPickOpen(false);
-                  }}
-                >
-                  {b}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setBrandPickOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  return (
+    <>
+      <InventoryItemTabsHeader activeTab={activeTab} onChangeTab={setActiveTab} />
 
-      <Dialog open={quickBrandOpen} onOpenChange={setQuickBrandOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nhập nhanh thương hiệu</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={quickBrandDraft}
-            onChange={(e) => setQuickBrandDraft(e.target.value)}
-            placeholder="Tên thương hiệu"
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQuickBrandOpen(false)}>
-              Huỷ
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setInventoryExtras((prev) => ({ ...prev, brand: quickBrandDraft.trim() }));
-                setQuickBrandOpen(false);
-              }}
-            >
-              Áp dụng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex flex-col gap-4 pb-28">
+        {activeTab === "basic" && basicTab}
+        {activeTab === "additional" && additionalTab}
+        {activeTab === "warehouse" && warehouseTab}
+        {activeTab === "commission" && commissionTab}
+      </div>
+
+      <InventoryItemActionBar isSaving={isSaving} onCancel={() => navigate(`/admin/${entityKey}`)} />
+
+      <InventoryItemCreateDialogs
+        categoryPickOpen={categoryPickOpen}
+        setCategoryPickOpen={setCategoryPickOpen}
+        categoryOptions={categoryOptions}
+        handlePickCategory={handlePickCategory}
+        quickCategoryOpen={quickCategoryOpen}
+        setQuickCategoryOpen={setQuickCategoryOpen}
+        quickCategoryDraft={quickCategoryDraft}
+        setQuickCategoryDraft={setQuickCategoryDraft}
+        providerPickOpen={providerPickOpen}
+        setProviderPickOpen={setProviderPickOpen}
+        providerSearch={providerSearch}
+        setProviderSearch={setProviderSearch}
+        providersLoading={providersLoading}
+        providerFetch={providerFetch}
+        handlePickProvider={handlePickProvider}
+        quickProviderOpen={quickProviderOpen}
+        setQuickProviderOpen={setQuickProviderOpen}
+        quickProviderCode={quickProviderCode}
+        setQuickProviderCode={setQuickProviderCode}
+        quickProviderName={quickProviderName}
+        setQuickProviderName={setQuickProviderName}
+        createProviderMutation={createProviderMutation}
+        groupPickOpen={groupPickOpen}
+        setGroupPickOpen={setGroupPickOpen}
+        quickGroupOpen={quickGroupOpen}
+        setQuickGroupOpen={setQuickGroupOpen}
+        quickGroupDraft={quickGroupDraft}
+        setQuickGroupDraft={setQuickGroupDraft}
+        brandPickOpen={brandPickOpen}
+        setBrandPickOpen={setBrandPickOpen}
+        quickBrandOpen={quickBrandOpen}
+        setQuickBrandOpen={setQuickBrandOpen}
+        quickBrandDraft={quickBrandDraft}
+        setQuickBrandDraft={setQuickBrandDraft}
+        setValues={setValues}
+        onApplyQuickCategory={applyQuickCategory}
+        isApplyingQuickCategory={createCategoryMutation.isPending}
+      />
     </>
   );
 }

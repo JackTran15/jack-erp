@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatClientError } from "@erp/api-client";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 interface Assignment {
   id: string;
@@ -148,7 +149,7 @@ export function SalesHierarchyPage() {
   };
 
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <h1 style={styles.title}>Quản lý cấp bậc kinh doanh</h1>
 
       <div style={styles.branchSelector}>
@@ -294,7 +295,7 @@ export function SalesHierarchyPage() {
           </section>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 

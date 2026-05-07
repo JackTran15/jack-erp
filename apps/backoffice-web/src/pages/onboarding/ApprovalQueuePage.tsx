@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { hasAnyPermission } from "../../lib/permissions";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import {
   useRegistration,
   RegistrationStatus,
@@ -43,7 +45,6 @@ export function ApprovalQueuePage() {
 
   const [data, setData] = useState<RegistrationRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -51,32 +52,58 @@ export function ApprovalQueuePage() {
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  const canAccess = hasAnyPermission(...PERMISSIONS);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const filters: RegistrationFilters = { page: 1, pageSize: 50 };
       if (typeFilter !== "all") filters.type = typeFilter;
       if (statusFilter !== "all") filters.status = statusFilter;
       const res = await listRegistrations(filters);
       setData(res.data);
+      toast.dismiss("approval-queue-list");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Tải dữ liệu thất bại");
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "approval-queue-list",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setLoading(false);
     }
   }, [listRegistrations, typeFilter, statusFilter]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!canAccess) {
+      setLoading(false);
+      return;
+    }
+    void fetchData();
+  }, [canAccess, fetchData]);
 
-  if (!hasAnyPermission(...PERMISSIONS)) {
+  useEffect(() => {
+    if (canAccess) {
+      toast.dismiss("approval-queue-no-permission");
+      return;
+    }
+    toast.warning(
+      "Bạn không có quyền xem hàng đợi phê duyệt. Liên hệ quản trị viên nếu cần truy cập.",
+      {
+        id: "approval-queue-no-permission",
+        position: "bottom-right",
+        duration: 6000,
+      },
+    );
+  }, [canAccess]);
+
+  if (!canAccess) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Hàng đợi phê duyệt</h2>
-        <p style={{ color: "#c62828" }}>
-          Bạn không có quyền xem hàng đợi phê duyệt.
+      <div style={{ padding: 24, maxWidth: 520 }}>
+        <h2 style={{ marginTop: 0 }}>Hàng đợi phê duyệt</h2>
+        <p style={{ color: "#667085", lineHeight: 1.6 }}>
+          Bạn chưa được cấp quyền phê duyệt đăng ký tổ chức hoặc chi nhánh. Vui lòng
+          liên hệ quản trị viên hệ thống.
         </p>
       </div>
     );
@@ -92,7 +119,11 @@ export function ApprovalQueuePage() {
       await approveRegistration(record.id, record.type);
       await fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Phê duyệt thất bại");
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "approval-queue-action",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -110,7 +141,11 @@ export function ApprovalQueuePage() {
       setRejectReason("");
       await fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Từ chối thất bại");
+      toast.error(getUserFacingApiErrorMessage(err), {
+        id: "approval-queue-action",
+        position: "bottom-right",
+        duration: 6000,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -148,10 +183,6 @@ export function ApprovalQueuePage() {
           </select>
         </label>
       </div>
-
-      {error && (
-        <p style={{ color: "#c62828" }}>{error}</p>
-      )}
 
       {loading ? (
         <p>Đang tải…</p>

@@ -1,10 +1,13 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
 import { useCrudConfig, useCrudCreate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
+import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
+import { isNotFoundHttpError } from "../../lib/not-found-http-error";
+import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 
 export function CrudCreatePage() {
   const navigate = useNavigate();
@@ -28,16 +31,6 @@ export function CrudCreatePage() {
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [inventoryExtras, setInventoryExtras] = useState<Record<string, string>>({
-    itemType: "",
-    brand: "",
-    barcode: "",
-    description: "",
-    unitConversionName: "",
-    conversionRate: "1",
-    sellPriceByUnit: "",
-    purchasePriceByUnit: "",
-  });
 
   useEffect(() => {
     if (!config) return;
@@ -48,17 +41,36 @@ export function CrudCreatePage() {
     setValues(defaults);
   }, [config, editableFields]);
 
-  if (isLoading) return <PageShell><p>Đang tải cấu hình biểu mẫu…</p></PageShell>;
-  if (error) {
+  if (isLoading) {
     return (
-      <PageShell>
+      <AdminPageShell>
+        <p>Loading…</p>
+      </AdminPageShell>
+    );
+  }
+  if (error) {
+    if (isNotFoundHttpError(error)) {
+      return (
+        <AdminPageShell>
+          <HttpErrorView code={404} />
+        </AdminPageShell>
+      );
+    }
+    return (
+      <AdminPageShell>
         <p className="text-destructive">
           Lỗi tải cấu hình: {error instanceof Error ? error.message : "Không xác định"}
         </p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
-  if (!config) return <PageShell><p>Không tìm thấy cấu hình thực thể.</p></PageShell>;
+  if (!config) {
+    return (
+      <AdminPageShell>
+        <p>Không tìm thấy cấu hình thực thể.</p>
+      </AdminPageShell>
+    );
+  }
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname, [
     { label: `Thêm mới ${config.displayName}` },
@@ -89,7 +101,7 @@ export function CrudCreatePage() {
   };
 
   return (
-    <PageShell>
+    <AdminPageShell>
       <div className="mb-4 flex items-center justify-between">
         <div>
           <nav
@@ -113,18 +125,6 @@ export function CrudCreatePage() {
           </nav>
           <h1 className="mt-1 text-2xl font-semibold">Thêm mới {config.displayName}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => navigate(`/admin/${entityKey}`)}>
-            Quay lại
-          </Button>
-          <Button
-            type="submit"
-            form="crud-create-form"
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Đang lưu..." : "Lưu"}
-          </Button>
-        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
@@ -136,8 +136,8 @@ export function CrudCreatePage() {
               setValues={setValues}
               errors={errors}
               setErrors={setErrors}
-              inventoryExtras={inventoryExtras}
-              setInventoryExtras={setInventoryExtras}
+              entityKey={entityKey!}
+              isSaving={createMutation.isPending}
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
@@ -162,7 +162,7 @@ export function CrudCreatePage() {
           )}
         </form>
       </div>
-    </PageShell>
+    </AdminPageShell>
   );
 }
 
@@ -170,6 +170,3 @@ function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
 
-function PageShell({ children }: { children: ReactNode }) {
-  return <div className="w-full px-2 py-6 sm:px-3 lg:px-4">{children}</div>;
-}

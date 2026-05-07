@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useDashboard } from "../../hooks/useReportData";
+import { useQueryToast } from "../../hooks/useQueryToast";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 export function DashboardReportPage() {
   const [branchId, setBranchId] = useState("");
@@ -10,14 +12,25 @@ export function DashboardReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const { data, isLoading: loading, error, refetch } = useDashboard({
+  const {
+    data,
+    isLoading: loading,
+    error,
+    errorUpdatedAt,
+    refetch,
+  } = useDashboard({
     branchId: branchId || undefined,
     startDate,
     endDate,
   });
 
+  useQueryToast(error ? { variant: "error", error } : null, {
+    toastId: "report-dashboard",
+    updatedAt: errorUpdatedAt,
+  });
+
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <h1 style={styles.title}>Bảng điều khiển báo cáo</h1>
 
       <div style={styles.filters}>
@@ -54,7 +67,6 @@ export function DashboardReportPage() {
         </button>
       </div>
 
-      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Không tải được bảng điều khiển"}</p>}
       {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {data && (
@@ -75,7 +87,7 @@ export function DashboardReportPage() {
           {data.branchId ? ` | Chi nhánh: ${data.branchId}` : " | Gộp toàn hệ thống"}
         </p>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 
@@ -145,7 +157,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: "pointer",
   },
-  error: { color: "#c62828", marginBottom: 12 },
   muted: { color: "#667085" },
   cardGrid: {
     display: "grid",

@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@erp/ui";
+import { AdminPageShell } from "../components/layout/AdminPageShell";
 
 export function DashboardPage() {
   return (
-    <div className="mx-auto max-w-[1200px] px-4 py-6">
+    <AdminPageShell>
       <Card>
         <CardHeader>
           <CardTitle>Bảng điều khiển</CardTitle>
@@ -20,6 +21,6 @@ export function DashboardPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </AdminPageShell>
   );
 }

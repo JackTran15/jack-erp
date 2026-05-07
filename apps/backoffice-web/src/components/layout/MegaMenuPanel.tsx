@@ -1,47 +1,76 @@
+import { forwardRef } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@erp/ui";
 import { useLayout } from "./LayoutContext";
 import type { NavModule, NavSection, NavChild } from "./navConfig";
 
-interface MegaMenuPanelProps {
+export interface MegaMenuPanelProps {
   module: NavModule;
+}
+
+/** Chia section theo `flyout.splitLeft` / `flyout.splitRight` khi cả hai đều có. */
+function splitFlyoutSections(
+  module: NavModule,
+): { left: NavSection[]; right: NavSection[] } | null {
+  const left = module.flyout?.splitLeft;
+  const right = module.flyout?.splitRight;
+  if (!left || !right) return null;
+  const byId = new Map(module.sections.map((s) => [s.id, s]));
+  const pick = (ids: string[]) =>
+    ids.map((id) => byId.get(id)).filter((s): s is NavSection => s != null);
+  return { left: pick(left), right: pick(right) };
 }
 
 /**
  * Flyout mega-menu panel rendered to the right of the sidebar for modules
- * with `flyout: true`. Displays sections as grouped columns with a dark
+ * with `flyout.enabled`. Displays sections as grouped columns with a dark
  * background matching the app header.
  *
  * Positioning is computed from the current sidebar width (collapsed vs expanded)
  * so that it always attaches flush to the sidebar edge.
  */
-export function MegaMenuPanel({ module }: MegaMenuPanelProps) {
-  const { sidebarCollapsed } = useLayout();
+export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
+  function MegaMenuPanel({ module }, ref) {
+    const { sidebarCollapsed } = useLayout();
+    const columnSplit = splitFlyoutSections(module);
 
-  return (
-    <div
-      className={cn(
-        "fixed top-14 z-30 h-[calc(100vh-3.5rem)]",
-        "w-[500px] overflow-y-auto",
-        "border-l border-gray-700 bg-gray-900 text-white shadow-2xl",
-        "transition-[left] duration-200",
-        sidebarCollapsed ? "left-[60px]" : "left-60",
-      )}
-    >
-      <div className="p-5">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-          {module.label}
-        </p>
-
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 items-start">
-          {module.sections.map((section) => (
-            <SectionColumn key={section.id} section={section} />
-          ))}
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "fixed top-14 z-30 h-[calc(100vh-3.5rem)]",
+          "w-[500px] overflow-y-auto",
+          "border-l border-gray-700 bg-gray-900 text-white shadow-2xl",
+          "transition-[left] duration-200",
+          sidebarCollapsed ? "left-[60px]" : "left-60",
+        )}
+      >
+        <div className="p-5">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 items-start">
+            {columnSplit ? (
+              <>
+                <div className="flex flex-col gap-y-6">
+                  {columnSplit.left.map((section) => (
+                    <SectionColumn key={section.id} section={section} />
+                  ))}
+                </div>
+                <div className="flex flex-col gap-y-6">
+                  {columnSplit.right.map((section) => (
+                    <SectionColumn key={section.id} section={section} />
+                  ))}
+                </div>
+              </>
+            ) : (
+              module.sections.map((section) => (
+                <SectionColumn key={section.id} section={section} />
+              ))
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  },
+);
 
 // ─── Section column ────────────────────────────────────────────────────────────
 
@@ -53,7 +82,7 @@ function SectionColumn({ section }: SectionColumnProps) {
   return (
     <div>
       {section.label && (
-        <h3 className="mb-2 rounded px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-gray-400 bg-gray-800">
+        <h3 className="mb-2 rounded px-2 py-1 text-[14px] font-bold uppercase tracking-widest text-gray-400 bg-gray-800">
           {section.label}
         </h3>
       )}
@@ -75,8 +104,6 @@ interface MegaMenuLinkProps {
 }
 
 function MegaMenuLink({ child }: MegaMenuLinkProps) {
-  const Icon = child.icon;
-
   return (
     <NavLink
       to={child.to}
@@ -90,7 +117,6 @@ function MegaMenuLink({ child }: MegaMenuLinkProps) {
         )
       }
     >
-      {Icon && <Icon className="h-3.5 w-3.5 shrink-0 opacity-75" />}
       <span>{child.label}</span>
     </NavLink>
   );
