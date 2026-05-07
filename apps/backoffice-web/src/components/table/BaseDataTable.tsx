@@ -1,20 +1,9 @@
 import type React from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import {
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-  Input,
-} from "@erp/ui";
+import { cn, Input } from "@erp/ui";
 import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
-import {
-  COLUMN_FILTER_MODE_OPTIONS,
-  DEFAULT_COLUMN_FILTER_MODE,
-  describeFilterMode,
-} from "./pagination.dto";
+import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
+import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
 
 export interface TableColumn<T> {
   key: string;
@@ -131,7 +120,7 @@ export function BaseDataTable<T>({
                       )}
                     >
                       <div className="flex items-center gap-1">
-                        <FilterModeDropdown
+                        <ColumnFilterModeDropdown
                           fieldLabel={column.label}
                           value={activeFilter?.mode ?? DEFAULT_COLUMN_FILTER_MODE}
                           onChange={(mode) => columnFilterControl.onModeChange(column.key, mode)}
@@ -239,39 +228,3 @@ function SortableHeader<T>({
   );
 }
 
-function FilterModeDropdown({
-  fieldLabel,
-  value,
-  onChange,
-}: {
-  fieldLabel: string;
-  value: ColumnFilterMode;
-  onChange: (mode: ColumnFilterMode) => void;
-}) {
-  const current = COLUMN_FILTER_MODE_OPTIONS.find((o) => o.value === value) ?? COLUMN_FILTER_MODE_OPTIONS[0];
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="h-8 w-7 rounded border border-input bg-background px-1 text-center text-xs font-semibold text-foreground shadow-sm hover:bg-accent/30"
-          aria-label={`Kiểu lọc cho cột ${fieldLabel}`}
-          title={describeFilterMode(value)}
-        >
-          {current.symbol}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[220px] p-1">
-        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Chọn kiểu lọc</div>
-        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ColumnFilterMode)}>
-          {COLUMN_FILTER_MODE_OPTIONS.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value}>
-              <span className="inline-flex w-6 justify-center font-mono text-sm">{option.symbol}</span>
-              <span className="ml-2 text-sm">{option.label}</span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
