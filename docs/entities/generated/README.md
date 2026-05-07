@@ -2,7 +2,7 @@
 
 This folder is auto-generated from `entity-manifest.json`.
 
-Total entities: **44**
+Total entities: **55**
 
 ## Modules
 
@@ -10,7 +10,7 @@ Total entities: **44**
 - [Auth](./auth.md) - 5 entities
 - [Customer](./customer.md) - 1 entities
 - [Document Numbering](./document-numbering.md) - 2 entities
-- [Inventory](./inventory.md) - 13 entities
+- [Inventory](./inventory.md) - 24 entities
 - [Organization & Branch](./organization-branch.md) - 4 entities
 - [POS](./pos.md) - 7 entities
 - [Sales Hierarchy](./sales-hierarchy.md) - 2 entities
