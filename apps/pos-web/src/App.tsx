@@ -5,7 +5,7 @@ import { PosShellLayout } from "./components/PosShellLayout";
 import { RequirePosBranch } from "./components/RequirePosBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
-import { CheckoutPageV2 } from "./pages/CheckoutPageV2";
+import { CheckoutPageV2 } from "./features/checkout/pages/CheckoutPageV2";
 import { SessionPage } from "./pages/SessionPage";
 import { ReturnsPage } from "./pages/ReturnsPage";
 import { ExchangePage } from "./pages/ExchangePage";

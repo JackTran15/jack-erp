@@ -1,0 +1,159 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Dialog, DialogContent, cn } from "@erp/ui";
+import type { DraftInvoice } from "../types";
+import {
+  CheckoutDialogFooter,
+  CheckoutDialogHeader,
+} from "../common/CheckoutDialogScaffold";
+import { useControllableState } from "../../hooks/useControllableState";
+import { useDialogReset } from "../../hooks/useDialogReset";
+import { FilterBar } from "./FilterBar";
+import { InvoiceDetailPanel } from "./InvoiceDetailPanel";
+import { InvoiceListPanel } from "./InvoiceListPanel";
+import { isInDateRange, type DateRangeOption } from "./types";
+
+export interface DraftInvoicesDialogProps {
+  open: boolean;
+  onClose: () => void;
+  drafts: DraftInvoice[];
+  /** Pre-selected draft id when the modal mounts. */
+  initialSelectedId?: string | null;
+
+  /** "Đồng ý" — restore the picked draft into the active cart. */
+  onConfirm?: (draft: DraftInvoice) => void;
+  /** Inline `×` per row. */
+  onDelete?: (id: string) => void;
+
+  /**
+   * Search input is uncontrolled by default. Provide both `searchValue` +
+   * `onSearchChange` to lift state (e.g. server-side filtering).
+   */
+  searchValue?: string;
+  onSearchChange?: (next: string) => void;
+
+  /**
+   * Date filter is uncontrolled by default — the dialog manages its own
+   * popover + selection and filters in-memory by `createdAt`. Lift via
+   * `dateFilter` + `onDateFilterChange` when needed.
+   */
+  dateFilter?: DateRangeOption;
+  onDateFilterChange?: (next: DateRangeOption) => void;
+}
+
+/**
+ * "Hóa đơn chưa thanh toán" picker. Two-pane modal:
+ *   • Left  — master list of saved drafts with inline delete.
+ *   • Right — receipt-style detail panel with line items + total + zigzag edge.
+ *
+ * Self-contained — selection / search / date filter live inside; collaboration
+ * points (`onConfirm`, `onDelete`, optional controlled props) keep the dialog
+ * reusable from any host that holds the draft store.
+ */
+export function DraftInvoicesDialog({
+  open,
+  onClose,
+  drafts,
+  initialSelectedId = null,
+  onConfirm,
+  onDelete,
+  searchValue,
+  onSearchChange,
+  dateFilter,
+  onDateFilterChange,
+}: DraftInvoicesDialogProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const searchState = useControllableState<string>({
+    value: searchValue,
+    defaultValue: "",
+    onChange: onSearchChange,
+  });
+  const filterState = useControllableState<DateRangeOption>({
+    value: dateFilter,
+    defaultValue: "ALL",
+    onChange: onDateFilterChange,
+  });
+
+  const handleOpenReset = useCallback(() => {
+    setSelectedId(initialSelectedId ?? drafts[0]?.id ?? null);
+    searchState.reset("");
+    filterState.reset("ALL");
+  }, [drafts, filterState, initialSelectedId, searchState]);
+  useDialogReset(open, handleOpenReset);
+
+  const filteredDrafts = useMemo(() => {
+    const q = searchState.value.trim().toLowerCase();
+    return drafts.filter((d) => {
+      if (!isInDateRange(d.createdAt, filterState.value)) return false;
+      if (!q) return true;
+      const haystacks = [
+        d.invoiceNumber,
+        d.customerName ?? "",
+        d.customerPhone ?? "",
+      ];
+      return haystacks.some((s) => s.toLowerCase().includes(q));
+    });
+  }, [drafts, searchState.value, filterState.value]);
+
+  // Keep `selectedId` valid when the filtered list changes.
+  useEffect(() => {
+    if (!open) return;
+    if (filteredDrafts.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !filteredDrafts.some((d) => d.id === selectedId)) {
+      setSelectedId(filteredDrafts[0]!.id);
+    }
+  }, [filteredDrafts, open, selectedId]);
+
+  const selectedDraft = useMemo(
+    () => filteredDrafts.find((d) => d.id === selectedId) ?? null,
+    [filteredDrafts, selectedId],
+  );
+
+  const handleConfirm = () => {
+    if (!selectedDraft) return;
+    onConfirm?.(selectedDraft);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        className={cn(
+          "flex h-full max-h-[90vh] w-[95vw] max-w-[1280px] flex-col gap-4 overflow-hidden p-6",
+          "rounded-xl bg-[#F1F2F5] shadow-[0_24px_64px_rgba(15,20,36,0.18),0_8px_16px_rgba(15,20,36,0.08)]",
+        )}
+      >
+        {/* 4.2 Header */}
+        <CheckoutDialogHeader title="Hóa đơn chưa thanh toán" />
+
+        {/* 4.3 Filter bar */}
+        <FilterBar
+          search={searchState.value}
+          onSearchChange={searchState.setValue}
+          filter={filterState.value}
+          onFilterChange={filterState.setValue}
+        />
+
+        {/* 4.5+ Two-pane body */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
+          <InvoiceListPanel
+            drafts={filteredDrafts}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onDelete={onDelete}
+          />
+          <InvoiceDetailPanel draft={selectedDraft} />
+        </div>
+
+        {/* 4.16 Footer */}
+        <CheckoutDialogFooter
+          onSave={handleConfirm}
+          onCancel={onClose}
+          saveDisabled={!selectedDraft}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}

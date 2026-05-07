@@ -15,6 +15,7 @@ import {
   type CustomerRow,
 } from "../lib/customerApi";
 import { fetchPosCatalog, type PosCatalogLine } from "../lib/posCatalogApi";
+import { formatViDateTime } from "../lib/dateTime";
 import { usePosBranchStore } from "../stores/usePosBranchStore";
 
 import { AlertBar } from "../CheckoutPageV2Components/common/AlertBar";
@@ -112,22 +113,6 @@ function customerSearchErrorMessage(err: unknown): string {
     return m.replace(/^HTTP \d+: /, "").slice(0, 300) || "Đã xảy ra lỗi.";
   }
   return "Lỗi không xác định.";
-}
-
-const datetimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function formatDateTime(d: Date): string {
-  const parts = datetimeFormatter.formatToParts(d);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("day")}/${get("month")}/${get("year")} - ${get("hour")}:${get("minute")}`;
 }
 
 function buildSuggestions(amountDue: number): CashSuggestion[] {
@@ -321,7 +306,7 @@ export function CheckoutPageV2() {
     [grandTotal],
   );
 
-  const datetime = useMemo(() => formatDateTime(new Date()), []);
+  const datetime = useMemo(() => formatViDateTime(new Date()), []);
 
   // Methods used across all lines — drives the announce / invoice label.
   const primaryMethod = paymentLines[0]?.method ?? "CASH";
