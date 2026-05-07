@@ -1,0 +1,65 @@
+import type { CashSuggestion } from "../../types";
+import type { InvoicePrinter } from "../../printing/InvoicePrinter";
+import { CashSuggestionList } from "../CashSuggestionList";
+import {
+  PaymentCTAButtons,
+  type InvoicePayloadInput,
+} from "../PaymentCTAButtons";
+import { PrintAndOrderRow } from "../PrintAndOrderRow";
+
+interface CheckoutActionsSectionProps {
+  printInvoice: boolean;
+  onPrintInvoiceChange: (next: boolean) => void;
+  preorder: boolean;
+  onPreorderChange: (next: boolean) => void;
+  suggestions: CashSuggestion[];
+  selectedSuggestionId: string | null;
+  onPickSuggestion: (s: CashSuggestion) => void;
+  onSaveDraft: () => void;
+  onCollect: () => void;
+  collectDisabled?: boolean;
+  invoice?: InvoicePayloadInput;
+  invoicePrinter?: InvoicePrinter;
+}
+
+export function CheckoutActionsSection({
+  printInvoice,
+  onPrintInvoiceChange,
+  preorder,
+  onPreorderChange,
+  suggestions,
+  selectedSuggestionId,
+  onPickSuggestion,
+  onSaveDraft,
+  onCollect,
+  collectDisabled,
+  invoice,
+  invoicePrinter,
+}: CheckoutActionsSectionProps) {
+  return (
+    <div className="border-t border-gray-200 bg-white">
+      <PrintAndOrderRow
+        printInvoice={printInvoice}
+        onPrintInvoiceChange={onPrintInvoiceChange}
+        preorder={preorder}
+        onPreorderChange={onPreorderChange}
+      />
+      {suggestions.length > 0 ? (
+        <div className="py-3">
+          <CashSuggestionList
+            suggestions={suggestions}
+            selectedId={selectedSuggestionId}
+            onPick={onPickSuggestion}
+          />
+        </div>
+      ) : null}
+      <PaymentCTAButtons
+        onSaveDraft={onSaveDraft}
+        onCollect={onCollect}
+        collectDisabled={collectDisabled}
+        invoice={invoice}
+        printer={invoicePrinter}
+      />
+    </div>
+  );
+}
