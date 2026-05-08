@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PosSelectTrigger } from "../common/forms/PosSelectTrigger";
+import { PosSelectTrigger } from "@erp/pos/components/form/PosSelectTrigger";
 import { KeyboardHint } from "../common/KeyboardHint";
 
 export interface ToolbarSelectProps {

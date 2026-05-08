@@ -5,8 +5,8 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@erp/pos/components/dataTable/DataTable";
-import { PosCheckbox } from "@erp/pos/features/checkout/components/common/forms/PosCheckbox";
-import { PosNumberInput } from "@erp/pos/features/checkout/components/common/forms/PosNumberInput";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
+import { PosNumberInput } from "@erp/pos/components/form/PosNumberInput";
 import { clampReturnQty } from "../lib/returnGoodsMath";
 import type { ReturnInvoiceRow, ReturnableItem } from "../types";
 

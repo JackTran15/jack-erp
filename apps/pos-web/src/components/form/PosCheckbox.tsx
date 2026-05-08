@@ -5,6 +5,7 @@ export interface PosCheckboxProps {
   onChange: (next: boolean) => void;
   ariaLabel?: string;
   className?: string;
+  label?: string;
 }
 
 export function PosCheckbox({
@@ -12,11 +13,12 @@ export function PosCheckbox({
   onChange,
   ariaLabel,
   className,
+  label,
 }: PosCheckboxProps) {
   return (
     <label
       className={cn(
-        "relative inline-flex h-4 w-4 cursor-pointer items-center justify-center",
+        "relative inline-flex cursor-pointer items-center justify-center",
         className,
       )}
     >
@@ -29,7 +31,7 @@ export function PosCheckbox({
       />
       <span
         className={cn(
-          "flex h-4 w-4 items-center justify-center rounded-[2px] border transition-colors",
+          "relative flex h-4 w-4 items-center justify-center rounded-[2px] border transition-colors",
           checked
             ? "border-[#5B5BD6] bg-[#5B5BD6]"
             : "border-[#D1D5DB] bg-white peer-hover:border-[#9CA3AF]",
@@ -46,11 +48,15 @@ export function PosCheckbox({
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
           >
             <path d="M3 8.5 6.5 12 13 5" />
           </svg>
         ) : null}
       </span>
+      {label ? (
+        <span className="ml-2 text-sm text-[#374151]">{label}</span>
+      ) : null}
     </label>
   );
 }

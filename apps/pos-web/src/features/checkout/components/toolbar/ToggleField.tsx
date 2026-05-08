@@ -1,4 +1,4 @@
-import { PosToggle } from "../common/forms/PosToggle";
+import { PosToggle } from "@erp/pos/components/form/PosToggle";
 
 export interface ToggleFieldProps {
   label: string;

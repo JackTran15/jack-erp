@@ -1,7 +1,7 @@
 import {
   RefreshIcon,
 } from "@erp/pos/components/icons/Icon";
-import { PosSelect } from "@erp/pos/features/checkout/components/common/forms/PosSelect";
+import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import { PaginationButton } from "./PaginationButton";
 
 export interface PaginationBarProps {

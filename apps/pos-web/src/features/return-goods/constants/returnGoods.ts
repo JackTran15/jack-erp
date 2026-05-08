@@ -1,5 +1,3 @@
-export const RETURN_GOODS_TITLE = "Đổi trả hàng";
-
 export const RETURN_GOODS_DEFAULT_PAGE_SIZE = 100;
 
 export enum ReturnInvoiceColumnKey {

@@ -95,6 +95,7 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
     label: "Chuyển kho tạm",
     iconBgColor: "#EF6B5A",
     Icon: WarehouseOutIcon,
+    route: "/fast-stock-transfer",
     pinnable: true,
   },
   {

@@ -1,23 +1,15 @@
-import { useState } from "react";
 import { PaginationBar } from "@erp/pos/components/PaginationBar";
 import { DateRangeFilter } from "@erp/pos/components/dateRangeFilter";
 import { ExchangeClipboardIcon } from "@erp/pos/components/icons/Icon";
+import { AppHeader } from "@erp/pos/components/layout/appHeader/AppHeader";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { usePosBranchStore } from "@erp/pos/stores/usePosBranchStore";
-import { ReturnGoodsTopBar } from "../components/ReturnGoodsTopBar";
+import { useState } from "react";
 import { ReturnInvoiceTable } from "../components/ReturnInvoiceTable";
 import { ReturnItemsDialog } from "../components/ReturnItemsDialog";
-import {
-  RETURN_GOODS_DEFAULT_PAGE_SIZE,
-  RETURN_GOODS_TITLE,
-} from "../constants/returnGoods";
+import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "../constants/returnGoods";
 import { useReturnGoods } from "../hooks/useReturnGoods";
 
-/**
- * Top-level page composition for `/return-goods`. State lives in the
- * `useReturnGoods` hook; this file just wires the topbar, filter strip,
- * table, pagination, and items dialog together.
- */
 export function ReturnGoodsPage() {
   const branchName = usePosBranchStore((s) => s.branchName) ?? "—";
   const [pageDate] = useState(() => new Date());
@@ -42,8 +34,8 @@ export function ReturnGoodsPage() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <ReturnGoodsTopBar
-        title={RETURN_GOODS_TITLE}
+      <AppHeader
+        title={"Đổi trả hàng"}
         location={branchName}
         userName="Phan Thanh Hà"
       />
