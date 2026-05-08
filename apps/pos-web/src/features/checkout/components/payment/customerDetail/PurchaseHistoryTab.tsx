@@ -11,7 +11,7 @@ import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
 } from "../../../constants/filterOperator";
-import { PosSelect } from "../../common/forms/PosSelect";
+import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import { StatusBadge } from "./StatusBadge";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import type { PurchaseHistoryEntry } from "./types";

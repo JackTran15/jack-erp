@@ -5,8 +5,8 @@ import {
   FilterOperatorTypeEnum,
   OPERATOR_OPTIONS,
 } from "@erp/pos/features/checkout/constants/filterOperator";
-import { PosSelect } from "@erp/pos/features/checkout/components/common/forms/PosSelect";
-import { PosTextInput } from "@erp/pos/features/checkout/components/common/forms/PosTextInput";
+import { PosSelect } from "@erp/pos/components/form/PosSelect";
+import { PosTextInput } from "@erp/pos/components/form/PosTextInput";
 
 interface DataTableFilterCellProps {
   value?: string;

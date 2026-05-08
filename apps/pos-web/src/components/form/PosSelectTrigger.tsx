@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { DropdownButton } from "../DropdownButton";
+import { DropdownButton } from "@erp/pos/features/checkout/components/common/DropdownButton";
 
 export interface PosSelectTriggerProps {
   children: ReactNode;

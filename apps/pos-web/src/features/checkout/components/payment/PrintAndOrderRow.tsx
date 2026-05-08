@@ -1,4 +1,4 @@
-import { PosCheckbox } from "../common/forms/PosCheckbox";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 import { ToggleField } from "../toolbar/ToggleField";
 
 export interface PrintAndOrderRowProps {

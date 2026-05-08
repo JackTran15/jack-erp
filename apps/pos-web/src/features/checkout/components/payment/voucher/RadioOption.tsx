@@ -1,4 +1,4 @@
-import { PosRadio } from "../../common/forms/PosRadio";
+import { PosRadio } from "@erp/pos/components/form/PosRadio";
 
 interface RadioOptionProps {
   name: string;

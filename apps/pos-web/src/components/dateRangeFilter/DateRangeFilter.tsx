@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@erp/ui";
-import { PosRadio } from "@erp/pos/features/checkout/components/common/forms/PosRadio";
+import { PosRadio } from "@erp/pos/components/form/PosRadio";
 import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 import { DATE_RANGE_FILTER_CHOICES } from "./constants";
 import type { DateRangeFilterOption } from "./types";

@@ -33,7 +33,6 @@ export function InvoiceTabBar({
 }: InvoiceTabBarProps) {
   return (
     <AppHeader
-      className="h-11 gap-1 bg-gray-100 px-2"
       centerContent={
         <nav
           aria-label="Hóa đơn"

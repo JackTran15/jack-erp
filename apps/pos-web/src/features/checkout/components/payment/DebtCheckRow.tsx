@@ -1,5 +1,5 @@
 import { formatVnd } from "@erp/ui";
-import { PosCheckbox } from "../common/forms/PosCheckbox";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 
 export interface DebtCheckRowProps {
   checked: boolean;

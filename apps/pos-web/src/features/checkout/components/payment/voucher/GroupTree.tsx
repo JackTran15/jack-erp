@@ -1,7 +1,7 @@
 import { cn } from "@erp/ui";
 import { useMemo } from "react";
 import type { VoucherSelectableGroup } from "./types";
-import { PosCheckbox } from "../../common/forms/PosCheckbox";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 import { GroupNode } from "./GroupNode";
 
 interface GroupTreeProps {

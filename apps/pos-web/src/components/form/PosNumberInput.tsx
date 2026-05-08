@@ -41,10 +41,12 @@ export function PosNumberInput({
   className,
   inputClassName,
 }: PosNumberInputProps) {
-  const parse = parser ?? ((raw: string) => {
-    const digits = raw.replace(/\D/g, "");
-    return digits === "" ? 0 : Number(digits);
-  });
+  const parse =
+    parser ??
+    ((raw: string) => {
+      const digits = raw.replace(/\D/g, "");
+      return digits === "" ? 0 : Number(digits);
+    });
   const format = formatter ?? formatVnd;
 
   const input = (

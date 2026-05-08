@@ -1,5 +1,5 @@
 import { formatVnd } from "@erp/ui";
-import { PosNumberInput } from "../common/forms/PosNumberInput";
+import { PosNumberInput } from "@erp/pos/components/form/PosNumberInput";
 
 export interface QuantityInputProps {
   value: number;

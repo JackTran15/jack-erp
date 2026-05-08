@@ -1,6 +1,6 @@
 import { formatVnd } from "@erp/ui";
 import { AlertBar } from "../../common/AlertBar";
-import { PosTextarea } from "../../common/forms/PosTextarea";
+import { PosTextarea } from "@erp/pos/components/form/PosTextarea";
 import type { PaymentMethodOption } from "../../types";
 import { DebtCheckRow } from "../DebtCheckRow";
 import { KeepChangeRow } from "../KeepChangeRow";

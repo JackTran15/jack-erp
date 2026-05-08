@@ -9,7 +9,7 @@ import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
 } from "../../../constants/filterOperator";
-import { PosSelect } from "../../common/forms/PosSelect";
+import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import type { DebtEntry } from "./types";
 
 export interface DebtTabProps {

@@ -1,5 +1,5 @@
 import type { VoucherSelectableGroup } from "./types";
-import { PosCheckbox } from "../../common/forms/PosCheckbox";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 
 interface GroupNodeProps {
   group: VoucherSelectableGroup;

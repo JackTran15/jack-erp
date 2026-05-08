@@ -7,8 +7,8 @@ import {
 } from "@erp/pos/components/dataTable/DataTable";
 import { useDialogReset } from "../../../hooks/useDialogReset";
 import { VoucherApplyScopeEnum } from "../../../constants/voucher";
-import { PosCheckbox } from "../../common/forms/PosCheckbox";
-import { PosSelect } from "../../common/forms/PosSelect";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
+import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import type {
   VoucherApplyScope,
   VoucherDialogData,
@@ -20,7 +20,7 @@ import { FormRow } from "./FormRow";
 import { QuantityStepper } from "./QuantityStepper";
 import { MetricColumn } from "./MetricColumn";
 import { RadioOption } from "./RadioOption";
-import { PosTextInput } from "../../common/forms/PosTextInput";
+import { PosTextInput } from "@erp/pos/components/form/PosTextInput";
 import { GroupTree } from "./GroupTree";
 import { toggleSet } from "./toggleSet";
 
