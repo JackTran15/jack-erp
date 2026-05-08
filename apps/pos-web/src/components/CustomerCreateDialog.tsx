@@ -181,7 +181,7 @@ function seedFromQuery(query: string): { name: string; phone: string } {
 
 function SectionBanner({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-3 my-2 rounded-sm bg-[#EEF2F6] px-4 py-2 text-[15px] font-semibold text-gray-900">
+    <div className="my-2 rounded-sm bg-[#EEF2F6] px-4 py-2 text-[15px] font-semibold text-gray-900">
       {children}
     </div>
   );
@@ -624,7 +624,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
               {/* ============= Section 1: Thông tin cơ bản ============= */}
               <SectionBanner>Thông tin cơ bản</SectionBanner>
 
-              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2">
                 <FieldRow label="Mã khách hàng" htmlFor={codeId} required>
                   <UnderlineInput
                     id={codeId}
@@ -738,7 +738,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
               {/* ============= Section 2: Thẻ thành viên ============= */}
               <SectionBanner>Thông tin thẻ thành viên</SectionBanner>
 
-              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2">
                 <FieldRow label="Mã thẻ thành viên" htmlFor={cardCodeId}>
                   <UnderlineInput
                     id={cardCodeId}
@@ -807,7 +807,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
               {/* ============= Section 3: Công ty ============= */}
               <SectionBanner>Thông tin công ty</SectionBanner>
 
-              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 pb-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 pb-6 md:grid-cols-2">
                 <FieldRow label="Công ty" htmlFor={companyId}>
                   <UnderlineInput
                     id={companyId}
@@ -828,7 +828,6 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
         </form>
       </AppDialog.Body>
       <AppDialog.Footer
-        className="h-16 border-t border-gray-200 bg-white px-6"
         saveFormId={formId}
         saveLabel={loading ? "Đang lưu…" : submitText}
         saveDisabled={loading}

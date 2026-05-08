@@ -65,13 +65,12 @@ export function CustomerDetailDialog({
       open={open}
       onClose={onClose}
       width={1020}
-      contentClassName="rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
     >
       <AppDialog.Header title={`Khách hàng: ${data.identity.name}`} />
-      <AppDialog.Body>
+      <AppDialog.Body className="pt-1">
         <CustomerDetailTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto py-5">
           {activeTab === CustomerDetailTabKeyEnum.OVERVIEW ? (
             <OverviewTab
               data={data}
@@ -91,7 +90,6 @@ export function CustomerDetailDialog({
         </div>
       </AppDialog.Body>
       <AppDialog.Footer
-        className="h-16 border-t border-gray-200 px-6"
         onSave={footer.onPrimary}
         saveLabel={footer.primaryLabel}
         onCancel={onClose}

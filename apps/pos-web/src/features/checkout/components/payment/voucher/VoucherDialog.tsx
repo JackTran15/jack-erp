@@ -114,8 +114,6 @@ export function VoucherDialog({
     >
       <AppDialog.Header title="Voucher" />
       <AppDialog.Body>
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-6 pt-6">
         <div className="flex flex-col gap-6">
             {/* 4.3 Voucher select */}
             <FormRow
@@ -213,11 +211,9 @@ export function VoucherDialog({
                 }
               />
             ) : null}
-          </div>
         </div>
       </AppDialog.Body>
       <AppDialog.Footer
-        className="px-6 py-6"
         onSave={handleApply}
         onCancel={onClose}
       />

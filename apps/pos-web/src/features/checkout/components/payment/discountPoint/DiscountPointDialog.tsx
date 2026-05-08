@@ -81,8 +81,7 @@ export function DiscountPointDialog({
     >
       <AppDialog.Header title="Mã ưu đãi và điểm" />
       <AppDialog.Body>
-        {/* Body: 2 columns */}
-        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-2">
+        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto md:grid-cols-2">
           <MembershipPanel
             member={data?.member}
             onChangeCard={onChangeCard}
@@ -97,7 +96,6 @@ export function DiscountPointDialog({
         </div>
       </AppDialog.Body>
       <AppDialog.Footer
-        className="h-16 border-t border-[#E5E7EB] bg-[#F1F3F5] px-6"
         onCancel={onClose}
       />
     </AppDialog>

@@ -18,6 +18,11 @@ export interface AppDialogHeaderProps {
   titleClassName?: string;
 }
 
+export interface AppDialogBodyProps {
+  className?: string;
+  children?: ReactNode;
+}
+
 export interface AppDialogFooterProps {
   className?: string;
   /** Click handler for the primary button. Ignored when `saveFormId` is set. */
@@ -85,8 +90,8 @@ AppDialog.Header = ({
   );
 };
 
-AppDialog.Body = ({ children }: { children: React.ReactNode }) => {
-  return children;
+AppDialog.Body = ({ className, children }: AppDialogBodyProps) => {
+  return <div className={cn("flex-1 p-6 pt-4 overflow-y-auto", className)}>{children}</div>;
 }
 
 AppDialog.Footer = ({
@@ -100,7 +105,7 @@ AppDialog.Footer = ({
 }: AppDialogFooterProps) => {
   const showSave = Boolean(onSave || saveFormId);
   return (
-    <footer className={cn("flex items-center justify-end gap-2", className)}>
+    <footer className={cn("flex items-center justify-end gap-2 h-16 border-t border-gray-200 bg-white px-6", className)}>
       {showSave ? (
         <button
           type={saveFormId ? "submit" : "button"}

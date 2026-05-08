@@ -31,7 +31,7 @@ export function CustomerDetailTabs({
     <div
       role="tablist"
       aria-label="Chi tiết khách hàng"
-      className="flex items-end gap-1 border-b border-gray-200 px-2"
+      className="flex items-end gap-1 border-b border-gray-200"
     >
       {TABS.map((t) => {
         const active = t.key === activeTab;
