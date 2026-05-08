@@ -50,6 +50,7 @@ import {
 
 export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
+  const branchName = usePosBranchStore((s) => s.branchName)!;
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
 
@@ -431,7 +432,7 @@ export function CheckoutPageV2() {
         }}
         onCloseTab={handleCloseTab}
         onAddTab={handleAddTab}
-        location="Giầy MT Cần Thơ"
+        location={branchName}
         userName="Phan Thanh Hà"
       />
 

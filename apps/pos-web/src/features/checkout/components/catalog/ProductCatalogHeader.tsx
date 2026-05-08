@@ -1,4 +1,4 @@
-import { BoxIcon, SearchIcon } from "../icons/Icon";
+import { BoxIcon, SearchIcon } from "@erp/pos/components/icons/Icon";
 import { DropdownButton } from "../common/DropdownButton";
 import { KeyboardHint } from "../common/KeyboardHint";
 

@@ -8,7 +8,11 @@ import {
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppMenuTile } from "./AppMenuTile";
-import { APP_MENU_ITEMS, type AppMenuItem } from "./appMenuItems";
+import {
+  APP_MENU_ITEMS,
+  resolveSelectedAppMenuItemId,
+  type AppMenuItem,
+} from "./appMenuItems";
 
 export interface AppMenuPopoverProps {
   open: boolean;
@@ -34,17 +38,6 @@ interface PanelPosition {
   right: number;
 }
 
-const CHECKOUT_PATHS = new Set(["/", "/v2"]);
-
-function resolveSelectedId(pathname: string): string {
-  const match = APP_MENU_ITEMS.find(
-    (item) => item.route && item.route !== "/" && pathname.startsWith(item.route),
-  );
-  if (match) return match.id;
-  if (CHECKOUT_PATHS.has(pathname)) return "ban-hang";
-  return "";
-}
-
 /**
  * Floating launcher menu anchored under its trigger button. Renders a backdrop
  * scrim + the panel via portal so they escape the topbar's stacking context;
@@ -64,7 +57,7 @@ export function AppMenuPopover({
   const [position, setPosition] = useState<PanelPosition | null>(null);
 
   const activeId = useMemo(
-    () => selectedItemId ?? resolveSelectedId(location.pathname),
+    () => selectedItemId ?? resolveSelectedAppMenuItemId(location.pathname),
     [selectedItemId, location.pathname],
   );
 

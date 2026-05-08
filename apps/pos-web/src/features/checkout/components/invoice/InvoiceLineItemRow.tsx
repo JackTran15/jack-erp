@@ -1,4 +1,4 @@
-import { CloseIcon, WarningDot } from "../icons/Icon";
+import { CloseIcon, WarningDot } from "@erp/pos/components/icons/Icon";
 import { cn, formatVnd } from "@erp/ui";
 import type { CartLine } from "../types";
 

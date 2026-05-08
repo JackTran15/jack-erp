@@ -10,7 +10,7 @@ import {
   PlusCircleIcon,
   QrIcon,
   ReceiptIcon,
-} from "../icons/Icon";
+} from "@erp/pos/components/icons/Icon";
 import type { InvoicePrinter } from "../printing/InvoicePrinter";
 import {
   PromoMenuOptionEnum,

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DraftInvoice } from "../types";
-import { AppDialog } from "../../../../components/AppDialog";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import {
+  isInDateRange,
+  type DateRangeFilterOption,
+} from "@erp/pos/components/dateRangeFilter";
 import { useControllableState } from "../../hooks/useControllableState";
 import { useDialogReset } from "../../hooks/useDialogReset";
 import { FilterBar } from "./FilterBar";
 import { InvoiceDetailPanel } from "./InvoiceDetailPanel";
 import { InvoiceListPanel } from "./InvoiceListPanel";
-import { isInDateRange, type DateRangeOption } from "./types";
 
 export interface DraftInvoicesDialogProps {
   open: boolean;
@@ -32,8 +35,8 @@ export interface DraftInvoicesDialogProps {
    * popover + selection and filters in-memory by `createdAt`. Lift via
    * `dateFilter` + `onDateFilterChange` when needed.
    */
-  dateFilter?: DateRangeOption;
-  onDateFilterChange?: (next: DateRangeOption) => void;
+  dateFilter?: DateRangeFilterOption;
+  onDateFilterChange?: (next: DateRangeFilterOption) => void;
 }
 
 /**
@@ -57,13 +60,15 @@ export function DraftInvoicesDialog({
   dateFilter,
   onDateFilterChange,
 }: DraftInvoicesDialogProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSelectedId,
+  );
   const searchState = useControllableState<string>({
     value: searchValue,
     defaultValue: "",
     onChange: onSearchChange,
   });
-  const filterState = useControllableState<DateRangeOption>({
+  const filterState = useControllableState<DateRangeFilterOption>({
     value: dateFilter,
     defaultValue: "ALL",
     onChange: onDateFilterChange,

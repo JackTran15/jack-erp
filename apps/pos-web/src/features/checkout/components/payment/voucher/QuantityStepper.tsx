@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import { MinusIcon, PlusIcon } from "../../icons/Icon";
+import { MinusIcon, PlusIcon } from "@erp/pos/components/icons/Icon";
 import { StepperButton } from "./StepperButton";
 
 interface QuantityStepperProps {

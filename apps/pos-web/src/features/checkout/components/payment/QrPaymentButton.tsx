@@ -1,4 +1,4 @@
-import { QrIcon } from "../icons/Icon";
+import { QrIcon } from "@erp/pos/components/icons/Icon";
 
 export interface QrPaymentButtonProps {
   onClick?: () => void;

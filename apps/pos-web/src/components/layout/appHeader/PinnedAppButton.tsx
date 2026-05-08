@@ -27,7 +27,6 @@ export function PinnedAppButton({ item, active, onClick }: PinnedAppButtonProps)
         "hover:scale-105 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)]",
         "active:scale-95",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3D5AFE]/60 focus-visible:ring-offset-1",
-        active && "ring-2 ring-[#3D5AFE]/40 ring-offset-1",
       )}
     >
       <Icon size={16} strokeWidth={1.75} />

@@ -1,20 +1,26 @@
 import { useCallback, useMemo, useState } from "react";
-import { AppDialog } from "../../../../../components/AppDialog";
+import { cn, formatVnd } from "@erp/ui";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@erp/pos/components/dataTable/DataTable";
 import { useDialogReset } from "../../../hooks/useDialogReset";
 import { VoucherApplyScopeEnum } from "../../../constants/voucher";
+import { PosCheckbox } from "../../common/forms/PosCheckbox";
 import { PosSelect } from "../../common/forms/PosSelect";
 import type {
   VoucherApplyScope,
   VoucherDialogData,
   VoucherFormResult,
   VoucherOption,
+  VoucherSelectableItem,
 } from "./types";
 import { FormRow } from "./FormRow";
 import { QuantityStepper } from "./QuantityStepper";
 import { MetricColumn } from "./MetricColumn";
 import { RadioOption } from "./RadioOption";
 import { PosTextInput } from "../../common/forms/PosTextInput";
-import { ItemsTable } from "./ItemsTable";
 import { GroupTree } from "./GroupTree";
 import { toggleSet } from "./toggleSet";
 
@@ -105,6 +111,69 @@ export function VoucherDialog({
     onClose();
   };
 
+  const allItemsChecked =
+    items.length > 0 && items.every((i) => selectedItemIds.has(i.id));
+  const itemColumns = useMemo<
+    ReadonlyArray<DataTableColumn<VoucherSelectableItem>>
+  >(
+    () => [
+      {
+        key: "select",
+        title: (
+          <PosCheckbox
+            checked={allItemsChecked}
+            onChange={(next) =>
+              setSelectedItemIds(
+                next ? new Set(items.map((i) => i.id)) : new Set(),
+              )
+            }
+            ariaLabel="Chọn tất cả hàng hóa"
+          />
+        ),
+        headerClassName: "w-10",
+        cellClassName: "w-10",
+        render: (row) => (
+          <PosCheckbox
+            checked={selectedItemIds.has(row.id)}
+            onChange={() => setSelectedItemIds((prev) => toggleSet(prev, row.id))}
+            ariaLabel={row.name}
+          />
+        ),
+      },
+      {
+        key: "name",
+        title: "Tên hàng hóa",
+        render: (row) => row.name,
+      },
+      {
+        key: "qty",
+        title: "SL",
+        align: "right",
+        headerClassName: "w-12",
+        cellClassName: "tabular-nums",
+        render: (row) => row.qty,
+      },
+      {
+        key: "unitPrice",
+        title: "Đơn giá",
+        align: "right",
+        headerClassName: "w-24",
+        cellClassName: "tabular-nums",
+        render: (row) => formatVnd(row.unitPrice),
+      },
+      {
+        key: "lineTotal",
+        title: "Thành tiền",
+        align: "right",
+        headerClassName: "w-24",
+        cellClassName: "tabular-nums",
+        render: (row) =>
+          formatVnd(row.lineTotal ?? row.qty * row.unitPrice),
+      },
+    ],
+    [allItemsChecked, items, selectedItemIds],
+  );
+
   return (
     <AppDialog
       open={open}
@@ -183,18 +252,17 @@ export function VoucherDialog({
 
             {/* 4.7 / 4.8 Conditional content */}
             {scope === VoucherApplyScopeEnum.ITEMS ? (
-              <ItemsTable
-                items={items}
-                selectedIds={selectedItemIds}
-                onToggle={(id) =>
-                  setSelectedItemIds((prev) => toggleSet(prev, id))
-                }
-                onToggleAll={(next) =>
-                  setSelectedItemIds(
-                    next ? new Set(items.map((i) => i.id)) : new Set(),
-                  )
-                }
-              />
+              <div aria-label="Danh sách hàng hóa">
+                <DataTable<VoucherSelectableItem>
+                  columns={itemColumns}
+                  dataSource={items}
+                  rowKey={(row) => row.id}
+                  emptyText="Chưa có hàng hóa nào trong giỏ"
+                  rowClassName={(row) =>
+                    cn(selectedItemIds.has(row.id) && "bg-[#EEF2FF]")
+                  }
+                />
+              </div>
             ) : null}
 
             {scope === VoucherApplyScopeEnum.GROUPS ? (

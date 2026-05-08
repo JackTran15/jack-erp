@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import { cn, formatVnd } from "@erp/ui";
-import { CloseIcon, PlusCircleIcon } from "../icons/Icon";
+import { CloseIcon, PlusCircleIcon } from "@erp/pos/components/icons/Icon";
 import { PosNumberInput } from "../common/forms/PosNumberInput";
 import { PosSelect } from "../common/forms/PosSelect";
 import type { PaymentMethod, PaymentMethodOption } from "../types";

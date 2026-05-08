@@ -1,5 +1,5 @@
 import { forwardRef, type ReactNode } from "react";
-import { UserIcon } from "../icons/Icon";
+import { UserIcon } from "@erp/pos/components/icons/Icon";
 import {
   SearchPopover,
   type SearchSuggestion,

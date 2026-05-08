@@ -1,7 +1,7 @@
 import { cn } from "@erp/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon } from "../../icons/Icon";
+import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 
 export interface PosSelectOption<TValue extends string> {
   value: TValue;

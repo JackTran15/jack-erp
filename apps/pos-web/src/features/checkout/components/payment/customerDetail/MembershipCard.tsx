@@ -1,4 +1,4 @@
-import { RefreshIcon, ShoppingBagIcon } from "../../icons/Icon";
+import { RefreshIcon, ShoppingBagIcon } from "@erp/pos/components/icons/Icon";
 import type { CustomerMembershipData } from "./types";
 
 export interface MembershipCardProps {

@@ -1,18 +1,15 @@
+import { DataTable, type DataTableColumn } from "@erp/pos/components/dataTable/DataTable";
+import { DataTableFilterCell } from "@erp/pos/components/dataTable/DataTableFilterCell";
+import { PaginationBar } from "@erp/pos/components/PaginationBar";
+import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { formatVnd } from "@erp/ui";
 import { useMemo, useState } from "react";
-import { formatViDateTime } from "../../../../../lib/dateTime";
 import { DebtTypeFilterEnum } from "../../../constants/customer";
 import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
 } from "../../../constants/filterOperator";
 import { PosSelect } from "../../common/forms/PosSelect";
-import {
-  CustomerDetailDataTable,
-  type CustomerDetailTableColumn,
-} from "./CustomerDetailDataTable";
-import { CustomerDetailFilterInput } from "./CustomerDetailFilterInput";
-import { PaginationBar } from "./PaginationBar";
 import type { DebtEntry } from "./types";
 
 export interface DebtTabProps {
@@ -68,14 +65,14 @@ export function DebtTab({ rows }: DebtTabProps) {
       : rows.filter((r) => r.documentType === String(typeFilter));
 
   const total = filtered.reduce((s, r) => s + r.amount, 0);
-  const columns = useMemo<ReadonlyArray<CustomerDetailTableColumn<DebtEntry>>>(
+  const columns = useMemo<ReadonlyArray<DataTableColumn<DebtEntry>>>(
     () => [
       {
         key: "date",
         title: "Ngày hóa đơn",
         render: (row) => formatViDateTime(row.date),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.EQUALS}
@@ -91,7 +88,7 @@ export function DebtTab({ rows }: DebtTabProps) {
           </span>
         ),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
@@ -118,7 +115,7 @@ export function DebtTab({ rows }: DebtTabProps) {
         align: "right",
         render: (row) => formatVnd(row.amount),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             align="right"
             operatorType={FilterOperatorTypeEnum.NUMBER}
@@ -132,7 +129,7 @@ export function DebtTab({ rows }: DebtTabProps) {
         align: "right",
         render: (row) => formatVnd(row.remainingDebt),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             align="right"
             operatorType={FilterOperatorTypeEnum.NUMBER}
@@ -145,7 +142,7 @@ export function DebtTab({ rows }: DebtTabProps) {
         title: "Chi nhánh",
         render: (row) => row.branch,
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
@@ -159,7 +156,7 @@ export function DebtTab({ rows }: DebtTabProps) {
   return (
     <div className="flex flex-col">
       <div className="max-h-[360px] overflow-auto border border-gray-200">
-        <CustomerDetailDataTable
+        <DataTable
           columns={columns}
           dataSource={filtered}
           rowKey={(row) => row.id}

@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@erp/ui";
-import { PosRadio } from "../common/forms/PosRadio";
-import { ChevronDownIcon } from "../icons/Icon";
-import { DATE_RANGE_CHOICES, type DateRangeOption } from "./types";
+import { PosRadio } from "@erp/pos/features/checkout/components/common/forms/PosRadio";
+import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
+import { DATE_RANGE_FILTER_CHOICES } from "./constants";
+import type { DateRangeFilterOption } from "./types";
 
-interface DateRangeSelectProps {
-  value: DateRangeOption;
-  onChange: (next: DateRangeOption) => void;
+interface DateRangeFilterProps {
+  value: DateRangeFilterOption;
+  onChange: (next: DateRangeFilterOption) => void;
 }
 
-export function DateRangeSelect({ value, onChange }: DateRangeSelectProps) {
+/**
+ * Discrete date-range filter widget. Keeps a "pending" buffer so the user
+ * can preview a choice before committing via "Áp dụng" — matches the
+ * existing draft-invoices UX.
+ */
+export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState<DateRangeOption>(value);
+  const [pending, setPending] = useState<DateRangeFilterOption>(value);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +46,8 @@ export function DateRangeSelect({ value, onChange }: DateRangeSelectProps) {
   }, [open]);
 
   const currentLabel =
-    DATE_RANGE_CHOICES.find((c) => c.value === value)?.label ?? "Toàn bộ";
+    DATE_RANGE_FILTER_CHOICES.find((c) => c.value === value)?.label ??
+    "Toàn bộ";
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -60,7 +67,10 @@ export function DateRangeSelect({ value, onChange }: DateRangeSelectProps) {
         <ChevronDownIcon
           size={16}
           strokeWidth={2}
-          className={cn("text-[#6366F1] transition-transform", open && "rotate-180")}
+          className={cn(
+            "text-[#6366F1] transition-transform",
+            open && "rotate-180",
+          )}
         />
       </button>
 
@@ -74,7 +84,7 @@ export function DateRangeSelect({ value, onChange }: DateRangeSelectProps) {
           )}
         >
           <div className="py-2">
-            {DATE_RANGE_CHOICES.map((choice) => {
+            {DATE_RANGE_FILTER_CHOICES.map((choice) => {
               const selected = choice.value === pending;
               return (
                 <button
@@ -97,7 +107,7 @@ export function DateRangeSelect({ value, onChange }: DateRangeSelectProps) {
             })}
           </div>
 
-          <div className="flex items-center gap-6 border-t border-[#E6E8EE] px-5 py-3.5">
+          <div className="flex items-center justify-end gap-6 border-t border-[#E6E8EE] px-5 py-3.5">
             <button
               type="button"
               onClick={() => {

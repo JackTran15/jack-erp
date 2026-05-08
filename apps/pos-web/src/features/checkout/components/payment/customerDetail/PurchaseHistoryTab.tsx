@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import { formatVnd } from "@erp/ui";
-import {
-  CustomerDetailDataTable,
-  type CustomerDetailTableColumn,
-} from "./CustomerDetailDataTable";
+import { DataTable, type DataTableColumn } from "@erp/pos/components/dataTable/DataTable";
+import { DataTableFilterCell } from "@erp/pos/components/dataTable/DataTableFilterCell";
+import { PaginationBar } from "@erp/pos/components/PaginationBar";
 import {
   PurchaseHistoryStatusEnum,
   PurchaseHistoryStatusFilterEnum,
@@ -13,10 +12,8 @@ import {
   FilterOperatorTypeEnum,
 } from "../../../constants/filterOperator";
 import { PosSelect } from "../../common/forms/PosSelect";
-import { PaginationBar } from "./PaginationBar";
-import { CustomerDetailFilterInput } from "./CustomerDetailFilterInput";
 import { StatusBadge } from "./StatusBadge";
-import { formatViDateTime } from "../../../../../lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import type { PurchaseHistoryEntry } from "./types";
 
 export interface PurchaseHistoryTabProps {
@@ -54,7 +51,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
 
   const grandTotal = filtered.reduce((s, r) => s + r.totalAmount, 0);
   const columns = useMemo<
-    ReadonlyArray<CustomerDetailTableColumn<PurchaseHistoryEntry>>
+    ReadonlyArray<DataTableColumn<PurchaseHistoryEntry>>
   >(
     () => [
       {
@@ -62,7 +59,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         title: "Ngày hóa đơn",
         render: (row) => formatViDateTime(row.invoiceDate),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
@@ -78,7 +75,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
           </span>
         ),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
@@ -90,7 +87,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         title: "Tên cửa hàng",
         render: (row) => row.storeName || "—",
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.EQUALS}
@@ -124,7 +121,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         align: "right",
         render: (row) => formatVnd(row.totalAmount),
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             align="right"
             operatorType={FilterOperatorTypeEnum.NUMBER}
@@ -137,7 +134,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         title: "Ghi chú",
         render: (row) => row.note ?? "",
         filterRender: (
-          <CustomerDetailFilterInput
+          <DataTableFilterCell
             placeholder=""
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
@@ -151,7 +148,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
   return (
     <div className="flex flex-col">
       <div className="max-h-[360px] overflow-auto border border-gray-200">
-        <CustomerDetailDataTable
+        <DataTable
           columns={columns}
           dataSource={filtered}
           rowKey={(row) => row.id}

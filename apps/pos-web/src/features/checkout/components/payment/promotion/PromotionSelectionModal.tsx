@@ -3,7 +3,7 @@ import { cn } from "@erp/ui";
 import { AppDialog } from "../../../../../components/AppDialog";
 import { useControllableState } from "../../../hooks/useControllableState";
 import { useDialogReset } from "../../../hooks/useDialogReset";
-import { PlusCircleIcon, SearchIcon } from "../../icons/Icon";
+import { PlusCircleIcon, SearchIcon } from "@erp/pos/components/icons/Icon";
 import { PromotionTable } from "./PromotionTable";
 import type {
   PromotionItem,
