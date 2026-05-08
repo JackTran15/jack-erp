@@ -163,6 +163,7 @@ describe('DocumentNumberingService', () => {
 
     it('throws NotFoundException when no active rule exists', async () => {
       ruleRepo.findOne.mockResolvedValue(null);
+      ruleRepo.save.mockRejectedValueOnce(new Error('unique_constraint'));
 
       await expect(
         service.generate(DocumentType.INVOICE, undefined, actor),

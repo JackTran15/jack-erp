@@ -5,6 +5,7 @@ import { StockLedgerService, RecordMovementParams } from './stock-ledger.service
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { EventPublisher } from '../../events/event-publisher.service';
+import { ProductStorageLocationService } from '../product/product-storage-location.service';
 import { StockMovementType } from '@erp/shared-interfaces';
 
 describe('StockLedgerService', () => {
@@ -61,6 +62,10 @@ describe('StockLedgerService', () => {
       publishBatch: jest.fn().mockResolvedValue(undefined),
     };
 
+    const pslService = {
+      validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StockLedgerService,
@@ -68,6 +73,7 @@ describe('StockLedgerService', () => {
         { provide: getRepositoryToken(StockBalanceEntity), useValue: balanceRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: EventPublisher, useValue: eventPublisher },
+        { provide: ProductStorageLocationService, useValue: pslService },
       ],
     }).compile();
 

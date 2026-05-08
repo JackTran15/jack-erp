@@ -93,8 +93,16 @@ describe('CheckoutService', () => {
       }),
     };
 
+    const mockQb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
+      getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(mockQb) }),
     };
 
     const module: TestingModule = await Test.createTestingModule({

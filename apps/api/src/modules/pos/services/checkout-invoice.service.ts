@@ -111,6 +111,20 @@ export class CheckoutInvoiceService {
       }
     }
 
+    // ── 5b. Stock availability check ─────────────────────────────────────────
+    for (const item of itemsWithLocation) {
+      const balance = await this.stockLedgerService.getBalance(
+        item.itemId,
+        item.locationId!,
+        actor.organizationId,
+      );
+      if ((balance?.quantity ?? 0) < Number(item.quantity)) {
+        throw new BadRequestException(
+          `Insufficient stock for item ${item.itemId} at location ${item.locationId}. Available: ${balance?.quantity ?? 0}, required: ${item.quantity}`,
+        );
+      }
+    }
+
     // ── 6. Determine new status ───────────────────────────────────────────────
     const newStatus =
       remainder <= 0
