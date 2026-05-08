@@ -153,8 +153,8 @@ export class DocumentNumberingService {
     }
 
     if (!rule) {
-      throw new BadRequestException(
-        `Không thể khởi tạo quy tắc đánh số mặc định cho loại ${documentType}. Vui lòng thử lại hoặc cấu hình document numbering thủ công.`,
+      throw new NotFoundException(
+        `No active document numbering rule found for ${documentType}. Please configure one before proceeding.`,
       );
     }
 

@@ -154,7 +154,7 @@ describe('InvoiceDebtService', () => {
       mockManager.create.mockReturnValue(createdEntity);
       mockManager.save.mockResolvedValue(createdEntity);
 
-      const result = await service.createFromInvoice(invoice, mockManager as any);
+      const result = await service.createFromInvoice(invoice, undefined, mockManager as any);
 
       expect(mockManager.create).toHaveBeenCalledWith(
         InvoiceDebtEntity,

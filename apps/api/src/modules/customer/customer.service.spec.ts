@@ -8,6 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CustomerStatus } from '@erp/shared-interfaces';
 import { CustomerEntity } from './customer.entity';
+import { MembershipCardEntity } from './membership-card.entity';
 import { CustomerService } from './customer.service';
 import { EventPublisher } from '../events/event-publisher.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
@@ -83,10 +84,17 @@ describe('CustomerService', () => {
       transaction: jest.fn(),
     };
 
+    const membershipCardRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((dto) => ({ id: 'card-new', ...dto })),
+      save: jest.fn((entity) => Promise.resolve(entity)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CustomerService,
         { provide: getRepositoryToken(CustomerEntity), useValue: customerRepo },
+        { provide: getRepositoryToken(MembershipCardEntity), useValue: membershipCardRepo },
         { provide: EventPublisher, useValue: eventPublisher },
         { provide: DataSource, useValue: dataSource },
       ],

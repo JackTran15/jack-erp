@@ -74,6 +74,7 @@ describe('InvoiceService', () => {
       increment: jest.fn().mockResolvedValue(undefined),
       insert: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn(),
+      findBy: jest.fn().mockResolvedValue([{ id: 'item-1', sellingPrice: 50, purchasePrice: 30 }]),
     };
 
     invoiceRepo = {
