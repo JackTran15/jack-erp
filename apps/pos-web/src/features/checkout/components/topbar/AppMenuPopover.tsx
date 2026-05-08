@@ -15,6 +15,16 @@ export interface AppMenuPopoverProps {
   onClose: () => void;
   /** The button that opens the popover; used to anchor positioning. */
   triggerRef: RefObject<HTMLElement | null>;
+  /**
+   * Ids of the apps currently pinned. The matching tile renders its pin
+   * icon in the active state and a click toggles the pin off.
+   */
+  pinnedItemIds: ReadonlySet<string>;
+  /**
+   * Called when the user clicks the pin icon on a `pinnable` tile. Parent
+   * decides whether this is a pin or unpin based on the current state.
+   */
+  onTogglePin: (item: AppMenuItem) => void;
   /** Optional override; defaults to deriving from `useLocation()`. */
   selectedItemId?: string;
 }
@@ -45,6 +55,8 @@ export function AppMenuPopover({
   open,
   onClose,
   triggerRef,
+  pinnedItemIds,
+  onTogglePin,
   selectedItemId,
 }: AppMenuPopoverProps) {
   const navigate = useNavigate();
@@ -111,6 +123,8 @@ export function AppMenuPopover({
               selected={item.id === activeId}
               badge={item.badge === "new" ? "New" : undefined}
               onClick={() => handleSelect(item)}
+              onPin={item.pinnable ? () => onTogglePin(item) : undefined}
+              pinned={pinnedItemIds.has(item.id)}
             />
           ))}
           <div aria-hidden />

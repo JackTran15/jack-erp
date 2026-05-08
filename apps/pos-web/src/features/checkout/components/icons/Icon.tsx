@@ -394,6 +394,15 @@ export function QuestionBubbleIcon(props: IconProps) {
   );
 }
 
+export function PinIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 17v5" />
+      <path d="M9 10.76V6h6v4.76a2 2 0 0 0 1.11 1.79l1.78.9A2 2 0 0 1 19 15.24V17H5v-1.76a2 2 0 0 1 1.11-1.79l1.78-.9A2 2 0 0 0 9 10.76Z" />
+    </svg>
+  );
+}
+
 export function InfoCircleIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
