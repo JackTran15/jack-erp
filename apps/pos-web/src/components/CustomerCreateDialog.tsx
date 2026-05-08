@@ -1,5 +1,5 @@
 import {
-  useEffect,
+  useCallback,
   useId,
   useMemo,
   useRef,
@@ -7,12 +7,9 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  cn,
-} from "@erp/ui";
+import { cn } from "@erp/ui";
+import { AppDialog } from "./AppDialog";
+import { useDialogReset } from "../features/checkout/hooks/useDialogReset";
 import {
   createCustomer,
   phoneDigitsOnly,
@@ -490,7 +487,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
     onAddCustomerGroup,
   } = props;
 
-  const titleId = useId();
+  const formId = useId();
   const codeId = useId();
   const nameId = useId();
   const phoneId = useId();
@@ -518,9 +515,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
   /** Auto-generated code persisted across renders within a single open. */
   const generatedCodeRef = useRef<string>("");
 
-  // Reset form whenever the dialog opens — different reset path per mode.
-  useEffect(() => {
-    if (!open) return;
+  // Reset form on each open transition — different reset path per mode.
+  const handleOpenReset = useCallback(() => {
     setError("");
     setLoading(false);
     setTouched({});
@@ -545,7 +541,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
         email: customer?.email ?? "",
       });
     }
-  }, [open, isEdit, customer, defaultQuery, defaultCustomerCode]);
+  }, [isEdit, customer, defaultQuery, defaultCustomerCode]);
+  useDialogReset(open, handleOpenReset);
 
   // ---- Validation ----------------------------------------------------------
   const errors = useMemo(() => {
@@ -600,25 +597,16 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
 
   // ---- Render --------------------------------------------------------------
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        aria-labelledby={titleId}
-        className={cn(
-          "flex max-h-[90vh] w-[95vw] max-w-[880px] flex-col gap-0 overflow-hidden p-0",
-          "rounded-lg shadow-[0_20px_48px_rgba(0,0,0,0.16)]",
-        )}
-      >
-        <header className="flex h-16 items-center justify-between px-6">
-          <DialogTitle
-            id={titleId}
-            className="text-[22px] font-bold text-gray-900"
-          >
-            {titleText}
-          </DialogTitle>
-          {/* Built-in close button rendered by DialogContent at top-right. */}
-        </header>
-
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={880}
+      contentClassName="shadow-[0_20px_48px_rgba(0,0,0,0.16)]"
+    >
+      <AppDialog.Header title={titleText} />
+      <AppDialog.Body>
         <form
+          id={formId}
           onSubmit={handleSubmit}
           noValidate
           className="flex flex-1 flex-col overflow-y-auto"
@@ -633,237 +621,220 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
               </div>
             ) : null}
 
-            {/* ============= Section 1: Thông tin cơ bản ============= */}
-            <SectionBanner>Thông tin cơ bản</SectionBanner>
+              {/* ============= Section 1: Thông tin cơ bản ============= */}
+              <SectionBanner>Thông tin cơ bản</SectionBanner>
 
-            <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
-              <FieldRow label="Mã khách hàng" htmlFor={codeId} required>
-                <UnderlineInput
-                  id={codeId}
-                  value={values.code ?? ""}
-                  onChange={(v) => setField("code", v)}
-                  readOnly
-                />
-              </FieldRow>
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
+                <FieldRow label="Mã khách hàng" htmlFor={codeId} required>
+                  <UnderlineInput
+                    id={codeId}
+                    value={values.code ?? ""}
+                    onChange={(v) => setField("code", v)}
+                    readOnly
+                  />
+                </FieldRow>
 
-              <FieldRow
-                label="Khách hàng"
-                htmlFor={nameId}
-                required
-                error={showNameError ? errors.name : undefined}
-              >
-                <UnderlineInput
-                  id={nameId}
-                  value={values.name}
-                  onChange={(v) => setField("name", v)}
-                  onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-                  placeholder="Tên khách hàng"
-                  invalid={showNameError}
-                  autoComplete="name"
-                />
-              </FieldRow>
+                <FieldRow
+                  label="Khách hàng"
+                  htmlFor={nameId}
+                  required
+                  error={showNameError ? errors.name : undefined}
+                >
+                  <UnderlineInput
+                    id={nameId}
+                    value={values.name}
+                    onChange={(v) => setField("name", v)}
+                    onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+                    placeholder="Tên khách hàng"
+                    invalid={showNameError}
+                    autoComplete="name"
+                  />
+                </FieldRow>
 
-              <FieldRow label="Số điện thoại" htmlFor={phoneId}>
-                <UnderlineInput
-                  id={phoneId}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  value={values.phone ?? ""}
-                  onChange={(v) => setField("phone", v)}
-                  placeholder="Số điện thoại"
-                />
-              </FieldRow>
+                <FieldRow label="Số điện thoại" htmlFor={phoneId}>
+                  <UnderlineInput
+                    id={phoneId}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={values.phone ?? ""}
+                    onChange={(v) => setField("phone", v)}
+                    placeholder="Số điện thoại"
+                  />
+                </FieldRow>
 
-              <FieldRow label="Email" htmlFor={emailId}>
-                <UnderlineInput
-                  id={emailId}
-                  type="email"
-                  autoComplete="email"
-                  value={values.email ?? ""}
-                  onChange={(v) => setField("email", v)}
-                />
-              </FieldRow>
+                <FieldRow label="Email" htmlFor={emailId}>
+                  <UnderlineInput
+                    id={emailId}
+                    type="email"
+                    autoComplete="email"
+                    value={values.email ?? ""}
+                    onChange={(v) => setField("email", v)}
+                  />
+                </FieldRow>
 
-              <FieldRow label="CCCD" htmlFor={cccdId}>
-                <UnderlineInput
-                  id={cccdId}
-                  value={values.cccd ?? ""}
-                  onChange={(v) => setField("cccd", v)}
-                  placeholder="Số căn cước công dân"
-                />
-              </FieldRow>
+                <FieldRow label="CCCD" htmlFor={cccdId}>
+                  <UnderlineInput
+                    id={cccdId}
+                    value={values.cccd ?? ""}
+                    onChange={(v) => setField("cccd", v)}
+                    placeholder="Số căn cước công dân"
+                  />
+                </FieldRow>
 
-              <FieldRow label="Ngày sinh" htmlFor={birthdayId}>
-                <UnderlineInput
-                  id={birthdayId}
-                  type="date"
-                  value={values.birthday ?? ""}
-                  onChange={(v) => setField("birthday", v)}
-                  trailing={<CalendarIcon />}
-                />
-              </FieldRow>
+                <FieldRow label="Ngày sinh" htmlFor={birthdayId}>
+                  <UnderlineInput
+                    id={birthdayId}
+                    type="date"
+                    value={values.birthday ?? ""}
+                    onChange={(v) => setField("birthday", v)}
+                    trailing={<CalendarIcon />}
+                  />
+                </FieldRow>
 
-              <FieldRow label="Giới tính">
-                <GenderRadioGroup
-                  name="gender"
-                  value={values.gender ?? "UNSPECIFIED"}
-                  onChange={(v) => setField("gender", v)}
-                />
-              </FieldRow>
+                <FieldRow label="Giới tính">
+                  <GenderRadioGroup
+                    name="gender"
+                    value={values.gender ?? "UNSPECIFIED"}
+                    onChange={(v) => setField("gender", v)}
+                  />
+                </FieldRow>
 
-              <FieldRow label="Địa chỉ" alignTop className="md:col-span-2">
-                <div className="space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <UnderlineSelect
-                      value={values.province ?? ""}
-                      onChange={(v) => setField("province", v)}
-                      options={provinces}
-                      placeholder="Tỉnh/Thành phố"
-                      ariaLabel="Tỉnh/Thành phố"
-                    />
-                    <UnderlineSelect
-                      value={values.district ?? ""}
-                      onChange={(v) => setField("district", v)}
-                      options={districts}
-                      placeholder="Quận/huyện"
-                      ariaLabel="Quận/huyện"
-                    />
-                    <UnderlineSelect
-                      value={values.ward ?? ""}
-                      onChange={(v) => setField("ward", v)}
-                      options={wards}
-                      placeholder="Xã/phường"
-                      ariaLabel="Xã/phường"
+                <FieldRow label="Địa chỉ" alignTop className="md:col-span-2">
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <UnderlineSelect
+                        value={values.province ?? ""}
+                        onChange={(v) => setField("province", v)}
+                        options={provinces}
+                        placeholder="Tỉnh/Thành phố"
+                        ariaLabel="Tỉnh/Thành phố"
+                      />
+                      <UnderlineSelect
+                        value={values.district ?? ""}
+                        onChange={(v) => setField("district", v)}
+                        options={districts}
+                        placeholder="Quận/huyện"
+                        ariaLabel="Quận/huyện"
+                      />
+                      <UnderlineSelect
+                        value={values.ward ?? ""}
+                        onChange={(v) => setField("ward", v)}
+                        options={wards}
+                        placeholder="Xã/phường"
+                        ariaLabel="Xã/phường"
+                      />
+                    </div>
+                    <UnderlineInput
+                      value={values.addressLine ?? ""}
+                      onChange={(v) => setField("addressLine", v)}
+                      placeholder="Số nhà, tên đường"
+                      ariaLabel="Số nhà, tên đường"
                     />
                   </div>
+                </FieldRow>
+              </div>
+
+              {/* ============= Section 2: Thẻ thành viên ============= */}
+              <SectionBanner>Thông tin thẻ thành viên</SectionBanner>
+
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
+                <FieldRow label="Mã thẻ thành viên" htmlFor={cardCodeId}>
                   <UnderlineInput
-                    value={values.addressLine ?? ""}
-                    onChange={(v) => setField("addressLine", v)}
-                    placeholder="Số nhà, tên đường"
-                    ariaLabel="Số nhà, tên đường"
-                  />
-                </div>
-              </FieldRow>
-            </div>
-
-            {/* ============= Section 2: Thẻ thành viên ============= */}
-            <SectionBanner>Thông tin thẻ thành viên</SectionBanner>
-
-            <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 md:grid-cols-2">
-              <FieldRow label="Mã thẻ thành viên" htmlFor={cardCodeId}>
-                <UnderlineInput
-                  id={cardCodeId}
-                  value={values.cardCode ?? ""}
-                  onChange={(v) => setField("cardCode", v)}
-                  trailing={
-                    <button
-                      type="button"
-                      aria-label="Quét mã thẻ thành viên"
-                      className="rounded p-0.5 text-gray-500 hover:text-gray-700"
-                    >
-                      <ScanIcon />
-                    </button>
-                  }
-                />
-              </FieldRow>
-
-              <FieldRow label="Hạng thẻ" htmlFor={cardTierId}>
-                <UnderlineSelect
-                  id={cardTierId}
-                  value={values.cardTier ?? ""}
-                  onChange={(v) => setField("cardTier", v)}
-                  options={cardTiers}
-                />
-              </FieldRow>
-
-              <FieldRow label="Nhóm khách hàng" htmlFor={groupId}>
-                <UnderlineSelect
-                  id={groupId}
-                  value={values.customerGroup ?? ""}
-                  onChange={(v) => setField("customerGroup", v)}
-                  options={customerGroups}
-                  trailing={
-                    onAddCustomerGroup ? (
+                    id={cardCodeId}
+                    value={values.cardCode ?? ""}
+                    onChange={(v) => setField("cardCode", v)}
+                    trailing={
                       <button
                         type="button"
-                        aria-label="Thêm nhóm khách hàng mới"
-                        onClick={onAddCustomerGroup}
-                        className="rounded p-0.5 hover:scale-110"
+                        aria-label="Quét mã thẻ thành viên"
+                        className="rounded p-0.5 text-gray-500 hover:text-gray-700"
                       >
-                        <PlusCircleSolidIcon />
+                        <ScanIcon />
                       </button>
-                    ) : undefined
-                  }
-                />
-              </FieldRow>
+                    }
+                  />
+                </FieldRow>
 
-              <FieldRow label="Nhân viên phụ trách" htmlFor={managerId}>
-                <UnderlineSelect
-                  id={managerId}
-                  value={values.accountManager ?? ""}
-                  onChange={(v) => setField("accountManager", v)}
-                  options={accountManagers}
-                />
-              </FieldRow>
+                <FieldRow label="Hạng thẻ" htmlFor={cardTierId}>
+                  <UnderlineSelect
+                    id={cardTierId}
+                    value={values.cardTier ?? ""}
+                    onChange={(v) => setField("cardTier", v)}
+                    options={cardTiers}
+                  />
+                </FieldRow>
 
-              <FieldRow label="Ghi chú" htmlFor={noteId}>
-                <UnderlineInput
-                  id={noteId}
-                  value={values.note ?? ""}
-                  onChange={(v) => setField("note", v)}
-                />
-              </FieldRow>
-            </div>
+                <FieldRow label="Nhóm khách hàng" htmlFor={groupId}>
+                  <UnderlineSelect
+                    id={groupId}
+                    value={values.customerGroup ?? ""}
+                    onChange={(v) => setField("customerGroup", v)}
+                    options={customerGroups}
+                    trailing={
+                      onAddCustomerGroup ? (
+                        <button
+                          type="button"
+                          aria-label="Thêm nhóm khách hàng mới"
+                          onClick={onAddCustomerGroup}
+                          className="rounded p-0.5 hover:scale-110"
+                        >
+                          <PlusCircleSolidIcon />
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                </FieldRow>
 
-            {/* ============= Section 3: Công ty ============= */}
-            <SectionBanner>Thông tin công ty</SectionBanner>
+                <FieldRow label="Nhân viên phụ trách" htmlFor={managerId}>
+                  <UnderlineSelect
+                    id={managerId}
+                    value={values.accountManager ?? ""}
+                    onChange={(v) => setField("accountManager", v)}
+                    options={accountManagers}
+                  />
+                </FieldRow>
 
-            <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 pb-6 md:grid-cols-2">
-              <FieldRow label="Công ty" htmlFor={companyId}>
-                <UnderlineInput
-                  id={companyId}
-                  value={values.companyName ?? ""}
-                  onChange={(v) => setField("companyName", v)}
-                />
-              </FieldRow>
+                <FieldRow label="Ghi chú" htmlFor={noteId}>
+                  <UnderlineInput
+                    id={noteId}
+                    value={values.note ?? ""}
+                    onChange={(v) => setField("note", v)}
+                  />
+                </FieldRow>
+              </div>
 
-              <FieldRow label="Mã số thuế" htmlFor={taxCodeId}>
-                <UnderlineInput
-                  id={taxCodeId}
-                  value={values.taxCode ?? ""}
-                  onChange={(v) => setField("taxCode", v)}
-                />
-              </FieldRow>
-            </div>
+              {/* ============= Section 3: Công ty ============= */}
+              <SectionBanner>Thông tin công ty</SectionBanner>
+
+              <div className="grid grid-cols-1 gap-y-5 gap-x-8 px-6 pb-6 md:grid-cols-2">
+                <FieldRow label="Công ty" htmlFor={companyId}>
+                  <UnderlineInput
+                    id={companyId}
+                    value={values.companyName ?? ""}
+                    onChange={(v) => setField("companyName", v)}
+                  />
+                </FieldRow>
+
+                <FieldRow label="Mã số thuế" htmlFor={taxCodeId}>
+                  <UnderlineInput
+                    id={taxCodeId}
+                    value={values.taxCode ?? ""}
+                    onChange={(v) => setField("taxCode", v)}
+                  />
+                </FieldRow>
+              </div>
           </div>
-
-          <footer className="flex h-16 items-center justify-end gap-2 border-t border-gray-200 bg-white px-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className={cn(
-                "inline-flex h-9 items-center justify-center rounded-md px-6 text-[14px] font-medium text-white",
-                "bg-[#5B5FE9] shadow-[0_2px_4px_rgba(91,95,233,0.2)] transition-colors",
-                "hover:bg-[#4F52D6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#A5B4FC]",
-                "disabled:cursor-not-allowed disabled:opacity-60",
-              )}
-            >
-              {loading ? "Đang lưu…" : submitText}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(
-                "inline-flex h-9 items-center justify-center rounded-md border border-gray-300 px-6 text-[14px] text-gray-900 transition-colors",
-                "hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#A5B4FC]",
-              )}
-            >
-              Hủy bỏ
-            </button>
-          </footer>
         </form>
-      </DialogContent>
-    </Dialog>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="h-16 border-t border-gray-200 bg-white px-6"
+        saveFormId={formId}
+        saveLabel={loading ? "Đang lưu…" : submitText}
+        saveDisabled={loading}
+        cancelLabel="Hủy bỏ"
+        onCancel={onClose}
+      />
+    </AppDialog>
   );
 }

@@ -1,11 +1,7 @@
 import { useCallback, type FormEvent } from "react";
-import { Dialog, DialogContent, cn } from "@erp/ui";
+import { AppDialog } from "../../../../../components/AppDialog";
 import { useControllableState } from "../../../hooks/useControllableState";
 import { useDialogReset } from "../../../hooks/useDialogReset";
-import {
-  CheckoutDialogFooter,
-  CheckoutDialogHeader,
-} from "../../common/CheckoutDialogScaffold";
 import type { DiscountPointData } from "./types";
 import { MembershipPanel } from "./MembershipPanel";
 import { VoucherSearchPanel } from "./VoucherSearchPanel";
@@ -77,16 +73,14 @@ export function DiscountPointDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className={cn(
-          "flex max-h-[90vh] w-[95vw] max-w-[1120px] flex-col gap-0 overflow-hidden p-0",
-          "rounded-lg bg-[#F1F3F5] shadow-[0_20px_60px_rgba(0,0,0,0.15)]",
-        )}
-      >
-        {/* 4.2 Header — title + close (rendered by DialogContent). */}
-        <CheckoutDialogHeader title="Mã ưu đãi và điểm" />
-
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={1120}
+      contentClassName="bg-[#F1F3F5] shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+    >
+      <AppDialog.Header title="Mã ưu đãi và điểm" />
+      <AppDialog.Body>
         {/* Body: 2 columns */}
         <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-2">
           <MembershipPanel
@@ -101,13 +95,11 @@ export function DiscountPointDialog({
             onSubmit={handleSubmitSearch}
           />
         </div>
-
-        {/* 4.14 Footer */}
-        <CheckoutDialogFooter
-          className="h-16 border-t border-[#E5E7EB] bg-[#F1F3F5] px-6"
-          onCancel={onClose}
-        />
-      </DialogContent>
-    </Dialog>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="h-16 border-t border-[#E5E7EB] bg-[#F1F3F5] px-6"
+        onCancel={onClose}
+      />
+    </AppDialog>
   );
 }
