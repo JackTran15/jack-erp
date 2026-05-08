@@ -4,8 +4,13 @@ import {
   type DataTableColumn,
 } from "@erp/pos/components/dataTable/DataTable";
 import { PosTextInput } from "@erp/pos/components/form/PosTextInput";
-import type { FastStockTransferRow } from "../types";
+import type { FastStockTransferFilters, FastStockTransferRow } from "../types";
 import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
+import { DataTableFilterCell } from "@erp/pos/components/dataTable";
+import {
+  FilterOperatorEnum,
+  FilterOperatorTypeEnum,
+} from "../../checkout/constants/filterOperator";
 
 type EditableFields = Pick<
   FastStockTransferRow,
@@ -16,6 +21,11 @@ interface FastStockTransferTableProps {
   rows: ReadonlyArray<FastStockTransferRow>;
   editingRowId: string | null;
   editableDraft: EditableFields | null;
+  filters: FastStockTransferFilters;
+  setFilter: <K extends keyof FastStockTransferFilters>(
+    key: K,
+    value: FastStockTransferFilters[K],
+  ) => void;
   onStartEdit: (rowId: string) => void;
   onEditField: (key: keyof EditableFields, value: string) => void;
   onSaveRow: (rowId: string) => void;
@@ -26,6 +36,8 @@ export function FastStockTransferTable({
   rows,
   editingRowId,
   editableDraft,
+  filters,
+  setFilter,
   onStartEdit,
   onEditField,
   onSaveRow,
@@ -51,6 +63,14 @@ export function FastStockTransferTable({
           ) : (
             row.transporter
           ),
+        filterRender: (
+          <DataTableFilterCell
+            value={filters.transporter}
+            onChange={(value) => setFilter("transporter", value)}
+            operatorType={FilterOperatorTypeEnum.TEXT}
+            leadingOperator={FilterOperatorEnum.CONTAINS}
+          />
+        ),
       },
       {
         key: "sku",
@@ -65,11 +85,27 @@ export function FastStockTransferTable({
           ) : (
             row.sku
           ),
+        filterRender: (
+          <DataTableFilterCell
+            value={filters.sku}
+            onChange={(value) => setFilter("sku", value)}
+            operatorType={FilterOperatorTypeEnum.TEXT}
+            leadingOperator={FilterOperatorEnum.CONTAINS}
+          />
+        ),
       },
       {
         key: "productName",
         title: "Tên hàng hóa",
         render: (row) => row.productName,
+        filterRender: (
+          <DataTableFilterCell
+            value={filters.productName}
+            onChange={(value) => setFilter("productName", value)}
+            operatorType={FilterOperatorTypeEnum.TEXT}
+            leadingOperator={FilterOperatorEnum.CONTAINS}
+          />
+        ),
       },
       {
         key: "location",
@@ -84,11 +120,27 @@ export function FastStockTransferTable({
           ) : (
             row.location
           ),
+        filterRender: (
+          <DataTableFilterCell
+            value={filters.location}
+            onChange={(value) => setFilter("location", value)}
+            operatorType={FilterOperatorTypeEnum.TEXT}
+            leadingOperator={FilterOperatorEnum.CONTAINS}
+          />
+        ),
       },
       {
         key: "unit",
         title: "ĐVT",
         render: (row) => row.unit,
+        filterRender: (
+          <DataTableFilterCell
+            value={filters.unit}
+            onChange={(value) => setFilter("unit", value)}
+            operatorType={FilterOperatorTypeEnum.TEXT}
+            leadingOperator={FilterOperatorEnum.CONTAINS}
+          />
+        ),
       },
       {
         key: "quantity",
