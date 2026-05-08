@@ -1,5 +1,7 @@
-import { cn } from "@erp/ui";
-import { ChevronDownIcon, RefreshIcon } from "../../icons/Icon";
+import {
+  RefreshIcon,
+} from "@erp/pos/components/icons/Icon";
+import { PosSelect } from "@erp/pos/features/checkout/components/common/forms/PosSelect";
 import { PaginationButton } from "./PaginationButton";
 
 export interface PaginationBarProps {
@@ -17,9 +19,9 @@ export interface PaginationBarProps {
 }
 
 /**
- * Pagination row shown beneath data tables in the dialog (spec 4.10).
- * Buttons are inert when no callback is supplied — pass handlers from the
- * parent once a real data source is hooked up.
+ * App-shared pagination row shown beneath data tables. Buttons are inert
+ * when no callback is supplied — pass handlers from the parent once a real
+ * data source is hooked up.
  */
 export function PaginationBar({
   page,
@@ -84,20 +86,16 @@ export function PaginationBar({
         </button>
         <label className="ml-2 inline-flex items-center gap-1 text-[14px] text-gray-500">
           <span className="sr-only">Số dòng/trang</span>
-          <select
-            value={pageSize}
-            onChange={(e) =>
-              onPageSizeChange?.(Number.parseInt(e.target.value, 10))
-            }
-            className="h-8 rounded-md border border-gray-200 bg-white pl-2 pr-6 text-[14px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#5C6BC0]/30"
-          >
-            {pageSizeOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon size={14} className="-ml-6 text-gray-500" />
+          <PosSelect
+            value={String(pageSize)}
+            onChange={(next) => onPageSizeChange?.(Number.parseInt(next, 10))}
+            options={pageSizeOptions.map((opt) => ({
+              value: String(opt),
+              label: String(opt),
+            }))}
+            className="w-[72px]"
+            triggerClassName="text-[14px] text-gray-700"
+          />
         </label>
       </div>
 

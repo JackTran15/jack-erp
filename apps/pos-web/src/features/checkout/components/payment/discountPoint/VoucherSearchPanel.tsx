@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { cn } from "@erp/ui";
-import { SearchIcon } from "../../icons/Icon";
+import { SearchIcon } from "@erp/pos/components/icons/Icon";
 import { VoucherEmptyState } from "./VoucherEmptyState";
 
 interface VoucherSearchPanelProps {

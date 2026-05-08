@@ -1,4 +1,4 @@
-import { CloseIcon, FileTextIcon } from "../icons/Icon";
+import { CloseIcon, FileTextIcon } from "@erp/pos/components/icons/Icon";
 import { cn } from "@erp/ui";
 
 export interface InvoiceTabProps {

@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import { LayersIcon } from "../../icons/Icon";
+import { LayersIcon } from "@erp/pos/components/icons/Icon";
 import type { MemberCardData } from "./types";
 
 interface MemberCardTealProps {

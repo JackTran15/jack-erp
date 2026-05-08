@@ -1,6 +1,6 @@
 import type { ComponentType, MouseEvent } from "react";
 import { cn } from "@erp/ui";
-import { PinIcon, type IconProps } from "../icons/Icon";
+import { PinIcon, type IconProps } from "@erp/pos/components/icons/Icon";
 
 export interface AppMenuTileProps {
   label: string;

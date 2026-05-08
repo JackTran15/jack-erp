@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { formatViDateTime } from "../../../../lib/dateTime";
-import { CloseIcon } from "../icons/Icon";
+import { CloseIcon } from "@erp/pos/components/icons/Icon";
 import type { DraftInvoice } from "../types";
 
 interface DraftRowProps {

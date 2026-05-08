@@ -1,4 +1,4 @@
-import { CloseIcon, UserIcon } from "../icons/Icon";
+import { CloseIcon, UserIcon } from "@erp/pos/components/icons/Icon";
 import { formatVnd } from "@erp/ui";
 import { CustomerActions, type CustomerActionItem } from "./CustomerActions";
 

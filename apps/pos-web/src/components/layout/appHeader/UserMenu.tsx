@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from "../icons/Icon";
+import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 
 export interface UserMenuProps {
   name: string;

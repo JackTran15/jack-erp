@@ -1,5 +1,5 @@
 import { forwardRef, type ReactNode } from "react";
-import { BarcodeIcon, ChevronDownIcon } from "../icons/Icon";
+import { BarcodeIcon, ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 import { IconButton } from "../common/IconButton";
 import {
   SearchPopover,

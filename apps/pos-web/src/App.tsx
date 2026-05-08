@@ -6,6 +6,7 @@ import { RequirePosBranch } from "./components/RequirePosBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { CheckoutPageV2 } from "./features/checkout/pages/CheckoutPageV2";
+import { ReturnGoodsPage } from "./features/return-goods/pages/ReturnGoodsPage";
 import { SessionPage } from "./pages/SessionPage";
 import { ReturnsPage } from "./pages/ReturnsPage";
 import { ExchangePage } from "./pages/ExchangePage";
@@ -29,10 +30,10 @@ export function App() {
           <Route path="/dang-nhap" element={<PosLoginPage />} />
           <Route element={<RequirePosAuth />}>
             <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
-            <Route path="/v2" element={<CheckoutPageV2 />} />
             <Route element={<RequirePosBranch />}>
+              <Route path="/" element={<CheckoutPageV2 />} />
+              <Route path="/return-goods" element={<ReturnGoodsPage />} />
               <Route element={<PosShellLayout />}>
-                <Route path="/" element={<CheckoutPage />} />
                 <Route path="/session" element={<SessionPage />} />
                 <Route path="/returns" element={<ReturnsPage />} />
                 <Route path="/exchange" element={<ExchangePage />} />

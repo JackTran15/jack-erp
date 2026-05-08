@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GiftIcon, ReceiptIcon } from "../icons/Icon";
+import { GiftIcon, ReceiptIcon } from "@erp/pos/components/icons/Icon";
 import {
   PromoMenuOptionEnum,
   type PromoMenuOption,

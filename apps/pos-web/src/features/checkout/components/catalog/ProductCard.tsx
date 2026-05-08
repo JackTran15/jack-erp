@@ -1,4 +1,4 @@
-import { ShoppingBagIcon } from "../icons/Icon";
+import { ShoppingBagIcon } from "@erp/pos/components/icons/Icon";
 import { PriceBadge } from "../common/PriceBadge";
 import type { CatalogProduct } from "../types";
 

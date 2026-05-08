@@ -17,7 +17,7 @@ import {
   TruckIcon,
   WarehouseOutIcon,
   type IconProps,
-} from "../icons/Icon";
+} from "@erp/pos/components/icons/Icon";
 import type { ComponentType } from "react";
 
 export interface AppMenuItem {
@@ -68,7 +68,7 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
     label: "Đổi trả hàng",
     iconBgColor: "#EF6B5A",
     Icon: ExchangeClipboardIcon,
-    route: "/exchange",
+    route: "/return-goods",
     pinnable: true,
   },
   {
@@ -146,3 +146,14 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
     Icon: InfoCircleIcon,
   },
 ];
+
+const CHECKOUT_PATHS = new Set(["/"]);
+
+export function resolveSelectedAppMenuItemId(pathname: string): string {
+  const match = APP_MENU_ITEMS.find(
+    (item) => item.route && item.route !== "/" && pathname.startsWith(item.route),
+  );
+  if (match) return match.id;
+  if (CHECKOUT_PATHS.has(pathname)) return "ban-hang";
+  return "";
+}

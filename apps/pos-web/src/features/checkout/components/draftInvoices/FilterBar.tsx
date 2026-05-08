@@ -1,13 +1,13 @@
+import { DateRangeFilter } from "@erp/pos/components/dateRangeFilter";
+import type { DateRangeFilterOption } from "@erp/pos/components/dateRangeFilter";
 import { cn } from "@erp/ui";
-import { SearchIcon } from "../icons/Icon";
-import type { DateRangeOption } from "./types";
-import { DateRangeSelect } from "./DateRangeSelect";
+import { SearchIcon } from "@erp/pos/components/icons/Icon";
 
 interface FilterBarProps {
   search: string;
   onSearchChange: (next: string) => void;
-  filter: DateRangeOption;
-  onFilterChange: (next: DateRangeOption) => void;
+  filter: DateRangeFilterOption;
+  onFilterChange: (next: DateRangeFilterOption) => void;
 }
 
 export function FilterBar({
@@ -38,8 +38,7 @@ export function FilterBar({
           )}
         />
       </div>
-
-      <DateRangeSelect value={filter} onChange={onFilterChange} />
+      <DateRangeFilter value={filter} onChange={onFilterChange} />
     </div>
   );
 }

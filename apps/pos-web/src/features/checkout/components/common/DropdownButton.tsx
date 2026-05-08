@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronDownIcon } from "../icons/Icon";
+import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 import { cn } from "@erp/ui";
 
 export interface DropdownButtonProps {
