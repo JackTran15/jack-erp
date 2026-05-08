@@ -29,6 +29,8 @@ export interface AppMenuItem {
   /** Present ⇒ click navigates here; otherwise click is a close-only no-op. */
   route?: string;
   badge?: "new";
+  /** When true, the popover renders a pin icon at the top-right of the tile. */
+  pinnable?: boolean;
 }
 
 /**
@@ -67,6 +69,7 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
     iconBgColor: "#EF6B5A",
     Icon: ExchangeClipboardIcon,
     route: "/exchange",
+    pinnable: true,
   },
   {
     id: "yc-dieu-chuyen",
@@ -92,6 +95,7 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
     label: "Chuyển kho tạm",
     iconBgColor: "#EF6B5A",
     Icon: WarehouseOutIcon,
+    pinnable: true,
   },
   {
     id: "may-in",
