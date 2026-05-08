@@ -53,6 +53,8 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'product.write', description: 'Create, update and delete product records', module: 'product' },
 
   // POS
+  { key: 'pos.invoice.read', description: 'View POS invoices', module: 'pos' },
+  { key: 'pos.invoice.write', description: 'Create, update and cancel POS invoices', module: 'pos' },
   { key: 'pos.sale.create', description: 'Create POS sales', module: 'pos' },
   { key: 'pos.return.create', description: 'Create POS returns', module: 'pos' },
   { key: 'pos.exchange.create', description: 'Create POS exchanges', module: 'pos' },

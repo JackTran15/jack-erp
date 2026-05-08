@@ -9,3 +9,7 @@ export {
 } from './exchange.dto';
 export { SubmitReconciliationDto } from './reconciliation.dto';
 export { PosCatalogQueryDto } from './pos-catalog.query.dto';
+export { CreateInvoiceDto, CreateInvoiceItemDto } from './create-invoice.dto';
+export { UpdateInvoiceDto } from './update-invoice.dto';
+export { CheckoutInvoiceDto } from './checkout-invoice.dto';
+export { InvoiceQueryDto } from './invoice-query.dto';

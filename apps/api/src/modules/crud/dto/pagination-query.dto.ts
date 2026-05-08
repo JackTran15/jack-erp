@@ -32,4 +32,9 @@ export class PaginationQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  filters?: string;
 }

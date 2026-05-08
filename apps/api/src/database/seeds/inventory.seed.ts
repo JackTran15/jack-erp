@@ -36,6 +36,11 @@ const IDS = {
   stockLaptopMain: '80000000-0000-4000-8000-000000000001',
   stockLaptopReserve: '80000000-0000-4000-8000-000000000002',
   stockMonitorMain: '80000000-0000-4000-8000-000000000003',
+  // Chart of Accounts
+  accountCash: 'B0000000-0000-4000-8000-000000000001',
+  accountBank: 'B0000000-0000-4000-8000-000000000002',
+  accountRevenue: 'B0000000-0000-4000-8000-000000000003',
+  accountReceivable: 'B0000000-0000-4000-8000-000000000004',
   // Product catalog (EPIC-006)
   productShoe: 'A0000000-0000-4000-8000-000000000001',
   attrDefSize: 'A1000000-0000-4000-8000-000000000001',
@@ -145,6 +150,19 @@ async function seedInventoryData() {
       ON CONFLICT (user_id, branch_id) DO NOTHING
       `,
       [IDS.user, IDS.branch, IDS.organization],
+    );
+
+    await AppDataSource.query(
+      `
+      INSERT INTO accounts (id, organization_id, branch_id, code, name, type, is_active, created_by, created_at, updated_at)
+      VALUES
+        ($1, $5, NULL, '1111', 'Tiền mặt',            'ASSET',   true, $5, NOW(), NOW()),
+        ($2, $5, NULL, '1121', 'Tiền gửi ngân hàng',  'ASSET',   true, $5, NOW(), NOW()),
+        ($3, $5, NULL, '5111', 'Doanh thu bán hàng',  'REVENUE', true, $5, NOW(), NOW()),
+        ($4, $5, NULL, '1311', 'Phải thu khách hàng', 'ASSET',   true, $5, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [IDS.accountCash, IDS.accountBank, IDS.accountRevenue, IDS.accountReceivable, IDS.organization],
     );
 
     await AppDataSource.query(
