@@ -105,7 +105,7 @@ export function PromotionSelectionModal({
       <AppDialog.Header title="Chương trình khuyến mãi" />
       <AppDialog.Body>
         {/* 4.5 Search input */}
-        <div className="px-6 pt-4">
+        <div className="w-full">
           <div className="relative w-full max-w-[400px]">
             <span
               aria-hidden="true"
@@ -130,7 +130,7 @@ export function PromotionSelectionModal({
         </div>
 
         {/* 4.6 Table */}
-        <div className="px-6 pt-4">
+        <div className="w-full pt-4">
           <PromotionTable
             rows={rows}
             selectedId={selectedId}
@@ -160,7 +160,6 @@ export function PromotionSelectionModal({
         ) : null}
       </AppDialog.Body>
       <AppDialog.Footer
-        className="mt-auto gap-3 px-6 pb-5 pt-3"
         onSave={handleConfirm}
         onCancel={onClose}
         saveDisabled={confirmDisabled}

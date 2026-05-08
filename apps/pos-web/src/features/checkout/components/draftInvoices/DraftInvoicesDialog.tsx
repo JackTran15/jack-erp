@@ -121,30 +121,27 @@ export function DraftInvoicesDialog({
       contentClassName="h-full bg-[#F1F2F5]"
     >
       <AppDialog.Header title="Hóa đơn chưa thanh toán" />
-      <AppDialog.Body>
-        <div className="p-6 pt-4 grow h-full gap-4 flex flex-col">
-          {/* 4.3 Filter bar */}
-          <FilterBar
-            search={searchState.value}
-            onSearchChange={searchState.setValue}
-            filter={filterState.value}
-            onFilterChange={filterState.setValue}
-          />
+      <AppDialog.Body className="flex flex-col gap-4">
+        {/* 4.3 Filter bar */}
+        <FilterBar
+          search={searchState.value}
+          onSearchChange={searchState.setValue}
+          filter={filterState.value}
+          onFilterChange={filterState.setValue}
+        />
 
-          {/* 4.5+ Two-pane body */}
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
-            <InvoiceListPanel
-              drafts={filteredDrafts}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onDelete={onDelete}
-            />
-            <InvoiceDetailPanel draft={selectedDraft} />
-          </div>
+        {/* 4.5+ Two-pane body */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
+          <InvoiceListPanel
+            drafts={filteredDrafts}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onDelete={onDelete}
+          />
+          <InvoiceDetailPanel draft={selectedDraft} />
         </div>
       </AppDialog.Body>
       <AppDialog.Footer
-        className="h-16 border-t border-gray-200 bg-white px-6"
         onSave={handleConfirm}
         onCancel={onClose}
         saveDisabled={!selectedDraft}
