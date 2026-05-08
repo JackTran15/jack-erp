@@ -18,6 +18,7 @@ import { BaseCrudService, CrudOperation } from '../crud/base-crud.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
 import { CustomerEntity } from './customer.entity';
+import { MembershipCardEntity, MembershipTier } from './membership-card.entity';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto';
 
 export const CUSTOMER_SERVICE_TOKEN = 'CustomerService';
@@ -33,10 +34,66 @@ export class CustomerService extends BaseCrudService<
   constructor(
     @InjectRepository(CustomerEntity)
     protected readonly repository: Repository<CustomerEntity>,
+    @InjectRepository(MembershipCardEntity)
+    private readonly cardRepository: Repository<MembershipCardEntity>,
     protected readonly dataSource: DataSource,
     private readonly eventPublisher: EventPublisher,
   ) {
     super(dataSource);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Create with optional membership card (transactional)
+  // ---------------------------------------------------------------------------
+
+  override async create(dto: CreateCustomerDto, actor: ActorContext): Promise<CustomerEntity> {
+    const { membershipCard, ...customerFields } = dto;
+
+    await this.validateBusinessRules('create', customerFields as CreateCustomerDto, actor);
+    const prepared = await this.beforeCreate(customerFields as CreateCustomerDto, actor);
+
+    let saved: CustomerEntity;
+
+    await this.dataSource.transaction(async (manager) => {
+      const entity = manager.create(CustomerEntity, {
+        ...prepared,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+      });
+      saved = await manager.save(entity);
+
+      if (membershipCard) {
+        const duplicate = await manager.findOne(MembershipCardEntity, {
+          where: { cardNumber: membershipCard.cardNumber, organizationId: actor.organizationId },
+        });
+        if (duplicate) {
+          throw new ConflictException(
+            `Membership card number "${membershipCard.cardNumber}" already exists in this organization`,
+          );
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const card = manager.create(MembershipCardEntity, {
+          organizationId: actor.organizationId,
+          customerId: saved.id,
+          cardNumber: membershipCard.cardNumber,
+          tier: membershipCard.tier ?? MembershipTier.NONE,
+          points: 0,
+          issuedAt: new Date(membershipCard.issuedAt ?? today),
+          expiresAt: membershipCard.expiresAt ? new Date(membershipCard.expiresAt) : undefined,
+          lomasCardNumber: membershipCard.lomasCardNumber,
+          lomasTier: membershipCard.lomasTier,
+          isActive: true,
+          createdBy: actor.userId,
+        });
+        await manager.save(card);
+      }
+    });
+
+    this.logger.log(`Created customer id=${saved!.id} (org=${actor.organizationId})`);
+    await this.afterCreate(saved!, actor);
+    return saved!;
   }
 
   // ---------------------------------------------------------------------------

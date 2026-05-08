@@ -255,6 +255,16 @@ export class JournalService {
     return { data, total, page, pageSize };
   }
 
+  async findBySourceRef(
+    sourceReferenceId: string,
+    orgId: string,
+  ): Promise<JournalEntryEntity | null> {
+    return this.entryRepo.findOne({
+      where: { sourceReferenceId, organizationId: orgId, status: JournalStatus.POSTED },
+      relations: ['lines'],
+    });
+  }
+
   async getById(
     id: string,
     actor: ActorContext,

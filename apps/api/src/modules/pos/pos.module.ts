@@ -3,7 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { StockLedgerModule } from '../inventory/ledger/stock-ledger.module';
 import { AccountingModule } from '../accounting/accounting.module';
+import { EventsModule } from '../events/events.module';
 import { WebSocketModule } from '../websocket/websocket.module';
+import { PromotionModule } from '../promotion/promotion.module';
 import {
   PosSessionEntity,
   SaleEntity,
@@ -12,6 +14,11 @@ import {
   ReturnEntity,
   ReturnLineEntity,
   SessionReconciliationEntity,
+  InvoiceEntity,
+  InvoiceItemEntity,
+  InvoicePaymentEntity,
+  InvoiceDebtEntity,
+  DebtPaymentEntity,
 } from './entities';
 import {
   PosSessionService,
@@ -20,7 +27,12 @@ import {
   ExchangeService,
   PosCatalogService,
 } from './services';
+import { InvoiceService } from './services/invoice.service';
+import { CheckoutInvoiceService } from './services/checkout-invoice.service';
+import { CancelInvoiceService } from './services/cancel-invoice.service';
+import { InvoiceDebtService } from './services/invoice-debt.service';
 import { PosController } from './pos.controller';
+import { InvoiceController } from './controllers/invoice.controller';
 
 @Module({
   imports: [
@@ -32,25 +44,38 @@ import { PosController } from './pos.controller';
       ReturnEntity,
       ReturnLineEntity,
       SessionReconciliationEntity,
+      InvoiceEntity,
+      InvoiceItemEntity,
+      InvoicePaymentEntity,
+      InvoiceDebtEntity,
+      DebtPaymentEntity,
     ]),
     DocumentNumberingModule,
     StockLedgerModule,
     AccountingModule,
+    EventsModule,
     WebSocketModule,
+    PromotionModule,
   ],
-  controllers: [PosController],
+  controllers: [PosController, InvoiceController],
   providers: [
     PosSessionService,
     CheckoutService,
     ReturnService,
     ExchangeService,
     PosCatalogService,
+    InvoiceService,
+    CheckoutInvoiceService,
+    CancelInvoiceService,
+    InvoiceDebtService,
   ],
   exports: [
     PosSessionService,
     CheckoutService,
     ReturnService,
     ExchangeService,
+    InvoiceService,
+    InvoiceDebtService,
   ],
 })
 export class PosModule {}

@@ -16,6 +16,10 @@ flowchart LR
   E2 --> E4["EPIC-004 PosAndAccounting"]
   E3 --> E4
   E4 --> E5["EPIC-005 ReportingAndHardening"]
+  E2 --> E7["EPIC-007 PosInvoiceCustomerPromotions"]
+  E3 --> E7
+  E4 --> E7
+  E6["EPIC-006 ProductVariantsCatalog"] --> E7
 ```
 
 ## Ticket Dependency Graph
@@ -88,4 +92,22 @@ flowchart LR
 - [EPIC-006 Product variants & catalog](./epics/EPIC-006-product-variants-catalog.md)
 - Tickets: [TKT-027](./tickets/TKT-027-inventory-product-schema.md) – [TKT-037](./tickets/TKT-037-product-variants-test-plan.md)
 - Dependencies: [TKT-DEP-006-dependencies.md](./TKT-DEP-006-dependencies.md)
+
+## EPIC-007 POS Invoice, Customer Loyalty & Promotions
+
+- [EPIC-007 POS Invoice, Customer Loyalty & Promotions](./epics/EPIC-007-pos-invoice-customer-promotions.md)
+- ERD: [docs/pos-erd.md](../docs/pos-erd.md)
+- Tickets: [TKT-038](./tickets/TKT-038-invoice-entities-migration.md) – [TKT-046](./tickets/TKT-046-promotion-apply-service.md)
+
+| Ticket | Mô tả |
+|---|---|
+| [TKT-038](./tickets/TKT-038-invoice-entities-migration.md) | Invoice + InvoiceItem entities & migration |
+| [TKT-039](./tickets/TKT-039-invoice-crud-api.md) | Invoice CRUD API (draft lifecycle) |
+| [TKT-040](./tickets/TKT-040-invoice-checkout-service.md) | Invoice checkout service (draft → paid \| debt) |
+| [TKT-041](./tickets/TKT-041-customer-module-extensions.md) | Customer extensions + CustomerGroup |
+| [TKT-042](./tickets/TKT-042-membership-card-api.md) | MembershipCard + PointHistory API |
+| [TKT-043](./tickets/TKT-043-invoice-debt-service.md) | InvoiceDebt + DebtPayment & debt flow |
+| [TKT-044](./tickets/TKT-044-purchase-history-api.md) | Purchase history API |
+| [TKT-045](./tickets/TKT-045-promotion-entities.md) | Promotion module entities |
+| [TKT-046](./tickets/TKT-046-promotion-apply-service.md) | Promotion apply service + InvoicePromotion |
 

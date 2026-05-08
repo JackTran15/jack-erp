@@ -5,3 +5,8 @@ export { PaymentEntity } from './payment.entity';
 export { ReturnEntity } from './return.entity';
 export { ReturnLineEntity } from './return-line.entity';
 export { SessionReconciliationEntity } from './session-reconciliation.entity';
+export { InvoiceEntity, InvoiceStatus, InvoicePaymentMethod } from './invoice.entity';
+export { InvoiceItemEntity } from './invoice-item.entity';
+export { InvoicePaymentEntity } from './invoice-payment.entity';
+export { InvoiceDebtEntity, DebtStatus, DebtDocumentType } from './invoice-debt.entity';
+export { DebtPaymentEntity, DebtPaymentMethod } from './debt-payment.entity';

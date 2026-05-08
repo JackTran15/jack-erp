@@ -14,6 +14,12 @@ export class UpdateCustomerDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(50)
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
   @MaxLength(200)
   name?: string;
 
