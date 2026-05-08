@@ -1,10 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { Dialog, DialogContent, cn } from "@erp/ui";
+import { AppDialog } from "../../../../../components/AppDialog";
 import { useDialogReset } from "../../../hooks/useDialogReset";
-import {
-  CheckoutDialogFooter,
-  CheckoutDialogHeader,
-} from "../../common/CheckoutDialogScaffold";
 import { VoucherApplyScopeEnum } from "../../../constants/voucher";
 import { PosSelect } from "../../common/forms/PosSelect";
 import type {
@@ -110,19 +106,17 @@ export function VoucherDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className={cn(
-          "flex max-h-[90vh] w-[95vw] max-w-[620px] flex-col gap-0 overflow-hidden p-0",
-          "rounded-lg bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
-        )}
-      >
-        {/* 4.2 Header */}
-        <CheckoutDialogHeader title="Voucher" />
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 pt-6">
-          <div className="flex flex-col gap-6">
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={620}
+      contentClassName="bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+    >
+      <AppDialog.Header title="Voucher" />
+      <AppDialog.Body>
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-6 pt-6">
+        <div className="flex flex-col gap-6">
             {/* 4.3 Voucher select */}
             <FormRow
               label={
@@ -221,14 +215,12 @@ export function VoucherDialog({
             ) : null}
           </div>
         </div>
-
-        {/* 4.9 Footer */}
-        <CheckoutDialogFooter
-          className="px-6 py-6"
-          onSave={handleApply}
-          onCancel={onClose}
-        />
-      </DialogContent>
-    </Dialog>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="px-6 py-6"
+        onSave={handleApply}
+        onCancel={onClose}
+      />
+    </AppDialog>
   );
 }

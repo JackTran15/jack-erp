@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, cn } from "@erp/ui";
 import type { DraftInvoice } from "../types";
-import {
-  CheckoutDialogFooter,
-  CheckoutDialogHeader,
-} from "../common/CheckoutDialogScaffold";
+import { AppDialog } from "../../../../components/AppDialog";
 import { useControllableState } from "../../hooks/useControllableState";
 import { useDialogReset } from "../../hooks/useDialogReset";
 import { FilterBar } from "./FilterBar";
@@ -118,42 +114,41 @@ export function DraftInvoicesDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className={cn(
-          "flex h-full max-h-[90vh] w-[95vw] max-w-[1280px] flex-col gap-4 overflow-hidden p-6",
-          "rounded-xl bg-[#F1F2F5] shadow-[0_24px_64px_rgba(15,20,36,0.18),0_8px_16px_rgba(15,20,36,0.08)]",
-        )}
-      >
-        {/* 4.2 Header */}
-        <CheckoutDialogHeader title="Hóa đơn chưa thanh toán" />
-
-        {/* 4.3 Filter bar */}
-        <FilterBar
-          search={searchState.value}
-          onSearchChange={searchState.setValue}
-          filter={filterState.value}
-          onFilterChange={filterState.setValue}
-        />
-
-        {/* 4.5+ Two-pane body */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
-          <InvoiceListPanel
-            drafts={filteredDrafts}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onDelete={onDelete}
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={1280}
+      contentClassName="h-full bg-[#F1F2F5]"
+    >
+      <AppDialog.Header title="Hóa đơn chưa thanh toán" />
+      <AppDialog.Body>
+        <div className="p-6 pt-4 grow h-full gap-4 flex flex-col">
+          {/* 4.3 Filter bar */}
+          <FilterBar
+            search={searchState.value}
+            onSearchChange={searchState.setValue}
+            filter={filterState.value}
+            onFilterChange={filterState.setValue}
           />
-          <InvoiceDetailPanel draft={selectedDraft} />
-        </div>
 
-        {/* 4.16 Footer */}
-        <CheckoutDialogFooter
-          onSave={handleConfirm}
-          onCancel={onClose}
-          saveDisabled={!selectedDraft}
-        />
-      </DialogContent>
-    </Dialog>
+          {/* 4.5+ Two-pane body */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
+            <InvoiceListPanel
+              drafts={filteredDrafts}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onDelete={onDelete}
+            />
+            <InvoiceDetailPanel draft={selectedDraft} />
+          </div>
+        </div>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="h-16 border-t border-gray-200 bg-white px-6"
+        onSave={handleConfirm}
+        onCancel={onClose}
+        saveDisabled={!selectedDraft}
+      />
+    </AppDialog>
   );
 }

@@ -1,15 +1,7 @@
 import { useCallback, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  cn,
-} from "@erp/ui";
 import { CustomerDetailTabKeyEnum } from "../../../constants/customer";
+import { AppDialog } from "../../../../../components/AppDialog";
 import { useDialogReset } from "../../../hooks/useDialogReset";
-import {
-  CheckoutDialogFooter,
-  CheckoutDialogHeader,
-} from "../../common/CheckoutDialogScaffold";
 import { CustomerDetailTabs } from "./CustomerDetailTabs";
 import { DebtTab } from "./DebtTab";
 import { InfoTab } from "./InfoTab";
@@ -69,15 +61,14 @@ export function CustomerDetailDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className={cn(
-          "flex max-h-[90vh] w-[95vw] max-w-[1020px] flex-col gap-0 overflow-hidden p-0",
-          "rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)]",
-        )}
-      >
-        <CheckoutDialogHeader title={`Khách hàng: ${data.identity.name}`} />
-
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={1020}
+      contentClassName="rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+    >
+      <AppDialog.Header title={`Khách hàng: ${data.identity.name}`} />
+      <AppDialog.Body>
         <CustomerDetailTabs activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -98,15 +89,14 @@ export function CustomerDetailDialog({
             <DebtTab rows={data.debts ?? []} />
           ) : null}
         </div>
-
-        <CheckoutDialogFooter
-          className="h-16 border-t border-gray-200 px-6"
-          onSave={footer.onPrimary}
-          saveLabel={footer.primaryLabel}
-          onCancel={onClose}
-        />
-      </DialogContent>
-    </Dialog>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="h-16 border-t border-gray-200 px-6"
+        onSave={footer.onPrimary}
+        saveLabel={footer.primaryLabel}
+        onCancel={onClose}
+      />
+    </AppDialog>
   );
 }
 

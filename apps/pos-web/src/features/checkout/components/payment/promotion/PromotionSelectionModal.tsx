@@ -1,11 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { Dialog, DialogContent, cn } from "@erp/ui";
+import { cn } from "@erp/ui";
+import { AppDialog } from "../../../../../components/AppDialog";
 import { useControllableState } from "../../../hooks/useControllableState";
 import { useDialogReset } from "../../../hooks/useDialogReset";
-import {
-  CheckoutDialogFooter,
-  CheckoutDialogHeader,
-} from "../../common/CheckoutDialogScaffold";
 import { PlusCircleIcon, SearchIcon } from "../../icons/Icon";
 import { PromotionTable } from "./PromotionTable";
 import type {
@@ -104,16 +101,9 @@ export function PromotionSelectionModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent
-        className={cn(
-          "flex max-h-[90vh] w-[95vw] max-w-[1072px] flex-col gap-0 overflow-hidden p-0",
-          "rounded-lg shadow-[0_20px_48px_rgba(15,23,42,0.12)]",
-        )}
-      >
-        {/* 4.2 Header — title + built-in close (rendered by DialogContent). */}
-        <CheckoutDialogHeader title="Chương trình khuyến mãi" />
-
+    <AppDialog open={open} onClose={onClose} width={1072}>
+      <AppDialog.Header title="Chương trình khuyến mãi" />
+      <AppDialog.Body>
         {/* 4.5 Search input */}
         <div className="px-6 pt-4">
           <div className="relative w-full max-w-[400px]">
@@ -168,15 +158,13 @@ export function PromotionSelectionModal({
             </button>
           </div>
         ) : null}
-
-        {/* 4.11 Footer — primary on the left, "Đóng" on the right (per spec). */}
-        <CheckoutDialogFooter
-          className="mt-auto gap-3 px-6 pb-5 pt-3"
-          onSave={handleConfirm}
-          onCancel={onClose}
-          saveDisabled={confirmDisabled}
-        />
-      </DialogContent>
-    </Dialog>
+      </AppDialog.Body>
+      <AppDialog.Footer
+        className="mt-auto gap-3 px-6 pb-5 pt-3"
+        onSave={handleConfirm}
+        onCancel={onClose}
+        saveDisabled={confirmDisabled}
+      />
+    </AppDialog>
   );
 }
