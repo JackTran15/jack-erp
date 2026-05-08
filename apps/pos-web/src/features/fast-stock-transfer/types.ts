@@ -9,6 +9,9 @@ export interface FastStockTransferFilters {
   transporter: string;
   product: string;
   location: string;
+  unit: string;
+  productName: string;
+  sku: string;
   showRowsNeedingReview: boolean;
 }
 

@@ -1,6 +1,4 @@
-import {
-  RefreshIcon,
-} from "@erp/pos/components/icons/Icon";
+import { RefreshIcon } from "@erp/pos/components/icons/Icon";
 import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import { PaginationButton } from "./PaginationButton";
 
@@ -87,6 +85,7 @@ export function PaginationBar({
         <label className="ml-2 inline-flex items-center gap-1 text-[14px] text-gray-500">
           <span className="sr-only">Số dòng/trang</span>
           <PosSelect
+            position="top"
             value={String(pageSize)}
             onChange={(next) => onPageSizeChange?.(Number.parseInt(next, 10))}
             options={pageSizeOptions.map((opt) => ({

@@ -18,6 +18,7 @@ export interface PosSelectProps<TValue extends string> {
   placeholder?: string;
   emptyText?: string;
   variant?: "boxed" | "underline";
+  position?: "top" | "bottom";
   showChevron?: boolean;
   className?: string;
   menuClassName?: string;
@@ -33,6 +34,7 @@ export function PosSelect<TValue extends string>({
   placeholder,
   emptyText = "Không có kết quả",
   variant = "boxed",
+  position = "bottom",
   showChevron = true,
   className,
   menuClassName,
@@ -158,6 +160,15 @@ export function PosSelect<TValue extends string>({
                 top: menuPosition.top,
                 left: menuPosition.left,
                 width: menuPosition.width,
+                ...(position === "top"
+                  ? {
+                      top:
+                        menuPosition.top -
+                        (menuRef.current?.clientHeight ?? 0) -
+                        (triggerRef.current?.clientHeight ?? 0) -
+                        8,
+                    }
+                  : {}),
                 opacity:
                   menuPosition.top === 0 && menuPosition.left === 0 ? 0 : 1,
               }}

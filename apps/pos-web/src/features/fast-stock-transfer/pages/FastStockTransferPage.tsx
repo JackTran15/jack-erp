@@ -57,6 +57,8 @@ export function FastStockTransferPage() {
           rows={rows}
           editingRowId={editingRowId}
           editableDraft={editableDraft}
+          filters={filters}
+          setFilter={setFilter}
           onStartEdit={handleStartEdit}
           onEditField={handleEditField}
           onSaveRow={handleSaveRow}
