@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   BellIcon,
   GridIcon,
@@ -37,6 +37,7 @@ export function InvoiceTabBar({
   userName,
 }: InvoiceTabBarProps) {
   const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const appMenuTriggerRef = useRef<HTMLButtonElement>(null);
   return (
     <header className="sticky top-0 z-10 flex h-11 items-center gap-1 border-b border-gray-200 bg-gray-100 px-2">
       <SapoLogo />
@@ -69,20 +70,20 @@ export function InvoiceTabBar({
         <IconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
         <IconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
         <UserMenu name={userName} />
-        <div className="relative">
-          <IconButton
-            ariaLabel="Menu ứng dụng"
-            icon={<GridIcon size={18} />}
-            active={appMenuOpen}
-            aria-expanded={appMenuOpen}
-            aria-haspopup="menu"
-            onClick={() => setAppMenuOpen((v) => !v)}
-          />
-          <AppMenuPopover
-            open={appMenuOpen}
-            onClose={() => setAppMenuOpen(false)}
-          />
-        </div>
+        <IconButton
+          ref={appMenuTriggerRef}
+          ariaLabel="Menu ứng dụng"
+          icon={<GridIcon size={18} />}
+          active={appMenuOpen}
+          aria-expanded={appMenuOpen}
+          aria-haspopup="menu"
+          onClick={() => setAppMenuOpen((v) => !v)}
+        />
+        <AppMenuPopover
+          open={appMenuOpen}
+          onClose={() => setAppMenuOpen(false)}
+          triggerRef={appMenuTriggerRef}
+        />
       </div>
     </header>
   );
