@@ -18,29 +18,25 @@ const TITLE_H = 40;
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 type Bounds = { x: number; y: number; w: number; h: number };
 
-type ActionContext = {
+type Action = {
+  kind: "drag" | "resize";
+  edge: ResizeEdge | null;
   startX: number;
   startY: number;
   origin: Bounds;
-  viewportW: number;
-  viewportH: number;
+  vw: number;
+  vh: number;
   pointerId: number;
   target: HTMLElement;
 };
 
-type PointerAction =
-  | ({ kind: "drag" } & ActionContext)
-  | ({ kind: "resize"; edge: ResizeEdge } & ActionContext);
-
 function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(Math.max(n, lo), hi);
+  return n < lo ? lo : n > hi ? hi : n;
 }
 
 function clampPosition(x: number, y: number, w: number, vw: number, vh: number) {
-  const maxX = vw - VIEW_MARGIN;
-  const minX = VIEW_MARGIN - w;
   return {
-    x: clamp(x, minX, maxX),
+    x: clamp(x, VIEW_MARGIN - w, vw - VIEW_MARGIN),
     y: clamp(y, 0, vh - TITLE_H),
   };
 }
@@ -59,9 +55,12 @@ function computeCentered(defaultWidth: number, defaultHeight: number, minW: numb
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const sized = clampSize(defaultWidth, defaultHeight, vw, vh, minW, minH);
-  const x = Math.max(VIEW_MARGIN, Math.round((vw - sized.w) / 2));
-  const y = Math.max(VIEW_MARGIN, Math.round((vh - sized.h) / 2));
-  return { x, y, w: sized.w, h: sized.h };
+  return {
+    x: Math.max(VIEW_MARGIN, Math.round((vw - sized.w) / 2)),
+    y: Math.max(VIEW_MARGIN, Math.round((vh - sized.h) / 2)),
+    w: sized.w,
+    h: sized.h,
+  };
 }
 
 export interface AppModalProps {
@@ -76,6 +75,12 @@ export interface AppModalProps {
   cancelLabel?: string;
   saveDisabled?: boolean;
   showFooter?: boolean;
+  /**
+   * Custom footer content. When provided, replaces the default Save/Cancel
+   * pair. Useful for dialogs that need additional actions (e.g. Trợ giúp,
+   * Lưu và thêm mới) or a different layout.
+   */
+  footer?: React.ReactNode;
   className?: string;
   defaultWidth?: number;
   defaultHeight?: number;
@@ -95,92 +100,69 @@ function AppModal({
   cancelLabel = "Huỷ",
   saveDisabled,
   showFooter = true,
+  footer,
   className,
   defaultWidth = 520,
   defaultHeight = 440,
   minWidth = DEFAULT_MIN_W,
   minHeight = DEFAULT_MIN_H,
 }: AppModalProps) {
-  // bounds is the resting (committed) state; React owns it.
-  // During drag/resize we mutate the DOM directly and only setBounds on pointerup.
   const [bounds, setBounds] = React.useState<Bounds>(() =>
     computeCentered(defaultWidth, defaultHeight, minWidth, minHeight),
   );
   const [maximized, setMaximized] = React.useState(false);
+
+  // Refs read inside the high-frequency pointermove handler. Updated on each
+  // render so the handler always sees fresh values without re-attaching.
   const boundsRef = React.useRef<Bounds>(bounds);
   const maximizedRef = React.useRef(false);
+  const minWidthRef = React.useRef(minWidth);
+  const minHeightRef = React.useRef(minHeight);
+  boundsRef.current = bounds;
+  maximizedRef.current = maximized;
+  minWidthRef.current = minWidth;
+  minHeightRef.current = minHeight;
+
   const preMaxRef = React.useRef<Bounds | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
-  const actionRef = React.useRef<PointerAction | null>(null);
-  const rafRef = React.useRef<number | null>(null);
-  const pendingRef = React.useRef<{ b: Bounds; sized: boolean } | null>(null);
+  const actionRef = React.useRef<Action | null>(null);
 
-  // Keep refs in sync with state.
-  React.useEffect(() => {
-    boundsRef.current = bounds;
-  }, [bounds]);
-  React.useEffect(() => {
-    maximizedRef.current = maximized;
-  }, [maximized]);
-
-  // Re-center whenever the dialog opens (resets any drag/resize/maximize from a prior session).
+  // Re-center whenever the dialog opens.
   React.useEffect(() => {
     if (!open) return;
     const next = computeCentered(defaultWidth, defaultHeight, minWidth, minHeight);
-    boundsRef.current = next;
     setBounds(next);
     setMaximized(false);
     preMaxRef.current = null;
   }, [open, defaultWidth, defaultHeight, minWidth, minHeight]);
 
-  const writeFrameToDom = React.useCallback((b: Bounds, sized: boolean) => {
-    const el = contentRef.current;
-    if (!el || maximizedRef.current) return;
-    el.style.transform = `translate3d(${b.x}px, ${b.y}px, 0)`;
-    if (sized) {
-      el.style.width = `${b.w}px`;
-      el.style.height = `${b.h}px`;
-    }
-  }, []);
-
-  const flushFrame = React.useCallback(() => {
-    rafRef.current = null;
-    const pending = pendingRef.current;
-    pendingRef.current = null;
-    if (!pending) return;
-    boundsRef.current = pending.b;
-    writeFrameToDom(pending.b, pending.sized);
-  }, [writeFrameToDom]);
-
-  const scheduleBounds = React.useCallback(
-    (next: Bounds, sized: boolean) => {
-      const prev = pendingRef.current;
-      pendingRef.current = { b: next, sized: sized || (prev?.sized ?? false) };
-      if (rafRef.current === null) {
-        rafRef.current = window.requestAnimationFrame(flushFrame);
-      }
-    },
-    [flushFrame],
-  );
-
-  const onPointerMove = React.useCallback(
-    (e: PointerEvent) => {
+  // Stable hot-path handlers — created once per mount, read fresh state via refs.
+  // This avoids re-attaching window listeners and lets us use passive: true.
+  const handlersRef = React.useRef<{
+    move: (e: PointerEvent) => void;
+    end: () => void;
+  } | null>(null);
+  if (handlersRef.current === null) {
+    const move = (e: PointerEvent) => {
       const action = actionRef.current;
       if (!action || maximizedRef.current) return;
+      const el = contentRef.current;
+      if (!el) return;
       const dx = e.clientX - action.startX;
       const dy = e.clientY - action.startY;
-      const { origin, viewportW: vw, viewportH: vh } = action;
+      const { origin, vw, vh, kind, edge } = action;
 
-      if (action.kind === "drag") {
+      if (kind === "drag") {
         const p = clampPosition(origin.x + dx, origin.y + dy, origin.w, vw, vh);
-        scheduleBounds({ x: p.x, y: p.y, w: origin.w, h: origin.h }, false);
+        boundsRef.current = { x: p.x, y: p.y, w: origin.w, h: origin.h };
+        el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`;
         return;
       }
 
-      const east = action.edge.includes("e");
-      const west = action.edge.includes("w");
-      const south = action.edge.includes("s");
-      const north = action.edge.includes("n");
+      const east = edge!.indexOf("e") >= 0;
+      const west = edge!.indexOf("w") >= 0;
+      const south = edge!.indexOf("s") >= 0;
+      const north = edge!.indexOf("n") >= 0;
 
       let w = origin.w;
       let h = origin.h;
@@ -188,7 +170,7 @@ function AppModal({
       if (west) w = origin.w - dx;
       if (south) h = origin.h + dy;
       if (north) h = origin.h - dy;
-      const sized = clampSize(w, h, vw, vh, minWidth, minHeight);
+      const sized = clampSize(w, h, vw, vh, minWidthRef.current, minHeightRef.current);
       w = sized.w;
       h = sized.h;
       let x = origin.x;
@@ -196,72 +178,72 @@ function AppModal({
       if (west) x = origin.x + origin.w - w;
       if (north) y = origin.y + origin.h - h;
       const p = clampPosition(x, y, w, vw, vh);
-      scheduleBounds({ x: p.x, y: p.y, w, h }, true);
-    },
-    [scheduleBounds, minWidth, minHeight],
-  );
-
-  const endAction = React.useCallback(() => {
-    const action = actionRef.current;
-    if (!action) return;
-    try {
-      action.target.releasePointerCapture(action.pointerId);
-    } catch {
-      /* ignore */
-    }
-    actionRef.current = null;
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", endAction);
-    window.removeEventListener("pointercancel", endAction);
-    document.body.style.userSelect = "";
-    document.body.style.cursor = "";
-    const el = contentRef.current;
-    if (el) el.style.willChange = "";
-    if (rafRef.current !== null) {
-      window.cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-      // Apply final pending frame synchronously.
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (pending) {
-        boundsRef.current = pending.b;
-        writeFrameToDom(pending.b, pending.sized);
+      boundsRef.current = { x: p.x, y: p.y, w, h };
+      el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`;
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+    };
+    const end = () => {
+      const action = actionRef.current;
+      if (!action) return;
+      try {
+        action.target.releasePointerCapture(action.pointerId);
+      } catch {
+        /* ignore */
       }
-    }
-    // Sync committed bounds back into React state.
-    setBounds(boundsRef.current);
-  }, [onPointerMove, writeFrameToDom]);
-
-  const beginAction = React.useCallback(
-    (kind: "drag" | "resize", edge: ResizeEdge | null, e: React.PointerEvent, cursor: string) => {
-      if (maximizedRef.current) return;
-      const target = e.currentTarget as HTMLElement;
-      target.setPointerCapture(e.pointerId);
-      actionRef.current = {
-        kind,
-        edge: edge as ResizeEdge,
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        origin: { ...boundsRef.current },
-        viewportW: window.innerWidth,
-        viewportH: window.innerHeight,
-        target,
-      } as PointerAction;
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = cursor;
+      actionRef.current = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
       const el = contentRef.current;
-      if (el) el.style.willChange = kind === "drag" ? "transform" : "transform, width, height";
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", endAction);
-      window.addEventListener("pointercancel", endAction);
-    },
-    [onPointerMove, endAction],
-  );
+      if (el) el.style.willChange = "";
+      // Sync the committed value back to React state.
+      setBounds(boundsRef.current);
+    };
+    handlersRef.current = { move, end };
+  }
 
+  const beginAction = (
+    kind: "drag" | "resize",
+    edge: ResizeEdge | null,
+    e: React.PointerEvent,
+    cursor: string,
+  ) => {
+    if (maximizedRef.current) return;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    actionRef.current = {
+      kind,
+      edge,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origin: boundsRef.current,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      target,
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = cursor;
+    const el = contentRef.current;
+    if (el) el.style.willChange = kind === "drag" ? "transform" : "transform, width, height";
+    const h = handlersRef.current!;
+    // skip the JS-blocked path and frees a frame of latency.
+    window.addEventListener("pointermove", h.move, { passive: true });
+    window.addEventListener("pointerup", h.end);
+    window.addEventListener("pointercancel", h.end);
+  };
+
+  // Cleanup on unmount.
   React.useEffect(() => {
     return () => {
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+      const h = handlersRef.current;
+      if (!h) return;
+      window.removeEventListener("pointermove", h.move);
+      window.removeEventListener("pointerup", h.end);
+      window.removeEventListener("pointercancel", h.end);
     };
   }, []);
 
@@ -275,10 +257,7 @@ function AppModal({
       const prev = preMaxRef.current;
       preMaxRef.current = null;
       setMaximized(false);
-      if (prev) {
-        boundsRef.current = prev;
-        setBounds(prev);
-      }
+      if (prev) setBounds(prev);
       return;
     }
     preMaxRef.current = { ...boundsRef.current };
@@ -397,16 +376,20 @@ function AppModal({
           </div>
 
           {showFooter ? (
-            <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:justify-end">
-              <Button type="button" variant="outline" onClick={handleCancel}>
-                {cancelLabel}
-              </Button>
-              {onSave ? (
-                <Button type="button" disabled={saveDisabled} onClick={() => void onSave()}>
-                  {saveLabel}
+            footer ? (
+              <div className="shrink-0 border-t bg-background px-4 py-3">{footer}</div>
+            ) : (
+              <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:justify-end">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  {cancelLabel}
                 </Button>
-              ) : null}
-            </DialogFooter>
+                {onSave ? (
+                  <Button type="button" disabled={saveDisabled} onClick={() => void onSave()}>
+                    {saveLabel}
+                  </Button>
+                ) : null}
+              </DialogFooter>
+            )
           ) : null}
         </div>
       </DialogContent>

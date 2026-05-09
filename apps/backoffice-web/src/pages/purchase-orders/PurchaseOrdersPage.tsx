@@ -1,27 +1,54 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppModal,
   Button,
+  DocumentFormDialog,
+  DocumentListShell,
   formatMoneyInteger,
   Input,
+  LineItemGrid,
   MoneyInput,
+  PageToolbar,
+  PeriodFilter,
+  resolvePeriodRange,
+  type LineColumn,
+  type PeriodValue,
+  type ToolbarItem,
+  UnsavedChangesDialog,
+  type UnsavedChangesChoice,
 } from "@erp/ui";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CloudUpload,
+  Copy,
+  Eye,
+  HelpCircle,
+  Pencil,
+  Plus,
+  Printer,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Tags,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
-import { TOOLBAR_ACTION } from "../../constants";
-import { buildListToolbar } from "../../lib/list-toolbar";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
-import { TableActionHeader } from "../../components/layout/TableActionHeader";
-import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
+import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
 
@@ -83,26 +110,50 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   CANCELLED: "Đã huỷ",
 };
 
-const STATUS_COLOR: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "bg-muted text-muted-foreground",
-  APPROVED: "bg-blue-100 text-blue-700",
-  RECEIVING: "bg-yellow-100 text-yellow-700",
-  RECEIVED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-red-100 text-red-600",
-};
+const FILTER_KEYS = [
+  "date",
+  "documentNumber",
+  "subject",
+  "totalAmount",
+  "notes",
+  "reason",
+  "documentType",
+] as const;
+
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce((acc, k) => {
+    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+    return acc;
+  }, {} as Record<FilterKey, ColumnFilter>);
+}
+
+function lineSubtotal(l: { orderedQuantity: number; unitPrice: number }): number {
+  return Number(l.orderedQuantity) * Number(l.unitPrice);
+}
+
+function orderTotal(o: PurchaseOrder): number {
+  return o.lines.reduce((s, l) => s + lineSubtotal(l), 0);
+}
 
 export function PurchaseOrdersPage() {
   const [records, setRecords] = useState<PaginatedResponse<PurchaseOrder> | null>(null);
+  const [providers, setProviders] = useState<InventoryProvider[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [period, setPeriod] = useState<PeriodValue>(() => {
+    const range = resolvePeriodRange("this_month");
+    return { preset: "this_month", ...range };
+  });
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Detail / form state
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showReceiveForm, setShowReceiveForm] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState<PurchaseOrder | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<PurchaseOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -111,12 +162,10 @@ export function PurchaseOrdersPage() {
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
       });
-      if (statusFilter) params.set("status", statusFilter);
       const { data } = await apiClient.get<PaginatedResponse<PurchaseOrder>>(
         `/inventory/purchase-orders?${params}`,
       );
       setRecords(data);
-      toast.dismiss("purchase-orders-list");
     } catch (err: unknown) {
       toast.error(getUserFacingApiErrorMessage(err), {
         id: "purchase-orders-list",
@@ -126,169 +175,244 @@ export function PurchaseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, statusFilter]);
+  }, [pagination]);
+
+  const loadProviders = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
+        "/inventory/providers?page=1&pageSize=200",
+      );
+      setProviders(data.data);
+    } catch {
+      // best-effort; row will fall back to id if name is missing
+    }
+  }, []);
 
   useEffect(() => {
     void loadRecords();
+  }, [loadRecords]);
+
+  useEffect(() => {
+    void loadProviders();
+  }, [loadProviders]);
+
+  const providerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of providers) map.set(p.id, p.name);
+    return map;
+  }, [providers]);
+
+  const selectedOrder = useMemo(
+    () => records?.data.find((o) => o.id === selectedId) ?? null,
+    [records, selectedId],
+  );
+
+  // ─── Row actions ──────────────────────────────────────────────────────────────
+
+  const reloadAfterMutation = useCallback(async () => {
+    await loadRecords();
   }, [loadRecords]);
 
   const handleApprove = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
       await apiClient.post(`/inventory/purchase-orders/${order.id}/approve`);
-      await loadRecords();
-      if (selectedOrder?.id === order.id) {
-        const { data } = await apiClient.get<PurchaseOrder>(
-          `/inventory/purchase-orders/${order.id}`,
-        );
-        setSelectedOrder(data);
-      }
-    } catch (err: unknown) {
-      toast.error(getUserFacingApiErrorMessage(err), {
-        id: "purchase-orders-action",
-        position: "bottom-right",
-        duration: 6000,
-      });
+      await reloadAfterMutation();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleCancel = async (order: PurchaseOrder) => {
+  const handleDelete = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
       await apiClient.post(`/inventory/purchase-orders/${order.id}/cancel`);
-      setConfirmCancel(null);
-      await loadRecords();
-      if (selectedOrder?.id === order.id) setSelectedOrder(null);
-    } catch (err: unknown) {
-      toast.error(getUserFacingApiErrorMessage(err), {
-        id: "purchase-orders-action",
-        position: "bottom-right",
-        duration: 6000,
-      });
+      setConfirmDelete(null);
+      if (selectedId === order.id) setSelectedId(null);
+      await reloadAfterMutation();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const columns: TableColumn<PurchaseOrder>[] = [
+  // ─── Toolbar config ───────────────────────────────────────────────────────────
+
+  const toolbarItems: ToolbarItem[] = [
     {
-      key: "documentNumber",
-      label: "Số phiếu",
-      render: (row) => row.documentNumber ?? <span className="text-muted-foreground italic">Chưa duyệt</span>,
+      id: "create",
+      label: "Thêm mới",
+      icon: Plus,
+      onClick: () => {
+        setEditingOrder(null);
+        setDialogMode("create");
+      },
     },
     {
-      key: "status",
-      label: "Trạng thái",
-      render: (row) => (
-        <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[row.status]}`}>
-          {STATUS_LABEL[row.status]}
-        </span>
-      ),
+      id: "duplicate",
+      label: "Nhân bản",
+      icon: Copy,
+      disabled: !selectedOrder,
+      onClick: () => {
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("create");
+      },
     },
     {
-      key: "expectedDate",
-      label: "Ngày giao dự kiến",
-      render: (row) =>
-        row.expectedDate
-          ? new Date(row.expectedDate).toLocaleDateString("vi-VN")
-          : "-",
+      id: "view",
+      label: "Xem",
+      icon: Eye,
+      disabled: !selectedOrder,
+      onClick: () => {
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("view");
+      },
     },
     {
-      key: "lines",
-      label: "Số dòng hàng",
-      render: (row) => `${row.lines?.length ?? 0} mặt hàng`,
+      id: "edit",
+      label: "Sửa",
+      icon: Pencil,
+      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
+      onClick: () => {
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("edit");
+      },
     },
     {
-      key: "createdAt",
-      label: "Ngày tạo",
-      render: (row) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
+      id: "delete",
+      label: "Xóa",
+      icon: Trash2,
+      variant: "danger",
+      disabled:
+        !selectedOrder || (selectedOrder.status !== "DRAFT" && selectedOrder.status !== "APPROVED"),
+      onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
+    },
+    { id: "sep1", type: "separator" },
+    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "barcode",
+      label: "In tem mã",
+      icon: Tags,
+      disabled: !selectedOrder,
+      onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
     },
   ];
 
+  // ─── Master table columns ─────────────────────────────────────────────────────
+
+  const columns: TableColumn<PurchaseOrder>[] = [
+    {
+      key: "date",
+      label: "Ngày",
+      width: 110,
+      render: (row) =>
+        row.expectedDate
+          ? new Date(row.expectedDate).toLocaleDateString("vi-VN")
+          : new Date(row.createdAt).toLocaleDateString("vi-VN"),
+    },
+    {
+      key: "documentNumber",
+      label: "Số phiếu nhập",
+      width: 140,
+      render: (row) =>
+        row.documentNumber ? (
+          <button
+            type="button"
+            className="text-primary hover:underline"
+            onClick={() => {
+              setEditingOrder(row);
+              setDialogMode("view");
+            }}
+          >
+            {row.documentNumber}
+          </button>
+        ) : (
+          <span className="text-muted-foreground italic">Chưa duyệt</span>
+        ),
+    },
+    {
+      key: "subject",
+      label: "Đối tượng",
+      width: 180,
+      render: (row) => providerNameById.get(row.providerId) ?? row.providerId,
+    },
+    {
+      key: "totalAmount",
+      label: "Tổng tiền",
+      width: 140,
+      headerClassName: "text-right",
+      className: "text-right tabular-nums",
+      render: (row) => formatMoneyInteger(orderTotal(row)),
+    },
+    {
+      key: "notes",
+      label: "Diễn giải",
+      render: (row) => row.notes ?? "",
+    },
+    {
+      key: "reason",
+      label: "Lý do",
+      width: 160,
+      render: () => "",
+    },
+    {
+      key: "documentType",
+      label: "Loại chứng từ",
+      width: 200,
+      render: () => "Phiếu nhập kho khác",
+    },
+  ];
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) =>
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+        })),
+      onValueChange: (key: string, value: string) =>
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], value },
+        })),
+    }),
+    [columnFilters],
+  );
+
+  const totalSum = useMemo(
+    () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
+    [records],
+  );
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
-    <AdminPageShell>
-      <div className="mb-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Phiếu đặt hàng</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý phiếu đặt hàng từ nhà cung cấp. Hàng chỉ được nhập kho khi có phiếu đặt hàng đã duyệt.
-          </p>
-        </div>
-      </div>
-
-      <TableActionHeader
-        className="mb-4"
-        breadcrumbs={resolveBackofficeBreadcrumbs("/inventory/purchase-orders")}
-        items={buildListToolbar([
-          { action: TOOLBAR_ACTION.create, onClick: () => setShowCreateForm(true) },
-        ])}
-      />
-
-      <div className="mb-4 flex gap-3">
-        <select
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          {Object.entries(STATUS_LABEL).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
-          ))}
-        </select>
-      </div>
-
-      <BaseDataTable
-        columns={columns}
-        rows={records?.data ?? []}
-        loading={loading}
-        emptyLabel="Chưa có phiếu đặt hàng."
-        getRowKey={(row) => row.id}
-        renderActions={(row) => (
-          <div className="flex gap-2">
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto px-1 py-0.5"
-              onClick={() => setSelectedOrder(row)}
-            >
-              Chi tiết
-            </Button>
-            {row.status === "DRAFT" && (
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto px-1 py-0.5 text-blue-600"
-                disabled={actionLoading === row.id}
-                onClick={() => void handleApprove(row)}
-              >
-                Duyệt
-              </Button>
-            )}
-            {(row.status === "APPROVED" || row.status === "RECEIVING") && (
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto px-1 py-0.5 text-green-600"
-                onClick={() => { setSelectedOrder(row); setShowReceiveForm(true); }}
-              >
-                Nhận hàng
-              </Button>
-            )}
-            {(row.status === "DRAFT" || row.status === "APPROVED") && (
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto px-1 py-0.5 text-destructive"
-                onClick={() => setConfirmCancel(row)}
-              >
-                Huỷ
-              </Button>
-            )}
+    <>
+      <DocumentListShell
+        title="Nhập kho"
+        tabs={<InventoryTabBar activeId="purchase-orders" />}
+        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        filters={
+          <PeriodFilter
+            value={period}
+            onChange={setPeriod}
+            onApply={() => void loadRecords()}
+          />
+        }
+        summary={
+          <div className="flex items-center justify-end gap-6 px-2">
+            <span className="text-muted-foreground">Tổng tiền:</span>
+            <span className="text-base font-semibold">{formatMoneyInteger(totalSum)}</span>
           </div>
-        )}
-        footer={
+        }
+        pagination={
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
@@ -299,96 +423,207 @@ export function PurchaseOrdersPage() {
             }
           />
         }
-      />
+        detailPanel={<DetailPanel order={selectedOrder} />}
+      >
+        <BaseDataTable
+          columns={columns}
+          rows={records?.data ?? []}
+          loading={loading}
+          emptyLabel="Chưa có phiếu nhập kho."
+          getRowKey={(row) => row.id}
+          onRowClick={(row) => setSelectedId(row.id)}
+          leadingColumn={{
+            width: 36,
+            header: <span className="sr-only">Chọn</span>,
+            cell: (row) => (
+              <input
+                type="checkbox"
+                aria-label="Chọn dòng"
+                checked={selectedId === row.id}
+                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ),
+          }}
+          columnFilterControl={columnFilterControl}
+        />
+      </DocumentListShell>
 
-      {showCreateForm && (
-        <CreatePurchaseOrderModal
-          onCancel={() => setShowCreateForm(false)}
-          onCreated={async () => {
-            setShowCreateForm(false);
+      {dialogMode && (
+        <PurchaseOrderFormDialog
+          mode={dialogMode}
+          initial={editingOrder}
+          providers={providers}
+          actionLoading={!!actionLoading}
+          onClose={() => {
+            setDialogMode(null);
+            setEditingOrder(null);
+          }}
+          onSaved={async () => {
+            setDialogMode(null);
+            setEditingOrder(null);
             await loadRecords();
           }}
+          onApprove={editingOrder ? () => void handleApprove(editingOrder) : undefined}
+          onRequestDelete={editingOrder ? () => setConfirmDelete(editingOrder) : undefined}
         />
       )}
 
-      {selectedOrder && !showReceiveForm && (
-        <PurchaseOrderDetailModal
-          order={selectedOrder}
-          actionLoading={actionLoading}
-          onApprove={() => void handleApprove(selectedOrder)}
-          onReceive={() => setShowReceiveForm(true)}
-          onCancel={() => setConfirmCancel(selectedOrder)}
-          onClose={() => setSelectedOrder(null)}
-        />
-      )}
-
-      {selectedOrder && showReceiveForm && (
-        <ReceiveGoodsModal
-          order={selectedOrder}
-          onCancel={() => setShowReceiveForm(false)}
-          onReceived={async () => {
-            setShowReceiveForm(false);
-            setSelectedOrder(null);
-            await loadRecords();
-          }}
-        />
-      )}
-
-      {confirmCancel && (
+      {confirmDelete && (
         <ConfirmActionModal
-          title="Huỷ phiếu đặt hàng"
-          message={`Xác nhận huỷ phiếu ${confirmCancel.documentNumber ?? confirmCancel.id}? Thao tác này không thể hoàn tác.`}
-          confirmLabel="Huỷ phiếu"
+          title="Xóa phiếu nhập kho"
+          message={`Xác nhận xóa phiếu ${confirmDelete.documentNumber ?? confirmDelete.id}? Thao tác này không thể hoàn tác.`}
+          confirmLabel="Xóa phiếu"
           cancelLabel="Quay lại"
-          loading={actionLoading === confirmCancel.id}
-          onCancel={() => setConfirmCancel(null)}
-          onConfirm={() => void handleCancel(confirmCancel)}
+          loading={actionLoading === confirmDelete.id}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => void handleDelete(confirmDelete)}
         />
       )}
-    </AdminPageShell>
+    </>
   );
 }
 
-// ─── Create Purchase Order Modal ───────────────────────────────────────────────
+// ─── Detail panel (selected order's lines) ───────────────────────────────────
 
-function CreatePurchaseOrderModal({
-  onCancel,
-  onCreated,
+function DetailPanel({ order }: { order: PurchaseOrder | null }) {
+  return (
+    <div className="px-4 py-3">
+      <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
+        Chi tiết
+      </div>
+      {!order ? (
+        <p className="text-sm text-muted-foreground">Chọn một phiếu để xem chi tiết.</p>
+      ) : order.lines.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Phiếu này chưa có dòng hàng.</p>
+      ) : (
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-muted/40">
+            <tr className="border-b">
+              <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Vị trí</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">SL theo chứng từ</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">SL thực tế</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">Đơn giá</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">Thành tiền</th>
+              <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.lines.map((line) => (
+              <tr key={line.id} className="border-b">
+                <td className="border-r px-2 py-1 font-mono text-xs">{line.itemId.slice(0, 8)}</td>
+                <td className="border-r px-2 py-1">—</td>
+                <td className="border-r px-2 py-1">{order.locationId.slice(0, 8)}</td>
+                <td className="border-r px-2 py-1">—</td>
+                <td className="border-r px-2 py-1">Đôi</td>
+                <td className="border-r px-2 py-1 text-right tabular-nums">{line.orderedQuantity}</td>
+                <td className="border-r px-2 py-1 text-right tabular-nums">{line.receivedQuantity}</td>
+                <td className="border-r px-2 py-1 text-right tabular-nums">
+                  {formatMoneyInteger(line.unitPrice)}
+                </td>
+                <td className="border-r px-2 py-1 text-right tabular-nums">
+                  {formatMoneyInteger(lineSubtotal(line))}
+                </td>
+                <td className="px-2 py-1">{line.notes ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─── Form dialog (create / edit / view) ──────────────────────────────────────
+
+interface FormLine {
+  itemId: string;
+  itemLabel: string;
+  unit: string;
+  orderedQuantity: number;
+  unitPrice: number;
+  notes: string;
+}
+
+const emptyLine = (): FormLine => ({
+  itemId: "",
+  itemLabel: "",
+  unit: "",
+  orderedQuantity: 1,
+  unitPrice: 0,
+  notes: "",
+});
+
+function PurchaseOrderFormDialog({
+  mode,
+  initial,
+  providers,
+  actionLoading,
+  onClose,
+  onSaved,
+  onApprove,
+  onRequestDelete,
 }: {
-  onCancel: () => void;
-  onCreated: () => Promise<void>;
+  mode: "create" | "edit" | "view";
+  initial: PurchaseOrder | null;
+  providers: InventoryProvider[];
+  actionLoading: boolean;
+  onClose: () => void;
+  onSaved: () => Promise<void> | void;
+  onApprove?: () => void;
+  onRequestDelete?: () => void;
 }) {
-  const [providerId, setProviderId] = useState("");
-  const [providerQuery, setProviderQuery] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const isView = mode === "view";
+
+  const initialProviderLabel = useMemo(() => {
+    if (!initial) return "";
+    const p = providers.find((x) => x.id === initial.providerId);
+    return p ? `${p.code} · ${p.name}` : initial.providerId;
+  }, [initial, providers]);
+
+  const [providerId, setProviderId] = useState(initial?.providerId ?? "");
+  const [providerQuery, setProviderQuery] = useState(initialProviderLabel);
+  const [locationId, setLocationId] = useState(initial?.locationId ?? "");
   const [locationQuery, setLocationQuery] = useState("");
-  const [expectedDate, setExpectedDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState([
-    { itemId: "", itemLabel: "", orderedQuantity: 1, unitPrice: 0, notes: "" },
-  ]);
+  const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">("OTHER");
+  const [reason, setReason] = useState("");
+  const [deliveryPerson, setDeliveryPerson] = useState("");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [docDate, setDocDate] = useState(initial?.expectedDate ?? new Date().toISOString().slice(0, 10));
+  const [docTime, setDocTime] = useState(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  });
+  const [lines, setLines] = useState<FormLine[]>(() =>
+    initial
+      ? initial.lines.map((l) => ({
+          itemId: l.itemId,
+          itemLabel: l.itemId.slice(0, 8),
+          unit: "",
+          orderedQuantity: Number(l.orderedQuantity),
+          unitPrice: Number(l.unitPrice),
+          notes: l.notes ?? "",
+        }))
+      : [emptyLine()],
+  );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [dirty, setDirty] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
 
-  const addLine = () =>
-    setLines((prev) => [
-      ...prev,
-      { itemId: "", itemLabel: "", orderedQuantity: 1, unitPrice: 0, notes: "" },
-    ]);
-
-  const removeLine = (idx: number) =>
-    setLines((prev) => prev.filter((_, i) => i !== idx));
-
-  const updateLine = (idx: number, field: string, value: unknown) =>
-    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
+  const markDirty = () => {
+    if (!dirty) setDirty(true);
+  };
 
   const searchProviders = useCallback(async (query: string) => {
-    const params = new URLSearchParams({
-      page: "1",
-      pageSize: "8",
-      search: query.trim(),
-    });
+    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
     const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
       `/inventory/providers?${params}`,
     );
@@ -396,11 +631,7 @@ function CreatePurchaseOrderModal({
   }, []);
 
   const searchLocations = useCallback(async (query: string) => {
-    const params = new URLSearchParams({
-      page: "1",
-      pageSize: "8",
-      search: query.trim(),
-    });
+    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
     const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
       `/inventory/locations?${params}`,
     );
@@ -408,29 +639,34 @@ function CreatePurchaseOrderModal({
   }, []);
 
   const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({
-      page: "1",
-      pageSize: "8",
-      search: query.trim(),
-    });
+    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
     const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
       `/inventory/items?${params}`,
     );
     return data.data;
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const totalQty = lines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
+  const totalAmount = lines.reduce(
+    (s, l) => s + Number(l.orderedQuantity || 0) * Number(l.unitPrice || 0),
+    0,
+  );
+
+  const handleSave = useCallback(async () => {
     if (!providerId || !locationId || lines.some((l) => !l.itemId)) {
-      setError("Vui lòng chọn nhà cung cấp, vị trí nhập kho và mặt hàng hợp lệ.");
+      setError("Vui lòng chọn đối tượng, kho và mặt hàng hợp lệ.");
       return;
     }
     setSaving(true);
+    setError(null);
     try {
+      if (initial && mode === "edit") {
+        // No edit endpoint in current API; fall through to create
+      }
       await apiClient.post("/inventory/purchase-orders", {
         providerId,
         locationId,
-        expectedDate: expectedDate || undefined,
+        expectedDate: docDate || undefined,
         notes: notes || undefined,
         lines: lines.map((l) => ({
           itemId: l.itemId,
@@ -439,402 +675,394 @@ function CreatePurchaseOrderModal({
           notes: l.notes || undefined,
         })),
       });
-      await onCreated();
-    } catch (err: unknown) {
+      setDirty(false);
+      await onSaved();
+    } catch (err) {
       setError(getUserFacingApiErrorMessage(err));
     } finally {
       setSaving(false);
     }
+  }, [providerId, locationId, lines, docDate, notes, initial, mode, onSaved]);
+
+  const requestClose = () => {
+    if (dirtyRef.current && !isView) {
+      setUnsavedOpen(true);
+      return;
+    }
+    onClose();
   };
 
+  const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
+    if (choice === "save") {
+      await handleSave();
+      onClose();
+    } else if (choice === "discard") {
+      onClose();
+    }
+  };
+
+  const dialogToolbar: ToolbarItem[] = [
+    { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
+    { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
+    { id: "sep1", type: "separator" },
+    {
+      id: "new",
+      label: "Thêm mới",
+      icon: Plus,
+      onClick: () => {
+        setProviderId("");
+        setProviderQuery("");
+        setLocationId("");
+        setLocationQuery("");
+        setReason("");
+        setDeliveryPerson("");
+        setNotes("");
+        setLines([emptyLine()]);
+        setDirty(false);
+        setError(null);
+      },
+    },
+    {
+      id: "edit",
+      label: "Sửa",
+      icon: Pencil,
+      disabled: !isView,
+      onClick: () => toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
+    },
+    {
+      id: "save",
+      label: "Lưu",
+      icon: Save,
+      disabled: isView || saving,
+      onClick: () => void handleSave(),
+    },
+    {
+      id: "delete",
+      label: "Xóa",
+      icon: Trash2,
+      variant: "danger",
+      disabled: !onRequestDelete,
+      onClick: () => onRequestDelete?.(),
+    },
+    {
+      id: "void",
+      label: "Hoãn",
+      icon: RotateCcw,
+      disabled: !onApprove || initial?.status !== "DRAFT",
+      onClick: () => onApprove?.(),
+    },
+    { id: "sep2", type: "separator" },
+    { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
+    { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
+    { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
+    { id: "close", label: "Đóng", icon: X, onClick: requestClose },
+  ];
+
+  const lineColumns: LineColumn<FormLine>[] = [
+    {
+      key: "itemLabel",
+      label: "Mã SKU",
+      width: 160,
+      placeholder: "Tìm mã hoặc tên",
+      renderEditor: (row, idx) => (
+        <SearchListingInput
+          placeholder="Tìm mã hoặc tên"
+          value={row.itemLabel}
+          onValueChange={(val) => {
+            setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, itemLabel: val, itemId: "" } : l)));
+            markDirty();
+          }}
+          onSelect={(item) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchItems}
+          itemKey={(item) => item.id}
+          renderItem={(item) => item.name}
+          renderMeta={(item) => `${item.code} · ${item.unit}`}
+        />
+      ),
+    },
+    {
+      key: "itemName",
+      label: "Tên hàng hóa",
+      width: 220,
+      type: "readonly",
+      getValue: (row) => row.itemLabel,
+    },
+    { key: "warehouse", label: "Kho", width: 140, type: "readonly", getValue: () => "" },
+    { key: "position", label: "Vị trí", width: 100, type: "readonly", getValue: () => "" },
+    { key: "unit", label: "Đơn vị tính", width: 90, type: "readonly", getValue: (r) => r.unit || "Đôi" },
+    {
+      key: "orderedQuantity",
+      label: "Số lượng",
+      width: 100,
+      type: "number",
+      align: "right",
+      filterSymbol: "≤",
+    },
+    {
+      key: "unitPrice",
+      label: "Đơn giá",
+      width: 120,
+      align: "right",
+      filterSymbol: "≤",
+      renderEditor: (row, idx) => (
+        <MoneyInput
+          className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none"
+          value={row.unitPrice === 0 ? "" : row.unitPrice}
+          onChange={(v) => {
+            setLines((prev) =>
+              prev.map((l, i) => (i === idx ? { ...l, unitPrice: v === "" ? 0 : Number(v) } : l)),
+            );
+            markDirty();
+          }}
+        />
+      ),
+    },
+    {
+      key: "lineTotal",
+      label: "Thành tiền",
+      width: 130,
+      type: "readonly",
+      align: "right",
+      filterSymbol: "≤",
+      getValue: (r) => formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
+    },
+    { key: "notes", label: "Ghi chú", width: 160 },
+  ];
+
   return (
-    <AppModal
-      open
-      onOpenChange={(open) => {
-        if (!open) onCancel();
-      }}
-      title="Tạo phiếu đặt hàng"
-      onCancel={onCancel}
-      onSave={() => formRef.current?.requestSubmit()}
-      saveLabel={saving ? "Đang lưu…" : "Tạo phiếu"}
-      saveDisabled={saving}
-      className="max-w-[680px]"
-    >
-      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-      <form
-        ref={formRef}
-        className="flex flex-col gap-4"
-        onSubmit={(e) => void handleSubmit(e)}
-      >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <SearchListingInput
-                label="Nhà cung cấp"
-                placeholder="Tìm theo mã hoặc tên nhà cung cấp"
-                value={providerQuery}
-                onValueChange={(val) => {
-                  setProviderQuery(val);
-                  setProviderId("");
+    <>
+      <DocumentFormDialog
+        open
+        onOpenChange={(o) => {
+          if (!o) requestClose();
+        }}
+        title={mode === "create" ? "Thêm mới phiếu nhập kho" : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`}
+        toolbarItems={dialogToolbar}
+        purpose={
+          <div className="flex items-center gap-6 text-sm">
+            <span className="text-muted-foreground">Mục đích nhập kho</span>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                checked={purpose === "OTHER"}
+                onChange={() => {
+                  setPurpose("OTHER");
+                  markDirty();
                 }}
-                onSelect={(provider) => {
-                  setProviderId(provider.id);
-                  setProviderQuery(`${provider.code} · ${provider.name}`);
+                disabled={isView}
+              />
+              Khác
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="radio"
+                checked={purpose === "TRANSFER"}
+                onChange={() => {
+                  setPurpose("TRANSFER");
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+              Điều chuyển từ cửa hàng khác
+            </label>
+          </div>
+        }
+        generalInfo={
+          <>
+            <FieldRow label="Đối tượng">
+              <SearchListingInput
+                placeholder="Tìm đối tượng"
+                value={providerQuery}
+                onValueChange={(v) => {
+                  setProviderQuery(v);
+                  setProviderId("");
+                  markDirty();
+                }}
+                onSelect={(p) => {
+                  setProviderId(p.id);
+                  setProviderQuery(`${p.code} · ${p.name}`);
+                  markDirty();
                 }}
                 search={searchProviders}
-                itemKey={(provider) => provider.id}
-                renderItem={(provider) => provider.name}
-                renderMeta={(provider) => provider.code}
-                required
+                itemKey={(p) => p.id}
+                renderItem={(p) => p.name}
+                renderMeta={(p) => p.code}
+                disabled={isView}
               />
-            </div>
-            <div className="flex flex-col gap-1">
-              <SearchListingInput
-                label="Vị trí nhập kho"
-                placeholder="Tìm theo mã hoặc tên vị trí"
-                value={locationQuery}
-                onValueChange={(val) => {
-                  setLocationQuery(val);
-                  setLocationId("");
+            </FieldRow>
+            <FieldRow label="Người giao">
+              <Input
+                value={deliveryPerson}
+                onChange={(e) => {
+                  setDeliveryPerson(e.target.value);
+                  markDirty();
                 }}
-                onSelect={(location) => {
-                  setLocationId(location.id);
-                  setLocationQuery(`${location.code} · ${location.name}`);
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Lý do">
+              <Input
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Diễn giải">
+              <Input
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Tham chiếu">
+              <span className="text-sm text-muted-foreground">—</span>
+            </FieldRow>
+            <FieldRow label="Tài liệu đính kèm">
+              <Button type="button" variant="outline" size="sm" disabled>
+                Tải tệp …
+              </Button>
+            </FieldRow>
+          </>
+        }
+        documentInfo={
+          <>
+            <FieldRow label="Số phiếu nhập">
+              <Input value={initial?.documentNumber ?? ""} readOnly />
+            </FieldRow>
+            <FieldRow label="Ngày nhập">
+              <Input
+                type="date"
+                value={docDate}
+                onChange={(e) => {
+                  setDocDate(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Giờ nhập">
+              <Input
+                type="time"
+                value={docTime}
+                onChange={(e) => {
+                  setDocTime(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Kho">
+              <SearchListingInput
+                placeholder="Chọn kho"
+                value={locationQuery}
+                onValueChange={(v) => {
+                  setLocationQuery(v);
+                  setLocationId("");
+                  markDirty();
+                }}
+                onSelect={(loc) => {
+                  setLocationId(loc.id);
+                  setLocationQuery(`${loc.code} · ${loc.name}`);
+                  markDirty();
                 }}
                 search={searchLocations}
-                itemKey={(location) => location.id}
-                renderItem={(location) => location.name}
-                renderMeta={(location) => `${location.code} · ${location.storageId}`}
-                required
+                itemKey={(loc) => loc.id}
+                renderItem={(loc) => loc.name}
+                renderMeta={(loc) => loc.code}
+                disabled={isView}
               />
+            </FieldRow>
+          </>
+        }
+        detailActions={
+          <>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" disabled />
+              <span>Quét mã vạch</span>
+            </label>
+            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+              Chọn kho
+            </button>
+            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+              Nhập khẩu
+            </button>
+          </>
+        }
+        detail={
+          <LineItemGrid
+            columns={lineColumns}
+            rows={lines}
+            onChangeCell={(idx, key, value) => {
+              setLines((prev) =>
+                prev.map((l, i) =>
+                  i === idx ? { ...l, [key]: value } : l,
+                ),
+              );
+              markDirty();
+            }}
+            onAddRow={() => {
+              setLines((prev) => [...prev, emptyLine()]);
+              markDirty();
+            }}
+            onDeleteRow={(idx) => {
+              setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+              markDirty();
+            }}
+            showAddRow={!isView}
+            showRowActions={!isView}
+          />
+        }
+        footerSummary={
+          <div className="flex items-center justify-between">
+            <span>Số dòng = {lines.length}</span>
+            <div className="flex gap-8">
+              <span>
+                Số lượng: <strong className="ml-1">{totalQty}</strong>
+              </span>
+              <span>
+                Thành tiền: <strong className="ml-1">{formatMoneyInteger(totalAmount)}</strong>
+              </span>
             </div>
           </div>
+        }
+      />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Ngày giao dự kiến</label>
-              <input
-                type="date"
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={expectedDate}
-                onChange={(e) => setExpectedDate(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Ghi chú</label>
-              <input
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
+      {error && (
+        <AppModal open onOpenChange={() => setError(null)} title="Lỗi" defaultWidth={420} defaultHeight={220}>
+          <p className="text-sm text-destructive">{error}</p>
+        </AppModal>
+      )}
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold">Dòng hàng</span>
-              <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                + Thêm dòng
-              </Button>
-            </div>
-            <div className="rounded-md border border-border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                    <th className="px-3 py-2 text-left">Mặt hàng</th>
-                    <th className="px-3 py-2 text-right">Số lượng</th>
-                    <th className="px-3 py-2 text-right">Đơn giá</th>
-                    <th className="px-3 py-2 text-left">Ghi chú</th>
-                    <th className="px-2 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line, idx) => (
-                    <tr key={idx} className="border-b last:border-b-0">
-                      <td className="px-3 py-2 align-top">
-                        <SearchListingInput
-                          placeholder="Tìm mã hoặc tên hàng"
-                          value={line.itemLabel}
-                          onValueChange={(val) => {
-                            updateLine(idx, "itemLabel", val);
-                            updateLine(idx, "itemId", "");
-                          }}
-                          onSelect={(item) => {
-                            updateLine(idx, "itemId", item.id);
-                            updateLine(idx, "itemLabel", `${item.code} · ${item.name}`);
-                          }}
-                          search={searchItems}
-                          itemKey={(item) => item.id}
-                          renderItem={(item) => item.name}
-                          renderMeta={(item) => `${item.code} · ${item.unit}`}
-                          required
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <Input
-                          type="number"
-                          min="0.01"
-                          step="any"
-                          className="text-right"
-                          value={line.orderedQuantity}
-                          onChange={(e) => updateLine(idx, "orderedQuantity", e.target.value)}
-                          required
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <MoneyInput
-                          className="text-right"
-                          value={line.unitPrice === 0 ? "" : line.unitPrice}
-                          onChange={(v) =>
-                            updateLine(idx, "unitPrice", v === "" ? 0 : v)
-                          }
-                        />
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <Input
-                          value={line.notes}
-                          onChange={(e) => updateLine(idx, "notes", e.target.value)}
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-center align-top">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-destructive"
-                          onClick={() => removeLine(idx)}
-                          disabled={lines.length === 1}
-                        >
-                          ×
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </form>
-    </AppModal>
+      <UnsavedChangesDialog
+        open={unsavedOpen}
+        onOpenChange={setUnsavedOpen}
+        onChoose={(c) => void handleUnsavedChoice(c)}
+        saveDisabled={actionLoading || saving}
+      />
+    </>
   );
 }
 
-// ─── Purchase Order Detail Modal ───────────────────────────────────────────────
-
-function PurchaseOrderDetailModal({
-  order,
-  actionLoading,
-  onApprove,
-  onReceive,
-  onCancel,
-  onClose,
-}: {
-  order: PurchaseOrder;
-  actionLoading: string | null;
-  onApprove: () => void;
-  onReceive: () => void;
-  onCancel: () => void;
-  onClose: () => void;
-}) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <AppModal
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title={`Phiếu đặt hàng ${order.documentNumber ?? "(chưa duyệt)"}`}
-      showFooter={false}
-      className="max-w-[680px]"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <span
-          className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[order.status]}`}
-        >
-          {STATUS_LABEL[order.status]}
-        </span>
-      </div>
-
-        <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          <div>
-            <dt className="text-muted-foreground">ID nhà cung cấp</dt>
-            <dd className="font-mono text-xs">{order.providerId}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">ID vị trí kho</dt>
-            <dd className="font-mono text-xs">{order.locationId}</dd>
-          </div>
-          {order.expectedDate && (
-            <div>
-              <dt className="text-muted-foreground">Ngày giao dự kiến</dt>
-              <dd>{new Date(order.expectedDate).toLocaleDateString("vi-VN")}</dd>
-            </div>
-          )}
-          {order.notes && (
-            <div className="col-span-2">
-              <dt className="text-muted-foreground">Ghi chú</dt>
-              <dd>{order.notes}</dd>
-            </div>
-          )}
-        </dl>
-
-        <h3 className="mb-2 text-sm font-semibold">Dòng hàng</h3>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-xs text-muted-foreground">
-              <th className="py-1 text-left">ID mặt hàng</th>
-              <th className="py-1 text-right">Đặt</th>
-              <th className="py-1 text-right">Đã nhận</th>
-              <th className="py-1 text-right">Đơn giá</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.lines.map((line) => (
-              <tr key={line.id} className="border-b">
-                <td className="py-1 font-mono text-xs">{line.itemId}</td>
-                <td className="py-1 text-right">{line.orderedQuantity}</td>
-                <td className="py-1 text-right">{line.receivedQuantity}</td>
-                <td className="py-1 text-right">
-                  {formatMoneyInteger(line.unitPrice)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="mt-4 flex justify-end gap-2">
-          {order.status === "DRAFT" && (
-            <Button
-              variant="default"
-              size="sm"
-              disabled={actionLoading === order.id}
-              onClick={onApprove}
-            >
-              Duyệt phiếu
-            </Button>
-          )}
-          {(order.status === "APPROVED" || order.status === "RECEIVING") && (
-            <Button variant="default" size="sm" onClick={onReceive}>
-              Nhận hàng
-            </Button>
-          )}
-          {(order.status === "DRAFT" || order.status === "APPROVED") && (
-            <Button variant="outline" size="sm" className="text-destructive" onClick={onCancel}>
-              Huỷ phiếu
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={onClose}>
-            Đóng
-          </Button>
-        </div>
-    </AppModal>
-  );
-}
-
-// ─── Receive Goods Modal ───────────────────────────────────────────────────────
-
-function ReceiveGoodsModal({
-  order,
-  onCancel,
-  onReceived,
-}: {
-  order: PurchaseOrder;
-  onCancel: () => void;
-  onReceived: () => Promise<void>;
-}) {
-  const [quantities, setQuantities] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    for (const line of order.lines) {
-      init[line.id] = Number(line.orderedQuantity) - Number(line.receivedQuantity);
-    }
-    return init;
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-
-  const pendingLines = order.lines.filter(
-    (l) => Number(l.receivedQuantity) < Number(l.orderedQuantity),
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const lines = pendingLines
-        .filter((l) => quantities[l.id] > 0)
-        .map((l) => ({ lineId: l.id, receivedQuantity: Number(quantities[l.id]) }));
-
-      if (lines.length === 0) {
-        setError("Vui lòng nhập số lượng nhận cho ít nhất một dòng hàng");
-        return;
-      }
-
-      await apiClient.post(`/inventory/purchase-orders/${order.id}/receive`, { lines });
-      await onReceived();
-    } catch (err: unknown) {
-      setError(getUserFacingApiErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <AppModal
-      open
-      onOpenChange={(open) => {
-        if (!open) onCancel();
-      }}
-      title="Nhận hàng vào kho"
-      description={`Phiếu: ${order.documentNumber ?? order.id}`}
-      onCancel={onCancel}
-      onSave={() => formRef.current?.requestSubmit()}
-      saveLabel={saving ? "Đang nhập kho…" : "Xác nhận nhận hàng"}
-      saveDisabled={saving}
-      className="max-w-[560px]"
-    >
-      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-      <form
-        ref={formRef}
-        className="flex flex-col gap-4"
-        onSubmit={(e) => void handleSubmit(e)}
-      >
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-xs text-muted-foreground">
-                <th className="py-1 text-left">Mặt hàng</th>
-                <th className="py-1 text-right">Còn lại</th>
-                <th className="py-1 text-right">Số lượng nhận</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingLines.map((line) => {
-                const remaining = Number(line.orderedQuantity) - Number(line.receivedQuantity);
-                return (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-1.5 font-mono text-xs">{line.itemId}</td>
-                    <td className="py-1.5 text-right">{remaining}</td>
-                    <td className="py-1.5 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        max={remaining}
-                        step="any"
-                        className="w-24 rounded border border-input bg-background px-2 py-1 text-right text-sm"
-                        value={quantities[line.id] ?? 0}
-                        onChange={(e) =>
-                          setQuantities((prev) => ({
-                            ...prev,
-                            [line.id]: Number(e.target.value),
-                          }))
-                        }
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-        </form>
-    </AppModal>
+    <div className="grid grid-cols-[120px_1fr] items-center gap-3">
+      <label className="text-sm text-muted-foreground">{label}</label>
+      <div>{children}</div>
+    </div>
   );
 }

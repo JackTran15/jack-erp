@@ -77,3 +77,41 @@ export {
   type ToolbarAction,
   type ToolbarSeparator,
 } from "./components/page-toolbar";
+
+export {
+  PageTabBar,
+  type PageTabBarProps,
+  type PageTabItem,
+} from "./components/page-tab-bar";
+
+export {
+  UnsavedChangesDialog,
+  type UnsavedChangesDialogProps,
+  type UnsavedChangesChoice,
+} from "./components/unsaved-changes-dialog";
+
+export {
+  DocumentListShell,
+  type DocumentListShellProps,
+} from "./components/document-list-shell";
+
+export {
+  DocumentFormDialog,
+  type DocumentFormDialogProps,
+} from "./components/document-form-dialog";
+
+export {
+  LineItemGrid,
+  type LineItemGridProps,
+  type LineColumn,
+  type LineColumnType,
+} from "./components/line-item-grid";
+
+export {
+  PeriodFilter,
+  PERIOD_PRESET_OPTIONS,
+  resolvePeriodRange,
+  type PeriodFilterProps,
+  type PeriodPreset,
+  type PeriodValue,
+} from "./components/period-filter";
