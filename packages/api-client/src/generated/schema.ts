@@ -70,6 +70,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/entities/{entityKey}/records/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CrudController_getRecord"];
+        put?: never;
+        post?: never;
+        delete: operations["CrudController_deleteRecord"];
+        options?: never;
+        head?: never;
+        patch: operations["CrudController_updateRecord"];
+        trace?: never;
+    };
     "/admin/entities/{entityKey}/records": {
         parameters: {
             query?: never;
@@ -84,22 +100,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/admin/entities/{entityKey}/records/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["CrudController_deleteRecord"];
-        options?: never;
-        head?: never;
-        patch: operations["CrudController_updateRecord"];
         trace?: never;
     };
     "/auth/login": {
@@ -182,6 +182,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/registration-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Must be before @Get(':id') so "registration-requests" is not parsed as a UUID. */
+        get: operations["OrganizationController_listOrgRegistrationRequests"];
+        put?: never;
+        post: operations["RegistrationController_submitOrgRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/{id}": {
         parameters: {
             query?: never;
@@ -198,134 +215,6 @@ export interface paths {
         patch: operations["OrganizationController_update"];
         trace?: never;
     };
-    "/branches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["BranchController_list"];
-        put?: never;
-        post: operations["BranchController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/branches/main": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["BranchController_findMainBranch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/branches/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["BranchController_findById"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["BranchController_update"];
-        trace?: never;
-    };
-    "/branches/{id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["BranchController_archive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/branches/{id}/suspend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["BranchController_suspend"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/branches/{id}/assign-user/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["BranchController_assignUser"];
-        delete: operations["BranchController_unassignUser"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/branches/users/{userId}/branches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["BranchController_getUserBranches"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/registration-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["RegistrationController_listOrgRequests"];
-        put?: never;
-        post: operations["RegistrationController_submitOrgRequest"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/branches/registration-requests": {
         parameters: {
             query?: never;
@@ -333,7 +222,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["RegistrationController_listBranchRequests"];
+        /** Must be before @Get(':id') so "registration-requests" is not parsed as a UUID. */
+        get: operations["BranchController_listBranchRegistrationRequests"];
         put?: never;
         post: operations["RegistrationController_submitBranchRequest"];
         delete?: never;
@@ -401,6 +291,118 @@ export interface paths {
         put?: never;
         post: operations["RegistrationController_rejectBranchRequest"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_list"];
+        put?: never;
+        post: operations["BranchController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/main": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_findMainBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/users/{userId}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_getUserBranches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["BranchController_update"];
+        trace?: never;
+    };
+    "/branches/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_suspend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/assign-user/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_assignUser"];
+        delete: operations["BranchController_unassignUser"];
         options?: never;
         head?: never;
         patch?: never;
@@ -660,6 +662,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["InventoryLocationController_updateItem"];
+        trace?: never;
+    };
+    "/inventory/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getProviderById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/inventory/storages": {
@@ -1238,6 +1272,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductController_list"];
+        put?: never;
+        post: operations["ProductController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductController_findById"];
+        put?: never;
+        post?: never;
+        delete: operations["ProductController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductController_update"];
+        trace?: never;
+    };
+    "/products/{id}/generate-variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductController_generateVariants"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{id}/resolve-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductController_resolveVariant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductAttributeController_list"];
+        put?: never;
+        post: operations["ProductAttributeController_createDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductAttributeController_deleteDefinition"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductAttributeController_updateDefinition"];
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{attrDefId}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductAttributeController_createOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{attrDefId}/options/{optionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductAttributeController_deleteOption"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductAttributeController_updateOption"];
+        trace?: never;
+    };
     "/inventory/stock/transfers": {
         parameters: {
             query?: never;
@@ -1590,6 +1752,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pos/branches/{branchId}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pos/sessions/open": {
         parameters: {
             query?: never;
@@ -1894,6 +2072,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrderController_list"];
+        put?: never;
+        post: operations["PurchaseOrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrderController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_receiveGoods"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_list"];
+        put?: never;
+        post: operations["GoodsIssueController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1930,55 +2268,6 @@ export interface components {
             contactPhone?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "SUSPENDED";
-        };
-        CreateBranchDto: {
-            name: string;
-            address?: string;
-            phone?: string;
-            /** Format: email */
-            email?: string;
-            /** Format: uuid */
-            parentBranchId?: string;
-        };
-        BranchEntity: {
-            name: string;
-            address?: string;
-            phone?: string;
-            email?: string;
-            /** @enum {string} */
-            status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
-            isMainBranch: boolean;
-            parentBranchId?: string;
-            parentBranch?: components["schemas"]["BranchEntity"];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        UpdateBranchDto: {
-            name?: string;
-            address?: string;
-            phone?: string;
-            /** Format: email */
-            email?: string;
-            /** @enum {string} */
-            status?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
-        };
-        UserBranchAssignmentEntity: {
-            id: string;
-            userId: string;
-            branchId: string;
-            organizationId: string;
-            /** Format: date-time */
-            assignedAt: string;
-            assignedBy: string;
         };
         SubmitOrgRegistrationDto: {
             organizationName: string;
@@ -2023,9 +2312,58 @@ export interface components {
         RejectRegistrationDto: {
             reason: string;
         };
+        CreateBranchDto: {
+            name: string;
+            address?: string;
+            phone?: string;
+            /** Format: email */
+            email?: string;
+            /** Format: uuid */
+            parentBranchId?: string;
+        };
+        BranchEntity: {
+            name: string;
+            address?: string;
+            phone?: string;
+            email?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+            isMainBranch: boolean;
+            parentBranchId?: string;
+            parentBranch?: components["schemas"]["BranchEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UserBranchAssignmentEntity: {
+            id: string;
+            userId: string;
+            branchId: string;
+            organizationId: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: string;
+        };
+        UpdateBranchDto: {
+            name?: string;
+            address?: string;
+            phone?: string;
+            /** Format: email */
+            email?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+        };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -2037,7 +2375,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -2069,7 +2407,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE";
             branchId?: string;
         };
         SalesmanAssignmentEntity: {
@@ -2147,6 +2485,48 @@ export interface components {
             unit: string;
             category?: string;
             isActive?: boolean;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            /** Format: uuid */
+            providerId: string;
+        };
+        ProviderEntity: {
+            code: string;
+            name: string;
+            email?: string;
+            phone?: string;
+            notes?: string;
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ProductEntity: {
+            name: string;
+            description?: string;
+            isActive: boolean;
+            defaultProviderId?: string;
+            defaultProvider?: components["schemas"]["ProviderEntity"];
+            autoMigrated: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
         };
         ItemEntity: {
             code: string;
@@ -2155,6 +2535,13 @@ export interface components {
             unit: string;
             category?: string;
             isActive: boolean;
+            purchasePrice: number;
+            sellingPrice: number;
+            providerId: string;
+            provider?: components["schemas"]["ProviderEntity"];
+            productId?: string;
+            product?: components["schemas"]["ProductEntity"];
+            variantLabel?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -2173,6 +2560,10 @@ export interface components {
             unit?: string;
             category?: string;
             isActive?: boolean;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            /** Format: uuid */
+            providerId?: string;
         };
         CreateStorageDto: {
             name: string;
@@ -2596,6 +2987,7 @@ export interface components {
         };
         StockBalanceEntity: {
             itemId: string;
+            item?: components["schemas"]["ItemEntity"];
             locationId: string;
             quantity: number;
             /** Format: date-time */
@@ -2611,6 +3003,71 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        CreateProductDto: {
+            name: string;
+            description?: string;
+            isActive?: boolean;
+            /** Format: uuid */
+            defaultProviderId?: string;
+        };
+        UpdateProductDto: {
+            name?: string;
+            description?: string;
+            isActive?: boolean;
+            /** Format: uuid */
+            defaultProviderId?: string;
+        };
+        GenerateVariantsDto: {
+            force?: boolean;
+        };
+        ResolveVariantDto: {
+            attributes: Record<string, never>;
+        };
+        ProductAttributeDefinitionEntity: {
+            productId: string;
+            product?: components["schemas"]["ProductEntity"];
+            name: string;
+            sortOrder: number;
+            options?: components["schemas"]["ProductAttributeOptionEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ProductAttributeOptionEntity: {
+            attributeDefinitionId: string;
+            attributeDefinition?: components["schemas"]["ProductAttributeDefinitionEntity"];
+            valueLabel: string;
+            sortOrder: number;
+            codeSuffix?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateAttributeDefinitionDto: {
+            name: string;
+            sortOrder?: number;
+        };
+        CreateAttributeOptionDto: {
+            valueLabel: string;
+            sortOrder?: number;
+            codeSuffix?: string;
         };
         CreateTransferDto: Record<string, never>;
         StockTransferEntity: {
@@ -2981,6 +3438,77 @@ export interface components {
             startDate?: string;
             endDate?: string;
         };
+        CreatePurchaseOrderDto: Record<string, never>;
+        PurchaseOrderEntity: {
+            documentNumber?: string;
+            providerId: string;
+            locationId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
+            expectedDate?: string;
+            notes?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            lines: components["schemas"]["PurchaseOrderLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        PurchaseOrderLineEntity: {
+            id: string;
+            purchaseOrderId: string;
+            itemId: string;
+            orderedQuantity: number;
+            receivedQuantity: number;
+            unitPrice: number;
+            notes?: string;
+            purchaseOrder?: components["schemas"]["PurchaseOrderEntity"];
+        };
+        ReceiveGoodsDto: Record<string, never>;
+        CreateGoodsIssueDto: Record<string, never>;
+        GoodsIssueEntity: {
+            documentNumber?: string;
+            locationId: string;
+            reason: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
+            notes?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            lines: components["schemas"]["GoodsIssueLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        GoodsIssueLineEntity: {
+            id: string;
+            goodsIssueId: string;
+            itemId: string;
+            quantity: number;
+            notes?: string;
+            goodsIssue?: components["schemas"]["GoodsIssueEntity"];
+        };
     };
     responses: never;
     parameters: never;
@@ -3039,7 +3567,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -3055,6 +3585,83 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Entity CRUD configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_getRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_deleteRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CrudController_updateRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Record fields to update */
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated record */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3119,58 +3726,6 @@ export interface operations {
         responses: {
             /** @description Created record */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    CrudController_deleteRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                entityKey: string;
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    CrudController_updateRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                entityKey: string;
-                id: string;
-            };
-            cookie?: never;
-        };
-        /** @description Record fields to update */
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Updated record */
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3296,6 +3851,46 @@ export interface operations {
             };
         };
     };
+    OrganizationController_listOrgRegistrationRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RegistrationController_submitOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitOrgRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
     OrganizationController_findById: {
         parameters: {
             query?: never;
@@ -3338,6 +3933,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationEntity"];
+                };
+            };
+        };
+    };
+    BranchController_listBranchRegistrationRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RegistrationController_submitBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitBranchRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_approveOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_rejectOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_approveBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_rejectBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
                 };
             };
         };
@@ -3397,6 +4124,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_getUserBranches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBranchAssignmentEntity"][];
                 };
             };
         };
@@ -3528,199 +4276,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    BranchController_getUserBranches: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserBranchAssignmentEntity"][];
-                };
-            };
-        };
-    };
-    RegistrationController_listOrgRequests: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    RegistrationController_submitOrgRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubmitOrgRegistrationDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
-            };
-        };
-    };
-    RegistrationController_listBranchRequests: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    RegistrationController_submitBranchRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubmitBranchRegistrationDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
-            };
-        };
-    };
-    RegistrationController_approveOrgRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
-            };
-        };
-    };
-    RegistrationController_rejectOrgRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectRegistrationDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
-            };
-        };
-    };
-    RegistrationController_approveBranchRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
-            };
-        };
-    };
-    RegistrationController_rejectBranchRequest: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectRegistrationDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationRequestEntity"];
-                };
             };
         };
     };
@@ -4217,6 +4772,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listProviders: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_getProviderById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderEntity"];
                 };
             };
         };
@@ -5317,6 +5916,332 @@ export interface operations {
             };
         };
     };
+    ProductController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_generateVariants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateVariantsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_resolveVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveVariantDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"][];
+                };
+            };
+        };
+    };
+    ProductAttributeController_createDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeDefinitionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_deleteDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductAttributeController_updateDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeDefinitionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_createOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeOptionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeOptionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_deleteOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+                optionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductAttributeController_updateOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+                optionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeOptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeOptionEntity"];
+                };
+            };
+        };
+    };
     StockTransferController_list: {
         parameters: {
             query?: {
@@ -5831,6 +6756,29 @@ export interface operations {
             };
         };
     };
+    PosController_getCatalog: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
     PosController_openSession: {
         parameters: {
             query?: never;
@@ -6272,6 +7220,270 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    PurchaseOrderController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PurchaseOrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePurchaseOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_receiveGoods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveGoodsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsIssueController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsIssueDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
             };
         };
     };
