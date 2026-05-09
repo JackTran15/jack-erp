@@ -3,6 +3,7 @@ import { DocumentType } from "@erp/shared-interfaces";
 import { formatClientError } from "@erp/api-client";
 import { AppModal, Button, Input } from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import {
@@ -195,7 +196,7 @@ export function DocumentNumberingPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Cấu hình đánh số chứng từ</h1>
@@ -307,7 +308,7 @@ export function DocumentNumberingPage() {
           }}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 

@@ -4,6 +4,7 @@ import { formatClientError } from "@erp/api-client";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { Badge, Button } from "@erp/ui";
 import { productsApi, type Product } from "../../api/products";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { ProductForm } from "./components/ProductForm";
 import { AttributeDefinitionsForm } from "./components/AttributeDefinitionsForm";
@@ -61,16 +62,18 @@ export function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Đang tải…</span>
-      </div>
+      <AdminPageShell>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Đang tải…</span>
+        </div>
+      </AdminPageShell>
     );
   }
 
   if (error && !product) {
     return (
-      <div className="mx-auto max-w-[1240px] px-4 py-6">
+      <AdminPageShell>
         <button
           type="button"
           className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -80,14 +83,14 @@ export function ProductDetailPage() {
           Quay lại
         </button>
         <p className="text-sm text-destructive">{error}</p>
-      </div>
+      </AdminPageShell>
     );
   }
 
   if (!product) return null;
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-4 flex items-start justify-between">
         <div>
           <button
@@ -168,6 +171,6 @@ export function ProductDetailPage() {
           onCancel={() => setConfirmDelete(false)}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }

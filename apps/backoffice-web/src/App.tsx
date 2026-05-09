@@ -24,6 +24,8 @@ import { CashReportPage } from "./pages/reports/CashReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
+import { StockTransferPage } from "./pages/stock-transfer/StockTransferPage";
+import { ItemLocationsPage } from "./pages/item-locations/ItemLocationsPage";
 import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 import { ProductsPage } from "./pages/products/ProductsPage";
@@ -79,6 +81,14 @@ export function App() {
                 <Route
                   path="/inventory/goods-issues"
                   element={<GoodsIssuePage />}
+                />
+                <Route
+                  path="/inventory/stock-transfers"
+                  element={<StockTransferPage />}
+                />
+                <Route
+                  path="/inventory/item-locations"
+                  element={<ItemLocationsPage />}
                 />
                 <Route
                   path="/onboarding/org-registration"

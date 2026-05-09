@@ -88,11 +88,10 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/inventory-management", label: "Quản lý kho", },
           { to: "/products", label: "Sản phẩm", },
-          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
-          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
-          { to: "/inventory-management", label: "Quản lý kho", },
-          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
-          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
+          { to: "/inventory/purchase-orders", label: "Nhập kho", },
+          { to: "/inventory/goods-issues", label: "Xuất kho", },
+          { to: "/inventory/stock-transfers", label: "Chuyển kho", },
+          { to: "/inventory/item-locations", label: "Vị trí hàng hóa", },
         ],
       },
     ],
@@ -248,7 +247,6 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/setup", label: "Thiết lập chung", },
           { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
-          { to: "/setup", label: "Thiết lập chung" },
         ],
       },
     ],

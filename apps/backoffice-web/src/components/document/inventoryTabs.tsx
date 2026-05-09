@@ -1,0 +1,59 @@
+import { Link } from "react-router-dom";
+import { PageTabBar, type PageTabItem } from "@erp/ui";
+
+export type InventoryTabId =
+  | "purchase-orders"
+  | "transfer-in"
+  | "goods-issues"
+  | "stock-transfer"
+  | "transfer-order"
+  | "stock-take"
+  | "stock-summary"
+  | "item-locations"
+  | "item-location-details";
+
+export const INVENTORY_TABS: (PageTabItem & {
+  id: InventoryTabId;
+  /** Pages that aren't built yet are rendered as disabled placeholders. */
+  comingSoon?: boolean;
+})[] = [
+  { id: "purchase-orders", label: "Nhập kho", href: "/inventory/purchase-orders" },
+  { id: "transfer-in", label: "Điều chuyển từ cửa hàng khác", href: "#", comingSoon: true },
+  { id: "goods-issues", label: "Xuất kho", href: "/inventory/goods-issues" },
+  { id: "stock-transfer", label: "Chuyển kho", href: "/inventory/stock-transfers" },
+  { id: "transfer-order", label: "Lệnh điều chuyển", href: "#", comingSoon: true },
+  { id: "stock-take", label: "Kiểm kê kho", href: "#", comingSoon: true },
+  { id: "stock-summary", label: "Tổng hợp tồn kho", href: "/inventory-management" },
+  { id: "item-locations", label: "Vị trí hàng hóa", href: "/inventory/item-locations" },
+  { id: "item-location-details", label: "Chi tiết vị trí hàng hóa", href: "#", comingSoon: true },
+];
+
+export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
+  return (
+    <PageTabBar
+      activeId={activeId}
+      items={INVENTORY_TABS}
+      renderItem={(item, isActive) => {
+        if (isActive) {
+          return <span className="font-semibold text-foreground">{item.label}</span>;
+        }
+        const tab = item as (typeof INVENTORY_TABS)[number];
+        if (tab.comingSoon) {
+          return (
+            <span
+              className="cursor-not-allowed text-muted-foreground/70"
+              title="Sắp triển khai"
+            >
+              {item.label}
+            </span>
+          );
+        }
+        return (
+          <Link to={item.href ?? "#"} className="text-primary hover:underline">
+            {item.label}
+          </Link>
+        );
+      }}
+    />
+  );
+}

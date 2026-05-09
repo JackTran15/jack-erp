@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { AppModal, Badge, type ToolbarItem } from "@erp/ui";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { TableActionHeader } from "../../components/layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
@@ -91,7 +92,7 @@ export function ProductsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-3">
         <h1 className="text-2xl font-semibold">Sản phẩm</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -163,6 +164,6 @@ export function ProductsPage() {
           />
         </AppModal>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
