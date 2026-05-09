@@ -2,7 +2,10 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
 import { useCrudConfig, useCrudRecord } from "./useCrudApi";
 import { CrudDetailBody } from "./CrudDetailView";
+import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
+import { isNotFoundHttpError } from "../../lib/not-found-http-error";
+import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 
 export function CrudDetailPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
@@ -18,32 +21,47 @@ export function CrudDetailPage() {
 
   if (configLoading) {
     return (
-      <PageShell>
+      <AdminPageShell>
         <p>Đang tải cấu hình…</p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
   if (configError) {
+    if (isNotFoundHttpError(configError)) {
+      return (
+        <AdminPageShell>
+          <HttpErrorView code={404} />
+        </AdminPageShell>
+      );
+    }
     return (
-      <PageShell>
+      <AdminPageShell>
         <p className="text-destructive">
           Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}
         </p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
   if (!config) {
     return (
-      <PageShell>
+      <AdminPageShell>
         <p>Không tìm thấy thực thể.</p>
-      </PageShell>
+      </AdminPageShell>
+    );
+  }
+
+  if (recordError && !recordLoading && isNotFoundHttpError(recordError)) {
+    return (
+      <AdminPageShell>
+        <HttpErrorView code={404} />
+      </AdminPageShell>
     );
   }
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname, [{ label: "Chi tiết" }]);
 
   return (
-    <PageShell>
+    <AdminPageShell>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <nav
@@ -91,10 +109,6 @@ export function CrudDetailPage() {
           <CrudDetailBody config={config} record={record} />
         </div>
       )}
-    </PageShell>
+    </AdminPageShell>
   );
-}
-
-function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="w-full px-2 py-6 sm:px-3 lg:px-4">{children}</div>;
 }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-24T19:21:37.314Z",
-  "totalEntities": 44,
+  "generatedAt": "2026-05-07T13:06:51.030Z",
+  "totalEntities": 55,
   "entities": [
     {
       "className": "AccountEntity",
@@ -252,19 +252,11 @@
       "comment": "Customer who purchases goods. Supports deduplication via merge workflow.",
       "columns": [
         {
-          "property": "firstName",
-          "dbColumn": "first_name",
+          "property": "name",
+          "dbColumn": "name",
           "type": "varchar",
           "nullable": false,
-          "comment": "Customers given name",
-          "isPrimaryKey": false
-        },
-        {
-          "property": "lastName",
-          "dbColumn": "last_name",
-          "type": "varchar",
-          "nullable": false,
-          "comment": "Customers family name",
+          "comment": "Customers full name",
           "isPrimaryKey": false
         },
         {
@@ -280,7 +272,7 @@
           "dbColumn": "phone",
           "type": "varchar",
           "nullable": true,
-          "comment": "Phone number for contact or lookup at POS",
+          "comment": "Phone number for contact or lookup at POS; unique within organization when set",
           "isPrimaryKey": false
         },
         {
@@ -319,7 +311,7 @@
       "indexes": [
         "'uq_customer_org_email', ['organizationId', 'email'], {\n  unique: true,\n  where: '\"email\" IS NOT NULL',\n}",
         "'idx_customer_org_status', ['organizationId', 'status']",
-        "'idx_customer_org_phone', ['organizationId', 'phone']"
+        "'uq_customer_org_phone', ['organizationId', 'phone'], {\n  unique: true,\n  where: '\"phone\" IS NOT NULL',\n}"
       ],
       "uniques": []
     },
@@ -578,6 +570,151 @@
       "uniques": []
     },
     {
+      "className": "GoodsIssueEntity",
+      "tableName": "goods_issues",
+      "filePath": "apps/api/src/modules/inventory/goods-issue/goods-issue.entity.ts",
+      "extendsBase": true,
+      "comment": "Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → APPROVED → POSTED | CANCELLED",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated on posting",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Source storage location",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reason",
+          "dbColumn": "reason",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Reason for issuance (e.g. bán hàng, nội bộ, mẫu)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "GoodsIssueStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Free-text notes",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "GoodsIssueLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "GoodsIssueLineEntity",
+      "tableName": "goods_issue_lines",
+      "filePath": "apps/api/src/modules/inventory/goods-issue/goods-issue-line.entity.ts",
+      "extendsBase": false,
+      "comment": "Single item line within a goods issue document.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "goodsIssueId",
+          "dbColumn": "goods_issue_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent goods issue document",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Item being issued from stock",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Quantity to issue (always positive)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Per-line notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "goodsIssue",
+          "kind": "ManyToOne",
+          "target": "GoodsIssueEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
+    },
+    {
       "className": "InventoryImportJobEntity",
       "tableName": "inventory_import_jobs",
       "filePath": "apps/api/src/modules/inventory/csv/inventory-import-job.entity.ts",
@@ -749,6 +886,82 @@
       "uniques": []
     },
     {
+      "className": "ItemAttributeValueEntity",
+      "tableName": "item_attribute_values",
+      "filePath": "apps/api/src/modules/inventory/product/item-attribute-value.entity.ts",
+      "extendsBase": true,
+      "comment": "Junction: links an item (variant) to one option per attribute dimension.",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to items — the variant item",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "attributeDefinitionId",
+          "dbColumn": "attribute_definition_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to attribute definition (which dimension)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "optionId",
+          "dbColumn": "option_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to attribute option (which value in that dimension)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        },
+        {
+          "property": "attributeDefinition",
+          "kind": "ManyToOne",
+          "target": "ProductAttributeDefinitionEntity"
+        },
+        {
+          "property": "option",
+          "kind": "ManyToOne",
+          "target": "ProductAttributeOptionEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['itemId', 'attributeDefinitionId']"
+      ]
+    },
+    {
+      "className": "ItemCategoryEntity",
+      "tableName": "inventory_item_categories",
+      "filePath": "apps/api/src/modules/inventory/location/item-category.entity.ts",
+      "extendsBase": true,
+      "comment": "User-defined product category label (per organization), used when assigning items.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Display name of the category (unique per organization)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'name']"
+      ]
+    },
+    {
       "className": "ItemEntity",
       "tableName": "items",
       "filePath": "apps/api/src/modules/inventory/location/item.entity.ts",
@@ -803,9 +1016,62 @@
           "default": "true",
           "comment": "When false, item cannot be used in new transactions",
           "isPrimaryKey": false
+        },
+        {
+          "property": "purchasePrice",
+          "dbColumn": "purchase_price",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "comment": "Default purchase (cost) price per unit",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sellingPrice",
+          "dbColumn": "selling_price",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "comment": "Default selling price per unit",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "providerId",
+          "dbColumn": "provider_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to inventory_providers — the supplier for this item",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "productId",
+          "dbColumn": "product_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to products — null for legacy items without a parent product",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "variantLabel",
+          "dbColumn": "variant_label",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Denormalized display label for variant attributes (e.g. \"39 · Nâu\")",
+          "isPrimaryKey": false
         }
       ],
-      "relations": [],
+      "relations": [
+        {
+          "property": "provider",
+          "kind": "ManyToOne",
+          "target": "ProviderEntity"
+        },
+        {
+          "property": "product",
+          "kind": "ManyToOne",
+          "target": "ProductEntity"
+        }
+      ],
       "indexes": [],
       "uniques": [
         "['organizationId', 'code']"
@@ -1436,6 +1702,437 @@
         "['organizationId', 'branchId', 'status']",
         "['organizationId', 'openedBy', 'createdAt']"
       ],
+      "uniques": []
+    },
+    {
+      "className": "ProductAttributeDefinitionEntity",
+      "tableName": "product_attribute_definitions",
+      "filePath": "apps/api/src/modules/inventory/product/product-attribute-definition.entity.ts",
+      "extendsBase": true,
+      "comment": "A dimension of variation for a product (e.g. Size, Color).",
+      "columns": [
+        {
+          "property": "productId",
+          "dbColumn": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to products — the product this attribute belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Attribute dimension name (e.g. Size, Color)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sortOrder",
+          "dbColumn": "sort_order",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Display ordering among sibling definitions",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "product",
+          "kind": "ManyToOne",
+          "target": "ProductEntity"
+        },
+        {
+          "property": "options",
+          "kind": "OneToMany",
+          "target": "ProductAttributeOptionEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['productId', 'name']"
+      ]
+    },
+    {
+      "className": "ProductAttributeOptionEntity",
+      "tableName": "product_attribute_options",
+      "filePath": "apps/api/src/modules/inventory/product/product-attribute-option.entity.ts",
+      "extendsBase": true,
+      "comment": "A specific value within an attribute dimension (e.g. \"39\", \"Nâu\").",
+      "columns": [
+        {
+          "property": "attributeDefinitionId",
+          "dbColumn": "attribute_definition_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to the parent attribute definition",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "valueLabel",
+          "dbColumn": "value_label",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Display label for the option value",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sortOrder",
+          "dbColumn": "sort_order",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Display ordering among sibling options",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "codeSuffix",
+          "dbColumn": "code_suffix",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Short code appended to SKU when generating variant codes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "attributeDefinition",
+          "kind": "ManyToOne",
+          "target": "ProductAttributeDefinitionEntity"
+        }
+      ],
+      "indexes": [
+        "['attributeDefinitionId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ProductEntity",
+      "tableName": "products",
+      "filePath": "apps/api/src/modules/inventory/product/product.entity.ts",
+      "extendsBase": true,
+      "comment": "A product grouping that may have multiple item variants (SKUs). Org-level, not per-branch.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable product name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Detailed product description",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Inactive products are hidden from catalog",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "defaultProviderId",
+          "dbColumn": "default_provider_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Default supplier for variants of this product",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "autoMigrated",
+          "dbColumn": "auto_migrated",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "True if created by legacy migration script (TKT-036)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "defaultProvider",
+          "kind": "ManyToOne",
+          "target": "ProviderEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'isActive']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "ProductStorageLocationEntity",
+      "tableName": "product_storage_locations",
+      "filePath": "apps/api/src/modules/inventory/product/product-storage-location.entity.ts",
+      "extendsBase": true,
+      "comment": "Maps a product to exactly one location within a storage.\nConstraint: one product can only be stored in one location per storage (warehouse).",
+      "columns": [
+        {
+          "property": "productId",
+          "dbColumn": "product_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to products",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "storageId",
+          "dbColumn": "storage_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to storages — which warehouse",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to locations — assigned position in that storage",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "product",
+          "kind": "ManyToOne",
+          "target": "ProductEntity"
+        }
+      ],
+      "indexes": [
+        "['storageId', 'locationId']"
+      ],
+      "uniques": [
+        "['productId', 'storageId']"
+      ]
+    },
+    {
+      "className": "ProviderEntity",
+      "tableName": "inventory_providers",
+      "filePath": "apps/api/src/modules/inventory/location/provider.entity.ts",
+      "extendsBase": true,
+      "comment": "Supplier / vendor who provides items to the organization.",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Short alphanumeric code unique per organization",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable provider name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "email",
+          "dbColumn": "email",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Contact email address",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "phone",
+          "dbColumn": "phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Contact phone number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Free-text notes or address info",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Inactive providers cannot be assigned to new items",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'code']"
+      ]
+    },
+    {
+      "className": "PurchaseOrderEntity",
+      "tableName": "purchase_orders",
+      "filePath": "apps/api/src/modules/inventory/purchase-order/purchase-order.entity.ts",
+      "extendsBase": true,
+      "comment": "Phiếu đặt hàng — purchase order from supplier. Workflow: DRAFT → APPROVED → RECEIVING → RECEIVED | CANCELLED",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated on approval",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "providerId",
+          "dbColumn": "provider_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Supplier (inventory_providers)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Destination storage location for received goods",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "PurchaseOrderStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "expectedDate",
+          "dbColumn": "expected_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Expected delivery date",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Free-text notes",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "PurchaseOrderLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "PurchaseOrderLineEntity",
+      "tableName": "purchase_order_lines",
+      "filePath": "apps/api/src/modules/inventory/purchase-order/purchase-order-line.entity.ts",
+      "extendsBase": false,
+      "comment": "Single item line within a purchase order.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "purchaseOrderId",
+          "dbColumn": "purchase_order_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent purchase order",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Item being ordered",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "orderedQuantity",
+          "dbColumn": "ordered_quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Quantity ordered from supplier",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "receivedQuantity",
+          "dbColumn": "received_quantity",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Quantity already received into stock",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Unit purchase price",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Per-line notes",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "purchaseOrder",
+          "kind": "ManyToOne",
+          "target": "PurchaseOrderEntity"
+        }
+      ],
+      "indexes": [],
       "uniques": []
     },
     {
@@ -2573,7 +3270,13 @@
           "isPrimaryKey": false
         }
       ],
-      "relations": [],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        }
+      ],
       "indexes": [
         "['organizationId', 'branchId']"
       ],

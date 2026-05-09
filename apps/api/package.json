@@ -18,7 +18,9 @@
     "schema:sync": "typeorm-ts-node-commonjs schema:sync -d src/database/data-source.ts",
     "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/database/data-source.ts",
     "seed:inventory": "ts-node src/database/seeds/inventory.seed.ts",
-    "seed:dev-admin": "ts-node src/database/seeds/inventory.seed.ts"
+    "seed:dev-admin": "ts-node src/database/seeds/inventory.seed.ts",
+    "migrate:legacy-items": "ts-node src/scripts/migrate-legacy-items.ts",
+    "migrate:legacy-items:rollback": "ts-node src/scripts/migrate-legacy-items.ts --rollback"
   },
   "dependencies": {
     "@erp/shared-interfaces": "workspace:*",

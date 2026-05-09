@@ -4,13 +4,25 @@ import { HttpError, type ApiError } from "./http";
 
 export const erpApi = createErpApiClient(apiClient);
 
+function httpStatusFromErrorBody(e: Record<string, unknown>): number {
+  const fromCode = e.statusCode;
+  if (typeof fromCode === "number" && Number.isFinite(fromCode)) {
+    return fromCode;
+  }
+  const fromStatus = e.status;
+  if (typeof fromStatus === "number" && Number.isFinite(fromStatus)) {
+    return fromStatus;
+  }
+  return 0;
+}
+
 function throwOnErpError(r: { error: unknown }): void {
   if (!r.error) return;
   const err = r.error;
   if (err && typeof err === "object" && "message" in (err as object)) {
     const e = err as Record<string, unknown>;
     throw new HttpError({
-      status: 0,
+      status: httpStatusFromErrorBody(e),
       code: String(e.code ?? "UNKNOWN"),
       message: String(e.message ?? formatClientError(err)),
       details: e.details,

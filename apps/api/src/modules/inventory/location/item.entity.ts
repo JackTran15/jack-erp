@@ -1,6 +1,7 @@
 import { Entity, Column, Unique, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { ProviderEntity } from './provider.entity';
+import { ProductEntity } from '../product/product.entity';
 
 /** A stockable product or material tracked in inventory. Identified by unique code per organization. */
 @Entity('items')
@@ -36,4 +37,14 @@ export class ItemEntity extends BaseEntity {
   @ManyToOne(() => ProviderEntity, { nullable: false })
   @JoinColumn({ name: 'provider_id' })
   provider?: ProviderEntity;
+
+  @Column({ name: 'product_id', type: 'uuid', nullable: true, comment: 'FK to products — null for legacy items without a parent product' })
+  productId?: string;
+
+  @ManyToOne(() => ProductEntity, { nullable: true })
+  @JoinColumn({ name: 'product_id' })
+  product?: ProductEntity;
+
+  @Column({ name: 'variant_label', nullable: true, comment: 'Denormalized display label for variant attributes (e.g. "39 · Nâu")' })
+  variantLabel?: string;
 }

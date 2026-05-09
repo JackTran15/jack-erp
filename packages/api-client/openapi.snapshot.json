@@ -44,7 +44,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -76,6 +86,123 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/entities/{entityKey}/records/{id}": {
+      "get": {
+        "operationId": "CrudController_getRecord",
+        "parameters": [
+          {
+            "name": "entityKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Single record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "CrudController_updateRecord",
+        "parameters": [
+          {
+            "name": "entityKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Record fields to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "operationId": "CrudController_deleteRecord",
+        "parameters": [
+          {
+            "name": "entityKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
         "tags": [
@@ -213,86 +340,6 @@
         ]
       }
     },
-    "/admin/entities/{entityKey}/records/{id}": {
-      "patch": {
-        "operationId": "CrudController_updateRecord",
-        "parameters": [
-          {
-            "name": "entityKey",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "Record fields to update",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated record",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "admin"
-        ]
-      },
-      "delete": {
-        "operationId": "CrudController_deleteRecord",
-        "parameters": [
-          {
-            "name": "entityKey",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "admin"
-        ]
-      }
-    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -413,6 +460,50 @@
         ]
       }
     },
+    "/organizations/registration-requests": {
+      "get": {
+        "operationId": "OrganizationController_listOrgRegistrationRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Must be before @Get(':id') so \"registration-requests\" is not parsed as a UUID.",
+        "tags": [
+          "Organization"
+        ]
+      },
+      "post": {
+        "operationId": "RegistrationController_submitOrgRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitOrgRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      }
+    },
     "/organizations/{id}": {
       "get": {
         "operationId": "OrganizationController_findById",
@@ -481,6 +572,190 @@
         ]
       }
     },
+    "/branches/registration-requests": {
+      "post": {
+        "operationId": "RegistrationController_submitBranchRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitBranchRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      },
+      "get": {
+        "operationId": "BranchController_listBranchRegistrationRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Must be before @Get(':id') so \"registration-requests\" is not parsed as a UUID.",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/organizations/registration-requests/{id}/approve": {
+      "post": {
+        "operationId": "RegistrationController_approveOrgRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      }
+    },
+    "/organizations/registration-requests/{id}/reject": {
+      "post": {
+        "operationId": "RegistrationController_rejectOrgRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      }
+    },
+    "/branches/registration-requests/{id}/approve": {
+      "post": {
+        "operationId": "RegistrationController_approveBranchRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      }
+    },
+    "/branches/registration-requests/{id}/reject": {
+      "post": {
+        "operationId": "RegistrationController_rejectBranchRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Registration"
+        ]
+      }
+    },
     "/branches": {
       "post": {
         "operationId": "BranchController_create",
@@ -535,6 +810,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/users/{userId}/branches": {
+      "get": {
+        "operationId": "BranchController_getUserBranches",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBranchAssignmentEntity"
+                  }
                 }
               }
             }
@@ -737,265 +1045,6 @@
         },
         "tags": [
           "Branch"
-        ]
-      }
-    },
-    "/branches/users/{userId}/branches": {
-      "get": {
-        "operationId": "BranchController_getUserBranches",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserBranchAssignmentEntity"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/organizations/registration-requests": {
-      "post": {
-        "operationId": "RegistrationController_submitOrgRequest",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitOrgRegistrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      },
-      "get": {
-        "operationId": "RegistrationController_listOrgRequests",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      }
-    },
-    "/branches/registration-requests": {
-      "post": {
-        "operationId": "RegistrationController_submitBranchRequest",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitBranchRegistrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      },
-      "get": {
-        "operationId": "RegistrationController_listBranchRequests",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      }
-    },
-    "/organizations/registration-requests/{id}/approve": {
-      "post": {
-        "operationId": "RegistrationController_approveOrgRequest",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      }
-    },
-    "/organizations/registration-requests/{id}/reject": {
-      "post": {
-        "operationId": "RegistrationController_rejectOrgRequest",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectRegistrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      }
-    },
-    "/branches/registration-requests/{id}/approve": {
-      "post": {
-        "operationId": "RegistrationController_approveBranchRequest",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
-        ]
-      }
-    },
-    "/branches/registration-requests/{id}/reject": {
-      "post": {
-        "operationId": "RegistrationController_rejectBranchRequest",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectRegistrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Registration"
         ]
       }
     },
@@ -1766,6 +1815,101 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/providers": {
+      "get": {
+        "operationId": "InventoryLocationController_listProviders",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/providers/{id}": {
+      "get": {
+        "operationId": "InventoryLocationController_getProviderById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderEntity"
                 }
               }
             }
@@ -3585,6 +3729,557 @@
         ]
       }
     },
+    "/products": {
+      "get": {
+        "operationId": "ProductController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      },
+      "post": {
+        "operationId": "ProductController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "operationId": "ProductController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      },
+      "patch": {
+        "operationId": "ProductController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/products/{id}/generate-variants": {
+      "post": {
+        "operationId": "ProductController_generateVariants",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateVariantsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/products/{id}/resolve-variant": {
+      "post": {
+        "operationId": "ProductController_resolveVariant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveVariantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/products/{productId}/attributes": {
+      "get": {
+        "operationId": "ProductAttributeController_list",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductAttributeDefinitionEntity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      },
+      "post": {
+        "operationId": "ProductAttributeController_createDefinition",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttributeDefinitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAttributeDefinitionEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      }
+    },
+    "/products/{productId}/attributes/{id}": {
+      "patch": {
+        "operationId": "ProductAttributeController_updateDefinition",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttributeDefinitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAttributeDefinitionEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductAttributeController_deleteDefinition",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      }
+    },
+    "/products/{productId}/attributes/{attrDefId}/options": {
+      "post": {
+        "operationId": "ProductAttributeController_createOption",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attrDefId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttributeOptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAttributeOptionEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      }
+    },
+    "/products/{productId}/attributes/{attrDefId}/options/{optionId}": {
+      "patch": {
+        "operationId": "ProductAttributeController_updateOption",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attrDefId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "optionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttributeOptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductAttributeOptionEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductAttributeController_deleteOption",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attrDefId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "optionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductAttribute"
+        ]
+      }
+    },
     "/inventory/stock/transfers": {
       "post": {
         "operationId": "StockTransferController_create",
@@ -4486,6 +5181,48 @@
         ]
       }
     },
+    "/pos/branches/{branchId}/catalog": {
+      "get": {
+        "operationId": "PosController_getCatalog",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
     "/pos/sessions/open": {
       "post": {
         "operationId": "PosController_openSession",
@@ -5203,6 +5940,444 @@
           "Reporting"
         ]
       }
+    },
+    "/inventory/purchase-orders": {
+      "post": {
+        "operationId": "PurchaseOrderController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      },
+      "get": {
+        "operationId": "PurchaseOrderController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      }
+    },
+    "/inventory/purchase-orders/{id}": {
+      "get": {
+        "operationId": "PurchaseOrderController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      }
+    },
+    "/inventory/purchase-orders/{id}/approve": {
+      "post": {
+        "operationId": "PurchaseOrderController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      }
+    },
+    "/inventory/purchase-orders/{id}/receive": {
+      "post": {
+        "operationId": "PurchaseOrderController_receiveGoods",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveGoodsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      }
+    },
+    "/inventory/purchase-orders/{id}/cancel": {
+      "post": {
+        "operationId": "PurchaseOrderController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseOrder"
+        ]
+      }
+    },
+    "/inventory/goods-issues": {
+      "post": {
+        "operationId": "GoodsIssueController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoodsIssueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      },
+      "get": {
+        "operationId": "GoodsIssueController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}": {
+      "get": {
+        "operationId": "GoodsIssueController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}/approve": {
+      "post": {
+        "operationId": "GoodsIssueController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}/post": {
+      "post": {
+        "operationId": "GoodsIssueController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
+    },
+    "/inventory/goods-issues/{id}/cancel": {
+      "post": {
+        "operationId": "GoodsIssueController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssue"
+        ]
+      }
     }
   },
   "info": {
@@ -5341,164 +6516,6 @@
             ]
           }
         }
-      },
-      "CreateBranchDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "parentBranchId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "BranchEntity": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
-            ],
-            "type": "string"
-          },
-          "isMainBranch": {
-            "type": "boolean"
-          },
-          "parentBranchId": {
-            "type": "string"
-          },
-          "parentBranch": {
-            "$ref": "#/components/schemas/BranchEntity"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "name",
-          "status",
-          "isMainBranch",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "UpdateBranchDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
-            ]
-          }
-        }
-      },
-      "UserBranchAssignmentEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "assignedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "assignedBy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "branchId",
-          "organizationId",
-          "assignedAt",
-          "assignedBy"
-        ]
       },
       "SubmitOrgRegistrationDto": {
         "type": "object",
@@ -5641,6 +6658,164 @@
           "reason"
         ]
       },
+      "CreateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "parentBranchId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "BranchEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "isMainBranch": {
+            "type": "boolean"
+          },
+          "parentBranchId": {
+            "type": "string"
+          },
+          "parentBranch": {
+            "$ref": "#/components/schemas/BranchEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "isMainBranch",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UserBranchAssignmentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "branchId",
+          "organizationId",
+          "assignedAt",
+          "assignedBy"
+        ]
+      },
+      "UpdateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ]
+          }
+        }
+      },
       "CreateDocumentNumberRuleDto": {
         "type": "object",
         "properties": {
@@ -5654,7 +6829,9 @@
               "ADJUSTMENT",
               "JOURNAL",
               "PAYABLE",
-              "RECEIVABLE"
+              "RECEIVABLE",
+              "PURCHASE_ORDER",
+              "GOODS_ISSUE"
             ]
           },
           "branchId": {
@@ -5708,7 +6885,9 @@
               "ADJUSTMENT",
               "JOURNAL",
               "PAYABLE",
-              "RECEIVABLE"
+              "RECEIVABLE",
+              "PURCHASE_ORDER",
+              "GOODS_ISSUE"
             ],
             "type": "string"
           },
@@ -5826,7 +7005,9 @@
               "ADJUSTMENT",
               "JOURNAL",
               "PAYABLE",
-              "RECEIVABLE"
+              "RECEIVABLE",
+              "PURCHASE_ORDER",
+              "GOODS_ISSUE"
             ]
           },
           "branchId": {
@@ -6087,15 +7268,28 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
           "code",
           "name",
-          "unit"
+          "unit",
+          "providerId"
         ]
       },
-      "ItemEntity": {
+      "ProviderEntity": {
         "type": "object",
         "properties": {
           "code": {
@@ -6104,13 +7298,13 @@
           "name": {
             "type": "string"
           },
-          "description": {
+          "email": {
             "type": "string"
           },
-          "unit": {
+          "phone": {
             "type": "string"
           },
-          "category": {
+          "notes": {
             "type": "string"
           },
           "isActive": {
@@ -6143,8 +7337,144 @@
         "required": [
           "code",
           "name",
+          "isActive",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "ProductEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "defaultProviderId": {
+            "type": "string"
+          },
+          "defaultProvider": {
+            "$ref": "#/components/schemas/ProviderEntity"
+          },
+          "autoMigrated": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "name",
+          "isActive",
+          "autoMigrated",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "ItemEntity": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderEntity"
+          },
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductEntity"
+          },
+          "variantLabel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "code",
+          "name",
           "unit",
           "isActive",
+          "purchasePrice",
+          "sellingPrice",
+          "providerId",
           "id",
           "organizationId",
           "createdAt",
@@ -6175,6 +7505,18 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sellingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -7576,6 +8918,9 @@
           "itemId": {
             "type": "string"
           },
+          "item": {
+            "$ref": "#/components/schemas/ItemEntity"
+          },
           "locationId": {
             "type": "string"
           },
@@ -7619,6 +8964,210 @@
           "createdAt",
           "updatedAt",
           "createdBy"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "defaultProviderId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "defaultProviderId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "GenerateVariantsDto": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ResolveVariantDto": {
+        "type": "object",
+        "properties": {
+          "attributes": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "attributes"
+        ]
+      },
+      "ProductAttributeDefinitionEntity": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductEntity"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAttributeOptionEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "sortOrder",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "ProductAttributeOptionEntity": {
+        "type": "object",
+        "properties": {
+          "attributeDefinitionId": {
+            "type": "string"
+          },
+          "attributeDefinition": {
+            "$ref": "#/components/schemas/ProductAttributeDefinitionEntity"
+          },
+          "valueLabel": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "codeSuffix": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "attributeDefinitionId",
+          "valueLabel",
+          "sortOrder",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CreateAttributeDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateAttributeOptionDto": {
+        "type": "object",
+        "properties": {
+          "valueLabel": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          },
+          "codeSuffix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueLabel"
         ]
       },
       "CreateTransferDto": {
@@ -8849,6 +10398,241 @@
         },
         "required": [
           "type"
+        ]
+      },
+      "CreatePurchaseOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "PurchaseOrderEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "RECEIVING",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "expectedDate": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "string"
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLineEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "providerId",
+          "locationId",
+          "status",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "PurchaseOrderLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "purchaseOrderId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "orderedQuantity": {
+            "type": "number"
+          },
+          "receivedQuantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "purchaseOrder": {
+            "$ref": "#/components/schemas/PurchaseOrderEntity"
+          }
+        },
+        "required": [
+          "id",
+          "purchaseOrderId",
+          "itemId",
+          "orderedQuantity",
+          "receivedQuantity",
+          "unitPrice"
+        ]
+      },
+      "ReceiveGoodsDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateGoodsIssueDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "GoodsIssueEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "string"
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsIssueLineEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "locationId",
+          "reason",
+          "status",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "GoodsIssueLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "goodsIssueId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "goodsIssue": {
+            "$ref": "#/components/schemas/GoodsIssueEntity"
+          }
+        },
+        "required": [
+          "id",
+          "goodsIssueId",
+          "itemId",
+          "quantity"
         ]
       }
     }

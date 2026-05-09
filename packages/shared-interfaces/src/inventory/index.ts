@@ -33,6 +33,8 @@ export enum GoodsIssueStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export type { Product } from './product';
+
 export enum ImportJobStatus {
   PENDING = 'PENDING',
   VALIDATING = 'VALIDATING',
@@ -80,6 +82,12 @@ export interface Item {
   /** Present on admin list rows when joined from the linked provider. */
   providerName?: string;
   providerCode?: string;
+  /** FK to products — null for legacy items without a parent product. */
+  productId?: string;
+  /** Denormalized display label for variant attributes (e.g. "39 · Nâu"). */
+  variantLabel?: string;
+  /** Present on list rows when joined from the linked product. */
+  productName?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -147,6 +155,10 @@ export interface StockBalance {
   itemCode?: string;
   /** Category, unit, and description summary from the linked item. */
   itemVariants?: string;
+  /** Name of the parent product (via item.product). Empty for legacy items. */
+  productName?: string;
+  /** Variant attribute label (e.g. "39 · Nâu"), falls back to category/unit/desc for legacy items. */
+  variantLabel?: string;
 }
 
 export interface StockLedgerEntry {

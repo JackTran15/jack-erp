@@ -8,7 +8,7 @@
   --pos-touch-min: 44px;
   --pos-radius: 8px;
   --pos-radius-sm: 6px;
-  --pos-font: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pos-font: "Roboto", roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   --pos-text: #121212;
   --pos-text-muted: #5f6368;
   --pos-bg: #f0f2f5;

@@ -17,6 +17,7 @@ import { EventPublisher } from '../../events/event-publisher.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
+import { ProductStorageLocationService } from '../product/product-storage-location.service';
 
 export interface RecordMovementParams {
   itemId: string;
@@ -59,11 +60,18 @@ export class StockLedgerService {
     private readonly balanceRepo: Repository<StockBalanceEntity>,
     private readonly dataSource: DataSource,
     private readonly eventPublisher: EventPublisher,
+    private readonly pslService: ProductStorageLocationService,
   ) {}
 
   async recordMovement(
     params: RecordMovementParams,
   ): Promise<StockLedgerEntryEntity> {
+    await this.pslService.validateAndAssignByLocation(
+      params.itemId,
+      params.locationId,
+      params.actorContext,
+    );
+
     const entry = await this.dataSource.transaction(async (manager) => {
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
@@ -94,6 +102,14 @@ export class StockLedgerService {
     movements: RecordMovementParams[],
   ): Promise<StockLedgerEntryEntity[]> {
     if (movements.length === 0) return [];
+
+    for (const params of movements) {
+      await this.pslService.validateAndAssignByLocation(
+        params.itemId,
+        params.locationId,
+        params.actorContext,
+      );
+    }
 
     const entries = await this.dataSource.transaction(async (manager) => {
       const savedEntries: StockLedgerEntryEntity[] = [];

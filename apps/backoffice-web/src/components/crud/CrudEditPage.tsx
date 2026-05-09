@@ -1,9 +1,12 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
+import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
+import { isNotFoundHttpError } from "../../lib/not-found-http-error";
+import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 
 export function CrudEditPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
@@ -45,34 +48,48 @@ export function CrudEditPage() {
 
   if (configLoading || recordLoading) {
     return (
-      <PageShell>
+      <AdminPageShell>
         <p>Đang tải…</p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
   if (configError) {
+    if (isNotFoundHttpError(configError)) {
+      return (
+        <AdminPageShell>
+          <HttpErrorView code={404} />
+        </AdminPageShell>
+      );
+    }
     return (
-      <PageShell>
+      <AdminPageShell>
         <p className="text-destructive">
           Lỗi cấu hình: {configError instanceof Error ? configError.message : "Không xác định"}
         </p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
   if (recordError) {
+    if (isNotFoundHttpError(recordError)) {
+      return (
+        <AdminPageShell>
+          <HttpErrorView code={404} />
+        </AdminPageShell>
+      );
+    }
     return (
-      <PageShell>
+      <AdminPageShell>
         <p className="text-destructive">
           Lỗi bản ghi: {recordError instanceof Error ? recordError.message : "Không tải được"}
         </p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
   if (!config || !record) {
     return (
-      <PageShell>
+      <AdminPageShell>
         <p>Không tìm thấy dữ liệu.</p>
-      </PageShell>
+      </AdminPageShell>
     );
   }
 
@@ -103,7 +120,7 @@ export function CrudEditPage() {
   };
 
   return (
-    <PageShell>
+    <AdminPageShell>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <nav
@@ -161,7 +178,7 @@ export function CrudEditPage() {
           ))}
         </form>
       </div>
-    </PageShell>
+    </AdminPageShell>
   );
 }
 
@@ -169,6 +186,3 @@ function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
 
-function PageShell({ children }: { children: ReactNode }) {
-  return <div className="w-full px-2 py-6 sm:px-3 lg:px-4">{children}</div>;
-}

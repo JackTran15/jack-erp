@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatClientError } from "@erp/api-client";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { AppModal, Button, Input, type ToolbarItem } from "@erp/ui";
+import { AppModal, Button, Input } from "@erp/ui";
+import { TOOLBAR_ACTION } from "../../constants";
+import { buildListToolbar } from "../../lib/list-toolbar";
 import { apiClient } from "../../lib/api-axios";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
@@ -13,6 +14,7 @@ import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -190,7 +192,7 @@ export function GoodsIssuePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Phiếu xuất hàng</h1>
@@ -203,9 +205,9 @@ export function GoodsIssuePage() {
       <TableActionHeader
         className="mb-4"
         breadcrumbs={resolveBackofficeBreadcrumbs("/inventory/goods-issues")}
-        items={buildGoodsIssueToolbarItems({
-          onCreate: () => setShowCreateForm(true),
-        })}
+        items={buildListToolbar([
+          { action: TOOLBAR_ACTION.create, onClick: () => setShowCreateForm(true) },
+        ])}
       />
 
       <div className="mb-4 flex gap-3">
@@ -277,13 +279,17 @@ export function GoodsIssuePage() {
             )}
           </div>
         )}
-      />
-
-      <PaginationControls
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={records?.total ?? 0}
-        onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+        footer={
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={records?.total ?? 0}
+            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageSizeChange={(nextPageSize) =>
+              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+            }
+          />
+        }
       />
 
       {showCreateForm && (
@@ -330,21 +336,8 @@ export function GoodsIssuePage() {
           onConfirm={() => void handleCancel(confirmCancel)}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
-}
-
-function buildGoodsIssueToolbarItems({
-  onCreate,
-}: {
-  onCreate: () => void;
-}): ToolbarItem[] {
-  return [
-    { id: "create", label: "Thêm mới", icon: Plus, onClick: onCreate },
-    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
-    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
-    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
-  ];
 }
 
 // ─── Create Goods Issue Modal ──────────────────────────────────────────────────

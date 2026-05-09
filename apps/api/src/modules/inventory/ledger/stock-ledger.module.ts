@@ -10,10 +10,12 @@ import {
   INVENTORY_STOCK_BALANCE_ENTITY_CONFIG,
   INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,
 } from './stock-balance-crud.service';
+import { ProductModule } from '../product/product.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([StockLedgerEntryEntity, StockBalanceEntity]),
+    ProductModule,
   ],
   controllers: [StockLedgerController],
   providers: [

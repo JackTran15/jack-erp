@@ -4,6 +4,7 @@ import { HttpError } from "../../lib/http";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import { getStoredOrganizationId } from "../../lib/auth-storage";
 import { Button, Input, FormField, Card, CardContent, CardHeader, CardTitle } from "@erp/ui";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 export function TenantSetupPage() {
   const orgId = getStoredOrganizationId();
@@ -49,7 +50,7 @@ export function TenantSetupPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[720px] px-4 py-6">
+    <AdminPageShell>
       <h1 className="mb-2 text-2xl font-bold text-foreground">Thiết lập tenant</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         Tổ chức đang đăng nhập: <strong>{orgId ?? "—"}</strong>
@@ -122,6 +123,6 @@ export function TenantSetupPage() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </AdminPageShell>
   );
 }

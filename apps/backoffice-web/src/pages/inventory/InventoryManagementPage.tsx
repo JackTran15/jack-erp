@@ -6,16 +6,14 @@ import type {
   PaginatedResponse,
 } from "@erp/shared-interfaces";
 import { formatClientError } from "@erp/api-client";
-import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   AppModal,
   Button,
   FormField,
   Input,
-  MoneyInput,
-  formatMoneyInteger,
-  type ToolbarItem,
 } from "@erp/ui";
+import { TOOLBAR_ACTION } from "../../constants";
+import { buildListToolbar } from "../../lib/list-toolbar";
 import { erpApi } from "../../lib/erp-api";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
@@ -26,6 +24,7 @@ import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 const ENTITY_OPTIONS = [
   { key: "inventory-providers", label: "Nhà cung cấp" },
@@ -168,19 +167,19 @@ export function InventoryManagementPage() {
       setPendingDelete(null);
       await loadRecords();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Xoá bản ghi thất bại");
+      setError(err instanceof Error ? err.message : "Xóa bản ghi thất bại");
     } finally {
       setSaving(false);
     }
   }, [config, entityKey, loadRecords, pendingDelete]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-6">
+    <AdminPageShell>
       <div className="mb-3">
         <div>
           <h1 className="text-2xl font-semibold">Quản lý kho</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Quản lý kho lưu trữ, mặt hàng và tồn kho với thao tác thêm, sửa, xoá từng dòng.
+            Quản lý kho lưu trữ, mặt hàng và tồn kho với thao tác thêm, sửa, xóa từng dòng.
           </p>
         </div>
       </div>
@@ -188,13 +187,17 @@ export function InventoryManagementPage() {
       <TableActionHeader
         className="mb-4"
         breadcrumbs={resolveBackofficeBreadcrumbs("/inventory-management")}
-        items={buildInventoryToolbarItems({
-          canCreate: Boolean(config),
-          onCreate: () => {
-            setEditingRecord(null);
-            setFormOpen(true);
+        items={buildListToolbar([
+          {
+            action: TOOLBAR_ACTION.create,
+            label: "Thêm dòng",
+            onClick: () => {
+              setEditingRecord(null);
+              setFormOpen(true);
+            },
+            disabled: !config,
           },
-        })}
+        ])}
       />
 
       <div className="mb-4 flex gap-3">
@@ -257,18 +260,22 @@ export function InventoryManagementPage() {
               className="h-auto px-1 py-0.5 text-destructive"
               onClick={() => setPendingDelete(row)}
             >
-              Xoá
+              Xóa
             </Button>
           </div>
         )}
-      />
-
-      <PaginationControls
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={records?.total ?? 0}
-        onPageChange={(nextPage) =>
-          setPagination((prev) => ({ ...prev, page: nextPage }))
+        footer={
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={records?.total ?? 0}
+            onPageChange={(nextPage) =>
+              setPagination((prev) => ({ ...prev, page: nextPage }))
+            }
+            onPageSizeChange={(nextPageSize) =>
+              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+            }
+          />
         }
       />
 
@@ -287,32 +294,17 @@ export function InventoryManagementPage() {
 
       {pendingDelete && config && (
         <ConfirmActionModal
-          title={`Xoá ${config.displayName}`}
-          message="Thao tác này không thể hoàn tác. Xác nhận xoá dòng này?"
-          confirmLabel="Xoá"
+          title={`Xóa ${config.displayName}`}
+          message="Thao tác này không thể hoàn tác. Xác nhận xóa dòng này?"
+          confirmLabel="Xóa"
           cancelLabel="Huỷ"
           loading={saving}
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => void confirmDelete()}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
-}
-
-function buildInventoryToolbarItems({
-  canCreate,
-  onCreate,
-}: {
-  canCreate: boolean;
-  onCreate: () => void;
-}): ToolbarItem[] {
-  return [
-    { id: "create", label: "Thêm dòng", icon: Plus, onClick: onCreate, disabled: !canCreate },
-    { id: "duplicate", label: "Nhân bản", icon: Copy, onClick: () => undefined, disabled: true },
-    { id: "edit", label: "Sửa", icon: Pencil, onClick: () => undefined, disabled: true },
-    { id: "delete", label: "Xoá", icon: Trash2, onClick: () => undefined, disabled: true, variant: "danger" },
-  ];
 }
 
 function InventoryRecordFormModal({
@@ -425,18 +417,6 @@ function FieldInput({
   }
 
   if (field.type === "number") {
-    if (field.numberFormat === "money") {
-      return (
-        <MoneyInput
-          value={
-            value === undefined || value === null || value === ""
-              ? ""
-              : Number(value)
-          }
-          onChange={(v) => onChange(v === "" ? "" : v)}
-        />
-      );
-    }
     return (
       <Input
         type="number"
@@ -484,10 +464,6 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
     } catch {
       return String(value);
     }
-  }
-  if (field.type === "number" && field.numberFormat === "money") {
-    const n = Number(value);
-    return Number.isFinite(n) ? formatMoneyInteger(n) : String(value);
   }
   return String(value);
 }

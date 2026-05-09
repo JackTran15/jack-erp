@@ -13,15 +13,15 @@ export function BackofficeLayout() {
     <LayoutContext.Provider value={{ sidebarCollapsed, toggleSidebar }}>
       <div className="min-h-screen bg-background">
         <AppHeader />
-        <div className="flex pt-14">
+        <div className="flex w-full pt-14">
           <AppSidebar />
           <main
             className={cn(
-              "flex-1 overflow-auto transition-all duration-200",
+              "flex min-h-[calc(100vh-3.5rem)] min-w-0 flex-1 flex-col overflow-auto transition-all duration-200",
               sidebarCollapsed ? "ml-[60px]" : "ml-60",
             )}
           >
-            <div className="w-full px-2 py-6 sm:px-3 lg:px-4">
+            <div className="flex min-h-full w-full min-w-0 flex-1 flex-col p-6">
               <Outlet />
             </div>
           </main>

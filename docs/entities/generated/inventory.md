@@ -2,7 +2,58 @@
 
 Generated from `docs/entities/entity-manifest.json`.
 
-Total entities: **13**
+Total entities: **24**
+
+---
+
+## GoodsIssueEntity
+
+- **Table:** `goods_issues`
+- **Source:** `apps/api/src/modules/inventory/goods-issue/goods-issue.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → APPROVED → POSTED | CANCELLED
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `documentNumber` | `document_number` | `varchar` | - | Auto-generated on posting |
+| `locationId` | `location_id` | `uuid` | NN | Source storage location |
+| `reason` | `reason` | `varchar` | NN | Reason for issuance (e.g. bán hàng, nội bộ, mẫu) |
+| `status` | `status` | `enum` | NN, default: GoodsIssueStatus.DRAFT | - |
+| `notes` | `notes` | `varchar` | - | Free-text notes |
+| `approvedBy` | `approved_by` | `uuid` | - | - |
+| `approvedAt` | `approved_at` | `timestamptz` | - | - |
+| `postedBy` | `posted_by` | `uuid` | - | - |
+| `postedAt` | `posted_at` | `timestamptz` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `GoodsIssueLineEntity`
+
+---
+
+## GoodsIssueLineEntity
+
+- **Table:** `goods_issue_lines`
+- **Source:** `apps/api/src/modules/inventory/goods-issue/goods-issue-line.entity.ts`
+- **Extends BaseEntity:** No
+- **Description:** Single item line within a goods issue document.
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `id` | `id` | `uuid` | PK, NN | - |
+| `goodsIssueId` | `goods_issue_id` | `uuid` | NN | Parent goods issue document |
+| `itemId` | `item_id` | `uuid` | NN | Item being issued from stock |
+| `quantity` | `quantity` | `numeric` | NN | Quantity to issue (always positive) |
+| `notes` | `notes` | `varchar` | - | Per-line notes |
+
+### Relations
+- `ManyToOne` `goodsIssue` → `GoodsIssueEntity`
 
 ---
 
@@ -65,6 +116,49 @@ Total entities: **13**
 
 ---
 
+## ItemAttributeValueEntity
+
+- **Table:** `item_attribute_values`
+- **Source:** `apps/api/src/modules/inventory/product/item-attribute-value.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Junction: links an item (variant) to one option per attribute dimension.
+
+### Unique Constraints
+- `['itemId', 'attributeDefinitionId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `itemId` | `item_id` | `uuid` | NN | FK to items — the variant item |
+| `attributeDefinitionId` | `attribute_definition_id` | `uuid` | NN | FK to attribute definition (which dimension) |
+| `optionId` | `option_id` | `uuid` | NN | FK to attribute option (which value in that dimension) |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
+- `ManyToOne` `attributeDefinition` → `ProductAttributeDefinitionEntity`
+- `ManyToOne` `option` → `ProductAttributeOptionEntity`
+
+---
+
+## ItemCategoryEntity
+
+- **Table:** `inventory_item_categories`
+- **Source:** `apps/api/src/modules/inventory/location/item-category.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** User-defined product category label (per organization), used when assigning items.
+
+### Unique Constraints
+- `['organizationId', 'name']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `name` | `name` | `varchar` | NN | Display name of the category (unique per organization) |
+
+---
+
 ## ItemEntity
 
 - **Table:** `items`
@@ -85,6 +179,15 @@ Total entities: **13**
 | `unit` | `unit` | `varchar` | NN | Unit of measure (e.g. pcs, kg, box) |
 | `category` | `category` | `varchar` | - | Grouping label for filtering and reporting (e.g. Electronics, Furniture) |
 | `isActive` | `is_active` | `varchar` | NN, default: true | When false, item cannot be used in new transactions |
+| `purchasePrice` | `purchase_price` | `decimal` | NN, default: 0 | Default purchase (cost) price per unit |
+| `sellingPrice` | `selling_price` | `decimal` | NN, default: 0 | Default selling price per unit |
+| `providerId` | `provider_id` | `uuid` | NN | FK to inventory_providers — the supplier for this item |
+| `productId` | `product_id` | `uuid` | - | FK to products — null for legacy items without a parent product |
+| `variantLabel` | `variant_label` | `varchar` | - | Denormalized display label for variant attributes (e.g. "39 · Nâu") |
+
+### Relations
+- `ManyToOne` `provider` → `ProviderEntity`
+- `ManyToOne` `product` → `ProductEntity`
 
 ---
 
@@ -110,6 +213,181 @@ Total entities: **13**
 
 ### Relations
 - `ManyToOne` `storage` → `StorageEntity`
+
+---
+
+## ProductAttributeDefinitionEntity
+
+- **Table:** `product_attribute_definitions`
+- **Source:** `apps/api/src/modules/inventory/product/product-attribute-definition.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** A dimension of variation for a product (e.g. Size, Color).
+
+### Unique Constraints
+- `['productId', 'name']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `productId` | `product_id` | `uuid` | NN | FK to products — the product this attribute belongs to |
+| `name` | `name` | `varchar` | NN | Attribute dimension name (e.g. Size, Color) |
+| `sortOrder` | `sort_order` | `int` | NN, default: 0 | Display ordering among sibling definitions |
+
+### Relations
+- `ManyToOne` `product` → `ProductEntity`
+- `OneToMany` `options` → `ProductAttributeOptionEntity`
+
+---
+
+## ProductAttributeOptionEntity
+
+- **Table:** `product_attribute_options`
+- **Source:** `apps/api/src/modules/inventory/product/product-attribute-option.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** A specific value within an attribute dimension (e.g. "39", "Nâu").
+
+### Indexes
+- `['attributeDefinitionId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `attributeDefinitionId` | `attribute_definition_id` | `uuid` | NN | FK to the parent attribute definition |
+| `valueLabel` | `value_label` | `varchar` | NN | Display label for the option value |
+| `sortOrder` | `sort_order` | `int` | NN, default: 0 | Display ordering among sibling options |
+| `codeSuffix` | `code_suffix` | `varchar` | - | Short code appended to SKU when generating variant codes |
+
+### Relations
+- `ManyToOne` `attributeDefinition` → `ProductAttributeDefinitionEntity`
+
+---
+
+## ProductEntity
+
+- **Table:** `products`
+- **Source:** `apps/api/src/modules/inventory/product/product.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** A product grouping that may have multiple item variants (SKUs). Org-level, not per-branch.
+
+### Indexes
+- `['organizationId', 'isActive']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `name` | `name` | `varchar` | NN | Human-readable product name |
+| `description` | `description` | `varchar` | - | Detailed product description |
+| `isActive` | `is_active` | `varchar` | NN, default: true | Inactive products are hidden from catalog |
+| `defaultProviderId` | `default_provider_id` | `uuid` | - | Default supplier for variants of this product |
+| `autoMigrated` | `auto_migrated` | `varchar` | NN, default: false | True if created by legacy migration script (TKT-036) |
+
+### Relations
+- `ManyToOne` `defaultProvider` → `ProviderEntity`
+
+---
+
+## ProductStorageLocationEntity
+
+- **Table:** `product_storage_locations`
+- **Source:** `apps/api/src/modules/inventory/product/product-storage-location.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Maps a product to exactly one location within a storage.
+Constraint: one product can only be stored in one location per storage (warehouse).
+
+### Unique Constraints
+- `['productId', 'storageId']`
+
+### Indexes
+- `['storageId', 'locationId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `productId` | `product_id` | `uuid` | NN | FK to products |
+| `storageId` | `storage_id` | `uuid` | NN | FK to storages — which warehouse |
+| `locationId` | `location_id` | `uuid` | NN | FK to locations — assigned position in that storage |
+
+### Relations
+- `ManyToOne` `product` → `ProductEntity`
+
+---
+
+## ProviderEntity
+
+- **Table:** `inventory_providers`
+- **Source:** `apps/api/src/modules/inventory/location/provider.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Supplier / vendor who provides items to the organization.
+
+### Unique Constraints
+- `['organizationId', 'code']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `code` | `code` | `varchar` | NN | Short alphanumeric code unique per organization |
+| `name` | `name` | `varchar` | NN | Human-readable provider name |
+| `email` | `email` | `varchar` | - | Contact email address |
+| `phone` | `phone` | `varchar` | - | Contact phone number |
+| `notes` | `notes` | `varchar` | - | Free-text notes or address info |
+| `isActive` | `is_active` | `varchar` | NN, default: true | Inactive providers cannot be assigned to new items |
+
+---
+
+## PurchaseOrderEntity
+
+- **Table:** `purchase_orders`
+- **Source:** `apps/api/src/modules/inventory/purchase-order/purchase-order.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Phiếu đặt hàng — purchase order from supplier. Workflow: DRAFT → APPROVED → RECEIVING → RECEIVED | CANCELLED
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `documentNumber` | `document_number` | `varchar` | - | Auto-generated on approval |
+| `providerId` | `provider_id` | `uuid` | NN | Supplier (inventory_providers) |
+| `locationId` | `location_id` | `uuid` | NN | Destination storage location for received goods |
+| `status` | `status` | `enum` | NN, default: PurchaseOrderStatus.DRAFT | - |
+| `expectedDate` | `expected_date` | `date` | - | Expected delivery date |
+| `notes` | `notes` | `varchar` | - | Free-text notes |
+| `approvedBy` | `approved_by` | `uuid` | - | - |
+| `approvedAt` | `approved_at` | `timestamptz` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `PurchaseOrderLineEntity`
+
+---
+
+## PurchaseOrderLineEntity
+
+- **Table:** `purchase_order_lines`
+- **Source:** `apps/api/src/modules/inventory/purchase-order/purchase-order-line.entity.ts`
+- **Extends BaseEntity:** No
+- **Description:** Single item line within a purchase order.
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `id` | `id` | `uuid` | PK, NN | - |
+| `purchaseOrderId` | `purchase_order_id` | `uuid` | NN | Parent purchase order |
+| `itemId` | `item_id` | `uuid` | NN | Item being ordered |
+| `orderedQuantity` | `ordered_quantity` | `numeric` | NN | Quantity ordered from supplier |
+| `receivedQuantity` | `received_quantity` | `numeric` | NN, default: 0 | Quantity already received into stock |
+| `unitPrice` | `unit_price` | `numeric` | NN, default: 0 | Unit purchase price |
+| `notes` | `notes` | `varchar` | - | Per-line notes |
+
+### Relations
+- `ManyToOne` `purchaseOrder` → `PurchaseOrderEntity`
 
 ---
 
@@ -210,6 +488,9 @@ Total entities: **13**
 | `locationId` | `location_id` | `uuid` | NN | The location holding the stock |
 | `quantity` | `quantity` | `numeric` | NN, default: 0 | Current on-hand quantity; can be negative in rare adjustment scenarios |
 | `lastMovementAt` | `last_movement_at` | `timestamptz` | - | Timestamp of the most recent stock movement affecting this balance |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
 
 ---
 

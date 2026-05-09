@@ -32,7 +32,7 @@ export class InventoryItemCrudService extends BaseCrudService<
   }
 
   protected override getByIdRelations(): string[] {
-    return ['provider'];
+    return ['provider', 'product'];
   }
 
   protected override configureListQuery(
@@ -40,6 +40,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     alias: string,
   ): void {
     qb.leftJoinAndSelect(`${alias}.provider`, 'provider');
+    qb.leftJoinAndSelect(`${alias}.product`, 'product');
   }
 
   protected override applySearch(
@@ -55,7 +56,8 @@ export class InventoryItemCrudService extends BaseCrudService<
           .orWhere(`${alias}.name ILIKE :search`, { search: `%${search}%` })
           .orWhere(`${alias}.category ILIKE :search`, { search: `%${search}%` })
           .orWhere('provider.name ILIKE :search', { search: `%${search}%` })
-          .orWhere('provider.code ILIKE :search', { search: `%${search}%` });
+          .orWhere('provider.code ILIKE :search', { search: `%${search}%` })
+          .orWhere('product.name ILIKE :search', { search: `%${search}%` });
       }),
     );
   }
@@ -63,11 +65,14 @@ export class InventoryItemCrudService extends BaseCrudService<
   protected override transformListResults(data: ItemEntity[]): unknown[] {
     return data.map((row) => {
       const provider = row.provider;
-      const { provider: _drop, ...rest } = row;
+      const product = row.product;
+      const { provider: _dropProvider, product: _dropProduct, ...rest } = row;
       return {
         ...rest,
         providerName: provider?.name ?? '',
         providerCode: provider?.code ?? '',
+        productName: product?.name ?? '',
+        variantLabel: row.variantLabel ?? '',
       };
     });
   }
@@ -115,6 +120,8 @@ function stripDerivedProviderFields<T extends Record<string, any>>(payload: T): 
   delete next.providerName;
   delete next.providerCode;
   delete next.provider;
+  delete next.productName;
+  delete next.product;
   return next;
 }
 
@@ -145,10 +152,13 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'providerId', label: 'ID NCC', type: 'string', required: true },
     { key: 'providerName', label: 'Tên NCC', type: 'string', readOnly: true },
     { key: 'providerCode', label: 'Mã NCC', type: 'string', readOnly: true },
+    { key: 'productId', label: 'ID Sản phẩm', type: 'string' },
+    { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true },
+    { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true },
     { key: 'isActive', label: 'Đang hoạt động', type: 'boolean' },
     { key: 'createdAt', label: 'Ngày tạo', type: 'date' },
   ],
-  searchableFields: ['code', 'name', 'category', 'providerName', 'providerCode'],
+  searchableFields: ['code', 'name', 'category', 'providerName', 'providerCode', 'productName'],
   filterDefinitions: [
     {
       key: 'isActive',
@@ -160,6 +170,7 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
       ],
     },
     { key: 'providerId', label: 'ID NCC', type: 'text' },
+    { key: 'productId', label: 'ID Sản phẩm', type: 'text' },
   ],
   permissions: {
     create: 'inventory.write',

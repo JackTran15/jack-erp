@@ -82,3 +82,10 @@ flowchart LR
 ## Tickets
 
 - [All tickets](./tickets/)
+
+## EPIC-006 Product variants & catalog
+
+- [EPIC-006 Product variants & catalog](./epics/EPIC-006-product-variants-catalog.md)
+- Tickets: [TKT-027](./tickets/TKT-027-inventory-product-schema.md) – [TKT-037](./tickets/TKT-037-product-variants-test-plan.md)
+- Dependencies: [TKT-DEP-006-dependencies.md](./TKT-DEP-006-dependencies.md)
+

@@ -16,7 +16,6 @@ import {
   Building2,
   CheckSquare,
   PlusCircle,
-  LayoutGrid,
   Box,
   Truck,
   UserSquare,
@@ -25,6 +24,8 @@ import {
   FileText,
   DollarSign,
   Hash,
+  Layers,
+  LayoutGrid
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -32,7 +33,6 @@ export interface NavChild {
   to: string;
   label: string;
   end?: boolean;
-  icon?: ComponentType<{ className?: string }>;
 }
 
 export interface NavSection {
@@ -41,18 +41,24 @@ export interface NavSection {
   children: NavChild[];
 }
 
+/** Mega menu configuration for the sidebar. */
+export interface NavModuleFlyout {
+  enabled: boolean;
+  splitLeft?: string[];
+  splitRight?: string[];
+}
+
 export interface NavModule {
   id: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   defaultPath: string;
   sections: NavSection[];
-  /**
-   * When true the sidebar renders sections as a flyout mega-menu panel
-   * (multi-column, positioned to the right of the sidebar) instead of
-   * the standard single-column collapsible list.
-   */
-  flyout?: boolean;
+  flyout?: NavModuleFlyout;
+}
+
+export function isFlyoutEnabled(module: NavModule): boolean {
+  return module.flyout?.enabled === true;
 }
 
 export const navConfig: NavModule[] = [
@@ -65,7 +71,7 @@ export const navConfig: NavModule[] = [
       {
         id: "overview-main",
         children: [
-          { to: "/", label: "Bảng điều khiển", end: true, icon: LayoutDashboard },
+          { to: "/", label: "Bảng điều khiển", end: true },
         ],
       },
     ],
@@ -75,13 +81,18 @@ export const navConfig: NavModule[] = [
     label: "Kho hàng",
     icon: Warehouse,
     defaultPath: "/inventory-management",
+    flyout: { enabled: true },
     sections: [
       {
         id: "inventory-main",
         children: [
-          { to: "/inventory-management", label: "Quản lý kho", icon: Package },
-          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", icon: ShoppingCart },
-          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", icon: PackageMinus },
+          { to: "/inventory-management", label: "Quản lý kho", },
+          { to: "/products", label: "Sản phẩm", },
+          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
+          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
+          { to: "/inventory-management", label: "Quản lý kho", },
+          { to: "/inventory/purchase-orders", label: "Phiếu đặt hàng", },
+          { to: "/inventory/goods-issues", label: "Phiếu xuất hàng", },
         ],
       },
     ],
@@ -95,7 +106,7 @@ export const navConfig: NavModule[] = [
       {
         id: "customers-main",
         children: [
-          { to: "/admin/customers", label: "Danh sách khách hàng", icon: Users },
+          { to: "/admin/customers", label: "Danh sách khách hàng", },
         ],
       },
     ],
@@ -105,22 +116,23 @@ export const navConfig: NavModule[] = [
     label: "Báo cáo",
     icon: BarChart3,
     defaultPath: "/reports",
+    flyout: { enabled: true },
     sections: [
       {
         id: "reports-overview",
         label: "Tổng hợp",
         children: [
-          { to: "/reports", label: "Bảng tổng hợp", end: true, icon: BarChart3 },
+          { to: "/reports", label: "Bảng tổng hợp", end: true },
         ],
       },
       {
         id: "reports-detail",
         label: "Chi tiết",
         children: [
-          { to: "/reports/sales", label: "Doanh số", icon: TrendingUp },
-          { to: "/reports/inventory", label: "Tồn kho", icon: PackageOpen },
-          { to: "/reports/aging", label: "Công nợ", icon: CreditCard },
-          { to: "/reports/cash", label: "Tiền mặt", icon: Banknote },
+          { to: "/reports/sales", label: "Doanh số", },
+          { to: "/reports/inventory", label: "Tồn kho", },
+          { to: "/reports/aging", label: "Công nợ", },
+          { to: "/reports/cash", label: "Tiền mặt", },
         ],
       },
     ],
@@ -134,7 +146,7 @@ export const navConfig: NavModule[] = [
       {
         id: "branch-main",
         children: [
-          { to: "/branch-management/sales-hierarchy", label: "Cấp bậc kinh doanh", icon: GitBranch },
+          { to: "/branch-management/sales-hierarchy", label: "Cấp bậc kinh doanh", },
         ],
       },
     ],
@@ -144,49 +156,83 @@ export const navConfig: NavModule[] = [
     label: "Đăng ký & Phê duyệt",
     icon: ClipboardCheck,
     defaultPath: "/onboarding/approvals",
+    flyout: { enabled: true },
     sections: [
       {
         id: "onboarding-main",
         children: [
-          { to: "/onboarding/approvals", label: "Hàng chờ phê duyệt", icon: CheckSquare },
-          { to: "/onboarding/org-registration", label: "Đăng ký tổ chức", icon: Building2 },
-          { to: "/onboarding/branch-registration", label: "Đăng ký chi nhánh", icon: PlusCircle },
+          { to: "/onboarding/approvals", label: "Hàng chờ phê duyệt", },
+          { to: "/onboarding/org-registration", label: "Đăng ký tổ chức", },
+          { to: "/onboarding/branch-registration", label: "Đăng ký chi nhánh", },
         ],
       },
     ],
   },
   {
-    id: "danh-muc",
+    id: "catalog",
     label: "Danh mục",
     icon: LayoutGrid,
     defaultPath: "/admin/inventory-items",
-    flyout: true,
+    flyout: {
+      enabled: true,
+      splitLeft: ["catalog-goods", "catalog-customers", "catalog-suppliers"],
+      splitRight: ["catalog-receipts-expenses", "catalog-misc"],
+    },
     sections: [
       {
-        id: "danh-muc-hang-hoa",
+        id: "catalog-goods",
         label: "HÀNG HÓA",
         children: [
-          { to: "/admin/inventory-items",          label: "Hàng hóa",    icon: Box },
-          { to: "/admin/inventory-providers",      label: "Nhà cung cấp", icon: Truck },
-          { to: "/admin/inventory-storages",       label: "Kho hàng",    icon: Warehouse },
-          { to: "/admin/inventory-stock-balances", label: "Tồn kho",     icon: Package },
+          { to: "/admin/inventory-item-groups", label: "Nhóm hàng hoá" },
+          { to: "/admin/inventory-items", label: "Hàng hoá" },
+          {
+            to: "/admin/inventory-item-units", label: "Đơn vị tính" },
+          { to: "/admin/inventory-item-barcodes", label: "In tem mã" },
+          {
+            to: "/admin/inventory-item-prices", label: "Bảng giá" },
+          { to: "/admin/inventory-storages", label: "Kho hàng" },
+          { to: "/admin/inventory-stock-balances", label: "Tồn kho" },
         ],
       },
       {
-        id: "danh-muc-khach-hang",
+        id: "catalog-receipts-expenses",
+        label: "THU, CHI",
+        children: [
+          { to: "/admin/accounts", label: "Tài khoản kế toán" },
+          { to: "/admin/payables", label: "Phải trả" },
+          { to: "/admin/receivables", label: "Phải thu" },
+          { to: "/admin/expenses", label: "Chi phí" },
+        ],
+      },
+      {
+        id: "catalog-customers",
         label: "KHÁCH HÀNG",
         children: [
-          { to: "/admin/customers", label: "Khách hàng", icon: UserSquare },
+          { to: "/admin/customer-groups", label: "Nhóm khách hàng" },
+          { to: "/admin/customers", label: "Khách hàng" },
         ],
       },
       {
-        id: "danh-muc-ke-toan",
-        label: "KẾ TOÁN",
+        id: "catalog-misc",
+        label: "KHÁC",
         children: [
-          { to: "/admin/accounts",     label: "Tài khoản kế toán", icon: BookOpen },
-          { to: "/admin/payables",     label: "Phải trả",          icon: Receipt },
-          { to: "/admin/receivables",  label: "Phải thu",          icon: FileText },
-          { to: "/admin/expenses",     label: "Chi phí",           icon: DollarSign },
+          { to: "/admin/employees", label: "Nhân viên" },
+          { to: "/admin/job-positions", label: "Vị trí công việc" },
+          { to: "/admin/stores", label: "Cửa hàng" },
+          { to: "/admin/cash-boxes", label: "Két đựng tiền" },
+          { to: "/admin/work-shifts", label: "Ca làm việc" },
+          { to: "/admin/payment-methods", label: "Phương thức dịch vụ và thanh toán" },
+          { to: "/admin/bank-accounts", label: "Tài khoản ngân hàng" },
+          { to: "/admin/sales-channels", label: "Kênh bán hàng" },
+        ],
+      },
+      {
+        id: "catalog-suppliers",
+        label: "NHÀ CUNG CẤP",
+        children: [
+          { to: "/admin/provider-groups", label: "Nhóm nhà cung cấp" },
+          { to: "/admin/inventory-providers", label: "Nhà cung cấp" },
+          { to: "/admin/delivery-partners", label: "Đối tác giao hàng" },
         ],
       },
     ],
@@ -200,8 +246,9 @@ export const navConfig: NavModule[] = [
       {
         id: "settings-main",
         children: [
-          { to: "/setup", label: "Thiết lập chung", icon: Settings },
-          { to: "/settings/document-numbering", label: "Đánh số chứng từ", icon: Hash },
+          { to: "/setup", label: "Thiết lập chung", },
+          { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
+          { to: "/setup", label: "Thiết lập chung" },
         ],
       },
     ],

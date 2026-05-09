@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useCashReconciliation } from "../../hooks/useReportData";
+import { useQueryToast } from "../../hooks/useQueryToast";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
 export function CashReportPage() {
   const [branchId, setBranchId] = useState("");
@@ -12,10 +14,21 @@ export function CashReportPage() {
     new Date().toISOString().slice(0, 10),
   );
 
-  const { data = [], isLoading: loading, error, refetch } = useCashReconciliation({
+  const {
+    data = [],
+    isLoading: loading,
+    error,
+    errorUpdatedAt,
+    refetch,
+  } = useCashReconciliation({
     branchId: branchId || undefined,
     startDate,
     endDate,
+  });
+
+  useQueryToast(error ? { variant: "error", error } : null, {
+    toastId: "report-cash-reconciliation",
+    updatedAt: errorUpdatedAt,
   });
 
   const handleExportCsv = () => {
@@ -42,7 +55,7 @@ export function CashReportPage() {
   const totalVariance = data.reduce((sum, r) => sum + r.discrepancy, 0);
 
   return (
-    <div style={styles.page}>
+    <AdminPageShell>
       <div style={styles.header}>
         <h1 style={styles.title}>Đối soát quỹ</h1>
         <button style={styles.btnSecondary} onClick={handleExportCsv} disabled={data.length === 0}>
@@ -66,7 +79,6 @@ export function CashReportPage() {
         <button style={styles.btn} onClick={() => void refetch()}>Làm mới</button>
       </div>
 
-      {error && <p style={styles.error}>{error instanceof Error ? error.message : "Tải dữ liệu thất bại"}</p>}
       {loading && <p style={styles.muted}>Đang tải…</p>}
 
       {!loading && data.length === 0 && <p style={styles.muted}>Không có bản ghi đối soát.</p>}
@@ -128,7 +140,7 @@ export function CashReportPage() {
           </div>
         </>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 
@@ -145,7 +157,6 @@ const styles: Record<string, React.CSSProperties> = {
   input: { padding: "8px 10px", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, outline: "none", minWidth: 160 },
   btn: { padding: "8px 16px", background: "#1570ef", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer" },
   btnSecondary: { padding: "8px 16px", background: "#fff", color: "#344054", border: "1px solid #d0d5dd", borderRadius: 6, fontSize: 14, cursor: "pointer" },
-  error: { color: "#c62828", marginBottom: 12 },
   muted: { color: "#667085" },
   tableWrap: { overflowX: "auto", border: "1px solid #e4e7ec", borderRadius: 8 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
