@@ -49,6 +49,7 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { MOCK_PURCHASE_ORDERS } from "./PurchaseOrdersPage.fixtures";
 
 type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
 
@@ -59,12 +60,19 @@ interface PurchaseOrderLine {
   receivedQuantity: number;
   unitPrice: number;
   notes?: string;
+  // replace with real fields from API calls
+  itemCode?: string;
+  itemName?: string;
+  warehouse?: string;
+  position?: string;
+  unit?: string;
 }
 
 interface PurchaseOrder {
   id: string;
   documentNumber?: string;
   providerId: string;
+  providerName?: string;
   locationId: string;
   status: PurchaseOrderStatus;
   expectedDate?: string;
@@ -165,12 +173,24 @@ export function PurchaseOrdersPage() {
       const { data } = await apiClient.get<PaginatedResponse<PurchaseOrder>>(
         `/inventory/purchase-orders?${params}`,
       );
-      setRecords(data);
-    } catch (err: unknown) {
-      toast.error(getUserFacingApiErrorMessage(err), {
-        id: "purchase-orders-list",
-        position: "bottom-right",
-        duration: 6000,
+      // Replace with real data from API calls
+      if (data.data.length === 0) {
+        setRecords({
+          data: MOCK_PURCHASE_ORDERS as unknown as PurchaseOrder[],
+          total: MOCK_PURCHASE_ORDERS.length,
+          page: 1,
+          pageSize: pagination.pageSize,
+        });
+      } else {
+        setRecords(data);
+      }
+    } catch {
+      // Replace with real data from API calls
+      setRecords({
+        data: MOCK_PURCHASE_ORDERS as unknown as PurchaseOrder[],
+        total: MOCK_PURCHASE_ORDERS.length,
+        page: 1,
+        pageSize: pagination.pageSize,
       });
     } finally {
       setLoading(false);
@@ -199,8 +219,12 @@ export function PurchaseOrdersPage() {
   const providerNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of providers) map.set(p.id, p.name);
+      // replace with real data from API calls
+    for (const order of records?.data ?? []) {
+      if (order.providerName) map.set(order.providerId, order.providerName);
+    }
     return map;
-  }, [providers]);
+  }, [providers, records]);
 
   const selectedOrder = useMemo(
     () => records?.data.find((o) => o.id === selectedId) ?? null,
@@ -325,7 +349,9 @@ export function PurchaseOrdersPage() {
           <button
             type="button"
             className="text-primary hover:underline"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedId(row.id);
               setEditingOrder(row);
               setDialogMode("view");
             }}
@@ -515,11 +541,15 @@ function DetailPanel({ order }: { order: PurchaseOrder | null }) {
           <tbody>
             {order.lines.map((line) => (
               <tr key={line.id} className="border-b">
-                <td className="border-r px-2 py-1 font-mono text-xs">{line.itemId.slice(0, 8)}</td>
-                <td className="border-r px-2 py-1">—</td>
-                <td className="border-r px-2 py-1">{order.locationId.slice(0, 8)}</td>
-                <td className="border-r px-2 py-1">—</td>
-                <td className="border-r px-2 py-1">Đôi</td>
+                <td className="border-r px-2 py-1 font-mono text-xs">
+                  {line.itemCode ?? line.itemId.slice(0, 8)}
+                </td>
+                <td className="border-r px-2 py-1">{line.itemName ?? "—"}</td>
+                <td className="border-r px-2 py-1">
+                  {line.warehouse ?? order.locationId.slice(0, 8)}
+                </td>
+                <td className="border-r px-2 py-1">{line.position ?? "—"}</td>
+                <td className="border-r px-2 py-1">{line.unit ?? "Đôi"}</td>
                 <td className="border-r px-2 py-1 text-right tabular-nums">{line.orderedQuantity}</td>
                 <td className="border-r px-2 py-1 text-right tabular-nums">{line.receivedQuantity}</td>
                 <td className="border-r px-2 py-1 text-right tabular-nums">

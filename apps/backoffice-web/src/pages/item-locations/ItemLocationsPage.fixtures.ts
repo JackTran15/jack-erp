@@ -1,6 +1,7 @@
 /**
  * Static fixtures for the Item Locations (Vị trí hàng hóa) page. Replaced by
  * API calls when the UI is wired to the real backend.
+ * Remove this file when the UI is wired to the real backend.
  */
 
 export type ItemLocationStatus = "ACTIVE" | "INACTIVE";

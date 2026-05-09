@@ -9,55 +9,63 @@ import { formatClientError } from "@erp/api-client";
 import {
   AppModal,
   Button,
+  DocumentListShell,
   FormField,
   Input,
+  PageToolbar,
+  type ToolbarItem,
 } from "@erp/ui";
-import { TOOLBAR_ACTION } from "../../constants";
-import { buildListToolbar } from "../../lib/list-toolbar";
+import { Plus, RefreshCw } from "lucide-react";
 import { erpApi } from "../../lib/erp-api";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../components/table/PaginationControls";
-import { TableActionHeader } from "../../components/layout/TableActionHeader";
-import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
+import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import { AdminPageShell } from "../../components/layout/AdminPageShell";
 
-const ENTITY_OPTIONS = [
-  { key: "inventory-providers", label: "Nhà cung cấp" },
-  { key: "inventory-stock-balances", label: "Tồn kho" },
-];
+const ENTITY_KEY = "inventory-storages";
 
 type RowData = Record<string, unknown>;
 
-export function InventoryManagementPage() {
-  const [entityKey, setEntityKey] = useState<string>(ENTITY_OPTIONS[0].key);
+type SubTab = "count" | "branches";
+
+const SUB_TABS: { id: SubTab; label: string }[] = [
+  { id: "count", label: "Số lượng kho" },
+  { id: "branches", label: "Chi nhánh kho" },
+];
+
+export function StoragesPage() {
+  const [subTab, setSubTab] = useState<SubTab>("count");
   const [config, setConfig] = useState<CrudEntityConfig | null>(null);
   const [records, setRecords] = useState<PaginatedResponse<RowData> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [pagination, setPagination] =
-    useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] = useState<PaginationStateDto>({
+    ...DEFAULT_PAGINATION,
+    sortBy: "name",
+    sortOrder: "asc",
+  });
   const [editingRecord, setEditingRecord] = useState<RowData | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<RowData | null>(null);
 
+  // Re-sort when switching tab so each view emphasises its own dimension.
   useEffect(() => {
-    setConfig(null);
-    setRecords(null);
-    setError(null);
-    setSearchInput("");
-    setPagination(DEFAULT_PAGINATION);
-  }, [entityKey]);
+    setPagination((prev) => ({
+      ...prev,
+      page: 1,
+      sortBy: subTab === "branches" ? "branchId" : "name",
+      sortOrder: "asc",
+    }));
+  }, [subTab]);
 
   const loadConfig = useCallback(async () => {
     const { data, error } = await erpApi.GET("/admin/entities/{entityKey}", {
-      params: { path: { entityKey } },
+      params: { path: { entityKey: ENTITY_KEY } },
     });
     if (error) {
       setError(formatClientError(error));
@@ -65,15 +73,14 @@ export function InventoryManagementPage() {
     }
     setConfig(data as unknown as CrudEntityConfig);
     setError(null);
-  }, [entityKey]);
+  }, []);
 
   const loadRecords = useCallback(async () => {
     if (!config) return;
-
     setLoading(true);
     const { data, error } = await erpApi.GET("/admin/entities/{entityKey}/records", {
       params: {
-        path: { entityKey },
+        path: { entityKey: ENTITY_KEY },
         query: {
           page: pagination.page,
           pageSize: pagination.pageSize,
@@ -90,7 +97,7 @@ export function InventoryManagementPage() {
       setError(null);
     }
     setLoading(false);
-  }, [config, entityKey, pagination]);
+  }, [config, pagination]);
 
   useEffect(() => {
     void loadConfig();
@@ -102,12 +109,35 @@ export function InventoryManagementPage() {
 
   const columns = useMemo<TableColumn<RowData>[]>(() => {
     if (!config) return [];
-    return config.fields.map((field) => ({
+    // For "Chi nhánh kho" tab, lead with branchId so the branch dimension is
+    // emphasised; for "Số lượng kho" use the default ordering.
+    const fields = subTab === "branches"
+      ? [...config.fields].sort((a, b) => {
+          if (a.key === "branchId") return -1;
+          if (b.key === "branchId") return 1;
+          return 0;
+        })
+      : config.fields;
+    return fields.map((field) => ({
       key: field.key,
       label: field.label,
       render: (row) => formatCell(row[field.key], field),
     }));
-  }, [config]);
+  }, [config, subTab]);
+
+  const summary = useMemo(() => {
+    if (!records) return null;
+    if (subTab === "branches") {
+      const branches = new Set(
+        records.data
+          .map((row) => row.branchId)
+          .filter((value): value is string | number => value !== null && value !== undefined)
+          .map(String),
+      );
+      return `Số chi nhánh có kho: ${branches.size} · Tổng kho: ${records.total}`;
+    }
+    return `Tổng số kho: ${records.total}`;
+  }, [records, subTab]);
 
   const saveRecord = useCallback(
     async (payload: RowData) => {
@@ -119,7 +149,7 @@ export function InventoryManagementPage() {
           const { error } = await erpApi.PATCH(
             "/admin/entities/{entityKey}/records/{id}",
             {
-              params: { path: { entityKey, id } },
+              params: { path: { entityKey: ENTITY_KEY, id } },
               body: payload,
             },
           );
@@ -128,10 +158,13 @@ export function InventoryManagementPage() {
             return;
           }
         } else {
-          const { error } = await erpApi.POST("/admin/entities/{entityKey}/records", {
-            params: { path: { entityKey } },
-            body: payload,
-          });
+          const { error } = await erpApi.POST(
+            "/admin/entities/{entityKey}/records",
+            {
+              params: { path: { entityKey: ENTITY_KEY } },
+              body: payload,
+            },
+          );
           if (error) {
             setError(formatClientError(error));
             return;
@@ -146,7 +179,7 @@ export function InventoryManagementPage() {
         setSaving(false);
       }
     },
-    [config, editingRecord, entityKey, loadRecords],
+    [config, editingRecord, loadRecords],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -156,7 +189,7 @@ export function InventoryManagementPage() {
     try {
       const { error } = await erpApi.DELETE(
         "/admin/entities/{entityKey}/records/{id}",
-        { params: { path: { entityKey, id } } },
+        { params: { path: { entityKey: ENTITY_KEY, id } } },
       );
       if (error) {
         setError(formatClientError(error));
@@ -169,100 +202,62 @@ export function InventoryManagementPage() {
     } finally {
       setSaving(false);
     }
-  }, [config, entityKey, loadRecords, pendingDelete]);
+  }, [config, loadRecords, pendingDelete]);
+
+  const toolbarItems: ToolbarItem[] = [
+    {
+      id: "create",
+      label: "Thêm kho",
+      icon: Plus,
+      onClick: () => {
+        setEditingRecord(null);
+        setFormOpen(true);
+      },
+      disabled: !config,
+    },
+    {
+      id: "refresh",
+      label: "Tải lại",
+      icon: RefreshCw,
+      onClick: () => void loadRecords(),
+      disabled: loading,
+    },
+  ];
 
   return (
-    <AdminPageShell>
-      <div className="mb-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Quản lý kho</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Quản lý kho lưu trữ, mặt hàng và tồn kho với thao tác thêm, sửa, xóa từng dòng.
-          </p>
-        </div>
-      </div>
-
-      <TableActionHeader
-        className="mb-4"
-        breadcrumbs={resolveBackofficeBreadcrumbs("/inventory-management")}
-        items={buildListToolbar([
-          {
-            action: TOOLBAR_ACTION.create,
-            label: "Thêm dòng",
-            onClick: () => {
-              setEditingRecord(null);
-              setFormOpen(true);
-            },
-            disabled: !config,
-          },
-        ])}
-      />
-
-      <div className="mb-4 flex gap-3">
-        <select
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={entityKey}
-          onChange={(event) => setEntityKey(event.target.value)}
-        >
-          {ENTITY_OPTIONS.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <form
-          className="flex flex-1 gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setPagination((prev) => ({ ...prev, page: 1, search: searchInput }));
-          }}
-        >
-          <Input
-            className="flex-1"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Tìm kiếm"
-          />
-          <Button type="submit" variant="outline">
-            Tìm
-          </Button>
-        </form>
-      </div>
-
-      {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-
-      <BaseDataTable
-        columns={columns}
-        rows={records?.data ?? []}
-        loading={loading}
-        emptyLabel="Không có bản ghi."
-        getRowKey={(row, index) =>
-          String((config && row[config.idField]) ?? `row-${index}`)
-        }
-        renderActions={(row) => (
-          <div className="flex gap-2">
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto px-1 py-0.5"
-              onClick={() => {
-                setEditingRecord(row);
-                setFormOpen(true);
-              }}
-            >
-              Sửa
-            </Button>
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto px-1 py-0.5 text-destructive"
-              onClick={() => setPendingDelete(row)}
-            >
-              Xóa
-            </Button>
+    <>
+      <DocumentListShell
+        title="Kho lưu trữ"
+        tabs={<InventoryTabBar activeId="storages" />}
+        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        filters={
+          <div className="flex items-center gap-3">
+            <nav className="flex items-center gap-1 rounded-md border bg-background p-0.5 text-sm">
+              {SUB_TABS.map((tab) => {
+                const active = tab.id === subTab;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`rounded px-3 py-1 transition ${
+                      active
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:bg-accent/40"
+                    }`}
+                    onClick={() => setSubTab(tab.id)}
+                    aria-pressed={active}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+            {summary ? (
+              <span className="text-sm text-muted-foreground">{summary}</span>
+            ) : null}
           </div>
-        )}
-        footer={
+        }
+        pagination={
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
@@ -273,12 +268,49 @@ export function InventoryManagementPage() {
             onPageSizeChange={(nextPageSize) =>
               setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
             }
+            onRefresh={() => void loadRecords()}
           />
         }
-      />
+      >
+        {error ? (
+          <p className="px-4 py-2 text-sm text-destructive">{error}</p>
+        ) : null}
+        <BaseDataTable
+          columns={columns}
+          rows={records?.data ?? []}
+          loading={loading}
+          emptyLabel="Chưa có kho nào."
+          getRowKey={(row, index) =>
+            String((config && row[config.idField]) ?? `row-${index}`)
+          }
+          renderActions={(row) => (
+            <div className="flex gap-2">
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto px-1 py-0.5"
+                onClick={() => {
+                  setEditingRecord(row);
+                  setFormOpen(true);
+                }}
+              >
+                Sửa
+              </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto px-1 py-0.5 text-destructive"
+                onClick={() => setPendingDelete(row)}
+              >
+                Xóa
+              </Button>
+            </div>
+          )}
+        />
+      </DocumentListShell>
 
-      {formOpen && config && (
-        <InventoryRecordFormModal
+      {formOpen && config ? (
+        <StorageRecordFormModal
           config={config}
           saving={saving}
           record={editingRecord}
@@ -288,24 +320,24 @@ export function InventoryManagementPage() {
           }}
           onSubmit={saveRecord}
         />
-      )}
+      ) : null}
 
-      {pendingDelete && config && (
+      {pendingDelete && config ? (
         <ConfirmActionModal
           title={`Xóa ${config.displayName}`}
-          message="Thao tác này không thể hoàn tác. Xác nhận xóa dòng này?"
+          message="Thao tác này không thể hoàn tác. Xác nhận xóa kho này?"
           confirmLabel="Xóa"
           cancelLabel="Huỷ"
           loading={saving}
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => void confirmDelete()}
         />
-      )}
-    </AdminPageShell>
+      ) : null}
+    </>
   );
 }
 
-function InventoryRecordFormModal({
+function StorageRecordFormModal({
   config,
   record,
   saving,
@@ -318,14 +350,6 @@ function InventoryRecordFormModal({
   onSubmit: (payload: RowData) => Promise<void>;
   onCancel: () => void;
 }) {
-  const readOnlyFields = config.fields.filter(
-    (field) =>
-      field.readOnly &&
-      field.key !== config.idField &&
-      field.key !== "createdAt" &&
-      field.key !== "updatedAt",
-  );
-
   const editableFields = config.fields.filter(
     (field) =>
       !field.readOnly &&
@@ -366,18 +390,6 @@ function InventoryRecordFormModal({
           void onSubmit(buildPayload(values, editableFields));
         }}
       >
-        {readOnlyFields.length > 0 && (
-          <div className="mb-1 flex flex-col gap-2.5 border-b border-border pb-3">
-            {readOnlyFields.map((field) => (
-              <div key={field.key} className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-muted-foreground">{field.label}</span>
-                <span className="text-sm text-foreground">
-                  {formatCell(record?.[field.key], field)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
         {editableFields.map((field) => (
           <FormField key={field.key} label={field.label}>
             <FieldInput
@@ -409,11 +421,10 @@ function FieldInput({
         type="checkbox"
         checked={Boolean(value)}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-5 w-5 rounded border-2 border-input accent-primary cursor-pointer"
+        className="h-5 w-5 cursor-pointer rounded border-2 border-input accent-primary"
       />
     );
   }
-
   if (field.type === "number") {
     return (
       <Input
@@ -425,7 +436,6 @@ function FieldInput({
       />
     );
   }
-
   return (
     <Input
       type="text"
@@ -444,7 +454,7 @@ function buildPayload(values: RowData, fields: FieldDefinition[]): RowData {
 }
 
 function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
-  if (value === null || value === undefined || value === "") return "-";
+  if (value === null || value === undefined || value === "") return "—";
   if (field.type === "boolean") {
     return (
       <input
@@ -452,7 +462,7 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
         checked={Boolean(value)}
         disabled
         readOnly
-        className="h-5 w-5 rounded border-2 border-input accent-primary cursor-default disabled:opacity-70"
+        className="h-5 w-5 cursor-default rounded border-2 border-input accent-primary disabled:opacity-70"
       />
     );
   }

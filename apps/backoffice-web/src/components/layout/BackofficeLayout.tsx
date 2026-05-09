@@ -17,11 +17,11 @@ export function BackofficeLayout() {
           <AppSidebar />
           <main
             className={cn(
-              "flex min-h-[calc(100vh-3.5rem)] min-w-0 flex-1 flex-col overflow-auto transition-all duration-200",
+              "flex h-[calc(100vh-3.5rem)] min-w-0 flex-1 flex-col overflow-auto transition-all duration-200",
               sidebarCollapsed ? "ml-[60px]" : "ml-60",
             )}
           >
-            <div className="flex min-h-full w-full min-w-0 flex-1 flex-col p-6">
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col p-6">
               <Outlet />
             </div>
           </main>

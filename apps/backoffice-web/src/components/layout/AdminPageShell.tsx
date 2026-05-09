@@ -12,7 +12,12 @@ export interface AdminPageShellProps {
  */
 export function AdminPageShell({ children, className }: AdminPageShellProps) {
   return (
-    <div className={cn("flex min-h-full w-full min-w-0 flex-1 flex-col", className)}>
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col",
+        className,
+      )}
+    >
       {children}
     </div>
   );
