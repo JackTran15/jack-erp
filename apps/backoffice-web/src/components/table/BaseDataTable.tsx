@@ -5,6 +5,13 @@ import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
 import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
 import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
 
+export type ColumnFilterKind = "symbol" | "select" | "none";
+
+export interface ColumnFilterSelectOption {
+  value: string;
+  label: string;
+}
+
 export interface TableColumn<T> {
   key: string;
   label: string;
@@ -13,6 +20,14 @@ export interface TableColumn<T> {
   headerClassName?: string;
   width?: number | string;
   sortable?: boolean;
+  /**
+   * - "symbol" (default): operator chip (*, =, +, -, !) + free text input
+   * - "select": dropdown of predefined values (provide `filterOptions`)
+   * - "none": render an empty filter cell (column is non-filterable)
+   */
+  filterKind?: ColumnFilterKind;
+  filterOptions?: ColumnFilterSelectOption[];
+  filterPlaceholder?: string;
 }
 
 interface LeadingColumn<T> {
@@ -83,7 +98,7 @@ export function BaseDataTable<T>({
           <thead>
             <tr>
               {leadingColumn ? (
-                <th className={cn("sticky top-0 z-20 border-b-2 border-border bg-muted px-2 py-2.5 text-center", leadingColumn.headerClassName)}>
+                <th className={cn("sticky top-0 z-20 h-10 border-b border-border bg-background px-2 py-0 text-center", leadingColumn.headerClassName)}>
                   {leadingColumn.header}
                 </th>
               ) : null}
@@ -97,7 +112,7 @@ export function BaseDataTable<T>({
                 />
               ))}
               {renderActions ? (
-                <th className="sticky top-0 z-20 border-b-2 border-border bg-muted px-3 py-2.5 text-left text-sm font-semibold whitespace-nowrap">
+                <th className="sticky top-0 z-20 h-10 border-b border-border bg-background px-3 py-0 text-left text-sm font-semibold whitespace-nowrap">
                   {actionsLabel}
                 </th>
               ) : null}
@@ -105,33 +120,56 @@ export function BaseDataTable<T>({
             {columnFilterControl ? (
               <tr>
                 {leadingColumn ? (
-                  <th className="sticky top-12 z-20 border-b border-border bg-white px-2 py-1 text-left text-xs text-muted-foreground">
+                  <th className="sticky top-10 z-20 h-10 border-b border-border bg-background px-2 py-0 text-left text-xs text-muted-foreground shadow-[0_1px_0_0_rgb(0_0_0_/_0.04)]">
                     {leadingColumn.filterHeader}
                   </th>
                 ) : null}
                 {columns.map((column) => {
                   const activeFilter = columnFilterControl.filters[column.key];
+                  const kind: ColumnFilterKind = column.filterKind ?? "symbol";
                   return (
                     <th
                       key={`${column.key}-filter`}
                       className={cn(
-                        "sticky top-12 z-20 border-b border-border bg-white px-2 py-1 align-top",
+                        "sticky top-10 z-20 h-10 border-b border-border bg-background px-2 py-0 align-middle shadow-[0_1px_0_0_rgb(0_0_0_/_0.04)]",
                         column.headerClassName,
                       )}
                     >
-                      <div className="flex items-center gap-1">
-                        <ColumnFilterModeDropdown
-                          fieldLabel={column.label}
-                          value={activeFilter?.mode ?? DEFAULT_COLUMN_FILTER_MODE}
-                          onChange={(mode) => columnFilterControl.onModeChange(column.key, mode)}
-                        />
-                        <Input
-                          className="h-8 min-w-0 flex-1 text-xs font-normal"
-                          placeholder="Giá trị..."
+                      {kind === "none" ? null : kind === "select" ? (
+                        <select
+                          className="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs font-normal"
                           value={activeFilter?.value ?? ""}
-                          onChange={(event) => columnFilterControl.onValueChange(column.key, event.target.value)}
-                        />
-                      </div>
+                          onChange={(event) => {
+                            // Select filters always use exact-match semantics.
+                            columnFilterControl.onModeChange(column.key, "equals");
+                            columnFilterControl.onValueChange(column.key, event.target.value);
+                          }}
+                          aria-label={`Lọc ${column.label}`}
+                        >
+                          <option value="">
+                            {column.filterPlaceholder ?? "— Tất cả —"}
+                          </option>
+                          {(column.filterOptions ?? []).map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <ColumnFilterModeDropdown
+                            fieldLabel={column.label}
+                            value={activeFilter?.mode ?? DEFAULT_COLUMN_FILTER_MODE}
+                            onChange={(mode) => columnFilterControl.onModeChange(column.key, mode)}
+                          />
+                          <Input
+                            className="h-8 min-w-0 flex-1 text-xs font-normal"
+                            placeholder="Giá trị..."
+                            value={activeFilter?.value ?? ""}
+                            onChange={(event) => columnFilterControl.onValueChange(column.key, event.target.value)}
+                          />
+                        </div>
+                      )}
                     </th>
                   );
                 })}
@@ -208,7 +246,7 @@ function SortableHeader<T>({
   return (
     <th
       className={cn(
-        "sticky top-0 z-20 border-b-2 border-border bg-muted px-3 py-2.5 text-left text-sm font-semibold whitespace-nowrap",
+        "sticky top-0 z-20 h-10 border-b border-border bg-background px-3 py-0 text-left text-sm font-semibold whitespace-nowrap",
         column.headerClassName,
       )}
       aria-sort={active ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}

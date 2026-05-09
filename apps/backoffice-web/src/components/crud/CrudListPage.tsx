@@ -119,11 +119,36 @@ export function CrudListPage() {
     });
   }, [filteredRecords, config?.idField]);
 
+  const filterDefinitionByKey = useMemo(() => {
+    const definitions = config?.filterDefinitions ?? [];
+    const map = new Map<string, (typeof definitions)[number]>();
+    definitions.forEach((definition) => {
+      map.set(definition.key, definition);
+    });
+    return map;
+  }, [config?.filterDefinitions]);
+
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
       (config?.fields ?? []).map((field) => {
         const widthVariant = resolveColumnWidthVariant(entityKey!, field);
         const widthPx = TABLE_COLUMN_WIDTH_PX[widthVariant];
+        const filterDef = filterDefinitionByKey.get(field.key);
+        // Pick filter UI per column. Boolean fields and any field whose
+        // server-declared `filterDefinition.type === 'select'` get the dropdown
+        // filter; everything else falls back to the operator/value combo.
+        const useSelect =
+          (filterDef?.type === "select" && filterDef.options?.length) ||
+          field.type === "boolean";
+        const selectOptions =
+          filterDef?.type === "select"
+            ? filterDef.options
+            : field.type === "boolean"
+              ? [
+                  { value: "true", label: "Có" },
+                  { value: "false", label: "Không" },
+                ]
+              : undefined;
         return {
           key: field.key,
           label: field.label,
@@ -131,9 +156,11 @@ export function CrudListPage() {
           headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
           className: `max-w-[${widthPx}px]`,
           render: (row) => formatCell(row[field.key], field),
+          filterKind: useSelect ? "select" : "symbol",
+          filterOptions: selectOptions,
         };
       }),
-    [config?.fields, entityKey],
+    [config?.fields, entityKey, filterDefinitionByKey],
   );
 
   if (configLoading) {

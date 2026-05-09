@@ -88,6 +88,7 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/inventory-management", label: "Quản lý kho", },
           { to: "/products", label: "Sản phẩm", },
+          { to: "/inventory/storages", label: "Kho lưu trữ", },
           { to: "/inventory/purchase-orders", label: "Nhập kho", },
           { to: "/inventory/goods-issues", label: "Xuất kho", },
           { to: "/inventory/stock-transfers", label: "Chuyển kho", },
