@@ -197,8 +197,14 @@ function AppModal({
       window.removeEventListener("pointercancel", end);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
+      document.body.style.pointerEvents = "";
       const el = contentRef.current;
-      if (el) el.style.willChange = "";
+      if (el) {
+        el.style.willChange = "";
+        el.style.pointerEvents = "";
+        el.style.transition = "";
+        el.style.boxShadow = "";
+      }
       // Sync the committed value back to React state.
       setBounds(boundsRef.current);
     };
@@ -227,8 +233,14 @@ function AppModal({
     };
     document.body.style.userSelect = "none";
     document.body.style.cursor = cursor;
+    document.body.style.pointerEvents = "none";
     const el = contentRef.current;
-    if (el) el.style.willChange = kind === "drag" ? "transform" : "transform, width, height";
+    if (el) {
+      el.style.willChange = kind === "drag" ? "transform" : "transform, width, height";
+      el.style.pointerEvents = "auto";
+      el.style.transition = "none";
+      el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.18)";
+    }
     const h = handlersRef.current!;
     // skip the JS-blocked path and frees a frame of latency.
     window.addEventListener("pointermove", h.move, { passive: true });
@@ -240,10 +252,19 @@ function AppModal({
   React.useEffect(() => {
     return () => {
       const h = handlersRef.current;
-      if (!h) return;
-      window.removeEventListener("pointermove", h.move);
-      window.removeEventListener("pointerup", h.end);
-      window.removeEventListener("pointercancel", h.end);
+      if (h) {
+        window.removeEventListener("pointermove", h.move);
+        window.removeEventListener("pointerup", h.end);
+        window.removeEventListener("pointercancel", h.end);
+      }
+      // Defensive: if we unmount mid-gesture, restore body styles we set in
+      // beginAction so the rest of the app stays interactive.
+      if (actionRef.current) {
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.body.style.pointerEvents = "";
+        actionRef.current = null;
+      }
     };
   }, []);
 
