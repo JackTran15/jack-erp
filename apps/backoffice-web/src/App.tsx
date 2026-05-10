@@ -21,6 +21,14 @@ import { SalesReportPage } from "./pages/reports/SalesReportPage";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
+import { StockSummaryReportPage } from "./pages/reports/storage/StockSummaryReportPage";
+import { StockDocumentDetailsReportPage } from "./pages/reports/storage/StockDocumentDetailsReportPage";
+import { StockQuantityDetailsReportPage } from "./pages/reports/storage/StockQuantityDetailsReportPage";
+import { StockByBranchReportPage } from "./pages/reports/storage/StockByBranchReportPage";
+import { StockSummaryByBranchReportPage } from "./pages/reports/storage/StockSummaryByBranchReportPage";
+import { TransferSummaryReportPage } from "./pages/reports/storage/TransferSummaryReportPage";
+import { TransferByBranchReportPage } from "./pages/reports/storage/TransferByBranchReportPage";
+import { TemporaryIssuesReportPage } from "./pages/reports/storage/TemporaryIssuesReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
@@ -114,6 +122,38 @@ export function App() {
                 <Route path="/reports/inventory" element={<InventoryReportPage />} />
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
+                <Route
+                  path="/reports/storage/stock-summary"
+                  element={<StockSummaryReportPage />}
+                />
+                <Route
+                  path="/reports/storage/stock-document-details"
+                  element={<StockDocumentDetailsReportPage />}
+                />
+                <Route
+                  path="/reports/storage/stock-quantity-details"
+                  element={<StockQuantityDetailsReportPage />}
+                />
+                <Route
+                  path="/reports/storage/stock-by-branch"
+                  element={<StockByBranchReportPage />}
+                />
+                <Route
+                  path="/reports/storage/stock-summary-by-branch"
+                  element={<StockSummaryByBranchReportPage />}
+                />
+                <Route
+                  path="/reports/storage/transfer-summary"
+                  element={<TransferSummaryReportPage />}
+                />
+                <Route
+                  path="/reports/storage/transfer-by-branch"
+                  element={<TransferByBranchReportPage />}
+                />
+                <Route
+                  path="/reports/storage/temporary-issues"
+                  element={<TemporaryIssuesReportPage />}
+                />
                 <Route
                   path="/settings/document-numbering"
                   element={<DocumentNumberingPage />}
