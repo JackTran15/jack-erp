@@ -45,7 +45,7 @@ export class ReportingService {
       `SELECT COALESCE(SUM(total_amount), 0) AS total
        FROM pos_sales
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND sale_date >= $3 AND sale_date < $4`,
       [actor.organizationId, branchFilter, todayStart, todayEnd],
     );
@@ -54,7 +54,7 @@ export class ReportingService {
       `SELECT COALESCE(SUM(total_amount), 0) AS total
        FROM pos_returns
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND return_date >= $3 AND return_date < $4`,
       [actor.organizationId, branchFilter, todayStart, todayEnd],
     );
@@ -63,7 +63,7 @@ export class ReportingService {
       `SELECT COUNT(*)::int AS count
        FROM pos_sessions
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND status IN ('OPEN', 'ACTIVE_SALES')`,
       [actor.organizationId, branchFilter],
     );
@@ -72,7 +72,7 @@ export class ReportingService {
       `SELECT COALESCE(SUM(amount - settled_amount), 0) AS total
        FROM receivables
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND status IN ('POSTED', 'PARTIALLY_SETTLED')`,
       [actor.organizationId, branchFilter],
     );
@@ -81,7 +81,7 @@ export class ReportingService {
       `SELECT COALESCE(SUM(amount - settled_amount), 0) AS total
        FROM payables
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND status IN ('POSTED', 'PARTIALLY_SETTLED')`,
       [actor.organizationId, branchFilter],
     );
@@ -90,7 +90,7 @@ export class ReportingService {
       `SELECT COUNT(*)::int AS count
        FROM stock_balances
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND quantity <= 0`,
       [actor.organizationId, branchFilter],
     );
@@ -124,7 +124,7 @@ export class ReportingService {
               COUNT(*)::int AS count
        FROM pos_sales
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND sale_date >= $3 AND sale_date < $4`,
       [actor.organizationId, branchFilter, startDate, endDate],
     );
@@ -134,7 +134,7 @@ export class ReportingService {
               COUNT(*)::int AS count
        FROM pos_returns
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND return_date >= $3 AND return_date < $4`,
       [actor.organizationId, branchFilter, startDate, endDate],
     );
@@ -173,7 +173,7 @@ export class ReportingService {
        FROM stock_balances sb
        JOIN items i ON i.id = sb.item_id AND i.organization_id = sb.organization_id
        WHERE sb.organization_id = $1
-         AND ($2 IS NULL OR sb.branch_id = $2)
+         AND ($2::text IS NULL OR sb.branch_id = $2::text)
        ORDER BY i.name`,
       [actor.organizationId, branchFilter],
     );
@@ -225,7 +225,7 @@ export class ReportingService {
        FROM pos_session_reconciliations r
        JOIN pos_sessions s ON s.id = r.session_id
        WHERE r.organization_id = $1
-         AND ($2 IS NULL OR s.branch_id = $2)
+         AND ($2::text IS NULL OR s.branch_id = $2::text)
        ORDER BY r.created_at DESC
        LIMIT 100`,
       [actor.organizationId, branchFilter],
@@ -259,7 +259,7 @@ export class ReportingService {
          COALESCE(SUM(amount - settled_amount), 0) AS total
        FROM ${table}
        WHERE organization_id = $1
-         AND ($2 IS NULL OR branch_id = $2)
+         AND ($2::text IS NULL OR branch_id = $2::text)
          AND status IN ('POSTED', 'PARTIALLY_SETTLED')`,
       [organizationId, branchFilter],
     );
