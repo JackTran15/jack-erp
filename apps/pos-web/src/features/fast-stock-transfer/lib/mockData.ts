@@ -11,6 +11,9 @@ export const EMPTY_FAST_STOCK_TRANSFER_FILTERS: FastStockTransferFilters = {
   product: "",
   location: "",
   showRowsNeedingReview: true,
+  sku: "",
+  unit: "",
+  productName: "",
 };
 
 export const FAST_STOCK_TRANSFER_WAREHOUSE_OPTIONS = [
