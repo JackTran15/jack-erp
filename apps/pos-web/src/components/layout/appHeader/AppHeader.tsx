@@ -135,7 +135,9 @@ export function AppHeader({
       )}
     >
       <div className="flex items-center gap-2">
-        <SapoLogo />
+        <div onClick={() => navigate('/')} className="cursor-pointer">
+          <SapoLogo />
+        </div>
         {visiblePinnedItems.map(renderPinnedItem)}
       </div>
       {title && (
