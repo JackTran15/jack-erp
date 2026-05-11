@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import { CustomerDetailTabKeyEnum } from "../../../constants/customer";
+import { CustomerDetailTabKeyEnum } from "@erp/pos/features/checkout/constants/customer";
 import type { CustomerDetailTabKey } from "./types";
 
 export interface CustomerDetailTabsProps {

@@ -15,7 +15,8 @@ interface CheckoutActionsSectionProps {
   suggestions: CashSuggestion[];
   selectedSuggestionId: string | null;
   onPickSuggestion: (s: CashSuggestion) => void;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
+  onCancelInvoice?: () => void;
   onCollect: () => void;
   collectDisabled?: boolean;
   invoice?: InvoicePayloadInput;
@@ -31,6 +32,7 @@ export function CheckoutActionsSection({
   selectedSuggestionId,
   onPickSuggestion,
   onSaveDraft,
+  onCancelInvoice,
   onCollect,
   collectDisabled,
   invoice,
@@ -55,6 +57,7 @@ export function CheckoutActionsSection({
       ) : null}
       <PaymentCTAButtons
         onSaveDraft={onSaveDraft}
+        onCancelInvoice={onCancelInvoice}
         onCollect={onCollect}
         collectDisabled={collectDisabled}
         invoice={invoice}

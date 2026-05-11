@@ -1,9 +1,9 @@
-import type { VoucherApplyScope } from "../../../constants/voucher";
+import type { VoucherApplyScope } from "@erp/pos/features/checkout/constants/voucher";
 
 export {
   VoucherApplyScopeEnum,
   type VoucherApplyScope,
-} from "../../../constants/voucher";
+} from "@erp/pos/features/checkout/constants/voucher";
 
 /**
  * Data contracts for `VoucherDialog` ("Voucher" modal).

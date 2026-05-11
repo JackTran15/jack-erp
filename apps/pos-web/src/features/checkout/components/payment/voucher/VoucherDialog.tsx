@@ -5,8 +5,8 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@erp/pos/components/dataTable/DataTable";
-import { useDialogReset } from "../../../hooks/useDialogReset";
-import { VoucherApplyScopeEnum } from "../../../constants/voucher";
+import { useDialogReset } from "@erp/pos/features/checkout/hooks/useDialogReset";
+import { VoucherApplyScopeEnum } from "@erp/pos/features/checkout/constants/voucher";
 import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import type {

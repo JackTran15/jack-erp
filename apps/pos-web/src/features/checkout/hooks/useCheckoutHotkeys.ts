@@ -5,7 +5,7 @@ interface UseCheckoutHotkeysInput {
   customerSearchRef: RefObject<HTMLInputElement | null>;
   hasCartItems: boolean;
   onCheckout: () => void;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
 }
 
 export function useCheckoutHotkeys({
@@ -48,7 +48,7 @@ export function useCheckoutHotkeys({
           break;
         case "F10":
           e.preventDefault();
-          onSaveDraft();
+          onSaveDraft?.();
           break;
       }
     }

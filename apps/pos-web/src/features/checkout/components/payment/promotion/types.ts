@@ -2,7 +2,7 @@ import type {
   PromotionKind,
   PromotionStatus,
   PromotionStatusTone,
-} from "../../../constants/promotion";
+} from "@erp/pos/features/checkout/constants/promotion";
 
 export {
   PromotionKindEnum,
@@ -11,7 +11,7 @@ export {
   type PromotionKind,
   type PromotionStatus,
   type PromotionStatusTone,
-} from "../../../constants/promotion";
+} from "@erp/pos/features/checkout/constants/promotion";
 
 /**
  * Data contracts for `PromotionSelectionModal`.

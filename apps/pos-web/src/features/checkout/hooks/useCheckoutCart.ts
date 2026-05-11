@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { CatalogProduct, CartLine } from "../components/types";
-import type { PosCatalogLine } from "../../../lib/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 import { lineTotal, locationQtyFor } from "../lib/checkoutUtils";
 
 interface UseCheckoutCartInput {

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
-import { CustomerDetailTabKeyEnum } from "../../../constants/customer";
-import { AppDialog } from "../../../../../components/AppDialog";
-import { useDialogReset } from "../../../hooks/useDialogReset";
+import { CustomerDetailTabKeyEnum } from "@erp/pos/features/checkout/constants/customer";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import { useDialogReset } from "@erp/pos/features/checkout/hooks/useDialogReset";
 import { CustomerDetailTabs } from "./CustomerDetailTabs";
 import { DebtTab } from "./DebtTab";
 import { InfoTab } from "./InfoTab";

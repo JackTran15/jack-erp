@@ -5,11 +5,12 @@ import {
 } from "../components/payment/PaymentMethodRow";
 import type { CartLine } from "../components/types";
 import { PaymentMethodEnum } from "../constants/paymentMethod";
-import type { CustomerRow } from "../../../lib/customerApi";
+import type { CustomerRow } from "@erp/pos/lib/customerApi";
 
 interface ResetCheckoutSaleSessionInput {
-  setCart: Dispatch<SetStateAction<CartLine[]>>;
-  setSelectedLineId: Dispatch<SetStateAction<string | null>>;
+  /** Optional when cart lives in Zustand (`usePosCheckoutSessionStore`). */
+  setCart?: Dispatch<SetStateAction<CartLine[]>>;
+  setSelectedLineId?: Dispatch<SetStateAction<string | null>>;
   setSelectedCustomer: Dispatch<SetStateAction<CustomerRow | null>>;
   setCustomerQuery: Dispatch<SetStateAction<string>>;
   setCustomerFieldError: Dispatch<SetStateAction<string>>;
@@ -32,8 +33,8 @@ export function resetCheckoutSaleSession({
   setKeepChange,
   setDebt,
 }: ResetCheckoutSaleSessionInput): void {
-  setCart([]);
-  setSelectedLineId(null);
+  setCart?.([]);
+  setSelectedLineId?.(null);
   setSelectedCustomer(null);
   setCustomerQuery("");
   setCustomerFieldError("");

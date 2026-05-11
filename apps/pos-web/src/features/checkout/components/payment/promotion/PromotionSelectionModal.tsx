@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { cn } from "@erp/ui";
-import { AppDialog } from "../../../../../components/AppDialog";
-import { useControllableState } from "../../../hooks/useControllableState";
-import { useDialogReset } from "../../../hooks/useDialogReset";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import { useControllableState } from "@erp/pos/features/checkout/hooks/useControllableState";
+import { useDialogReset } from "@erp/pos/features/checkout/hooks/useDialogReset";
 import { PlusCircleIcon, SearchIcon } from "@erp/pos/components/icons/Icon";
 import { PromotionTable } from "./PromotionTable";
 import type {

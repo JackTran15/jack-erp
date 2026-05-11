@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import { formatViDateTime } from "../../../../lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { CloseIcon } from "@erp/pos/components/icons/Icon";
 import type { DraftInvoice } from "../types";
 

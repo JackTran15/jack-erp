@@ -68,11 +68,28 @@ export function useCheckoutPayment({
     () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
     [paymentLines],
   );
-  const rawChangeAmount = Math.max(0, totalPaid - grandTotal);
+  /**
+   * Amount to settle in VND (non-negative). For a net refund (grandTotal < 0),
+   * this is how much the shop owes the customer.
+   */
+  const settlementAbs =
+    grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
+
+  /** Sale: excess cash handed back. Refund: amount still to pay out to customer. */
+  const rawChangeAmount =
+    grandTotal < 0
+      ? Math.max(0, settlementAbs - totalPaid)
+      : Math.max(0, totalPaid - settlementAbs);
   const changeAmount = keepChange ? 0 : rawChangeAmount;
-  const shortageAmount = Math.max(0, grandTotal - totalPaid);
-  const isShort = totalPaid > 0 && shortageAmount > 0;
-  const suggestions = useMemo(() => buildSuggestions(grandTotal), [grandTotal]);
+
+  /** Only when customer still owes the shop (positive net). */
+  const shortageAmount =
+    grandTotal < 0 ? 0 : Math.max(0, settlementAbs - totalPaid);
+  const isShort = grandTotal > 0 && totalPaid > 0 && shortageAmount > 0;
+  const suggestions = useMemo(
+    () => buildSuggestions(grandTotal < 0 ? settlementAbs : grandTotal),
+    [grandTotal, settlementAbs],
+  );
   const primaryMethod = paymentLines[0]?.method ?? PaymentMethodEnum.CASH;
   const primaryMethodLabel = useMemo(
     () =>

@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { SearchSuggestion } from "../components/common/SearchPopover";
 import type { CatalogProduct } from "../components/types";
-import { fetchPosCatalog, type PosCatalogLine } from "../../../lib/posCatalogApi";
+import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 import { locationQtyFor, matchesCatalogQuery } from "../lib/checkoutUtils";
 
 interface ToolbarState {

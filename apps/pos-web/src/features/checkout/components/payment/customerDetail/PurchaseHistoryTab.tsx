@@ -6,11 +6,11 @@ import { PaginationBar } from "@erp/pos/components/PaginationBar";
 import {
   PurchaseHistoryStatusEnum,
   PurchaseHistoryStatusFilterEnum,
-} from "../../../constants/customer";
+} from "@erp/pos/features/checkout/constants/customer";
 import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
-} from "../../../constants/filterOperator";
+} from "@erp/pos/features/checkout/constants/filterOperator";
 import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import { StatusBadge } from "./StatusBadge";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";

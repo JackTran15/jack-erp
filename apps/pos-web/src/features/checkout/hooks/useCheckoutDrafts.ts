@@ -9,8 +9,8 @@ import type {
   DraftInvoicePayment,
 } from "../components/types";
 import { PaymentMethodEnum } from "../constants/paymentMethod";
-import type { CustomerRow } from "../../../lib/customerApi";
-import { formatCustomerDisplay } from "../../../lib/customerApi";
+import type { CustomerRow } from "@erp/pos/lib/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/customerApi";
 import { calculateDraftTotal } from "../lib/checkoutReceiptFactory";
 
 interface SaveDraftInput {

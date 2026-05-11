@@ -7,7 +7,7 @@ import type {
 } from "../components/types";
 import { PaymentMethodEnum } from "../constants/paymentMethod";
 import { PromoMenuOptionEnum } from "../constants/promoMenu";
-import type { PosCatalogLine } from "../../../lib/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 
 const qtyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 2,
@@ -25,7 +25,8 @@ export function locationQtyFor(product: PosCatalogLine): number {
 }
 
 export function lineTotal(line: CartLine): number {
-  return line.unitPrice * line.qty;
+  const base = line.unitPrice * line.qty;
+  return line.isReturnCredit ? -base : base;
 }
 
 export function paymentLabel(m: PaymentMethod): string {

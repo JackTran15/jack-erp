@@ -57,6 +57,15 @@ export function ChevronDownIcon(props: IconProps) {
   );
 }
 
+/** Left-pointing arrow (e.g. back / cancel invoice). */
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
 export function MapPinIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -247,6 +256,17 @@ export function WarningDot(props: IconProps) {
       {...rest}
     >
       <circle cx="4" cy="4" r="4" />
+    </svg>
+  );
+}
+
+/** Outline triangle with exclamation (alerts / confirmations). */
+export function WarningIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
     </svg>
   );
 }
