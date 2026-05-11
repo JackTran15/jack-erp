@@ -1,0 +1,153 @@
+import { useMemo } from "react";
+import { cn, formatVnd } from "@erp/ui";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import {
+  DataTable,
+  type DataTableColumn,
+} from "@erp/pos/components/dataTable/DataTable";
+import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
+import { PosNumberInput } from "@erp/pos/components/form/PosNumberInput";
+import { clampReturnQty } from "../lib/returnGoodsMath";
+import type { ReturnInvoiceRow, ReturnableItem } from "../types";
+
+export interface ReturnItemsDialogProps {
+  open: boolean;
+  invoice: ReturnInvoiceRow | null;
+  selectedIds: ReadonlySet<string>;
+  qtyById: Readonly<Record<string, number>>;
+  onToggleItem: (id: string) => void;
+  onToggleAll: (next: boolean) => void;
+  onChangeQty: (id: string, value: number) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+/**
+ * "Chọn hàng trả lại: {invoiceNumber}" modal. Lets the operator pick which
+ * lines from the source invoice to return and how many units of each.
+ */
+export function ReturnItemsDialog({
+  open,
+  invoice,
+  selectedIds,
+  qtyById,
+  onToggleItem,
+  onToggleAll,
+  onChangeQty,
+  onConfirm,
+  onClose,
+}: ReturnItemsDialogProps) {
+  const items = invoice?.items ?? [];
+  const allChecked = items.length > 0 && items.every((i) => selectedIds.has(i.id));
+  const anyChecked = items.some((i) => selectedIds.has(i.id));
+
+  const columns = useMemo<ReadonlyArray<DataTableColumn<ReturnableItem>>>(
+    () => [
+      {
+        key: "select",
+        title: (
+          <PosCheckbox
+            checked={allChecked}
+            onChange={onToggleAll}
+            ariaLabel="Chọn tất cả hàng trả"
+          />
+        ),
+        headerClassName: "w-10",
+        cellClassName: "w-10",
+        render: (row) => (
+          <PosCheckbox
+            checked={selectedIds.has(row.id)}
+            onChange={() => onToggleItem(row.id)}
+            ariaLabel={row.name}
+          />
+        ),
+      },
+      {
+        key: "name",
+        title: "Tên hàng hóa",
+        render: (row) => (
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium text-[#1F2937]">
+              {row.code}
+            </span>
+            <span className="text-[13px] text-gray-500">{row.name}</span>
+          </div>
+        ),
+      },
+      {
+        key: "unitPrice",
+        title: "Đơn giá",
+        align: "right",
+        headerClassName: "w-[120px]",
+        cellClassName: "w-[120px] tabular-nums",
+        render: (row) => formatVnd(row.unitPrice),
+      },
+      {
+        key: "allowedQty",
+        title: "SL được trả",
+        align: "right",
+        headerClassName: "w-[120px]",
+        cellClassName: "w-[120px] tabular-nums",
+        render: (row) => row.allowedQty,
+      },
+      {
+        key: "returnQty",
+        title: "SL trả",
+        align: "right",
+        headerClassName: "w-[120px]",
+        cellClassName: "w-[120px]",
+        render: (row) => (
+          <PosNumberInput
+            value={qtyById[row.id] ?? 0}
+            onChange={(next) =>
+              onChangeQty(row.id, clampReturnQty(next, row.allowedQty))
+            }
+            min={0}
+            max={row.allowedQty}
+            ariaLabel={`Số lượng trả ${row.name}`}
+            variant="underline"
+            inputMode="numeric"
+            displayValue={String(qtyById[row.id] ?? 0)}
+            parser={(raw) => {
+              const digits = raw.replace(/\D/g, "");
+              return digits === "" ? 0 : Number(digits);
+            }}
+            formatter={(value) => String(value)}
+          />
+        ),
+      },
+    ],
+    [allChecked, onToggleAll, onToggleItem, onChangeQty, qtyById, selectedIds],
+  );
+
+  const title = invoice
+    ? `Chọn hàng trả lại: ${invoice.invoiceNumber}`
+    : "Chọn hàng trả lại";
+
+  return (
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={760}
+      contentClassName="bg-white"
+    >
+      <AppDialog.Header title={title} />
+      <AppDialog.Body className="flex flex-col gap-4">
+        <DataTable<ReturnableItem>
+          columns={columns}
+          dataSource={items}
+          rowKey={(row) => row.id}
+          emptyText="Hóa đơn này chưa có hàng hóa nào để trả."
+          rowClassName={(row) =>
+            cn(selectedIds.has(row.id) && "bg-[#EEF2FF]")
+          }
+        />
+      </AppDialog.Body>
+      <AppDialog.Footer
+        onSave={onConfirm}
+        onCancel={onClose}
+        saveDisabled={!anyChecked}
+      />
+    </AppDialog>
+  );
+}

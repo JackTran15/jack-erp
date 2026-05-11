@@ -5,6 +5,9 @@ import { PosShellLayout } from "./components/PosShellLayout";
 import { RequirePosBranch } from "./components/RequirePosBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
+import { CheckoutPageV2 } from "./features/checkout/pages/CheckoutPageV2";
+import { FastStockTransferPage } from "./features/fast-stock-transfer/pages/FastStockTransferPage";
+import { ReturnGoodsPage } from "./features/return-goods/pages/ReturnGoodsPage";
 import { SessionPage } from "./pages/SessionPage";
 import { ReturnsPage } from "./pages/ReturnsPage";
 import { ExchangePage } from "./pages/ExchangePage";
@@ -29,8 +32,13 @@ export function App() {
           <Route element={<RequirePosAuth />}>
             <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
             <Route element={<RequirePosBranch />}>
+              <Route path="/" element={<CheckoutPageV2 />} />
+              <Route
+                path="/fast-stock-transfer"
+                element={<FastStockTransferPage />}
+              />
+              <Route path="/return-goods" element={<ReturnGoodsPage />} />
               <Route element={<PosShellLayout />}>
-                <Route path="/" element={<CheckoutPage />} />
                 <Route path="/session" element={<SessionPage />} />
                 <Route path="/returns" element={<ReturnsPage />} />
                 <Route path="/exchange" element={<ExchangePage />} />

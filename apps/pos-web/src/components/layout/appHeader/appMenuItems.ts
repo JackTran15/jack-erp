@@ -1,0 +1,160 @@
+import {
+  BarChartUpIcon,
+  BookOpenIcon,
+  BrandMarkIcon,
+  CartIcon,
+  CoinDollarIcon,
+  ExchangeClipboardIcon,
+  FileTextIcon,
+  GearIcon,
+  GlobeIcon,
+  InfoCircleIcon,
+  MultiDisplayIcon,
+  NotebookEditIcon,
+  PackageSendIcon,
+  PrinterIcon,
+  QuestionBubbleIcon,
+  TruckIcon,
+  WarehouseOutIcon,
+  type IconProps,
+} from "@erp/pos/components/icons/Icon";
+import type { ComponentType } from "react";
+
+export interface AppMenuItem {
+  id: string;
+  label: string;
+  /** Squircle background fill. */
+  iconBgColor: string;
+  Icon: ComponentType<IconProps>;
+  /** Present ⇒ click navigates here; otherwise click is a close-only no-op. */
+  route?: string;
+  badge?: "new";
+  /** When true, the popover renders a pin icon at the top-right of the tile. */
+  pinnable?: boolean;
+}
+
+/**
+ * Static config for the POS application menu (17 modules).
+ * Order matches the row/column layout in `task/MainMenuPOS_description.md §4.6`.
+ */
+export const APP_MENU_ITEMS: AppMenuItem[] = [
+  {
+    id: "ban-hang",
+    label: "Bán hàng",
+    iconBgColor: "#4DA6FF",
+    Icon: CartIcon,
+    route: "/",
+  },
+  {
+    id: "don-hang",
+    label: "Đơn hàng",
+    iconBgColor: "#A78BFA",
+    Icon: TruckIcon,
+  },
+  {
+    id: "ds-hoa-don",
+    label: "DS hóa đơn",
+    iconBgColor: "#E879A8",
+    Icon: FileTextIcon,
+  },
+  {
+    id: "don-hang-online",
+    label: "Đơn hàng online",
+    iconBgColor: "#22C55E",
+    Icon: GlobeIcon,
+  },
+  {
+    id: "doi-tra-hang",
+    label: "Đổi trả hàng",
+    iconBgColor: "#EF6B5A",
+    Icon: ExchangeClipboardIcon,
+    route: "/return-goods",
+    pinnable: true,
+  },
+  {
+    id: "yc-dieu-chuyen",
+    label: "YC điều chuyển",
+    iconBgColor: "#22B8CF",
+    Icon: PackageSendIcon,
+  },
+  {
+    id: "thu-chi",
+    label: "Thu chi",
+    iconBgColor: "#7C6FF0",
+    Icon: CoinDollarIcon,
+  },
+  {
+    id: "man-hinh-phu",
+    label: "Màn hình phụ",
+    iconBgColor: "#2563EB",
+    Icon: MultiDisplayIcon,
+    badge: "new",
+  },
+  {
+    id: "chuyen-kho-tam",
+    label: "Chuyển kho tạm",
+    iconBgColor: "#EF6B5A",
+    Icon: WarehouseOutIcon,
+    route: "/fast-stock-transfer",
+    pinnable: true,
+  },
+  {
+    id: "may-in",
+    label: "Máy in - Mẫu in",
+    iconBgColor: "#F59E0B",
+    Icon: PrinterIcon,
+  },
+  {
+    id: "bao-cao-theo-ngay",
+    label: "Báo cáo theo ngày",
+    iconBgColor: "#22B8CF",
+    Icon: BarChartUpIcon,
+  },
+  {
+    id: "nhat-ky-truy-cap",
+    label: "Nhật ký truy cập",
+    iconBgColor: "#9CA3AF",
+    Icon: NotebookEditIcon,
+  },
+  {
+    id: "trang-quan-ly",
+    label: "Trang quản lý",
+    iconBgColor: "#7C6FF0",
+    Icon: BrandMarkIcon,
+  },
+  {
+    id: "thiet-lap-hien-thi",
+    label: "Thiết lập hiển thị",
+    iconBgColor: "#22B8CF",
+    Icon: GearIcon,
+  },
+  {
+    id: "huong-dan",
+    label: "Hướng dẫn",
+    iconBgColor: "#7C6FF0",
+    Icon: BookOpenIcon,
+  },
+  {
+    id: "gop-y-cai-tien",
+    label: "Góp ý cải tiến",
+    iconBgColor: "#22B8CF",
+    Icon: QuestionBubbleIcon,
+  },
+  {
+    id: "gioi-thieu",
+    label: "Giới thiệu",
+    iconBgColor: "#F59E0B",
+    Icon: InfoCircleIcon,
+  },
+];
+
+const CHECKOUT_PATHS = new Set(["/"]);
+
+export function resolveSelectedAppMenuItemId(pathname: string): string {
+  const match = APP_MENU_ITEMS.find(
+    (item) => item.route && item.route !== "/" && pathname.startsWith(item.route),
+  );
+  if (match) return match.id;
+  if (CHECKOUT_PATHS.has(pathname)) return "ban-hang";
+  return "";
+}
