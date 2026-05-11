@@ -92,10 +92,10 @@ export interface DraftInvoicePayment {
 }
 
 /**
- * A snapshot of an invoice saved via "Lưu tạm" (Draft Invoice). Shows up in
- * the "HĐ lưu tạm" picker dialog and can be restored back into the active
- * cart. Kept self-contained — `lines` and `payments` are deep-cloned copies
- * at save time, so subsequent edits to the live cart don't mutate the draft.
+ * Snapshot of a cart saved as a draft invoice. Listed in the draft picker
+ * and opened on a **new** invoice tab when the user confirms.
+ * Self-contained: `lines` and `payments` are deep-cloned at save time so
+ * later edits to the live cart do not mutate the draft.
  */
 export interface DraftInvoice {
   id: string;

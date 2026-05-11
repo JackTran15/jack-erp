@@ -92,7 +92,7 @@ interface PosCheckoutSessionState {
 
   /** New invoice tab in quick-exchange mode (empty carts). */
   enterQuickExchange: () => void;
-  /** New invoice tab with return lines from hoá đơn (invoice_return). */
+  /** New invoice tab with return lines from an existing sale invoice (`invoice_return`). */
   enterInvoiceReturnWithLines: (lines: CartLine[]) => void;
 
   addDraft: (draft: DraftInvoice) => void;
@@ -105,7 +105,8 @@ interface PosCheckoutSessionState {
   /** After successful payment or draft save — clear lines, back to sale. */
   resetActiveSessionAfterCheckout: () => void;
 
-  applyDraftToActiveSession: (draft: DraftInvoice) => void;
+  /** Open a draft on a new invoice tab; leaves the previously active tab unchanged. */
+  openDraftInNewSession: (draft: DraftInvoice) => void;
 }
 
 const initialId = `s-${crypto.randomUUID()}`;
@@ -294,41 +295,49 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         });
       },
 
-      applyDraftToActiveSession: (draft) => {
-        const id = get().activeSessionId;
+      openDraftInNewSession: (draft) => {
+        const { sessions } = get();
+        const newId = `s-${Date.now()}`;
+        const nextIdx = sessions.length + 1;
+        const label = `Hóa đơn ${nextIdx}`;
         const variant = coerceCheckoutVariant(draft.checkoutVariant);
+
+        let newSession: InvoiceSession;
+
+        if (
+          variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+          draft.quickExchangePurchase &&
+          draft.quickExchangeReturn
+        ) {
+          newSession = {
+            id: newId,
+            label,
+            checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
+            purchaseCart: draft.quickExchangePurchase.map((l) => ({ ...l })),
+            returnCart: draft.quickExchangeReturn.map((l) => ({ ...l })),
+            activeExchangePane: ExchangePane.RETURN,
+            selectedLinePurchaseId: null,
+            selectedLineReturnId: null,
+          };
+        } else {
+          newSession = {
+            id: newId,
+            label,
+            checkoutVariant:
+              variant === CheckoutVariantEnum.INVOICE_RETURN
+                ? CheckoutVariantEnum.INVOICE_RETURN
+                : CheckoutVariantEnum.SALE,
+            purchaseCart: draft.lines.map((l) => ({ ...l })),
+            returnCart: [],
+            activeExchangePane: ExchangePane.RETURN,
+            selectedLinePurchaseId: null,
+            selectedLineReturnId: null,
+          };
+        }
+
         set({
-          sessions: get().sessions.map((s) => {
-            if (s.id !== id) return s;
-            if (
-              variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-              draft.quickExchangePurchase &&
-              draft.quickExchangeReturn
-            ) {
-              return {
-                ...s,
-                checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
-                purchaseCart: draft.quickExchangePurchase.map((l) => ({
-                  ...l,
-                })),
-                returnCart: draft.quickExchangeReturn.map((l) => ({ ...l })),
-                activeExchangePane: ExchangePane.RETURN,
-                selectedLinePurchaseId: null,
-                selectedLineReturnId: null,
-              };
-            }
-            return {
-              ...s,
-              checkoutVariant:
-                variant === CheckoutVariantEnum.INVOICE_RETURN
-                  ? CheckoutVariantEnum.INVOICE_RETURN
-                  : CheckoutVariantEnum.SALE,
-              purchaseCart: draft.lines.map((l) => ({ ...l })),
-              returnCart: [],
-              selectedLinePurchaseId: null,
-              selectedLineReturnId: null,
-            };
-          }),
+          sessions: [...sessions, newSession],
+          activeSessionId: newId,
           draftInvoices: get().draftInvoices.filter((d) => d.id !== draft.id),
         });
       },

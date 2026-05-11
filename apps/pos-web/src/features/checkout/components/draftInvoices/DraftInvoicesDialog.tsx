@@ -18,7 +18,7 @@ export interface DraftInvoicesDialogProps {
   /** Pre-selected draft id when the modal mounts. */
   initialSelectedId?: string | null;
 
-  /** "Đồng ý" — restore the picked draft into the active cart. */
+  /** Confirm (e.g. "Đồng ý"): opens the draft on a new invoice tab without overwriting the current tab. */
   onConfirm?: (draft: DraftInvoice) => void;
   /** Inline `×` per row. */
   onDelete?: (id: string) => void;
