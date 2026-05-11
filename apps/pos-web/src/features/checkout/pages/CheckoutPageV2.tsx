@@ -74,8 +74,8 @@ export function CheckoutPageV2() {
   const addDraft = usePosCheckoutSessionStore((s) => s.addDraft);
   const removeDraft = usePosCheckoutSessionStore((s) => s.removeDraft);
   const nextDraftSeq = usePosCheckoutSessionStore((s) => s.nextDraftSeq);
-  const applyDraftToActiveSession = usePosCheckoutSessionStore(
-    (s) => s.applyDraftToActiveSession,
+  const openDraftInNewSession = usePosCheckoutSessionStore(
+    (s) => s.openDraftInNewSession,
   );
   const resetActiveSessionAfterCheckout = usePosCheckoutSessionStore(
     (s) => s.resetActiveSessionAfterCheckout,
@@ -443,23 +443,15 @@ export function CheckoutPageV2() {
 
   const handleRestoreDraft = useCallback(
     (draft: DraftInvoice) => {
-      applyDraftToActiveSession(draft);
       const restored: PaymentLine[] =
         draft.payments && draft.payments.length > 0
           ? draft.payments.map((p) => createPaymentLine(p.method, p.amount))
           : [createPaymentLine(PaymentMethodEnum.CASH)];
-      setPaymentLines(restored);
-      setSelectedSuggestionId(null);
-      setCartError("");
-      announce(`Đã mở hóa đơn lưu tạm ${draft.invoiceNumber}.`);
+      pendingDraftPaymentLinesRef.current = restored;
+      openDraftInNewSession(draft);
+      announce(`Đã tạo hóa đơn mới từ lưu tạm ${draft.invoiceNumber}.`);
     },
-    [
-      announce,
-      applyDraftToActiveSession,
-      setPaymentLines,
-      setSelectedSuggestionId,
-      setCartError,
-    ],
+    [announce, openDraftInNewSession],
   );
 
   const handleDeleteDraft = useCallback(
@@ -525,6 +517,8 @@ export function CheckoutPageV2() {
 
   /** Customer + payment UI are React-local; reset when switching invoice tab so they match the active session. */
   const lastActiveSessionIdRef = useRef<string | null>(null);
+  /** After `openDraftInNewSession`, tab-switch effect resets payment; re-apply draft payments once. */
+  const pendingDraftPaymentLinesRef = useRef<PaymentLine[] | null>(null);
   useEffect(() => {
     if (lastActiveSessionIdRef.current === null) {
       lastActiveSessionIdRef.current = activeSessionId;
@@ -543,6 +537,9 @@ export function CheckoutPageV2() {
       setKeepChange,
       setDebt,
     });
+    const pendingPayments = pendingDraftPaymentLinesRef.current;
+    pendingDraftPaymentLinesRef.current = null;
+    if (pendingPayments) setPaymentLines(pendingPayments);
     setCreateCustomerOpen(false);
     setEditCustomerOpen(false);
     setCreateDefaultQuery("");
