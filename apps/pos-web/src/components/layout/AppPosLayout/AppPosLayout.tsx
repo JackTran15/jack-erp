@@ -1,18 +1,15 @@
 import { cn } from "@erp/ui";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { ComponentType, useMemo, useRef, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { IconButton } from "@erp/pos/features/checkout/components/common/IconButton";
 import {
   BellIcon,
   GridIcon,
+  IconProps,
   PlusIcon,
   RefreshIcon,
 } from "@erp/pos/components/icons/Icon";
 import { AppMenuPopover } from "./AppMenuPopover/AppMenuPopover";
-import {
-  resolveSelectedAppMenuItemId,
-  type AppMenuItem,
-} from "./appMenuItems";
 import { AppLocationIndicator } from "./AppLocationIndicator/AppLocationIndicator";
 import { PinnedAppButton } from "./PinnedAppButton/PinnedAppButton";
 import { AppLogo } from "./AppLogo/AppLogo";
@@ -27,36 +24,23 @@ import type {
 } from "@erp/pos/features/checkout/components/types";
 import { DraftInvoicesDialog } from "@erp/pos/features/checkout/components/draftInvoices/DraftInvoicesDialog";
 import { useAnnounce } from "@erp/pos/hooks/useAnnounce";
+import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/localstorage";
 
-const APP_HEADER_PINNED_ITEM_LIMIT = 2;
-const APP_HEADER_PINNED_STORAGE_KEY = "pos.appHeader.pinnedItemIds";
 
-function readPinnedItems(): AppMenuItem[] {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawIds = JSON.parse(
-      window.localStorage.getItem(APP_HEADER_PINNED_STORAGE_KEY) ?? "[]",
-    );
-
-    if (!Array.isArray(rawIds)) return [];
-
-    return rawIds
-      .map((id) => APP_MENU_ITEMS.find((item) => item.id === id))
-      .filter((item): item is AppMenuItem => Boolean(item))
-      .slice(0, APP_HEADER_PINNED_ITEM_LIMIT);
-  } catch {
-    return [];
-  }
+export interface AppMenuItem {
+  id: string;
+  label: string;
+  /** Squircle background fill. */
+  iconBgColor: string;
+  Icon: ComponentType<IconProps>;
+  /** Present ⇒ click navigates here; otherwise click is a close-only no-op. */
+  route?: string;
+  badge?: "new";
+  /** When true, the popover renders a pin icon at the top-right of the tile. */
+  pinnable?: boolean;
 }
 
-function writePinnedItems(items: AppMenuItem[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    APP_HEADER_PINNED_STORAGE_KEY,
-    JSON.stringify(items.map((item) => item.id)),
-  );
-}
+export const APP_HEADER_PINNED_ITEM_LIMIT = 2;
 
 /**
  * Shared shell header used across POS module pages. Keeps the common right-side
@@ -278,4 +262,15 @@ export function AppPosLayout() {
       <Outlet/>
     </div>
   );
+}
+
+const CHECKOUT_PATHS = new Set(["/"]);
+
+export function resolveSelectedAppMenuItemId(pathname: string): string {
+  const match = APP_MENU_ITEMS.find(
+    (item) => item.route && item.route !== "/" && pathname.startsWith(item.route),
+  );
+  if (match) return match.id;
+  if (CHECKOUT_PATHS.has(pathname)) return "ban-hang";
+  return "";
 }
