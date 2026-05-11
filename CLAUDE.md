@@ -2,173 +2,146 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Monorepo
 
-**Package manager:** `pnpm` (workspace root). Node >= 20 required. Run `pnpm install` from the root before anything else.
-
-> **Footgun:** `pnpm install` runs a `postinstall` that builds `@erp/shared-interfaces`, `@erp/shared-kafka-client`, and `@erp/api-client` (see root `package.json`). Skipping it (or editing files inside `packages/shared-*` later) will cause stale types in the API. Run `pnpm build:shared` after changing those packages — `make dev-api` does this for you, but `dev-backoffice` / `dev-pos` do not (they consume the already-generated TypeScript output).
-
-### Development
-
-```bash
-# Start individual services
-make dev-api              # NestJS API on :4000 (auto-builds shared packages first)
-make dev-backoffice       # Vite/React backoffice on :3000
-make dev-pos              # Vite/React POS on :3001
-
-# Or via pnpm filters
-pnpm dev:api
-pnpm dev:backoffice
-pnpm dev:pos
-```
-
-### Lint
-
-```bash
-pnpm lint                                  # Lint every workspace package
-pnpm --filter @erp/backoffice-web lint     # Single package
-# Note: apps/api currently stubs `lint` as `echo lint` — no ESLint wired up there yet.
-```
-
-### Infrastructure (Docker)
-
-```bash
-docker compose up -d      # Postgres :5433, Redis :6380, Redpanda :19092, Adminer :18088, Redpanda Console :18080
-```
-
-Copy `apps/api/.env.example` → `apps/api/.env` before first run. The defaults match the docker-compose ports.
-
-### Database
-
-```bash
-pnpm migration:run        # Apply pending migrations
-pnpm migration:generate   # Generate migration from entity diff (API must have DB connection)
-pnpm migration:revert     # Revert last migration
-pnpm migration:show       # List applied vs. pending migrations
-pnpm migration:create     # Create an empty migration skeleton
-pnpm seed:inventory       # Seed demo org, admin user, branches, and inventory data
-pnpm seed:dev-admin       # Alias of seed:inventory (dev login + tenant data)
-```
-
-### API client codegen
-
-```bash
-pnpm openapi:generate     # Fetches /docs-json from running API and regenerates packages/api-client/src/generated/schema.ts
-# or:
-make openapi-generate
-```
-The API must be running at `http://127.0.0.1:4000`. Falls back to `openapi-stub.json` if not reachable.
-Commit `openapi.snapshot.json` when the API contract changes so teammates don't need to run the API to build.
-
-### Tests
-
-```bash
-# API unit tests (Jest, matches *.spec.ts)
-pnpm --filter @erp/api test
-
-# Single test file
-pnpm --filter @erp/api test -- --testPathPattern=auth.service
-
-# E2E tests
-pnpm test:e2e
-```
-
-### Build
-
-```bash
-make build-api
-make build-backoffice
-make build-pos
-# or all at once:
-make build-all
-```
-
-### Utility scripts
-
-```bash
-pnpm contract:check       # Verify FE/BE contract is in sync (uses scripts/contract-check.ts)
-pnpm docs:entities        # Regenerate entity manifest + markdown under docs/entities/
-```
-
-## Conventions
-
-### Vietnamese UI copy (hard rule, from `.cursor/rules/vietnamese-ui.mdc`)
-
-- All user-facing strings in `apps/backoffice-web` (page titles, buttons, form labels, placeholders, frontend-generated error/success messages, table & filter copy) **must be Vietnamese**, written naturally and consistently with common ERP terminology.
-- API keys, IDs, and enum values sent to the server stay as-is (UUIDs, `ACTIVE`, etc.) — only the **display label** is translated.
-- `CrudEntityConfig.displayName` / `label` for entities rendered in the backoffice should also be Vietnamese.
-- Currency and dates: format with `Intl` using locale `vi-VN` unless a specific override is required.
-- When adding a new screen or component to the backoffice, default to Vietnamese strings — do **not** add English copy unless it's a forced technical term (API name, raw error code).
-
-### Shared UI components (backoffice)
-
-To keep the backoffice visually and behaviorally consistent, prefer the shared building blocks over rolling new ones:
-
-- **Modals → always use `AppModal` from `@erp/ui`** (`packages/ui/src/components/app-modal.tsx`). It already provides drag, resize, maximize, escape-to-close, and a default Vietnamese Save/Cancel footer (`saveLabel = "Lưu"`, `cancelLabel = "Huỷ"`). Use the `footer` prop to inject extra actions instead of building a bespoke `<Dialog>`. Do not import shadcn `Dialog` directly for new dialogs — wrap them with `AppModal` so resize/drag behavior stays uniform.
-- **Tables → use `BaseDataTable`** at `apps/backoffice-web/src/components/table/BaseDataTable.tsx` with the typed `TableColumn<T>` API. Column-level filtering is built in via `filterKind: "symbol" | "select" | "none"` (and `filterOptions` for select), so derive filter state from column config rather than building separate filter bars per page. Reach for a custom table only when the data shape genuinely cannot be expressed as `TableColumn<T>`.
-
-### Documentation files
-
-- Do **not** create incidental summary `.md` files (work-in-progress notes, "what I just did" recaps, throwaway design docs). Long-lived docs belong under `docs/` and follow its numbering convention.
-- The full design corpus lives in `docs/` as numbered files `01-product-scope.md` → `21-generic-crud-platform.md`, plus `docs/entities/` for per-entity field-level docs and `docs/go-live-checklist.md`. Treat the numbering as stable — when adding a new top-level doc, append the next number rather than reshuffling.
-
-## Architecture
-
-### Monorepo layout
+pnpm workspace (`pnpm-workspace.yaml`). Node `>=20`, pnpm `10.x`.
 
 ```
 apps/
-  api/            NestJS backend
-  backoffice-web/ React admin SPA
-  pos-web/        React POS SPA
+  api/             @erp/api             NestJS backend (port 4000)
+  backoffice-web/  @erp/backoffice-web  React admin SPA (port 3000)
+  pos-web/         @erp/pos-web         React POS SPA (port 3001)
 packages/
-  api-client/     Generated TypeScript HTTP client (openapi-typescript)
-  shared-interfaces/ Shared TypeScript types used by API and both frontends
-  shared-kafka-client/ Typed Redpanda/Kafka producer + consumer
-  ui/             Shared React component library (Tailwind)
+  shared-interfaces/    @erp/shared-interfaces    shared TS types
+  shared-kafka-client/  @erp/shared-kafka-client  Kafka/Redpanda wrapper
+  api-client/           @erp/api-client           OpenAPI-generated TS client
+  ui/                   @erp/ui                   shared shadcn/Radix component library
 ```
 
-### Multi-tenant model
+`postinstall` builds the three shared packages — `@erp/api-client`, `@erp/shared-interfaces`, `@erp/shared-kafka-client`. After cloning, always run `pnpm install` (which runs `pnpm build:shared`) before `dev:api`.
 
-Every operational record is scoped by `organizationId` (top-level company) and `branchId` (operational unit). These flow through the system as:
-- JWT payload: `{ userId, organizationId, roles[], branchIds[] }`
-- HTTP header: `X-Branch-Id` — validated against the JWT `branchIds` list by the `@Actor` decorator
-- The `Actor` param decorator (in `apps/api/src/common/decorators/actor-context.decorator.ts`) resolves the active branch from the header first, then JWT fallback.
+## Common commands
 
-### Auth & session
+```bash
+# Dev servers (run in separate terminals)
+make dev-api           # NestJS API on :4000 (auto-rebuilds shared packages first)
+make dev-backoffice    # Backoffice on :3000
+make dev-pos           # POS on :3001
 
-- Login → JWT access token (15 min) + refresh token (7 days), session stored in Redis via `SessionStore`
-- `AuthGuard` (applied globally) verifies JWT and checks the session is still active in Redis (supports server-side revocation)
-- `PermissionGuard` checks `@RequirePermission('permission.name')` decorator against `RbacService`
-- `@Public()` decorator opts a route out of `AuthGuard`
-- Sessions are rotated on refresh (old jti is revoked, new jti issued)
+# Build / test / lint (workspace-wide)
+pnpm build             # pnpm -r build
+pnpm test              # pnpm -r test
+pnpm lint              # pnpm -r lint (most workspaces echo "lint" — no real linter wired)
+
+# API-only
+pnpm --filter @erp/api test                   # Jest unit tests (rootDir = apps/api/src)
+pnpm --filter @erp/api test -- foo.spec.ts    # single test file
+pnpm --filter @erp/api test -- -t "creates"   # filter by test name
+pnpm --filter @erp/api test:e2e               # Jest e2e (apps/api/test/e2e/jest-e2e.config.ts)
+
+# DB schema (TypeORM, data-source.ts = apps/api/src/database/data-source.ts)
+pnpm migration:generate src/database/migrations/MyChange   # diff entities vs DB
+pnpm migration:run
+pnpm migration:revert
+pnpm migration:show
+
+# Seeds
+pnpm seed:inventory        # demo org + admin user + branch + inventory
+pnpm seed:dev-admin        # alias of seed:inventory
+
+# API client regeneration (API must be running on :4000)
+pnpm openapi:generate      # regenerates packages/api-client from /docs-json
+```
+
+Local infra (Postgres :5433, Redis :6380, Redpanda :19092, Adminer :18088, Redpanda Console :18080):
+```bash
+docker compose up -d
+```
+
+## Architecture
+
+### Stack
+- Backend: NestJS 11, TypeORM, PostgreSQL, Redis (ioredis), Redpanda (Kafka-compatible via kafkajs), Socket.IO with Redis adapter.
+- Frontend: React 19, TypeScript 5, Vite 6, React Router v7, TanStack Query v5, Zustand v5, Tailwind 3 + Radix primitives via `@erp/ui`.
+- All user-facing UI strings are **Vietnamese**; enum/ID values stay English (UUIDs, `ACTIVE`, etc.). Format numbers/dates with `Intl` locale `vi-VN`.
+
+### Multi-tenant scoping (load-bearing)
+
+Every operational record is scoped by `organizationId` (company) + `branchId` (branch).
+
+- JWT payload: `{ userId, organizationId, roles[], branchIds[], jti }`.
+- The active branch is passed per-request as `X-Branch-Id` header.
+- Controllers use `@Actor()` to get `ActorContext { userId, organizationId, branchId?, roles }`; queries **must** filter by `actor.organizationId` (and `branchId` when scope demands).
+- Auth/branch decorators applied at the class level (`@UseGuards(AuthGuard, PermissionGuard)`); per-method use `@Public()`, `@RequirePermission("x.y")`, `@RequireBranchScope()`.
+
+### Database rules
+
+- `synchronize: false` everywhere — schema changes only via TypeORM migrations in `apps/api/src/database/migrations/`.
+- IDs: `@PrimaryGeneratedColumn("uuid")` (UUID v4).
+- Money: `@Column({ type: "numeric", precision: 18, scale: 2 })`.
+- Timestamps stored UTC via `@CreateDateColumn` / `@UpdateDateColumn`.
+- Soft-delete via `@DeleteDateColumn()` / `SoftDeleteEntity` base.
+- Business transactions (stock ledger, journal entries, posted invoices) are **immutable after posting**; corrections are done via reversal entries, not edits.
 
 ### Generic CRUD platform
 
-`CrudModule` provides a reusable admin CRUD layer at `/admin/entities/:entityKey`. Modules register entities by implementing `BaseCrudService` and calling `EntityRegistryService.registerEntity()` during `OnModuleInit`. The backoffice `CrudListPage` at `/admin/:entityKey` consumes this dynamically. This keeps entity management out of bespoke controllers for simple admin tables.
+The API exposes a generic admin surface at `/admin/entities/:entityKey/records`. Any entity implementing `BaseCrudService<E, CreateDto, UpdateDto>` and registered via `EntityRegistryService.registerEntity(CONFIG, TOKEN)` in its module's `OnModuleInit` automatically gets:
+- REST CRUD endpoints at `/admin/entities/:entityKey/records`
+- A backoffice route `/admin/:entityKey` that auto-renders a list page via `CrudListPage` and hooks (`useCrudConfig`, `useCrudRecords`, `useCrudCreate`, `useCrudUpdate`, `useCrudDelete`).
 
-### Real-time / events
+`CrudEntityConfig` describes the entity (`entityKey`, `displayName`, `fields`, `searchableFields`, `filterDefinitions`, `permissions`, `scopingPolicy: ScopingPolicy.ORGANIZATION | BRANCH`, `deletionPolicy: SOFT | HARD`). Use this before hand-building admin pages.
 
-- **WebSocket**: Socket.IO with a Redis adapter (`RedisIoAdapter`) for horizontal scaling. Events module (`EventsModule`) is global.
-- **Kafka (Redpanda)**: `shared-kafka-client` wraps KafkaJS with typed envelopes, retry, and DLQ. `EventPublisher` and `EventConsumerManager` are global providers discovered via `@nestjs/core` `DiscoveryModule`.
+### Events
 
-### Frontend patterns
+Kafka/Redpanda is the event bus. Inject `EventPublisher` (global provider) and call `await events.publish("inventory.item.created", payload)`. Topics are created on app start by `TopicInitializer`. Dead-letter handling lives under `modules/events/`.
 
-Both `backoffice-web` and `pos-web` follow the same pattern:
-- **State**: TanStack Query for server state, Zustand for client/UI state
-- **HTTP**: `packages/api-client` (`createErpApiClient`) is the preferred client — it injects `Authorization`, `X-Branch-Id`, `X-Request-Id`, and `X-Idempotency-Key` automatically. The older `apps/backoffice-web/src/lib/http.ts` Axios wrapper is legacy.
-- **Auth context**: `useAuth` / `AuthProvider` in backoffice; `RequirePosAuth` / `RequirePosBranch` guards in pos-web
-- **Routing**: React Router v7; all authenticated routes wrap `RequireAuth` → `BackofficeLayout` (backoffice) or the equivalent POS shell
+### Frontend data fetching
 
-### API conventions
+Both apps consume the API via a typed wrapper around `@erp/api-client`:
+```ts
+import { erpApi, requireErpData, requireErpSuccess } from "../lib/erp-api";
+```
+- `erpApi` auto-injects `Authorization`, `X-Branch-Id`, `X-Request-Id`, `X-Idempotency-Key`.
+- `requireErpData(...)` throws `HttpError` on API error, returns the body on success.
+- `requireErpSuccess(...)` is the void-returning variant for DELETE / no-body endpoints.
+- Always wrap in TanStack Query; queryKey arrays start with the resource name and include all filters: `["inventory-items", page, search]`. Invalidate by prefix to bust related queries.
 
-- All controllers use `ValidationPipe` (whitelist + transform + forbidNonWhitelisted) globally
-- Swagger UI at `http://localhost:4000/docs`, JSON spec at `/docs-json`
-- `synchronize: false` — schema changes always go through TypeORM migrations
-- Monetary amounts: `NUMERIC(18,2)`. IDs: UUID v4. Timestamps: UTC.
-- Business transactions (stock ledger, journal entries) are immutable after posting; corrections use reversal entries.
-- Document numbers are generated by `DocumentNumberingModule` using configurable rules per document type.
+After changing API endpoints: run the API, then `pnpm openapi:generate`. Commit the updated `openapi.snapshot.json` and generated `packages/api-client/src/generated/schema.ts` (do not hand-edit the generated file).
 
-### Detailed docs
+### Auth session
+- Access token kept in memory only; refresh token in `localStorage("refresh_token")`.
+- `isAuthenticated` is derived from access token + Redis session check.
 
-Full domain design docs are in `docs/` — see the `## Conventions › Documentation files` section above for the numbering layout.
+## NestJS module convention
+
+```
+modules/my-feature/
+  my-feature.module.ts        // @Module, OnModuleInit for entity registration
+  my-feature.controller.ts    // @UseGuards(AuthGuard, PermissionGuard) at class level
+  my-feature.service.ts
+  my-feature.entity.ts
+  dto/{create,update}-my-feature.dto.ts   // class-validator + @ApiProperty for Swagger
+```
+
+Global `ValidationPipe` uses `whitelist: true, transform: true, forbidNonWhitelisted: true` — DTOs must declare every accepted field.
+
+OpenAPI UI at `/docs`, JSON at `/docs-json` (disabled when `NODE_ENV=production` or `DISABLE_SWAGGER=1`).
+
+## React component convention
+
+- Named exports only (no `export default`).
+- Separate `interface Props`, no inline prop types.
+- Add `React.memo` / `useMemo` / `useCallback` only when profiling shows a hot path.
+- Cross-component UI state: React Context or Zustand. **Do not put server data in Zustand** — that belongs in TanStack Query.
+- Always import primitives from `@erp/ui`, not Radix sub-packages directly.
+- `cn()` from `@erp/ui` for conditional class merging; semantic Tailwind tokens (`bg-background`, `text-foreground`, etc.) instead of raw colors — the dark sidebar/header chrome (`bg-gray-900`) is the explicit exception.
+- Icons exclusively from `lucide-react`.
+- Page-level CRUD action bars use `PageToolbar` placed inside the page component (not in the layout).
+
+### Navigation
+
+`apps/backoffice-web/src/components/layout/navConfig.ts` is the single source of truth for the sidebar. Adding a route requires both an `<Route>` in `App.tsx` and a `NavChild` in `navConfig.ts`.
+
+## Documentation
+
+Architectural specs and entity-level schema references live under `docs/` (per-domain markdown files + `docs/entities/`). Implementation tickets and epic dependency graph live under `tickets/`. Generate entity docs with `pnpm docs:entities`.

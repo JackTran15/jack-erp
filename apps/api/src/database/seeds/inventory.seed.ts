@@ -41,6 +41,14 @@ const IDS = {
   accountBank: 'B0000000-0000-4000-8000-000000000002',
   accountRevenue: 'B0000000-0000-4000-8000-000000000003',
   accountReceivable: 'B0000000-0000-4000-8000-000000000004',
+  // POS / Customer
+  cashAccountRegister: 'C0000000-0000-4000-8000-000000000001',
+  customerWalkIn:    'D0000000-0000-4000-8000-000000000001',
+  customerNguyenAn:  'D0000000-0000-4000-8000-000000000002',
+  customerTranBinh:  'D0000000-0000-4000-8000-000000000003',
+  customerLeChi:     'D0000000-0000-4000-8000-000000000004',
+  customerPhamDung:  'D0000000-0000-4000-8000-000000000005',
+  customerHoangMai:  'D0000000-0000-4000-8000-000000000006',
   // Product catalog (EPIC-006)
   productShoe: 'A0000000-0000-4000-8000-000000000001',
   attrDefSize: 'A1000000-0000-4000-8000-000000000001',
@@ -163,6 +171,70 @@ async function seedInventoryData() {
       ON CONFLICT (id) DO NOTHING
       `,
       [IDS.accountCash, IDS.accountBank, IDS.accountRevenue, IDS.accountReceivable, IDS.organization],
+    );
+
+    // Cash account (REGISTER) tied to the main branch + 1111 ledger account
+    await AppDataSource.query(
+      `
+      INSERT INTO cash_accounts (id, organization_id, branch_id, name, type, balance, account_id, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, 'Main Register', 'REGISTER', 0, $4, $5, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [IDS.cashAccountRegister, IDS.organization, IDS.branch, IDS.accountCash, IDS.user],
+    );
+
+    // Customers — walk-in (debt scenarios) + a few sample retail/B2B records.
+    // Phone/email columns are unique-per-org so values must not collide across rows.
+    await AppDataSource.query(
+      `
+      INSERT INTO customers (
+        id, organization_id, branch_id, code, name, email, phone, address,
+        status, gender, company_name, tax_code, note,
+        created_by, created_at, updated_at
+      )
+      VALUES
+        ($1, $7, NULL, 'KH000001', 'Walk-in Customer',
+         NULL, NULL, NULL,
+         'ACTIVE', 'unspecified', NULL, NULL, 'Default anonymous walk-in',
+         $8, NOW(), NOW()),
+
+        ($2, $7, NULL, 'KH000002', 'Nguyễn Văn An',
+         'an.nguyen@example.com', '0901000002', '12 Lê Lợi, Q.1, TP.HCM',
+         'ACTIVE', 'male', NULL, NULL, 'Khách lẻ thân thiết',
+         $8, NOW(), NOW()),
+
+        ($3, $7, NULL, 'KH000003', 'Trần Thị Bình',
+         'binh.tran@example.com', '0901000003', '45 Nguyễn Huệ, Q.1, TP.HCM',
+         'ACTIVE', 'female', NULL, NULL, NULL,
+         $8, NOW(), NOW()),
+
+        ($4, $7, NULL, 'KH000004', 'Lê Quang Chi',
+         'chi.le@example.com',  '0901000004', '88 Trần Hưng Đạo, Q.5, TP.HCM',
+         'ACTIVE', 'male', NULL, NULL, NULL,
+         $8, NOW(), NOW()),
+
+        ($5, $7, NULL, 'KH000005', 'Phạm Văn Dũng',
+         'dung.pham@example.com', '0901000005', '17 Cách Mạng Tháng 8, Q.3, TP.HCM',
+         'ACTIVE', 'male',
+         'Công ty TNHH Dũng Phát', '0312345678', 'Khách B2B — thanh toán công nợ 30 ngày',
+         $8, NOW(), NOW()),
+
+        ($6, $7, NULL, 'KH000006', 'Hoàng Thị Mai',
+         'mai.hoang@example.com', '0901000006', '202 Võ Văn Tần, Q.3, TP.HCM',
+         'ACTIVE', 'female', NULL, NULL, 'Hội viên hạng bạc',
+         $8, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        IDS.customerWalkIn,
+        IDS.customerNguyenAn,
+        IDS.customerTranBinh,
+        IDS.customerLeChi,
+        IDS.customerPhamDung,
+        IDS.customerHoangMai,
+        IDS.organization,
+        IDS.user,
+      ],
     );
 
     await AppDataSource.query(

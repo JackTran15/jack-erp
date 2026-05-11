@@ -13,6 +13,8 @@ import {
 import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
 import { CustomerController } from './customer.controller';
+import { LoyaltyPointsPublisher } from './publishers/loyalty-points.publisher';
+import { LoyaltyPointsConsumer } from './consumers/loyalty-points.consumer';
 
 @Module({
   imports: [
@@ -29,8 +31,10 @@ import { CustomerController } from './customer.controller';
     { provide: CUSTOMER_SERVICE_TOKEN, useExisting: CustomerService },
     CustomerGroupService,
     MembershipCardService,
+    LoyaltyPointsPublisher,
+    LoyaltyPointsConsumer,
   ],
-  exports: [CustomerService, MembershipCardService],
+  exports: [CustomerService, MembershipCardService, LoyaltyPointsPublisher],
 })
 export class CustomerModule implements OnModuleInit {
   constructor(

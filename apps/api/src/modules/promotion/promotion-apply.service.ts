@@ -211,22 +211,9 @@ export class PromotionApplyService {
 
     for (const promo of promotions) {
       if (promo.promotionType === InvoicePromotionType.VOUCHER) {
-        await manager
-          .createQueryBuilder()
-          .update('vouchers')
-          .set({ is_used: false, redeemed_invoice_id: null } as any)
-          .where('id = :id AND redeemed_invoice_id = :invoiceId', {
-            id: promo.refId,
-            invoiceId,
-          })
-          .execute();
+        await this.voucherService.unmarkUsed(promo.refId, invoiceId, manager);
       } else if (promo.promotionType === InvoicePromotionType.DISCOUNT_CODE) {
-        await manager
-          .createQueryBuilder()
-          .update('discount_codes')
-          .set({ used_count: () => 'GREATEST(used_count - 1, 0)' } as any)
-          .where('id = :id', { id: promo.refId })
-          .execute();
+        await this.discountCodeService.decrementUsedCount(promo.refId, manager);
       }
     }
 

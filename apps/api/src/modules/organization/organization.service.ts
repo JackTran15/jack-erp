@@ -11,6 +11,7 @@ import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { OrganizationEntity, OrganizationStatus } from './organization.entity';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
+import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
 
 @Injectable()
 export class OrganizationService {
@@ -19,6 +20,7 @@ export class OrganizationService {
   constructor(
     @InjectRepository(OrganizationEntity)
     private readonly orgRepo: Repository<OrganizationEntity>,
+    private readonly coaSeederService: CoaSeederService,
   ) {}
 
   async create(
@@ -42,6 +44,15 @@ export class OrganizationService {
     });
 
     const saved = await this.orgRepo.save(org);
+
+    try {
+      await this.coaSeederService.seedForOrganization(saved.id, actor.userId);
+    } catch (err) {
+      this.logger.error(
+        `Failed to seed COA for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
     this.logger.log(`Organization created: ${saved.id} by ${actor.userId}`);
     return saved;
   }

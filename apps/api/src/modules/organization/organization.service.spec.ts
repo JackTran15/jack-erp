@@ -6,6 +6,7 @@ import {
   OrganizationStatus,
 } from './organization.entity';
 import { OrganizationService } from './organization.service';
+import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -34,6 +35,7 @@ describe('OrganizationService', () => {
     save: jest.Mock;
     update: jest.Mock;
   };
+  let coaSeederService: { seedForOrganization: jest.Mock };
 
   beforeEach(async () => {
     orgRepo = {
@@ -43,11 +45,13 @@ describe('OrganizationService', () => {
       save: jest.fn((entity) => Promise.resolve(entity)),
       update: jest.fn(),
     };
+    coaSeederService = { seedForOrganization: jest.fn().mockResolvedValue(15) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationService,
         { provide: getRepositoryToken(OrganizationEntity), useValue: orgRepo },
+        { provide: CoaSeederService, useValue: coaSeederService },
       ],
     }).compile();
 
@@ -70,6 +74,19 @@ describe('OrganizationService', () => {
       expect(orgRepo.save).toHaveBeenCalled();
       expect(result.name).toBe('New Org');
       expect(result.status).toBe(OrganizationStatus.ACTIVE);
+      expect(coaSeederService.seedForOrganization).toHaveBeenCalledWith(
+        result.id,
+        'user-1',
+      );
+    });
+
+    it('does not fail organization create when COA seed throws', async () => {
+      orgRepo.findOne.mockResolvedValue(null);
+      coaSeederService.seedForOrganization.mockRejectedValue(new Error('db error'));
+
+      await expect(
+        service.create({ name: 'New Org', contactEmail: 'a@b.com' }, actor),
+      ).resolves.toBeDefined();
     });
 
     it('throws ConflictException when name already exists', async () => {

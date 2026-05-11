@@ -39,4 +39,12 @@ export class PosSessionEntity extends BaseEntity {
     comment: 'Cash amount in the register at session start (float/seed money)',
   })
   openingCashAmount: number;
+
+  @Column({
+    name: 'cash_account_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Cash register/drawer used in this session (required for sessions created after EPIC-009)',
+  })
+  cashAccountId?: string;
 }

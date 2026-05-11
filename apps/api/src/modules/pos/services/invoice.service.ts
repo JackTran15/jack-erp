@@ -5,11 +5,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, EntityManager } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
@@ -65,15 +66,20 @@ export class InvoiceService {
           throw new BadRequestException(`Items not found in this organisation: ${missingIds.join(', ')}`);
         }
 
+        const productLocationMap = await this.resolveProductLocations(manager, catalogItems);
+
         const itemEntities = items.map((item, index) => {
           const catalog = priceMap.get(item.itemId);
+          const productId = catalog?.productId;
+          const resolvedLocationId =
+            item.locationId ?? (productId ? productLocationMap.get(productId) : undefined);
           return manager.create(InvoiceItemEntity, {
             organizationId: actor.organizationId,
             branchId: actor.branchId,
             createdBy: actor.userId,
             invoiceId: savedInvoice.id,
             itemId: item.itemId,
-            locationId: item.locationId,
+            locationId: resolvedLocationId,
             itemCode: item.itemCode,
             itemName: item.itemName,
             unit: item.unit,
@@ -204,16 +210,20 @@ export class InvoiceService {
           const itemIds = [...new Set(dto.items.map((i) => i.itemId))];
           const catalogItems = await manager.findBy(ItemEntity, { id: In(itemIds) });
           const priceMap = new Map(catalogItems.map((c) => [c.id, c]));
+          const productLocationMap = await this.resolveProductLocations(manager, catalogItems);
 
           const itemEntities = dto.items.map((item, index) => {
             const catalog = priceMap.get(item.itemId);
+            const productId = catalog?.productId;
+            const resolvedLocationId =
+              item.locationId ?? (productId ? productLocationMap.get(productId) : undefined);
             return manager.create(InvoiceItemEntity, {
               organizationId: actor.organizationId,
               branchId: actor.branchId,
               createdBy: actor.userId,
               invoiceId: id,
               itemId: item.itemId,
-              locationId: item.locationId,
+              locationId: resolvedLocationId,
               itemCode: item.itemCode,
               itemName: item.itemName,
               unit: item.unit,
@@ -265,6 +275,21 @@ export class InvoiceService {
     });
 
     this.logger.log(`Deleted draft invoice ${id} (org=${actor.organizationId})`);
+  }
+
+  private async resolveProductLocations(
+    manager: EntityManager,
+    catalogItems: ItemEntity[],
+  ): Promise<Map<string, string>> {
+    const productIds = [
+      ...new Set(catalogItems.map((c) => c.productId).filter((p): p is string => !!p)),
+    ];
+    if (productIds.length === 0) return new Map();
+
+    const rows = await manager.findBy(ProductStorageLocationEntity, {
+      productId: In(productIds),
+    });
+    return new Map(rows.map((r) => [r.productId, r.locationId]));
   }
 
   async findDrafts(

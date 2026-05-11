@@ -5,14 +5,17 @@ import { CashAccountEntity } from './cash-account.entity';
 import { CashMovementEntity } from './cash-movement.entity';
 import { CashService } from './cash.service';
 import { CashController } from './cash.controller';
+import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
+import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publisher';
+import { CashFromPaymentConsumer } from '../consumers/cash-from-payment.consumer';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CashAccountEntity, CashMovementEntity]),
+    TypeOrmModule.forFeature([CashAccountEntity, CashMovementEntity, PosSessionEntity]),
     JournalModule,
   ],
   controllers: [CashController],
-  providers: [CashService],
-  exports: [CashService],
+  providers: [CashService, CashFromPaymentPublisher, CashFromPaymentConsumer],
+  exports: [CashService, CashFromPaymentPublisher],
 })
 export class CashModule {}

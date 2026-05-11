@@ -2,11 +2,12 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import { SessionStatus, PaymentMethod, WsEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -14,6 +15,11 @@ import { WebSocketEmitterService } from '../../websocket/websocket-emitter.servi
 import { PosSessionEntity, SaleEntity, ReturnEntity, SessionReconciliationEntity } from '../entities';
 import { PaymentEntity } from '../entities';
 import { OpenSessionDto, SubmitReconciliationDto } from '../dto';
+import { CashAccountEntity, CashAccountType } from '../../accounting/cash/cash-account.entity';
+import {
+  CashMovementEntity,
+  CashMovementType,
+} from '../../accounting/cash/cash-movement.entity';
 
 const VARIANCE_THRESHOLD = Number(process.env.POS_VARIANCE_THRESHOLD ?? '50');
 
@@ -32,6 +38,10 @@ export class PosSessionService {
     private readonly paymentRepo: Repository<PaymentEntity>,
     @InjectRepository(SessionReconciliationEntity)
     private readonly reconciliationRepo: Repository<SessionReconciliationEntity>,
+    @InjectRepository(CashAccountEntity)
+    private readonly cashAccountRepo: Repository<CashAccountEntity>,
+    @InjectRepository(CashMovementEntity)
+    private readonly cashMovementRepo: Repository<CashMovementEntity>,
     private readonly wsEmitter: WebSocketEmitterService,
   ) {}
 
@@ -39,12 +49,43 @@ export class PosSessionService {
     dto: OpenSessionDto,
     actor: ActorContext,
   ): Promise<PosSessionEntity> {
+    const cashAccount = await this.cashAccountRepo.findOne({
+      where: { id: dto.cashAccountId, organizationId: actor.organizationId },
+    });
+    if (!cashAccount) {
+      throw new NotFoundException(`Cash account ${dto.cashAccountId} not found`);
+    }
+    if (cashAccount.type !== CashAccountType.REGISTER) {
+      throw new BadRequestException(
+        'Only REGISTER cash accounts can be linked to POS sessions',
+      );
+    }
+    if (cashAccount.branchId !== dto.branchId) {
+      throw new BadRequestException(
+        'Cash account branch mismatch — cash_account must belong to the same branch as the session',
+      );
+    }
+
+    const activeSession = await this.sessionRepo.findOne({
+      where: {
+        cashAccountId: dto.cashAccountId,
+        organizationId: actor.organizationId,
+        status: In([SessionStatus.OPEN, SessionStatus.ACTIVE_SALES]),
+      },
+    });
+    if (activeSession) {
+      throw new ConflictException(
+        `Cash account "${cashAccount.name}" is already in use by session ${activeSession.id}`,
+      );
+    }
+
     const now = new Date();
     const session = this.sessionRepo.create({
       organizationId: actor.organizationId,
       branchId: dto.branchId,
       createdBy: actor.userId,
       terminalId: dto.terminalId,
+      cashAccountId: dto.cashAccountId,
       status: SessionStatus.OPEN,
       openedBy: actor.userId,
       openedAt: now,
@@ -53,7 +94,7 @@ export class PosSessionService {
 
     const saved = await this.sessionRepo.save(session);
     this.logger.log(
-      `Opened POS session ${saved.id} (branch=${dto.branchId}, org=${actor.organizationId})`,
+      `Opened POS session ${saved.id} (branch=${dto.branchId}, cash_account=${dto.cashAccountId}, org=${actor.organizationId})`,
     );
     return saved;
   }
@@ -283,8 +324,73 @@ export class PosSessionService {
     return session;
   }
 
+  /**
+   * Compute expected cash for a session based on cash_movements bound to it.
+   *
+   * Formula:
+   *   opening
+   *   + sum(DEPOSIT | ADJUSTMENT where session_id = X)
+   *   - sum(WITHDRAWAL where session_id = X)
+   *   - sum(TRANSFER where cash_account_id = session.cash_account_id)   // outflow
+   *   + sum(TRANSFER where to_account_id = session.cash_account_id     // inflow,
+   *                       AND created_at between session open/close)
+   */
   private async calculateExpectedCash(
     session: PosSessionEntity,
+  ): Promise<number> {
+    const opening = Number(session.openingCashAmount ?? 0);
+
+    if (!session.cashAccountId) {
+      // Legacy session without a linked cash_account — fall back to the previous logic.
+      return this.legacyCalculateExpectedCash(session, opening);
+    }
+
+    const movements = await this.cashMovementRepo.find({
+      where: { sessionId: session.id, organizationId: session.organizationId },
+    });
+
+    let delta = 0;
+    for (const m of movements) {
+      const amt = Number(m.amount);
+      if (m.type === CashMovementType.DEPOSIT || m.type === CashMovementType.ADJUSTMENT) {
+        delta += amt;
+      } else if (m.type === CashMovementType.WITHDRAWAL) {
+        delta -= amt;
+      } else if (m.type === CashMovementType.TRANSFER) {
+        // Movement is bound to source (cashAccountId). Inflow handled below.
+        if (m.cashAccountId === session.cashAccountId) {
+          delta -= amt;
+        }
+      }
+    }
+
+    // Incoming transfers: toAccountId = session.cashAccountId, occurring between
+    // session open and close (may have a different sessionId or none).
+    const transferIns = await this.cashMovementRepo
+      .createQueryBuilder('m')
+      .where('m.organizationId = :orgId', { orgId: session.organizationId })
+      .andWhere('m.type = :type', { type: CashMovementType.TRANSFER })
+      .andWhere('m.toAccountId = :dest', { dest: session.cashAccountId })
+      .andWhere('m.createdAt >= :openedAt', { openedAt: session.openedAt })
+      .andWhere(
+        session.closedAt
+          ? 'm.createdAt <= :closedAt'
+          : 'm.createdAt <= NOW()',
+        session.closedAt ? { closedAt: session.closedAt } : {},
+      )
+      .getMany();
+
+    for (const t of transferIns) {
+      delta += Number(t.amount);
+    }
+
+    return Number((opening + delta).toFixed(2));
+  }
+
+  /** Backward-compatible path for sessions without a linked cash_account. */
+  private async legacyCalculateExpectedCash(
+    session: PosSessionEntity,
+    opening: number,
   ): Promise<number> {
     const sales = await this.saleRepo.find({
       where: { sessionId: session.id, organizationId: session.organizationId },
@@ -309,7 +415,6 @@ export class PosSessionService {
       cashRefunds += Number(ret.totalAmount);
     }
 
-    const expected = Number(session.openingCashAmount) + cashIn - cashRefunds;
-    return Number(expected.toFixed(2));
+    return Number((opening + cashIn - cashRefunds).toFixed(2));
   }
 }

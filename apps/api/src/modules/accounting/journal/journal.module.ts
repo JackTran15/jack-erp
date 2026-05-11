@@ -6,6 +6,9 @@ import { JournalEntryEntity } from './journal-entry.entity';
 import { JournalLineEntity } from './journal-line.entity';
 import { JournalService } from './journal.service';
 import { JournalController } from './journal.controller';
+import { JournalSalePublisher } from '../publishers/journal-sale.publisher';
+import { JournalSaleConsumer } from '../consumers/journal-sale.consumer';
+import { JournalReverseConsumer } from '../consumers/journal-reverse.consumer';
 
 @Module({
   imports: [
@@ -17,7 +20,12 @@ import { JournalController } from './journal.controller';
     DocumentNumberingModule,
   ],
   controllers: [JournalController],
-  providers: [JournalService],
-  exports: [JournalService],
+  providers: [
+    JournalService,
+    JournalSalePublisher,
+    JournalSaleConsumer,
+    JournalReverseConsumer,
+  ],
+  exports: [JournalService, JournalSalePublisher],
 })
 export class JournalModule {}

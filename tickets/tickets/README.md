@@ -40,3 +40,21 @@
 
 - [TKT-017 Reporting and analytics](./TKT-017-reporting-and-analytics.md)
 - [TKT-018 E2E hardening and go-live readiness](./TKT-018-e2e-hardening-and-golive-readiness.md)
+
+## POS Event-Driven Refactor (EPIC-008)
+
+- [TKT-047 Dead Letter Events infrastructure](./TKT-047-dead-letter-events-infrastructure.md)
+- [TKT-048 Stock deduction Kafka migration](./TKT-048-stock-deduction-kafka-migration.md)
+- [TKT-049 Loyalty points Kafka migration](./TKT-049-loyalty-points-kafka-migration.md)
+- [TKT-050 Journal posting Kafka migration](./TKT-050-journal-posting-kafka-migration.md)
+- [TKT-051 Checkout invoice event-driven refactor](./TKT-051-checkout-invoice-event-driven-refactor.md)
+- [TKT-052 COA and document numbering seed](./TKT-052-coa-and-document-numbering-seed.md)
+
+## Cash Management Enhancement (EPIC-009)
+
+- [TKT-053 Cash account type field](./TKT-053-cash-account-type-field.md)
+- [TKT-054 Cash movement transfer target](./TKT-054-cash-movement-transfer-target.md)
+- [TKT-055 CashService journal bug fix](./TKT-055-cash-service-journal-bug-fix.md)
+- [TKT-056 POS session cash account link](./TKT-056-pos-session-cash-account-link.md)
+- [TKT-057 Cash movement session link](./TKT-057-cash-movement-session-link.md)
+- [TKT-058 Checkout cash movement integration](./TKT-058-checkout-cash-movement-integration.md)

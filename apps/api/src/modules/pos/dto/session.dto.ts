@@ -14,6 +14,9 @@ export class OpenSessionDto {
   @IsUUID()
   branchId: string;
 
+  @IsUUID()
+  cashAccountId: string;
+
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   openingCashAmount: number;

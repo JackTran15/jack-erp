@@ -1,6 +1,7 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { CashAccountEntity } from './cash-account.entity';
+import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 
 export enum CashMovementType {
   DEPOSIT = 'DEPOSIT',
@@ -13,13 +14,22 @@ export enum CashMovementType {
 @Entity('cash_movements')
 @Index('idx_cash_movement_account', ['cashAccountId'])
 @Index('idx_cash_movement_org_branch', ['organizationId', 'branchId'])
+@Index('idx_cash_movement_to_account', ['toAccountId'])
+@Index('idx_cash_movement_session', ['sessionId'])
 export class CashMovementEntity extends BaseEntity {
-  @Column({ name: 'cash_account_id', type: 'uuid', comment: 'The cash account affected' })
+  @Column({ name: 'cash_account_id', type: 'uuid', comment: 'The cash account affected (source for TRANSFER)' })
   cashAccountId: string;
 
   @ManyToOne(() => CashAccountEntity)
   @JoinColumn({ name: 'cash_account_id' })
   cashAccount: CashAccountEntity;
+
+  @Column({ name: 'to_account_id', type: 'uuid', nullable: true, comment: 'Destination cash account when type=TRANSFER' })
+  toAccountId?: string;
+
+  @ManyToOne(() => CashAccountEntity, { nullable: true })
+  @JoinColumn({ name: 'to_account_id' })
+  toAccount?: CashAccountEntity;
 
   @Column({
     type: 'enum',
@@ -41,4 +51,11 @@ export class CashMovementEntity extends BaseEntity {
 
   @Column({ type: 'text', nullable: true, comment: 'Free-text notes' })
   notes?: string;
+
+  @Column({ name: 'session_id', type: 'uuid', nullable: true, comment: 'POS session that recorded this movement, if any' })
+  sessionId?: string;
+
+  @ManyToOne(() => PosSessionEntity, { nullable: true })
+  @JoinColumn({ name: 'session_id' })
+  session?: PosSessionEntity;
 }
