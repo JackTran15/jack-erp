@@ -523,6 +523,48 @@ export function CheckoutPageV2() {
     setDebt,
   ]);
 
+  /** Customer + payment UI are React-local; reset when switching invoice tab so they match the active session. */
+  const lastActiveSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastActiveSessionIdRef.current === null) {
+      lastActiveSessionIdRef.current = activeSessionId;
+      return;
+    }
+    if (lastActiveSessionIdRef.current === activeSessionId) return;
+    lastActiveSessionIdRef.current = activeSessionId;
+
+    resetCheckoutSaleSession({
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
+    });
+    setCreateCustomerOpen(false);
+    setEditCustomerOpen(false);
+    setCreateDefaultQuery("");
+    setCartError("");
+    setCancelInvoiceDialogOpen(false);
+    setAppliedPromotion(null);
+  }, [
+    activeSessionId,
+    setSelectedCustomer,
+    setCustomerQuery,
+    setCustomerFieldError,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
+    setCreateCustomerOpen,
+    setEditCustomerOpen,
+    setCreateDefaultQuery,
+    setCartError,
+  ]);
+
   useCheckoutHotkeys({
     productSearchRef,
     customerSearchRef,
