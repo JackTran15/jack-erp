@@ -6,6 +6,7 @@ import { AccountingModule } from '../accounting/accounting.module';
 import { EventsModule } from '../events/events.module';
 import { WebSocketModule } from '../websocket/websocket.module';
 import { PromotionModule } from '../promotion/promotion.module';
+import { CustomerModule } from '../customer/customer.module';
 import {
   PosSessionEntity,
   SaleEntity,
@@ -56,6 +57,7 @@ import { InvoiceController } from './controllers/invoice.controller';
     EventsModule,
     WebSocketModule,
     PromotionModule,
+    CustomerModule,
   ],
   controllers: [PosController, InvoiceController],
   providers: [

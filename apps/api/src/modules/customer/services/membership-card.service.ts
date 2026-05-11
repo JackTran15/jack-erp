@@ -119,6 +119,36 @@ export class MembershipCardService {
     return updated!;
   }
 
+  async awardPointsForInvoice(
+    invoice: { id: string; customerId: string; subtotal: number },
+    actor: ActorContext,
+  ): Promise<void> {
+    const card = await this.cardRepo.findOne({
+      where: {
+        customerId: invoice.customerId,
+        organizationId: actor.organizationId,
+        isActive: true,
+      },
+    });
+    if (!card) return;
+
+    const points = Math.floor(invoice.subtotal / 1000);
+    if (points <= 0) return;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.increment(MembershipCardEntity, { id: card.id }, 'points', points);
+      await manager.insert(PointHistoryEntity, {
+        cardId: card.id,
+        invoiceId: invoice.id,
+        type: PointType.EARN,
+        delta: points,
+        note: 'Tích điểm từ hóa đơn',
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      });
+    });
+  }
+
   async getPointHistory(
     cardId: string,
     actor: ActorContext,

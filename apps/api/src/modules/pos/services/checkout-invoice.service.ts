@@ -28,6 +28,7 @@ import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
 
 @Injectable()
 export class CheckoutInvoiceService {
@@ -46,6 +47,7 @@ export class CheckoutInvoiceService {
     private readonly eventPublisher: EventPublisher,
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly promotionApplyService: PromotionApplyService,
+    private readonly membershipCardService: MembershipCardService,
   ) {}
 
   async checkout(
@@ -219,6 +221,24 @@ export class CheckoutInvoiceService {
       throw new InternalServerErrorException(
         'Stock deduction failed. Invoice has been reverted to draft.',
       );
+    }
+
+    // ── 9.5. Award loyalty points (non-critical) ─────────────────────────────
+    if (updatedInvoice.customerId) {
+      try {
+        await this.membershipCardService.awardPointsForInvoice(
+          {
+            id: updatedInvoice.id,
+            customerId: updatedInvoice.customerId,
+            subtotal,
+          },
+          actor,
+        );
+      } catch (pointsErr) {
+        this.logger.warn(
+          `Points award failed for invoice ${id}: ${pointsErr}`,
+        );
+      }
     }
 
     // ── 10. Accounting journal (non-critical) ──────────────────────────────────
