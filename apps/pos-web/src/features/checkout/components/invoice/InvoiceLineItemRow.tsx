@@ -1,4 +1,5 @@
 import { CloseIcon, WarningDot } from "@erp/pos/components/icons/Icon";
+import { lineTotal } from "@erp/pos/features/checkout/lib/checkoutUtils";
 import { cn, formatVnd } from "@erp/ui";
 import type { CartLine } from "../types";
 
@@ -27,13 +28,19 @@ export function InvoiceLineItemRow({
   onBumpQty,
   onChangeUnitPrice,
 }: InvoiceLineItemRowProps) {
-  const lineTotal = line.qty * line.unitPrice;
+  const rowTotal = lineTotal(line);
+  const isReturnCredit = Boolean(line.isReturnCredit);
+  const displayQty = isReturnCredit ? -line.qty : line.qty;
   return (
     <tr
       onClick={() => onSelect(line.lineId)}
       className={cn(
         "h-12 cursor-pointer text-[14px] text-gray-900 transition-colors",
-        selected ? "bg-indigo-50" : "bg-white hover:bg-gray-50",
+        selected
+          ? "bg-indigo-50"
+          : isReturnCredit
+            ? "bg-orange-50 hover:bg-orange-100/80"
+            : "bg-white hover:bg-gray-50",
       )}
     >
       <td className="w-10 px-3 text-center text-gray-500">{index}</td>
@@ -71,9 +78,9 @@ export function InvoiceLineItemRow({
           <input
             type="number"
             inputMode="numeric"
-            min={1}
-            max={line.maxQty}
-            value={line.qty}
+            min={isReturnCredit ? -line.maxQty : 1}
+            max={isReturnCredit ? -1 : line.maxQty}
+            value={displayQty}
             onChange={(e) => onChangeQty(line.lineId, e.target.value)}
             onClick={(e) => e.stopPropagation()}
             aria-label={`Số lượng ${line.name}`}
@@ -109,7 +116,9 @@ export function InvoiceLineItemRow({
           className="h-7 w-full rounded-md border border-transparent bg-transparent px-1 text-right text-[14px] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
       </td>
-      <td className="w-28 px-2 text-right font-medium">{formatVnd(lineTotal)}</td>
+      <td className="w-28 px-2 text-right font-medium">
+        {formatVnd(rowTotal)}
+      </td>
       <td className="w-10 px-2 text-right">
         <button
           type="button"

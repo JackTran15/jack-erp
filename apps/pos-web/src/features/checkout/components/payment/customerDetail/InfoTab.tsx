@@ -1,5 +1,5 @@
 import { InfoSectionGroup, type InfoRow } from "./InfoSectionGroup";
-import { CustomerGenderEnum } from "../../../constants/customer";
+import { CustomerGenderEnum } from "@erp/pos/features/checkout/constants/customer";
 import type { CustomerDetailData } from "./types";
 
 export interface InfoTabProps {

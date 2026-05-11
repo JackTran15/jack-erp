@@ -27,6 +27,24 @@ export interface InvoiceTabItem {
   badgeCount?: number;
 }
 
+/** Checkout mode per open invoice tab (Zustand session). String values for JSON persist. */
+export enum CheckoutVariantEnum {
+  SALE = "sale",
+  QUICK_EXCHANGE = "quick_exchange",
+  INVOICE_RETURN = "invoice_return",
+}
+
+/** Normalize persisted / loose string into {@link CheckoutVariantEnum}. */
+export function coerceCheckoutVariant(raw: unknown): CheckoutVariantEnum {
+  if (raw === CheckoutVariantEnum.QUICK_EXCHANGE || raw === "quick_exchange") {
+    return CheckoutVariantEnum.QUICK_EXCHANGE;
+  }
+  if (raw === CheckoutVariantEnum.INVOICE_RETURN || raw === "invoice_return") {
+    return CheckoutVariantEnum.INVOICE_RETURN;
+  }
+  return CheckoutVariantEnum.SALE;
+}
+
 /** Single line in the active invoice cart. Identical to legacy CheckoutPage. */
 export interface CartLine {
   lineId: string;
@@ -38,6 +56,11 @@ export interface CartLine {
   qty: number;
   locationId: string;
   maxQty: number;
+  /**
+   * When true (invoice_return): qty is a positive count of units returned;
+   * monetary effect is negative (refund credit). UI shows negative qty / pink row.
+   */
+  isReturnCredit?: boolean;
 }
 
 export interface CatalogProduct {
@@ -92,4 +115,8 @@ export interface DraftInvoice {
    * time. Optional so older snapshots without payment data still load.
    */
   payments?: DraftInvoicePayment[];
+  /** When set, restore splits carts for quick_exchange. */
+  checkoutVariant?: CheckoutVariantEnum;
+  quickExchangePurchase?: CartLine[];
+  quickExchangeReturn?: CartLine[];
 }

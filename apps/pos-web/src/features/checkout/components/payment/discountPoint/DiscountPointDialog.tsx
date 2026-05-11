@@ -1,7 +1,7 @@
 import { useCallback, type FormEvent } from "react";
-import { AppDialog } from "../../../../../components/AppDialog";
-import { useControllableState } from "../../../hooks/useControllableState";
-import { useDialogReset } from "../../../hooks/useDialogReset";
+import { AppDialog } from "@erp/pos/components/AppDialog";
+import { useControllableState } from "@erp/pos/features/checkout/hooks/useControllableState";
+import { useDialogReset } from "@erp/pos/features/checkout/hooks/useDialogReset";
 import type { DiscountPointData } from "./types";
 import { MembershipPanel } from "./MembershipPanel";
 import { VoucherSearchPanel } from "./VoucherSearchPanel";

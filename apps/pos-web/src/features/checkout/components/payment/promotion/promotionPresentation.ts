@@ -8,7 +8,7 @@ import {
   PromotionKindEnum,
   PromotionStatusEnum,
   PromotionStatusToneEnum,
-} from "../../../constants/promotion";
+} from "@erp/pos/features/checkout/constants/promotion";
 
 const KIND_LABELS: Record<PromotionKind, string> = {
   [PromotionKindEnum.AMOUNT_OFF]: "Giảm tiền",

@@ -49,7 +49,10 @@ export function buildCheckoutInvoicePayload({
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
-  const totalQty = cart.reduce((sum, l) => sum + l.qty, 0);
+  const totalQty = cart.reduce(
+    (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
+    0,
+  );
   const paid = totalPaid > 0 ? totalPaid : grandTotal;
   const payments =
     totalPaid > 0
@@ -68,7 +71,7 @@ export function buildCheckoutInvoicePayload({
     lines: cart.map((l, i) => ({
       index: i + 1,
       name: l.name,
-      qty: l.qty,
+      qty: l.isReturnCredit ? -l.qty : l.qty,
       unitPrice: l.unitPrice,
     })),
     totals: {
@@ -76,7 +79,10 @@ export function buildCheckoutInvoicePayload({
       subtotal: grandTotal,
       grandTotal,
       paid,
-      change: Math.max(0, paid - grandTotal),
+      change:
+        grandTotal < 0
+          ? Math.max(0, -grandTotal - totalPaid)
+          : Math.max(0, totalPaid - grandTotal),
     },
     payments,
     policy: RETURN_POLICY,

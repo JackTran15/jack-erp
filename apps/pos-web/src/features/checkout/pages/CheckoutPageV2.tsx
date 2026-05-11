@@ -1,32 +1,49 @@
-import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
-import { CustomerCreateDialog } from "../../../components/CustomerCreateDialog";
-import { useAnnounce } from "../../../hooks/useAnnounce";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import { CustomerCreateDialog } from "@erp/pos/components/CustomerCreateDialog";
+import { useAnnounce } from "@erp/pos/hooks/useAnnounce";
 import {
   formatCustomerDisplay,
   type CustomerRow,
-} from "../../../lib/customerApi";
-import { type PosCatalogLine } from "../../../lib/posCatalogApi";
-import { usePosBranchStore } from "../../../stores/usePosBranchStore";
+} from "@erp/pos/lib/customerApi";
+import { type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
+import { usePosBranchStore } from "@erp/pos/stores/usePosBranchStore";
+import { usePosCheckoutSessionStore } from "@erp/pos/stores/usePosCheckoutSessionStore";
 
-import { formatViDateTime } from "../../../lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { PanelCollapseHandle } from "../components/catalog/PanelCollapseHandle";
 import { ProductCatalogGrid } from "../components/catalog/ProductCatalogGrid";
 import { ProductCatalogHeader } from "../components/catalog/ProductCatalogHeader";
 import { AlertBar } from "../components/common/AlertBar";
+import { CancelInvoiceConfirmDialog } from "../components/CancelInvoiceConfirmDialog";
 import { DraftInvoicesDialog } from "../components/draftInvoices/DraftInvoicesDialog";
+import { CheckoutExchangeTabs } from "../components/exchange/CheckoutExchangeTabs";
 import { InvoiceLineItemTable } from "../components/invoice/InvoiceLineItemTable";
-import { type PaymentLine } from "../components/payment/PaymentMethodRow";
+import {
+  createPaymentLine,
+  type PaymentLine,
+} from "../components/payment/PaymentMethodRow";
 import { PaymentSummaryPanel } from "../components/payment/PaymentSummaryPanel";
 import type { PromotionItem } from "../components/payment/promotion/types";
 import type { InvoicePayload } from "../components/printing/types";
 import { POSToolbar } from "../components/toolbar/POSToolbar";
 import { InvoiceTabBar } from "../components/topbar/InvoiceTabBar";
-import type { CatalogProduct, InvoiceTabItem } from "../components/types";
-import { PAYMENT_METHODS } from "../constants/paymentMethod";
-import { useCheckoutCart } from "../hooks/useCheckoutCart";
+import {
+  CheckoutVariantEnum,
+  type CatalogProduct,
+  type DraftInvoice,
+  type InvoiceTabItem,
+} from "../components/types";
+import { PAYMENT_METHODS, PaymentMethodEnum } from "../constants/paymentMethod";
+import { useCheckoutSessionCart } from "../hooks/useCheckoutSessionCart";
 import { useCheckoutCatalog } from "../hooks/useCheckoutCatalog";
 import { useCheckoutCustomer } from "../hooks/useCheckoutCustomer";
-import { useCheckoutDrafts } from "../hooks/useCheckoutDrafts";
 import { useCheckoutHotkeys } from "../hooks/useCheckoutHotkeys";
 import { useCheckoutPayment } from "../hooks/useCheckoutPayment";
 import { buildCheckoutInvoicePayload } from "../lib/checkoutReceiptFactory";
@@ -40,26 +57,55 @@ import {
   resolvePaymentMethodLabel,
 } from "../lib/checkoutUtils";
 
-// ---------------------------------------------------------------------------
-// Constants & helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
 export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
   const branchName = usePosBranchStore((s) => s.branchName)!;
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
 
-  // Tabs (UI only — single active cart at a time, mirrors legacy single-cart).
-  const [tabs, setTabs] = useState<InvoiceTabItem[]>([
-    { id: "tab-1", label: "Hóa đơn 1" },
-    { id: "tab-draft", label: "HĐ lưu tạm", isDraft: true },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>("tab-1");
+  const sessions = usePosCheckoutSessionStore((s) => s.sessions);
+  const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
+  const setActiveSessionId = usePosCheckoutSessionStore(
+    (s) => s.setActiveSessionId,
+  );
+  const addSession = usePosCheckoutSessionStore((s) => s.addSession);
+  const removeSession = usePosCheckoutSessionStore((s) => s.removeSession);
+  const draftInvoices = usePosCheckoutSessionStore((s) => s.draftInvoices);
+  const addDraft = usePosCheckoutSessionStore((s) => s.addDraft);
+  const removeDraft = usePosCheckoutSessionStore((s) => s.removeDraft);
+  const nextDraftSeq = usePosCheckoutSessionStore((s) => s.nextDraftSeq);
+  const applyDraftToActiveSession = usePosCheckoutSessionStore(
+    (s) => s.applyDraftToActiveSession,
+  );
+  const resetActiveSessionAfterCheckout = usePosCheckoutSessionStore(
+    (s) => s.resetActiveSessionAfterCheckout,
+  );
+  const ensureHydratedShape = usePosCheckoutSessionStore(
+    (s) => s.ensureHydratedShape,
+  );
+  const setActiveExchangePane = usePosCheckoutSessionStore(
+    (s) => s.setActiveExchangePane,
+  );
+  const cashierDisplayName = usePosCheckoutSessionStore(
+    (s) => s.cashierDisplayName,
+  );
+
+  useEffect(() => {
+    ensureHydratedShape();
+  }, [ensureHydratedShape]);
+
+  const tabs = useMemo<InvoiceTabItem[]>(() => {
+    const fromSessions = sessions.map((s) => ({
+      id: s.id,
+      label: s.label,
+    }));
+    return [
+      ...fromSessions,
+      { id: "tab-draft", label: "HĐ lưu tạm", isDraft: true },
+    ];
+  }, [sessions]);
+
+  const [draftsDialogOpen, setDraftsDialogOpen] = useState(false);
 
   const {
     catalog,
@@ -81,8 +127,11 @@ export function CheckoutPageV2() {
 
   const { message: announcement, announce } = useAnnounce();
   const {
+    checkoutVariant,
+    purchaseCart,
+    returnCart,
+    activeExchangePane,
     cart,
-    setCart,
     selectedLineId,
     setSelectedLineId,
     cartError,
@@ -95,7 +144,17 @@ export function CheckoutPageV2() {
     bumpQty,
     removeLine,
     isLineWarning,
-  } = useCheckoutCart({ announce });
+    itemCountForPayment,
+    linesForDraftSingle,
+  } = useCheckoutSessionCart({ announce });
+
+  const isReturnExchangeInvoice = useMemo(
+    () =>
+      checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE ||
+      checkoutVariant === CheckoutVariantEnum.INVOICE_RETURN,
+    [checkoutVariant],
+  );
+
   const {
     selectedCustomer,
     setSelectedCustomer,
@@ -150,42 +209,54 @@ export function CheckoutPageV2() {
     methods: PAYMENT_METHODS,
   });
 
-  // Promotion / voucher selection — backend wiring lands later, so the page
-  // currently exposes an empty list (modal renders its empty state).
   const [appliedPromotion, setAppliedPromotion] =
     useState<PromotionItem | null>(null);
   const promotions = useMemo<PromotionItem[]>(() => [], []);
 
-  const {
-    drafts,
-    draftsDialogOpen,
-    setDraftsDialogOpen,
-    handleSaveDraft: saveDraft,
-    handleRestoreDraft: restoreDraft,
-    handleDeleteDraft: deleteDraft,
-  } = useCheckoutDrafts();
-
-  // Inject the live draft count into the "HĐ lưu tạm" tab as a badge. Tabs
-  // without `isDraft` flow through unchanged.
   const tabsWithBadges = useMemo<InvoiceTabItem[]>(
     () =>
-      tabs.map((t) => (t.isDraft ? { ...t, badgeCount: drafts.length } : t)),
-    [tabs, drafts.length],
+      tabs.map((t) =>
+        t.isDraft ? { ...t, badgeCount: draftInvoices.length } : t,
+      ),
+    [tabs, draftInvoices.length],
   );
 
-  // ---- Derived data ----
   const datetime = useMemo(() => formatViDateTime(new Date()), []);
 
-  /** Resolve the human label for a `PaymentMethod`. Falls back to the raw value. */
   const labelForMethod = useCallback(
     (m: PaymentLine["method"]): string =>
       resolvePaymentMethodLabel(m, PAYMENT_METHODS),
     [],
   );
 
-  // ---- Customer state/handlers are provided by useCheckoutCustomer ----
+  const receiptLines = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...returnCart, ...purchaseCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, returnCart, purchaseCart]);
 
-  // ---- Cart handlers ----
+  const voucherLineSource = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...purchaseCart, ...returnCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, purchaseCart, returnCart]);
+
+  const hasAnyCartLines = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return purchaseCart.length + returnCart.length > 0;
+    }
+    return purchaseCart.length > 0;
+  }, [checkoutVariant, purchaseCart, returnCart]);
+
+  const allLinesForPriceCheck = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...purchaseCart, ...returnCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, purchaseCart, returnCart]);
+
   const handleSelectProduct = useCallback(
     (p: PosCatalogLine) => {
       const atDef = locationQtyFor(p);
@@ -226,20 +297,25 @@ export function CheckoutPageV2() {
     [catalog, handleCatalogSelectFromCart],
   );
 
-  // ---- Checkout / save-draft ----
+  const settlementAbs = grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
+
   const handleCheckout = useCallback(
     (e: FormEvent | { preventDefault: () => void }) => {
       e.preventDefault();
-      if (cart.length === 0) {
+      if (!hasAnyCartLines) {
         setCartError("Giỏ hàng trống.");
         return;
       }
-      if (cart.some((l) => l.unitPrice <= 0)) {
+      if (allLinesForPriceCheck.some((l) => l.unitPrice <= 0)) {
         setCartError("Nhập đơn giá > 0 cho từng dòng hàng.");
         return;
       }
-      if (totalPaid > 0 && totalPaid < grandTotal) {
+      if (grandTotal > 0 && totalPaid > 0 && totalPaid < grandTotal) {
         setCartError("Tiền khách đưa chưa đủ.");
+        return;
+      }
+      if (grandTotal < 0 && totalPaid < settlementAbs) {
+        setCartError("Nhập đủ số tiền trả khách.");
         return;
       }
       setCartError("");
@@ -253,9 +329,8 @@ export function CheckoutPageV2() {
           maximumFractionDigits: 0,
         }).format(grandTotal)}, ${paymentLabel(primaryMethod)}.`,
       );
+      resetActiveSessionAfterCheckout();
       resetCheckoutSaleSession({
-        setCart,
-        setSelectedLineId,
         setSelectedCustomer,
         setCustomerQuery,
         setCustomerFieldError,
@@ -266,114 +341,252 @@ export function CheckoutPageV2() {
         setDebt,
       });
     },
-    [announce, cart, grandTotal, primaryMethod, selectedCustomer, totalPaid],
+    [
+      announce,
+      allLinesForPriceCheck,
+      grandTotal,
+      hasAnyCartLines,
+      primaryMethod,
+      resetActiveSessionAfterCheckout,
+      selectedCustomer,
+      settlementAbs,
+      totalPaid,
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
+    ],
   );
 
   const handleSaveDraft = useCallback(() => {
-    saveDraft({
-      cart,
-      paymentLines,
-      selectedCustomer,
-      labelForMethod,
-      announce,
-      onAfterSave: () =>
-        resetCheckoutSaleSession({
-          setCart,
-          setSelectedLineId,
-          setSelectedCustomer,
-          setCustomerQuery,
-          setCustomerFieldError,
-          setPaymentLines,
-          setSelectedSuggestionId,
-          setNote,
-          setKeepChange,
-          setDebt,
-        }),
+    if (!hasAnyCartLines) return;
+
+    const now = new Date();
+    const yy = String(now.getFullYear() % 100).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const seq = String(nextDraftSeq()).padStart(4, "0");
+    const invoiceNumber = `${yy}${mm}${dd}${seq}`;
+
+    const paymentsSnapshot =
+      paymentLines
+        .filter((l) => l.amount > 0)
+        .map((l) => ({
+          method: l.method,
+          label: labelForMethod(l.method),
+          amount: l.amount,
+        })) ?? [];
+
+    const snapshot: DraftInvoice = {
+      id: crypto.randomUUID(),
+      invoiceNumber,
+      customerId: selectedCustomer?.id ?? null,
+      customerName: selectedCustomer
+        ? formatCustomerDisplay(selectedCustomer)
+        : null,
+      customerPhone: selectedCustomer?.phone ?? null,
+      createdAt: now,
+      lines: linesForDraftSingle.map((l) => ({ ...l })),
+      total: grandTotal,
+      payments: paymentsSnapshot.length > 0 ? paymentsSnapshot : undefined,
+      checkoutVariant,
+      quickExchangePurchase:
+        checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE
+          ? purchaseCart.map((l) => ({ ...l }))
+          : undefined,
+      quickExchangeReturn:
+        checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE
+          ? returnCart.map((l) => ({ ...l }))
+          : undefined,
+    };
+
+    addDraft(snapshot);
+    announce(`Đã lưu tạm hóa đơn ${invoiceNumber}.`);
+    resetActiveSessionAfterCheckout();
+    resetCheckoutSaleSession({
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
     });
   }, [
+    addDraft,
     announce,
-    cart,
+    checkoutVariant,
+    grandTotal,
+    hasAnyCartLines,
     labelForMethod,
+    linesForDraftSingle,
+    nextDraftSeq,
     paymentLines,
-    saveDraft,
+    purchaseCart,
+    returnCart,
+    resetActiveSessionAfterCheckout,
     selectedCustomer,
+    setSelectedCustomer,
+    setCustomerQuery,
+    setCustomerFieldError,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
   ]);
 
   const handleRestoreDraft = useCallback(
-    (draft: (typeof drafts)[number]) => {
-      restoreDraft({
-        draft,
-        setCart,
-        setSelectedLineId,
-        setPaymentLines,
-        setSelectedSuggestionId,
-        setCartError,
-        announce,
-      });
+    (draft: DraftInvoice) => {
+      applyDraftToActiveSession(draft);
+      const restored: PaymentLine[] =
+        draft.payments && draft.payments.length > 0
+          ? draft.payments.map((p) => createPaymentLine(p.method, p.amount))
+          : [createPaymentLine(PaymentMethodEnum.CASH)];
+      setPaymentLines(restored);
+      setSelectedSuggestionId(null);
+      setCartError("");
+      announce(`Đã mở hóa đơn lưu tạm ${draft.invoiceNumber}.`);
     },
-    [announce, restoreDraft],
+    [
+      announce,
+      applyDraftToActiveSession,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setCartError,
+    ],
   );
 
   const handleDeleteDraft = useCallback(
     (id: string) => {
-      deleteDraft({ id, announce });
+      removeDraft(id);
+      announce("Đã xóa hóa đơn lưu tạm.");
     },
-    [announce, deleteDraft],
+    [announce, removeDraft],
   );
 
-  // ---- Tabs ----
   const handleAddTab = useCallback(() => {
-    setTabs((prev) => {
-      const newId = `tab-${Date.now()}`;
-      const drafts = prev.filter((t) => t.isDraft);
-      const actives = prev.filter((t) => !t.isDraft);
-      const newTab: InvoiceTabItem = {
-        id: newId,
-        label: `Hóa đơn ${actives.length + 1}`,
-      };
-      setActiveTabId(newId);
-      return [...actives, newTab, ...drafts];
-    });
-  }, []);
+    addSession();
+  }, [addSession]);
 
   const handleCloseTab = useCallback(
     (id: string) => {
-      setTabs((prev) => {
-        const next = prev.filter((t) => t.id !== id);
-        if (id === activeTabId) {
-          const fallback = next.find((t) => !t.isDraft) ?? next[0];
-          setActiveTabId(fallback?.id ?? "");
-        }
-        return next;
-      });
+      if (id === "tab-draft") return;
+      if (sessions.length <= 1) return;
+      removeSession(id);
     },
-    [activeTabId],
+    [removeSession, sessions.length],
   );
 
-  // ---- Keyboard shortcuts ----
+  const [cancelInvoiceDialogOpen, setCancelInvoiceDialogOpen] = useState(false);
+
+  const handleRequestCancelInvoice = useCallback(() => {
+    setCancelInvoiceDialogOpen(true);
+  }, []);
+
+  const handleConfirmCancelInvoice = useCallback(() => {
+    setCancelInvoiceDialogOpen(false);
+    if (sessions.length > 1) {
+      removeSession(activeSessionId);
+    } else {
+      resetActiveSessionAfterCheckout();
+      resetCheckoutSaleSession({
+        setSelectedCustomer,
+        setCustomerQuery,
+        setCustomerFieldError,
+        setPaymentLines,
+        setSelectedSuggestionId,
+        setNote,
+        setKeepChange,
+        setDebt,
+      });
+    }
+    announce("Đã hủy hóa đơn.");
+  }, [
+    announce,
+    sessions.length,
+    activeSessionId,
+    removeSession,
+    resetActiveSessionAfterCheckout,
+    setSelectedCustomer,
+    setCustomerQuery,
+    setCustomerFieldError,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
+  ]);
+
   useCheckoutHotkeys({
     productSearchRef,
     customerSearchRef,
-    hasCartItems: cart.length > 0,
+    hasCartItems: hasAnyCartLines,
     onCheckout: () => handleCheckout({ preventDefault: () => {} }),
-    onSaveDraft: handleSaveDraft,
+    onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
   });
 
-  // Payment suggestion/line mutation handlers are provided by useCheckoutPayment.
-
-  // ---- Invoice payload factory (printed on "Thu tiền") ----
-  // Closure captures the *current* render's state so the receipt reflects
-  // the cart/customer/totals before `handleCheckout` clears them.
   const buildInvoicePayload = (): InvoicePayload | null =>
     buildCheckoutInvoicePayload({
       printInvoice,
-      cart,
+      cart: receiptLines,
       grandTotal,
       totalPaid,
       paymentLines,
       primaryMethodLabel,
       methods: PAYMENT_METHODS,
     });
+
+  const quickExchangeReturnQty = useMemo(
+    () => returnCart.reduce((s, l) => s + l.qty, 0),
+    [returnCart],
+  );
+  const quickExchangePurchaseQty = useMemo(
+    () => purchaseCart.reduce((s, l) => s + l.qty, 0),
+    [purchaseCart],
+  );
+
+  const invoiceReturnReturnQty = useMemo(
+    () =>
+      purchaseCart
+        .filter((l) => l.isReturnCredit)
+        .reduce((s, l) => s + l.qty, 0),
+    [purchaseCart],
+  );
+  const invoiceReturnPurchaseQty = useMemo(
+    () =>
+      purchaseCart
+        .filter((l) => !l.isReturnCredit)
+        .reduce((s, l) => s + l.qty, 0),
+    [purchaseCart],
+  );
+
+  const quickExchangeBadges = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return {
+        returnQuantity: quickExchangeReturnQty,
+        purchaseQuantity: quickExchangePurchaseQty,
+      };
+    }
+    if (checkoutVariant === CheckoutVariantEnum.INVOICE_RETURN) {
+      return {
+        returnQuantity: invoiceReturnReturnQty,
+        purchaseQuantity: invoiceReturnPurchaseQty,
+      };
+    }
+    return null;
+  }, [
+    checkoutVariant,
+    invoiceReturnPurchaseQty,
+    invoiceReturnReturnQty,
+    quickExchangePurchaseQty,
+    quickExchangeReturnQty,
+  ]);
 
   return (
     <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
@@ -418,26 +631,30 @@ export function CheckoutPageV2() {
 
       <InvoiceTabBar
         tabs={tabsWithBadges}
-        activeTabId={activeTabId}
+        activeTabId={activeSessionId}
         onSelectTab={(id) => {
-          // The "HĐ lưu tạm" tab is a launcher for the drafts picker, not a
-          // real cart tab — clicking it opens the dialog and leaves the
-          // active cart untouched.
           const tab = tabs.find((t) => t.id === id);
           if (tab?.isDraft) {
             setDraftsDialogOpen(true);
             return;
           }
-          setActiveTabId(id);
+          setActiveSessionId(id);
         }}
         onCloseTab={handleCloseTab}
         onAddTab={handleAddTab}
         location={branchName}
-        userName="Phan Thanh Hà"
+        userName={cashierDisplayName ?? "Phan Thanh Hà"}
       />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
+          {checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE ? (
+            <CheckoutExchangeTabs
+              activePane={activeExchangePane}
+              onSelectPane={setActiveExchangePane}
+            />
+          ) : null}
+
           <POSToolbar<PosCatalogLine>
             ref={productSearchRef}
             state={toolbar}
@@ -569,7 +786,7 @@ export function CheckoutPageV2() {
           }}
           voucher={{
             data: {
-              items: cart.map((l) => ({
+              items: voucherLineSource.map((l) => ({
                 id: l.lineId,
                 name: l.name,
                 qty: l.qty,
@@ -585,7 +802,8 @@ export function CheckoutPageV2() {
             },
           }}
           onEditCustomer={() => setEditCustomerOpen(true)}
-          itemCount={cart.length}
+          quickExchangeBadges={quickExchangeBadges}
+          itemCount={itemCountForPayment}
           total={grandTotal}
           deposit={0}
           methods={PAYMENT_METHODS}
@@ -607,9 +825,14 @@ export function CheckoutPageV2() {
           suggestions={suggestions}
           selectedSuggestionId={selectedSuggestionId}
           onPickSuggestion={handlePickSuggestion}
-          onSaveDraft={handleSaveDraft}
+          onSaveDraft={
+            isReturnExchangeInvoice ? undefined : handleSaveDraft
+          }
+          onCancelInvoice={
+            isReturnExchangeInvoice ? handleRequestCancelInvoice : undefined
+          }
           onCollect={() => handleCheckout({ preventDefault: () => {} })}
-          collectDisabled={cart.length === 0}
+          collectDisabled={!hasAnyCartLines}
           invoice={buildInvoicePayload}
         />
       </div>
@@ -617,9 +840,15 @@ export function CheckoutPageV2() {
       <DraftInvoicesDialog
         open={draftsDialogOpen}
         onClose={() => setDraftsDialogOpen(false)}
-        drafts={drafts}
+        drafts={draftInvoices}
         onConfirm={handleRestoreDraft}
         onDelete={handleDeleteDraft}
+      />
+
+      <CancelInvoiceConfirmDialog
+        open={cancelInvoiceDialogOpen}
+        onClose={() => setCancelInvoiceDialogOpen(false)}
+        onConfirm={handleConfirmCancelInvoice}
       />
     </div>
   );

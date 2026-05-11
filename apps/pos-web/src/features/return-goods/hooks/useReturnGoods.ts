@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { usePosCheckoutSessionStore } from "@erp/pos/stores/usePosCheckoutSessionStore";
 import {
   isInDateRange,
   type DateRangeFilterOption,
-} from "../../../components/dateRangeFilter";
+} from "@erp/pos/components/dateRangeFilter";
 import { EMPTY_RETURN_INVOICE_FILTERS } from "../constants/returnGoods";
 import { getMockReturnInvoices } from "../lib/mockData";
+import { buildInvoiceReturnCartLines } from "../lib/toCheckoutCartLines";
 import {
   clampReturnQty,
   sumSelectedReturnTotal,
@@ -61,6 +64,11 @@ function matchesNumberInput(value: number, raw: string): boolean {
  * once the backend exists.
  */
 export function useReturnGoods(): UseReturnGoodsResult {
+  const navigate = useNavigate();
+  const enterInvoiceReturnWithLines = usePosCheckoutSessionStore(
+    (s) => s.enterInvoiceReturnWithLines,
+  );
+
   const [dateRange, setDateRange] = useState<DateRangeFilterOption>("TODAY");
   const [filters, setFilters] = useState<ReturnInvoiceFilters>(
     () => ({ ...EMPTY_RETURN_INVOICE_FILTERS }),
@@ -160,9 +168,20 @@ export function useReturnGoods(): UseReturnGoodsResult {
   );
 
   const confirmReturn = useCallback(() => {
-    // Stub workflow: in production this would submit the return payload.
+    if (!activeInvoice) return;
+    const lines = buildInvoiceReturnCartLines(
+      activeInvoice,
+      selectedIds,
+      qtyById,
+    );
+    if (lines.length === 0) {
+      setDialogOpen(false);
+      return;
+    }
+    enterInvoiceReturnWithLines(lines);
     setDialogOpen(false);
-  }, []);
+    navigate("/");
+  }, [activeInvoice, selectedIds, qtyById, enterInvoiceReturnWithLines, navigate]);
 
   const items: ReadonlyArray<ReturnableItem> = activeInvoice?.items ?? [];
   const selectedTotal = sumSelectedReturnTotal(items, qtyById, selectedIds);

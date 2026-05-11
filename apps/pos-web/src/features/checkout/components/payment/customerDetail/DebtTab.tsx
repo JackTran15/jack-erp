@@ -4,11 +4,11 @@ import { PaginationBar } from "@erp/pos/components/PaginationBar";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { formatVnd } from "@erp/ui";
 import { useMemo, useState } from "react";
-import { DebtTypeFilterEnum } from "../../../constants/customer";
+import { DebtTypeFilterEnum } from "@erp/pos/features/checkout/constants/customer";
 import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
-} from "../../../constants/filterOperator";
+} from "@erp/pos/features/checkout/constants/filterOperator";
 import { PosSelect } from "@erp/pos/components/form/PosSelect";
 import type { DebtEntry } from "./types";
 

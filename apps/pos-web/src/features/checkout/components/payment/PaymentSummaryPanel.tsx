@@ -16,6 +16,7 @@ import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
 } from "../../constants/promoMenu";
+import { QuickExchangeBadges } from "./QuickExchangeBadges";
 import { CheckoutActionsSection } from "./sections/CheckoutActionsSection";
 import { CustomerSection } from "./sections/CustomerSection";
 import { PaymentSection } from "./sections/PaymentSection";
@@ -116,6 +117,12 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangeCustomerCard?: () => void;
   onRefreshCustomerPoints?: () => void;
 
+  /** Return flows: read-only đổi trả / mua thêm labels + qty (quick exchange + invoice return). */
+  quickExchangeBadges?: {
+    returnQuantity: number;
+    purchaseQuantity: number;
+  } | null;
+
   // Summary
   itemCount: number;
   total: number;
@@ -155,7 +162,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   suggestions: CashSuggestion[];
   selectedSuggestionId: string | null;
   onPickSuggestion: (s: CashSuggestion) => void;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
+  onCancelInvoice?: () => void;
   onCollect: () => void;
   collectDisabled?: boolean;
 
@@ -213,6 +221,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onCollectCustomerDebt,
     onChangeCustomerCard,
     onRefreshCustomerPoints,
+    quickExchangeBadges,
     itemCount,
     total,
     deposit,
@@ -238,6 +247,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     selectedSuggestionId,
     onPickSuggestion,
     onSaveDraft,
+    onCancelInvoice,
     onCollect,
     collectDisabled,
     invoice,
@@ -392,6 +402,13 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           customerFieldError={customerFieldError}
         />
 
+        {quickExchangeBadges != null ? (
+          <QuickExchangeBadges
+            returnQuantity={quickExchangeBadges.returnQuantity}
+            purchaseQuantity={quickExchangeBadges.purchaseQuantity}
+          />
+        ) : null}
+
         <PaymentSection
           itemCount={itemCount}
           total={total}
@@ -424,6 +441,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         selectedSuggestionId={selectedSuggestionId}
         onPickSuggestion={onPickSuggestion}
         onSaveDraft={onSaveDraft}
+        onCancelInvoice={onCancelInvoice}
         onCollect={onCollect}
         collectDisabled={collectDisabled}
         invoice={invoice}

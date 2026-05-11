@@ -2,7 +2,7 @@ import type {
   CustomerDetailTabKey,
   CustomerGender,
   PurchaseHistoryStatus,
-} from "../../../constants/customer";
+} from "@erp/pos/features/checkout/constants/customer";
 
 export {
   CustomerDetailTabKeyEnum,
@@ -11,7 +11,7 @@ export {
   type CustomerDetailTabKey,
   type CustomerGender,
   type PurchaseHistoryStatus,
-} from "../../../constants/customer";
+} from "@erp/pos/features/checkout/constants/customer";
 
 /**
  * Data contracts for `CustomerDetailDialog`.

@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import { PurchaseHistoryStatusEnum } from "../../../constants/customer";
+import { PurchaseHistoryStatusEnum } from "@erp/pos/features/checkout/constants/customer";
 import type { PurchaseHistoryStatus } from "./types";
 
 export interface StatusBadgeProps {

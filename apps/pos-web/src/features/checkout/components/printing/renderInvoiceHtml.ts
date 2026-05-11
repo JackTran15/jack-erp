@@ -1,5 +1,5 @@
 import type { InvoicePayload } from "./types";
-import { formatViDateTime } from "../../../../lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/dateTime";
 
 /**
  * Format a number as VND, vi-VN grouping (1.650.000) — no currency symbol.

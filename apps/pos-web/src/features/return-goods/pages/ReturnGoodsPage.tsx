@@ -4,13 +4,19 @@ import { ExchangeClipboardIcon } from "@erp/pos/components/icons/Icon";
 import { AppHeader } from "@erp/pos/components/layout/appHeader/AppHeader";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";
 import { usePosBranchStore } from "@erp/pos/stores/usePosBranchStore";
+import { usePosCheckoutSessionStore } from "@erp/pos/stores/usePosCheckoutSessionStore";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ReturnInvoiceTable } from "../components/ReturnInvoiceTable";
 import { ReturnItemsDialog } from "../components/ReturnItemsDialog";
 import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "../constants/returnGoods";
 import { useReturnGoods } from "../hooks/useReturnGoods";
 
 export function ReturnGoodsPage() {
+  const navigate = useNavigate();
+  const enterQuickExchange = usePosCheckoutSessionStore(
+    (s) => s.enterQuickExchange,
+  );
   const branchName = usePosBranchStore((s) => s.branchName) ?? "—";
   const [pageDate] = useState(() => new Date());
   const {
@@ -50,6 +56,10 @@ export function ReturnGoodsPage() {
           <button
             type="button"
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#F59E0B] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#D97706] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FCD34D] focus-visible:ring-offset-2"
+            onClick={() => {
+              enterQuickExchange();
+              navigate("/");
+            }}
           >
             <ExchangeClipboardIcon size={16} strokeWidth={1.75} />
             Đổi trả nhanh
