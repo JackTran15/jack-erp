@@ -40,12 +40,6 @@ export function ReturnGoodsPage() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <AppHeader
-        title={"Đổi trả hàng"}
-        location={branchName}
-        userName="Phan Thanh Hà"
-      />
-
       <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

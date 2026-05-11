@@ -5,6 +5,7 @@ import {
   CheckoutVariantEnum,
   coerceCheckoutVariant,
   type DraftInvoice,
+  type DraftInvoicePayment,
 } from "@erp/pos/features/checkout/components/types";
 
 const STORAGE_KEY = "pos-checkout-sessions";
@@ -70,8 +71,14 @@ interface PosCheckoutSessionState {
   draftInvoices: DraftInvoice[];
   draftSeq: number;
   cashierDisplayName: string | null;
+  draftsDialogOpen: boolean;
+  pendingDraftPaymentLines: DraftInvoicePayment[] | null;
 
   setCashierDisplayName: (name: string | null) => void;
+  setDraftsDialogOpen: (open: boolean) => void;
+  setPendingDraftPaymentLines: (
+    value: DraftInvoicePayment[] | null,
+  ) => void;
   setActiveSessionId: (id: string) => void;
   setActiveExchangePane: (pane: ExchangePane) => void;
   patchActiveSession: (partial: Partial<InvoiceSession>) => void;
@@ -120,8 +127,15 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       draftInvoices: [],
       draftSeq: 1,
       cashierDisplayName: null,
+      draftsDialogOpen: false,
+      pendingDraftPaymentLines: null,
 
       setCashierDisplayName: (name) => set({ cashierDisplayName: name }),
+
+      setDraftsDialogOpen: (open) => set({ draftsDialogOpen: open }),
+
+      setPendingDraftPaymentLines: (value) =>
+        set({ pendingDraftPaymentLines: value }),
 
       setActiveSessionId: (id) => {
         const { sessions } = get();
@@ -339,6 +353,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           sessions: [...sessions, newSession],
           activeSessionId: newId,
           draftInvoices: get().draftInvoices.filter((d) => d.id !== draft.id),
+          pendingDraftPaymentLines: draft.payments ?? null,
         });
       },
     }),
