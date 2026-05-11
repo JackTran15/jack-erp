@@ -318,15 +318,12 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       );
     });
 
-    it('skips stock deduction publish for items without locationId', async () => {
+    it('throws when any item is missing a locationId', async () => {
       itemRepo.find.mockResolvedValue([invoiceItemStub({ locationId: undefined })]);
-      await service.checkout('inv-1', cashPaymentDto(), actor);
-      expect(stockDeductionPublisher.publish).toHaveBeenCalledWith(
-        'inv-1',
-        [],
-        'branch-1',
-        actor,
+      await expect(service.checkout('inv-1', cashPaymentDto(), actor)).rejects.toThrow(
+        /without an assigned location/,
       );
+      expect(stockDeductionPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('publishes loyalty points award event when customer present', async () => {
