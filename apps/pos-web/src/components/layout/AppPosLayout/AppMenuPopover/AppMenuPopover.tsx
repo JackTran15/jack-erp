@@ -8,11 +8,8 @@ import {
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppMenuTile } from "./AppMenuTile/AppMenuTile";
-import {
-  resolveSelectedAppMenuItemId,
-  type AppMenuItem,
-} from "../appMenuItems";
 import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
+import { AppMenuItem, resolveSelectedAppMenuItemId } from "../AppPosLayout";
 
 export interface AppMenuPopoverProps {
   open: boolean;
