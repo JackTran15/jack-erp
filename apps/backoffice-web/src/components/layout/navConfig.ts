@@ -135,6 +135,20 @@ export const navConfig: NavModule[] = [
           { to: "/reports/cash", label: "Tiền mặt", },
         ],
       },
+      {
+        id: "storage-reports",
+        label: "Báo cáo kho",
+        children: [
+          { to: "/reports/storage/stock-summary", label: "Tổng hợp nhập xuất tồn kho", },
+          { to: "/reports/storage/stock-document-details", label: "Bảng kê chi tiết phiếu nhập xuất kho", },
+          { to: "/reports/storage/stock-quantity-details", label: "Chi tiết số lượng nhập xuất tồn kho", },
+          { to: "/reports/storage/stock-summary-by-branch", label: "Tổng hợp nhập xuất tồn kho theo cửa hàng", },
+          { to: "/reports/storage/stock-by-branch", label: "Số lượng tồn kho theo cửa hàng", },
+          { to: "/reports/storage/transfer-summary", label: "Tổng hợp nhập xuất điều chuyển", },
+          { to: "/reports/storage/transfer-by-branch", label: "Tổng hợp hàng hóa điều chuyển theo cửa hàng", },
+          { to: "/reports/storage/temporary-issues", label: "Hàng hoá xuất kho tạm", },
+        ],
+      },
     ],
   },
   {
