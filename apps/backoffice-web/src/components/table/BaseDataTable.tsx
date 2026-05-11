@@ -359,7 +359,7 @@ export function BaseDataTable<T>({
                       onPointerDown={(e) => beginGroupResize(groupKeys, e)}
                       className="group/resizer absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize select-none touch-none"
                     >
-                      <div className="pointer-events-none absolute right-0 top-0 h-[3000px] w-px bg-primary opacity-0 transition-opacity group-hover/resizer:opacity-100" />
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-primary opacity-0 transition-opacity group-hover/resizer:opacity-100" />
                     </div>
                   </th>
                 );
@@ -644,7 +644,7 @@ function SortableHeader<T>({
           onPointerDown={onResizeStart}
           className="group/resizer absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize select-none touch-none"
         >
-          <div className="pointer-events-none absolute right-0 top-0 h-[3000px] w-px bg-primary opacity-0 transition-opacity group-hover/resizer:opacity-100" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-primary opacity-0 transition-opacity group-hover/resizer:opacity-100" />
         </div>
       ) : null}
     </th>
