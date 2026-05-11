@@ -12,6 +12,7 @@ import { SessionPage } from "./pages/SessionPage";
 import { ReturnsPage } from "./pages/ReturnsPage";
 import { ExchangePage } from "./pages/ExchangePage";
 import { PosLoginPage } from "./pages/PosLoginPage";
+import { AppPosLayout } from "./components/layout/AppPosLayout/AppPosLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,13 +33,14 @@ export function App() {
           <Route element={<RequirePosAuth />}>
             <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
             <Route element={<RequirePosBranch />}>
-              <Route path="/" element={<CheckoutPageV2 />} />
-              <Route
-                path="/fast-stock-transfer"
-                element={<FastStockTransferPage />}
-              />
-              <Route path="/return-goods" element={<ReturnGoodsPage />} />
-              <Route element={<PosShellLayout />}>
+            
+              <Route element={<AppPosLayout />}>
+                <Route path="/" element={<CheckoutPageV2 />} />
+                <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
+                <Route path="/return-goods" element={<ReturnGoodsPage />} />
+              </Route>
+
+              <Route  element={<PosShellLayout />}>
                 <Route path="/session" element={<SessionPage />} />
                 <Route path="/returns" element={<ReturnsPage />} />
                 <Route path="/exchange" element={<ExchangePage />} />

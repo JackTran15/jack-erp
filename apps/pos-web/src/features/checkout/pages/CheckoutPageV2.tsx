@@ -22,7 +22,6 @@ import { ProductCatalogGrid } from "../components/catalog/ProductCatalogGrid";
 import { ProductCatalogHeader } from "../components/catalog/ProductCatalogHeader";
 import { AlertBar } from "../components/common/AlertBar";
 import { CancelInvoiceConfirmDialog } from "../components/CancelInvoiceConfirmDialog";
-import { DraftInvoicesDialog } from "../components/draftInvoices/DraftInvoicesDialog";
 import { CheckoutExchangeTabs } from "../components/exchange/CheckoutExchangeTabs";
 import { InvoiceLineItemTable } from "../components/invoice/InvoiceLineItemTable";
 import {
@@ -33,14 +32,12 @@ import { PaymentSummaryPanel } from "../components/payment/PaymentSummaryPanel";
 import type { PromotionItem } from "../components/payment/promotion/types";
 import type { InvoicePayload } from "../components/printing/types";
 import { POSToolbar } from "../components/toolbar/POSToolbar";
-import { InvoiceTabBar } from "../components/topbar/InvoiceTabBar";
 import {
   CheckoutVariantEnum,
   type CatalogProduct,
   type DraftInvoice,
-  type InvoiceTabItem,
 } from "../components/types";
-import { PAYMENT_METHODS, PaymentMethodEnum } from "../constants/paymentMethod";
+import { PAYMENT_METHODS } from "../constants/paymentMethod";
 import { useCheckoutSessionCart } from "../hooks/useCheckoutSessionCart";
 import { useCheckoutCatalog } from "../hooks/useCheckoutCatalog";
 import { useCheckoutCustomer } from "../hooks/useCheckoutCustomer";
@@ -59,24 +56,14 @@ import {
 
 export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
-  const branchName = usePosBranchStore((s) => s.branchName)!;
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
-  const setActiveSessionId = usePosCheckoutSessionStore(
-    (s) => s.setActiveSessionId,
-  );
-  const addSession = usePosCheckoutSessionStore((s) => s.addSession);
   const removeSession = usePosCheckoutSessionStore((s) => s.removeSession);
-  const draftInvoices = usePosCheckoutSessionStore((s) => s.draftInvoices);
   const addDraft = usePosCheckoutSessionStore((s) => s.addDraft);
-  const removeDraft = usePosCheckoutSessionStore((s) => s.removeDraft);
   const nextDraftSeq = usePosCheckoutSessionStore((s) => s.nextDraftSeq);
-  const openDraftInNewSession = usePosCheckoutSessionStore(
-    (s) => s.openDraftInNewSession,
-  );
   const resetActiveSessionAfterCheckout = usePosCheckoutSessionStore(
     (s) => s.resetActiveSessionAfterCheckout,
   );
@@ -86,26 +73,10 @@ export function CheckoutPageV2() {
   const setActiveExchangePane = usePosCheckoutSessionStore(
     (s) => s.setActiveExchangePane,
   );
-  const cashierDisplayName = usePosCheckoutSessionStore(
-    (s) => s.cashierDisplayName,
-  );
 
   useEffect(() => {
     ensureHydratedShape();
   }, [ensureHydratedShape]);
-
-  const tabs = useMemo<InvoiceTabItem[]>(() => {
-    const fromSessions = sessions.map((s) => ({
-      id: s.id,
-      label: s.label,
-    }));
-    return [
-      ...fromSessions,
-      { id: "tab-draft", label: "HĐ lưu tạm", isDraft: true },
-    ];
-  }, [sessions]);
-
-  const [draftsDialogOpen, setDraftsDialogOpen] = useState(false);
 
   const {
     catalog,
@@ -212,14 +183,6 @@ export function CheckoutPageV2() {
   const [appliedPromotion, setAppliedPromotion] =
     useState<PromotionItem | null>(null);
   const promotions = useMemo<PromotionItem[]>(() => [], []);
-
-  const tabsWithBadges = useMemo<InvoiceTabItem[]>(
-    () =>
-      tabs.map((t) =>
-        t.isDraft ? { ...t, badgeCount: draftInvoices.length } : t,
-      ),
-    [tabs, draftInvoices.length],
-  );
 
   const datetime = useMemo(() => formatViDateTime(new Date()), []);
 
@@ -441,40 +404,6 @@ export function CheckoutPageV2() {
     setDebt,
   ]);
 
-  const handleRestoreDraft = useCallback(
-    (draft: DraftInvoice) => {
-      const restored: PaymentLine[] =
-        draft.payments && draft.payments.length > 0
-          ? draft.payments.map((p) => createPaymentLine(p.method, p.amount))
-          : [createPaymentLine(PaymentMethodEnum.CASH)];
-      pendingDraftPaymentLinesRef.current = restored;
-      openDraftInNewSession(draft);
-      announce(`Đã tạo hóa đơn mới từ lưu tạm ${draft.invoiceNumber}.`);
-    },
-    [announce, openDraftInNewSession],
-  );
-
-  const handleDeleteDraft = useCallback(
-    (id: string) => {
-      removeDraft(id);
-      announce("Đã xóa hóa đơn lưu tạm.");
-    },
-    [announce, removeDraft],
-  );
-
-  const handleAddTab = useCallback(() => {
-    addSession();
-  }, [addSession]);
-
-  const handleCloseTab = useCallback(
-    (id: string) => {
-      if (id === "tab-draft") return;
-      if (sessions.length <= 1) return;
-      removeSession(id);
-    },
-    [removeSession, sessions.length],
-  );
-
   const [cancelInvoiceDialogOpen, setCancelInvoiceDialogOpen] = useState(false);
 
   const handleRequestCancelInvoice = useCallback(() => {
@@ -517,8 +446,6 @@ export function CheckoutPageV2() {
 
   /** Customer + payment UI are React-local; reset when switching invoice tab so they match the active session. */
   const lastActiveSessionIdRef = useRef<string | null>(null);
-  /** After `openDraftInNewSession`, tab-switch effect resets payment; re-apply draft payments once. */
-  const pendingDraftPaymentLinesRef = useRef<PaymentLine[] | null>(null);
   useEffect(() => {
     if (lastActiveSessionIdRef.current === null) {
       lastActiveSessionIdRef.current = activeSessionId;
@@ -537,9 +464,18 @@ export function CheckoutPageV2() {
       setKeepChange,
       setDebt,
     });
-    const pendingPayments = pendingDraftPaymentLinesRef.current;
-    pendingDraftPaymentLinesRef.current = null;
-    if (pendingPayments) setPaymentLines(pendingPayments);
+    const pendingDraftPayments =
+      usePosCheckoutSessionStore.getState().pendingDraftPaymentLines;
+    usePosCheckoutSessionStore
+      .getState()
+      .setPendingDraftPaymentLines(null);
+    if (pendingDraftPayments && pendingDraftPayments.length > 0) {
+      setPaymentLines(
+        pendingDraftPayments.map((p) =>
+          createPaymentLine(p.method, p.amount),
+        ),
+      );
+    }
     setCreateCustomerOpen(false);
     setEditCustomerOpen(false);
     setCreateDefaultQuery("");
@@ -666,23 +602,6 @@ export function CheckoutPageV2() {
           setEditCustomerOpen(false);
           pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
         }}
-      />
-
-      <InvoiceTabBar
-        tabs={tabsWithBadges}
-        activeTabId={activeSessionId}
-        onSelectTab={(id) => {
-          const tab = tabs.find((t) => t.id === id);
-          if (tab?.isDraft) {
-            setDraftsDialogOpen(true);
-            return;
-          }
-          setActiveSessionId(id);
-        }}
-        onCloseTab={handleCloseTab}
-        onAddTab={handleAddTab}
-        location={branchName}
-        userName={cashierDisplayName ?? "Phan Thanh Hà"}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -875,14 +794,6 @@ export function CheckoutPageV2() {
           invoice={buildInvoicePayload}
         />
       </div>
-
-      <DraftInvoicesDialog
-        open={draftsDialogOpen}
-        onClose={() => setDraftsDialogOpen(false)}
-        drafts={draftInvoices}
-        onConfirm={handleRestoreDraft}
-        onDelete={handleDeleteDraft}
-      />
 
       <CancelInvoiceConfirmDialog
         open={cancelInvoiceDialogOpen}

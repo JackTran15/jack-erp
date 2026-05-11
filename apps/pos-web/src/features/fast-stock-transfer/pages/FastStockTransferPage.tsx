@@ -1,4 +1,3 @@
-import { AppHeader } from "@erp/pos/components/layout/appHeader/AppHeader";
 import { usePosBranchStore } from "@erp/pos/stores/usePosBranchStore";
 import { FastStockTransferConfirmDialog } from "../components/FastStockTransferConfirmDialog";
 import { FastStockTransferTable } from "../components/FastStockTransferTable";
@@ -33,12 +32,6 @@ export function FastStockTransferPage() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <AppHeader
-        title="Chuyển kho tạm"
-        location={branchName}
-        userName="Phan Thanh Hà"
-      />
-
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-3 py-3">
         <FastStockTransferToolbar
           mode={mode}
