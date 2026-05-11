@@ -8,3 +8,4 @@ coverage
 *.tsbuildinfo
 test_logs/
 **copy**
+**/*/scripts/pos-e2e-py/*
