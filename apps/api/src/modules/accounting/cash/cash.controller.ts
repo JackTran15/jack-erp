@@ -18,6 +18,7 @@ import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { CashService, CashListQuery, CashMovementListQuery } from './cash.service';
 import { CreateCashAccountDto, RecordCashMovementDto } from './dto';
 import { CashMovementType } from './cash-movement.entity';
+import { CashAccountType } from './cash-account.entity';
 
 @Controller('cash')
 @UseInterceptors(AuditInterceptor)
@@ -41,12 +42,14 @@ export class CashController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('branchId') branchId?: string,
+    @Query('type') type?: CashAccountType,
     @Actor() actor?: ActorContext,
   ) {
     const query: CashListQuery = {
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
       branchId,
+      type,
     };
     return this.cashService.listAccounts(query, actor!);
   }

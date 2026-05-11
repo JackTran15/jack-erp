@@ -136,4 +136,14 @@ export class DiscountCodeService {
       throw new ConflictException(`Discount code ${id} has reached its usage limit`);
     }
   }
+
+  async decrementUsedCount(id: string, manager?: EntityManager): Promise<void> {
+    const qb = manager
+      ? manager.createQueryBuilder().update(DiscountCodeEntity)
+      : this.repo.createQueryBuilder().update(DiscountCodeEntity);
+    await qb
+      .set({ usedCount: () => 'GREATEST(used_count - 1, 0)' })
+      .where('id = :id', { id })
+      .execute();
+  }
 }

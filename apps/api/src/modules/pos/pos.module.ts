@@ -21,6 +21,8 @@ import {
   InvoiceDebtEntity,
   DebtPaymentEntity,
 } from './entities';
+import { CashAccountEntity } from '../accounting/cash/cash-account.entity';
+import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
 import {
   PosSessionService,
   CheckoutService,
@@ -34,6 +36,7 @@ import { CancelInvoiceService } from './services/cancel-invoice.service';
 import { InvoiceDebtService } from './services/invoice-debt.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
+import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
 
 @Module({
   imports: [
@@ -50,6 +53,8 @@ import { InvoiceController } from './controllers/invoice.controller';
       InvoicePaymentEntity,
       InvoiceDebtEntity,
       DebtPaymentEntity,
+      CashAccountEntity,
+      CashMovementEntity,
     ]),
     DocumentNumberingModule,
     StockLedgerModule,
@@ -70,6 +75,7 @@ import { InvoiceController } from './controllers/invoice.controller';
     CheckoutInvoiceService,
     CancelInvoiceService,
     InvoiceDebtService,
+    InvoiceCancelledPublisher,
   ],
   exports: [
     PosSessionService,

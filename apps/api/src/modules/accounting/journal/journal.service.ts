@@ -13,6 +13,7 @@ import {
   DocumentType,
   DomainEventType,
 } from '@erp/shared-interfaces';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -97,7 +98,7 @@ export class JournalService {
       return savedEntry;
     });
 
-    await this.eventPublisher.publish('erp.journal.posted', {
+    await this.eventPublisher.publish(ERP_TOPICS.JOURNAL_POSTED, {
       eventId: uuid(),
       eventType: DomainEventType.JOURNAL_POSTED,
       timestamp: now.toISOString(),
@@ -197,7 +198,7 @@ export class JournalService {
       return savedReversal;
     });
 
-    await this.eventPublisher.publish('erp.journal.reversed', {
+    await this.eventPublisher.publish(ERP_TOPICS.JOURNAL_REVERSED, {
       eventId: uuid(),
       eventType: DomainEventType.JOURNAL_REVERSED,
       timestamp: now.toISOString(),

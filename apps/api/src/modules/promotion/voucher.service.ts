@@ -130,4 +130,14 @@ export class VoucherService {
       throw new ConflictException(`Voucher ${id} is already used or inactive`);
     }
   }
+
+  async unmarkUsed(id: string, invoiceId: string, manager?: EntityManager): Promise<void> {
+    const qb = manager
+      ? manager.createQueryBuilder().update(VoucherEntity)
+      : this.repo.createQueryBuilder().update(VoucherEntity);
+    await qb
+      .set({ isUsed: false, redeemedInvoiceId: () => 'NULL' })
+      .where('id = :id AND redeemed_invoice_id = :invoiceId', { id, invoiceId })
+      .execute();
+  }
 }

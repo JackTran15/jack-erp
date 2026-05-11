@@ -342,6 +342,6 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
     update: 'customer.write',
     delete: 'customer.write',
   },
-  scopingPolicy: ScopingPolicy.BRANCH,
+  scopingPolicy: ScopingPolicy.ORGANIZATION,
   deletionPolicy: DeletionPolicy.SOFT,
 };

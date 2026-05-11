@@ -2,33 +2,36 @@ import {
   Injectable,
   Logger,
   BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { In, Repository, DataSource } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   DocumentType,
-  JournalSource,
-  StockMovementType,
   DomainEventType,
+  SessionStatus,
   WsEventType,
 } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { StockLedgerService } from '../../inventory/ledger/stock-ledger.service';
-import { JournalService } from '../../accounting/journal/journal.service';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
-import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
+import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
+import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
+import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import {
+  InvoiceEntity,
+  InvoicePaymentMethod,
+  InvoiceStatus,
+} from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
-import { InvoiceDebtEntity } from '../entities/invoice-debt.entity';
+import { PosSessionEntity } from '../entities/pos-session.entity';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
-import { MembershipCardService } from '../../customer/services/membership-card.service';
 
 @Injectable()
 export class CheckoutInvoiceService {
@@ -39,15 +42,18 @@ export class CheckoutInvoiceService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceItemEntity)
     private readonly itemRepo: Repository<InvoiceItemEntity>,
+    @InjectRepository(PosSessionEntity)
+    private readonly sessionRepo: Repository<PosSessionEntity>,
     private readonly dataSource: DataSource,
     private readonly invoiceDebtService: InvoiceDebtService,
     private readonly documentNumberingService: DocumentNumberingService,
-    private readonly stockLedgerService: StockLedgerService,
-    private readonly journalService: JournalService,
     private readonly eventPublisher: EventPublisher,
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly promotionApplyService: PromotionApplyService,
-    private readonly membershipCardService: MembershipCardService,
+    private readonly stockDeductionPublisher: StockDeductionPublisher,
+    private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
+    private readonly journalSalePublisher: JournalSalePublisher,
+    private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
   ) {}
 
   async checkout(
@@ -55,7 +61,6 @@ export class CheckoutInvoiceService {
     dto: CheckoutInvoiceDto,
     actor: ActorContext,
   ): Promise<InvoiceEntity> {
-    // ── 1. Load & validate invoice ──────────────────────────────────────────
     const invoice = await this.invoiceRepo.findOne({
       where: { id, organizationId: actor.organizationId },
     });
@@ -70,7 +75,6 @@ export class CheckoutInvoiceService {
       );
     }
 
-    // ── 2. Load items ────────────────────────────────────────────────────────
     const items = await this.itemRepo.find({
       where: { invoiceId: id },
       order: { sortOrder: 'ASC' },
@@ -80,16 +84,20 @@ export class CheckoutInvoiceService {
       throw new BadRequestException(`Invoice ${id} has no items`);
     }
 
-    // ── 3. Filter items that have a location (for stock movement recording) ──
-    const itemsWithLocation = items.filter((i) => i.locationId);
+    const itemsMissingLocation = items.filter((i) => !i.locationId);
+    if (itemsMissingLocation.length > 0) {
+      throw new BadRequestException(
+        `Invoice ${id} has items without an assigned location: ${itemsMissingLocation
+          .map((i) => i.itemId)
+          .join(', ')}. Configure product → location mapping before checkout.`,
+      );
+    }
 
-    // ── 4. Recalculate totals ─────────────────────────────────────────────────
     const subtotal = items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
     const discountAmount = Number(invoice.discountAmount ?? 0);
     const depositAmount = Number(invoice.depositAmount ?? 0);
     const amountDue = subtotal - discountAmount - depositAmount;
 
-    // ── 5. Payment math ───────────────────────────────────────────────────────
     const round = (v: number) => Math.round(v * 100) / 100;
     const totalPaid = round(dto.payments.reduce((sum, p) => sum + p.amount, 0));
     const remainder = round(amountDue - totalPaid);
@@ -113,21 +121,6 @@ export class CheckoutInvoiceService {
       }
     }
 
-    // ── 5b. Stock availability check ─────────────────────────────────────────
-    for (const item of itemsWithLocation) {
-      const balance = await this.stockLedgerService.getBalance(
-        item.itemId,
-        item.locationId!,
-        actor.organizationId,
-      );
-      if ((balance?.quantity ?? 0) < Number(item.quantity)) {
-        throw new BadRequestException(
-          `Insufficient stock for item ${item.itemId} at location ${item.locationId}. Available: ${balance?.quantity ?? 0}, required: ${item.quantity}`,
-        );
-      }
-    }
-
-    // ── 6. Determine new status ───────────────────────────────────────────────
     const newStatus =
       remainder <= 0
         ? InvoiceStatus.PAID
@@ -135,8 +128,6 @@ export class CheckoutInvoiceService {
         ? InvoiceStatus.PARTIAL_DEBT
         : InvoiceStatus.DEBT;
 
-    // ── 7. Generate real invoice code ─────────────────────────────────────────
-    const draftCode = invoice.code;
     const realCode = await this.documentNumberingService.generate(
       DocumentType.INVOICE,
       invoice.branchId,
@@ -145,149 +136,117 @@ export class CheckoutInvoiceService {
 
     const now = new Date();
 
-    // ── 8. Commit invoice + payments + debt in one DB transaction ─────────────
-    const updatedInvoice = await this.dataSource.transaction(async (manager) => {
-      invoice.isDraft = false;
-      invoice.status = newStatus;
-      invoice.issuedAt = now;
-      invoice.code = realCode;
-      invoice.subtotal = subtotal;
-      invoice.discountAmount = discountAmount;
-      invoice.depositAmount = depositAmount;
-      invoice.amountDue = amountDue;
-      invoice.totalPaid = totalPaid;
-
-      const saved = await manager.save(invoice);
-
-      if (dto.payments.length > 0) {
-        const paymentEntities = dto.payments.map((p) =>
-          manager.create(InvoicePaymentEntity, {
-            organizationId: actor.organizationId,
-            branchId: actor.branchId,
-            createdBy: actor.userId,
-            invoiceId: saved.id,
-            paymentMethod: p.paymentMethod,
-            amount: p.amount,
-            accountId: p.accountId,
-            reference: p.reference,
-          }),
-        );
-        await manager.save(paymentEntities);
-      }
-
-      if (remainder > 0) {
-        await this.invoiceDebtService.createFromInvoice(saved, remainder, manager);
-      }
-
-      await this.promotionApplyService.commitPromotions(saved, manager);
-
-      return saved;
-    });
-
-    // ── 9. Stock movements — compensate on failure ────────────────────────────
-    try {
-      const movements = itemsWithLocation.map((item) => ({
-        itemId: item.itemId,
-        locationId: item.locationId!,
-        branchId: invoice.branchId!,
-        organizationId: actor.organizationId,
-        movementType: StockMovementType.SALE_ISSUE,
-        quantity: -Number(item.quantity),
-        referenceType: 'INVOICE',
-        referenceId: updatedInvoice.id,
-        actorContext: actor,
-      }));
-
-      if (movements.length > 0) {
-        await this.stockLedgerService.recordBatchMovements(movements);
-      }
-    } catch (stockErr) {
-      this.logger.error(
-        `Stock deduction failed for invoice ${id} — reverting to draft. Error: ${stockErr}`,
-      );
-
+    const { invoice: updatedInvoice, payments: savedPayments } =
       await this.dataSource.transaction(async (manager) => {
-        await manager.update(InvoiceEntity, { id }, {
-          isDraft: true,
-          status: InvoiceStatus.DRAFT,
-          code: draftCode,
-          issuedAt: null as any,
-          totalPaid: 0,
-        });
-        await manager.delete(InvoicePaymentEntity, { invoiceId: id });
-        await manager.delete(InvoiceDebtEntity, { invoiceId: id });
+        invoice.isDraft = false;
+        invoice.status = newStatus;
+        invoice.issuedAt = now;
+        invoice.code = realCode;
+        invoice.subtotal = subtotal;
+        invoice.discountAmount = discountAmount;
+        invoice.depositAmount = depositAmount;
+        invoice.amountDue = amountDue;
+        invoice.totalPaid = totalPaid;
+
+        const saved = await manager.save(invoice);
+
+        let savedPayments: InvoicePaymentEntity[] = [];
+        if (dto.payments.length > 0) {
+          const paymentEntities = dto.payments.map((p) =>
+            manager.create(InvoicePaymentEntity, {
+              organizationId: actor.organizationId,
+              branchId: actor.branchId,
+              createdBy: actor.userId,
+              invoiceId: saved.id,
+              paymentMethod: p.paymentMethod,
+              amount: p.amount,
+              accountId: p.accountId,
+              reference: p.reference,
+            }),
+          );
+          savedPayments = await manager.save(paymentEntities);
+        }
+
+        if (remainder > 0) {
+          await this.invoiceDebtService.createFromInvoice(saved, remainder, manager);
+        }
+
+        await this.promotionApplyService.commitPromotions(saved, manager);
+
+        return { invoice: saved, payments: savedPayments };
       });
 
-      throw new InternalServerErrorException(
-        'Stock deduction failed. Invoice has been reverted to draft.',
-      );
-    }
+    // Publish 3 downstream events — consumers process async with DLQ + dead_letter_events
+    await this.stockDeductionPublisher.publish(
+      updatedInvoice.id,
+      items.map((item) => ({
+        itemId: item.itemId,
+        locationId: item.locationId!,
+        quantity: Number(item.quantity),
+      })),
+      updatedInvoice.branchId!,
+      actor,
+    );
 
-    // ── 9.5. Award loyalty points (non-critical) ─────────────────────────────
-    if (updatedInvoice.customerId) {
-      try {
-        await this.membershipCardService.awardPointsForInvoice(
+    await this.loyaltyPointsPublisher.publish(
+      {
+        invoiceId: updatedInvoice.id,
+        customerId: updatedInvoice.customerId,
+        subtotal,
+        issuedAt: updatedInvoice.issuedAt,
+        branchId: updatedInvoice.branchId,
+      },
+      actor,
+    );
+
+    await this.journalSalePublisher.publish(
+      {
+        invoiceId: updatedInvoice.id,
+        code: realCode,
+        branchId: updatedInvoice.branchId,
+        amountDue,
+        remainder,
+        revenueAccountId: dto.revenueAccountId,
+        receivableAccountId: dto.receivableAccountId,
+        payments: dto.payments.map((p) => ({
+          accountId: p.accountId,
+          amount: p.amount,
+        })),
+      },
+      actor,
+    );
+
+    // Publish cash movement events for CASH payments — consumer creates cash_movements
+    // and updates cash_accounts.balance on the session's drawer.
+    const cashPayments = savedPayments.filter(
+      (p) => p.paymentMethod === InvoicePaymentMethod.CASH,
+    );
+    if (cashPayments.length > 0) {
+      const activeSession = await this.sessionRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          openedBy: actor.userId,
+          status: In([SessionStatus.OPEN, SessionStatus.ACTIVE_SALES]),
+        },
+      });
+
+      for (const cp of cashPayments) {
+        await this.cashFromPaymentPublisher.publish(
           {
-            id: updatedInvoice.id,
-            customerId: updatedInvoice.customerId,
-            subtotal,
+            invoiceId: updatedInvoice.id,
+            invoicePaymentId: cp.id,
+            invoiceCode: realCode,
+            sessionId: activeSession?.id,
+            cashAccountId: activeSession?.cashAccountId ?? cp.accountId,
+            contraAccountId: dto.revenueAccountId,
+            amount: Number(cp.amount),
+            branchId: updatedInvoice.branchId,
           },
           actor,
         );
-      } catch (pointsErr) {
-        this.logger.warn(
-          `Points award failed for invoice ${id}: ${pointsErr}`,
-        );
       }
     }
 
-    // ── 10. Accounting journal (non-critical) ──────────────────────────────────
-    try {
-      const journalActor = { ...actor, branchId: updatedInvoice.branchId };
-      let lineOrder = 1;
-      const journalLines: { accountId: string; debitAmount: number; creditAmount: number; lineOrder: number }[] = [];
-
-      for (const p of dto.payments) {
-        journalLines.push({
-          accountId: p.accountId,
-          debitAmount: p.amount,
-          creditAmount: 0,
-          lineOrder: lineOrder++,
-        });
-      }
-
-      if (remainder > 0) {
-        journalLines.push({
-          accountId: dto.receivableAccountId!,
-          debitAmount: remainder,
-          creditAmount: 0,
-          lineOrder: lineOrder++,
-        });
-      }
-
-      journalLines.push({
-        accountId: dto.revenueAccountId,
-        debitAmount: 0,
-        creditAmount: amountDue,
-        lineOrder: lineOrder,
-      });
-
-      await this.journalService.post(
-        {
-          source: JournalSource.SALE,
-          sourceReferenceId: updatedInvoice.id,
-          description: `POS Invoice ${realCode}`,
-          lines: journalLines,
-        },
-        journalActor,
-      );
-    } catch (journalErr) {
-      this.logger.error(
-        `CRITICAL: Journal posting failed for invoice ${id} (code=${realCode}). Manual reconciliation required. Error: ${journalErr}`,
-      );
-    }
-
-    // ── 11. Kafka event ────────────────────────────────────────────────────────
     await this.eventPublisher.publish(
       ERP_TOPICS.SALE_POSTED,
       {
@@ -307,7 +266,6 @@ export class CheckoutInvoiceService {
       updatedInvoice.id,
     );
 
-    // ── 12. WebSocket notification ─────────────────────────────────────────────
     this.wsEmitter.emitToBranch(invoice.branchId!, {
       eventId: uuid(),
       eventType: WsEventType.POS_CHECKOUT_ACKNOWLEDGED,

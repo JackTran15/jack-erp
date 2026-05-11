@@ -135,11 +135,18 @@ export interface Expense {
   createdBy: string;
 }
 
+export enum CashAccountType {
+  REGISTER = 'REGISTER',
+  SAFE = 'SAFE',
+  PETTY_CASH = 'PETTY_CASH',
+}
+
 export interface CashAccount {
   id: string;
   organizationId: string;
   branchId: string;
   name: string;
+  type: CashAccountType;
   balance: number;
   createdAt: string;
   updatedAt: string;

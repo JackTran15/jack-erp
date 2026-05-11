@@ -11,6 +11,9 @@ import {
   INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,
 } from './stock-balance-crud.service';
 import { ProductModule } from '../product/product.module';
+import { StockDeductionPublisher } from '../publishers/stock-deduction.publisher';
+import { StockDeductionConsumer } from '../consumers/stock-deduction.consumer';
+import { StockReturnConsumer } from '../consumers/stock-return.consumer';
 
 @Module({
   imports: [
@@ -25,8 +28,11 @@ import { ProductModule } from '../product/product.module';
       provide: INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,
       useExisting: InventoryStockBalanceCrudService,
     },
+    StockDeductionPublisher,
+    StockDeductionConsumer,
+    StockReturnConsumer,
   ],
-  exports: [StockLedgerService],
+  exports: [StockLedgerService, StockDeductionPublisher],
 })
 export class StockLedgerModule implements OnModuleInit {
   constructor(private readonly entityRegistry: EntityRegistryService) {}

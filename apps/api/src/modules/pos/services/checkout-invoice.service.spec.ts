@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CheckoutInvoiceService } from './checkout-invoice.service';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
@@ -8,11 +8,14 @@ import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { StockLedgerService } from '../../inventory/ledger/stock-ledger.service';
-import { JournalService } from '../../accounting/journal/journal.service';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
+import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
+import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
+import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { PosSessionEntity } from '../entities/pos-session.entity';
 
 const actor = {
   userId: 'user-1',
@@ -79,24 +82,31 @@ const invoiceItemStub = (overrides: Partial<InvoiceItemEntity> = {}): InvoiceIte
     ...overrides,
   }) as InvoiceItemEntity;
 
-describe('CheckoutInvoiceService', () => {
+describe('CheckoutInvoiceService (event-driven)', () => {
   let service: CheckoutInvoiceService;
   let invoiceRepo: Record<string, jest.Mock>;
   let itemRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let invoiceDebtService: { createFromInvoice: jest.Mock };
   let documentNumberingService: { generate: jest.Mock };
-  let stockLedgerService: { getBalance: jest.Mock; recordBatchMovements: jest.Mock };
-  let journalService: { post: jest.Mock };
   let eventPublisher: { publish: jest.Mock };
   let wsEmitter: { emitToBranch: jest.Mock };
   let promotionApplyService: { commitPromotions: jest.Mock };
+  let stockDeductionPublisher: { publish: jest.Mock };
+  let loyaltyPointsPublisher: { publish: jest.Mock };
+  let journalSalePublisher: { publish: jest.Mock };
+  let cashFromPaymentPublisher: { publish: jest.Mock };
+  let sessionRepo: { findOne: jest.Mock };
   let mockManager: Record<string, jest.Mock>;
 
   beforeEach(async () => {
+    let createCounter = 0;
     mockManager = {
       save:   jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
-      create: jest.fn().mockImplementation((_entity, data) => ({ id: 'generated-id', ...data })),
+      create: jest.fn().mockImplementation((_entity, data) => ({
+        id: `generated-id-${++createCounter}`,
+        ...data,
+      })),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
@@ -107,28 +117,31 @@ describe('CheckoutInvoiceService', () => {
 
     invoiceDebtService       = { createFromInvoice: jest.fn().mockResolvedValue({ id: 'debt-1' }) };
     documentNumberingService = { generate: jest.fn().mockResolvedValue('INV-2605-00001') };
-    stockLedgerService       = {
-      getBalance: jest.fn().mockResolvedValue({ quantity: 100 }),
-      recordBatchMovements: jest.fn().mockResolvedValue([]),
-    };
-    journalService       = { post: jest.fn().mockResolvedValue({ id: 'journal-1' }) };
-    eventPublisher       = { publish: jest.fn().mockResolvedValue(undefined) };
-    wsEmitter            = { emitToBranch: jest.fn() };
-    promotionApplyService = { commitPromotions: jest.fn().mockResolvedValue(undefined) };
+    eventPublisher           = { publish: jest.fn().mockResolvedValue(undefined) };
+    wsEmitter                = { emitToBranch: jest.fn() };
+    promotionApplyService    = { commitPromotions: jest.fn().mockResolvedValue(undefined) };
+    stockDeductionPublisher  = { publish: jest.fn().mockResolvedValue(undefined) };
+    loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
+    journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
+    cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CheckoutInvoiceService,
         { provide: getRepositoryToken(InvoiceEntity),     useValue: invoiceRepo },
         { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },
+        { provide: getRepositoryToken(PosSessionEntity),  useValue: sessionRepo },
         { provide: DataSource,                            useValue: dataSource },
         { provide: InvoiceDebtService,                    useValue: invoiceDebtService },
         { provide: DocumentNumberingService,              useValue: documentNumberingService },
-        { provide: StockLedgerService,                    useValue: stockLedgerService },
-        { provide: JournalService,                        useValue: journalService },
         { provide: EventPublisher,                        useValue: eventPublisher },
         { provide: WebSocketEmitterService,               useValue: wsEmitter },
         { provide: PromotionApplyService,                 useValue: promotionApplyService },
+        { provide: StockDeductionPublisher,               useValue: stockDeductionPublisher },
+        { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
+        { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
+        { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
       ],
     }).compile();
 
@@ -152,11 +165,6 @@ describe('CheckoutInvoiceService', () => {
     it('throws when invoice has no items', async () => {
       itemRepo.find.mockResolvedValue([]);
       await expect(service.checkout('inv-1', cashPaymentDto(), actor)).rejects.toThrow(/no items/);
-    });
-
-    it('throws when stock is insufficient', async () => {
-      stockLedgerService.getBalance.mockResolvedValue({ quantity: 1 });
-      await expect(service.checkout('inv-1', cashPaymentDto(), actor)).rejects.toThrow(/Insufficient stock/);
     });
 
     it('throws when totalPaid > amountDue (overpayment)', async () => {
@@ -206,38 +214,6 @@ describe('CheckoutInvoiceService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Split payment (CASH + BANK_TRANSFER)
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('split payment CASH + BANK_TRANSFER', () => {
-    const splitDto = (): CheckoutInvoiceDto => ({
-      payments: [
-        { paymentMethod: 'cash' as any,         amount: 100, accountId: CASH_ACCOUNT },
-        { paymentMethod: 'bank_transfer' as any, amount: 100, accountId: BANK_ACCOUNT },
-      ],
-      revenueAccountId: REVENUE_ACCOUNT,
-    });
-
-    it('sets status=PAID when totalPaid = amountDue', async () => {
-      const result = await service.checkout('inv-1', splitDto(), actor);
-      expect(result.status).toBe(InvoiceStatus.PAID);
-    });
-
-    it('journal has 2 debit lines + 1 credit line', async () => {
-      await service.checkout('inv-1', splitDto(), actor);
-      expect(journalService.post).toHaveBeenCalledWith(
-        expect.objectContaining({
-          lines: expect.arrayContaining([
-            expect.objectContaining({ accountId: CASH_ACCOUNT,    debitAmount: 100 }),
-            expect.objectContaining({ accountId: BANK_ACCOUNT,    debitAmount: 100 }),
-            expect.objectContaining({ accountId: REVENUE_ACCOUNT, creditAmount: 200 }),
-          ]),
-        }),
-        expect.anything(),
-      );
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
   // Partial DEBT
   // ═══════════════════════════════════════════════════════════════════════════
   describe('partial DEBT (totalPaid < amountDue)', () => {
@@ -261,23 +237,23 @@ describe('CheckoutInvoiceService', () => {
       );
     });
 
-    it('journal has DR cash + DR receivable + CR revenue', async () => {
+    it('publishes journal event with receivableAccountId and remainder', async () => {
       await service.checkout('inv-1', partialDto(), actor);
-      expect(journalService.post).toHaveBeenCalledWith(
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
-          lines: expect.arrayContaining([
-            expect.objectContaining({ accountId: CASH_ACCOUNT,       debitAmount: 120 }),
-            expect.objectContaining({ accountId: RECEIVABLE_ACCOUNT, debitAmount: 80 }),
-            expect.objectContaining({ accountId: REVENUE_ACCOUNT,    creditAmount: 200 }),
-          ]),
+          invoiceId: 'inv-1',
+          amountDue: 200,
+          remainder: 80,
+          receivableAccountId: RECEIVABLE_ACCOUNT,
+          payments: [expect.objectContaining({ accountId: CASH_ACCOUNT, amount: 120 })],
         }),
-        expect.anything(),
+        actor,
       );
     });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Full DEBT (payments = [])
+  // Full DEBT
   // ═══════════════════════════════════════════════════════════════════════════
   describe('full DEBT (no payments)', () => {
     const debtDto = (): CheckoutInvoiceDto => ({
@@ -302,59 +278,73 @@ describe('CheckoutInvoiceService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Stock movement
+  // Split payment
   // ═══════════════════════════════════════════════════════════════════════════
-  describe('stock movement', () => {
-    it('calls recordBatchMovements with SALE_ISSUE and negative quantity', async () => {
+  describe('split payment CASH + BANK_TRANSFER', () => {
+    const splitDto = (): CheckoutInvoiceDto => ({
+      payments: [
+        { paymentMethod: 'cash' as any,          amount: 100, accountId: CASH_ACCOUNT },
+        { paymentMethod: 'bank_transfer' as any, amount: 100, accountId: BANK_ACCOUNT },
+      ],
+      revenueAccountId: REVENUE_ACCOUNT,
+    });
+
+    it('publishes journal with both payment accounts and revenue', async () => {
+      await service.checkout('inv-1', splitDto(), actor);
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payments: expect.arrayContaining([
+            expect.objectContaining({ accountId: CASH_ACCOUNT, amount: 100 }),
+            expect.objectContaining({ accountId: BANK_ACCOUNT, amount: 100 }),
+          ]),
+          revenueAccountId: REVENUE_ACCOUNT,
+        }),
+        actor,
+      );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Event publishing
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('event publishing', () => {
+    it('publishes stock deduction events for items with location', async () => {
       await service.checkout('inv-1', cashPaymentDto(), actor);
-      expect(stockLedgerService.recordBatchMovements).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            itemId: 'item-1',
-            locationId: 'loc-1',
-            quantity: -2,
-            referenceType: 'INVOICE',
-          }),
-        ]),
+      expect(stockDeductionPublisher.publish).toHaveBeenCalledWith(
+        'inv-1',
+        [{ itemId: 'item-1', locationId: 'loc-1', quantity: 2 }],
+        'branch-1',
+        actor,
       );
     });
 
-    it('skips items without locationId', async () => {
+    it('skips stock deduction publish for items without locationId', async () => {
       itemRepo.find.mockResolvedValue([invoiceItemStub({ locationId: undefined })]);
       await service.checkout('inv-1', cashPaymentDto(), actor);
-      expect(stockLedgerService.recordBatchMovements).not.toHaveBeenCalled();
-    });
-
-    it('reverts invoice to DRAFT and throws when stock movement fails', async () => {
-      stockLedgerService.recordBatchMovements.mockRejectedValue(new Error('stock error'));
-
-      await expect(service.checkout('inv-1', cashPaymentDto(), actor)).rejects.toThrow(
-        InternalServerErrorException,
-      );
-
-      expect(dataSource.transaction).toHaveBeenCalledTimes(2);
-      expect(mockManager.update).toHaveBeenCalledWith(
-        InvoiceEntity,
-        { id: 'inv-1' },
-        expect.objectContaining({ isDraft: true, status: InvoiceStatus.DRAFT }),
+      expect(stockDeductionPublisher.publish).toHaveBeenCalledWith(
+        'inv-1',
+        [],
+        'branch-1',
+        actor,
       );
     });
-  });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Journal
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('journal posting', () => {
-    it('does NOT throw when journal posting fails (non-critical)', async () => {
-      journalService.post.mockRejectedValue(new Error('journal error'));
-      await expect(service.checkout('inv-1', cashPaymentDto(), actor)).resolves.not.toThrow();
+    it('publishes loyalty points award event when customer present', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ invoiceId: 'inv-1', customerId: 'cust-1', subtotal: 200 }),
+        actor,
+      );
     });
-  });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Events & WebSocket
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('events', () => {
+    it('publishes journal sale event', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ invoiceId: 'inv-1', amountDue: 200, remainder: 0 }),
+        actor,
+      );
+    });
+
     it('publishes SALE_POSTED Kafka event', async () => {
       await service.checkout('inv-1', cashPaymentDto(), actor);
       expect(eventPublisher.publish).toHaveBeenCalledWith(
@@ -370,6 +360,77 @@ describe('CheckoutInvoiceService', () => {
         'branch-1',
         expect.objectContaining({ eventType: 'POS_CHECKOUT_ACKNOWLEDGED' }),
       );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Cash movement integration (TKT-058)
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('cash movement integration', () => {
+    const cardOnlyDto: CheckoutInvoiceDto = {
+      payments: [{ paymentMethod: 'card' as any, amount: 200, accountId: BANK_ACCOUNT }],
+      revenueAccountId: REVENUE_ACCOUNT,
+    };
+
+    it('publishes cash event for CASH payment using session cash_account', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        cashAccountId: 'register-1',
+      });
+
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+
+      expect(cashFromPaymentPublisher.publish).toHaveBeenCalledTimes(1);
+      expect(cashFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          invoiceId: 'inv-1',
+          invoiceCode: 'INV-2605-00001',
+          sessionId: 'session-1',
+          cashAccountId: 'register-1',
+          contraAccountId: REVENUE_ACCOUNT,
+          amount: 200,
+        }),
+        actor,
+      );
+    });
+
+    it('falls back to payment.accountId when no active session', async () => {
+      sessionRepo.findOne.mockResolvedValue(null);
+
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+
+      expect(cashFromPaymentPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: undefined,
+          cashAccountId: CASH_ACCOUNT,
+        }),
+        actor,
+      );
+    });
+
+    it('does NOT publish cash event for CARD-only payment', async () => {
+      await service.checkout('inv-1', cardOnlyDto, actor);
+      expect(cashFromPaymentPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes one event per CASH payment in a split payment', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        cashAccountId: 'register-1',
+      });
+
+      const splitDto: CheckoutInvoiceDto = {
+        payments: [
+          { paymentMethod: 'cash' as any, amount: 100, accountId: CASH_ACCOUNT },
+          { paymentMethod: 'card' as any, amount: 50, accountId: BANK_ACCOUNT },
+          { paymentMethod: 'cash' as any, amount: 50, accountId: CASH_ACCOUNT },
+        ],
+        revenueAccountId: REVENUE_ACCOUNT,
+      };
+
+      await service.checkout('inv-1', splitDto, actor);
+
+      expect(cashFromPaymentPublisher.publish).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -19,6 +19,9 @@ import {
   ON_DOMAIN_EVENT_KEY,
   type DomainEventMetadata,
 } from './decorators/on-event.decorator';
+import { DeadLetterService } from './services/dead-letter.service';
+import { EventIdempotencyService } from './services/event-idempotency.service';
+import { TopicInitializer } from './topics.init';
 
 interface RegisteredConsumer {
   consumer: Consumer;
@@ -40,10 +43,14 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
     private readonly publisher: EventPublisher,
     private readonly discoveryService: DiscoveryService,
     private readonly reflector: Reflector,
+    private readonly deadLetterService: DeadLetterService,
+    private readonly idempotencyService: EventIdempotencyService,
+    private readonly topicInitializer: TopicInitializer,
   ) {}
 
   async onModuleInit(): Promise<void> {
     this.discoverHandlers();
+    await this.topicInitializer.ensureTopics();
     await this.startAll();
   }
 
@@ -114,11 +121,78 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
         maxRetries: 3,
       });
 
-      await subscribeAndRun(consumer, topic, wrapWithDlq(handler));
+      const idempotentHandler = this.wrapWithIdempotency(groupId, topic, handler);
+      await subscribeAndRun(consumer, topic, wrapWithDlq(idempotentHandler));
 
       this.consumers.push({ consumer, topic });
       this.logger.log(`Consumer started: group=${groupId} topic=${topic}`);
+
+      // DLQ recorder — subscribes to <topic>.dlq and writes to dead_letter_events
+      await this.startDlqRecorder(topic, dlqTopic, groupId);
     }
+  }
+
+  private wrapWithIdempotency(
+    consumerName: string,
+    topic: string,
+    handler: EventHandler,
+  ): EventHandler {
+    return async (event, metadata) => {
+      const claimed = await this.idempotencyService.tryClaim(consumerName, event, topic);
+      if (!claimed) {
+        this.logger.log(
+          `Skipped already-processed event ${event.eventId} (consumer=${consumerName} topic=${topic})`,
+        );
+        return;
+      }
+
+      try {
+        await handler(event, metadata);
+      } catch (err) {
+        await this.idempotencyService.release(consumerName, event.eventId);
+        throw err;
+      }
+    };
+  }
+
+  private async startDlqRecorder(
+    originalTopic: string,
+    dlqTopic: string,
+    parentGroupId: string,
+  ): Promise<void> {
+    const kafka = this.publisher.getKafkaInstance();
+    const consumer = createConsumer(kafka, {
+      groupId: `${parentGroupId}.dlq-recorder`,
+    });
+    await consumer.connect();
+    await consumer.subscribe({ topic: dlqTopic, fromBeginning: false });
+
+    await consumer.run({
+      autoCommit: true,
+      eachMessage: async ({ partition, message }) => {
+        try {
+          const body = JSON.parse(message.value?.toString() ?? '{}');
+          const event = body.event ?? {};
+          await this.deadLetterService.record({
+            topic: body.originalTopic ?? originalTopic,
+            partition: body.originalPartition ?? partition,
+            offset: body.originalOffset ?? message.offset,
+            key: message.key?.toString(),
+            payload: event,
+            error: body.error,
+            organizationId: event.organizationId ?? 'unknown',
+            branchId: event.branchId,
+          });
+        } catch (err) {
+          this.logger.error(
+            `Failed to record DLQ message from ${dlqTopic}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      },
+    });
+
+    this.consumers.push({ consumer, topic: dlqTopic });
+    this.logger.log(`DLQ recorder started: topic=${dlqTopic}`);
   }
 
   async stopAll(): Promise<void> {

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SessionStatus, WsEventType } from '@erp/shared-interfaces';
 import { PosSessionService } from './pos-session.service';
 import {
@@ -11,6 +11,14 @@ import {
   SessionReconciliationEntity,
 } from '../entities';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
+import {
+  CashAccountEntity,
+  CashAccountType,
+} from '../../accounting/cash/cash-account.entity';
+import {
+  CashMovementEntity,
+  CashMovementType,
+} from '../../accounting/cash/cash-movement.entity';
 
 describe('PosSessionService', () => {
   let service: PosSessionService;
@@ -19,6 +27,8 @@ describe('PosSessionService', () => {
   let returnRepo: Record<string, jest.Mock>;
   let paymentRepo: Record<string, jest.Mock>;
   let reconciliationRepo: Record<string, jest.Mock>;
+  let cashAccountRepo: Record<string, jest.Mock>;
+  let cashMovementRepo: Record<string, jest.Mock>;
   let wsEmitter: Record<string, jest.Mock>;
 
   const actor = {
@@ -52,9 +62,30 @@ describe('PosSessionService', () => {
       findOne: jest.fn(),
     };
 
+    cashAccountRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'cash-1',
+        name: 'Quầy 1',
+        type: CashAccountType.REGISTER,
+        branchId: 'branch-1',
+        organizationId: 'org-1',
+      }),
+    };
+
+    cashMovementRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      })),
+    };
+
     wsEmitter = {
       emitToBranch: jest.fn(),
     };
+
+    sessionRepo.findOne = jest.fn().mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -64,6 +95,8 @@ describe('PosSessionService', () => {
         { provide: getRepositoryToken(ReturnEntity), useValue: returnRepo },
         { provide: getRepositoryToken(PaymentEntity), useValue: paymentRepo },
         { provide: getRepositoryToken(SessionReconciliationEntity), useValue: reconciliationRepo },
+        { provide: getRepositoryToken(CashAccountEntity), useValue: cashAccountRepo },
+        { provide: getRepositoryToken(CashMovementEntity), useValue: cashMovementRepo },
         { provide: WebSocketEmitterService, useValue: wsEmitter },
       ],
     }).compile();
@@ -72,21 +105,138 @@ describe('PosSessionService', () => {
   });
 
   describe('openSession', () => {
-    it('should create a session with OPEN status', async () => {
-      const dto = { branchId: 'branch-1', openingCashAmount: 500 };
+    const openDto = {
+      branchId: 'branch-1',
+      cashAccountId: 'cash-1',
+      openingCashAmount: 500,
+    };
 
-      const result = await service.openSession(dto, actor);
+    it('should create a session with OPEN status and cashAccountId set', async () => {
+      const result = await service.openSession(openDto, actor);
 
       expect(result.status).toBe(SessionStatus.OPEN);
       expect(result.openingCashAmount).toBe(500);
       expect(result.openedBy).toBe('user-1');
+      expect(result.cashAccountId).toBe('cash-1');
       expect(sessionRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           status: SessionStatus.OPEN,
           branchId: 'branch-1',
+          cashAccountId: 'cash-1',
         }),
       );
-      expect(sessionRepo.save).toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when cash_account does not exist', async () => {
+      cashAccountRepo.findOne.mockResolvedValue(null);
+      await expect(service.openSession(openDto, actor)).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when cash_account.type is not REGISTER', async () => {
+      cashAccountRepo.findOne.mockResolvedValue({
+        id: 'cash-1',
+        name: 'Két chính',
+        type: CashAccountType.SAFE,
+        branchId: 'branch-1',
+        organizationId: 'org-1',
+      });
+      await expect(service.openSession(openDto, actor)).rejects.toThrow(/REGISTER/);
+    });
+
+    it('throws BadRequestException when cash_account.branchId differs', async () => {
+      cashAccountRepo.findOne.mockResolvedValue({
+        id: 'cash-1',
+        name: 'Quầy 1',
+        type: CashAccountType.REGISTER,
+        branchId: 'branch-2',
+        organizationId: 'org-1',
+      });
+      await expect(service.openSession(openDto, actor)).rejects.toThrow(/branch mismatch/);
+    });
+
+    it('throws ConflictException when cash_account already in use by an active session', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-existing',
+        cashAccountId: 'cash-1',
+        status: SessionStatus.OPEN,
+      });
+      await expect(service.openSession(openDto, actor)).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('calculateExpectedCash (via startClose) — TKT-057', () => {
+    const sessionWithCashAccount = {
+      id: 'session-1',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      status: SessionStatus.ACTIVE_SALES,
+      openingCashAmount: 500,
+      cashAccountId: 'cash-1',
+      openedAt: new Date('2026-05-11T00:00:00Z'),
+      closedAt: undefined,
+    };
+
+    it('returns opening when no movements', async () => {
+      sessionRepo.findOne.mockResolvedValue({ ...sessionWithCashAccount });
+      cashMovementRepo.find.mockResolvedValue([]);
+
+      const result = await service.startClose('session-1', actor);
+
+      expect(result.expectedCash).toBe(500);
+    });
+
+    it('adds DEPOSIT, subtracts WITHDRAWAL, adds ADJUSTMENT', async () => {
+      sessionRepo.findOne.mockResolvedValue({ ...sessionWithCashAccount });
+      cashMovementRepo.find.mockResolvedValue([
+        { type: CashMovementType.DEPOSIT, amount: 300, cashAccountId: 'cash-1' },
+        { type: CashMovementType.WITHDRAWAL, amount: 100, cashAccountId: 'cash-1' },
+        { type: CashMovementType.ADJUSTMENT, amount: 20, cashAccountId: 'cash-1' },
+      ]);
+
+      const result = await service.startClose('session-1', actor);
+
+      // 500 + 300 - 100 + 20 = 720
+      expect(result.expectedCash).toBe(720);
+    });
+
+    it('subtracts TRANSFER where cash_account_id = session.cashAccountId (outflow)', async () => {
+      sessionRepo.findOne.mockResolvedValue({ ...sessionWithCashAccount });
+      cashMovementRepo.find.mockResolvedValue([
+        {
+          type: CashMovementType.TRANSFER,
+          amount: 200,
+          cashAccountId: 'cash-1',
+          toAccountId: 'safe-1',
+        },
+      ]);
+
+      const result = await service.startClose('session-1', actor);
+
+      // 500 - 200 = 300
+      expect(result.expectedCash).toBe(300);
+    });
+
+    it('adds TRANSFER where to_account_id = session.cashAccountId (inflow)', async () => {
+      sessionRepo.findOne.mockResolvedValue({ ...sessionWithCashAccount });
+      cashMovementRepo.find.mockResolvedValue([]);
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            type: CashMovementType.TRANSFER,
+            amount: 150,
+            toAccountId: 'cash-1',
+            cashAccountId: 'safe-1',
+          },
+        ]),
+      };
+      cashMovementRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.startClose('session-1', actor);
+
+      // 500 + 150 = 650
+      expect(result.expectedCash).toBe(650);
     });
   });
 

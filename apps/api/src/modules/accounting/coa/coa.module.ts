@@ -8,6 +8,7 @@ import {
   ACCOUNT_ENTITY_CONFIG,
 } from './coa.service';
 import { CoaController } from './coa.controller';
+import { CoaSeederService } from '../seeders/coa-seeder.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([AccountEntity])],
@@ -15,8 +16,9 @@ import { CoaController } from './coa.controller';
   providers: [
     CoaService,
     { provide: ACCOUNT_SERVICE_TOKEN, useExisting: CoaService },
+    CoaSeederService,
   ],
-  exports: [CoaService],
+  exports: [CoaService, CoaSeederService],
 })
 export class CoaModule implements OnModuleInit {
   constructor(
