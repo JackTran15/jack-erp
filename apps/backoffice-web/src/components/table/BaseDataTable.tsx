@@ -1,7 +1,6 @@
 import React from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn, Input } from "@erp/ui";
-import { cn, Input } from "@erp/ui";
 import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
 import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
 import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
