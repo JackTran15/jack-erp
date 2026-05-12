@@ -30,8 +30,27 @@ export interface InvoiceTotals {
   grandTotal: number;
   /** Amount tendered (e.g. cash given). */
   paid: number;
-  /** Change to return; should be max(0, paid - grandTotal). */
+  /**
+   * "Trả lại khách" on the receipt — the *signed* delta:
+   *   • positive → change to hand back to the customer
+   *   • negative → customer still owes the shop (printed if the cashier
+   *     prints with an unresolved shortage)
+   *   • zero     → exact payment, or the cashier opted to forgive the
+   *     residual via "Khách không lấy tiền thừa" / "Bớt tiền lẻ cho khách"
+   */
   change: number;
+  /**
+   * "Khách không lấy tiền thừa" — set when the cashier forgave a positive
+   * overpayment. Carries the raw kept amount so the receipt can echo it
+   * alongside the zeroed `change` line.
+   */
+  keptChange?: number;
+  /**
+   * "Bớt tiền lẻ cho khách" — set when the cashier forgave a shortage.
+   * Carries the raw written-off amount so the receipt can echo it
+   * alongside the zeroed `change` line.
+   */
+  forgivenShortage?: number;
 }
 
 export interface InvoicePolicy {
