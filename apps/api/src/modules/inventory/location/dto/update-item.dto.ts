@@ -1,4 +1,15 @@
-import { IsString, IsOptional, IsBoolean, IsUUID, IsNumber, Min, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  IsNumber,
+  IsInt,
+  Min,
+  Max,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateItemDto {
   @IsOptional()
@@ -19,13 +30,16 @@ export class UpdateItemDto {
   unit?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPosVisible?: boolean;
 
   @IsOptional()
   @IsNumber()
@@ -38,6 +52,37 @@ export class UpdateItemDto {
   sellingPrice?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightGram?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  lengthCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  widthCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  heightCm?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  manufactureYear?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  composition?: string;
+
+  @IsOptional()
   @IsUUID()
-  providerId?: string;
+  productId?: string;
 }

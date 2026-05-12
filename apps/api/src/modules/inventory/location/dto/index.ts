@@ -1,5 +1,7 @@
 export { CreateItemDto } from './create-item.dto';
 export { UpdateItemDto } from './update-item.dto';
+export { CreateProviderDto } from './create-provider.dto';
+export { UpdateProviderDto } from './update-provider.dto';
 export { CreateStorageDto } from './create-storage.dto';
 export { UpdateStorageDto } from './update-storage.dto';
 export { CreateShowroomDto } from './create-showroom.dto';

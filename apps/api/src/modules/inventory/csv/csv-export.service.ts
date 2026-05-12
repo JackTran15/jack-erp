@@ -9,7 +9,7 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 
 interface ExportQuery extends PaginationQuery {
   branchId?: string;
-  category?: string;
+  categoryId?: string;
   fromDate?: string;
   toDate?: string;
   locationId?: string;
@@ -35,28 +35,33 @@ export class CsvExportService {
   ): Promise<string> {
     const qb = this.itemRepo
       .createQueryBuilder('item')
-      .leftJoinAndSelect('item.provider', 'provider')
+      .leftJoinAndSelect('item.category', 'category')
+      .leftJoinAndSelect('item.providers', 'ip', 'ip.is_primary = true')
+      .leftJoinAndSelect('ip.provider', 'provider')
       .where('item.organizationId = :orgId', { orgId: actor.organizationId });
 
-    if (query.category) {
-      qb.andWhere('item.category = :category', { category: query.category });
+    if (query.categoryId) {
+      qb.andWhere('item.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
     }
     qb.orderBy('item.code', 'ASC');
 
     const items = await qb.getMany();
 
     const headers = ['itemCode', 'itemName', 'uom', 'category', 'isActive', 'providerCode', 'providerName'];
-    const rows = items.map((item) =>
-      [
+    const rows = items.map((item) => {
+      const primary = item.providers?.find((p) => p.isPrimary);
+      return [
         this.escapeCsv(item.code),
         this.escapeCsv(item.name),
         this.escapeCsv(item.unit),
-        this.escapeCsv(item.category ?? ''),
+        this.escapeCsv(item.category?.name ?? ''),
         item.isActive ? 'true' : 'false',
-        this.escapeCsv(item.provider?.code ?? ''),
-        this.escapeCsv(item.provider?.name ?? ''),
-      ].join(','),
-    );
+        this.escapeCsv(primary?.provider?.code ?? ''),
+        this.escapeCsv(primary?.provider?.name ?? ''),
+      ].join(',');
+    });
 
     return [headers.join(','), ...rows].join('\n');
   }

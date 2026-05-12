@@ -58,6 +58,7 @@ export class PosCatalogService {
        WHERE sb.organization_id = $1
          AND sb.branch_id = $2
          AND i.is_active = true
+         AND i.is_pos_visible = true
          ${searchClause}
        ORDER BY i.name ASC, sb.location_id ASC`,
       params,

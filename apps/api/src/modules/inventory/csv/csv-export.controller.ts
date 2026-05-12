@@ -13,7 +13,7 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsUUID } from 'class-validator';
 import { CsvExportService } from './csv-export.service';
 
 class ExportQueryDto extends PaginationQueryDto {
@@ -22,8 +22,8 @@ class ExportQueryDto extends PaginationQueryDto {
   branchId?: string;
 
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @IsOptional()
   @IsString()

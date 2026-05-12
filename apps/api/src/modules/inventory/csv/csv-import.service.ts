@@ -19,6 +19,8 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { InventoryLocationService } from '../location/inventory-location.service';
+import { ItemEntity } from '../location/item.entity';
+import { ItemProviderEntity } from '../location/item-provider.entity';
 import {
   StockLedgerService,
   RecordMovementParams,
@@ -53,6 +55,10 @@ export class CsvImportService {
     private readonly jobRepo: Repository<InventoryImportJobEntity>,
     @InjectRepository(InventoryImportJobRowEntity)
     private readonly rowRepo: Repository<InventoryImportJobRowEntity>,
+    @InjectRepository(ItemEntity)
+    private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(ItemProviderEntity)
+    private readonly itemProviderRepo: Repository<ItemProviderEntity>,
     private readonly dataSource: DataSource,
     private readonly locationService: InventoryLocationService,
     private readonly stockLedgerService: StockLedgerService,
@@ -406,45 +412,68 @@ export class CsvImportService {
       data.providerCode,
       actor,
     );
+    const categoryId = data.category
+      ? (await this.locationService.resolveOrCreateCategoryByName(
+          data.category,
+          actor,
+        )).id
+      : undefined;
 
+    let itemId: string;
     try {
-      await this.locationService.createItem(
+      const created = await this.locationService.createItem(
         {
           code: data.itemCode,
           name: data.itemName,
           unit: data.uom,
-          category: data.category || undefined,
+          categoryId,
           isActive,
-          providerId: provider.id,
         },
         actor,
       );
+      itemId = created.id;
     } catch (error) {
       if (error instanceof ConflictException) {
-        const existingItems = await this.dataSource
-          .getRepository('items')
-          .findOne({
-            where: {
-              organizationId: actor.organizationId,
-              code: data.itemCode,
-            },
-          });
-        if (existingItems) {
-          await this.locationService.updateItem(
-            existingItems.id,
-            {
-              name: data.itemName,
-              unit: data.uom,
-              category: data.category || undefined,
-              isActive,
-              providerId: provider.id,
-            },
-            actor,
-          );
-        }
+        const existing = await this.itemRepo.findOne({
+          where: {
+            organizationId: actor.organizationId,
+            code: data.itemCode,
+          },
+        });
+        if (!existing) throw error;
+        await this.locationService.updateItem(
+          existing.id,
+          {
+            name: data.itemName,
+            unit: data.uom,
+            categoryId,
+            isActive,
+          },
+          actor,
+        );
+        itemId = existing.id;
       } else {
         throw error;
       }
+    }
+
+    // Link provider as primary if not already linked; if no primary exists, this one becomes primary.
+    const existingLink = await this.itemProviderRepo.findOne({
+      where: { itemId, providerId: provider.id },
+    });
+    if (!existingLink) {
+      const hasPrimary = await this.itemProviderRepo.count({
+        where: { itemId, isPrimary: true },
+      });
+      await this.itemProviderRepo.save(
+        this.itemProviderRepo.create({
+          itemId,
+          providerId: provider.id,
+          isPrimary: hasPrimary === 0,
+          organizationId: actor.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
     }
   }
 
