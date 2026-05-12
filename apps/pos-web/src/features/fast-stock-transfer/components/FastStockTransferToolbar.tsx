@@ -113,12 +113,15 @@ export function FastStockTransferToolbar({
             labelClassName="w-1/3"
           >
             <PosSelect<string>
-              value={filters.sourceWarehouse}
+              value={
+                warehouseOptions.includes(filters.sourceWarehouse)
+                  ? filters.sourceWarehouse
+                  : null
+              }
               onChange={(value) => onFilterChange("sourceWarehouse", value)}
-              options={warehouseOptions.map((option) => ({
-                value: option,
-                label: option,
-              }))}
+              items={warehouseOptions}
+              itemKey={(o) => o}
+              renderItem={(o) => o}
               placeholder=""
             />
           </PosFormItem>
@@ -129,14 +132,17 @@ export function FastStockTransferToolbar({
             labelClassName="w-1/3"
           >
             <PosSelect<string>
-              value={filters.destinationWarehouse}
+              value={
+                warehouseOptions.includes(filters.destinationWarehouse)
+                  ? filters.destinationWarehouse
+                  : null
+              }
               onChange={(value) =>
                 onFilterChange("destinationWarehouse", value)
               }
-              options={warehouseOptions.map((option) => ({
-                value: option,
-                label: option,
-              }))}
+              items={warehouseOptions}
+              itemKey={(o) => o}
+              renderItem={(o) => o}
               placeholder=""
             />
           </PosFormItem>

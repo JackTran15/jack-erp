@@ -183,25 +183,31 @@ export function BasicInfoSection({
           <div className="space-y-2">
             <div className="grid grid-cols-3 gap-2">
               <PosSelect
-                value={values.province ?? ""}
-                onChange={(v) => onChange("province", v)}
-                options={provinces}
+                value={provinces.find((o) => o.value === values.province) ?? null}
+                onChange={(item) => onChange("province", item.value)}
+                items={provinces}
+                itemKey={(o) => o.value}
+                renderItem={(o) => o.label}
                 variant="underline"
                 placeholder="Tỉnh/Thành phố"
                 ariaLabel="Tỉnh/Thành phố"
               />
               <PosSelect
-                value={values.district ?? ""}
-                onChange={(v) => onChange("district", v)}
-                options={districts}
+                value={districts.find((o) => o.value === values.district) ?? null}
+                onChange={(item) => onChange("district", item.value)}
+                items={districts}
+                itemKey={(o) => o.value}
+                renderItem={(o) => o.label}
                 variant="underline"
                 placeholder="Quận/huyện"
                 ariaLabel="Quận/huyện"
               />
               <PosSelect
-                value={values.ward ?? ""}
-                onChange={(v) => onChange("ward", v)}
-                options={wards}
+                value={wards.find((o) => o.value === values.ward) ?? null}
+                onChange={(item) => onChange("ward", item.value)}
+                items={wards}
+                itemKey={(o) => o.value}
+                renderItem={(o) => o.label}
                 variant="underline"
                 placeholder="Xã/phường"
                 ariaLabel="Xã/phường"

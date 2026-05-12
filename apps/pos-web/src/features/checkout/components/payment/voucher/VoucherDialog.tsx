@@ -195,12 +195,11 @@ export function VoucherDialog({
             >
               <PosSelect
                 id="voucher-select"
-                value={voucherId ?? ""}
-                onChange={(next) => setVoucherId(next || null)}
-                options={voucherOptions.map((opt) => ({
-                  value: opt.id,
-                  label: opt.label,
-                }))}
+                value={selectedVoucher}
+                onChange={(item) => setVoucherId(item.id || null)}
+                items={voucherOptions}
+                itemKey={(opt) => opt.id}
+                renderItem={(opt) => opt.label}
                 placeholder="Chọn voucher"
                 variant="underline"
               />

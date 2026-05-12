@@ -24,6 +24,12 @@ interface UseCheckoutPaymentInput {
 interface UseCheckoutPaymentResult {
   paymentLines: PaymentLine[];
   setPaymentLines: Dispatch<SetStateAction<PaymentLine[]>>;
+  /**
+   * "Forgive the residual delta" — single flag that powers both checkbox
+   * affordances. Surfaced as "Khách không lấy tiền thừa" when the customer
+   * overpaid and as "Bớt tiền lẻ cho khách" when underpaid; in either case
+   * checking it zeroes the effective change / shortage.
+   */
   keepChange: boolean;
   setKeepChange: Dispatch<SetStateAction<boolean>>;
   debt: boolean;
@@ -37,7 +43,13 @@ interface UseCheckoutPaymentResult {
   selectedSuggestionId: string | null;
   setSelectedSuggestionId: Dispatch<SetStateAction<string | null>>;
   totalPaid: number;
+  /** Unadjusted positive change (totalPaid − settlementAbs, ≥0). */
+  rawChangeAmount: number;
+  /** Unadjusted shortage (settlementAbs − totalPaid, ≥0). */
+  rawShortageAmount: number;
+  /** Effective change after applying `keepChange` (0 when checked). */
   changeAmount: number;
+  /** Effective shortage after applying `keepChange` (0 when checked). */
   shortageAmount: number;
   isShort: boolean;
   suggestions: CashSuggestion[];
@@ -80,12 +92,17 @@ export function useCheckoutPayment({
     grandTotal < 0
       ? Math.max(0, settlementAbs - totalPaid)
       : Math.max(0, totalPaid - settlementAbs);
-  const changeAmount = keepChange ? 0 : rawChangeAmount;
-
-  /** Only when customer still owes the shop (positive net). */
-  const shortageAmount =
+  /** Only when the customer still owes the shop (positive net). */
+  const rawShortageAmount =
     grandTotal < 0 ? 0 : Math.max(0, settlementAbs - totalPaid);
-  const isShort = grandTotal > 0 && totalPaid > 0 && shortageAmount > 0;
+
+  // The single `keepChange` flag zeroes whichever side of the delta is
+  // non-zero. Only one side is ever non-zero at a time (the sale either
+  // over- or under-paid), so applying the flag to both sides is safe and
+  // saves having a second mirror state for the under-paid case.
+  const changeAmount = keepChange ? 0 : rawChangeAmount;
+  const shortageAmount = keepChange ? 0 : rawShortageAmount;
+  const isShort = grandTotal > 0 && totalPaid > 0 && rawShortageAmount > 0;
   const suggestions = useMemo(
     () => buildSuggestions(grandTotal < 0 ? settlementAbs : grandTotal),
     [grandTotal, settlementAbs],
@@ -133,6 +150,8 @@ export function useCheckoutPayment({
     selectedSuggestionId,
     setSelectedSuggestionId,
     totalPaid,
+    rawChangeAmount,
+    rawShortageAmount,
     changeAmount,
     shortageAmount,
     isShort,
