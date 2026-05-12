@@ -12,6 +12,7 @@ import { ProductAttributeDefinitionEntity } from './product-attribute-definition
 import { ProductAttributeOptionEntity } from './product-attribute-option.entity';
 import { ItemAttributeValueEntity } from './item-attribute-value.entity';
 import { ItemEntity } from '../location/item.entity';
+import { ItemProviderEntity } from '../location/item-provider.entity';
 
 const VARIANT_THRESHOLD = 500;
 const MAX_CODE_COLLISION_RETRIES = 5;
@@ -250,7 +251,6 @@ export class VariantGenerationService {
       isActive: true,
       purchasePrice: 0,
       sellingPrice: 0,
-      providerId: product.defaultProviderId!,
       productId: product.id,
       variantLabel,
       organizationId: actor.organizationId,
@@ -258,6 +258,18 @@ export class VariantGenerationService {
     });
 
     const savedItem = await manager.save(ItemEntity, item);
+
+    // Link default provider as primary in M2M table.
+    await manager.save(
+      ItemProviderEntity,
+      manager.create(ItemProviderEntity, {
+        itemId: savedItem.id,
+        providerId: product.defaultProviderId!,
+        isPrimary: true,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
 
     const junctions = combo.map((c) =>
       manager.create(ItemAttributeValueEntity, {

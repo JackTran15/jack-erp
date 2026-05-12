@@ -10,6 +10,7 @@ import { CsvExportService } from './csv-export.service';
 import { CsvImportController } from './csv-import.controller';
 import { CsvExportController } from './csv-export.controller';
 import { ItemEntity } from '../location/item.entity';
+import { ItemProviderEntity } from '../location/item-provider.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 
@@ -19,6 +20,7 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
       InventoryImportJobEntity,
       InventoryImportJobRowEntity,
       ItemEntity,
+      ItemProviderEntity,
       StockBalanceEntity,
       StockLedgerEntryEntity,
     ]),

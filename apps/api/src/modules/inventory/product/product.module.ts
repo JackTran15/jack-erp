@@ -7,6 +7,7 @@ import { ProductAttributeOptionEntity } from './product-attribute-option.entity'
 import { ItemAttributeValueEntity } from './item-attribute-value.entity';
 import { ProductStorageLocationEntity } from './product-storage-location.entity';
 import { ItemEntity } from '../location/item.entity';
+import { ItemProviderEntity } from '../location/item-provider.entity';
 import { ProductCrudService, PRODUCT_ENTITY_CONFIG, PRODUCT_SERVICE_TOKEN } from './product-crud.service';
 import { ProductAttributeService } from './product-attribute.service';
 import { VariantGenerationService } from './variant-generation.service';
@@ -24,6 +25,7 @@ import { ProductAttributeController } from './product-attribute.controller';
       ItemAttributeValueEntity,
       ProductStorageLocationEntity,
       ItemEntity,
+      ItemProviderEntity,
       LocationEntity,
     ]),
   ],

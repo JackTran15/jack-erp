@@ -9,7 +9,7 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BaseCrudService } from '../../crud/base-crud.service';
 import { ItemEntity } from './item.entity';
-import { ProviderEntity } from './provider.entity';
+import { ItemCategoryEntity } from './item-category.entity';
 
 export const INVENTORY_ITEM_SERVICE_TOKEN = 'InventoryItemCrudService';
 
@@ -24,22 +24,22 @@ export class InventoryItemCrudService extends BaseCrudService<
   constructor(
     @InjectRepository(ItemEntity)
     protected readonly repository: Repository<ItemEntity>,
-    @InjectRepository(ProviderEntity)
-    private readonly providerRepo: Repository<ProviderEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly categoryRepo: Repository<ItemCategoryEntity>,
     protected readonly dataSource: DataSource,
   ) {
     super(dataSource);
   }
 
   protected override getByIdRelations(): string[] {
-    return ['provider', 'product'];
+    return ['category', 'product'];
   }
 
   protected override configureListQuery(
     qb: SelectQueryBuilder<ItemEntity>,
     alias: string,
   ): void {
-    qb.leftJoinAndSelect(`${alias}.provider`, 'provider');
+    qb.leftJoinAndSelect(`${alias}.category`, 'category');
     qb.leftJoinAndSelect(`${alias}.product`, 'product');
   }
 
@@ -54,9 +54,7 @@ export class InventoryItemCrudService extends BaseCrudService<
         sub
           .where(`${alias}.code ILIKE :search`, { search: `%${search}%` })
           .orWhere(`${alias}.name ILIKE :search`, { search: `%${search}%` })
-          .orWhere(`${alias}.category ILIKE :search`, { search: `%${search}%` })
-          .orWhere('provider.name ILIKE :search', { search: `%${search}%` })
-          .orWhere('provider.code ILIKE :search', { search: `%${search}%` })
+          .orWhere('category.name ILIKE :search', { search: `%${search}%` })
           .orWhere('product.name ILIKE :search', { search: `%${search}%` });
       }),
     );
@@ -64,13 +62,12 @@ export class InventoryItemCrudService extends BaseCrudService<
 
   protected override transformListResults(data: ItemEntity[]): unknown[] {
     return data.map((row) => {
-      const provider = row.provider;
+      const category = row.category;
       const product = row.product;
-      const { provider: _dropProvider, product: _dropProduct, ...rest } = row;
+      const { category: _dropCategory, product: _dropProduct, ...rest } = row;
       return {
         ...rest,
-        providerName: provider?.name ?? '',
-        providerCode: provider?.code ?? '',
+        categoryName: category?.name ?? '',
         productName: product?.name ?? '',
         variantLabel: row.variantLabel ?? '',
       };
@@ -81,9 +78,9 @@ export class InventoryItemCrudService extends BaseCrudService<
     payload: Record<string, any>,
     actor: ActorContext,
   ): Promise<Record<string, any>> {
-    const cleaned = stripDerivedProviderFields(payload);
-    if (cleaned.providerId) {
-      await this.ensureProviderBelongsToOrg(cleaned.providerId, actor);
+    const cleaned = stripDerivedFields(payload);
+    if (cleaned.categoryId) {
+      await this.ensureCategoryBelongsToOrg(cleaned.categoryId, actor);
     }
     return super.beforeCreate(cleaned, actor);
   }
@@ -93,35 +90,37 @@ export class InventoryItemCrudService extends BaseCrudService<
     payload: Record<string, any>,
     actor: ActorContext,
   ): Promise<Record<string, any>> {
-    const cleaned = stripDerivedProviderFields(payload);
-    if (cleaned.providerId) {
-      await this.ensureProviderBelongsToOrg(cleaned.providerId, actor);
+    const cleaned = stripDerivedFields(payload);
+    if (cleaned.categoryId) {
+      await this.ensureCategoryBelongsToOrg(cleaned.categoryId, actor);
     }
     return super.beforeUpdate(id, cleaned, actor);
   }
 
-  private async ensureProviderBelongsToOrg(
-    providerId: string,
+  private async ensureCategoryBelongsToOrg(
+    categoryId: string,
     actor: ActorContext,
   ): Promise<void> {
-    const provider = await this.providerRepo.findOne({
-      where: { id: providerId, organizationId: actor.organizationId },
+    const cat = await this.categoryRepo.findOne({
+      where: { id: categoryId, organizationId: actor.organizationId },
     });
-    if (!provider) {
+    if (!cat) {
       throw new BadRequestException(
-        `Provider ${providerId} not found in this organization`,
+        `Danh mục ${categoryId} không tồn tại trong tổ chức`,
       );
     }
   }
 }
 
-function stripDerivedProviderFields<T extends Record<string, any>>(payload: T): T {
+function stripDerivedFields<T extends Record<string, any>>(payload: T): T {
   const next = { ...payload };
-  delete next.providerName;
-  delete next.providerCode;
-  delete next.provider;
+  delete next.categoryName;
+  delete next.category;
   delete next.productName;
   delete next.product;
+  delete next.providers;
+  delete next.barcodes;
+  delete next.thresholds;
   return next;
 }
 
@@ -134,7 +133,8 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'code', label: 'Mã', type: 'string', required: true },
     { key: 'name', label: 'Tên', type: 'string', required: true },
     { key: 'unit', label: 'Đơn vị', type: 'string', required: true },
-    { key: 'category', label: 'Danh mục', type: 'string' },
+    { key: 'categoryId', label: 'ID Danh mục', type: 'string' },
+    { key: 'categoryName', label: 'Danh mục', type: 'string', readOnly: true },
     {
       key: 'purchasePrice',
       label: 'Giá mua',
@@ -149,16 +149,20 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
       numberFormat: 'money',
       required: true,
     },
-    { key: 'providerId', label: 'ID NCC', type: 'string', required: true },
-    { key: 'providerName', label: 'Tên NCC', type: 'string', readOnly: true },
-    { key: 'providerCode', label: 'Mã NCC', type: 'string', readOnly: true },
+    { key: 'isPosVisible', label: 'Hiển thị POS', type: 'boolean' },
+    { key: 'weightGram', label: 'Trọng lượng (g)', type: 'number' },
+    { key: 'lengthCm', label: 'Dài (cm)', type: 'number' },
+    { key: 'widthCm', label: 'Rộng (cm)', type: 'number' },
+    { key: 'heightCm', label: 'Cao (cm)', type: 'number' },
+    { key: 'manufactureYear', label: 'Năm sản xuất', type: 'number' },
+    { key: 'composition', label: 'Thành phần', type: 'string' },
     { key: 'productId', label: 'ID Sản phẩm', type: 'string' },
     { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true },
     { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true },
     { key: 'isActive', label: 'Đang hoạt động', type: 'boolean' },
     { key: 'createdAt', label: 'Ngày tạo', type: 'date' },
   ],
-  searchableFields: ['code', 'name', 'category', 'providerName', 'providerCode', 'productName'],
+  searchableFields: ['code', 'name', 'categoryName', 'productName'],
   filterDefinitions: [
     {
       key: 'isActive',
@@ -169,7 +173,16 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
         { label: 'Không', value: 'false' },
       ],
     },
-    { key: 'providerId', label: 'ID NCC', type: 'text' },
+    {
+      key: 'isPosVisible',
+      label: 'Hiển thị POS',
+      type: 'select',
+      options: [
+        { label: 'Có', value: 'true' },
+        { label: 'Không', value: 'false' },
+      ],
+    },
+    { key: 'categoryId', label: 'ID Danh mục', type: 'text' },
     { key: 'productId', label: 'ID Sản phẩm', type: 'text' },
   ],
   permissions: {
