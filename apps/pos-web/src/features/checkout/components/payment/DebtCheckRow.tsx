@@ -14,7 +14,7 @@ export interface DebtCheckRowProps {
  */
 export function DebtCheckRow({ checked, onChange, amount }: DebtCheckRowProps) {
   return (
-    <label className="flex h-10 cursor-pointer items-center justify-between gap-3 text-[14px] text-gray-900">
+    <label className="flex h-10 cursor-pointer items-center justify-between gap-3 text-sm text-gray-900">
       <span className="inline-flex items-center gap-2">
         <PosCheckbox
           checked={checked}

@@ -79,9 +79,13 @@ export function MembershipSection({
           <PosSelect
             id={ids.cardTier}
             variant="underline"
-            value={values.cardTier ?? ""}
-            onChange={(v) => onChange("cardTier", v)}
-            options={cardTiers}
+            value={
+              cardTiers.find((o) => o.value === values.cardTier) ?? null
+            }
+            onChange={(item) => onChange("cardTier", item.value)}
+            items={cardTiers}
+            itemKey={(o) => o.value}
+            renderItem={(o) => o.label}
           />
         </PosFormItem>
 
@@ -94,9 +98,14 @@ export function MembershipSection({
           <PosSelect
             id={ids.group}
             variant="underline"
-            value={values.customerGroup ?? ""}
-            onChange={(v) => onChange("customerGroup", v)}
-            options={customerGroups}
+            value={
+              customerGroups.find((o) => o.value === values.customerGroup) ??
+              null
+            }
+            onChange={(item) => onChange("customerGroup", item.value)}
+            items={customerGroups}
+            itemKey={(o) => o.value}
+            renderItem={(o) => o.label}
             trailing={
               onAddCustomerGroup ? (
                 <button
@@ -121,9 +130,14 @@ export function MembershipSection({
           <PosSelect
             id={ids.manager}
             variant="underline"
-            value={values.accountManager ?? ""}
-            onChange={(v) => onChange("accountManager", v)}
-            options={accountManagers}
+            value={
+              accountManagers.find((o) => o.value === values.accountManager) ??
+              null
+            }
+            onChange={(item) => onChange("accountManager", item.value)}
+            items={accountManagers}
+            itemKey={(o) => o.value}
+            renderItem={(o) => o.label}
           />
         </PosFormItem>
 
