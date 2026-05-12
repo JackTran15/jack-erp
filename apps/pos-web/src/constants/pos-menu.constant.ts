@@ -18,7 +18,7 @@ import {
   WarehouseOutIcon,
   type IconProps,
 } from "@erp/pos/components/icons/Icon";
-import { AppMenuItem } from "../components/layout/AppPosLayout/appMenuItems";
+import { AppMenuItem } from "@erp/pos/components/layout/AppPosLayout/AppPosLayout";
 
 export const APP_MENU_ITEMS: AppMenuItem[] = [
   {
