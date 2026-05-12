@@ -591,6 +591,7 @@ export function CheckoutPageV2() {
       paymentLines,
       primaryMethodLabel,
       methods: PAYMENT_METHODS,
+      keepChange,
     });
 
   const quickExchangeReturnQty = useMemo(
