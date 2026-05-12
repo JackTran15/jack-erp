@@ -338,7 +338,15 @@ export function MultiDisplayIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
       <rect x="2" y="4" width="13" height="10" rx="1.5" />
-      <rect x="9" y="10" width="13" height="10" rx="1.5" fill="currentColor" fillOpacity="0.15" />
+      <rect
+        x="9"
+        y="10"
+        width="13"
+        height="10"
+        rx="1.5"
+        fill="currentColor"
+        fillOpacity="0.15"
+      />
       <rect x="9" y="10" width="13" height="10" rx="1.5" />
     </svg>
   );
@@ -429,6 +437,33 @@ export function InfoCircleIcon(props: IconProps) {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v5" />
       <path d="M12 8h.01" />
+    </svg>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+export function ScanFrameIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 7V5a2 2 0 0 1 2-2h2M21 7V5a2 2 0 0 0-2-2h-2M3 17v2a2 2 0 0 0 2 2h2M21 17v2a2 2 0 0 1-2 2h-2" />
+      <path d="M3 12h18" />
+    </svg>
+  );
+}
+
+export function PlusCircleSolidIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" fill="white" />
+      <path d="M12 8v8M8 12h8" />
     </svg>
   );
 }

@@ -1,10 +1,3 @@
-export enum CustomerGenderEnum {
-  MALE = "MALE",
-  FEMALE = "FEMALE",
-}
-
-export type CustomerGender = CustomerGenderEnum;
-
 export enum PurchaseHistoryStatusEnum {
   PAID = "PAID",
   DEBT = "DEBT",
