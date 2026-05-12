@@ -7,7 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { CustomerCreateDialog } from "../components/CustomerCreateDialog";
+import { CustomerCreateDialog } from "../features/checkout/components/customerCreate";
 import { CustomerSelectDialog } from "../components/CustomerSelectDialog";
 import { SearchSelectInput } from "../components/SearchSelectInput";
 import type { SearchSelectSuggestion } from "../components/SearchSelectInput";

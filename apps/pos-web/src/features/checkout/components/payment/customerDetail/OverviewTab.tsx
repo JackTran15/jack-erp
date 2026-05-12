@@ -20,8 +20,7 @@ export function OverviewTab({
   return (
     <div className="grid grid-cols-[460px_1fr] gap-5">
       <MembershipCard
-        name={data.identity.name}
-        membership={data.membership}
+        data={data}
         onChangeCard={onChangeCard}
         onRefreshPoints={onRefreshPoints}
       />
