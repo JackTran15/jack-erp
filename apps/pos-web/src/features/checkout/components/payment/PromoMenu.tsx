@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@erp/ui";
 import { GiftIcon, ReceiptIcon } from "@erp/pos/components/icons/Icon";
+import { useListKeyboardNavigation } from "@erp/pos/hooks/useListKeyboardNavigation";
 import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
@@ -89,11 +91,30 @@ export function PromoMenu({
   voucher,
 }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   // Dialog state lives inside the menu so the host doesn't need to wire it
   // explicitly — the menu is the single owner of "click X → show dialog X".
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
+
+  const handlePick = useCallback(
+    (key: PromoMenuOption) => {
+      if (key === PromoMenuOptionEnum.PROMO) setDiscountDialogOpen(true);
+      if (key === PromoMenuOptionEnum.VOUCHER) setVoucherDialogOpen(true);
+      onSelect(key);
+      onClose();
+    },
+    [onSelect, onClose],
+  );
+
+  const { highlightIdx, setHighlightIdx, handleKeyDown } =
+    useListKeyboardNavigation<MenuItem>({
+      items: ITEMS,
+      open,
+      onSelect: (item) => handlePick(item.key),
+      onEscape: onClose,
+    });
 
   useEffect(() => {
     if (!open) return;
@@ -101,7 +122,17 @@ export function PromoMenu({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // PromoMenu is a popover with no dedicated focusable trigger — focus can
+      // be anywhere (e.g. the customer search field). Ignore if the user is
+      // typing in another input so native Arrow/Enter still work in those fields.
+      const target = e.target as HTMLElement | null;
+      const inOtherInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (inOtherInput) return;
+      handleKeyDown(e);
     };
     document.addEventListener("mousedown", onDocDown);
     document.addEventListener("keydown", onKey);
@@ -109,14 +140,15 @@ export function PromoMenu({
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, handleKeyDown]);
 
-  const handlePick = (key: PromoMenuOption) => {
-    if (key === PromoMenuOptionEnum.PROMO) setDiscountDialogOpen(true);
-    if (key === PromoMenuOptionEnum.VOUCHER) setVoucherDialogOpen(true);
-    onSelect(key);
-    onClose();
-  };
+  // Scroll the highlighted item into view (only when needed — the list is short so this rarely fires).
+  useEffect(() => {
+    if (!open || highlightIdx < 0) return;
+    const el = itemRefs.current[highlightIdx];
+    if (!el) return;
+    el.scrollIntoView({ block: "nearest" });
+  }, [open, highlightIdx]);
 
   return (
     <>
@@ -128,26 +160,37 @@ export function PromoMenu({
           className="absolute right-0 top-full z-[100] mt-1 w-[160px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
         >
           <ul className="py-1">
-            {ITEMS.map((item, idx) => (
-              <li
-                key={item.key}
-                className={
-                  idx < ITEMS.length - 1
-                    ? "border-b border-gray-100"
-                    : undefined
-                }
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handlePick(item.key)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-gray-900 transition-colors hover:bg-gray-50"
+            {ITEMS.map((item, idx) => {
+              const isHighlighted = idx === highlightIdx;
+              return (
+                <li
+                  key={item.key}
+                  className={
+                    idx < ITEMS.length - 1
+                      ? "border-b border-gray-100"
+                      : undefined
+                  }
                 >
-                  <span className="text-gray-500">{item.icon}</span>
-                  {item.label}
-                </button>
-              </li>
-            ))}
+                  <button
+                    ref={(el) => {
+                      itemRefs.current[idx] = el;
+                    }}
+                    type="button"
+                    role="menuitem"
+                    aria-selected={isHighlighted}
+                    onClick={() => handlePick(item.key)}
+                    onMouseEnter={() => setHighlightIdx(idx)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] text-gray-900 transition-colors",
+                      isHighlighted ? "bg-indigo-50" : "hover:bg-gray-50",
+                    )}
+                  >
+                    <span className="text-gray-500">{item.icon}</span>
+                    {item.label}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}

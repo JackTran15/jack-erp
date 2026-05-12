@@ -1,3 +1,4 @@
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { CloseIcon, WarningDot } from "@erp/pos/components/icons/Icon";
 import { lineTotal } from "@erp/pos/features/checkout/lib/checkoutUtils";
 import { cn, formatVnd } from "@erp/ui";
@@ -9,6 +10,20 @@ export interface InvoiceLineItemRowProps {
   selected: boolean;
   /** Show the red warning dot before SL (e.g. line is at stock cap). */
   hasWarning?: boolean;
+  /**
+   * When `=== line.lineId`, the row automatically focuses and selects the qty
+   * input (for the MISA flow: after pressing Enter to add a product, focus
+   * moves to the qty field of the newly added line).
+   */
+  autoFocusQty?: boolean;
+  /** Called after the row has consumed the focus event, so the parent can reset pendingFocusLineId. */
+  onAutoFocusConsumed?: () => void;
+  /**
+   * Enter on the qty input triggers this callback — the host uses it to return
+   * focus to the product search field, completing one "add product → change qty
+   * → search next product" cycle.
+   */
+  onCommitQty?: () => void;
   onSelect: (lineId: string) => void;
   onRemove: (lineId: string) => void;
   onChangeQty: (lineId: string, raw: string) => void;
@@ -22,6 +37,9 @@ export function InvoiceLineItemRow({
   line,
   selected,
   hasWarning,
+  autoFocusQty,
+  onAutoFocusConsumed,
+  onCommitQty,
   onSelect,
   onRemove,
   onChangeQty,
@@ -31,6 +49,26 @@ export function InvoiceLineItemRow({
   const rowTotal = lineTotal(line);
   const isReturnCredit = Boolean(line.isReturnCredit);
   const displayQty = isReturnCredit ? -line.qty : line.qty;
+
+  const qtyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusQty) return;
+    const el = qtyInputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+    onAutoFocusConsumed?.();
+  }, [autoFocusQty, onAutoFocusConsumed]);
+
+  const handleQtyKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      qtyInputRef.current?.blur();
+      onCommitQty?.();
+    }
+  };
+
   return (
     <tr
       onClick={() => onSelect(line.lineId)}
@@ -76,6 +114,7 @@ export function InvoiceLineItemRow({
             </button>
           ) : null}
           <input
+            ref={qtyInputRef}
             type="number"
             inputMode="numeric"
             min={isReturnCredit ? -line.maxQty : 1}
@@ -83,6 +122,7 @@ export function InvoiceLineItemRow({
             value={displayQty}
             onChange={(e) => onChangeQty(line.lineId, e.target.value)}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleQtyKeyDown}
             aria-label={`Số lượng ${line.name}`}
             className="h-7 w-10 rounded-md border border-gray-200 bg-white px-1 text-center text-[14px] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />

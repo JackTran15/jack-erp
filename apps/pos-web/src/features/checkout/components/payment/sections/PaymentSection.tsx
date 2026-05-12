@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { formatVnd } from "@erp/ui";
 import { AlertBar } from "../../common/AlertBar";
 import { PosTextarea } from "@erp/pos/components/form/PosTextarea";
@@ -18,6 +19,8 @@ interface PaymentSectionProps {
   methods: readonly PaymentMethodOption[];
   onChangePaymentLines: (lines: PaymentLine[]) => void;
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  /** Ref forwarded to the amount input of the first payment line (for F12). */
+  paymentAmountRef?: Ref<HTMLInputElement>;
   changeAmount: number;
   shortageAmount: number;
   showKeepChange: boolean;
@@ -40,6 +43,7 @@ export function PaymentSection({
   methods,
   onChangePaymentLines,
   paymentAmountReadOnly,
+  paymentAmountRef,
   changeAmount,
   shortageAmount,
   showKeepChange,
@@ -68,6 +72,7 @@ export function PaymentSection({
           methods={methods}
           onChange={onChangePaymentLines}
           amountReadOnly={paymentAmountReadOnly}
+          amountInputRef={paymentAmountRef}
         />
       </div>
       <div className="border-t border-gray-200 px-4 py-2">

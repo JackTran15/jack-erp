@@ -134,6 +134,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangePaymentLines: (lines: PaymentLine[]) => void;
   /** Optional read-only predicate forwarded to `PaymentMethodList`. */
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  paymentAmountRef?: React.Ref<HTMLInputElement>;
   changeAmount: number;
   shortageAmount: number;
 
@@ -229,6 +230,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     paymentLines,
     onChangePaymentLines,
     paymentAmountReadOnly,
+    paymentAmountRef,
     changeAmount,
     shortageAmount,
     keepChange,
@@ -418,6 +420,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           methods={methods}
           onChangePaymentLines={onChangePaymentLines}
           paymentAmountReadOnly={paymentAmountReadOnly}
+          paymentAmountRef={paymentAmountRef}
           changeAmount={changeAmount}
           shortageAmount={shortageAmount}
           showKeepChange={showKeepChange}

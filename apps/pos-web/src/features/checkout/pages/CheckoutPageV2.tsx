@@ -31,6 +31,7 @@ import {
 import { PaymentSummaryPanel } from "../components/payment/PaymentSummaryPanel";
 import type { PromotionItem } from "../components/payment/promotion/types";
 import type { InvoicePayload } from "../components/printing/types";
+import { useInvoicePrinter } from "../components/printing/useInvoicePrinter";
 import { POSToolbar } from "../components/toolbar/POSToolbar";
 import {
   CheckoutVariantEnum,
@@ -58,6 +59,10 @@ export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
+  const [pendingQtyFocusLineId, setPendingQtyFocusLineId] = useState<
+    string | null
+  >(null);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
@@ -224,9 +229,13 @@ export function CheckoutPageV2() {
     (p: PosCatalogLine) => {
       const atDef = locationQtyFor(p);
       if (atDef >= 1) {
-        addProduct(p);
+        const lineId = addProduct(p);
         setToolbar((s) => ({ ...s, query: "" }));
-        productSearchRef.current?.focus();
+        // MISA flow: focus chuyển sang ô SL của dòng vừa thêm (Bước 2).
+        // Khi user gõ SL xong + Enter, InvoiceLineItemRow gọi onCommitQty
+        // để focus quay lại ô tìm SP cho lần thêm tiếp theo (Bước 3).
+        if (lineId) setPendingQtyFocusLineId(lineId);
+        else productSearchRef.current?.focus();
       } else {
         setCartError("Hết tồn.");
       }
@@ -238,9 +247,10 @@ export function CheckoutPageV2() {
     (q: string): boolean => {
       const matched = filteredProducts;
       if (matched.length === 1) {
-        addProduct(matched[0]!);
+        const lineId = addProduct(matched[0]!);
         setToolbar((s) => ({ ...s, query: "" }));
-        productSearchRef.current?.focus();
+        if (lineId) setPendingQtyFocusLineId(lineId);
+        else productSearchRef.current?.focus();
       } else if (matched.length === 0) {
         setCartError("Không tìm thấy hàng phù hợp.");
       } else {
@@ -255,10 +265,20 @@ export function CheckoutPageV2() {
 
   const handleCatalogSelect = useCallback(
     (product: CatalogProduct) => {
-      handleCatalogSelectFromCart(product, catalog);
+      const lineId = handleCatalogSelectFromCart(product, catalog);
+      if (lineId) setPendingQtyFocusLineId(lineId);
     },
     [catalog, handleCatalogSelectFromCart],
   );
+
+  const handleQtyAutoFocusConsumed = useCallback(() => {
+    setPendingQtyFocusLineId(null);
+  }, []);
+
+  const handleCommitQty = useCallback(() => {
+    productSearchRef.current?.focus();
+    productSearchRef.current?.select();
+  }, []);
 
   const settlementAbs = grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
 
@@ -498,24 +518,52 @@ export function CheckoutPageV2() {
     setCartError,
   ]);
 
-  useCheckoutHotkeys({
-    productSearchRef,
-    customerSearchRef,
-    hasCartItems: hasAnyCartLines,
-    onCheckout: () => handleCheckout({ preventDefault: () => {} }),
-    onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
-  });
+  const printer = useInvoicePrinter();
 
-  const buildInvoicePayload = (): InvoicePayload | null =>
-    buildCheckoutInvoicePayload({
+  const buildInvoicePayload = useCallback(
+    (): InvoicePayload | null =>
+      buildCheckoutInvoicePayload({
+        printInvoice,
+        cart: receiptLines,
+        grandTotal,
+        totalPaid,
+        paymentLines,
+        primaryMethodLabel,
+        methods: PAYMENT_METHODS,
+      }),
+    [
       printInvoice,
-      cart: receiptLines,
+      receiptLines,
       grandTotal,
       totalPaid,
       paymentLines,
       primaryMethodLabel,
-      methods: PAYMENT_METHODS,
-    });
+    ],
+  );
+
+  // F9 path: mirror PaymentCTAButtons.handleCollect so the hotkey prints
+  // the receipt before committing. Print errors must not block the commit.
+  const handleHotkeyCheckout = useCallback(async () => {
+    const payload = buildInvoicePayload();
+    if (payload) {
+      try {
+        await printer.print(payload);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("Lỗi in hóa đơn:", err);
+      }
+    }
+    handleCheckout({ preventDefault: () => {} });
+  }, [buildInvoicePayload, printer, handleCheckout]);
+
+  useCheckoutHotkeys({
+    productSearchRef,
+    customerSearchRef,
+    paymentAmountRef,
+    hasCartItems: hasAnyCartLines,
+    onCheckout: handleHotkeyCheckout,
+    onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
+  });
 
   const quickExchangeReturnQty = useMemo(
     () => returnCart.reduce((s, l) => s + l.qty, 0),
@@ -655,6 +703,9 @@ export function CheckoutPageV2() {
             lines={cart}
             selectedId={selectedLineId}
             isLineWarning={isLineWarning}
+            autoFocusQtyLineId={pendingQtyFocusLineId}
+            onAutoFocusConsumed={handleQtyAutoFocusConsumed}
+            onCommitQty={handleCommitQty}
             onSelect={setSelectedLineId}
             onRemove={removeLine}
             onChangeQty={updateQty}
@@ -695,6 +746,7 @@ export function CheckoutPageV2() {
 
         <PaymentSummaryPanel<CustomerRow>
           ref={customerSearchRef}
+          paymentAmountRef={paymentAmountRef}
           datetime={datetime}
           saleMode="Tại cửa hàng"
           customerQuery={customerQuery}
