@@ -13,8 +13,10 @@ import {
 import { isCartLineWarning, locationQtyFor } from "../lib/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
+  POS_CHECKOUT_QTY_MIN,
   safePosCheckoutQtyFromRaw,
 } from "../lib/posCheckoutQty";
+import { clampReturnQty } from "../../return-goods/lib/returnGoodsMath";
 import { netSessionGrandTotal } from "../lib/checkoutSessionTotals";
 
 function isSignedNegativeQtyCart(
@@ -200,7 +202,14 @@ export function useCheckoutSessionCart({
         const safe = safePosCheckoutQtyFromRaw(raw, {
           treatAsSignedReturnMagnitude: signedReturnUi,
         });
-        return prev.map((l) => (l.lineId === lineId ? { ...l, qty: safe } : l));
+        let nextQty = safe;
+        if (line.isReturnCredit) {
+          const capped = clampReturnQty(safe, line.maxQty);
+          nextQty = capped > 0 ? capped : POS_CHECKOUT_QTY_MIN;
+        }
+        return prev.map((l) =>
+          l.lineId === lineId ? { ...l, qty: nextQty } : l,
+        );
       });
     },
     [targetCartUpdater, variant, activeCheckoutPane],
@@ -211,12 +220,15 @@ export function useCheckoutSessionCart({
       targetCartUpdater((prev) => {
         const line = prev.find((x) => x.lineId === lineId);
         if (!line) return prev;
-        const next = line.qty + delta;
+        let next = line.qty + delta;
         if (next < 1) return prev;
+        if (line.isReturnCredit) {
+          next = Math.min(next, Math.max(line.maxQty, 1));
+        }
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
     },
-    [targetCartUpdater, setCartError],
+    [targetCartUpdater],
   );
 
   const removeLine = useCallback(

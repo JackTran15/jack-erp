@@ -26,10 +26,8 @@ interface PaymentSectionProps {
   shortageAmount: number;
 
   /**
-   * A single `keepChange` boolean powers both "Khách không lấy tiền thừa"
-   * (when overpaid) and "Bớt tiền lẻ cho khách" (when underpaid). The two
-   * `show*` flags decide which row to render — only one can ever be true
-   * at a time since the sale is either over- or under-paid.
+   * Single `keepChange` flag: sale shows one of two rows from raw deltas;
+   * refund uses one row for waive remainder or excess payout.
    */
   showKeepChange: boolean;
   showForgiveShortage: boolean;
@@ -74,10 +72,7 @@ export function PaymentSection({
   onNoteChange,
   onPrintQr,
 }: PaymentSectionProps) {
-  // Signed display: positive = change to give back, negative = shortage.
-  // Only one of changeAmount / shortageAmount is non-zero at a time (the
-  // sale either over- or under-paid), so the subtraction picks the right
-  // sign without an explicit branch.
+  // Signed net for styling: positive = change due, negative = shortage (sale).
   const netChangeDisplay = changeAmount - shortageAmount;
   const refundDisplayAmount = Math.max(0, -total);
   return (
@@ -154,7 +149,9 @@ export function PaymentSection({
             amount={
               keepChange
                 ? isRefundFlow
-                  ? refundDisplayAmount
+                  ? rawShortageAmount > 0
+                    ? rawShortageAmount
+                    : rawChangeAmount
                   : rawChangeAmount
                 : 0
             }
@@ -167,13 +164,11 @@ export function PaymentSection({
             amount={keepChange ? rawShortageAmount : 0}
           />
         ) : null}
-        {!isRefundFlow ? (
-          <DebtCheckRow
-            checked={debt}
-            onChange={onDebtChange}
-            amount={debtAmount}
-          />
-        ) : null}
+        <DebtCheckRow
+          checked={debt}
+          onChange={onDebtChange}
+          amount={debtAmount}
+        />
       </div>
       <div className="border-t border-b border-gray-200 px-4">
         <PosTextarea

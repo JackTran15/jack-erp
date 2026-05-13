@@ -15,6 +15,10 @@ import type {
 } from "../components/types";
 import { PaymentMethodEnum } from "../constants/paymentMethod";
 import { buildSuggestions } from "../lib/checkoutUtils";
+import {
+  derivePaymentDisplay,
+  settlementAbsFromGrand,
+} from "../lib/checkoutSettlement";
 
 interface UseCheckoutPaymentInput {
   grandTotal: number;
@@ -25,10 +29,7 @@ interface UseCheckoutPaymentResult {
   paymentLines: PaymentLine[];
   setPaymentLines: Dispatch<SetStateAction<PaymentLine[]>>;
   /**
-   * "Forgive the residual delta" — single flag that powers both checkbox
-   * affordances. Surfaced as "Khách không lấy tiền thừa" when the customer
-   * overpaid and as "Bớt tiền lẻ cho khách" when underpaid; in either case
-   * checking it zeroes the effective change / shortage.
+   * Waive / forgive residual (only when debt is off — debt hides this path).
    */
   keepChange: boolean;
   setKeepChange: Dispatch<SetStateAction<boolean>>;
@@ -43,13 +44,9 @@ interface UseCheckoutPaymentResult {
   selectedSuggestionId: string | null;
   setSelectedSuggestionId: Dispatch<SetStateAction<string | null>>;
   totalPaid: number;
-  /** Unadjusted positive change (totalPaid − settlementAbs, ≥0). */
   rawChangeAmount: number;
-  /** Unadjusted shortage (settlementAbs − totalPaid, ≥0). */
   rawShortageAmount: number;
-  /** Effective change after applying `keepChange` (0 when checked). */
   changeAmount: number;
-  /** Effective shortage after applying `keepChange` (0 when checked). */
   shortageAmount: number;
   isShort: boolean;
   suggestions: CashSuggestion[];
@@ -80,31 +77,26 @@ export function useCheckoutPayment({
     () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
     [paymentLines],
   );
-  /**
-   * Amount to settle in VND (non-negative). For a net refund (grandTotal < 0),
-   * this is how much the shop owes the customer.
-   */
-  const settlementAbs =
-    grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
+
+  const settlementAbs = settlementAbsFromGrand(grandTotal);
   const isRefundFlow = grandTotal < 0;
-  const remainingSettlementAmount = Math.max(0, settlementAbs - totalPaid);
 
-  /** Positive excess vs settlement target (sale: tiền thừa; refund: trả dư). */
-  const rawChangeAmount =
-    isRefundFlow
-      ? Math.max(0, totalPaid - settlementAbs)
-      : Math.max(0, totalPaid - settlementAbs);
-  /** Only when the customer still owes the shop (positive net). */
-  const rawShortageAmount =
-    isRefundFlow ? 0 : Math.max(0, settlementAbs - totalPaid);
+  const rawChangeAmount = Math.max(0, totalPaid - settlementAbs);
+  const rawShortageAmount = Math.max(0, settlementAbs - totalPaid);
 
-  // The single `keepChange` flag zeroes whichever side of the delta is
-  // non-zero. Only one side is ever non-zero at a time (the sale either
-  // over- or under-paid), so applying the flag to both sides is safe and
-  // saves having a second mirror state for the under-paid case.
-  const changeAmount = keepChange ? 0 : rawChangeAmount;
-  const shortageAmount = keepChange ? 0 : rawShortageAmount;
-  const isShort = grandTotal > 0 && totalPaid > 0 && rawShortageAmount > 0;
+  const { changeAmount, shortageAmount, debtAmount } = useMemo(
+    () =>
+      derivePaymentDisplay({
+        grandTotal,
+        totalPaid,
+        keepChange,
+        debt,
+      }),
+    [grandTotal, totalPaid, keepChange, debt],
+  );
+
+  const isShort = grandTotal > 0 && rawShortageAmount > 0;
+
   const suggestions = useMemo(
     () => buildSuggestions(isRefundFlow ? settlementAbs : grandTotal),
     [grandTotal, isRefundFlow, settlementAbs],
@@ -116,11 +108,6 @@ export function useCheckoutPayment({
       String(primaryMethod),
     [methods, primaryMethod],
   );
-  const debtAmount = debt
-    ? isRefundFlow
-      ? remainingSettlementAmount
-      : shortageAmount
-    : 0;
 
   const handlePickSuggestion = useCallback((s: CashSuggestion) => {
     setSelectedSuggestionId(s.id);

@@ -4,6 +4,7 @@ import type {
   CartLine,
   PaymentMethodOption,
 } from "../components/types";
+import { deriveInvoiceTotals } from "./checkoutSettlement";
 import { lineTotal, resolvePaymentMethodLabel } from "./checkoutUtils";
 
 /** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
@@ -36,13 +37,9 @@ interface BuildCheckoutInvoicePayloadInput {
   paymentLines: PaymentLine[];
   primaryMethodLabel: string;
   methods: readonly PaymentMethodOption[];
-  /**
-   * Mirrors `useCheckoutPayment.keepChange` — when `true`, the cashier opted
-   * to forgive the residual delta ("Khách không lấy tiền thừa" when overpaid
-   * or "Bớt tiền lẻ cho khách" when underpaid). Zeroes the receipt's
-   * "Trả lại khách" line so the printout matches the on-screen flow.
-   */
   keepChange: boolean;
+  /** Matches UI "Tính vào công nợ" (purchase and refund). */
+  debt: boolean;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -54,6 +51,7 @@ export function buildCheckoutInvoicePayload({
   primaryMethodLabel,
   methods,
   keepChange,
+  debt,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -61,7 +59,6 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
     0,
   );
-  const isRefundFlow = grandTotal < 0;
   const paid = totalPaid > 0 ? totalPaid : 0;
   const payments =
     totalPaid > 0
@@ -73,23 +70,7 @@ export function buildCheckoutInvoicePayload({
           }))
       : [{ label: primaryMethodLabel, amount: 0 }];
 
-  // Signed "Trả lại khách":
-  //   Sale  (grandTotal >= 0): totalPaid − grandTotal       (positive=change, negative=short)
-  //   Refund (grandTotal <  0): max(0, |grandTotal| − totalPaid)  (positive=shop still owes)
-  // `keepChange` zeroes it in either direction — see input docs above.
-  const rawSignedChange =
-    grandTotal < 0
-      ? Math.max(0, -grandTotal - totalPaid)
-      : totalPaid - grandTotal;
-  const change = keepChange ? 0 : rawSignedChange;
-  // Echo the forgiven amount on its own labeled row. Only one of these is
-  // non-zero at a time (the sale was either over- or under-paid).
-  const keptChange =
-    keepChange && rawSignedChange > 0 ? rawSignedChange : undefined;
-  const forgivenShortage =
-    keepChange && !isRefundFlow && rawSignedChange < 0
-      ? -rawSignedChange
-      : undefined;
+  const t = deriveInvoiceTotals({ grandTotal, totalPaid, keepChange, debt });
 
   return {
     store: STORE_INFO,
@@ -106,9 +87,11 @@ export function buildCheckoutInvoicePayload({
       subtotal: grandTotal,
       grandTotal,
       paid,
-      change,
-      keptChange,
-      forgivenShortage,
+      change: t.change,
+      keptChange: t.keptChange,
+      forgivenShortage: t.forgivenShortage,
+      debtReduction: t.debtReduction,
+      customerDebtIssued: t.customerDebtIssued,
     },
     payments,
     policy: RETURN_POLICY,

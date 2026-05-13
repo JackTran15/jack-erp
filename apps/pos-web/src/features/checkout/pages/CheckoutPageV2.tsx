@@ -280,7 +280,7 @@ export function CheckoutPageV2() {
   const [deposit, setDeposit] = useState(0);
   const settlementGrandTotal = grandTotal - deposit;
 
-  const { setDebt, ...paymentCore } = useCheckoutPayment({
+  const { setDebt, setKeepChange, ...paymentCore } = useCheckoutPayment({
     grandTotal: settlementGrandTotal,
     methods: PAYMENT_METHODS,
   });
@@ -291,9 +291,12 @@ export function CheckoutPageV2() {
         setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
         return;
       }
+      if (next) {
+        setKeepChange(false);
+      }
       setDebt(next);
     },
-    [selectedCustomer, setCartError, setDebt],
+    [selectedCustomer, setCartError, setDebt, setKeepChange],
   );
 
   const handleRequireCustomerForDeposit = useCallback(() => {
@@ -307,6 +310,7 @@ export function CheckoutPageV2() {
     handleDebtChange,
     handleRequireCustomerForDeposit,
     setDebt,
+    setKeepChange,
     ...paymentCore,
   };
   setKeepChangeRef.current = payment.setKeepChange;
@@ -362,6 +366,7 @@ export function CheckoutPageV2() {
       primaryMethodLabel: payment.primaryMethodLabel,
       methods: PAYMENT_METHODS,
       keepChange: payment.keepChange,
+      debt: payment.debt,
     });
   }, [
     payment.printInvoice,
@@ -371,6 +376,7 @@ export function CheckoutPageV2() {
     payment.paymentLines,
     payment.primaryMethodLabel,
     payment.keepChange,
+    payment.debt,
   ]);
 
   const printReceiptIfNeeded = useCallback(
@@ -400,10 +406,19 @@ export function CheckoutPageV2() {
         setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
         return false;
       }
+      if (purchaseCart.some((l) => l.isReturnCredit && l.qty > l.maxQty)) {
+        setCartError(
+          "Số lượng hoàn trả vượt quá số lượng được phép trên hóa đơn gốc. Vui lòng kiểm tra lại.",
+        );
+        return false;
+      }
+      const saleNetReturnToCustomer =
+        payment.changeAmount - payment.shortageAmount;
       if (
         settlementGrandTotal > 0 &&
-        payment.totalPaid > 0 &&
-        payment.totalPaid < settlementGrandTotal
+        saleNetReturnToCustomer < 0 &&
+        !payment.keepChange &&
+        !(payment.debt && selectedCustomer)
       ) {
         setCartError(
           "Bạn chưa nhập đủ số tiền cần thanh toán. Vui lòng kiểm tra lại!",
@@ -413,7 +428,8 @@ export function CheckoutPageV2() {
       if (
         settlementGrandTotal < 0 &&
         payment.totalPaid < settlementAbsCheckout &&
-        !payment.keepChange
+        !payment.keepChange &&
+        !(payment.debt && selectedCustomer)
       ) {
         setCartError(
           "Bạn chưa nhập đủ số tiền cần trả khách. Vui lòng kiểm tra lại!",
@@ -454,10 +470,11 @@ export function CheckoutPageV2() {
     },
     [
       announce,
+      payment.changeAmount,
       payment.debt,
-      payment.primaryMethod,
-      payment.totalPaid,
       payment.keepChange,
+      payment.primaryMethod,
+      payment.shortageAmount,
       hasAnyCartLines,
       purchaseCart,
       resetActiveSessionAfterCheckout,
@@ -716,6 +733,23 @@ export function CheckoutPageV2() {
     quickExchangeReturnQty,
   ]);
 
+  /** Sale: negative net change on panel means underpaid — block collect unless forgive/debt. */
+  const collectBlockedByShortPayment = useMemo(() => {
+    if (settlementGrandTotal <= 0) return false;
+    const net = payment.changeAmount - payment.shortageAmount;
+    if (net >= 0) return false;
+    if (payment.keepChange) return false;
+    if (payment.debt && selectedCustomer) return false;
+    return true;
+  }, [
+    settlementGrandTotal,
+    payment.changeAmount,
+    payment.shortageAmount,
+    payment.keepChange,
+    payment.debt,
+    selectedCustomer,
+  ]);
+
   return (
     <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
       <div
@@ -965,9 +999,9 @@ export function CheckoutPageV2() {
           paymentLines={payment.paymentLines}
           onChangePaymentLines={payment.handleChangePaymentLines}
           changeAmount={payment.changeAmount}
-          shortageAmount={payment.isShort ? payment.shortageAmount : 0}
+          shortageAmount={payment.shortageAmount}
           rawChangeAmount={payment.rawChangeAmount}
-          rawShortageAmount={payment.isShort ? payment.rawShortageAmount : 0}
+          rawShortageAmount={payment.rawShortageAmount}
           keepChange={payment.keepChange}
           onKeepChangeChange={payment.setKeepChange}
           debt={payment.debt}
@@ -987,7 +1021,7 @@ export function CheckoutPageV2() {
             isReturnExchangeInvoice ? handleRequestCancelInvoice : undefined
           }
           onCollect={finalizeCheckoutAndPrint}
-          collectDisabled={!hasAnyCartLines}
+          collectDisabled={!hasAnyCartLines || collectBlockedByShortPayment}
         />
       </div>
 

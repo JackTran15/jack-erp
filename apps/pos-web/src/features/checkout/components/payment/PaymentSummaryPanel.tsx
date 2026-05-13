@@ -143,11 +143,10 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   /** Raw shortage amount (unaffected by `forgiveShortage`) — drives row visibility. */
   rawShortageAmount: number;
 
-  // "Forgive the residual delta" — a single boolean drives both visual
-  // affordances. Surfaced as "Khách không lấy tiền thừa" when the customer
-  // overpaid (rawChangeAmount > 0) and as "Bớt tiền lẻ cho khách" when the
-  // customer underpaid (rawShortageAmount > 0). Provide both prop + setter
-  // to enable the row in either direction.
+  /**
+   * When set with `onKeepChangeChange`, drives keep-change / forgive-shortage
+   * rows: sale uses raw overpay vs raw shortage; refund uses one row for waive.
+   */
   keepChange?: boolean;
   onKeepChangeChange?: (next: boolean) => void;
 
@@ -264,10 +263,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const amountDue = Math.max(0, total - deposit);
   const hasCustomer = Boolean(selectedCustomerLabel);
 
-  // Split-button on the customer row:
-  //   • Gift icon ("Voucher / Quà tặng") → promotion-selection dialog.
-  //   • Chevron secondary trigger → legacy `PromoMenu` (3 quick options).
-  // Both states live here so `customerActions` below can wire each trigger.
+  // Split-button on the customer row: gift opens promotion dialog; chevron opens PromoMenu.
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
 
@@ -327,9 +323,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
             onSelect={(opt) => {
-              // "Khuyến mãi" reuses the same PromotionSelectionModal mounted
-              // for the gift split-button — single source of truth for the
-              // promotion picker.
+              // Discount option reuses the same modal as the gift primary action.
               if (opt === PromoMenuOptionEnum.DISCOUNT) {
                 setPromotionDialogOpen(true);
               }
@@ -364,18 +358,19 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     customerExtraActions,
   ]);
 
-  // Both checkbox rows are mutually exclusive (the sale is either over- or
-  // under-paid, never both) and share the single `keepChange` flag. Keying
-  // off the *raw* amounts (not the effective `changeAmount` / `shortageAmount`)
-  // keeps the row visible once the user checks the box — otherwise checking
-  // would zero the effective amount and immediately hide the row.
+  // keepChange wires two sale rows (mutually exclusive) and one refund row.
+  // Visibility keys off raw amounts so the row stays visible after checking.
   const isRefundFlow = total < 0;
   const hasKeepChangeWire =
     typeof keepChange === "boolean" && typeof onKeepChangeChange === "function";
   const showKeepChange =
-    hasKeepChangeWire && (isRefundFlow || rawChangeAmount > 0);
+    hasKeepChangeWire &&
+    !debt &&
+    (isRefundFlow
+      ? rawChangeAmount > 0 || rawShortageAmount > 0
+      : rawChangeAmount > 0);
   const showForgiveShortage =
-    hasKeepChangeWire && !isRefundFlow && rawShortageAmount > 0;
+    hasKeepChangeWire && !debt && !isRefundFlow && rawShortageAmount > 0;
 
   const handleOpenDepositDialog = () => {
     if (!selectedCustomerId) {

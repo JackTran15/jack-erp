@@ -38,8 +38,8 @@ export function getOversellSaleLines(lines: CartLine[]): CartLine[] {
   return lines.filter(lineExceedsOnHandSnapshot);
 }
 
+/** Cảnh báo SL: bán vượt tồn hoặc hoàn vượt SL được phép trên hóa đơn gốc (`maxQty`). */
 export function isCartLineWarning(line: CartLine): boolean {
-  if (line.isReturnCredit) return false;
   return line.qty > line.maxQty;
 }
 
