@@ -26,6 +26,12 @@ export function KeepChangeRow({
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onChange(!checked);
+            }
+          }}
           className="h-4 w-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
         />
         Khách không lấy tiền thừa

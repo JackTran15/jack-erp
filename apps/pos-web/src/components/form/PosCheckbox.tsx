@@ -27,6 +27,12 @@ export function PosCheckbox({
         checked={checked}
         aria-label={ariaLabel}
         onChange={(e) => onChange(e.target.checked)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onChange(!checked);
+          }
+        }}
         className="peer absolute inset-0 cursor-pointer opacity-0"
       />
       <span
