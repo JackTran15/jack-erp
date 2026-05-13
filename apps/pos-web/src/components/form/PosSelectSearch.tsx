@@ -143,24 +143,6 @@ export function PosSelectSearch<T>({
 
   useEffect(() => {
     if (!open) return;
-    const root = rootRef.current;
-    if (!root) return;
-    const onFocusOut = (e: FocusEvent) => {
-      const next = e.relatedTarget;
-      if (next instanceof Node) {
-        if (menuRef.current?.contains(next)) return;
-        if (root.contains(next)) return;
-      }
-      setOpen(false);
-      setQuery("");
-      setHighlightIdx(-1);
-    };
-    root.addEventListener("focusout", onFocusOut);
-    return () => root.removeEventListener("focusout", onFocusOut);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     const update = () => {
       const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -199,10 +181,6 @@ export function PosSelectSearch<T>({
         e.preventDefault();
         closeMenu();
       }
-      return;
-    }
-    if (e.key === "Tab" && open) {
-      closeMenu();
       return;
     }
     if (!open) {

@@ -30,7 +30,7 @@ export function KeepChangeRow({
         />
         Khách không lấy tiền thừa
       </span>
-      <span className="text-gray-900">{formatVnd(amount)}</span>
+      <span className="text-gray-500">{formatVnd(amount)}</span>
     </label>
   );
 }

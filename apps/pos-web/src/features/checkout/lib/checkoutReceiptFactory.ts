@@ -61,8 +61,7 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
     0,
   );
-  const isRefundFlow = grandTotal < 0;
-  const paid = totalPaid > 0 ? totalPaid : 0;
+  const paid = totalPaid > 0 ? totalPaid : grandTotal;
   const payments =
     totalPaid > 0
       ? paymentLines
@@ -71,7 +70,7 @@ export function buildCheckoutInvoicePayload({
             label: resolvePaymentMethodLabel(l.method, methods),
             amount: l.amount,
           }))
-      : [{ label: primaryMethodLabel, amount: 0 }];
+      : [{ label: primaryMethodLabel, amount: grandTotal }];
 
   // Signed "Trả lại khách":
   //   Sale  (grandTotal >= 0): totalPaid − grandTotal       (positive=change, negative=short)
@@ -87,9 +86,7 @@ export function buildCheckoutInvoicePayload({
   const keptChange =
     keepChange && rawSignedChange > 0 ? rawSignedChange : undefined;
   const forgivenShortage =
-    keepChange && !isRefundFlow && rawSignedChange < 0
-      ? -rawSignedChange
-      : undefined;
+    keepChange && rawSignedChange < 0 ? -rawSignedChange : undefined;
 
   return {
     store: STORE_INFO,

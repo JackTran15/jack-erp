@@ -9,7 +9,7 @@ import {
 import type { SearchSuggestion } from "../components/common/SearchPopover";
 import type { CatalogProduct } from "../components/types";
 import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
-import { matchesCatalogQuery } from "../lib/checkoutUtils";
+import { locationQtyFor, matchesCatalogQuery } from "../lib/checkoutUtils";
 
 interface ToolbarState {
   query: string;
@@ -94,6 +94,7 @@ export function useCheckoutCatalog(
       const matched = catalog.filter((p) => matchesCatalogQuery(p, q));
       return matched.slice(0, 8).map((p) => ({
         item: p,
+        disabled: locationQtyFor(p) < 1,
       }));
     },
     [catalog],

@@ -7,7 +7,6 @@ export interface PaymentSummaryBlockProps {
   total: number;
   deposit: number;
   amountDue: number;
-  onDepositClick?: () => void;
 }
 
 /**
@@ -18,8 +17,7 @@ export function PaymentSummaryBlock({
   itemCount,
   total,
   deposit,
-  amountDue: _amountDue,
-  onDepositClick,
+  amountDue,
 }: PaymentSummaryBlockProps) {
   return (
     <div className="space-y-2 py-3">
@@ -33,21 +31,16 @@ export function PaymentSummaryBlock({
         emphasis="strong"
       />
       <SummaryRow
-        label={
-          onDepositClick ? (
-            <button
-              type="button"
-              onClick={onDepositClick}
-              className="text-sm  text-indigo-600 hover:text-indigo-700"
-            >
-              Đặt cọc
-            </button>
-          ) : (
-            "Đặt cọc"
-          )
-        }
+        label="Đặt cọc"
         value={formatVnd(deposit)}
       />
+      <div className="border-t border-gray-200 pt-3">
+        <SummaryRow
+          label={<span className="font-medium text-gray-900">Còn phải thu</span>}
+          value={formatVnd(amountDue)}
+          emphasis="xl"
+        />
+      </div>
     </div>
   );
 }

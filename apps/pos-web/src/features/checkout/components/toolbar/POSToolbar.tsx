@@ -10,13 +10,8 @@ import {
 } from "@erp/pos/components/form/PosSelectSearch";
 import type { SearchSuggestion } from "../common/SearchPopover";
 import { ProductSearchInput } from "./ProductSearchInput";
+import { QuantityInput } from "./QuantityInput";
 import { ToggleField } from "./ToggleField";
-import { PosQuantityInput } from "@erp/pos/components/form/PosQuantityInput";
-import {
-  POS_CHECKOUT_QTY_MIN,
-  clampPosCheckoutQtyNumber,
-  safePosCheckoutQtyFromRaw,
-} from "../../lib/posCheckoutQty";
 
 export interface POSToolbarState {
   query: string;
@@ -36,7 +31,7 @@ export interface POSToolbarProps<
 
   /** Wired to ProductSearchInput → SearchPopover. */
   productSearch: (q: string) => Promise<SearchSuggestion<TProduct>[]>;
-  onSelectProduct: (item: TProduct, qty: number) => void;
+  onSelectProduct: (item: TProduct) => void;
   productItemKey: (item: TProduct) => string;
   productRenderItem: (item: TProduct) => ReactNode;
   productRenderMeta?: (item: TProduct) => ReactNode;
@@ -88,7 +83,7 @@ export const POSToolbar = forwardRef(function POSToolbar<
             value={state.query}
             onChange={onQueryChange}
             search={productSearch}
-            onSelect={(item) => onSelectProduct(item, state.qty)}
+            onSelect={onSelectProduct}
             itemKey={productItemKey}
             renderItem={productRenderItem}
             renderMeta={productRenderMeta}
@@ -96,19 +91,7 @@ export const POSToolbar = forwardRef(function POSToolbar<
             disabled={productSearchDisabled}
           />
         </div>
-        <PosQuantityInput
-          displayValue={state.qty}
-          onChangeRaw={(raw) => onQtyChange(safePosCheckoutQtyFromRaw(raw))}
-          onBumpUp={() => onQtyChange(clampPosCheckoutQtyNumber(state.qty + 1))}
-          onBumpDown={() =>
-            onQtyChange(clampPosCheckoutQtyNumber(state.qty - 1))
-          }
-          leading={<span className="text-gray-500 pl-2">SL</span>}
-          className="w-24"
-          min={POS_CHECKOUT_QTY_MIN}
-          bumpDownDisabled={state.qty <= POS_CHECKOUT_QTY_MIN}
-          variant="boxed"
-        />
+        <QuantityInput value={state.qty} onChange={onQtyChange} />
       </div>
       <ToggleField
         label="Tách dòng"

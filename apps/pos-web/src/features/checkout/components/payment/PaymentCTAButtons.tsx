@@ -1,39 +1,71 @@
 import { useState } from "react";
 import { ArrowLeftIcon } from "@erp/pos/components/icons/Icon";
 import { KeyboardHint } from "../common/KeyboardHint";
+import type { InvoicePrinter } from "../printing/InvoicePrinter";
+import type { InvoicePayload } from "../printing/types";
+import { useInvoicePrinter } from "../printing/useInvoicePrinter";
+
+/**
+ * Either a ready payload, or a factory invoked at click time so the caller
+ * can capture *current* cart/customer state before it gets reset by `onCollect`.
+ * Returning `null` from the factory skips printing (e.g. when the user has
+ * the "In hóa đơn" toggle off).
+ */
+export type InvoicePayloadInput =
+  | InvoicePayload
+  | (() => InvoicePayload | null);
 
 export interface PaymentCTAButtonsProps {
   /** Sale mode: save draft. Omitted when {@link onCancelInvoice} is used. */
   onSaveDraft?: () => void;
   /** Return / exchange: opens cancel confirmation on the host page. */
   onCancelInvoice?: () => void;
-  /**
-   * "Thu tiền" — host runs validation, commits checkout, then prints if needed.
-   * May be async (e.g. receipt print).
-   */
-  onCollect: () => void | Promise<void>;
+  onCollect: () => void;
   collectDisabled?: boolean;
+
+  /** When provided, "Thu tiền" prints the receipt before invoking onCollect. */
+  invoice?: InvoicePayloadInput;
+  /** Per-call printer override (DI seam for tests / future thermal/PDF strategies). */
+  printer?: InvoicePrinter;
 }
 
 /**
  * Bottom payment row: save draft (sale), or icon-only cancel (return / exchange),
- * plus collect. Receipt printing is owned by {@link onCollect} after validation.
+ * plus collect. Receipt printing is opt-in via `invoice` + `useInvoicePrinter`.
  */
 export function PaymentCTAButtons({
   onSaveDraft,
   onCancelInvoice,
   onCollect,
   collectDisabled,
+  invoice,
+  printer: printerOverride,
 }: PaymentCTAButtonsProps) {
+  const printer = useInvoicePrinter(printerOverride);
   const [busy, setBusy] = useState(false);
+
+  const resolveInvoice = (): InvoicePayload | null => {
+    if (!invoice) return null;
+    return typeof invoice === "function" ? invoice() : invoice;
+  };
 
   const handleCollect = async () => {
     if (busy) return;
+    const payload = resolveInvoice();
+    if (!payload) {
+      onCollect();
+      return;
+    }
     setBusy(true);
     try {
-      await Promise.resolve(onCollect());
+      await printer.print(payload);
+    } catch (err) {
+      // Printing must never block business flow — just surface to console.
+      // eslint-disable-next-line no-console
+      console.error("Lỗi in hóa đơn:", err);
     } finally {
       setBusy(false);
+      onCollect();
     }
   };
 

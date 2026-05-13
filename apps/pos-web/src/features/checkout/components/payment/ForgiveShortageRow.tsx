@@ -36,7 +36,7 @@ export function ForgiveShortageRow({
         />
         Bớt tiền lẻ cho khách
       </span>
-      <span className="text-gray-900">{formatVnd(amount)}</span>
+      <span className="text-gray-500">{formatVnd(amount)}</span>
     </label>
   );
 }

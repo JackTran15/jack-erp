@@ -1,17 +1,17 @@
 import { cn } from "@erp/ui";
-import { CheckoutPane } from "@erp/pos/stores/usePosCheckoutSessionStore";
+import { ExchangePane } from "@erp/pos/stores/usePosCheckoutSessionStore";
 
 export interface CheckoutExchangeTabsProps {
-  activeCheckoutPane: CheckoutPane;
-  onSelectCheckoutPane: (pane: CheckoutPane) => void;
+  activePane: ExchangePane;
+  onSelectPane: (pane: ExchangePane) => void;
 }
 
 /**
  * "Trả hàng" / "Mua thêm" — only for quick-exchange checkout mode.
  */
 export function CheckoutExchangeTabs({
-  activeCheckoutPane,
-  onSelectCheckoutPane,
+  activePane,
+  onSelectPane,
 }: CheckoutExchangeTabsProps) {
   return (
     <div
@@ -22,34 +22,34 @@ export function CheckoutExchangeTabs({
       <button
         type="button"
         role="tab"
-        aria-selected={activeCheckoutPane === CheckoutPane.RETURN}
+        aria-selected={activePane === ExchangePane.RETURN}
         className={cn(
           "relative flex min-w-0 flex-1 items-center justify-center py-3 text-[14px] font-medium transition-colors",
-          activeCheckoutPane === CheckoutPane.RETURN
+          activePane === ExchangePane.RETURN
             ? "bg-orange-50/90 text-orange-600"
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
         )}
-        onClick={() => onSelectCheckoutPane(CheckoutPane.RETURN)}
+        onClick={() => onSelectPane(ExchangePane.RETURN)}
       >
         Trả hàng
-        {activeCheckoutPane === CheckoutPane.RETURN ? (
+        {activePane === ExchangePane.RETURN ? (
           <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-orange-600" />
         ) : null}
       </button>
       <button
         type="button"
         role="tab"
-        aria-selected={activeCheckoutPane === CheckoutPane.PURCHASE}
+        aria-selected={activePane === ExchangePane.PURCHASE}
         className={cn(
           "relative flex min-w-0 flex-1 items-center justify-center py-3 text-[14px] font-medium transition-colors",
-          activeCheckoutPane === CheckoutPane.PURCHASE
+          activePane === ExchangePane.PURCHASE
             ? "bg-emerald-50/90 text-emerald-800"
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
         )}
-        onClick={() => onSelectCheckoutPane(CheckoutPane.PURCHASE)}
+        onClick={() => onSelectPane(ExchangePane.PURCHASE)}
       >
         Mua thêm
-        {activeCheckoutPane === CheckoutPane.PURCHASE ? (
+        {activePane === ExchangePane.PURCHASE ? (
           <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-emerald-600" />
         ) : null}
       </button>

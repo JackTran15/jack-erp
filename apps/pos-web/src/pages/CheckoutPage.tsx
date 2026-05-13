@@ -308,6 +308,10 @@ export function CheckoutPage() {
       setCartError("Giỏ hàng trống.");
       return;
     }
+    if (cart.some((l) => l.unitPrice <= 0)) {
+      setCartError("Nhập đơn giá > 0 cho từng dòng hàng.");
+      return;
+    }
     if (payment === "CASH" && cashReceivedNum > 0 && cashReceivedNum < grandTotal) {
       setCartError("Tiền khách đưa chưa đủ.");
       return;

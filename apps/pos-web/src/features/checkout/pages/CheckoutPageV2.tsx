@@ -1,4 +1,13 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import type { PosSelectSearchSuggestion } from "@erp/pos/components/form/PosSelectSearch";
+import { CustomerCreateDialog } from "../components/customerCreate";
 import { useAnnounce } from "@erp/pos/hooks/useAnnounce";
 import {
   formatCustomerDisplay,
@@ -6,32 +15,16 @@ import {
 } from "@erp/pos/lib/customerApi";
 import { type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 import { usePosBranchStore } from "@erp/pos/stores/usePosBranchStore";
-import {
-  CheckoutPane,
-  usePosCheckoutSessionStore,
-} from "@erp/pos/stores/usePosCheckoutSessionStore";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type FormEvent,
-  type SetStateAction,
-} from "react";
-import { CustomerCreateDialog } from "../components/customerCreate";
+import { usePosCheckoutSessionStore } from "@erp/pos/stores/usePosCheckoutSessionStore";
 
-import { AppErrorDialog } from "@erp/pos/components/AppErrorDialog";
 import { formatViDateTime } from "@erp/pos/lib/dateTime";
-import { CancelInvoiceConfirmDialog } from "../components/CancelInvoiceConfirmDialog";
 import { PanelCollapseHandle } from "../components/catalog/PanelCollapseHandle";
 import { ProductCatalogGrid } from "../components/catalog/ProductCatalogGrid";
 import { ProductCatalogHeader } from "../components/catalog/ProductCatalogHeader";
 import { AlertBar } from "../components/common/AlertBar";
+import { CancelInvoiceConfirmDialog } from "../components/CancelInvoiceConfirmDialog";
 import { CheckoutExchangeTabs } from "../components/exchange/CheckoutExchangeTabs";
 import { InvoiceLineItemTable } from "../components/invoice/InvoiceLineItemTable";
-import { OversellCheckoutConfirmDialog } from "../components/invoice/OversellCheckoutConfirmDialog";
 import {
   createPaymentLine,
   type PaymentLine,
@@ -39,7 +32,6 @@ import {
 import { PaymentSummaryPanel } from "../components/payment/PaymentSummaryPanel";
 import type { PromotionItem } from "../components/payment/promotion/types";
 import type { InvoicePayload } from "../components/printing/types";
-import { useInvoicePrinter } from "../components/printing/useInvoicePrinter";
 import { POSToolbar } from "../components/toolbar/POSToolbar";
 import {
   CheckoutVariantEnum,
@@ -47,23 +39,6 @@ import {
   type DraftInvoice,
 } from "../components/types";
 import { PAYMENT_METHODS } from "../constants/paymentMethod";
-import { useCheckoutCatalog } from "../hooks/useCheckoutCatalog";
-import { useCheckoutCustomer } from "../hooks/useCheckoutCustomer";
-import { useCheckoutHotkeys } from "../hooks/useCheckoutHotkeys";
-import { useCheckoutPayment } from "../hooks/useCheckoutPayment";
-import { useCheckoutSessionCart } from "../hooks/useCheckoutSessionCart";
-import { buildCheckoutInvoicePayload } from "../lib/checkoutReceiptFactory";
-import { resetCheckoutSaleSession } from "../lib/checkoutSaleSession";
-import {
-  formatOnHand,
-  getOversellSaleLines,
-  lineTotal,
-  locationQtyFor,
-  paymentLabel,
-  promoOptionLabel,
-  resolvePaymentMethodLabel,
-} from "../lib/checkoutUtils";
-import { clampPosCheckoutQtyNumber } from "../lib/posCheckoutQty";
 
 interface Salesperson {
   id: string;
@@ -112,19 +87,29 @@ function buildLocalSearch<T>(
     return matched.map((item) => ({ item }));
   };
 }
+import { useCheckoutSessionCart } from "../hooks/useCheckoutSessionCart";
+import { useCheckoutCatalog } from "../hooks/useCheckoutCatalog";
+import { useCheckoutCustomer } from "../hooks/useCheckoutCustomer";
+import { useCheckoutHotkeys } from "../hooks/useCheckoutHotkeys";
+import { useCheckoutPayment } from "../hooks/useCheckoutPayment";
+import { buildCheckoutInvoicePayload } from "../lib/checkoutReceiptFactory";
+import { resetCheckoutSaleSession } from "../lib/checkoutSaleSession";
+import {
+  formatOnHand,
+  lineTotal,
+  locationQtyFor,
+  paymentLabel,
+  promoOptionLabel,
+  resolvePaymentMethodLabel,
+} from "../lib/checkoutUtils";
 
 export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
-
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
   const catalogSearchRef = useRef<HTMLInputElement>(null);
   const salespersonRef = useRef<HTMLInputElement>(null);
   const priceBookRef = useRef<HTMLInputElement>(null);
-  const setKeepChangeRef = useRef<Dispatch<SetStateAction<boolean>> | null>(
-    null,
-  );
-  const lastActiveSessionIdRef = useRef<string | null>(null);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
@@ -137,8 +122,8 @@ export function CheckoutPageV2() {
   const ensureHydratedShape = usePosCheckoutSessionStore(
     (s) => s.ensureHydratedShape,
   );
-  const setActiveCheckoutPane = usePosCheckoutSessionStore(
-    (s) => s.setActiveCheckoutPane,
+  const setActiveExchangePane = usePosCheckoutSessionStore(
+    (s) => s.setActiveExchangePane,
   );
 
   useEffect(() => {
@@ -164,12 +149,11 @@ export function CheckoutPageV2() {
   } = useCheckoutCatalog(branchId);
 
   const { message: announcement, announce } = useAnnounce();
-
   const {
     checkoutVariant,
     purchaseCart,
     returnCart,
-    activeCheckoutPane,
+    activeExchangePane,
     cart,
     selectedLineId,
     setSelectedLineId,
@@ -194,16 +178,6 @@ export function CheckoutPageV2() {
     [checkoutVariant],
   );
 
-  const invoiceTableCheckoutPane = useMemo<CheckoutPane>(() => {
-    if (
-      checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-      activeCheckoutPane === CheckoutPane.RETURN
-    ) {
-      return CheckoutPane.RETURN;
-    }
-    return CheckoutPane.PURCHASE;
-  }, [checkoutVariant, activeCheckoutPane]);
-
   const [selectedSalesperson, setSelectedSalesperson] =
     useState<Salesperson | null>(null);
   const [selectedPriceBook, setSelectedPriceBook] = useState<PriceBook | null>(
@@ -224,27 +198,6 @@ export function CheckoutPageV2() {
   );
   const catalogGroupSearch = useMemo(
     () => buildLocalSearch(CATALOG_GROUP_OPTIONS, (g) => g.name),
-    [],
-  );
-
-  const voucherLineSource = useMemo(() => {
-    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
-      return [...purchaseCart, ...returnCart];
-    }
-    return purchaseCart;
-  }, [checkoutVariant, purchaseCart, returnCart]);
-
-  const hasAnyCartLines = useMemo(() => {
-    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
-      return purchaseCart.length + returnCart.length > 0;
-    }
-    return purchaseCart.length > 0;
-  }, [checkoutVariant, purchaseCart, returnCart]);
-
-  const onCustomerSelectedClearKeepChange = useCallback(
-    (_customer: CustomerRow) => {
-      setKeepChangeRef.current?.(false);
-    },
     [],
   );
 
@@ -269,79 +222,52 @@ export function CheckoutPageV2() {
   } = useCheckoutCustomer({
     announce,
     formatCustomerLabel: formatCustomerDisplay,
-    onCustomerSelected: onCustomerSelectedClearKeepChange,
+    onCustomerSelected: () => setKeepChange(false),
+  });
+
+  const {
+    paymentLines,
+    setPaymentLines,
+    keepChange,
+    setKeepChange,
+    debt,
+    setDebt,
+    note,
+    setNote,
+    printInvoice,
+    setPrintInvoice,
+    preorder,
+    setPreorder,
+    selectedSuggestionId,
+    setSelectedSuggestionId,
+    totalPaid,
+    rawChangeAmount,
+    rawShortageAmount,
+    changeAmount,
+    shortageAmount,
+    isShort,
+    suggestions,
+    primaryMethod,
+    primaryMethodLabel,
+    debtAmount,
+    handlePickSuggestion,
+    handleChangePaymentLines,
+  } = useCheckoutPayment({
+    grandTotal,
+    methods: PAYMENT_METHODS,
   });
 
   const [appliedPromotion, setAppliedPromotion] =
     useState<PromotionItem | null>(null);
   const promotions = useMemo<PromotionItem[]>(() => [], []);
+
   const datetime = useMemo(() => formatViDateTime(new Date()), []);
 
-  const [deposit, setDeposit] = useState(0);
-  const settlementGrandTotal = grandTotal - deposit;
-
-  const { setDebt, ...paymentCore } = useCheckoutPayment({
-    grandTotal: settlementGrandTotal,
-    methods: PAYMENT_METHODS,
-  });
-
-  const handleDebtChange = useCallback(
-    (next: boolean) => {
-      if (next && !selectedCustomer) {
-        setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
-        return;
-      }
-      setDebt(next);
-    },
-    [selectedCustomer, setCartError, setDebt],
+  const labelForMethod = useCallback(
+    (m: PaymentLine["method"]): string =>
+      resolvePaymentMethodLabel(m, PAYMENT_METHODS),
+    [],
   );
-
-  const handleRequireCustomerForDeposit = useCallback(() => {
-    setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
-  }, [setCartError]);
-
-  const payment = {
-    deposit,
-    setDeposit,
-    settlementGrandTotal,
-    handleDebtChange,
-    handleRequireCustomerForDeposit,
-    setDebt,
-    ...paymentCore,
-  };
-  setKeepChangeRef.current = payment.setKeepChange;
-
-  const [cancelInvoiceDialogOpen, setCancelInvoiceDialogOpen] = useState(false);
-  const [oversellCheckoutOpen, setOversellCheckoutOpen] = useState(false);
-
-  const onResetLocalCheckoutUi = useCallback(() => {
-    resetCheckoutSaleSession({
-      setSelectedCustomer,
-      setCustomerQuery,
-      setCustomerFieldError,
-      setPaymentLines: payment.setPaymentLines,
-      setSelectedSuggestionId: payment.setSelectedSuggestionId,
-      setNote: payment.setNote,
-      setKeepChange: payment.setKeepChange,
-      setDebt: payment.setDebt,
-    });
-    payment.setDeposit(0);
-  }, [
-    setSelectedCustomer,
-    setCustomerQuery,
-    setCustomerFieldError,
-    payment.setPaymentLines,
-    payment.setSelectedSuggestionId,
-    payment.setNote,
-    payment.setKeepChange,
-    payment.setDebt,
-    payment.setDeposit,
-  ]);
-
-  const settlementAbsCheckout =
-    settlementGrandTotal < 0
-      ? -settlementGrandTotal
-      : Math.max(0, settlementGrandTotal);
 
   const receiptLines = useMemo(() => {
     if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
@@ -350,92 +276,89 @@ export function CheckoutPageV2() {
     return purchaseCart;
   }, [checkoutVariant, returnCart, purchaseCart]);
 
-  const invoicePrinter = useInvoicePrinter();
+  const voucherLineSource = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...purchaseCart, ...returnCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, purchaseCart, returnCart]);
 
-  const buildReceiptPayload = useCallback((): InvoicePayload | null => {
-    return buildCheckoutInvoicePayload({
-      printInvoice: payment.printInvoice,
-      cart: receiptLines,
-      grandTotal,
-      totalPaid: payment.totalPaid,
-      paymentLines: payment.paymentLines,
-      primaryMethodLabel: payment.primaryMethodLabel,
-      methods: PAYMENT_METHODS,
-      keepChange: payment.keepChange,
-    });
-  }, [
-    payment.printInvoice,
-    receiptLines,
-    grandTotal,
-    payment.totalPaid,
-    payment.paymentLines,
-    payment.primaryMethodLabel,
-    payment.keepChange,
-  ]);
+  const hasAnyCartLines = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return purchaseCart.length + returnCart.length > 0;
+    }
+    return purchaseCart.length > 0;
+  }, [checkoutVariant, purchaseCart, returnCart]);
 
-  const printReceiptIfNeeded = useCallback(
-    async (payload: InvoicePayload | null) => {
-      if (!payload) return;
-      try {
-        await invoicePrinter.print(payload);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("Lỗi in hóa đơn:", err);
+  const allLinesForPriceCheck = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...purchaseCart, ...returnCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, purchaseCart, returnCart]);
+
+  const handleSelectProduct = useCallback(
+    (p: PosCatalogLine) => {
+      const atDef = locationQtyFor(p);
+      if (atDef >= 1) {
+        addProduct(p);
+        setToolbar((s) => ({ ...s, query: "" }));
+        productSearchRef.current?.focus();
+      } else {
+        setCartError("Hết tồn.");
       }
     },
-    [invoicePrinter],
+    [addProduct],
   );
 
+  const handleSubmitProductQuery = useCallback(
+    (q: string): boolean => {
+      const matched = filteredProducts;
+      if (matched.length === 1) {
+        addProduct(matched[0]!);
+        setToolbar((s) => ({ ...s, query: "" }));
+        productSearchRef.current?.focus();
+      } else if (matched.length === 0) {
+        setCartError("Không tìm thấy hàng phù hợp.");
+      } else {
+        setCartError(
+          "Nhiều kết quả — chọn hàng bên dưới hoặc thu hẹp từ khóa.",
+        );
+      }
+      return true;
+    },
+    [addProduct, filteredProducts],
+  );
+
+  const handleCatalogSelect = useCallback(
+    (product: CatalogProduct) => {
+      handleCatalogSelectFromCart(product, catalog);
+    },
+    [catalog, handleCatalogSelectFromCart],
+  );
+
+  const settlementAbs = grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
+
   const handleCheckout = useCallback(
-    (
-      e: FormEvent | { preventDefault: () => void },
-      options?: { bypassOversellModal?: boolean },
-    ): boolean => {
+    (e: FormEvent | { preventDefault: () => void }) => {
       e.preventDefault();
       if (!hasAnyCartLines) {
         setCartError("Giỏ hàng trống.");
-        return false;
+        return;
       }
-      if (payment.debt && !selectedCustomer) {
-        setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
-        return false;
+      if (allLinesForPriceCheck.some((l) => l.unitPrice <= 0)) {
+        setCartError("Nhập đơn giá > 0 cho từng dòng hàng.");
+        return;
       }
-      if (
-        settlementGrandTotal > 0 &&
-        payment.totalPaid > 0 &&
-        payment.totalPaid < settlementGrandTotal
-      ) {
-        setCartError(
-          "Bạn chưa nhập đủ số tiền cần thanh toán. Vui lòng kiểm tra lại!",
-        );
-        return false;
+      if (grandTotal > 0 && totalPaid > 0 && totalPaid < grandTotal) {
+        setCartError("Tiền khách đưa chưa đủ.");
+        return;
       }
-      if (
-        settlementGrandTotal < 0 &&
-        payment.totalPaid < settlementAbsCheckout &&
-        !payment.keepChange
-      ) {
-        setCartError(
-          "Bạn chưa nhập đủ số tiền cần trả khách. Vui lòng kiểm tra lại!",
-        );
-        return false;
+      if (grandTotal < 0 && totalPaid < settlementAbs) {
+        setCartError("Nhập đủ số tiền trả khách.");
+        return;
       }
-      if (
-        settlementGrandTotal < 0 &&
-        payment.totalPaid > settlementAbsCheckout
-      ) {
-        setCartError(
-          "Số tiền nhập trong hình thức đổi trả đang vượt quá số tiền cần trả lại khách. Vui lòng kiểm tra lại!",
-        );
-        return false;
-      }
-      if (
-        !options?.bypassOversellModal &&
-        getOversellSaleLines(purchaseCart).length > 0
-      ) {
-        setOversellCheckoutOpen(true);
-        return false;
-      }
+      setCartError("");
       const who = selectedCustomer
         ? ` cho ${formatCustomerDisplay(selectedCustomer)}`
         : " (khách lẻ)";
@@ -444,46 +367,39 @@ export function CheckoutPageV2() {
           style: "currency",
           currency: "VND",
           maximumFractionDigits: 0,
-        }).format(
-          settlementGrandTotal,
-        )}, ${paymentLabel(payment.primaryMethod)}.`,
+        }).format(grandTotal)}, ${paymentLabel(primaryMethod)}.`,
       );
       resetActiveSessionAfterCheckout();
-      onResetLocalCheckoutUi();
-      return true;
+      resetCheckoutSaleSession({
+        setSelectedCustomer,
+        setCustomerQuery,
+        setCustomerFieldError,
+        setPaymentLines,
+        setSelectedSuggestionId,
+        setNote,
+        setKeepChange,
+        setDebt,
+      });
     },
     [
       announce,
-      payment.debt,
-      payment.primaryMethod,
-      payment.totalPaid,
-      payment.keepChange,
+      allLinesForPriceCheck,
+      grandTotal,
       hasAnyCartLines,
-      purchaseCart,
+      primaryMethod,
       resetActiveSessionAfterCheckout,
       selectedCustomer,
-      settlementGrandTotal,
-      settlementAbsCheckout,
-      onResetLocalCheckoutUi,
-      setCartError,
-      setOversellCheckoutOpen,
+      settlementAbs,
+      totalPaid,
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
     ],
-  );
-
-  const finalizeCheckoutAndPrint = useCallback(
-    async (options?: { bypassOversellModal?: boolean }) => {
-      const payload = buildReceiptPayload();
-      const ok = handleCheckout({ preventDefault: () => {} }, options);
-      if (!ok) return;
-      await printReceiptIfNeeded(payload);
-    },
-    [buildReceiptPayload, handleCheckout, printReceiptIfNeeded],
-  );
-
-  const labelForMethod = useCallback(
-    (m: PaymentLine["method"]): string =>
-      resolvePaymentMethodLabel(m, PAYMENT_METHODS),
-    [],
   );
 
   const handleSaveDraft = useCallback(() => {
@@ -497,7 +413,7 @@ export function CheckoutPageV2() {
     const invoiceNumber = `${yy}${mm}${dd}${seq}`;
 
     const paymentsSnapshot =
-      payment.paymentLines
+      paymentLines
         .filter((l) => l.amount > 0)
         .map((l) => ({
           method: l.method,
@@ -531,7 +447,16 @@ export function CheckoutPageV2() {
     addDraft(snapshot);
     announce(`Đã lưu tạm hóa đơn ${invoiceNumber}.`);
     resetActiveSessionAfterCheckout();
-    onResetLocalCheckoutUi();
+    resetCheckoutSaleSession({
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
+    });
   }, [
     addDraft,
     announce,
@@ -541,85 +466,22 @@ export function CheckoutPageV2() {
     labelForMethod,
     linesForDraftSingle,
     nextDraftSeq,
-    payment.paymentLines,
+    paymentLines,
     purchaseCart,
     returnCart,
     resetActiveSessionAfterCheckout,
     selectedCustomer,
-    onResetLocalCheckoutUi,
+    setSelectedCustomer,
+    setCustomerQuery,
+    setCustomerFieldError,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
   ]);
 
-  useEffect(() => {
-    if (lastActiveSessionIdRef.current === null) {
-      lastActiveSessionIdRef.current = activeSessionId;
-      return;
-    }
-    if (lastActiveSessionIdRef.current === activeSessionId) return;
-    lastActiveSessionIdRef.current = activeSessionId;
-
-    onResetLocalCheckoutUi();
-
-    const pendingDraftPayments =
-      usePosCheckoutSessionStore.getState().pendingDraftPaymentLines;
-    usePosCheckoutSessionStore.getState().setPendingDraftPaymentLines(null);
-    if (pendingDraftPayments && pendingDraftPayments.length > 0) {
-      payment.setPaymentLines(
-        pendingDraftPayments.map((row) =>
-          createPaymentLine(row.method, row.amount),
-        ),
-      );
-    }
-    setCreateCustomerOpen(false);
-    setEditCustomerOpen(false);
-    setCreateDefaultQuery("");
-    setCartError("");
-    setCancelInvoiceDialogOpen(false);
-    setOversellCheckoutOpen(false);
-    setAppliedPromotion(null);
-  }, [
-    activeSessionId,
-    onResetLocalCheckoutUi,
-    payment.setPaymentLines,
-    setCreateCustomerOpen,
-    setEditCustomerOpen,
-    setCreateDefaultQuery,
-    setCartError,
-    setCancelInvoiceDialogOpen,
-    setOversellCheckoutOpen,
-    setAppliedPromotion,
-  ]);
-
-  const handleSelectProduct = useCallback(
-    (p: PosCatalogLine, qty = 1) => {
-      const requested = clampPosCheckoutQtyNumber(qty);
-      addProduct(p, requested);
-      setToolbar((s) => ({ ...s, query: "" }));
-      productSearchRef.current?.focus();
-    },
-    [addProduct, setToolbar],
-  );
-
-  const handleSubmitProductQuery = useCallback(
-    (_q: string): boolean => {
-      const matched = filteredProducts;
-      if (matched.length === 1) {
-        const requested = clampPosCheckoutQtyNumber(toolbar.qty);
-        const line = matched[0]!;
-        addProduct(line, requested);
-        setToolbar((s) => ({ ...s, query: "" }));
-        productSearchRef.current?.focus();
-      }
-      return true;
-    },
-    [addProduct, filteredProducts, toolbar.qty, setToolbar],
-  );
-
-  const handleCatalogSelect = useCallback(
-    (product: CatalogProduct) => {
-      handleCatalogSelectFromCart(product, catalog);
-    },
-    [catalog, handleCatalogSelectFromCart],
-  );
+  const [cancelInvoiceDialogOpen, setCancelInvoiceDialogOpen] = useState(false);
 
   const handleRequestCancelInvoice = useCallback(() => {
     setCancelInvoiceDialogOpen(true);
@@ -635,11 +497,11 @@ export function CheckoutPageV2() {
         setSelectedCustomer,
         setCustomerQuery,
         setCustomerFieldError,
-        setPaymentLines: payment.setPaymentLines,
-        setSelectedSuggestionId: payment.setSelectedSuggestionId,
-        setNote: payment.setNote,
-        setKeepChange: payment.setKeepChange,
-        setDebt: payment.setDebt,
+        setPaymentLines,
+        setSelectedSuggestionId,
+        setNote,
+        setKeepChange,
+        setDebt,
       });
     }
     announce("Đã hủy hóa đơn.");
@@ -652,11 +514,61 @@ export function CheckoutPageV2() {
     setSelectedCustomer,
     setCustomerQuery,
     setCustomerFieldError,
-    payment.setPaymentLines,
-    payment.setSelectedSuggestionId,
-    payment.setNote,
-    payment.setKeepChange,
-    payment.setDebt,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
+  ]);
+
+  /** Customer + payment UI are React-local; reset when switching invoice tab so they match the active session. */
+  const lastActiveSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastActiveSessionIdRef.current === null) {
+      lastActiveSessionIdRef.current = activeSessionId;
+      return;
+    }
+    if (lastActiveSessionIdRef.current === activeSessionId) return;
+    lastActiveSessionIdRef.current = activeSessionId;
+
+    resetCheckoutSaleSession({
+      setSelectedCustomer,
+      setCustomerQuery,
+      setCustomerFieldError,
+      setPaymentLines,
+      setSelectedSuggestionId,
+      setNote,
+      setKeepChange,
+      setDebt,
+    });
+    const pendingDraftPayments =
+      usePosCheckoutSessionStore.getState().pendingDraftPaymentLines;
+    usePosCheckoutSessionStore.getState().setPendingDraftPaymentLines(null);
+    if (pendingDraftPayments && pendingDraftPayments.length > 0) {
+      setPaymentLines(
+        pendingDraftPayments.map((p) => createPaymentLine(p.method, p.amount)),
+      );
+    }
+    setCreateCustomerOpen(false);
+    setEditCustomerOpen(false);
+    setCreateDefaultQuery("");
+    setCartError("");
+    setCancelInvoiceDialogOpen(false);
+    setAppliedPromotion(null);
+  }, [
+    activeSessionId,
+    setSelectedCustomer,
+    setCustomerQuery,
+    setCustomerFieldError,
+    setPaymentLines,
+    setSelectedSuggestionId,
+    setNote,
+    setKeepChange,
+    setDebt,
+    setCreateCustomerOpen,
+    setEditCustomerOpen,
+    setCreateDefaultQuery,
+    setCartError,
   ]);
 
   useCheckoutHotkeys({
@@ -666,11 +578,21 @@ export function CheckoutPageV2() {
     salespersonRef,
     priceBookRef,
     hasCartItems: hasAnyCartLines,
-    onCheckout: () => {
-      void finalizeCheckoutAndPrint();
-    },
+    onCheckout: () => handleCheckout({ preventDefault: () => {} }),
     onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
   });
+
+  const buildInvoicePayload = (): InvoicePayload | null =>
+    buildCheckoutInvoicePayload({
+      printInvoice,
+      cart: receiptLines,
+      grandTotal,
+      totalPaid,
+      paymentLines,
+      primaryMethodLabel,
+      methods: PAYMENT_METHODS,
+      keepChange,
+    });
 
   const quickExchangeReturnQty = useMemo(
     () => returnCart.reduce((s, l) => s + l.qty, 0),
@@ -680,6 +602,7 @@ export function CheckoutPageV2() {
     () => purchaseCart.reduce((s, l) => s + l.qty, 0),
     [purchaseCart],
   );
+
   const invoiceReturnReturnQty = useMemo(
     () =>
       purchaseCart
@@ -694,6 +617,7 @@ export function CheckoutPageV2() {
         .reduce((s, l) => s + l.qty, 0),
     [purchaseCart],
   );
+
   const quickExchangeBadges = useMemo(() => {
     if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
       return {
@@ -761,8 +685,8 @@ export function CheckoutPageV2() {
         <div className="flex flex-1 flex-col overflow-hidden">
           {checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE ? (
             <CheckoutExchangeTabs
-              activeCheckoutPane={activeCheckoutPane}
-              onSelectCheckoutPane={setActiveCheckoutPane}
+              activePane={activeExchangePane}
+              onSelectPane={setActiveExchangePane}
             />
           ) : null}
 
@@ -771,6 +695,7 @@ export function CheckoutPageV2() {
             state={toolbar}
             onQueryChange={(query) => {
               setToolbar((s) => ({ ...s, query }));
+              setCartError("");
             }}
             onQtyChange={(qty) => setToolbar((s) => ({ ...s, qty }))}
             onSplitLineChange={(splitLine) =>
@@ -778,14 +703,13 @@ export function CheckoutPageV2() {
             }
             productSearch={productSearchAdapter}
             onSelectProduct={handleSelectProduct}
-            productItemKey={(item) => item.itemId}
-            productRenderItem={(item) => item.name}
-            productRenderMeta={(item) => {
-              const atDef = locationQtyFor(item);
+            productItemKey={(p) => p.itemId}
+            productRenderItem={(p) => p.name}
+            productRenderMeta={(p) => {
+              const atDef = locationQtyFor(p);
               return (
                 <>
-                  {item.code} · Tồn{" "}
-                  {formatOnHand(item.quantityOnHand, item.unit)}
+                  {p.code} · Tồn {formatOnHand(p.quantityOnHand, p.unit)}
                   {atDef < 1 && " · Hết"}
                 </>
               );
@@ -806,13 +730,14 @@ export function CheckoutPageV2() {
               value: selectedPriceBook,
               onChange: setSelectedPriceBook,
               search: priceBookSearch,
-              itemKey: (book) => book.id,
-              renderItem: (book) => book.name,
-              renderSelected: (book) => book.name,
+              itemKey: (p) => p.id,
+              renderItem: (p) => p.name,
+              renderSelected: (p) => p.name,
               inputRef: priceBookRef,
             }}
           />
 
+          {cartError ? <AlertBar variant="error">{cartError}</AlertBar> : null}
           {catalogError ? (
             <AlertBar
               variant="error"
@@ -823,7 +748,6 @@ export function CheckoutPageV2() {
           ) : null}
 
           <InvoiceLineItemTable
-            checkoutPane={invoiceTableCheckoutPane}
             lines={cart}
             selectedId={selectedLineId}
             isLineWarning={isLineWarning}
@@ -847,14 +771,13 @@ export function CheckoutPageV2() {
                 onQueryChange={setCatalogQuery}
                 productSearch={productSearchAdapter}
                 onSelectProduct={handleSelectProduct}
-                productItemKey={(item) => item.itemId}
-                productRenderItem={(item) => item.name}
-                productRenderMeta={(item) => {
-                  const atDef = locationQtyFor(item);
+                productItemKey={(p) => p.itemId}
+                productRenderItem={(p) => p.name}
+                productRenderMeta={(p) => {
+                  const atDef = locationQtyFor(p);
                   return (
                     <>
-                      {item.code} · Tồn{" "}
-                      {formatOnHand(item.quantityOnHand, item.unit)}
+                      {p.code} · Tồn {formatOnHand(p.quantityOnHand, p.unit)}
                       {atDef < 1 && " · Hết"}
                     </>
                   );
@@ -915,12 +838,10 @@ export function CheckoutPageV2() {
           customerFieldError={customerFieldError}
           promotions={promotions}
           appliedPromotionId={appliedPromotion?.id ?? null}
-          onApplyPromotion={(promo) => {
-            setAppliedPromotion(promo);
+          onApplyPromotion={(p) => {
+            setAppliedPromotion(p);
             announce(
-              promo
-                ? `Đã áp dụng ${promo.name}.`
-                : "Đã bỏ chương trình khuyến mãi.",
+              p ? `Đã áp dụng ${p.name}.` : "Đã bỏ chương trình khuyến mãi.",
             );
           }}
           onPickPromoOption={(option) =>
@@ -958,36 +879,35 @@ export function CheckoutPageV2() {
           quickExchangeBadges={quickExchangeBadges}
           itemCount={itemCountForPayment}
           total={grandTotal}
-          deposit={payment.deposit}
-          onDepositChange={payment.setDeposit}
-          onRequireCustomerForDeposit={payment.handleRequireCustomerForDeposit}
+          deposit={0}
           methods={PAYMENT_METHODS}
-          paymentLines={payment.paymentLines}
-          onChangePaymentLines={payment.handleChangePaymentLines}
-          changeAmount={payment.changeAmount}
-          shortageAmount={payment.isShort ? payment.shortageAmount : 0}
-          rawChangeAmount={payment.rawChangeAmount}
-          rawShortageAmount={payment.isShort ? payment.rawShortageAmount : 0}
-          keepChange={payment.keepChange}
-          onKeepChangeChange={payment.setKeepChange}
-          debt={payment.debt}
-          debtAmount={payment.debtAmount}
-          onDebtChange={payment.handleDebtChange}
-          note={payment.note}
-          onNoteChange={payment.setNote}
-          printInvoice={payment.printInvoice}
-          onPrintInvoiceChange={payment.setPrintInvoice}
-          preorder={payment.preorder}
-          onPreorderChange={payment.setPreorder}
-          suggestions={payment.suggestions}
-          selectedSuggestionId={payment.selectedSuggestionId}
-          onPickSuggestion={payment.handlePickSuggestion}
+          paymentLines={paymentLines}
+          onChangePaymentLines={handleChangePaymentLines}
+          changeAmount={changeAmount}
+          shortageAmount={isShort ? shortageAmount : 0}
+          rawChangeAmount={rawChangeAmount}
+          rawShortageAmount={isShort ? rawShortageAmount : 0}
+          keepChange={keepChange}
+          onKeepChangeChange={setKeepChange}
+          debt={debt}
+          debtAmount={debtAmount}
+          onDebtChange={setDebt}
+          note={note}
+          onNoteChange={setNote}
+          printInvoice={printInvoice}
+          onPrintInvoiceChange={setPrintInvoice}
+          preorder={preorder}
+          onPreorderChange={setPreorder}
+          suggestions={suggestions}
+          selectedSuggestionId={selectedSuggestionId}
+          onPickSuggestion={handlePickSuggestion}
           onSaveDraft={isReturnExchangeInvoice ? undefined : handleSaveDraft}
           onCancelInvoice={
             isReturnExchangeInvoice ? handleRequestCancelInvoice : undefined
           }
-          onCollect={finalizeCheckoutAndPrint}
+          onCollect={() => handleCheckout({ preventDefault: () => {} })}
           collectDisabled={!hasAnyCartLines}
+          invoice={buildInvoicePayload}
         />
       </div>
 
@@ -995,22 +915,6 @@ export function CheckoutPageV2() {
         open={cancelInvoiceDialogOpen}
         onClose={() => setCancelInvoiceDialogOpen(false)}
         onConfirm={handleConfirmCancelInvoice}
-      />
-
-      <OversellCheckoutConfirmDialog
-        open={oversellCheckoutOpen}
-        onClose={() => setOversellCheckoutOpen(false)}
-        lines={getOversellSaleLines(purchaseCart)}
-        onConfirm={async () => {
-          setOversellCheckoutOpen(false);
-          await finalizeCheckoutAndPrint({ bypassOversellModal: true });
-        }}
-      />
-
-      <AppErrorDialog
-        open={Boolean(cartError)}
-        message={cartError}
-        onClose={() => setCartError("")}
       />
     </div>
   );

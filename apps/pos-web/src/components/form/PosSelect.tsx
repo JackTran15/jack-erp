@@ -241,23 +241,6 @@ export function PosSelect<T>({
   };
 
   useEffect(() => {
-    if (!open) return;
-    const root = rootRef.current;
-    if (!root) return;
-    const onFocusOut = (e: FocusEvent) => {
-      const next = e.relatedTarget;
-      if (next instanceof Node) {
-        if (menuRef.current?.contains(next)) return;
-        if (root.contains(next)) return;
-      }
-      setOpen(false);
-      setHighlightIdx(-1);
-    };
-    root.addEventListener("focusout", onFocusOut);
-    return () => root.removeEventListener("focusout", onFocusOut);
-  }, [open]);
-
-  useEffect(() => {
     if (!open || !triggerRef.current) return;
 
     const updateMenuPosition = () => {

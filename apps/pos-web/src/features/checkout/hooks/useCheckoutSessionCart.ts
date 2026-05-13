@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 import {
-  CheckoutPane,
+  ExchangePane,
   selectActiveSession,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/usePosCheckoutSessionStore";
@@ -10,22 +10,8 @@ import {
   type CatalogProduct,
   CheckoutVariantEnum,
 } from "../components/types";
-import { isCartLineWarning, locationQtyFor } from "../lib/checkoutUtils";
-import {
-  clampPosCheckoutQtyNumber,
-  safePosCheckoutQtyFromRaw,
-} from "../lib/posCheckoutQty";
+import { locationQtyFor } from "../lib/checkoutUtils";
 import { netSessionGrandTotal } from "../lib/checkoutSessionTotals";
-
-function isSignedNegativeQtyCart(
-  variant: CheckoutVariantEnum,
-  activeCheckoutPane: CheckoutPane,
-): boolean {
-  return (
-    variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-    activeCheckoutPane === CheckoutPane.RETURN
-  );
-}
 
 interface UseCheckoutSessionCartInput {
   announce: (message: string) => void;
@@ -43,7 +29,7 @@ export function useCheckoutSessionCart({
     session?.checkoutVariant ?? CheckoutVariantEnum.SALE;
   const purchaseCart = session?.purchaseCart ?? [];
   const returnCart = session?.returnCart ?? [];
-  const activeCheckoutPane = session?.activeCheckoutPane ?? CheckoutPane.RETURN;
+  const activeExchangePane = session?.activeExchangePane ?? ExchangePane.RETURN;
 
   const updatePurchaseCart = usePosCheckoutSessionStore(
     (s) => s.updatePurchaseCart,
@@ -61,29 +47,29 @@ export function useCheckoutSessionCart({
   const cart = useMemo(() => {
     if (!session) return [];
     if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
-      return activeCheckoutPane === CheckoutPane.RETURN
+      return activeExchangePane === ExchangePane.RETURN
         ? returnCart
         : purchaseCart;
     }
     return purchaseCart;
-  }, [session, variant, activeCheckoutPane, returnCart, purchaseCart]);
+  }, [session, variant, activeExchangePane, returnCart, purchaseCart]);
 
   const selectedLineId = useMemo(() => {
     if (!session) return null;
     if (
       variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-      activeCheckoutPane === CheckoutPane.RETURN
+      activeExchangePane === ExchangePane.RETURN
     ) {
       return session.selectedLineReturnId;
     }
     return session.selectedLinePurchaseId;
-  }, [session, variant, activeCheckoutPane]);
+  }, [session, variant, activeExchangePane]);
 
   const setSelectedLineId = useCallback(
     (id: string | null) => {
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeCheckoutPane === CheckoutPane.RETURN
+        activeExchangePane === ExchangePane.RETURN
       ) {
         setSelectedLineReturnId(id);
         return;
@@ -92,7 +78,7 @@ export function useCheckoutSessionCart({
     },
     [
       variant,
-      activeCheckoutPane,
+      activeExchangePane,
       setSelectedLineReturnId,
       setSelectedLinePurchaseId,
     ],
@@ -108,7 +94,7 @@ export function useCheckoutSessionCart({
       if (!session) return;
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeCheckoutPane === CheckoutPane.RETURN
+        activeExchangePane === ExchangePane.RETURN
       ) {
         updateReturnCart(session.id, updater);
         return;
@@ -118,24 +104,33 @@ export function useCheckoutSessionCart({
     [
       session,
       variant,
-      activeCheckoutPane,
+      activeExchangePane,
       updateReturnCart,
       updatePurchaseCart,
     ],
   );
 
   const addProduct = useCallback(
-    (product: PosCatalogLine, qtyToAdd = 1) => {
+    (product: PosCatalogLine) => {
       if (!session) return;
       const atLocation = locationQtyFor(product);
-      const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
+      if (atLocation < 1) {
+        setCartError("Hết tồn tại vị trí ưu tiên bán. Kiểm tra kho hàng.");
+        return;
+      }
       const apply = (prev: CartLine[]) => {
         const existing = prev.find((l) => l.itemId === product.itemId);
         if (existing) {
+          if (existing.qty + 1 > existing.maxQty) {
+            setCartError("Đã đạt tối đa tồn tại vị trí bán cho mặt hàng này.");
+            return prev;
+          }
+          setCartError("");
           return prev.map((l) =>
-            l.itemId === product.itemId ? { ...l, qty: l.qty + delta } : l,
+            l.itemId === product.itemId ? { ...l, qty: l.qty + 1 } : l,
           );
         }
+        setCartError("");
         const newLine: CartLine = {
           lineId: crypto.randomUUID(),
           itemId: product.itemId,
@@ -143,11 +138,11 @@ export function useCheckoutSessionCart({
           code: product.code,
           unit: product.unit,
           unitPrice: product.sellingPrice ?? 0,
-          qty: delta,
+          qty: 1,
           locationId: product.defaultLocationId,
           maxQty: atLocation,
         };
-        if (activeCheckoutPane === CheckoutPane.RETURN) {
+        if (activeExchangePane === ExchangePane.RETURN) {
           if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
             setSelectedLineReturnId(newLine.lineId);
           }
@@ -162,7 +157,7 @@ export function useCheckoutSessionCart({
     [
       session,
       variant,
-      activeCheckoutPane,
+      activeExchangePane,
       targetCartUpdater,
       announce,
       setSelectedLinePurchaseId,
@@ -191,19 +186,22 @@ export function useCheckoutSessionCart({
 
   const updateQty = useCallback(
     (lineId: string, raw: string) => {
+      const n = Math.floor(Number.parseFloat(raw.replace(",", ".")) || 0);
       targetCartUpdater((prev) => {
         const line = prev.find((l) => l.lineId === lineId);
         if (!line) return prev;
-        const signedReturnUi =
-          Boolean(line.isReturnCredit) ||
-          isSignedNegativeQtyCart(variant, activeCheckoutPane);
-        const safe = safePosCheckoutQtyFromRaw(raw, {
-          treatAsSignedReturnMagnitude: signedReturnUi,
-        });
+        if (line.isReturnCredit) {
+          const abs = Math.abs(n);
+          const safe = Math.max(1, Math.min(line.maxQty, abs));
+          return prev.map((l) =>
+            l.lineId === lineId ? { ...l, qty: safe } : l,
+          );
+        }
+        const safe = Math.max(1, Math.min(line.maxQty, n));
         return prev.map((l) => (l.lineId === lineId ? { ...l, qty: safe } : l));
       });
     },
-    [targetCartUpdater, variant, activeCheckoutPane],
+    [targetCartUpdater],
   );
 
   const bumpQty = useCallback(
@@ -213,10 +211,15 @@ export function useCheckoutSessionCart({
         if (!line) return prev;
         const next = line.qty + delta;
         if (next < 1) return prev;
+        if (next > line.maxQty) {
+          setCartError("Số lượng vượt tồn kho.");
+          return prev;
+        }
+        setCartError("");
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
     },
-    [targetCartUpdater, setCartError],
+    [targetCartUpdater],
   );
 
   const removeLine = useCallback(
@@ -229,7 +232,7 @@ export function useCheckoutSessionCart({
       if (selectedLineId === lineId) {
         if (
           variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-          activeCheckoutPane === CheckoutPane.RETURN
+          activeExchangePane === ExchangePane.RETURN
         ) {
           setSelectedLineReturnId(null);
         } else {
@@ -242,21 +245,18 @@ export function useCheckoutSessionCart({
       announce,
       selectedLineId,
       variant,
-      activeCheckoutPane,
+      activeExchangePane,
       setSelectedLineReturnId,
       setSelectedLinePurchaseId,
     ],
   );
 
-  const isLineWarning = useCallback(
-    (line: CartLine) => {
-      if (isSignedNegativeQtyCart(variant, activeCheckoutPane)) {
-        return false;
-      }
-      return isCartLineWarning(line);
-    },
-    [variant, activeCheckoutPane],
-  );
+  const isLineWarning = useCallback((line: CartLine) => {
+    if (line.isReturnCredit) {
+      return line.qty > line.maxQty || line.unitPrice <= 0;
+    }
+    return line.qty >= line.maxQty || line.unitPrice <= 0;
+  }, []);
 
   /** Combined line count for payment badge (sale / invoice_return). */
   const itemCountForPayment = useMemo(() => {
@@ -279,14 +279,14 @@ export function useCheckoutSessionCart({
     checkoutVariant: variant,
     purchaseCart,
     returnCart,
-    activeCheckoutPane,
+    activeExchangePane,
     cart,
     setCart: (next: CartLine[] | ((prev: CartLine[]) => CartLine[])) => {
       if (!session) return;
       const resolved = typeof next === "function" ? next(cart) : next;
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeCheckoutPane === CheckoutPane.RETURN
+        activeExchangePane === ExchangePane.RETURN
       ) {
         updateReturnCart(session.id, () => resolved);
       } else {

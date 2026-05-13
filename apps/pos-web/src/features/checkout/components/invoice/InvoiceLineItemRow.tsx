@@ -1,20 +1,12 @@
-import { CloseIcon } from "@erp/pos/components/icons/Icon";
-import { PosNumberInput } from "@erp/pos/components/form/PosNumberInput";
-import { PosQuantityInput } from "@erp/pos/components/form/PosQuantityInput";
-import {
-  lineExceedsOnHandSnapshot,
-  lineTotal,
-} from "@erp/pos/features/checkout/lib/checkoutUtils";
+import { CloseIcon, WarningDot } from "@erp/pos/components/icons/Icon";
+import { lineTotal } from "@erp/pos/features/checkout/lib/checkoutUtils";
 import { cn, formatVnd } from "@erp/ui";
 import type { CartLine } from "../types";
-import { InvoiceLineItemWarningCell } from "./InvoiceLineItemWarningCell";
-import { CheckoutPane } from "@erp/pos/stores/usePosCheckoutSessionStore";
 
 export interface InvoiceLineItemRowProps {
   index: number;
   line: CartLine;
   selected: boolean;
-  checkoutPane?: CheckoutPane;
   /** Show the red warning dot before SL (e.g. line is at stock cap). */
   hasWarning?: boolean;
   onSelect: (lineId: string) => void;
@@ -29,7 +21,6 @@ export function InvoiceLineItemRow({
   index,
   line,
   selected,
-  checkoutPane = CheckoutPane.PURCHASE,
   hasWarning,
   onSelect,
   onRemove,
@@ -38,22 +29,18 @@ export function InvoiceLineItemRow({
   onChangeUnitPrice,
 }: InvoiceLineItemRowProps) {
   const rowTotal = lineTotal(line);
-  const isReturnQuantityUi =
-    Boolean(line.isReturnCredit) || checkoutPane === CheckoutPane.RETURN;
-  const displayQty = isReturnQuantityUi ? -line.qty : line.qty;
-  const oversell = !isReturnQuantityUi && lineExceedsOnHandSnapshot(line);
+  const isReturnCredit = Boolean(line.isReturnCredit);
+  const displayQty = isReturnCredit ? -line.qty : line.qty;
   return (
     <tr
       onClick={() => onSelect(line.lineId)}
       className={cn(
-        "h-12 cursor-pointer text-sm text-gray-900 transition-colors",
+        "h-12 cursor-pointer text-[14px] text-gray-900 transition-colors",
         selected
           ? "bg-indigo-50"
-          : isReturnQuantityUi
+          : isReturnCredit
             ? "bg-orange-50 hover:bg-orange-100/80"
-            : oversell
-              ? "bg-red-50 hover:bg-red-100/60"
-              : "bg-white hover:bg-gray-50",
+            : "bg-white hover:bg-gray-50",
       )}
     >
       <td className="w-10 px-3 text-center text-gray-500">{index}</td>
@@ -62,35 +49,71 @@ export function InvoiceLineItemRow({
       </td>
       <td className="px-2">{line.name}</td>
       <td className="w-6 px-1">
-        <InvoiceLineItemWarningCell
-          hasWarning={hasWarning}
-          oversell={oversell}
-          onHandQty={line.maxQty}
-        />
+        {hasWarning ? (
+          <span
+            role="img"
+            aria-label="Cảnh báo tồn kho"
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-100 text-red-500"
+          >
+            <WarningDot size={8} />
+          </span>
+        ) : null}
       </td>
-      <td className="w-24 px-2">
-        <PosQuantityInput
-          displayValue={displayQty}
-          onChangeRaw={(raw) => onChangeQty(line.lineId, raw)}
-          onBumpDown={onBumpQty ? () => onBumpQty(line.lineId, -1) : undefined}
-          onBumpUp={onBumpQty ? () => onBumpQty(line.lineId, 1) : undefined}
-          bumpDownDisabled={line.qty <= 1}
-          bumpUpDisabled={false}
-          min={isReturnQuantityUi ? undefined : 1}
-          itemLabel={line.name}
-          ariaLabel={`Số lượng ${line.name}`}
-          variant="underline"
-        />
+      <td className="w-20 px-2">
+        <div className="flex items-center gap-0.5">
+          {onBumpQty ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBumpQty(line.lineId, -1);
+              }}
+              disabled={line.qty <= 1}
+              aria-label={`Giảm ${line.name}`}
+              className="h-7 w-5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            >
+              −
+            </button>
+          ) : null}
+          <input
+            type="number"
+            inputMode="numeric"
+            min={isReturnCredit ? -line.maxQty : 1}
+            max={isReturnCredit ? -1 : line.maxQty}
+            value={displayQty}
+            onChange={(e) => onChangeQty(line.lineId, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Số lượng ${line.name}`}
+            className="h-7 w-10 rounded-md border border-gray-200 bg-white px-1 text-center text-[14px] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          {onBumpQty ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBumpQty(line.lineId, 1);
+              }}
+              disabled={line.qty >= line.maxQty}
+              aria-label={`Tăng ${line.name}`}
+              className="h-7 w-5 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            >
+              +
+            </button>
+          ) : null}
+        </div>
       </td>
       <td className="w-16 px-2 text-gray-700">{line.unit}</td>
       <td className="w-32 px-2">
-        <PosNumberInput
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
           step={1000}
-          value={line.unitPrice || 0}
-          onChange={(v) => onChangeUnitPrice(line.lineId, v.toString())}
-          ariaLabel={`Đơn giá ${line.name}`}
-          variant="underline"
-          className="w-full"
+          value={line.unitPrice || ""}
+          onChange={(e) => onChangeUnitPrice(line.lineId, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Đơn giá ${line.name}`}
+          className="h-7 w-full rounded-md border border-transparent bg-transparent px-1 text-right text-[14px] focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
       </td>
       <td className="w-28 px-2 text-right font-medium">
