@@ -1,8 +1,9 @@
 import { RefreshIcon, ShoppingBagIcon } from "@erp/pos/components/icons/Icon";
-import type { CustomerDetailData } from "./types";
+import type { CustomerMembershipData } from "./types";
 
 export interface MembershipCardProps {
-  data: CustomerDetailData;
+  name: string;
+  membership?: CustomerMembershipData;
   onRefreshPoints?: () => void;
   onChangeCard?: () => void;
 }
@@ -13,15 +14,15 @@ export interface MembershipCardProps {
  * info rows (mã thẻ, điểm tích lũy, sử dụng điểm).
  */
 export function MembershipCard({
-  data,
+  name,
+  membership,
   onRefreshPoints,
   onChangeCard,
 }: MembershipCardProps) {
-  const { name } = data;
-  const cardCode = data.cardCode ?? "—";
-  const points = data.loyaltyPoints ?? 0;
-  const used = data.pointsUsed ?? 0;
-  const cap = data.pointsCap ?? Math.max(used, points, 100);
+  const cardCode = membership?.cardCode ?? "—";
+  const points = membership?.loyaltyPoints ?? 0;
+  const used = membership?.pointsUsed ?? 0;
+  const cap = membership?.pointsCap ?? Math.max(used, points, 100);
   const fillPercent = cap > 0 ? Math.min(100, (used / cap) * 100) : 0;
 
   return (

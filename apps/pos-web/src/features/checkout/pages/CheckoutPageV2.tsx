@@ -6,7 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { CustomerCreateDialog } from "../components/customerCreate";
+import { CustomerCreateDialog } from "@erp/pos/components/CustomerCreateDialog";
 import { useAnnounce } from "@erp/pos/hooks/useAnnounce";
 import {
   formatCustomerDisplay,
@@ -593,8 +593,8 @@ export function CheckoutPageV2() {
             ? {
                 id: selectedCustomer.id,
                 name: selectedCustomer.name,
-                phone: selectedCustomer.phone ?? undefined,
-                email: selectedCustomer.email ?? undefined,
+                phone: selectedCustomer.phone,
+                email: selectedCustomer.email,
               }
             : undefined
         }
@@ -718,7 +718,6 @@ export function CheckoutPageV2() {
             selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null
           }
           customerDebt={null}
-          selectedCustomerId={selectedCustomer?.id ?? null}
           onClearCustomer={selectedCustomer ? handleClearCustomer : undefined}
           customerFieldError={customerFieldError}
           promotions={promotions}

@@ -22,6 +22,7 @@ import { CustomerSection } from "./sections/CustomerSection";
 import { PaymentSection } from "./sections/PaymentSection";
 import type { CustomerActionItem } from "./CustomerActions";
 import { CustomerDetailDialog } from "./customerDetail/CustomerDetailDialog";
+import type { CustomerDetailData } from "./customerDetail/types";
 import { type InvoicePayloadInput } from "./PaymentCTAButtons";
 import { type PaymentLine } from "./PaymentMethodRow";
 import {
@@ -104,11 +105,11 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   customerExtraActions?: CustomerActionItem[];
 
   /**
-   * Selected customer id — required to open the `CustomerDetailDialog`,
-   * which fetches its own data via `useCustomer(id)`. When null the chip
-   * click is a no-op (the panel hides the chip in that state anyway).
+   * Detail data shown when the user clicks the selected-customer chip.
+   * When omitted, the panel synthesises a minimal payload from
+   * `selectedCustomerLabel` + `customerDebt` so the dialog still opens.
    */
-  selectedCustomerId?: string | null;
+  customerDetail?: CustomerDetailData;
   /** Tab footer callbacks — forwarded to `CustomerDetailDialog`. */
   onConfirmCustomerDetail?: () => void;
   onEditCustomer?: () => void;
@@ -214,7 +215,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     voucher,
     onScanCustomerQr,
     customerExtraActions,
-    selectedCustomerId,
+    customerDetail,
     onConfirmCustomerDetail,
     onEditCustomer,
     onCollectCustomerDebt,
@@ -264,8 +265,23 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
 
   // Customer detail dialog — opened by clicking the selected-customer chip.
-  // Owns its own data fetching, so we only need to pass id + fallback name.
   const [detailOpen, setDetailOpen] = useState(false);
+  const dialogData: CustomerDetailData = useMemo(() => {
+    if (customerDetail) return customerDetail;
+    // Fallback: build a minimal payload from what the panel already knows.
+    return {
+      identity: { name: selectedCustomerLabel ?? "" },
+      stats:
+        typeof customerDebt === "number"
+          ? {
+              totalSpent: 0,
+              invoiceCount: 0,
+              debtTotal: customerDebt,
+              debtDocumentCount: 0,
+            }
+          : undefined,
+    };
+  }, [customerDetail, selectedCustomerLabel, customerDebt]);
 
   /**
    * Source of truth for the customer-area action icons.
@@ -432,19 +448,16 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         invoicePrinter={invoicePrinter}
       />
 
-      {selectedCustomerId ? (
-        <CustomerDetailDialog
-          open={detailOpen}
-          onClose={() => setDetailOpen(false)}
-          customerId={selectedCustomerId}
-          fallbackName={selectedCustomerLabel ?? undefined}
-          onConfirm={onConfirmCustomerDetail}
-          onEdit={onEditCustomer}
-          onCollectDebt={onCollectCustomerDebt}
-          onChangeCard={onChangeCustomerCard}
-          onRefreshPoints={onRefreshCustomerPoints}
-        />
-      ) : null}
+      <CustomerDetailDialog
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        data={dialogData}
+        onConfirm={onConfirmCustomerDetail}
+        onEdit={onEditCustomer}
+        onCollectDebt={onCollectCustomerDebt}
+        onChangeCard={onChangeCustomerCard}
+        onRefreshPoints={onRefreshCustomerPoints}
+      />
 
       <PromotionSelectionModal
         open={promotionDialogOpen}

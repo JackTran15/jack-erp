@@ -1,13 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { CustomerDetailTabKeyEnum } from "@erp/pos/features/checkout/constants/customer";
 import { AppDialog } from "@erp/pos/components/AppDialog";
 import { useDialogReset } from "@erp/pos/features/checkout/hooks/useDialogReset";
-import { useCustomer } from "@erp/pos/hooks/useCustomer";
-import { useCustomerGroups } from "@erp/pos/hooks/useCustomerGroups";
 import { CustomerDetailTabs } from "./CustomerDetailTabs";
 import { DebtTab } from "./DebtTab";
 import { InfoTab } from "./InfoTab";
-import { mapCustomerToDetailData } from "./mapCustomerDetail";
 import { OverviewTab } from "./OverviewTab";
 import { PurchaseHistoryTab } from "./PurchaseHistoryTab";
 import type { CustomerDetailData, CustomerDetailTabKey } from "./types";
@@ -15,10 +12,7 @@ import type { CustomerDetailData, CustomerDetailTabKey } from "./types";
 export interface CustomerDetailDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Customer to display. The dialog fetches `/customers/:id` on open. */
-  customerId: string;
-  /** Shown in the title (and as the chip name) until the fetch resolves. */
-  fallbackName?: string;
+  data: CustomerDetailData;
   /** Initial tab when the dialog mounts (default: "overview"). */
   initialTab?: CustomerDetailTabKey;
 
@@ -41,17 +35,12 @@ interface FooterConfig {
 
 /**
  * Detail dialog opened from the selected-customer chip in the payment panel.
- *
- * Self-contained: when `open` flips true, the dialog fetches the customer
- * record (and the customer-groups lookup) via TanStack Query, then renders
- * the four tabs from a flat `CustomerDetailData` derived in this component.
- * Callers only need to supply `customerId` and optional fallback / callbacks.
+ * Owns its own tab state — caller only flips `open` / passes `data`.
  */
 export function CustomerDetailDialog({
   open,
   onClose,
-  customerId,
-  fallbackName,
+  data,
   initialTab = CustomerDetailTabKeyEnum.OVERVIEW,
   onConfirm,
   onEdit,
@@ -65,24 +54,6 @@ export function CustomerDetailDialog({
   }, [initialTab]);
   useDialogReset(open, handleOpenReset);
 
-  // Skip the fetch while the dialog is closed so we don't spam the API as the
-  // checkout page re-renders. TanStack Query dedups across consumers anyway.
-  const { data: customerRaw } = useCustomer(open ? customerId : undefined);
-  const { data: customerGroupsData } = useCustomerGroups();
-
-  const groupNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const g of customerGroupsData ?? []) map.set(g.id, g.name);
-    return map;
-  }, [customerGroupsData]);
-
-  const data: CustomerDetailData = useMemo(() => {
-    if (customerRaw) {
-      return mapCustomerToDetailData(customerRaw, { groupNameById });
-    }
-    return { name: fallbackName ?? "" };
-  }, [customerRaw, groupNameById, fallbackName]);
-
   const footer = footerForTab(activeTab, {
     onConfirm,
     onEdit,
@@ -90,8 +61,12 @@ export function CustomerDetailDialog({
   });
 
   return (
-    <AppDialog open={open} onClose={onClose} width={1020}>
-      <AppDialog.Header title={`Khách hàng: ${data.name}`} />
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      width={1020}
+    >
+      <AppDialog.Header title={`Khách hàng: ${data.identity.name}`} />
       <AppDialog.Body className="pt-1">
         <CustomerDetailTabs activeTab={activeTab} onChange={setActiveTab} />
 
