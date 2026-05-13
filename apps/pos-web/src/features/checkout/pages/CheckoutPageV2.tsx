@@ -828,6 +828,12 @@ export function CheckoutPageV2() {
           onDebtChange={setDebt}
           note={note}
           onNoteChange={setNote}
+          qrPayment={{
+            holderName: "HOÀNG THỊ THU",
+            accountNumber: "005704060134345",
+            bankCode: "VIB",
+            amount: grandTotal,
+          }}
           printInvoice={printInvoice}
           onPrintInvoiceChange={setPrintInvoice}
           preorder={preorder}

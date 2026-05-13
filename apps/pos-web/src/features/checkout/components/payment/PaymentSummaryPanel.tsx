@@ -32,6 +32,7 @@ import {
 } from "./PromoMenu";
 import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
 import type { PromotionItem } from "./promotion/types";
+import type { QrPaymentInfo } from "./VietQrPaymentDialog";
 
 export interface PaymentSummaryPanelProps<TCustomer> {
   // Sub-topbar
@@ -152,8 +153,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   note: string;
   onNoteChange: (n: string) => void;
 
-  // QR
-  onPrintQr?: () => void;
+  // QR — account + amount shown inside the VietQR dialog.
+  qrPayment: QrPaymentInfo;
 
   // Footer
   printInvoice: boolean;
@@ -240,7 +241,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onDebtChange,
     note,
     onNoteChange,
-    onPrintQr,
+    qrPayment,
     printInvoice,
     onPrintInvoiceChange,
     preorder,
@@ -431,7 +432,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           debtAmount={debtAmount}
           note={note}
           onNoteChange={onNoteChange}
-          onPrintQr={onPrintQr}
+          qrPayment={qrPayment}
         />
       </div>
 

@@ -8,6 +8,7 @@ import { KeepChangeRow } from "../KeepChangeRow";
 import { PaymentMethodList, type PaymentLine } from "../PaymentMethodRow";
 import { PaymentSummaryBlock } from "../PaymentSummaryBlock";
 import { QrPaymentButton } from "../QrPaymentButton";
+import type { QrPaymentInfo } from "../VietQrPaymentDialog";
 import { SummaryRow } from "../SummaryRow";
 
 interface PaymentSectionProps {
@@ -31,7 +32,8 @@ interface PaymentSectionProps {
   debtAmount: number;
   note: string;
   onNoteChange: (n: string) => void;
-  onPrintQr?: () => void;
+  /** Account + amount data shown inside the VietQR dialog. */
+  qrPayment: QrPaymentInfo;
 }
 
 export function PaymentSection({
@@ -54,7 +56,7 @@ export function PaymentSection({
   debtAmount,
   note,
   onNoteChange,
-  onPrintQr,
+  qrPayment,
 }: PaymentSectionProps) {
   return (
     <>
@@ -110,7 +112,7 @@ export function PaymentSection({
         />
       </div>
       <div className="px-4 py-3">
-        <QrPaymentButton onClick={onPrintQr} />
+        <QrPaymentButton payment={qrPayment} />
       </div>
     </>
   );
