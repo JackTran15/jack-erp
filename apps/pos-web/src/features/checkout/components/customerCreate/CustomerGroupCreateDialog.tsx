@@ -149,14 +149,9 @@ export function CustomerGroupCreateDialog({
             <PosSelect
               id={parentId}
               variant="underline"
-              value={
-                parentGroups.find((o) => o.value === values.parentGroupId) ??
-                null
-              }
-              onChange={(item) => setField("parentGroupId", item.value)}
-              items={parentGroups}
-              itemKey={(o) => o.value}
-              renderItem={(o) => o.label}
+              value={values.parentGroupId}
+              onChange={(v) => setField("parentGroupId", v)}
+              options={parentGroups}
               placeholder=""
               ariaLabel="Thuộc nhóm"
             />

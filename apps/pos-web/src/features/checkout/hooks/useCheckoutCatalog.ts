@@ -15,6 +15,8 @@ interface ToolbarState {
   query: string;
   qty: number;
   splitLine: boolean;
+  salesperson: string | undefined;
+  priceBook: string | undefined;
 }
 
 interface UseCheckoutCatalogResult {
@@ -47,6 +49,8 @@ export function useCheckoutCatalog(
     query: "",
     qty: 1,
     splitLine: false,
+    salesperson: undefined,
+    priceBook: undefined,
   });
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogGroup, setCatalogGroup] = useState<string | undefined>(

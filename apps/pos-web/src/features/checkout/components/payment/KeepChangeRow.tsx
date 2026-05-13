@@ -1,4 +1,3 @@
-import { PosCheckbox } from "@erp/pos/components/form/PosCheckbox";
 import { formatVnd } from "@erp/ui";
 
 export interface KeepChangeRowProps {
@@ -21,12 +20,13 @@ export function KeepChangeRow({
   amount = 0,
 }: KeepChangeRowProps) {
   return (
-    <label className="flex h-10 cursor-pointer items-center justify-between gap-3 px-0 text-sm text-gray-900">
+    <label className="flex h-10 cursor-pointer items-center justify-between gap-3 px-0 text-[14px] text-gray-900">
       <span className="inline-flex items-center gap-2">
-        <PosCheckbox
+        <input
+          type="checkbox"
           checked={checked}
-          onChange={onChange}
-          ariaLabel="Khách không lấy tiền thừa"
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500/30"
         />
         Khách không lấy tiền thừa
       </span>

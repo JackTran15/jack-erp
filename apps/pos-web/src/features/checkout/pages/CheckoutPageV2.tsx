@@ -6,7 +6,6 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import type { PosSelectSearchSuggestion } from "@erp/pos/components/form/PosSelectSearch";
 import { CustomerCreateDialog } from "../components/customerCreate";
 import { useAnnounce } from "@erp/pos/hooks/useAnnounce";
 import {
@@ -39,54 +38,6 @@ import {
   type DraftInvoice,
 } from "../components/types";
 import { PAYMENT_METHODS } from "../constants/paymentMethod";
-
-interface Salesperson {
-  id: string;
-  name: string;
-  code: string;
-}
-
-interface PriceBook {
-  id: string;
-  name: string;
-}
-
-interface ProductGroup {
-  id: string;
-  name: string;
-}
-
-const SALESPERSON_OPTIONS: ReadonlyArray<Salesperson> = [
-  { id: "nv01", code: "NV01", name: "Nguyễn Văn A" },
-  { id: "nv02", code: "NV02", name: "Trần Thị B" },
-  { id: "nv03", code: "NV03", name: "Lê Văn C" },
-];
-
-const PRICE_BOOK_OPTIONS: ReadonlyArray<PriceBook> = [
-  { id: "default", name: "Bảng giá chuẩn" },
-  { id: "vip", name: "Bảng giá VIP" },
-  { id: "wholesale", name: "Bảng giá sỉ" },
-];
-
-const CATALOG_GROUP_OPTIONS: ReadonlyArray<ProductGroup> = [
-  { id: "all", name: "Tất cả" },
-  { id: "drink", name: "Nước uống" },
-  { id: "food", name: "Đồ ăn" },
-  { id: "other", name: "Khác" },
-];
-
-function buildLocalSearch<T>(
-  items: ReadonlyArray<T>,
-  getLabel: (item: T) => string,
-) {
-  return (q: string): ReadonlyArray<PosSelectSearchSuggestion<T>> => {
-    const lower = q.trim().toLowerCase();
-    const matched = lower
-      ? items.filter((item) => getLabel(item).toLowerCase().includes(lower))
-      : items;
-    return matched.map((item) => ({ item }));
-  };
-}
 import { useCheckoutSessionCart } from "../hooks/useCheckoutSessionCart";
 import { useCheckoutCatalog } from "../hooks/useCheckoutCatalog";
 import { useCheckoutCustomer } from "../hooks/useCheckoutCustomer";
@@ -107,9 +58,6 @@ export function CheckoutPageV2() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
-  const catalogSearchRef = useRef<HTMLInputElement>(null);
-  const salespersonRef = useRef<HTMLInputElement>(null);
-  const priceBookRef = useRef<HTMLInputElement>(null);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
@@ -178,29 +126,6 @@ export function CheckoutPageV2() {
     [checkoutVariant],
   );
 
-  const [selectedSalesperson, setSelectedSalesperson] =
-    useState<Salesperson | null>(null);
-  const [selectedPriceBook, setSelectedPriceBook] = useState<PriceBook | null>(
-    null,
-  );
-  const selectedCatalogGroup = useMemo<ProductGroup | null>(
-    () => CATALOG_GROUP_OPTIONS.find((g) => g.id === catalogGroup) ?? null,
-    [catalogGroup],
-  );
-
-  const salespersonSearch = useMemo(
-    () => buildLocalSearch(SALESPERSON_OPTIONS, (s) => s.name),
-    [],
-  );
-  const priceBookSearch = useMemo(
-    () => buildLocalSearch(PRICE_BOOK_OPTIONS, (p) => p.name),
-    [],
-  );
-  const catalogGroupSearch = useMemo(
-    () => buildLocalSearch(CATALOG_GROUP_OPTIONS, (g) => g.name),
-    [],
-  );
-
   const {
     selectedCustomer,
     setSelectedCustomer,
@@ -241,8 +166,6 @@ export function CheckoutPageV2() {
     selectedSuggestionId,
     setSelectedSuggestionId,
     totalPaid,
-    rawChangeAmount,
-    rawShortageAmount,
     changeAmount,
     shortageAmount,
     isShort,
@@ -543,10 +466,14 @@ export function CheckoutPageV2() {
     });
     const pendingDraftPayments =
       usePosCheckoutSessionStore.getState().pendingDraftPaymentLines;
-    usePosCheckoutSessionStore.getState().setPendingDraftPaymentLines(null);
+    usePosCheckoutSessionStore
+      .getState()
+      .setPendingDraftPaymentLines(null);
     if (pendingDraftPayments && pendingDraftPayments.length > 0) {
       setPaymentLines(
-        pendingDraftPayments.map((p) => createPaymentLine(p.method, p.amount)),
+        pendingDraftPayments.map((p) =>
+          createPaymentLine(p.method, p.amount),
+        ),
       );
     }
     setCreateCustomerOpen(false);
@@ -574,9 +501,6 @@ export function CheckoutPageV2() {
   useCheckoutHotkeys({
     productSearchRef,
     customerSearchRef,
-    catalogSearchRef,
-    salespersonRef,
-    priceBookRef,
     hasCartItems: hasAnyCartLines,
     onCheckout: () => handleCheckout({ preventDefault: () => {} }),
     onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
@@ -689,7 +613,7 @@ export function CheckoutPageV2() {
             />
           ) : null}
 
-          <POSToolbar<PosCatalogLine, Salesperson, PriceBook>
+          <POSToolbar<PosCatalogLine>
             ref={productSearchRef}
             state={toolbar}
             onQueryChange={(query) => {
@@ -715,25 +639,6 @@ export function CheckoutPageV2() {
             }}
             onSubmitProductQuery={handleSubmitProductQuery}
             productSearchDisabled={catalogLoading}
-            salesperson={{
-              value: selectedSalesperson,
-              onChange: setSelectedSalesperson,
-              search: salespersonSearch,
-              itemKey: (s) => s.id,
-              renderItem: (s) => s.name,
-              renderMeta: (s) => `Mã: ${s.code}`,
-              renderSelected: (s) => s.name,
-              inputRef: salespersonRef,
-            }}
-            priceBook={{
-              value: selectedPriceBook,
-              onChange: setSelectedPriceBook,
-              search: priceBookSearch,
-              itemKey: (p) => p.id,
-              renderItem: (p) => p.name,
-              renderSelected: (p) => p.name,
-              inputRef: priceBookRef,
-            }}
           />
 
           {cartError ? <AlertBar variant="error">{cartError}</AlertBar> : null}
@@ -764,32 +669,13 @@ export function CheckoutPageV2() {
 
           {!catalogCollapsed && (
             <>
-              <ProductCatalogHeader<PosCatalogLine, ProductGroup>
-                inputRef={catalogSearchRef}
+              <ProductCatalogHeader
                 query={catalogQuery}
                 onQueryChange={setCatalogQuery}
-                productSearch={productSearchAdapter}
-                onSelectProduct={handleSelectProduct}
-                productItemKey={(p) => p.itemId}
-                productRenderItem={(p) => p.name}
-                productRenderMeta={(p) => {
-                  const atDef = locationQtyFor(p);
-                  return (
-                    <>
-                      {p.code} · Tồn {formatOnHand(p.quantityOnHand, p.unit)}
-                      {atDef < 1 && " · Hết"}
-                    </>
-                  );
-                }}
-                onSubmitProductQuery={handleSubmitProductQuery}
-                group={{
-                  value: selectedCatalogGroup,
-                  onChange: (g) => setCatalogGroup(g.id),
-                  search: catalogGroupSearch,
-                  itemKey: (g) => g.id,
-                  renderItem: (g) => g.name,
-                  renderSelected: (g) => g.name,
-                }}
+                group={catalogGroup}
+                onPickGroup={() =>
+                  setCatalogGroup((g) => (g ? undefined : "Tất cả"))
+                }
               />
               {catalogLoading ? (
                 <p className="px-3 py-6 text-[13px] text-gray-500">Đang tải…</p>
@@ -884,8 +770,6 @@ export function CheckoutPageV2() {
           onChangePaymentLines={handleChangePaymentLines}
           changeAmount={changeAmount}
           shortageAmount={isShort ? shortageAmount : 0}
-          rawChangeAmount={rawChangeAmount}
-          rawShortageAmount={isShort ? rawShortageAmount : 0}
           keepChange={keepChange}
           onKeepChangeChange={setKeepChange}
           debt={debt}
@@ -900,7 +784,9 @@ export function CheckoutPageV2() {
           suggestions={suggestions}
           selectedSuggestionId={selectedSuggestionId}
           onPickSuggestion={handlePickSuggestion}
-          onSaveDraft={isReturnExchangeInvoice ? undefined : handleSaveDraft}
+          onSaveDraft={
+            isReturnExchangeInvoice ? undefined : handleSaveDraft
+          }
           onCancelInvoice={
             isReturnExchangeInvoice ? handleRequestCancelInvoice : undefined
           }

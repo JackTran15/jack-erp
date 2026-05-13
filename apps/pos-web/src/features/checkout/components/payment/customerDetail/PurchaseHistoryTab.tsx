@@ -41,18 +41,6 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
     );
   const selectedStatus = STATUS_FILTER_TO_STATUS[statusFilter];
 
-  const statusOptions = useMemo(
-    () => [
-      { value: PurchaseHistoryStatusFilterEnum.ALL, label: "Tất cả" },
-      {
-        value: PurchaseHistoryStatusFilterEnum.PAID,
-        label: "Đã thanh toán",
-      },
-      { value: PurchaseHistoryStatusFilterEnum.DEBT, label: "Ghi nợ" },
-    ],
-    [],
-  );
-
   const filtered = useMemo(
     () =>
       selectedStatus === null
@@ -112,13 +100,16 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         render: (row) => <StatusBadge status={row.status} />,
         filterRender: (
           <PosSelect
-            value={
-              statusOptions.find((o) => o.value === statusFilter) ?? null
-            }
-            onChange={(item) => setStatusFilter(item.value)}
-            items={statusOptions}
-            itemKey={(o) => o.value}
-            renderItem={(o) => o.label}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: PurchaseHistoryStatusFilterEnum.ALL, label: "Tất cả" },
+              {
+                value: PurchaseHistoryStatusFilterEnum.PAID,
+                label: "Đã thanh toán",
+              },
+              { value: PurchaseHistoryStatusFilterEnum.DEBT, label: "Ghi nợ" },
+            ]}
             variant="underline"
             className="min-w-[130px]"
           />

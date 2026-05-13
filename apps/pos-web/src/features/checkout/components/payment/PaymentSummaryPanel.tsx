@@ -1,6 +1,9 @@
 import { forwardRef, useMemo, useState, type ReactNode } from "react";
 import type { SearchSuggestion } from "../common/SearchPopover";
-import type { CashSuggestion, PaymentMethodOption } from "../types";
+import type {
+  CashSuggestion,
+  PaymentMethodOption,
+} from "../types";
 import {
   ChevronDownIcon,
   GiftIcon,
@@ -130,20 +133,11 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangePaymentLines: (lines: PaymentLine[]) => void;
   /** Optional read-only predicate forwarded to `PaymentMethodList`. */
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
-  /** Effective change to give back (post `keepChange`). */
   changeAmount: number;
-  /** Effective shortage (post `forgiveShortage`). */
   shortageAmount: number;
-  /** Raw change amount (unaffected by `keepChange`) — drives row visibility. */
-  rawChangeAmount: number;
-  /** Raw shortage amount (unaffected by `forgiveShortage`) — drives row visibility. */
-  rawShortageAmount: number;
 
-  // "Forgive the residual delta" — a single boolean drives both visual
-  // affordances. Surfaced as "Khách không lấy tiền thừa" when the customer
-  // overpaid (rawChangeAmount > 0) and as "Bớt tiền lẻ cho khách" when the
-  // customer underpaid (rawShortageAmount > 0). Provide both prop + setter
-  // to enable the row in either direction.
+  // Keep change ("Khách không lấy tiền thừa") — only rendered when no
+  // customer is selected (per spec 4.7.10). Provide both to enable the row.
   keepChange?: boolean;
   onKeepChangeChange?: (next: boolean) => void;
 
@@ -236,8 +230,6 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     paymentAmountReadOnly,
     changeAmount,
     shortageAmount,
-    rawChangeAmount,
-    rawShortageAmount,
     keepChange,
     onKeepChangeChange,
     debt,
@@ -341,7 +333,9 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         keepWhenSelected: true,
       })),
     ];
-    const filtered = hasCustomer ? all.filter((a) => a.keepWhenSelected) : all;
+    const filtered = hasCustomer
+      ? all.filter((a) => a.keepWhenSelected)
+      : all;
     // Strip the local-only `keepWhenSelected` field before handing to
     // CustomerActions — it's a panel-internal visibility flag, not a public
     // CustomerActionItem property.
@@ -359,16 +353,12 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     customerExtraActions,
   ]);
 
-  // Both checkbox rows are mutually exclusive (the sale is either over- or
-  // under-paid, never both) and share the single `keepChange` flag. Keying
-  // off the *raw* amounts (not the effective `changeAmount` / `shortageAmount`)
-  // keeps the row visible once the user checks the box — otherwise checking
-  // would zero the effective amount and immediately hide the row.
-  const hasKeepChangeWire =
+  // Render keep-change row only when a customer is *not* selected and the
+  // host has wired the boolean state (controlled prop pattern).
+  const showKeepChange =
+    !hasCustomer &&
     typeof keepChange === "boolean" &&
     typeof onKeepChangeChange === "function";
-  const showKeepChange = hasKeepChangeWire && rawChangeAmount > 0;
-  const showForgiveShortage = hasKeepChangeWire && rawShortageAmount > 0;
 
   return (
     <aside className="flex h-full min-w-[350px] w-[26dvw] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
@@ -415,11 +405,8 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           changeAmount={changeAmount}
           shortageAmount={shortageAmount}
           showKeepChange={showKeepChange}
-          showForgiveShortage={showForgiveShortage}
           keepChange={keepChange}
           onKeepChangeChange={onKeepChangeChange}
-          rawChangeAmount={rawChangeAmount}
-          rawShortageAmount={rawShortageAmount}
           debt={debt}
           onDebtChange={onDebtChange}
           debtAmount={debtAmount}

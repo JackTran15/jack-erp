@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { ReactNode } from "react";
 import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 import { cn } from "@erp/ui";
 
@@ -13,8 +13,6 @@ export interface DropdownButtonProps {
   className?: string;
   /** Visual size — `md` is the default toolbar height. */
   size?: "sm" | "md";
-  /** Forwarded to the underlying button — used by hotkeys to focus the trigger. */
-  ref?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -29,11 +27,9 @@ export function DropdownButton({
   onClick,
   className,
   size = "md",
-  ref,
 }: DropdownButtonProps) {
   return (
     <button
-      ref={ref}
       type="button"
       onClick={onClick}
       className={cn(

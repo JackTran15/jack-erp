@@ -54,16 +54,9 @@ export function DataTableFilterCell({
     >
       {leadingOperator ? (
         <PosSelect
-          value={
-            operatorOptions.find((o) => o.value === currentOperator) ?? null
-          }
-          onChange={(item) =>
-            (onOperatorChange ?? setInnerOperator)(item.value)
-          }
-          items={operatorOptions}
-          itemKey={(o) => o.value}
-          renderItem={(o) => o.label}
-          renderSelected={(o) => o.selectedDisplay}
+          value={currentOperator}
+          onChange={onOperatorChange ?? setInnerOperator}
+          options={operatorOptions}
           className="w-8 shrink-0"
           menuClassName="left-0 min-w-[160px]"
           triggerClassName="flex items-center justify-center"

@@ -84,13 +84,14 @@ export function PaginationBar({
         </button>
         <label className="ml-2 inline-flex items-center gap-1 text-[14px] text-gray-500">
           <span className="sr-only">Số dòng/trang</span>
-          <PosSelect<number>
+          <PosSelect
             position="top"
-            value={pageSizeOptions.includes(pageSize) ? pageSize : null}
-            onChange={(next) => onPageSizeChange?.(next)}
-            items={pageSizeOptions}
-            itemKey={(n) => String(n)}
-            renderItem={(n) => String(n)}
+            value={String(pageSize)}
+            onChange={(next) => onPageSizeChange?.(Number.parseInt(next, 10))}
+            options={pageSizeOptions.map((opt) => ({
+              value: String(opt),
+              label: String(opt),
+            }))}
             className="w-[72px]"
             triggerClassName="text-[14px] text-gray-700"
           />

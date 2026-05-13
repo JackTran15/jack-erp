@@ -3,9 +3,6 @@ import { useEffect, type RefObject } from "react";
 interface UseCheckoutHotkeysInput {
   productSearchRef: RefObject<HTMLInputElement | null>;
   customerSearchRef: RefObject<HTMLInputElement | null>;
-  catalogSearchRef?: RefObject<HTMLInputElement | null>;
-  salespersonRef?: RefObject<HTMLInputElement | null>;
-  priceBookRef?: RefObject<HTMLInputElement | null>;
   hasCartItems: boolean;
   onCheckout: () => void;
   onSaveDraft?: () => void;
@@ -14,9 +11,6 @@ interface UseCheckoutHotkeysInput {
 export function useCheckoutHotkeys({
   productSearchRef,
   customerSearchRef,
-  catalogSearchRef,
-  salespersonRef,
-  priceBookRef,
   hasCartItems,
   onCheckout,
   onSaveDraft,
@@ -27,38 +21,27 @@ export function useCheckoutHotkeys({
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement;
 
-      // Focus shortcuts — work from anywhere (including inside other inputs).
-      if (e.key === "F3") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          catalogSearchRef?.current?.focus();
-        } else {
+      if (inField) {
+        if (e.key === "F3") {
+          e.preventDefault();
           productSearchRef.current?.focus();
+        }
+        if (e.key === "F4") {
+          e.preventDefault();
+          customerSearchRef.current?.focus();
         }
         return;
       }
-      if (e.key === "F4") {
-        e.preventDefault();
-        customerSearchRef.current?.focus();
-        return;
-      }
-
-      // Toolbar picker shortcuts. Use `e.code` so Mac Option key (which
-      // rewrites `e.key` to e.g. "˜") still triggers correctly.
-      if (e.altKey && e.code === "KeyN") {
-        e.preventDefault();
-        salespersonRef?.current?.focus();
-        return;
-      }
-      if (e.altKey && e.code === "KeyB") {
-        e.preventDefault();
-        priceBookRef?.current?.focus();
-        return;
-      }
-
-      if (inField) return;
 
       switch (e.key) {
+        case "F3":
+          e.preventDefault();
+          productSearchRef.current?.focus();
+          break;
+        case "F4":
+          e.preventDefault();
+          customerSearchRef.current?.focus();
+          break;
         case "F9":
           e.preventDefault();
           if (hasCartItems) onCheckout();
@@ -73,13 +56,10 @@ export function useCheckoutHotkeys({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    productSearchRef,
     customerSearchRef,
-    catalogSearchRef,
-    salespersonRef,
-    priceBookRef,
     hasCartItems,
     onCheckout,
     onSaveDraft,
+    productSearchRef,
   ]);
 }

@@ -102,16 +102,15 @@ export const PaymentMethodRow = forwardRef<
 
       <div className="min-w-0">
         <PosSelect
-          value={methods.find((m) => m.value === line.method) ?? null}
-          onChange={(item) => onChangeMethod(item.value)}
+          value={line.method}
+          onChange={onChangeMethod}
           ariaLabel="Phương thức thanh toán"
           variant="underline"
-          items={methods}
-          itemKey={(m) => m.value}
-          renderItem={(m) => m.label}
-          isItemDisabled={(m) =>
-            m.value !== line.method && unavailable.has(m.value)
-          }
+          options={methods.map((m) => ({
+            value: m.value,
+            label: m.label,
+            disabled: m.value !== line.method && unavailable.has(m.value),
+          }))}
           className="w-full"
           menuClassName="w-[280px]"
         />
