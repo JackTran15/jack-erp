@@ -36,13 +36,6 @@ interface BuildCheckoutInvoicePayloadInput {
   paymentLines: PaymentLine[];
   primaryMethodLabel: string;
   methods: readonly PaymentMethodOption[];
-  /**
-   * Mirrors `useCheckoutPayment.keepChange` — when `true`, the cashier opted
-   * to forgive the residual delta ("Khách không lấy tiền thừa" when overpaid
-   * or "Bớt tiền lẻ cho khách" when underpaid). Zeroes the receipt's
-   * "Trả lại khách" line so the printout matches the on-screen flow.
-   */
-  keepChange: boolean;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -53,7 +46,6 @@ export function buildCheckoutInvoicePayload({
   paymentLines,
   primaryMethodLabel,
   methods,
-  keepChange,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -72,22 +64,6 @@ export function buildCheckoutInvoicePayload({
           }))
       : [{ label: primaryMethodLabel, amount: grandTotal }];
 
-  // Signed "Trả lại khách":
-  //   Sale  (grandTotal >= 0): totalPaid − grandTotal       (positive=change, negative=short)
-  //   Refund (grandTotal <  0): max(0, |grandTotal| − totalPaid)  (positive=shop still owes)
-  // `keepChange` zeroes it in either direction — see input docs above.
-  const rawSignedChange =
-    grandTotal < 0
-      ? Math.max(0, -grandTotal - totalPaid)
-      : totalPaid - grandTotal;
-  const change = keepChange ? 0 : rawSignedChange;
-  // Echo the forgiven amount on its own labeled row. Only one of these is
-  // non-zero at a time (the sale was either over- or under-paid).
-  const keptChange =
-    keepChange && rawSignedChange > 0 ? rawSignedChange : undefined;
-  const forgivenShortage =
-    keepChange && rawSignedChange < 0 ? -rawSignedChange : undefined;
-
   return {
     store: STORE_INFO,
     invoiceNumber: generateInvoiceNumber(new Date()),
@@ -103,9 +79,10 @@ export function buildCheckoutInvoicePayload({
       subtotal: grandTotal,
       grandTotal,
       paid,
-      change,
-      keptChange,
-      forgivenShortage,
+      change:
+        grandTotal < 0
+          ? Math.max(0, -grandTotal - totalPaid)
+          : Math.max(0, totalPaid - grandTotal),
     },
     payments,
     policy: RETURN_POLICY,
