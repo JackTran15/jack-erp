@@ -9,6 +9,7 @@ export interface PosNumberInputProps {
   onChange: (next: number) => void;
   min?: number;
   max?: number;
+  step?: number;
   readOnly?: boolean;
   ref?: Ref<HTMLInputElement>;
   parser?: (raw: string) => number | null;
@@ -28,6 +29,7 @@ export function PosNumberInput({
   onChange,
   min,
   max,
+  step = 1,
   readOnly,
   ref,
   parser,
@@ -56,6 +58,7 @@ export function PosNumberInput({
       inputMode={inputMode}
       min={min}
       max={max}
+      step={step}
       value={displayValue ?? format(value)}
       onChange={(e) => {
         const n = parse(e.target.value);
@@ -68,9 +71,9 @@ export function PosNumberInput({
         "bg-transparent text-gray-900 focus:outline-none",
         align === "right" ? "text-right" : "text-left",
         "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-        variant === "boxed" && "h-7 px-2 text-[13px]",
+        variant === "boxed" && "h-7 px-2 text-sm",
         variant === "underline" &&
-          "h-8 w-full bg-transparent px-1 text-[16px] font-semibold text-[#0F172A]",
+          "h-8 w-full bg-transparent px-1 text-sm text-[#0F172A]",
         variant === "ghost" && "border-0 px-0 py-2",
         readOnly && "cursor-default",
         className,

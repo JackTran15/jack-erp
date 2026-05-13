@@ -1,10 +1,6 @@
 import type { CashSuggestion } from "../../types";
-import type { InvoicePrinter } from "../../printing/InvoicePrinter";
 import { CashSuggestionList } from "../CashSuggestionList";
-import {
-  PaymentCTAButtons,
-  type InvoicePayloadInput,
-} from "../PaymentCTAButtons";
+import { PaymentCTAButtons } from "../PaymentCTAButtons";
 import { PrintAndOrderRow } from "../PrintAndOrderRow";
 
 interface CheckoutActionsSectionProps {
@@ -17,10 +13,8 @@ interface CheckoutActionsSectionProps {
   onPickSuggestion: (s: CashSuggestion) => void;
   onSaveDraft?: () => void;
   onCancelInvoice?: () => void;
-  onCollect: () => void;
+  onCollect: () => void | Promise<void>;
   collectDisabled?: boolean;
-  invoice?: InvoicePayloadInput;
-  invoicePrinter?: InvoicePrinter;
 }
 
 export function CheckoutActionsSection({
@@ -35,8 +29,6 @@ export function CheckoutActionsSection({
   onCancelInvoice,
   onCollect,
   collectDisabled,
-  invoice,
-  invoicePrinter,
 }: CheckoutActionsSectionProps) {
   return (
     <div className="border-t border-gray-200 bg-white">
@@ -60,8 +52,6 @@ export function CheckoutActionsSection({
         onCancelInvoice={onCancelInvoice}
         onCollect={onCollect}
         collectDisabled={collectDisabled}
-        invoice={invoice}
-        printer={invoicePrinter}
       />
     </div>
   );

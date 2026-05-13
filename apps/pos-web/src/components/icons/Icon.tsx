@@ -476,3 +476,12 @@ export function TagIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ProhibitedGlyphIcon(props: IconProps) {
+  return (
+    <svg className="bg-white rounded-full text-red-500" {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}

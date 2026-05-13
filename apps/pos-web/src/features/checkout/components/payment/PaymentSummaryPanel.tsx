@@ -1,33 +1,35 @@
-import { forwardRef, useMemo, useState, type ReactNode } from "react";
-import type { SearchSuggestion } from "../common/SearchPopover";
-import type { CashSuggestion, PaymentMethodOption } from "../types";
 import {
   ChevronDownIcon,
   GiftIcon,
   PlusCircleIcon,
   QrIcon,
-  ReceiptIcon,
 } from "@erp/pos/components/icons/Icon";
-import type { InvoicePrinter } from "../printing/InvoicePrinter";
+import { forwardRef, useMemo, useState, type ReactNode } from "react";
 import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
 } from "../../constants/promoMenu";
-import { QuickExchangeBadges } from "./QuickExchangeBadges";
-import { CheckoutActionsSection } from "./sections/CheckoutActionsSection";
-import { CustomerSection } from "./sections/CustomerSection";
-import { PaymentSection } from "./sections/PaymentSection";
+import type { SearchSuggestion } from "../common/SearchPopover";
+import type { CashSuggestion, PaymentMethodOption } from "../types";
 import type { CustomerActionItem } from "./CustomerActions";
-import { CustomerDetailDialog } from "./customerDetail/CustomerDetailDialog";
-import { type InvoicePayloadInput } from "./PaymentCTAButtons";
 import { type PaymentLine } from "./PaymentMethodRow";
 import {
   PromoMenu,
   type PromoMenuDiscountPoint,
   type PromoMenuVoucher,
 } from "./PromoMenu";
+import { QuickExchangeBadges } from "./QuickExchangeBadges";
+import { DepositDialog } from "./DepositDialog";
+import { CustomerDetailDialog } from "./customerDetail/CustomerDetailDialog";
 import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
 import type { PromotionItem } from "./promotion/types";
+import { CheckoutActionsSection } from "./sections/CheckoutActionsSection";
+import { CustomerSection } from "./sections/CustomerSection";
+import { PaymentSection } from "./sections/PaymentSection";
+import {
+  PaymentMethodEnum,
+  type PaymentMethod,
+} from "../../constants/paymentMethod";
 
 export interface PaymentSummaryPanelProps<TCustomer> {
   // Sub-topbar
@@ -123,6 +125,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   itemCount: number;
   total: number;
   deposit: number;
+  onDepositChange: (next: number) => void;
+  onRequireCustomerForDeposit?: () => void;
 
   // Payment methods (multi-line — user can split a sale across N methods)
   methods: readonly PaymentMethodOption[];
@@ -169,13 +173,9 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onPickSuggestion: (s: CashSuggestion) => void;
   onSaveDraft?: () => void;
   onCancelInvoice?: () => void;
-  onCollect: () => void;
+  /** Validation + commit + optional receipt print — see checkout page. */
+  onCollect: () => void | Promise<void>;
   collectDisabled?: boolean;
-
-  /** Optional invoice payload (or factory) — when set, "Thu tiền" prints first. */
-  invoice?: InvoicePayloadInput;
-  /** Per-call printer override forwarded to `PaymentCTAButtons`. */
-  invoicePrinter?: InvoicePrinter;
 }
 
 /**
@@ -230,6 +230,8 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     itemCount,
     total,
     deposit,
+    onDepositChange,
+    onRequireCustomerForDeposit,
     methods,
     paymentLines,
     onChangePaymentLines,
@@ -257,8 +259,6 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onCancelInvoice,
     onCollect,
     collectDisabled,
-    invoice,
-    invoicePrinter,
   } = props;
 
   const amountDue = Math.max(0, total - deposit);
@@ -274,6 +274,11 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   // Customer detail dialog — opened by clicking the selected-customer chip.
   // Owns its own data fetching, so we only need to pass id + fallback name.
   const [detailOpen, setDetailOpen] = useState(false);
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [draftDepositAmount, setDraftDepositAmount] = useState(0);
+  const [draftDepositMethod, setDraftDepositMethod] = useState<PaymentMethod>(
+    PaymentMethodEnum.CASH,
+  );
 
   /**
    * Source of truth for the customer-area action icons.
@@ -364,11 +369,28 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   // off the *raw* amounts (not the effective `changeAmount` / `shortageAmount`)
   // keeps the row visible once the user checks the box — otherwise checking
   // would zero the effective amount and immediately hide the row.
+  const isRefundFlow = total < 0;
   const hasKeepChangeWire =
-    typeof keepChange === "boolean" &&
-    typeof onKeepChangeChange === "function";
-  const showKeepChange = hasKeepChangeWire && rawChangeAmount > 0;
-  const showForgiveShortage = hasKeepChangeWire && rawShortageAmount > 0;
+    typeof keepChange === "boolean" && typeof onKeepChangeChange === "function";
+  const showKeepChange =
+    hasKeepChangeWire && (isRefundFlow || rawChangeAmount > 0);
+  const showForgiveShortage =
+    hasKeepChangeWire && !isRefundFlow && rawShortageAmount > 0;
+
+  const handleOpenDepositDialog = () => {
+    if (!selectedCustomerId) {
+      onRequireCustomerForDeposit?.();
+      return;
+    }
+    setDraftDepositAmount(deposit);
+    setDraftDepositMethod(paymentLines[0]?.method ?? PaymentMethodEnum.CASH);
+    setDepositDialogOpen(true);
+  };
+
+  const handleConfirmDeposit = () => {
+    onDepositChange(Math.max(0, draftDepositAmount));
+    setDepositDialogOpen(false);
+  };
 
   return (
     <aside className="flex h-full min-w-[350px] w-[26dvw] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
@@ -408,10 +430,12 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           total={total}
           deposit={deposit}
           amountDue={amountDue}
+          onDepositClick={handleOpenDepositDialog}
           paymentLines={paymentLines}
           methods={methods}
           onChangePaymentLines={onChangePaymentLines}
           paymentAmountReadOnly={paymentAmountReadOnly}
+          isRefundFlow={isRefundFlow}
           changeAmount={changeAmount}
           shortageAmount={shortageAmount}
           showKeepChange={showKeepChange}
@@ -441,8 +465,6 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         onCancelInvoice={onCancelInvoice}
         onCollect={onCollect}
         collectDisabled={collectDisabled}
-        invoice={invoice}
-        invoicePrinter={invoicePrinter}
       />
 
       {selectedCustomerId ? (
@@ -458,6 +480,17 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           onRefreshPoints={onRefreshCustomerPoints}
         />
       ) : null}
+
+      <DepositDialog
+        open={depositDialogOpen}
+        amount={draftDepositAmount}
+        method={draftDepositMethod}
+        methods={methods}
+        onClose={() => setDepositDialogOpen(false)}
+        onAmountChange={setDraftDepositAmount}
+        onMethodChange={setDraftDepositMethod}
+        onConfirm={handleConfirmDeposit}
+      />
 
       <PromotionSelectionModal
         open={promotionDialogOpen}
