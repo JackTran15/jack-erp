@@ -5,9 +5,6 @@ import { SessionStatus, WsEventType } from '@erp/shared-interfaces';
 import { PosSessionService } from './pos-session.service';
 import {
   PosSessionEntity,
-  SaleEntity,
-  ReturnEntity,
-  PaymentEntity,
   SessionReconciliationEntity,
 } from '../entities';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
@@ -23,9 +20,6 @@ import {
 describe('PosSessionService', () => {
   let service: PosSessionService;
   let sessionRepo: Record<string, jest.Mock>;
-  let saleRepo: Record<string, jest.Mock>;
-  let returnRepo: Record<string, jest.Mock>;
-  let paymentRepo: Record<string, jest.Mock>;
   let reconciliationRepo: Record<string, jest.Mock>;
   let cashAccountRepo: Record<string, jest.Mock>;
   let cashMovementRepo: Record<string, jest.Mock>;
@@ -45,16 +39,6 @@ describe('PosSessionService', () => {
       save: jest.fn().mockImplementation((data) => Promise.resolve(data)),
       findOne: jest.fn(),
     };
-
-    saleRepo = {
-      find: jest.fn().mockResolvedValue([]),
-    };
-
-    returnRepo = {
-      find: jest.fn().mockResolvedValue([]),
-    };
-
-    paymentRepo = {};
 
     reconciliationRepo = {
       create: jest.fn().mockImplementation((data) => ({ id: 'recon-1', ...data })),
@@ -91,9 +75,6 @@ describe('PosSessionService', () => {
       providers: [
         PosSessionService,
         { provide: getRepositoryToken(PosSessionEntity), useValue: sessionRepo },
-        { provide: getRepositoryToken(SaleEntity), useValue: saleRepo },
-        { provide: getRepositoryToken(ReturnEntity), useValue: returnRepo },
-        { provide: getRepositoryToken(PaymentEntity), useValue: paymentRepo },
         { provide: getRepositoryToken(SessionReconciliationEntity), useValue: reconciliationRepo },
         { provide: getRepositoryToken(CashAccountEntity), useValue: cashAccountRepo },
         { provide: getRepositoryToken(CashMovementEntity), useValue: cashMovementRepo },

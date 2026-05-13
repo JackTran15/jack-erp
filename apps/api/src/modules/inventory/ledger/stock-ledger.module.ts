@@ -14,6 +14,7 @@ import { ProductModule } from '../product/product.module';
 import { StockDeductionPublisher } from '../publishers/stock-deduction.publisher';
 import { StockDeductionConsumer } from '../consumers/stock-deduction.consumer';
 import { StockReturnConsumer } from '../consumers/stock-return.consumer';
+import { StockReturnInConsumer } from '../consumers/stock-return-in.consumer';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StockReturnConsumer } from '../consumers/stock-return.consumer';
     StockDeductionPublisher,
     StockDeductionConsumer,
     StockReturnConsumer,
+    StockReturnInConsumer,
   ],
   exports: [StockLedgerService, StockDeductionPublisher],
 })

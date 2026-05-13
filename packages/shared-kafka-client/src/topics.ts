@@ -10,6 +10,12 @@ export const ERP_TOPICS = {
   CASH_MOVEMENT_FROM_PAYMENT: 'erp.cash.movement.from.payment',
   CUSTOMER_MERGED: 'erp.customer.merged',
   TEMP_WAREHOUSE_TRANSFER_REQUESTED: 'erp.temp-warehouse.transfer-requested',
+  RETURN_POSTED: 'erp.return.posted',
+  STOCK_RETURN_IN: 'erp.stock.return.in',
+  LOYALTY_POINTS_REVERSE: 'erp.loyalty.points.reverse',
+  CASH_REFUND: 'erp.cash.refund',
+  JOURNAL_POST_RETURN: 'erp.journal.post.return',
+  
 } as const;
 
 export type ErpTopic = (typeof ERP_TOPICS)[keyof typeof ERP_TOPICS];
