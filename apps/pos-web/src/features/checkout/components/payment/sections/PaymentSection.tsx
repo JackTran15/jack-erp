@@ -17,7 +17,9 @@ interface PaymentSectionProps {
   paymentLines: PaymentLine[];
   methods: readonly PaymentMethodOption[];
   onChangePaymentLines: (lines: PaymentLine[]) => void;
+  onDepositClick?: () => void;
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  isRefundFlow: boolean;
   /** Effective change-due-back (post `keepChange`). */
   changeAmount: number;
   /** Effective shortage (post `forgiveShortage`). */
@@ -54,7 +56,9 @@ export function PaymentSection({
   paymentLines,
   methods,
   onChangePaymentLines,
+  onDepositClick,
   paymentAmountReadOnly,
+  isRefundFlow,
   changeAmount,
   shortageAmount,
   showKeepChange,
@@ -75,6 +79,7 @@ export function PaymentSection({
   // sale either over- or under-paid), so the subtraction picks the right
   // sign without an explicit branch.
   const netChangeDisplay = changeAmount - shortageAmount;
+  const refundDisplayAmount = Math.max(0, -total);
   return (
     <>
       <div className="px-4">
@@ -83,16 +88,30 @@ export function PaymentSection({
           total={total}
           deposit={deposit}
           amountDue={amountDue}
+          onDepositClick={onDepositClick}
         />
       </div>
-      <div className="border-t border-gray-200 px-4">
-        <PaymentMethodList
-          lines={paymentLines}
-          methods={methods}
-          onChange={onChangePaymentLines}
-          amountReadOnly={paymentAmountReadOnly}
-        />
-      </div>
+      {!isRefundFlow ? (
+        <>
+          <div className="border-t border-gray-200 pt-3 px-4">
+            <SummaryRow
+              label={
+                <span className="font-medium text-gray-900">Còn phải thu</span>
+              }
+              value={formatVnd(amountDue)}
+              emphasis="xl"
+            />
+          </div>
+          <div className="border-t border-gray-200 px-4">
+            <PaymentMethodList
+              lines={paymentLines}
+              methods={methods}
+              onChange={onChangePaymentLines}
+              amountReadOnly={paymentAmountReadOnly}
+            />
+          </div>
+        </>
+      ) : null}
       <div className="border-t border-gray-200 px-4 py-2">
         <SummaryRow
           label={
@@ -105,17 +124,40 @@ export function PaymentSection({
                 netChangeDisplay < 0 ? "text-[#DC2626]" : "text-gray-900",
               )}
             >
-              {formatVnd(netChangeDisplay)}
+              {formatVnd(isRefundFlow ? refundDisplayAmount : netChangeDisplay)}
             </span>
           }
         />
       </div>
+      {isRefundFlow ? (
+        <>
+          <div className="border-t border-gray-200 px-4 py-2">
+            <p className="text-[13px] font-medium text-gray-900">
+              Hình thức đổi trả
+            </p>
+          </div>
+          <div className="border-t border-gray-200 px-4">
+            <PaymentMethodList
+              lines={paymentLines}
+              methods={methods}
+              onChange={onChangePaymentLines}
+              amountReadOnly={paymentAmountReadOnly}
+            />
+          </div>
+        </>
+      ) : null}
       <div className="border-t border-gray-200 px-4">
         {showKeepChange ? (
           <KeepChangeRow
             checked={keepChange ?? false}
             onChange={onKeepChangeChange ?? (() => {})}
-            amount={keepChange ? rawChangeAmount : 0}
+            amount={
+              keepChange
+                ? isRefundFlow
+                  ? refundDisplayAmount
+                  : rawChangeAmount
+                : 0
+            }
           />
         ) : null}
         {showForgiveShortage ? (
@@ -125,11 +167,13 @@ export function PaymentSection({
             amount={keepChange ? rawShortageAmount : 0}
           />
         ) : null}
-        <DebtCheckRow
-          checked={debt}
-          onChange={onDebtChange}
-          amount={debtAmount}
-        />
+        {!isRefundFlow ? (
+          <DebtCheckRow
+            checked={debt}
+            onChange={onDebtChange}
+            amount={debtAmount}
+          />
+        ) : null}
       </div>
       <div className="border-t border-b border-gray-200 px-4">
         <PosTextarea
