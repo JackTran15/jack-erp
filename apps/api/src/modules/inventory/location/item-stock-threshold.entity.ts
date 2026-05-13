@@ -15,10 +15,10 @@ export class ItemStockThresholdEntity extends BaseEntity {
   locationId: string;
 
   @Column({ name: 'min_qty', type: 'decimal', precision: 18, scale: 2, nullable: true })
-  minQty?: number;
+  minQty: number | null;
 
   @Column({ name: 'max_qty', type: 'decimal', precision: 18, scale: 2, nullable: true })
-  maxQty?: number;
+  maxQty: number | null;
 
   @ManyToOne(() => ItemEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'item_id' })

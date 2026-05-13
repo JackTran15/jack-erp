@@ -100,8 +100,8 @@ export class ItemStockThresholdService {
       where: { itemId, locationId, organizationId: actor.organizationId },
     });
     if (existing) {
-      existing.minQty = dto.minQty ?? undefined;
-      existing.maxQty = dto.maxQty ?? undefined;
+      existing.minQty = dto.minQty ?? null;
+      existing.maxQty = dto.maxQty ?? null;
       return this.repo.save(existing);
     }
 
@@ -109,8 +109,8 @@ export class ItemStockThresholdService {
       this.repo.create({
         itemId,
         locationId,
-        minQty: dto.minQty ?? undefined,
-        maxQty: dto.maxQty ?? undefined,
+        minQty: dto.minQty ?? null,
+        maxQty: dto.maxQty ?? null,
         organizationId: actor.organizationId,
         branchId: item.branchId ?? location.branchId,
         createdBy: actor.userId,
@@ -156,8 +156,8 @@ export class ItemStockThresholdService {
           where: { itemId, locationId: loc.id },
         });
         if (existing) {
-          existing.minQty = dto.minQty ?? undefined;
-          existing.maxQty = dto.maxQty ?? undefined;
+          existing.minQty = dto.minQty ?? null;
+          existing.maxQty = dto.maxQty ?? null;
           await manager.save(ItemStockThresholdEntity, existing);
         } else {
           await manager.save(
@@ -165,8 +165,8 @@ export class ItemStockThresholdService {
             manager.create(ItemStockThresholdEntity, {
               itemId,
               locationId: loc.id,
-              minQty: dto.minQty ?? undefined,
-              maxQty: dto.maxQty ?? undefined,
+              minQty: dto.minQty ?? null,
+              maxQty: dto.maxQty ?? null,
               organizationId: actor.organizationId,
               branchId: item.branchId ?? loc.branchId,
               createdBy: actor.userId,
