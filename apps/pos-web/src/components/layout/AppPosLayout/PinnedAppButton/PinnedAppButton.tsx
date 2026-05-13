@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import type { AppMenuItem } from "@erp/pos/components/layout/AppPosLayout/AppPosLayout";
+import type { AppMenuItem } from "../appMenuItems";
 
 export interface PinnedAppButtonProps {
   item: AppMenuItem;
@@ -13,11 +13,7 @@ export interface PinnedAppButtonProps {
  * a colored squircle with a centered white glyph, scaled to fit the existing
  * 44px topbar.
  */
-export function PinnedAppButton({
-  item,
-  active,
-  onClick,
-}: PinnedAppButtonProps) {
+export function PinnedAppButton({ item, active, onClick }: PinnedAppButtonProps) {
   const { label, Icon, iconBgColor } = item;
   return (
     <button
