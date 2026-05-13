@@ -31,26 +31,22 @@ export interface InvoiceTotals {
   /** Amount tendered (e.g. cash given). */
   paid: number;
   /**
-   * "Trả lại khách" on the receipt — the *signed* delta:
-   *   • positive → change to hand back to the customer
-   *   • negative → customer still owes the shop (printed if the cashier
-   *     prints with an unresolved shortage)
-   *   • zero     → exact payment, or the cashier opted to forgive the
-   *     residual via "Khách không lấy tiền thừa" / "Bớt tiền lẻ cho khách"
+   * Net change line on the receipt (positive = return to customer, negative = still owed to shop).
+   * Zero when exact, or when keepChange / debt options clear the residual per checkout rules.
    */
   change: number;
   /**
-   * "Khách không lấy tiền thừa" — set when the cashier forgave a positive
-   * overpayment. Carries the raw kept amount so the receipt can echo it
-   * alongside the zeroed `change` line.
+   * Optional line: excess tender not returned / refund remainder waived by cashier toggle.
    */
   keptChange?: number;
   /**
-   * "Bớt tiền lẻ cho khách" — set when the cashier forgave a shortage.
-   * Carries the raw written-off amount so the receipt can echo it
-   * alongside the zeroed `change` line.
+   * Optional line: small shortage forgiven on sale (keepChange, no debt).
    */
   forgivenShortage?: number;
+  /** Optional line: excess tender applied to reduce customer balance (sale + debt). */
+  debtReduction?: number;
+  /** Optional line: unpaid balance booked to customer debt (sale + debt). */
+  customerDebtIssued?: number;
 }
 
 export interface InvoicePolicy {

@@ -244,6 +244,22 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         </div>`
             : ""
         }
+        ${
+          totals.debtReduction != null && totals.debtReduction > 0
+            ? `<div class="summary-row forgiven">
+          <span>Giảm nợ</span>
+          <span class="value">${formatVnd(totals.debtReduction)}</span>
+        </div>`
+            : ""
+        }
+        ${
+          totals.customerDebtIssued != null && totals.customerDebtIssued > 0
+            ? `<div class="summary-row forgiven">
+          <span>Khách nợ</span>
+          <span class="value">${formatVnd(totals.customerDebtIssued)}</span>
+        </div>`
+            : ""
+        }
       </section>
 
       <p class="km-line">

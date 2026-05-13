@@ -75,8 +75,11 @@ export function InvoiceLineItemRow({
           onBumpDown={onBumpQty ? () => onBumpQty(line.lineId, -1) : undefined}
           onBumpUp={onBumpQty ? () => onBumpQty(line.lineId, 1) : undefined}
           bumpDownDisabled={line.qty <= 1}
-          bumpUpDisabled={false}
-          min={isReturnQuantityUi ? undefined : 1}
+          bumpUpDisabled={
+            isReturnQuantityUi ? line.qty >= line.maxQty : false
+          }
+          min={isReturnQuantityUi ? -Math.max(line.maxQty, 1) : 1}
+          max={isReturnQuantityUi ? -1 : undefined}
           itemLabel={line.name}
           ariaLabel={`Số lượng ${line.name}`}
           variant="underline"
