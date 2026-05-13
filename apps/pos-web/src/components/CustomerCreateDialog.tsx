@@ -108,13 +108,8 @@ export interface CustomerCreateDialogProps {
   onAddCustomerGroup?: () => void;
 
   /**
-   * Khi true, trả focus về element đang active lúc dialog mở sau khi đóng.
-   * Forward xuống `AppDialog`. Xem `AppDialog.returnFocusOnClose` để biết
-   * chi tiết.
-   */
-  returnFocusOnClose?: boolean;
-  /**
-   * Ref tới element nhận focus sau khi dialog đóng. Forward xuống `AppDialog`.
+   * Ref tới element nhận focus sau khi dialog đóng — override `document.activeElement`
+   * mặc định. Forward xuống `AppDialog.returnFocusTo`.
    */
   returnFocusTo?: RefObject<HTMLElement | null>;
 }
@@ -497,7 +492,6 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
     onCreated,
     onSubmit,
     onAddCustomerGroup,
-    returnFocusOnClose,
     returnFocusTo,
   } = props;
 
@@ -616,7 +610,6 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
       onClose={onClose}
       width={880}
       contentClassName="shadow-[0_20px_48px_rgba(0,0,0,0.16)]"
-      returnFocusOnClose={returnFocusOnClose}
       returnFocusTo={returnFocusTo}
     >
       <AppDialog.Header title={titleText} />
