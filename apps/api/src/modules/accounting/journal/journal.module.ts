@@ -9,6 +9,8 @@ import { JournalController } from './journal.controller';
 import { JournalSalePublisher } from '../publishers/journal-sale.publisher';
 import { JournalSaleConsumer } from '../consumers/journal-sale.consumer';
 import { JournalReverseConsumer } from '../consumers/journal-reverse.consumer';
+import { JournalReturnPublisher } from '../publishers/journal-return.publisher';
+import { JournalReturnConsumer } from '../consumers/journal-return.consumer';
 
 @Module({
   imports: [
@@ -25,7 +27,9 @@ import { JournalReverseConsumer } from '../consumers/journal-reverse.consumer';
     JournalSalePublisher,
     JournalSaleConsumer,
     JournalReverseConsumer,
+    JournalReturnPublisher,
+    JournalReturnConsumer,
   ],
-  exports: [JournalService, JournalSalePublisher],
+  exports: [JournalService, JournalSalePublisher, JournalReturnPublisher],
 })
 export class JournalModule {}

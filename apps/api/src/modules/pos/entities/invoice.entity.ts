@@ -1,4 +1,4 @@
-import { Entity, Column, Index } from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 
 export enum InvoiceStatus {
@@ -16,12 +16,25 @@ export enum InvoicePaymentMethod {
   CARD          = 'card',
 }
 
-/** POS invoice — supports drafts, full payment, and debt (credit) scenarios. */
+export enum InvoiceType {
+  SALE     = 'SALE',
+  RETURN   = 'RETURN',
+  EXCHANGE = 'EXCHANGE',
+}
+
+export enum RefundMethod {
+  CASH         = 'CASH',
+  STORE_CREDIT = 'STORE_CREDIT',
+  OFFSET       = 'OFFSET',
+}
+
+/** POS invoice — supports SALE, RETURN, EXCHANGE via the `type` column. */
 @Entity('invoices')
 @Index(['organizationId', 'branchId', 'issuedAt'])
 @Index(['organizationId', 'customerId'])
 @Index(['organizationId', 'sessionId', 'isDraft'])
 @Index('uq_invoice_org_code', ['organizationId', 'code'], { unique: true })
+@Index('IDX_invoices_org_original', ['organizationId', 'originalInvoiceId'])
 export class InvoiceEntity extends BaseEntity {
   @Column({ length: 20, comment: 'Auto-generated invoice code, unique per organisation' })
   code: string;
@@ -31,6 +44,25 @@ export class InvoiceEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: InvoiceStatus, default: InvoiceStatus.DRAFT, comment: 'Current lifecycle status of the invoice' })
   status: InvoiceStatus;
+
+  @Column({ type: 'enum', enum: InvoiceType, default: InvoiceType.SALE, comment: 'Invoice variant: SALE (outflow), RETURN (refund), EXCHANGE (swap)' })
+  type: InvoiceType;
+
+  @Column({ name: 'original_invoice_id', type: 'uuid', nullable: true, comment: 'For RETURN/EXCHANGE: link to the original SALE invoice (null for quick-return)' })
+  originalInvoiceId?: string;
+
+  @ManyToOne(() => InvoiceEntity, { nullable: true })
+  @JoinColumn({ name: 'original_invoice_id' })
+  originalInvoice?: InvoiceEntity;
+
+  @Column({ name: 'refund_method', type: 'enum', enum: RefundMethod, nullable: true, comment: 'How refund was settled: CASH / STORE_CREDIT / OFFSET (RETURN + EXCHANGE only)' })
+  refundMethod?: RefundMethod;
+
+  @Column({ name: 'refunded_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Amount refunded to customer (max(returnSubtotal - newSubtotal, 0))' })
+  refundedAmount: number;
+
+  @Column({ name: 'net_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'EXCHANGE net = newSubtotal - returnSubtotal (positive = customer pays more)' })
+  netAmount: number;
 
   @Column({ type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Sum of all line totals before discount' })
   subtotal: number;

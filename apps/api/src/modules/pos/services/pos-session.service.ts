@@ -9,11 +9,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
-import { SessionStatus, PaymentMethod, WsEventType } from '@erp/shared-interfaces';
+import { SessionStatus, WsEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
-import { PosSessionEntity, SaleEntity, ReturnEntity, SessionReconciliationEntity } from '../entities';
-import { PaymentEntity } from '../entities';
+import { PosSessionEntity, SessionReconciliationEntity } from '../entities';
 import { OpenSessionDto, SubmitReconciliationDto } from '../dto';
 import { CashAccountEntity, CashAccountType } from '../../accounting/cash/cash-account.entity';
 import {
@@ -30,12 +29,6 @@ export class PosSessionService {
   constructor(
     @InjectRepository(PosSessionEntity)
     private readonly sessionRepo: Repository<PosSessionEntity>,
-    @InjectRepository(SaleEntity)
-    private readonly saleRepo: Repository<SaleEntity>,
-    @InjectRepository(ReturnEntity)
-    private readonly returnRepo: Repository<ReturnEntity>,
-    @InjectRepository(PaymentEntity)
-    private readonly paymentRepo: Repository<PaymentEntity>,
     @InjectRepository(SessionReconciliationEntity)
     private readonly reconciliationRepo: Repository<SessionReconciliationEntity>,
     @InjectRepository(CashAccountEntity)
@@ -341,8 +334,12 @@ export class PosSessionService {
     const opening = Number(session.openingCashAmount ?? 0);
 
     if (!session.cashAccountId) {
-      // Legacy session without a linked cash_account — fall back to the previous logic.
-      return this.legacyCalculateExpectedCash(session, opening);
+      // Legacy session without a linked cash_account — degrade gracefully to opening
+      // (sale/return tables no longer exist after EPIC-011 cleanup).
+      this.logger.warn(
+        `Session ${session.id} has no cashAccountId; expectedCash falls back to opening only`,
+      );
+      return Number(opening.toFixed(2));
     }
 
     const movements = await this.cashMovementRepo.find({
@@ -385,36 +382,5 @@ export class PosSessionService {
     }
 
     return Number((opening + delta).toFixed(2));
-  }
-
-  /** Backward-compatible path for sessions without a linked cash_account. */
-  private async legacyCalculateExpectedCash(
-    session: PosSessionEntity,
-    opening: number,
-  ): Promise<number> {
-    const sales = await this.saleRepo.find({
-      where: { sessionId: session.id, organizationId: session.organizationId },
-      relations: ['payments'],
-    });
-
-    let cashIn = 0;
-    for (const sale of sales) {
-      for (const payment of sale.payments) {
-        if (payment.method === PaymentMethod.CASH) {
-          cashIn += Number(payment.amount);
-        }
-      }
-    }
-
-    const returns = await this.returnRepo.find({
-      where: { sessionId: session.id, organizationId: session.organizationId },
-    });
-
-    let cashRefunds = 0;
-    for (const ret of returns) {
-      cashRefunds += Number(ret.totalAmount);
-    }
-
-    return Number((opening + cashIn - cashRefunds).toFixed(2));
   }
 }
