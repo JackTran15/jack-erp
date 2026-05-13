@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { IconButton } from "../common/IconButton";
 
 /** Trigger for a split-button's secondary slot — usually a dropdown chevron. */
@@ -43,6 +43,12 @@ export interface CustomerActionItem {
    * `secondary` is not set.
    */
   popover?: ReactNode;
+  /**
+   * Ref forward xuống nút chính — dùng cho focus management (vd: trả focus
+   * về trigger sau khi đóng modal mở từ button này). Ignored cho split-button
+   * secondary slot.
+   */
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export interface CustomerActionsProps {
@@ -65,6 +71,7 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
             className="relative inline-flex items-center rounded-md"
           >
             <IconButton
+              ref={a.triggerRef}
               icon={a.icon}
               ariaLabel={a.ariaLabel}
               onClick={a.onClick}
@@ -89,6 +96,7 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
         ) : (
           <IconButton
             key={a.key}
+            ref={a.triggerRef}
             icon={a.icon}
             ariaLabel={a.ariaLabel}
             onClick={a.onClick}

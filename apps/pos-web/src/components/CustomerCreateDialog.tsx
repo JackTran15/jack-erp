@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { cn } from "@erp/ui";
 import { AppDialog } from "./AppDialog";
@@ -105,6 +106,17 @@ export interface CustomerCreateDialogProps {
   onSubmit?: (input: CustomerSubmitInput) => Promise<CustomerRow>;
   /** "+ Nhóm khách hàng" sub-flow trigger. Omit to hide the button. */
   onAddCustomerGroup?: () => void;
+
+  /**
+   * Khi true, trả focus về element đang active lúc dialog mở sau khi đóng.
+   * Forward xuống `AppDialog`. Xem `AppDialog.returnFocusOnClose` để biết
+   * chi tiết.
+   */
+  returnFocusOnClose?: boolean;
+  /**
+   * Ref tới element nhận focus sau khi dialog đóng. Forward xuống `AppDialog`.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +497,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
     onCreated,
     onSubmit,
     onAddCustomerGroup,
+    returnFocusOnClose,
+    returnFocusTo,
   } = props;
 
   const formId = useId();
@@ -602,6 +616,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
       onClose={onClose}
       width={880}
       contentClassName="shadow-[0_20px_48px_rgba(0,0,0,0.16)]"
+      returnFocusOnClose={returnFocusOnClose}
+      returnFocusTo={returnFocusTo}
     >
       <AppDialog.Header title={titleText} />
       <AppDialog.Body>

@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState, type ReactNode } from "react";
+import { forwardRef, useMemo, useState, type ReactNode, type RefObject } from "react";
 import type { SearchSuggestion } from "../common/SearchPopover";
 import type {
   CashSuggestion,
@@ -50,6 +50,12 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   customerRenderMeta?: (c: TCustomer) => ReactNode;
   onSubmitCustomerQuery?: (q: string) => boolean | void;
   onAddCustomer: () => void;
+  /**
+   * Ref tới nút "Thêm khách mới" — caller dùng để trả focus về button này
+   * sau khi đóng `CustomerCreateDialog`. Khi không truyền, button vẫn render
+   * bình thường nhưng không có ref attach.
+   */
+  addCustomerButtonRef?: RefObject<HTMLButtonElement | null>;
   onOpenCustomerDirectory?: () => void;
   /** Display name shown in the selected-customer chip when set. */
   selectedCustomerLabel?: string | null;
@@ -201,6 +207,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     customerRenderMeta,
     onSubmitCustomerQuery,
     onAddCustomer,
+    addCustomerButtonRef,
     onOpenCustomerDirectory,
     selectedCustomerLabel,
     customerDebt,
@@ -314,6 +321,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         ariaLabel: "Thêm khách mới",
         icon: <PlusCircleIcon size={16} className="text-green-500" />,
         onClick: onAddCustomer,
+        triggerRef: addCustomerButtonRef,
         keepWhenSelected: false,
       },
       {
@@ -362,6 +370,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   }, [
     hasCustomer,
     onAddCustomer,
+    addCustomerButtonRef,
     onOpenCustomerDirectory,
     onScanCustomerQr,
     onPickPromoOption,

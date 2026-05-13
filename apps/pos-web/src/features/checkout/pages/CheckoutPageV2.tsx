@@ -60,6 +60,7 @@ export function CheckoutPageV2() {
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
   const paymentAmountRef = useRef<HTMLInputElement>(null);
+  const addCustomerButtonRef = useRef<HTMLButtonElement>(null);
   const [pendingQtyFocusLineId, setPendingQtyFocusLineId] = useState<
     string | null
   >(null);
@@ -626,6 +627,7 @@ export function CheckoutPageV2() {
         open={createCustomerOpen}
         onClose={() => setCreateCustomerOpen(false)}
         defaultQuery={createDefaultQuery}
+        returnFocusTo={addCustomerButtonRef}
         onCreated={(c) => {
           setCreateCustomerOpen(false);
           pickCustomer(c, `Đã tạo và chọn khách ${formatCustomerDisplay(c)}.`);
@@ -766,6 +768,7 @@ export function CheckoutPageV2() {
           )}
           onSubmitCustomerQuery={handleCustomerSubmitQuery}
           onAddCustomer={handleAddCustomer}
+          addCustomerButtonRef={addCustomerButtonRef}
           selectedCustomerLabel={
             selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null
           }

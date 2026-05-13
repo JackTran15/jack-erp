@@ -1,5 +1,5 @@
 import { cn, Dialog, DialogContent, DialogTitle } from "@erp/ui";
-import { CSSProperties, ReactNode } from "react";
+import { CSSProperties, ReactNode, RefObject, useEffect, useRef } from "react";
 
 export interface AppDialogProps {
   open: boolean;
@@ -10,6 +10,17 @@ export interface AppDialogProps {
   contentStyle?: CSSProperties;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
+  /**
+   * Khi true, capture `document.activeElement` lúc `open` chuyển `false → true`
+   * và trả focus về element đó khi đóng. Mặc định false — giữ hành vi Radix
+   * mặc định cho caller chưa migrate.
+   */
+  returnFocusOnClose?: boolean;
+  /**
+   * Ref tới element cụ thể nhận focus khi đóng. Ưu tiên cao hơn activeElement
+   * đã capture; truyền prop này cũng implicitly bật `returnFocusOnClose`.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
 export interface AppDialogHeaderProps {
@@ -51,7 +62,26 @@ export function AppDialog({
   contentStyle,
   ariaLabelledBy,
   ariaDescribedBy,
+  returnFocusOnClose,
+  returnFocusTo,
 }: AppDialogProps) {
+  const shouldRestoreFocus = returnFocusOnClose || Boolean(returnFocusTo);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!shouldRestoreFocus) {
+      wasOpenRef.current = open;
+      return;
+    }
+    if (open && !wasOpenRef.current) {
+      const active = document.activeElement;
+      previousFocusRef.current =
+        active instanceof HTMLElement ? active : null;
+    }
+    wasOpenRef.current = open;
+  }, [open, shouldRestoreFocus]);
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
@@ -59,6 +89,22 @@ export function AppDialog({
         aria-describedby={ariaDescribedBy}
         style={{ maxWidth: `${width}px`, ...contentStyle }}
         className={cn(BASE_CONTENT_CLASSES, contentClassName)}
+        onCloseAutoFocus={
+          shouldRestoreFocus
+            ? (event) => {
+                const target =
+                  returnFocusTo?.current ?? previousFocusRef.current;
+                if (
+                  target &&
+                  document.contains(target) &&
+                  typeof target.focus === "function"
+                ) {
+                  event.preventDefault();
+                  target.focus();
+                }
+              }
+            : undefined
+        }
       >
         {children}
       </DialogContent>
