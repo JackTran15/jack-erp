@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { POS_HOTKEYS, usePosHotkey } from "@erp/pos/components/hotkeys";
+import { POS_HOTKEYS, usePosHotkey } from "@erp/pos/hooks/hotkeys";
 
 interface UseCheckoutHotkeysInput {
   /** Product search input (POSToolbar). F3 focuses here. */
