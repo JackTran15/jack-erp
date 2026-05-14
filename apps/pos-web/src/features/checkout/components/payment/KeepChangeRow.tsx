@@ -8,7 +8,7 @@ export interface KeepChangeRowProps {
 }
 
 /**
- * "Khách không lấy tiền thừa" checkbox row. Mirrors `DebtCheckRow` styling
+ * "Customer keeps the change" checkbox row. Mirrors `DebtCheckRow` styling
  * but renders the right-hand value in muted gray (vs indigo on debt).
  *
  * Per spec 4.7.10 this row is hidden whenever a customer is selected — the

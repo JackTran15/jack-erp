@@ -15,8 +15,8 @@ export interface CustomerActionSecondary {
  * The same item is rendered identically whether a customer is selected
  * (`SelectedCustomerCard`) or not (`CustomerInputRow`).
  *
- * Designed for extension — adding a future "đổi điểm", "tích điểm", or
- * "tặng quà" button is a one-line append to the consumer's array. To make
+ * Designed for extension — adding a future "redeem points", "accumulate points", or
+ * "give gift" button is a one-line append to the consumer's array. To make
  * an entry behave as a split-button, set `secondary` (and optionally
  * `popover` for the menu it anchors).
  */
@@ -44,9 +44,9 @@ export interface CustomerActionItem {
    */
   popover?: ReactNode;
   /**
-   * Ref forward xuống nút chính — dùng cho focus management (vd: trả focus
-   * về trigger sau khi đóng modal mở từ button này). Ignored cho split-button
-   * secondary slot.
+   * Ref forwarded to the primary button — used for focus management (e.g.
+   * returning focus to the trigger after closing a modal opened from this
+   * button). Ignored for the split-button secondary slot.
    */
   triggerRef?: RefObject<HTMLButtonElement | null>;
 }
@@ -56,7 +56,7 @@ export interface CustomerActionsProps {
 }
 
 /**
- * Inline group of customer-related quick actions (QR, thêm khách, lịch sử,
+ * Inline group of customer-related quick actions (QR, add customer, history,
  * voucher, …). Pure presentational — every behavior comes from the action
  * items themselves.
  */

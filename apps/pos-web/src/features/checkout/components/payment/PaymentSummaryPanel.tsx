@@ -51,9 +51,9 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onSubmitCustomerQuery?: (q: string) => boolean | void;
   onAddCustomer: () => void;
   /**
-   * Ref tới nút "Thêm khách mới" — caller dùng để trả focus về button này
-   * sau khi đóng `CustomerCreateDialog`. Khi không truyền, button vẫn render
-   * bình thường nhưng không có ref attach.
+   * Ref to the "Add new customer" button — caller uses it to return focus to
+   * this button after closing `CustomerCreateDialog`. When not provided, the
+   * button still renders normally but without the ref attached.
    */
   addCustomerButtonRef?: RefObject<HTMLButtonElement | null>;
   onOpenCustomerDirectory?: () => void;
@@ -65,7 +65,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   customerFieldError?: string;
 
   /**
-   * Promotions shown inside the "Chương trình khuyến mãi" dialog. When
+   * Promotions shown inside the "Promotion Program" dialog. When
    * omitted (or empty) the dialog renders its empty state.
    */
   promotions?: PromotionItem[];
@@ -74,8 +74,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   /** Fired when the user confirms a selection in the dialog. */
   onApplyPromotion?: (promotion: PromotionItem | null) => void;
   /**
-   * "Thêm khuyến mại" — outline CTA inside the dialog. Omit to hide the
-   * "Khuyến mại khác" section entirely.
+   * "Add promotion" — outline CTA inside the dialog. Omit to hide the
+   * "Other promotions" section entirely.
    */
   onAddPromotion?: () => void;
   /**
@@ -86,13 +86,13 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onPromotionSearchChange?: (next: string) => void;
   /**
    * Optional callback for the legacy promo-menu (anchored to the chevron
-   * next to "Voucher / Quà tặng"). Receives one of "promo" | "voucher" |
+   * next to "Voucher / Gift"). Receives one of "promo" | "voucher" |
    * "discount". Omit to keep the menu silent.
    */
   onPickPromoOption?: (option: PromoMenuOption) => void;
   /**
-   * Optional payload + handlers for the "Mã ưu đãi và điểm" dialog opened
-   * from the menu's "Mã ưu đãi" entry. Forwarded directly to `PromoMenu`.
+   * Optional payload + handlers for the "Discount code & points" dialog opened
+   * from the menu's "Discount code" entry. Forwarded directly to `PromoMenu`.
    */
   discountPoint?: PromoMenuDiscountPoint;
   /**
@@ -101,7 +101,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
    */
   voucher?: PromoMenuVoucher;
 
-  /** Quick-action button: Quét QR khách. Omit to hide. */
+  /** Quick-action button: Scan customer QR. Omit to hide. */
   onScanCustomerQr?: () => void;
 
   /**
@@ -124,7 +124,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangeCustomerCard?: () => void;
   onRefreshCustomerPoints?: () => void;
 
-  /** Return flows: read-only đổi trả / mua thêm labels + qty (quick exchange + invoice return). */
+  /** Return flows: read-only return / purchase-more labels + qty (quick exchange + invoice return). */
   quickExchangeBadges?: {
     returnQuantity: number;
     purchaseQuantity: number;
@@ -145,7 +145,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   changeAmount: number;
   shortageAmount: number;
 
-  // Keep change ("Khách không lấy tiền thừa") — only rendered when no
+  // Keep change ("Customer keeps the change") — only rendered when no
   // customer is selected (per spec 4.7.10). Provide both to enable the row.
   keepChange?: boolean;
   onKeepChangeChange?: (next: boolean) => void;
@@ -175,7 +175,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onCollect: () => void;
   collectDisabled?: boolean;
 
-  /** Optional invoice payload (or factory) — when set, "Thu tiền" prints first. */
+  /** Optional invoice payload (or factory) — when set, "Collect payment" prints first. */
   invoice?: InvoicePayloadInput;
   /** Per-call printer override forwarded to `PaymentCTAButtons`. */
   invoicePrinter?: InvoicePrinter;
@@ -268,7 +268,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const hasCustomer = Boolean(selectedCustomerLabel);
 
   // Split-button on the customer row:
-  //   • Gift icon ("Voucher / Quà tặng") → promotion-selection dialog.
+  //   • Gift icon ("Voucher / Gift") → promotion-selection dialog.
   //   • Chevron secondary trigger → legacy `PromoMenu` (3 quick options).
   // Both states live here so `customerActions` below can wire each trigger.
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
@@ -341,7 +341,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
             onSelect={(opt) => {
-              // "Khuyến mãi" reuses the same PromotionSelectionModal mounted
+              // "Promotion" reuses the same PromotionSelectionModal mounted
               // for the gift split-button — single source of truth for the
               // promotion picker.
               if (opt === PromoMenuOptionEnum.DISCOUNT) {

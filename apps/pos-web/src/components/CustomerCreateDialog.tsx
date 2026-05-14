@@ -47,7 +47,7 @@ export interface CustomerFormValues {
   province?: string | null;
   district?: string | null;
   ward?: string | null;
-  /** "Số nhà, tên đường" — the freeform first line of the address. */
+  /** Street address (house number, street name) — the freeform first line of the address. */
   addressLine?: string | null;
   cardCode?: string | null;
   cardTier?: string | null;

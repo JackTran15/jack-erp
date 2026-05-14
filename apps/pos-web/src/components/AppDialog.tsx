@@ -11,16 +11,18 @@ export interface AppDialogProps {
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
   /**
-   * Ref tới element nhận focus khi dialog đóng, override `document.activeElement`
-   * đã capture lúc mở. Dùng khi trigger có thể unmount (vd: button bị filter mất
-   * sau khi state đổi) hoặc hotkey mở modal cần trả focus về element khác.
+   * Ref to the element that receives focus when the dialog closes, overrides
+   * `document.activeElement` captured at open time. Use when the trigger may
+   * unmount (e.g. a button hidden by a filter after state changes) or when a
+   * hotkey-opened modal should return focus to a different element.
    */
   returnFocusTo?: RefObject<HTMLElement | null>;
   /**
-   * Ref tới element nhận focus khi dialog vừa mở, override Radix default
-   * (first focusable). Dùng cho form modal muốn focus thẳng vào input chính
-   * thay vì close button hay readonly field. Nếu element là input/textarea,
-   * text hiện có sẽ được select để dễ gõ đè.
+   * Ref to the element that receives focus when the dialog opens, overrides
+   * the Radix default (first focusable). Use for form modals that want to
+   * focus directly on the primary input instead of the close button or a
+   * read-only field. If the element is an input/textarea, existing text will
+   * be selected so it can be typed over.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
 }
