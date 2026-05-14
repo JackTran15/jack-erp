@@ -20,6 +20,8 @@ interface UseCheckoutHotkeysInput {
   onCheckout: () => void;
   /** Save as draft (F10). Pass `undefined` to disable (e.g. in return/exchange mode). */
   onSaveDraft?: () => void;
+  /** Create a new invoice (Alt+1). Pass `undefined` to disable. */
+  onAddSession?: () => void;
 }
 
 /**
@@ -46,6 +48,7 @@ export function useCheckoutHotkeys({
   hasCartItems,
   onCheckout,
   onSaveDraft,
+  onAddSession,
 }: UseCheckoutHotkeysInput): void {
   usePosHotkey(POS_HOTKEYS.checkout.focusProductSearch, () => {
     productSearchRef.current?.focus();
@@ -89,5 +92,9 @@ export function useCheckoutHotkeys({
 
   usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => onSaveDraft?.(), {
     enabled: Boolean(onSaveDraft),
+  });
+
+  usePosHotkey(POS_HOTKEYS.checkout.addSession, () => onAddSession?.(), {
+    enabled: Boolean(onAddSession),
   });
 }

@@ -135,6 +135,7 @@ export function CheckoutPageV2() {
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const removeSession = usePosCheckoutSessionStore((s) => s.removeSession);
+  const addSession = usePosCheckoutSessionStore((s) => s.addSession);
   const addDraft = usePosCheckoutSessionStore((s) => s.addDraft);
   const nextDraftSeq = usePosCheckoutSessionStore((s) => s.nextDraftSeq);
   const resetActiveSessionAfterCheckout = usePosCheckoutSessionStore(
@@ -726,6 +727,7 @@ export function CheckoutPageV2() {
       void finalizeCheckoutAndPrint();
     },
     onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
+    onAddSession: addSession,
   });
 
 

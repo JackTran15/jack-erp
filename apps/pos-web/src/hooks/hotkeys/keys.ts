@@ -36,6 +36,10 @@ export const POS_HOTKEYS = {
       key: "Alt+B",
       description: "Chọn bảng giá",
     },
+    addSession: {
+      key: "Alt+1",
+      description: "Tạo hóa đơn mới",
+    },
     completeCheckout: {
       key: "F9",
       description: "Hoàn tất & in hóa đơn",
