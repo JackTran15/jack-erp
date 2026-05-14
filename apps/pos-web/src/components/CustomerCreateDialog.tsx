@@ -264,6 +264,7 @@ interface UnderlineInputProps {
   inputMode?: "text" | "tel" | "email" | "numeric" | "search";
   autoComplete?: string;
   ariaLabel?: string;
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 function UnderlineInput({
@@ -279,6 +280,7 @@ function UnderlineInput({
   inputMode,
   autoComplete,
   ariaLabel,
+  inputRef,
 }: UnderlineInputProps) {
   return (
     <div
@@ -290,6 +292,7 @@ function UnderlineInput({
       )}
     >
       <input
+        ref={inputRef}
         id={id}
         type={type}
         value={value}
@@ -523,6 +526,9 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
   /** Auto-generated code persisted across renders within a single open. */
   const generatedCodeRef = useRef<string>("");
 
+  /** Focus target khi dialog vừa mở — ô fullname. */
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
   // Reset form on each open transition — different reset path per mode.
   const handleOpenReset = useCallback(() => {
     setError("");
@@ -611,6 +617,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
       width={880}
       contentClassName="shadow-[0_20px_48px_rgba(0,0,0,0.16)]"
       returnFocusTo={returnFocusTo}
+      initialFocusRef={nameInputRef}
     >
       <AppDialog.Header title={titleText} />
       <AppDialog.Body>
@@ -650,6 +657,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
                   error={showNameError ? errors.name : undefined}
                 >
                   <UnderlineInput
+                    inputRef={nameInputRef}
                     id={nameId}
                     value={values.name}
                     onChange={(v) => setField("name", v)}

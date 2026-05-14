@@ -64,6 +64,7 @@ export function CheckoutPageV2() {
   const [pendingQtyFocusLineId, setPendingQtyFocusLineId] = useState<
     string | null
   >(null);
+  const [createCustomerSucceeded, setCreateCustomerSucceeded] = useState(false);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
@@ -625,10 +626,16 @@ export function CheckoutPageV2() {
 
       <CustomerCreateDialog
         open={createCustomerOpen}
-        onClose={() => setCreateCustomerOpen(false)}
+        onClose={() => {
+          setCreateCustomerOpen(false);
+          setCreateCustomerSucceeded(false);
+        }}
         defaultQuery={createDefaultQuery}
-        returnFocusTo={addCustomerButtonRef}
+        returnFocusTo={
+          createCustomerSucceeded ? paymentAmountRef : customerSearchRef
+        }
         onCreated={(c) => {
+          setCreateCustomerSucceeded(true);
           setCreateCustomerOpen(false);
           pickCustomer(c, `Đã tạo và chọn khách ${formatCustomerDisplay(c)}.`);
         }}

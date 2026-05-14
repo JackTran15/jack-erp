@@ -16,6 +16,13 @@ export interface AppDialogProps {
    * sau khi state đổi) hoặc hotkey mở modal cần trả focus về element khác.
    */
   returnFocusTo?: RefObject<HTMLElement | null>;
+  /**
+   * Ref tới element nhận focus khi dialog vừa mở, override Radix default
+   * (first focusable). Dùng cho form modal muốn focus thẳng vào input chính
+   * thay vì close button hay readonly field. Nếu element là input/textarea,
+   * text hiện có sẽ được select để dễ gõ đè.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export interface AppDialogHeaderProps {
@@ -58,6 +65,7 @@ export function AppDialog({
   ariaLabelledBy,
   ariaDescribedBy,
   returnFocusTo,
+  initialFocusRef,
 }: AppDialogProps) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
@@ -78,6 +86,19 @@ export function AppDialog({
         aria-describedby={ariaDescribedBy}
         style={{ maxWidth: `${width}px`, ...contentStyle }}
         className={cn(BASE_CONTENT_CLASSES, contentClassName)}
+        onOpenAutoFocus={(event) => {
+          const target = initialFocusRef?.current;
+          if (target && typeof target.focus === "function") {
+            event.preventDefault();
+            target.focus();
+            if (
+              target instanceof HTMLInputElement ||
+              target instanceof HTMLTextAreaElement
+            ) {
+              target.select();
+            }
+          }
+        }}
         onCloseAutoFocus={(event) => {
           const target = returnFocusTo?.current ?? previousFocusRef.current;
           if (
