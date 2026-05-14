@@ -282,15 +282,39 @@ async function seedInventoryData() {
       [IDS.providerDefault, IDS.organization, IDS.user],
     );
 
+    // Create "Hardware" category for the two demo items.
+    const hardwareCategoryRows: Array<{ id: string }> = await AppDataSource.query(
+      `
+      INSERT INTO inventory_item_categories (id, organization_id, name, created_by, created_at, updated_at)
+      VALUES (uuid_generate_v4(), $1, 'Hardware', $2, NOW(), NOW())
+      ON CONFLICT (organization_id, name) DO UPDATE SET updated_at = NOW()
+      RETURNING id
+      `,
+      [IDS.organization, IDS.user],
+    );
+    const hardwareCategoryId = hardwareCategoryRows[0]!.id;
+
     await AppDataSource.query(
       `
-      INSERT INTO items (id, organization_id, branch_id, code, name, description, unit, category, is_active, provider_id, created_by, created_at, updated_at)
+      INSERT INTO items (id, organization_id, branch_id, code, name, description, unit, category_id, is_active, created_by, created_at, updated_at)
       VALUES
-        ($1, $2, NULL, 'LAPTOP-15', 'Laptop 15 inch', 'Standard demo laptop', 'pcs', 'Hardware', true, $5, $3, NOW(), NOW()),
-        ($4, $2, NULL, 'MONITOR-24', 'Monitor 24 inch', 'Standard demo monitor', 'pcs', 'Hardware', true, $5, $3, NOW(), NOW())
+        ($1, $2, NULL, 'LAPTOP-15', 'Laptop 15 inch', 'Standard demo laptop', 'pcs', $5, true, $3, NOW(), NOW()),
+        ($4, $2, NULL, 'MONITOR-24', 'Monitor 24 inch', 'Standard demo monitor', 'pcs', $5, true, $3, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
-      [IDS.itemLaptop, IDS.organization, IDS.user, IDS.itemMonitor, IDS.providerDefault],
+      [IDS.itemLaptop, IDS.organization, IDS.user, IDS.itemMonitor, hardwareCategoryId],
+    );
+
+    // Link the default supplier as primary for both demo items.
+    await AppDataSource.query(
+      `
+      INSERT INTO item_providers (organization_id, item_id, provider_id, is_primary, created_by)
+      VALUES
+        ($1, $2, $3, true, $4),
+        ($1, $5, $3, true, $4)
+      ON CONFLICT (item_id, provider_id) DO NOTHING
+      `,
+      [IDS.organization, IDS.itemLaptop, IDS.providerDefault, IDS.user, IDS.itemMonitor],
     );
 
     await AppDataSource.query(
@@ -358,24 +382,58 @@ async function seedInventoryData() {
       ],
     );
 
+    // "Giày dép" category for shoe variants.
+    const shoeCategoryRows: Array<{ id: string }> = await AppDataSource.query(
+      `
+      INSERT INTO inventory_item_categories (id, organization_id, name, created_by, created_at, updated_at)
+      VALUES (uuid_generate_v4(), $1, 'Giày dép', $2, NOW(), NOW())
+      ON CONFLICT (organization_id, name) DO UPDATE SET updated_at = NOW()
+      RETURNING id
+      `,
+      [IDS.organization, IDS.user],
+    );
+    const shoeCategoryId = shoeCategoryRows[0]!.id;
+
     // 6 variant items: Size(39,40,43) × Color(Nâu,Đen)
     await AppDataSource.query(
       `
-      INSERT INTO items (id, organization_id, branch_id, code, name, unit, category, is_active, provider_id, product_id, variant_label, purchase_price, selling_price, created_by, created_at, updated_at)
+      INSERT INTO items (id, organization_id, branch_id, code, name, unit, category_id, is_active, product_id, variant_label, purchase_price, selling_price, created_by, created_at, updated_at)
       VALUES
-        ($1,  $7, NULL, 'GELLI-39-NAU', 'Giày Gelli (39 · Nâu)', 'đôi', 'Giày dép', true, $8, $9, '39 · Nâu', 350000, 590000, $10, NOW(), NOW()),
-        ($2,  $7, NULL, 'GELLI-39-DEN', 'Giày Gelli (39 · Đen)', 'đôi', 'Giày dép', true, $8, $9, '39 · Đen', 350000, 590000, $10, NOW(), NOW()),
-        ($3,  $7, NULL, 'GELLI-40-NAU', 'Giày Gelli (40 · Nâu)', 'đôi', 'Giày dép', true, $8, $9, '40 · Nâu', 350000, 590000, $10, NOW(), NOW()),
-        ($4,  $7, NULL, 'GELLI-40-DEN', 'Giày Gelli (40 · Đen)', 'đôi', 'Giày dép', true, $8, $9, '40 · Đen', 350000, 590000, $10, NOW(), NOW()),
-        ($5,  $7, NULL, 'GELLI-43-NAU', 'Giày Gelli (43 · Nâu)', 'đôi', 'Giày dép', true, $8, $9, '43 · Nâu', 350000, 590000, $10, NOW(), NOW()),
-        ($6,  $7, NULL, 'GELLI-43-DEN', 'Giày Gelli (43 · Đen)', 'đôi', 'Giày dép', true, $8, $9, '43 · Đen', 350000, 590000, $10, NOW(), NOW())
+        ($1,  $7, NULL, 'GELLI-39-NAU', 'Giày Gelli (39 · Nâu)', 'đôi', $8, true, $9, '39 · Nâu', 350000, 590000, $10, NOW(), NOW()),
+        ($2,  $7, NULL, 'GELLI-39-DEN', 'Giày Gelli (39 · Đen)', 'đôi', $8, true, $9, '39 · Đen', 350000, 590000, $10, NOW(), NOW()),
+        ($3,  $7, NULL, 'GELLI-40-NAU', 'Giày Gelli (40 · Nâu)', 'đôi', $8, true, $9, '40 · Nâu', 350000, 590000, $10, NOW(), NOW()),
+        ($4,  $7, NULL, 'GELLI-40-DEN', 'Giày Gelli (40 · Đen)', 'đôi', $8, true, $9, '40 · Đen', 350000, 590000, $10, NOW(), NOW()),
+        ($5,  $7, NULL, 'GELLI-43-NAU', 'Giày Gelli (43 · Nâu)', 'đôi', $8, true, $9, '43 · Nâu', 350000, 590000, $10, NOW(), NOW()),
+        ($6,  $7, NULL, 'GELLI-43-DEN', 'Giày Gelli (43 · Đen)', 'đôi', $8, true, $9, '43 · Đen', 350000, 590000, $10, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
         IDS.itemShoe39Nau, IDS.itemShoe39Den,
         IDS.itemShoe40Nau, IDS.itemShoe40Den,
         IDS.itemShoe43Nau, IDS.itemShoe43Den,
-        IDS.organization, IDS.providerDefault, IDS.productShoe, IDS.user,
+        IDS.organization, shoeCategoryId, IDS.productShoe, IDS.user,
+      ],
+    );
+
+    // Link default supplier as primary for all 6 shoe variants.
+    await AppDataSource.query(
+      `
+      INSERT INTO item_providers (organization_id, item_id, provider_id, is_primary, created_by)
+      VALUES
+        ($1, $2, $8, true, $9),
+        ($1, $3, $8, true, $9),
+        ($1, $4, $8, true, $9),
+        ($1, $5, $8, true, $9),
+        ($1, $6, $8, true, $9),
+        ($1, $7, $8, true, $9)
+      ON CONFLICT (item_id, provider_id) DO NOTHING
+      `,
+      [
+        IDS.organization,
+        IDS.itemShoe39Nau, IDS.itemShoe39Den,
+        IDS.itemShoe40Nau, IDS.itemShoe40Den,
+        IDS.itemShoe43Nau, IDS.itemShoe43Den,
+        IDS.providerDefault, IDS.user,
       ],
     );
 

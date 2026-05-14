@@ -3,9 +3,12 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
+  HttpCode,
+  HttpStatus,
   ParseUUIDPipe,
   UseInterceptors,
   UseGuards,
@@ -17,9 +20,17 @@ import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { InventoryLocationService } from './inventory-location.service';
+import { ItemProviderService } from './item-provider.service';
+import { ItemBarcodeService } from './item-barcode.service';
+import { ItemStockThresholdService } from './item-stock-threshold.service';
+import { LinkItemProviderDto } from './dto/link-item-provider.dto';
+import { CreateItemBarcodeDto } from './dto/create-item-barcode.dto';
+import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
 import {
   CreateItemDto,
   UpdateItemDto,
+  CreateProviderDto,
+  UpdateProviderDto,
   CreateStorageDto,
   UpdateStorageDto,
   CreateShowroomDto,
@@ -34,7 +45,12 @@ import {
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class InventoryLocationController {
-  constructor(private readonly service: InventoryLocationService) {}
+  constructor(
+    private readonly service: InventoryLocationService,
+    private readonly itemProviderService: ItemProviderService,
+    private readonly itemBarcodeService: ItemBarcodeService,
+    private readonly itemThresholdService: ItemStockThresholdService,
+  ) {}
 
   // ─── Items (org-scoped, no branch required) ───────────────────────
 
@@ -75,12 +91,148 @@ export class InventoryLocationController {
     return this.service.updateItem(id, dto, actor);
   }
 
+  // ─── Item ↔ Provider (M2M) ─────────────────────────────────────────
+
+  @Get('items/:id/providers')
+  @RequirePermission('inventory.read')
+  listItemProviders(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemProviderService.list(id, actor);
+  }
+
+  @Post('items/:id/providers')
+  @RequirePermission('inventory.write')
+  linkItemProvider(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkItemProviderDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemProviderService.link(id, dto, actor);
+  }
+
+  @Delete('items/:id/providers/:providerId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('inventory.write')
+  async unlinkItemProvider(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('providerId', ParseUUIDPipe) providerId: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    await this.itemProviderService.unlink(id, providerId, actor);
+  }
+
+  @Patch('items/:id/providers/:providerId/set-primary')
+  @RequirePermission('inventory.write')
+  setItemProviderPrimary(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('providerId', ParseUUIDPipe) providerId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemProviderService.setPrimary(id, providerId, actor);
+  }
+
+  // ─── Item Barcodes ──────────────────────────────────────────────────
+
+  @Get('items/:id/barcodes')
+  @RequirePermission('inventory.read')
+  listItemBarcodes(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemBarcodeService.list(id, actor);
+  }
+
+  @Post('items/:id/barcodes')
+  @RequirePermission('inventory.write')
+  createItemBarcode(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateItemBarcodeDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemBarcodeService.create(id, dto, actor);
+  }
+
+  @Delete('items/:id/barcodes/:barcodeId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('inventory.write')
+  async deleteItemBarcode(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('barcodeId', ParseUUIDPipe) barcodeId: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    await this.itemBarcodeService.delete(id, barcodeId, actor);
+  }
+
+  @Get('barcodes/lookup')
+  @RequirePermission('inventory.read')
+  lookupBarcode(
+    @Query('code') code: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemBarcodeService.lookup(code ?? '', actor);
+  }
+
+  // ─── Item Stock Thresholds ──────────────────────────────────────────
+
+  @Get('items/:id/thresholds')
+  @RequirePermission('inventory.read')
+  listItemThresholds(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemThresholdService.list(id, actor);
+  }
+
+  @Patch('items/:id/thresholds/default')
+  @RequirePermission('inventory.write')
+  setDefaultItemThreshold(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetStockThresholdDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemThresholdService.setDefault(id, dto, actor);
+  }
+
+  @Get('items/:id/thresholds/:locationId')
+  @RequirePermission('inventory.read')
+  getItemThreshold(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemThresholdService.getOne(id, locationId, actor);
+  }
+
+  @Patch('items/:id/thresholds/:locationId')
+  @RequirePermission('inventory.write')
+  upsertItemThreshold(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Body() dto: SetStockThresholdDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemThresholdService.upsert(id, locationId, dto, actor);
+  }
+
+  @Delete('items/:id/thresholds/:locationId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('inventory.write')
+  async deleteItemThreshold(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    await this.itemThresholdService.delete(id, locationId, actor);
+  }
+
   // ─── Providers (org-scoped, no branch required) ──────────────────────
 
   @Get('providers')
   @RequirePermission('inventory.read')
   listProviders(
-    @Query() query: PaginationQueryDto,
+    @Query() query: PaginationQueryDto & { activeOnly?: string },
     @Actor() actor: ActorContext,
   ) {
     return this.service.listProviders(query, actor);
@@ -93,6 +245,35 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getProviderById(id, actor);
+  }
+
+  @Post('providers')
+  @RequirePermission('inventory.write')
+  createProvider(
+    @Body() dto: CreateProviderDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.createProvider(dto, actor);
+  }
+
+  @Patch('providers/:id')
+  @RequirePermission('inventory.write')
+  updateProvider(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProviderDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.updateProvider(id, dto, actor);
+  }
+
+  @Delete('providers/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('inventory.write')
+  async deleteProvider(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    await this.service.deactivateProvider(id, actor);
   }
 
   // ─── Storages (branch-scoped) ─────────────────────────────────────

@@ -30,8 +30,23 @@ export interface InvoiceTotals {
   grandTotal: number;
   /** Amount tendered (e.g. cash given). */
   paid: number;
-  /** Change to return; should be max(0, paid - grandTotal). */
+  /**
+   * Net change line on the receipt (positive = return to customer, negative = still owed to shop).
+   * Zero when exact, or when keepChange / debt options clear the residual per checkout rules.
+   */
   change: number;
+  /**
+   * Optional line: excess tender not returned / refund remainder waived by cashier toggle.
+   */
+  keptChange?: number;
+  /**
+   * Optional line: small shortage forgiven on sale (keepChange, no debt).
+   */
+  forgivenShortage?: number;
+  /** Optional line: excess tender applied to reduce customer balance (sale + debt). */
+  debtReduction?: number;
+  /** Optional line: unpaid balance booked to customer debt (sale + debt). */
+  customerDebtIssued?: number;
 }
 
 export interface InvoicePolicy {

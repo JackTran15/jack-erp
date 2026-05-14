@@ -1,63 +1,62 @@
 import type {
   CustomerDetailTabKey,
-  CustomerGender,
   PurchaseHistoryStatus,
 } from "@erp/pos/features/checkout/constants/customer";
+import type {
+  CustomerDetail,
+  MembershipTierEnum,
+} from "@erp/pos/lib/customerApi";
 
 export {
   CustomerDetailTabKeyEnum,
-  CustomerGenderEnum,
   PurchaseHistoryStatusEnum,
   type CustomerDetailTabKey,
-  type CustomerGender,
   type PurchaseHistoryStatus,
 } from "@erp/pos/features/checkout/constants/customer";
 
 /**
- * Data contracts for `CustomerDetailDialog`.
+ * Data contract for `CustomerDetailDialog`.
  *
- * Shapes are intentionally loose (everything optional except `name`) so the
- * caller can supply whatever it has — the dialog falls back to "Chưa có
- * thông tin" placeholders for missing fields. Replace fields with real
- * backend data when the customer-detail API lands.
+ * Mirrors the flat BE `CustomerDetail` response (same field names) and adds
+ * a few UI-only enriched fields populated by the host page:
+ *   - `groupName` / `staffName`  — resolved via lookup maps.
+ *   - `cardCode`, `tier`, `loyaltyPoints`, `pointsUsed`, `pointsCap`
+ *     — populated from `/customers/:id/membership-card`.
+ *   - `stats`, `purchaseHistory`, `debts`  — populated from their own
+ *     endpoints when the corresponding tabs need data.
+ *
+ * Only `name` is required because the dialog title shows "Khách hàng: {name}".
+ * Everything else is optional — missing values render as muted "Chưa có thông
+ * tin" placeholders.
  */
-
-export interface CustomerDetailIdentity {
-  /** Internal customer id, mirrors `CustomerRow.id`. */
-  id?: string;
+export interface CustomerDetailData
+  extends Partial<Omit<CustomerDetail, "name">> {
   /** Display name — required because the title shows "Khách hàng: {name}". */
   name: string;
-  phone?: string | null;
-  email?: string | null;
-  /** Public-facing customer code, e.g. "KH000016". */
-  code?: string | null;
-  cccd?: string | null;
-  birthday?: string | null;
-  gender?: CustomerGender | null;
-  address?: string | null;
-}
 
-export interface CustomerMembershipData {
+  // UI-only enriched fields ---------------------------------------------------
+
+  /** Display name resolved from `groupId` via the customer-groups lookup. */
+  groupName?: string | null;
+  /** Display name resolved from `assignedStaffId` via the staff lookup. */
+  staffName?: string | null;
+
   /** "Mã thẻ thành viên" — e.g. "100000001". */
   cardCode?: string | null;
   /** "Hạng thẻ Lomas" — e.g. "Bạc". */
-  tier?: string | null;
+  tier?: MembershipTierEnum | null;
   /** Loyalty point balance. */
   loyaltyPoints?: number;
   /** Points used so far (for the progress bar). */
   pointsUsed?: number;
   /** Soft cap used to render the progress bar; defaults to a sensible value. */
   pointsCap?: number;
-  /** "Nhóm KH". */
-  customerGroup?: string | null;
-  /** "Nhân viên phụ trách". */
-  accountManager?: string | null;
-}
 
-export interface CustomerCompanyInfo {
-  companyName?: string | null;
-  taxCode?: string | null;
-  note?: string | null;
+  // Other-tab data ------------------------------------------------------------
+
+  stats?: CustomerStatsData;
+  purchaseHistory?: PurchaseHistoryEntry[];
+  debts?: DebtEntry[];
 }
 
 export interface CustomerStatsData {
@@ -86,13 +85,3 @@ export interface DebtEntry {
   remainingDebt: number;
   branch: string;
 }
-
-export interface CustomerDetailData {
-  identity: CustomerDetailIdentity;
-  membership?: CustomerMembershipData;
-  company?: CustomerCompanyInfo;
-  stats?: CustomerStatsData;
-  purchaseHistory?: PurchaseHistoryEntry[];
-  debts?: DebtEntry[];
-}
-

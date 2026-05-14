@@ -4,6 +4,7 @@ import type {
   CartLine,
   PaymentMethodOption,
 } from "../components/types";
+import { deriveInvoiceTotals } from "./checkoutSettlement";
 import { lineTotal, resolvePaymentMethodLabel } from "./checkoutUtils";
 
 /** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
@@ -36,6 +37,9 @@ interface BuildCheckoutInvoicePayloadInput {
   paymentLines: PaymentLine[];
   primaryMethodLabel: string;
   methods: readonly PaymentMethodOption[];
+  keepChange: boolean;
+  /** Matches UI "Tính vào công nợ" (purchase and refund). */
+  debt: boolean;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -46,6 +50,8 @@ export function buildCheckoutInvoicePayload({
   paymentLines,
   primaryMethodLabel,
   methods,
+  keepChange,
+  debt,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -53,7 +59,7 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
     0,
   );
-  const paid = totalPaid > 0 ? totalPaid : grandTotal;
+  const paid = totalPaid > 0 ? totalPaid : 0;
   const payments =
     totalPaid > 0
       ? paymentLines
@@ -62,7 +68,9 @@ export function buildCheckoutInvoicePayload({
             label: resolvePaymentMethodLabel(l.method, methods),
             amount: l.amount,
           }))
-      : [{ label: primaryMethodLabel, amount: grandTotal }];
+      : [{ label: primaryMethodLabel, amount: 0 }];
+
+  const t = deriveInvoiceTotals({ grandTotal, totalPaid, keepChange, debt });
 
   return {
     store: STORE_INFO,
@@ -79,10 +87,11 @@ export function buildCheckoutInvoicePayload({
       subtotal: grandTotal,
       grandTotal,
       paid,
-      change:
-        grandTotal < 0
-          ? Math.max(0, -grandTotal - totalPaid)
-          : Math.max(0, totalPaid - grandTotal),
+      change: t.change,
+      keptChange: t.keptChange,
+      forgivenShortage: t.forgivenShortage,
+      debtReduction: t.debtReduction,
+      customerDebtIssued: t.customerDebtIssued,
     },
     payments,
     policy: RETURN_POLICY,

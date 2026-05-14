@@ -20,6 +20,8 @@ flowchart LR
   E3 --> E7
   E4 --> E7
   E6["EPIC-006 ProductVariantsCatalog"] --> E7
+  E3 --> E10["EPIC-010 ItemManagementEnhancement"]
+  E6 --> E10
 ```
 
 ## Ticket Dependency Graph
@@ -110,4 +112,40 @@ flowchart LR
 | [TKT-044](./tickets/TKT-044-purchase-history-api.md) | Purchase history API |
 | [TKT-045](./tickets/TKT-045-promotion-entities.md) | Promotion module entities |
 | [TKT-046](./tickets/TKT-046-promotion-apply-service.md) | Promotion apply service + InvoicePromotion |
+
+## EPIC-010 Item Management Enhancement (Phase 1)
+
+- [EPIC-010 Item Management Enhancement](./epics/EPIC-010-item-management-enhancement.md)
+- Tickets: [TKT-059](./tickets/TKT-059-item-management-schema.md) – [TKT-066](./tickets/TKT-066-item-management-test-plan.md)
+
+| Ticket | Mô tả |
+|---|---|
+| [TKT-059](./tickets/TKT-059-item-management-schema.md) | Schema migration: alter `items` + 3 bảng mới + data migration |
+| [TKT-060](./tickets/TKT-060-item-entity-enhancement.md) | `ItemEntity` / DTO / CrudConfig + filter POS catalog |
+| [TKT-061](./tickets/TKT-061-item-providers-m2m-api.md) | API M2M `item_providers` (CRUD + set-primary) |
+| [TKT-062](./tickets/TKT-062-provider-crud-endpoints.md) | Bổ sung `POST/PATCH/DELETE /inventory/providers` |
+| [TKT-063](./tickets/TKT-063-item-barcodes-api.md) | API `item_barcodes` (nhiều mã/item + lookup POS) |
+| [TKT-064](./tickets/TKT-064-item-stock-thresholds-api.md) | API định mức tồn min/max theo `(item, location)` |
+| [TKT-065](./tickets/TKT-065-backoffice-item-form-rebuild.md) | Backoffice UI form 3 tab (Cơ bản / Bổ sung / Kho) |
+| [TKT-066](./tickets/TKT-066-item-management-test-plan.md) | E2E + migration test + regression + docs |
+
+### Ticket dependency graph (EPIC-010)
+
+```mermaid
+flowchart LR
+  T59["TKT-059 Schema migration"] --> T60["TKT-060 Entity & DTO"]
+  T59 --> T61["TKT-061 Item-providers API"]
+  T59 --> T63["TKT-063 Item-barcodes API"]
+  T59 --> T64["TKT-064 Stock-thresholds API"]
+  T62["TKT-062 Provider CRUD"] --> T61
+  T60 --> T65["TKT-065 UI rebuild"]
+  T61 --> T65
+  T63 --> T65
+  T64 --> T65
+  T65 --> T66["TKT-066 E2E + DoD"]
+  T60 --> T66
+  T61 --> T66
+  T63 --> T66
+  T64 --> T66
+```
 

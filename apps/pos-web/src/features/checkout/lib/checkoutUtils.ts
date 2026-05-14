@@ -9,7 +9,7 @@ import { PaymentMethodEnum } from "../constants/paymentMethod";
 import { PromoMenuOptionEnum } from "../constants/promoMenu";
 import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 
-const qtyFormatter = new Intl.NumberFormat("vi-VN", {
+export const qtyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 2,
 });
 
@@ -27,6 +27,20 @@ export function locationQtyFor(product: PosCatalogLine): number {
 export function lineTotal(line: CartLine): number {
   const base = line.unitPrice * line.qty;
   return line.isReturnCredit ? -base : base;
+}
+
+/** Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống. */
+export function lineExceedsOnHandSnapshot(line: CartLine): boolean {
+  return Boolean(!line.isReturnCredit && line.qty > line.maxQty);
+}
+
+export function getOversellSaleLines(lines: CartLine[]): CartLine[] {
+  return lines.filter(lineExceedsOnHandSnapshot);
+}
+
+/** Cảnh báo SL: bán vượt tồn hoặc hoàn vượt SL được phép trên hóa đơn gốc (`maxQty`). */
+export function isCartLineWarning(line: CartLine): boolean {
+  return line.qty > line.maxQty;
 }
 
 export function paymentLabel(m: PaymentMethod): string {

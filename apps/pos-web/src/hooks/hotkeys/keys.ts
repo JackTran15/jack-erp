@@ -24,6 +24,18 @@ export const POS_HOTKEYS = {
       key: "F4",
       description: "Tìm khách hàng",
     },
+    focusCatalogSearch: {
+      key: "Shift+F3",
+      description: "Tìm nhanh trong danh mục",
+    },
+    focusSalesperson: {
+      key: "Alt+N",
+      description: "Chọn nhân viên bán hàng",
+    },
+    focusPriceBook: {
+      key: "Alt+B",
+      description: "Chọn bảng giá",
+    },
     completeCheckout: {
       key: "F9",
       description: "Hoàn tất & in hóa đơn",

@@ -12,6 +12,7 @@ import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
 import { ItemEntity } from './item.entity';
+import { ItemCategoryEntity } from './item-category.entity';
 import { ProviderEntity } from './provider.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
@@ -20,6 +21,8 @@ import { StorageManagerAssignmentEntity } from './storage-manager-assignment.ent
 import {
   CreateItemDto,
   UpdateItemDto,
+  CreateProviderDto,
+  UpdateProviderDto,
   CreateStorageDto,
   UpdateStorageDto,
   CreateShowroomDto,
@@ -37,6 +40,8 @@ export class InventoryLocationService {
   constructor(
     @InjectRepository(ItemEntity)
     private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(ItemCategoryEntity)
+    private readonly itemCategoryRepo: Repository<ItemCategoryEntity>,
     @InjectRepository(ProviderEntity)
     private readonly providerRepo: Repository<ProviderEntity>,
     @InjectRepository(StorageEntity)
@@ -60,8 +65,8 @@ export class InventoryLocationService {
       throw new ConflictException(`Item with code "${dto.code}" already exists`);
     }
 
-    if (dto.providerId) {
-      await this.validateProvider(dto.providerId, actor);
+    if (dto.categoryId) {
+      await this.validateCategory(dto.categoryId, actor);
     }
 
     const item = this.itemRepo.create({
@@ -78,13 +83,13 @@ export class InventoryLocationService {
   ): Promise<PaginatedResponse<ItemEntity>> {
     const qb = this.itemRepo
       .createQueryBuilder('item')
-      .leftJoinAndSelect('item.provider', 'provider')
+      .leftJoinAndSelect('item.category', 'category')
       .leftJoinAndSelect('item.product', 'product')
       .where('item.organizationId = :orgId', { orgId: actor.organizationId });
 
     if (query.search) {
       qb.andWhere(
-        '(item.code ILIKE :s OR item.name ILIKE :s OR item.category ILIKE :s OR item.variantLabel ILIKE :s OR provider.name ILIKE :s)',
+        '(item.code ILIKE :s OR item.name ILIKE :s OR category.name ILIKE :s OR item.variantLabel ILIKE :s)',
         { s: `%${query.search}%` },
       );
     }
@@ -102,6 +107,7 @@ export class InventoryLocationService {
   async getItemById(id: string, actor: ActorContext): Promise<ItemEntity> {
     const item = await this.itemRepo.findOne({
       where: { id, organizationId: actor.organizationId },
+      relations: ['category'],
     });
     if (!item) {
       throw new NotFoundException(`Item ${id} not found`);
@@ -115,11 +121,49 @@ export class InventoryLocationService {
     actor: ActorContext,
   ): Promise<ItemEntity> {
     const item = await this.getItemById(id, actor);
-    if (dto.providerId) {
-      await this.validateProvider(dto.providerId, actor);
+    if (dto.categoryId) {
+      await this.validateCategory(dto.categoryId, actor);
     }
     Object.assign(item, dto);
     return this.itemRepo.save(item);
+  }
+
+  private async validateCategory(
+    categoryId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const cat = await this.itemCategoryRepo.findOne({
+      where: { id: categoryId, organizationId: actor.organizationId },
+    });
+    if (!cat) {
+      throw new BadRequestException(
+        `Danh mục ${categoryId} không tồn tại trong tổ chức`,
+      );
+    }
+  }
+
+  /** Resolve an existing category by trimmed name, or create it if missing. Case-insensitive match. */
+  async resolveOrCreateCategoryByName(
+    rawName: string,
+    actor: ActorContext,
+  ): Promise<ItemCategoryEntity> {
+    const name = rawName.trim();
+    if (!name) {
+      throw new BadRequestException('Tên danh mục không được để trống');
+    }
+    const existing = await this.itemCategoryRepo
+      .createQueryBuilder('c')
+      .where('c.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(c.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    return this.itemCategoryRepo.save(
+      this.itemCategoryRepo.create({
+        name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
   }
 
   /** Resolve a provider by code within the actor's organization. */
@@ -136,10 +180,11 @@ export class InventoryLocationService {
     return provider;
   }
 
-  private async validateProvider(
+  /** Validate a provider exists, belongs to the org, and is active. Used by item-provider link flows. */
+  async validateProvider(
     providerId: string,
     actor: ActorContext,
-  ): Promise<void> {
+  ): Promise<ProviderEntity> {
     const provider = await this.providerRepo.findOne({
       where: { id: providerId, organizationId: actor.organizationId },
     });
@@ -153,12 +198,13 @@ export class InventoryLocationService {
         `Provider "${provider.name}" is inactive and cannot be assigned to items`,
       );
     }
+    return provider;
   }
 
   // ─── Providers (org-scoped, no branch required) ─────────────────────
 
   async listProviders(
-    query: PaginationQueryDto,
+    query: PaginationQueryDto & { activeOnly?: string | boolean },
     actor: ActorContext,
   ): Promise<PaginatedResponse<ProviderEntity>> {
     const qb = this.providerRepo
@@ -170,6 +216,14 @@ export class InventoryLocationService {
         '(p.code ILIKE :s OR p.name ILIKE :s OR p.email ILIKE :s OR p.phone ILIKE :s)',
         { s: `%${query.search}%` },
       );
+    }
+
+    const activeOnly =
+      query.activeOnly === true ||
+      query.activeOnly === 'true' ||
+      query.activeOnly === '1';
+    if (activeOnly) {
+      qb.andWhere('p.isActive = true');
     }
 
     const field = query.sortBy ?? 'createdAt';
@@ -190,6 +244,57 @@ export class InventoryLocationService {
       throw new NotFoundException(`Provider ${id} not found`);
     }
     return provider;
+  }
+
+  async createProvider(
+    dto: CreateProviderDto,
+    actor: ActorContext,
+  ): Promise<ProviderEntity> {
+    const exists = await this.providerRepo.findOne({
+      where: { organizationId: actor.organizationId, code: dto.code },
+    });
+    if (exists) {
+      throw new ConflictException(
+        `Mã nhà cung cấp "${dto.code}" đã tồn tại`,
+      );
+    }
+    const provider = this.providerRepo.create({
+      ...dto,
+      isActive: dto.isActive ?? true,
+      organizationId: actor.organizationId,
+      createdBy: actor.userId,
+    });
+    return this.providerRepo.save(provider);
+  }
+
+  async updateProvider(
+    id: string,
+    dto: UpdateProviderDto,
+    actor: ActorContext,
+  ): Promise<ProviderEntity> {
+    const provider = await this.getProviderById(id, actor);
+    if (dto.code && dto.code !== provider.code) {
+      const dup = await this.providerRepo.findOne({
+        where: { organizationId: actor.organizationId, code: dto.code },
+      });
+      if (dup && dup.id !== provider.id) {
+        throw new ConflictException(
+          `Mã nhà cung cấp "${dto.code}" đã tồn tại`,
+        );
+      }
+    }
+    Object.assign(provider, dto);
+    return this.providerRepo.save(provider);
+  }
+
+  /** Soft-delete: mark provider inactive. Existing item / PO references are preserved. */
+  async deactivateProvider(
+    id: string,
+    actor: ActorContext,
+  ): Promise<ProviderEntity> {
+    const provider = await this.getProviderById(id, actor);
+    provider.isActive = false;
+    return this.providerRepo.save(provider);
   }
 
   // ─── Storages ────────────────────────────────────────────────────────

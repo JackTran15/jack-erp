@@ -143,6 +143,8 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
         font-size: 14px;
       }
       .summary-row.change .value { font-style: italic; }
+      .summary-row.forgiven { font-weight: 700; font-style: italic; }
+      .summary-row.forgiven .value { font-weight: 700; }
 
       .km-line {
         border-top: 1px solid #000;
@@ -226,6 +228,38 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           <span>Trả lại khách</span>
           <span class="value">${formatVnd(totals.change)}</span>
         </div>
+        ${
+          totals.keptChange != null && totals.keptChange > 0
+            ? `<div class="summary-row forgiven">
+          <span>Khách không lấy tiền thừa</span>
+          <span class="value">${formatVnd(totals.keptChange)}</span>
+        </div>`
+            : ""
+        }
+        ${
+          totals.forgivenShortage != null && totals.forgivenShortage > 0
+            ? `<div class="summary-row forgiven">
+          <span>Bớt tiền lẻ cho khách</span>
+          <span class="value">${formatVnd(totals.forgivenShortage)}</span>
+        </div>`
+            : ""
+        }
+        ${
+          totals.debtReduction != null && totals.debtReduction > 0
+            ? `<div class="summary-row forgiven">
+          <span>Giảm nợ</span>
+          <span class="value">${formatVnd(totals.debtReduction)}</span>
+        </div>`
+            : ""
+        }
+        ${
+          totals.customerDebtIssued != null && totals.customerDebtIssued > 0
+            ? `<div class="summary-row forgiven">
+          <span>Khách nợ</span>
+          <span class="value">${formatVnd(totals.customerDebtIssued)}</span>
+        </div>`
+            : ""
+        }
       </section>
 
       <p class="km-line">

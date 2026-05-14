@@ -15,6 +15,10 @@ import type {
 } from "../components/types";
 import { PaymentMethodEnum } from "../constants/paymentMethod";
 import { buildSuggestions } from "../lib/checkoutUtils";
+import {
+  derivePaymentDisplay,
+  settlementAbsFromGrand,
+} from "../lib/checkoutSettlement";
 
 interface UseCheckoutPaymentInput {
   grandTotal: number;
@@ -24,6 +28,9 @@ interface UseCheckoutPaymentInput {
 interface UseCheckoutPaymentResult {
   paymentLines: PaymentLine[];
   setPaymentLines: Dispatch<SetStateAction<PaymentLine[]>>;
+  /**
+   * Waive / forgive residual (only when debt is off — debt hides this path).
+   */
   keepChange: boolean;
   setKeepChange: Dispatch<SetStateAction<boolean>>;
   debt: boolean;
@@ -37,6 +44,8 @@ interface UseCheckoutPaymentResult {
   selectedSuggestionId: string | null;
   setSelectedSuggestionId: Dispatch<SetStateAction<string | null>>;
   totalPaid: number;
+  rawChangeAmount: number;
+  rawShortageAmount: number;
   changeAmount: number;
   shortageAmount: number;
   isShort: boolean;
@@ -68,27 +77,29 @@ export function useCheckoutPayment({
     () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
     [paymentLines],
   );
-  /**
-   * Amount to settle in VND (non-negative). For a net refund (grandTotal < 0),
-   * this is how much the shop owes the customer.
-   */
-  const settlementAbs =
-    grandTotal < 0 ? -grandTotal : Math.max(0, grandTotal);
 
-  /** Sale: excess cash handed back. Refund: amount still to pay out to customer. */
-  const rawChangeAmount =
-    grandTotal < 0
-      ? Math.max(0, settlementAbs - totalPaid)
-      : Math.max(0, totalPaid - settlementAbs);
-  const changeAmount = keepChange ? 0 : rawChangeAmount;
+  const settlementAbs = settlementAbsFromGrand(grandTotal);
+  const isRefundFlow = grandTotal < 0;
 
-  /** Only when customer still owes the shop (positive net). */
-  const shortageAmount =
-    grandTotal < 0 ? 0 : Math.max(0, settlementAbs - totalPaid);
-  const isShort = grandTotal > 0 && totalPaid > 0 && shortageAmount > 0;
+  const rawChangeAmount = Math.max(0, totalPaid - settlementAbs);
+  const rawShortageAmount = Math.max(0, settlementAbs - totalPaid);
+
+  const { changeAmount, shortageAmount, debtAmount } = useMemo(
+    () =>
+      derivePaymentDisplay({
+        grandTotal,
+        totalPaid,
+        keepChange,
+        debt,
+      }),
+    [grandTotal, totalPaid, keepChange, debt],
+  );
+
+  const isShort = grandTotal > 0 && rawShortageAmount > 0;
+
   const suggestions = useMemo(
-    () => buildSuggestions(grandTotal < 0 ? settlementAbs : grandTotal),
-    [grandTotal, settlementAbs],
+    () => buildSuggestions(isRefundFlow ? settlementAbs : grandTotal),
+    [grandTotal, isRefundFlow, settlementAbs],
   );
   const primaryMethod = paymentLines[0]?.method ?? PaymentMethodEnum.CASH;
   const primaryMethodLabel = useMemo(
@@ -97,7 +108,6 @@ export function useCheckoutPayment({
       String(primaryMethod),
     [methods, primaryMethod],
   );
-  const debtAmount = debt ? shortageAmount : 0;
 
   const handlePickSuggestion = useCallback((s: CashSuggestion) => {
     setSelectedSuggestionId(s.id);
@@ -133,6 +143,8 @@ export function useCheckoutPayment({
     selectedSuggestionId,
     setSelectedSuggestionId,
     totalPaid,
+    rawChangeAmount,
+    rawShortageAmount,
     changeAmount,
     shortageAmount,
     isShort,

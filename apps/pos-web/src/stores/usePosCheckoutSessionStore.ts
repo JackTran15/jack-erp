@@ -11,16 +11,16 @@ import {
 const STORAGE_KEY = "pos-checkout-sessions";
 const STORE_VERSION = 1;
 
-export enum ExchangePane {
+export enum CheckoutPane {
   RETURN = "return",
   PURCHASE = "purchase",
 }
 
-export function coerceExchangePane(value: unknown): ExchangePane {
-  if (value === ExchangePane.PURCHASE || value === "purchase") {
-    return ExchangePane.PURCHASE;
+export function coerceCheckoutPane(value: unknown): CheckoutPane {
+  if (value === CheckoutPane.PURCHASE || value === "purchase") {
+    return CheckoutPane.PURCHASE;
   }
-  return ExchangePane.RETURN;
+  return CheckoutPane.RETURN;
 }
 
 export interface InvoiceSession {
@@ -29,7 +29,7 @@ export interface InvoiceSession {
   checkoutVariant: CheckoutVariantEnum;
   purchaseCart: CartLine[];
   returnCart: CartLine[];
-  activeExchangePane: ExchangePane;
+  activeCheckoutPane: CheckoutPane;
   selectedLinePurchaseId: string | null;
   selectedLineReturnId: string | null;
 }
@@ -41,7 +41,7 @@ function createSaleSession(id: string, label: string): InvoiceSession {
     checkoutVariant: CheckoutVariantEnum.SALE,
     purchaseCart: [],
     returnCart: [],
-    activeExchangePane: ExchangePane.RETURN,
+    activeCheckoutPane: CheckoutPane.RETURN,
     selectedLinePurchaseId: null,
     selectedLineReturnId: null,
   };
@@ -76,11 +76,9 @@ interface PosCheckoutSessionState {
 
   setCashierDisplayName: (name: string | null) => void;
   setDraftsDialogOpen: (open: boolean) => void;
-  setPendingDraftPaymentLines: (
-    value: DraftInvoicePayment[] | null,
-  ) => void;
+  setPendingDraftPaymentLines: (value: DraftInvoicePayment[] | null) => void;
   setActiveSessionId: (id: string) => void;
-  setActiveExchangePane: (pane: ExchangePane) => void;
+  setActiveCheckoutPane: (pane: CheckoutPane) => void;
   patchActiveSession: (partial: Partial<InvoiceSession>) => void;
 
   updatePurchaseCart: (
@@ -143,11 +141,11 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         set({ activeSessionId: id });
       },
 
-      setActiveExchangePane: (pane) => {
+      setActiveCheckoutPane: (pane) => {
         const { activeSessionId, sessions } = get();
         set({
           sessions: sessions.map((s) =>
-            s.id === activeSessionId ? { ...s, activeExchangePane: pane } : s,
+            s.id === activeSessionId ? { ...s, activeCheckoutPane: pane } : s,
           ),
         });
       },
@@ -231,7 +229,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
           purchaseCart: [],
           returnCart: [],
-          activeExchangePane: ExchangePane.RETURN,
+          activeCheckoutPane: CheckoutPane.RETURN,
           selectedLinePurchaseId: null,
           selectedLineReturnId: null,
         };
@@ -251,7 +249,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           checkoutVariant: CheckoutVariantEnum.INVOICE_RETURN,
           purchaseCart: lines.map((l) => ({ ...l })),
           returnCart: [],
-          activeExchangePane: ExchangePane.RETURN,
+          activeCheckoutPane: CheckoutPane.RETURN,
           selectedLinePurchaseId: null,
           selectedLineReturnId: null,
         };
@@ -300,7 +298,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   checkoutVariant: CheckoutVariantEnum.SALE,
                   purchaseCart: [],
                   returnCart: [],
-                  activeExchangePane: ExchangePane.RETURN,
+                  activeCheckoutPane: CheckoutPane.RETURN,
                   selectedLinePurchaseId: null,
                   selectedLineReturnId: null,
                 }
@@ -329,7 +327,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
             purchaseCart: draft.quickExchangePurchase.map((l) => ({ ...l })),
             returnCart: draft.quickExchangeReturn.map((l) => ({ ...l })),
-            activeExchangePane: ExchangePane.RETURN,
+            activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
           };
@@ -343,7 +341,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                 : CheckoutVariantEnum.SALE,
             purchaseCart: draft.lines.map((l) => ({ ...l })),
             returnCart: [],
-            activeExchangePane: ExchangePane.RETURN,
+            activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
           };
@@ -378,22 +376,27 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         const sessionsRaw = p.sessions ?? [];
         const sessions: InvoiceSession[] =
           sessionsRaw.length > 0
-            ? sessionsRaw.map((sess: InvoiceSession) => ({
-                id: sess.id,
-                label: sess.label,
-                checkoutVariant: coerceCheckoutVariant(sess.checkoutVariant),
-                purchaseCart: (sess.purchaseCart ?? []).map((l: CartLine) => ({
-                  ...l,
-                })),
-                returnCart: (sess.returnCart ?? []).map((l: CartLine) => ({
-                  ...l,
-                })),
-                activeExchangePane: coerceExchangePane(
-                  sess.activeExchangePane,
-                ),
-                selectedLinePurchaseId: sess.selectedLinePurchaseId ?? null,
-                selectedLineReturnId: sess.selectedLineReturnId ?? null,
-              }))
+            ? sessionsRaw.map((sess) => {
+                const raw = sess as InvoiceSession & {
+                  activeExchangePane?: unknown;
+                };
+                return {
+                  id: raw.id,
+                  label: raw.label,
+                  checkoutVariant: coerceCheckoutVariant(raw.checkoutVariant),
+                  purchaseCart: (raw.purchaseCart ?? []).map((l: CartLine) => ({
+                    ...l,
+                  })),
+                  returnCart: (raw.returnCart ?? []).map((l: CartLine) => ({
+                    ...l,
+                  })),
+                  activeCheckoutPane: coerceCheckoutPane(
+                    raw.activeCheckoutPane ?? raw.activeExchangePane,
+                  ),
+                  selectedLinePurchaseId: raw.selectedLinePurchaseId ?? null,
+                  selectedLineReturnId: raw.selectedLineReturnId ?? null,
+                };
+              })
             : current.sessions;
         const activeOk =
           p.activeSessionId && sessions.some((s) => s.id === p.activeSessionId);

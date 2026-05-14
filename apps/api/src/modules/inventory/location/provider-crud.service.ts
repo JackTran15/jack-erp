@@ -9,7 +9,7 @@ import {
 import { BaseCrudService, CrudOperation } from '../../crud/base-crud.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ProviderEntity } from './provider.entity';
-import { ItemEntity } from './item.entity';
+import { ItemProviderEntity } from './item-provider.entity';
 
 export const INVENTORY_PROVIDER_SERVICE_TOKEN = 'InventoryProviderCrudService';
 
@@ -25,8 +25,8 @@ export class InventoryProviderCrudService extends BaseCrudService<
   constructor(
     @InjectRepository(ProviderEntity)
     protected readonly repository: Repository<ProviderEntity>,
-    @InjectRepository(ItemEntity)
-    private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(ItemProviderEntity)
+    private readonly itemProviderRepo: Repository<ItemProviderEntity>,
     protected readonly dataSource: DataSource,
   ) {
     super(dataSource);
@@ -38,7 +38,7 @@ export class InventoryProviderCrudService extends BaseCrudService<
     _actor: ActorContext,
   ): Promise<void> {
     if (operation === 'delete' && payload.id) {
-      const linkedCount = await this.itemRepo.count({
+      const linkedCount = await this.itemProviderRepo.count({
         where: { providerId: payload.id },
       });
       if (linkedCount > 0) {

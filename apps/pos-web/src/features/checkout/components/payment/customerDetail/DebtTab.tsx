@@ -101,9 +101,11 @@ export function DebtTab({ rows }: DebtTabProps) {
         render: (row) => row.documentType,
         filterRender: (
           <PosSelect
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={typeOptions}
+            value={typeOptions.find((o) => o.value === typeFilter) ?? null}
+            onChange={(item) => setTypeFilter(item.value)}
+            items={typeOptions}
+            itemKey={(o) => o.value}
+            renderItem={(o) => o.label}
             variant="underline"
             className="min-w-[160px]"
           />

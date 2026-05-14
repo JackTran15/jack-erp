@@ -6,11 +6,17 @@ import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
 import { ProviderEntity } from './provider.entity';
+import { ItemProviderEntity } from './item-provider.entity';
+import { ItemBarcodeEntity } from './item-barcode.entity';
+import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
 import { LocationEntity } from './location.entity';
 import { StorageManagerAssignmentEntity } from './storage-manager-assignment.entity';
 import { InventoryLocationService } from './inventory-location.service';
+import { ItemProviderService } from './item-provider.service';
+import { ItemBarcodeService } from './item-barcode.service';
+import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { InventoryLocationController } from './inventory-location.controller';
 import {
   InventoryItemCrudService,
@@ -39,6 +45,9 @@ import {
       ItemEntity,
       ItemCategoryEntity,
       ProviderEntity,
+      ItemProviderEntity,
+      ItemBarcodeEntity,
+      ItemStockThresholdEntity,
       StorageEntity,
       ShowroomEntity,
       LocationEntity,
@@ -49,6 +58,9 @@ import {
   controllers: [InventoryLocationController],
   providers: [
     InventoryLocationService,
+    ItemProviderService,
+    ItemBarcodeService,
+    ItemStockThresholdService,
     InventoryItemCrudService,
     InventoryItemCategoryCrudService,
     InventoryStorageCrudService,
@@ -67,7 +79,12 @@ import {
       useExisting: InventoryItemCategoryCrudService,
     },
   ],
-  exports: [InventoryLocationService],
+  exports: [
+    InventoryLocationService,
+    ItemProviderService,
+    ItemBarcodeService,
+    ItemStockThresholdService,
+  ],
 })
 export class InventoryLocationModule implements OnModuleInit {
   constructor(

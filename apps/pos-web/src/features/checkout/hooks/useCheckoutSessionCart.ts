@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
 import {
-  ExchangePane,
+  CheckoutPane,
   selectActiveSession,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/usePosCheckoutSessionStore";
@@ -10,8 +10,24 @@ import {
   type CatalogProduct,
   CheckoutVariantEnum,
 } from "../components/types";
-import { locationQtyFor } from "../lib/checkoutUtils";
+import { isCartLineWarning, locationQtyFor } from "../lib/checkoutUtils";
+import {
+  clampPosCheckoutQtyNumber,
+  POS_CHECKOUT_QTY_MIN,
+  safePosCheckoutQtyFromRaw,
+} from "../lib/posCheckoutQty";
+import { clampReturnQty } from "../../return-goods/lib/returnGoodsMath";
 import { netSessionGrandTotal } from "../lib/checkoutSessionTotals";
+
+function isSignedNegativeQtyCart(
+  variant: CheckoutVariantEnum,
+  activeCheckoutPane: CheckoutPane,
+): boolean {
+  return (
+    variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+    activeCheckoutPane === CheckoutPane.RETURN
+  );
+}
 
 interface UseCheckoutSessionCartInput {
   announce: (message: string) => void;
@@ -29,7 +45,7 @@ export function useCheckoutSessionCart({
     session?.checkoutVariant ?? CheckoutVariantEnum.SALE;
   const purchaseCart = session?.purchaseCart ?? [];
   const returnCart = session?.returnCart ?? [];
-  const activeExchangePane = session?.activeExchangePane ?? ExchangePane.RETURN;
+  const activeCheckoutPane = session?.activeCheckoutPane ?? CheckoutPane.RETURN;
 
   const updatePurchaseCart = usePosCheckoutSessionStore(
     (s) => s.updatePurchaseCart,
@@ -47,29 +63,29 @@ export function useCheckoutSessionCart({
   const cart = useMemo(() => {
     if (!session) return [];
     if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
-      return activeExchangePane === ExchangePane.RETURN
+      return activeCheckoutPane === CheckoutPane.RETURN
         ? returnCart
         : purchaseCart;
     }
     return purchaseCart;
-  }, [session, variant, activeExchangePane, returnCart, purchaseCart]);
+  }, [session, variant, activeCheckoutPane, returnCart, purchaseCart]);
 
   const selectedLineId = useMemo(() => {
     if (!session) return null;
     if (
       variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-      activeExchangePane === ExchangePane.RETURN
+      activeCheckoutPane === CheckoutPane.RETURN
     ) {
       return session.selectedLineReturnId;
     }
     return session.selectedLinePurchaseId;
-  }, [session, variant, activeExchangePane]);
+  }, [session, variant, activeCheckoutPane]);
 
   const setSelectedLineId = useCallback(
     (id: string | null) => {
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeExchangePane === ExchangePane.RETURN
+        activeCheckoutPane === CheckoutPane.RETURN
       ) {
         setSelectedLineReturnId(id);
         return;
@@ -78,7 +94,7 @@ export function useCheckoutSessionCart({
     },
     [
       variant,
-      activeExchangePane,
+      activeCheckoutPane,
       setSelectedLineReturnId,
       setSelectedLinePurchaseId,
     ],
@@ -94,7 +110,7 @@ export function useCheckoutSessionCart({
       if (!session) return;
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeExchangePane === ExchangePane.RETURN
+        activeCheckoutPane === CheckoutPane.RETURN
       ) {
         updateReturnCart(session.id, updater);
         return;
@@ -104,16 +120,17 @@ export function useCheckoutSessionCart({
     [
       session,
       variant,
-      activeExchangePane,
+      activeCheckoutPane,
       updateReturnCart,
       updatePurchaseCart,
     ],
   );
 
   const addProduct = useCallback(
-    (product: PosCatalogLine): string | null => {
+    (product: PosCatalogLine, qtyToAdd = 1): string | null => {
       if (!session) return null;
       const atLocation = locationQtyFor(product);
+      const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
       if (atLocation < 1) {
         setCartError("Hết tồn tại vị trí ưu tiên bán. Kiểm tra kho hàng.");
         return null;
@@ -127,13 +144,13 @@ export function useCheckoutSessionCart({
       );
       const targetList =
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeExchangePane === ExchangePane.RETURN
+        activeCheckoutPane === CheckoutPane.RETURN
           ? (latest?.returnCart ?? [])
           : (latest?.purchaseCart ?? []);
       const existing = targetList.find((l) => l.itemId === product.itemId);
       let affectedLineId: string;
       if (existing) {
-        if (existing.qty + 1 > existing.maxQty) {
+        if (existing.qty + delta > existing.maxQty) {
           setCartError("Đã đạt tối đa tồn tại vị trí bán cho mặt hàng này.");
           return null;
         }
@@ -145,13 +162,12 @@ export function useCheckoutSessionCart({
       const apply = (prev: CartLine[]) => {
         const existingInPrev = prev.find((l) => l.itemId === product.itemId);
         if (existingInPrev) {
-          if (existingInPrev.qty + 1 > existingInPrev.maxQty) return prev;
+          if (existingInPrev.qty + delta > existingInPrev.maxQty) return prev;
           setCartError("");
           return prev.map((l) =>
-            l.itemId === product.itemId ? { ...l, qty: l.qty + 1 } : l,
+            l.itemId === product.itemId ? { ...l, qty: l.qty + delta } : l,
           );
         }
-        setCartError("");
         const newLine: CartLine = {
           lineId: affectedLineId,
           itemId: product.itemId,
@@ -159,11 +175,11 @@ export function useCheckoutSessionCart({
           code: product.code,
           unit: product.unit,
           unitPrice: product.sellingPrice ?? 0,
-          qty: 1,
+          qty: delta,
           locationId: product.defaultLocationId,
           maxQty: atLocation,
         };
-        if (activeExchangePane === ExchangePane.RETURN) {
+        if (activeCheckoutPane === CheckoutPane.RETURN) {
           if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
             setSelectedLineReturnId(newLine.lineId);
           }
@@ -179,7 +195,7 @@ export function useCheckoutSessionCart({
     [
       session,
       variant,
-      activeExchangePane,
+      activeCheckoutPane,
       targetCartUpdater,
       announce,
       setSelectedLinePurchaseId,
@@ -208,22 +224,26 @@ export function useCheckoutSessionCart({
 
   const updateQty = useCallback(
     (lineId: string, raw: string) => {
-      const n = Math.floor(Number.parseFloat(raw.replace(",", ".")) || 0);
       targetCartUpdater((prev) => {
         const line = prev.find((l) => l.lineId === lineId);
         if (!line) return prev;
+        const signedReturnUi =
+          Boolean(line.isReturnCredit) ||
+          isSignedNegativeQtyCart(variant, activeCheckoutPane);
+        const safe = safePosCheckoutQtyFromRaw(raw, {
+          treatAsSignedReturnMagnitude: signedReturnUi,
+        });
+        let nextQty = safe;
         if (line.isReturnCredit) {
-          const abs = Math.abs(n);
-          const safe = Math.max(1, Math.min(line.maxQty, abs));
-          return prev.map((l) =>
-            l.lineId === lineId ? { ...l, qty: safe } : l,
-          );
+          const capped = clampReturnQty(safe, line.maxQty);
+          nextQty = capped > 0 ? capped : POS_CHECKOUT_QTY_MIN;
         }
-        const safe = Math.max(1, Math.min(line.maxQty, n));
-        return prev.map((l) => (l.lineId === lineId ? { ...l, qty: safe } : l));
+        return prev.map((l) =>
+          l.lineId === lineId ? { ...l, qty: nextQty } : l,
+        );
       });
     },
-    [targetCartUpdater],
+    [targetCartUpdater, variant, activeCheckoutPane],
   );
 
   const bumpQty = useCallback(
@@ -231,13 +251,11 @@ export function useCheckoutSessionCart({
       targetCartUpdater((prev) => {
         const line = prev.find((x) => x.lineId === lineId);
         if (!line) return prev;
-        const next = line.qty + delta;
+        let next = line.qty + delta;
         if (next < 1) return prev;
-        if (next > line.maxQty) {
-          setCartError("Số lượng vượt tồn kho.");
-          return prev;
+        if (line.isReturnCredit) {
+          next = Math.min(next, Math.max(line.maxQty, 1));
         }
-        setCartError("");
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
     },
@@ -254,7 +272,7 @@ export function useCheckoutSessionCart({
       if (selectedLineId === lineId) {
         if (
           variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-          activeExchangePane === ExchangePane.RETURN
+          activeCheckoutPane === CheckoutPane.RETURN
         ) {
           setSelectedLineReturnId(null);
         } else {
@@ -267,18 +285,21 @@ export function useCheckoutSessionCart({
       announce,
       selectedLineId,
       variant,
-      activeExchangePane,
+      activeCheckoutPane,
       setSelectedLineReturnId,
       setSelectedLinePurchaseId,
     ],
   );
 
-  const isLineWarning = useCallback((line: CartLine) => {
-    if (line.isReturnCredit) {
-      return line.qty > line.maxQty || line.unitPrice <= 0;
-    }
-    return line.qty >= line.maxQty || line.unitPrice <= 0;
-  }, []);
+  const isLineWarning = useCallback(
+    (line: CartLine) => {
+      if (isSignedNegativeQtyCart(variant, activeCheckoutPane)) {
+        return false;
+      }
+      return isCartLineWarning(line);
+    },
+    [variant, activeCheckoutPane],
+  );
 
   /** Combined line count for payment badge (sale / invoice_return). */
   const itemCountForPayment = useMemo(() => {
@@ -301,14 +322,14 @@ export function useCheckoutSessionCart({
     checkoutVariant: variant,
     purchaseCart,
     returnCart,
-    activeExchangePane,
+    activeCheckoutPane,
     cart,
     setCart: (next: CartLine[] | ((prev: CartLine[]) => CartLine[])) => {
       if (!session) return;
       const resolved = typeof next === "function" ? next(cart) : next;
       if (
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-        activeExchangePane === ExchangePane.RETURN
+        activeCheckoutPane === CheckoutPane.RETURN
       ) {
         updateReturnCart(session.id, () => resolved);
       } else {

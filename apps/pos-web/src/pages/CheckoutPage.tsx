@@ -7,7 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { CustomerCreateDialog } from "../components/CustomerCreateDialog";
+import { CustomerCreateDialog } from "../features/checkout/components/customerCreate";
 import { CustomerSelectDialog } from "../components/CustomerSelectDialog";
 import { SearchSelectInput } from "../components/SearchSelectInput";
 import type { SearchSelectSuggestion } from "../components/SearchSelectInput";
@@ -306,10 +306,6 @@ export function CheckoutPage() {
     e.preventDefault();
     if (cart.length === 0) {
       setCartError("Giỏ hàng trống.");
-      return;
-    }
-    if (cart.some((l) => l.unitPrice <= 0)) {
-      setCartError("Nhập đơn giá > 0 cho từng dòng hàng.");
       return;
     }
     if (payment === "CASH" && cashReceivedNum > 0 && cashReceivedNum < grandTotal) {

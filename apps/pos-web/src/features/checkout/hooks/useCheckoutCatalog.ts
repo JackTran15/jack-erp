@@ -9,14 +9,12 @@ import {
 import type { SearchSuggestion } from "../components/common/SearchPopover";
 import type { CatalogProduct } from "../components/types";
 import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
-import { locationQtyFor, matchesCatalogQuery } from "../lib/checkoutUtils";
+import { matchesCatalogQuery } from "../lib/checkoutUtils";
 
 interface ToolbarState {
   query: string;
   qty: number;
   splitLine: boolean;
-  salesperson: string | undefined;
-  priceBook: string | undefined;
 }
 
 interface UseCheckoutCatalogResult {
@@ -49,8 +47,6 @@ export function useCheckoutCatalog(
     query: "",
     qty: 1,
     splitLine: false,
-    salesperson: undefined,
-    priceBook: undefined,
   });
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogGroup, setCatalogGroup] = useState<string | undefined>(
@@ -98,7 +94,6 @@ export function useCheckoutCatalog(
       const matched = catalog.filter((p) => matchesCatalogQuery(p, q));
       return matched.slice(0, 8).map((p) => ({
         item: p,
-        disabled: locationQtyFor(p) < 1,
       }));
     },
     [catalog],

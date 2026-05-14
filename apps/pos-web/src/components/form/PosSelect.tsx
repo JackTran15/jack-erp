@@ -1,28 +1,58 @@
 import { cn } from "@erp/ui";
 import {
-  useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
-import { useListKeyboardNavigation } from "@erp/pos/hooks/useListKeyboardNavigation";
 
-export interface PosSelectOption<TValue extends string> {
-  value: TValue;
-  label: string;
-  selectedDisplay?: string;
+/**
+ * The data-bound subset of {@link PosSelectProps}. Wrapper components can use
+ * this to accept a caller's typed data + handlers while owning presentation
+ * (variant, placeholder, icons, sizing). Mirrors `PosSelectSearchConfig<T>`.
+ */
+export interface PosSelectConfig<T> {
+  value?: T | null;
+  onChange: (item: T) => void;
+  items: ReadonlyArray<T>;
+  itemKey: (item: T) => string;
+  renderItem: (item: T) => ReactNode;
+  renderMeta?: (item: T) => ReactNode;
+  renderSelected?: (item: T) => ReactNode;
+  isItemDisabled?: (item: T) => boolean;
+  /** Forwarded to the underlying trigger button — used by hotkeys/focus. */
+  triggerRef?: Ref<HTMLButtonElement>;
   disabled?: boolean;
 }
 
-export interface PosSelectProps<TValue extends string> {
-  value: TValue;
-  onChange: (next: TValue) => void;
-  options: ReadonlyArray<PosSelectOption<TValue>>;
+export interface PosSelectProps<T> {
+  /** Currently selected item, or null/undefined when nothing is picked. */
+  value?: T | null;
+  /** Called when an item is picked from the menu. */
+  onChange: (item: T) => void;
+  /** The full list of options. */
+  items: ReadonlyArray<T>;
+
+  /** Stable, unique key per item. */
+  itemKey: (item: T) => string;
+  /** Render the primary line of an option inside the dropdown. */
+  renderItem: (item: T) => ReactNode;
+  /** Optional secondary line shown under the primary line in the dropdown. */
+  renderMeta?: (item: T) => ReactNode;
+  /**
+   * Content shown inside the trigger when an item is selected. Defaults to
+   * `renderItem` — override when the trigger needs a more compact display
+   * (e.g. an operator symbol while the menu shows the full label).
+   */
+  renderSelected?: (item: T) => ReactNode;
+  /** Per-item disabled predicate. */
+  isItemDisabled?: (item: T) => boolean;
+
   id?: string;
   ariaLabel?: string;
   placeholder?: string;
@@ -30,15 +60,43 @@ export interface PosSelectProps<TValue extends string> {
   variant?: "boxed" | "underline";
   position?: "top" | "bottom";
   showChevron?: boolean;
+  invalid?: boolean;
+  disabled?: boolean;
+  prefix?: ReactNode;
+  trailing?: ReactNode;
   className?: string;
   menuClassName?: string;
   triggerClassName?: string;
+  /** Forwarded to the underlying trigger button — used by hotkeys/focus. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
-export function PosSelect<TValue extends string>({
+/**
+ * Generic single-select dropdown for static option lists. Pair with
+ * {@link PosSelectSearch} when the picker needs type-to-filter — the two
+ * components share the same generic shape (`items`/`value`/`onChange` +
+ * `itemKey`/`renderItem`/`renderSelected`/`renderMeta`) so consumers can swap
+ * one for the other with minimal API churn.
+ *
+ * Behavior:
+ *  - Trigger is a button. Click toggles the floating menu (portal'd to body).
+ *  - Keyboard nav on the focused trigger:
+ *      ArrowDown / ArrowUp — open with highlight, or move highlight.
+ *      Home / End          — jump to first/last enabled item (open only).
+ *      Enter / Space       — open menu, or commit highlighted item.
+ *      Escape / Tab        — close menu.
+ *  - Selecting an item commits and closes; click-outside also closes.
+ *  - `position="top"` flips the menu above the trigger (useful in footers).
+ */
+export function PosSelect<T>({
   value,
   onChange,
-  options,
+  items,
+  itemKey,
+  renderItem,
+  renderMeta,
+  renderSelected,
+  isItemDisabled,
   id,
   ariaLabel,
   placeholder,
@@ -46,63 +104,164 @@ export function PosSelect<TValue extends string>({
   variant = "boxed",
   position = "bottom",
   showChevron = true,
+  invalid,
+  disabled,
+  prefix,
+  trailing,
   className,
   menuClassName,
   triggerClassName,
-}: PosSelectProps<TValue>) {
+  ref,
+}: PosSelectProps<T>) {
   const [open, setOpen] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [menuPosition, setMenuPosition] = useState({
     top: 0,
     left: 0,
     width: 0,
   });
-  const selected = useMemo(
-    () => options.find((option) => option.value === value) ?? null,
-    [options, value],
-  );
 
-  const reactId = useId();
-  const listboxId = `${reactId}-listbox`;
+  const setTriggerRef = (node: HTMLButtonElement | null) => {
+    triggerRef.current = node;
+    if (!ref) return;
+    if (typeof ref === "function") ref(node);
+    else (ref as { current: HTMLButtonElement | null }).current = node;
+  };
 
-  // On open, set initial highlight to the index of the currently selected option (if any).
-  // The hook auto-clamps to the nearest enabled item if the index falls on a disabled one.
-  const initialIndex = useMemo(() => {
-    const idx = options.findIndex((o) => o.value === value);
-    return idx >= 0 ? idx : 0;
-  }, [options, value]);
+  const selectedKey = value != null ? itemKey(value) : null;
+  const selectedDisplay = useMemo<ReactNode>(() => {
+    if (value == null) return placeholder ?? "";
+    return (renderSelected ?? renderItem)(value);
+  }, [value, placeholder, renderItem, renderSelected]);
 
-  const selectByIndex = useCallback(
-    (option: PosSelectOption<TValue>) => {
-      onChange(option.value);
+  const isDisabledAt = (idx: number) =>
+    idx < 0 || idx >= items.length || (isItemDisabled?.(items[idx]) ?? false);
+
+  /**
+   * Walk `items` from `start` in `dir` and return the first enabled index.
+   * Wraps around at the ends; returns -1 when every item is disabled.
+   */
+  const findEnabledIndex = (start: number, dir: 1 | -1): number => {
+    if (items.length === 0) return -1;
+    let idx = start;
+    for (let i = 0; i < items.length; i++) {
+      idx = (idx + dir + items.length) % items.length;
+      if (!isDisabledAt(idx)) return idx;
+    }
+    return -1;
+  };
+
+  const firstEnabledIndex = () => findEnabledIndex(-1, 1);
+  const lastEnabledIndex = () => findEnabledIndex(0, -1);
+
+  /** Seed the highlight: current selection if enabled, else first enabled. */
+  const initialHighlight = (): number => {
+    if (selectedKey != null) {
+      const idx = items.findIndex((item) => itemKey(item) === selectedKey);
+      if (idx >= 0 && !isDisabledAt(idx)) return idx;
+    }
+    return firstEnabledIndex();
+  };
+
+  const openMenu = () => {
+    if (disabled || open) return;
+    setHighlightIdx(initialHighlight());
+    setOpen(true);
+  };
+
+  const closeMenu = () => {
+    setOpen(false);
+    setHighlightIdx(-1);
+  };
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (open) closeMenu();
+    else openMenu();
+  };
+
+  const commit = (item: T) => {
+    onChange(item);
+    closeMenu();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    switch (e.key) {
+      case "Escape":
+        if (open) {
+          e.preventDefault();
+          closeMenu();
+        }
+        return;
+      case "ArrowDown":
+        e.preventDefault();
+        if (!open) {
+          openMenu();
+          return;
+        }
+        setHighlightIdx((prev) => findEnabledIndex(prev, 1));
+        return;
+      case "ArrowUp":
+        e.preventDefault();
+        if (!open) {
+          openMenu();
+          return;
+        }
+        setHighlightIdx((prev) => findEnabledIndex(prev, -1));
+        return;
+      case "Home":
+        if (!open) return;
+        e.preventDefault();
+        setHighlightIdx(firstEnabledIndex());
+        return;
+      case "End":
+        if (!open) return;
+        e.preventDefault();
+        setHighlightIdx(lastEnabledIndex());
+        return;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (!open) {
+          openMenu();
+          return;
+        }
+        if (highlightIdx >= 0 && !isDisabledAt(highlightIdx)) {
+          commit(items[highlightIdx]);
+        }
+        return;
+      case "Tab":
+        if (open) closeMenu();
+        return;
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const onFocusOut = (e: FocusEvent) => {
+      const next = e.relatedTarget;
+      if (next instanceof Node) {
+        if (menuRef.current?.contains(next)) return;
+        if (root.contains(next)) return;
+      }
       setOpen(false);
-    },
-    [onChange],
-  );
-
-  const isOptionDisabled = useCallback(
-    (option: PosSelectOption<TValue>) => Boolean(option.disabled),
-    [],
-  );
-
-  const { highlightIdx, setHighlightIdx, handleKeyDown } =
-    useListKeyboardNavigation<PosSelectOption<TValue>>({
-      items: options,
-      open,
-      isDisabled: isOptionDisabled,
-      initialIndex,
-      onSelect: selectByIndex,
-      onEscape: () => setOpen(false),
-    });
+      setHighlightIdx(-1);
+    };
+    root.addEventListener("focusout", onFocusOut);
+    return () => root.removeEventListener("focusout", onFocusOut);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !triggerRef.current) return;
 
     const updateMenuPosition = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
+      const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
       setMenuPosition({
         top: rect.bottom,
@@ -127,123 +286,92 @@ export function PosSelect<TValue extends string>({
       const clickedInsideTrigger = rootRef.current?.contains(target) ?? false;
       const clickedInsideMenu = menuRef.current?.contains(target) ?? false;
       if (!clickedInsideTrigger && !clickedInsideMenu) {
-        setOpen(false);
+        closeMenu();
       }
-    };
-    // Document-level keydown defensive — focus may not be on the trigger after
-    // a click (some browsers blur after opening a portal). The hook ignores
-    // unrelated keys; only ArrowUp/Down/Enter/Escape call `preventDefault`.
-    const onDocKeyDown = (e: KeyboardEvent) => {
-      // Tab / Shift+Tab → user leaves focus → close menu without preventDefault
-      // so focus moves normally to the next element.
-      if (e.key === "Tab") {
-        setOpen(false);
-        return;
-      }
-      // Ignore if the user is typing in another input (e.g. a search field).
-      const target = e.target as HTMLElement | null;
-      const inOtherInput =
-        target &&
-        target !== triggerRef.current &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable);
-      if (inOtherInput) return;
-      handleKeyDown(e);
     };
     document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onDocKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onDocKeyDown);
-    };
-  }, [open, handleKeyDown]);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
 
-  // When highlightIdx changes, scroll the option into view (nearest — only
-  // scrolls if actually needed). Skip when -1 (closed).
-  useEffect(() => {
-    if (!open || highlightIdx < 0) return;
-    const el = optionRefs.current[highlightIdx];
-    if (!el) return;
-    el.scrollIntoView({ block: "nearest" });
-  }, [open, highlightIdx]);
-
-  const handleTriggerKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (!open) {
-      // ArrowDown/ArrowUp/Enter on the trigger when closed → open menu.
-      // Escape when closed → do nothing.
-      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") {
-        e.preventDefault();
-        setOpen(true);
-      }
-      return;
-    }
-    handleKeyDown(e);
-  };
+  const wrapperClass =
+    variant === "underline"
+      ? cn(
+          "flex h-8 items-center gap-2 border-b border-transparent bg-transparent transition-[box-shadow] duration-150 ease-out",
+          invalid
+            ? "shadow-[inset_0_-2px_0_0_#F87171]"
+            : open
+              ? "shadow-[inset_0_-2px_0_0_#5B5BD6]"
+              : "shadow-[inset_0_-1px_0_0_#E5E7EB] focus-within:shadow-[inset_0_-2px_0_0_#5B5BD6]",
+        )
+      : cn(
+          "flex h-7 items-center gap-2 rounded border bg-white transition-[border-color,box-shadow] duration-150 ease-out",
+          invalid
+            ? "border-[#F87171]"
+            : "border-gray-200 focus-within:border-[#5C6BC0]",
+          open && !invalid && "ring-2 ring-[#5C6BC0]/30",
+        );
 
   const triggerClass =
     variant === "underline"
       ? cn(
-          "h-8 w-full border-b border-transparent bg-transparent pb-2 pl-0 pt-1 text-left text-[14px] text-gray-900 shadow-[inset_0_-1px_0_0_#E5E7EB] transition-[box-shadow,color] duration-150 ease-out",
-          showChevron && "pr-6",
-          open
-            ? "shadow-[inset_0_-2px_0_0_#5B5BD6]"
-            : "focus:shadow-[inset_0_-2px_0_0_#5B5BD6]",
-          !selected && "text-[#9CA3AF]",
+          "min-w-0 flex-1 bg-transparent pb-2 pl-0 pt-1 text-left text-[14px] text-gray-900 transition-colors",
+          value == null && "text-[#9CA3AF]",
         )
-      : cn(
-          "h-7 w-full rounded border border-gray-200 bg-white px-2 text-left text-[13px] transition-[border-color,box-shadow] duration-150 ease-out",
-          showChevron && "pr-7",
-          open
-            ? "ring-2 ring-[#5C6BC0]/30"
-            : "focus:ring-2 focus:ring-[#5C6BC0]/30",
-        );
+      : cn("min-w-0 flex-1 bg-transparent px-2 text-left text-[13px]");
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div
+      ref={rootRef}
+      className={cn(
+        wrapperClass,
+        disabled && "cursor-not-allowed opacity-60",
+        className,
+      )}
+    >
       <button
-        ref={triggerRef}
+        ref={setTriggerRef}
         id={id}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        onKeyDown={handleTriggerKeyDown}
+        onClick={toggleOpen}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
         className={cn(
           triggerClass,
-          "relative focus:outline-none",
+          "focus:outline-none inline-flex items-center gap-1.5",
           triggerClassName,
         )}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={open ? listboxId : undefined}
-        aria-activedescendant={
-          open && highlightIdx >= 0
-            ? `${listboxId}-option-${highlightIdx}`
-            : undefined
-        }
+        aria-invalid={invalid || undefined}
       >
-        <span className="block truncate">
-          {selected?.selectedDisplay ?? selected?.label ?? placeholder ?? ""}
-        </span>
-        {showChevron ? (
-          <span
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#6B7280] transition-transform",
-              open && "rotate-180",
-            )}
-          >
-            <ChevronDownIcon size={14} />
-          </span>
-        ) : null}
+        {prefix}
+
+        <span className="block truncate">{selectedDisplay}</span>
       </button>
+
+      {trailing}
+
+      {showChevron ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={toggleOpen}
+          className={cn(
+            "shrink-0 pr-1 text-[#6B7280] transition-transform focus:outline-none",
+            open && "rotate-180",
+          )}
+        >
+          <ChevronDownIcon size={14} />
+        </button>
+      ) : null}
 
       {open
         ? createPortal(
             <div
               ref={menuRef}
               role="listbox"
-              id={listboxId}
               className={cn(
                 "fixed pointer-events-auto z-[100] max-h-72 overflow-auto rounded-2xl border border-gray-200 bg-white shadow-lg transition-opacity delay-50 duration-75",
                 menuClassName,
@@ -265,52 +393,51 @@ export function PosSelect<TValue extends string>({
                   menuPosition.top === 0 && menuPosition.left === 0 ? 0 : 1,
               }}
             >
-              {options.length === 0 ? (
+              {items.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-gray-400">
                   {emptyText}
                 </div>
               ) : (
-                options.map((option, idx) => {
-                  const isSelected = option.value === value;
-                  const isHighlighted = idx === highlightIdx;
-                  const isDisabled = Boolean(option.disabled);
+                items.map((item, i) => {
+                  const key = itemKey(item);
+                  const isSelected = key === selectedKey;
+                  const itemDisabled = isItemDisabled?.(item) ?? false;
+                  const isHighlighted = i === highlightIdx;
                   return (
                     <button
-                      key={option.value}
-                      ref={(el) => {
-                        optionRefs.current[idx] = el;
-                      }}
-                      id={`${listboxId}-option-${idx}`}
+                      key={key}
                       type="button"
                       role="option"
                       aria-selected={isSelected}
-                      aria-disabled={isDisabled || undefined}
-                      disabled={isDisabled}
-                      onClick={() => {
-                        if (isDisabled) return;
-                        onChange(option.value);
-                        setOpen(false);
-                      }}
+                      disabled={itemDisabled}
                       onMouseEnter={() => {
-                        if (!isDisabled) setHighlightIdx(idx);
+                        if (!itemDisabled) setHighlightIdx(i);
+                      }}
+                      onMouseDown={(e) => {
+                        // Keep focus on the trigger so the parent's keyboard
+                        // flow isn't interrupted between mousedown and click.
+                        e.preventDefault();
+                      }}
+                      onClick={() => {
+                        if (!itemDisabled) commit(item);
                       }}
                       className={cn(
-                        "block w-full px-4 py-2 text-left text-sm transition-colors",
-                        isDisabled
+                        "block w-full px-4 py-2 text-left text-sm text-gray-900 transition-colors",
+                        itemDisabled
                           ? "cursor-not-allowed text-gray-400"
-                          : "text-gray-900",
-                        !isDisabled && isHighlighted && "bg-indigo-50",
-                        !isDisabled &&
-                          isSelected &&
-                          !isHighlighted &&
-                          "bg-[#F8FAFF] text-[#4F46E5]",
-                        !isDisabled &&
-                          !isSelected &&
-                          !isHighlighted &&
-                          "hover:bg-[#F8FAFC]",
+                          : isSelected
+                            ? "bg-indigo-100 text-[#4F46E5]"
+                            : isHighlighted
+                              ? "bg-indigo-50"
+                              : "hover:bg-indigo-50",
                       )}
                     >
-                      {option.label}
+                      <div>{renderItem(item)}</div>
+                      {renderMeta ? (
+                        <div className="text-[12px] text-gray-500">
+                          {renderMeta(item)}
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })

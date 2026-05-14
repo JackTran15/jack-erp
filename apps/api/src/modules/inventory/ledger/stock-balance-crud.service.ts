@@ -32,7 +32,7 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
   }
 
   protected override getByIdRelations(): string[] {
-    return ['item'];
+    return ['item', 'item.category', 'item.product'];
   }
 
   protected override configureListQuery(
@@ -40,6 +40,7 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
     alias: string,
   ): void {
     qb.leftJoinAndSelect(`${alias}.item`, 'item');
+    qb.leftJoinAndSelect('item.category', 'category');
     qb.leftJoinAndSelect('item.product', 'product');
   }
 
@@ -127,7 +128,8 @@ function stripDerivedItemFields<T extends Record<string, any>>(payload: T): T {
 function formatItemVariantSummary(item?: ItemEntity): string {
   if (!item) return '';
   const parts: string[] = [];
-  if (item.category?.trim()) parts.push(item.category.trim());
+  const categoryName = item.category?.name?.trim();
+  if (categoryName) parts.push(categoryName);
   if (item.unit?.trim()) parts.push(item.unit.trim());
   const desc = item.description?.trim();
   if (desc) {

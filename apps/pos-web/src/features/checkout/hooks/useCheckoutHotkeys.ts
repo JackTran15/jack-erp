@@ -8,6 +8,12 @@ interface UseCheckoutHotkeysInput {
   customerSearchRef: RefObject<HTMLInputElement | null>;
   /** Amount input of the first payment line. F12 focuses and selects here. */
   paymentAmountRef: RefObject<HTMLInputElement | null>;
+  /** Catalog filter input. Shift+F3 focuses here. */
+  catalogSearchRef?: RefObject<HTMLInputElement | null>;
+  /** Salesperson picker trigger. Alt+N focuses here. */
+  salespersonRef?: RefObject<HTMLInputElement | null>;
+  /** Price book picker trigger. Alt+B focuses here. */
+  priceBookRef?: RefObject<HTMLInputElement | null>;
   /** F9 only fires when the cart has at least one line. */
   hasCartItems: boolean;
   /** Complete the invoice (F9). */
@@ -34,6 +40,9 @@ export function useCheckoutHotkeys({
   productSearchRef,
   customerSearchRef,
   paymentAmountRef,
+  catalogSearchRef,
+  salespersonRef,
+  priceBookRef,
   hasCartItems,
   onCheckout,
   onSaveDraft,
@@ -54,14 +63,31 @@ export function useCheckoutHotkeys({
   });
 
   usePosHotkey(
-    POS_HOTKEYS.checkout.completeCheckout,
-    () => onCheckout(),
-    { enabled: hasCartItems },
+    POS_HOTKEYS.checkout.focusCatalogSearch,
+    () => {
+      catalogSearchRef?.current?.focus();
+      catalogSearchRef?.current?.select();
+    },
+    { enabled: Boolean(catalogSearchRef) },
   );
 
   usePosHotkey(
-    POS_HOTKEYS.checkout.saveDraft,
-    () => onSaveDraft?.(),
-    { enabled: Boolean(onSaveDraft) },
+    POS_HOTKEYS.checkout.focusSalesperson,
+    () => salespersonRef?.current?.focus(),
+    { enabled: Boolean(salespersonRef) },
   );
+
+  usePosHotkey(
+    POS_HOTKEYS.checkout.focusPriceBook,
+    () => priceBookRef?.current?.focus(),
+    { enabled: Boolean(priceBookRef) },
+  );
+
+  usePosHotkey(POS_HOTKEYS.checkout.completeCheckout, () => onCheckout(), {
+    enabled: hasCartItems,
+  });
+
+  usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => onSaveDraft?.(), {
+    enabled: Boolean(onSaveDraft),
+  });
 }

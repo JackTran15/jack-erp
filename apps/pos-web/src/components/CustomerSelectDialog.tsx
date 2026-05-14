@@ -12,6 +12,7 @@ import {
 import {
   createCustomer,
   formatCustomerDisplay,
+  generateCustomerCode,
   searchCustomers,
   type CustomerRow,
 } from "../lib/customerApi";
@@ -107,6 +108,7 @@ export function CustomerSelectDialog({ open, onClose, onSelected }: Props) {
       const phone = formPhone.trim() || undefined;
       const email = formEmail.trim() || undefined;
       const created = await createCustomer({
+        code: generateCustomerCode(),
         name,
         phone,
         email,
