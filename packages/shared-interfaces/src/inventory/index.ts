@@ -51,6 +51,43 @@ export enum LocationType {
   RACK = 'RACK',
   BIN = 'BIN',
   ZONE = 'ZONE',
+  TEMPORARY = 'TEMPORARY',
+}
+
+export enum TemporaryTransferStatus {
+  OPEN = 'OPEN',
+  PARTIALLY_RETURNED = 'PARTIALLY_RETURNED',
+  FULLY_RETURNED = 'FULLY_RETURNED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface TemporaryTransfer {
+  id: string;
+  organizationId: string;
+  branchId: string;
+  documentNumber?: string;
+  sourceBranchId: string;
+  destinationTempLocationId: string;
+  carrierUserId: string;
+  status: TemporaryTransferStatus;
+  notes?: string;
+  postedAt: string;
+  postedBy: string;
+  returnedAt?: string;
+  lines: TemporaryTransferLine[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface TemporaryTransferLine {
+  id: string;
+  transferId: string;
+  itemId: string;
+  sourceLocationId: string;
+  quantity: number;
+  returnedQuantity: number;
+  notes?: string;
 }
 
 export interface Provider {

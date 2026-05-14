@@ -113,6 +113,22 @@ export class AuthService {
     };
   }
 
+  async listActiveUsers(
+    organizationId: string,
+  ): Promise<Array<{ id: string; firstName: string; lastName: string; email: string }>> {
+    const users = await this.userRepo.find({
+      where: { organizationId, isActive: true },
+      select: ['id', 'firstName', 'lastName', 'email'],
+      order: { firstName: 'ASC', lastName: 'ASC' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+    }));
+  }
+
   async refresh(refreshToken: string): Promise<RefreshResponse> {
     let decoded: { jti: string; userId: string };
     try {

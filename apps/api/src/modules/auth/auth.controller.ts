@@ -11,6 +11,7 @@ import {
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
+import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import type {
   LoginRequest,
   LoginResponse,
@@ -51,6 +52,11 @@ export class AuthController {
       throw new UnauthorizedException('No active session');
     }
     await this.authService.logout(user.jti);
+  }
+
+  @Get('users')
+  async listUsers(@Actor() actor: ActorContext) {
+    return this.authService.listActiveUsers(actor.organizationId);
   }
 
   @Get('session')

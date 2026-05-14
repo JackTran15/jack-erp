@@ -20,6 +20,7 @@ import { InventoryLocationModule } from './modules/inventory/location/inventory-
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { StockLedgerModule } from './modules/inventory/ledger/stock-ledger.module';
 import { StockTransferModule } from './modules/inventory/transfer/stock-transfer.module';
+import { TemporaryTransferModule } from './modules/inventory/temporary-transfer/temporary-transfer.module';
 import { StockAdjustmentModule } from './modules/inventory/adjustment/stock-adjustment.module';
 import { InventoryCsvModule } from './modules/inventory/csv/inventory-csv.module';
 import { PosModule } from './modules/pos/pos.module';
@@ -72,6 +73,7 @@ import { PromotionModule } from './modules/promotion/promotion.module';
     AccountingModule,
     StockLedgerModule,
     StockTransferModule,
+    TemporaryTransferModule,
     StockAdjustmentModule,
     InventoryCsvModule,
     PosModule,

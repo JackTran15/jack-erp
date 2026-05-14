@@ -240,6 +240,7 @@ export class DocumentNumberingService {
       [DocumentType.RECEIVABLE]: 'REC',
       [DocumentType.PURCHASE_ORDER]: 'PO',
       [DocumentType.GOODS_ISSUE]: 'GI',
+      [DocumentType.TEMPORARY_TRANSFER]: 'TMP',
     };
 
     return prefixMap[documentType];

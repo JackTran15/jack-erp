@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
+import { PaginationQuery, PaginatedResponse, LocationType } from '@erp/shared-interfaces';
 import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
@@ -574,6 +574,58 @@ export class InventoryLocationService {
   ): Promise<LocationEntity> {
     const location = await this.getLocationById(id, actor);
     Object.assign(location, dto);
+    return this.locationRepo.save(location);
+  }
+
+  // ─── Temporary Location helper ───────────────────────────────────────
+
+  /**
+   * Resolve the temporary location for a branch, creating it (and its backing storage)
+   * on first use. Idempotent: subsequent calls return the existing record.
+   */
+  async getOrCreateMainTemporaryLocation(
+    branchId: string,
+    actor: ActorContext,
+  ): Promise<LocationEntity> {
+    const existing = await this.locationRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        branchId,
+        type: LocationType.TEMPORARY,
+        isActive: true,
+      },
+    });
+    if (existing) return existing;
+
+    let storage = await this.storageRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        branchId,
+        name: 'Kho tạm',
+      },
+    });
+    if (!storage) {
+      storage = await this.storageRepo.save(
+        this.storageRepo.create({
+          name: 'Kho tạm',
+          branchId,
+          isMainStorage: false,
+          organizationId: actor.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
+    }
+
+    const location = this.locationRepo.create({
+      code: 'TEMP',
+      name: 'Kho tạm',
+      storageId: storage.id,
+      branchId,
+      type: LocationType.TEMPORARY,
+      isActive: true,
+      organizationId: actor.organizationId,
+      createdBy: actor.userId,
+    });
     return this.locationRepo.save(location);
   }
 
