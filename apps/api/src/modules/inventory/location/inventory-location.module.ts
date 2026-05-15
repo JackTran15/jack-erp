@@ -13,11 +13,14 @@ import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
 import { LocationEntity } from './location.entity';
 import { StorageManagerAssignmentEntity } from './storage-manager-assignment.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { InventoryLocationService } from './inventory-location.service';
 import { ItemProviderService } from './item-provider.service';
 import { ItemBarcodeService } from './item-barcode.service';
 import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { InventoryLocationController } from './inventory-location.controller';
+import { InventoryLocationStockController } from './inventory-location-stock.controller';
+import { InventoryLocationStockService } from './inventory-location-stock.service';
 import {
   InventoryItemCrudService,
   INVENTORY_ITEM_ENTITY_CONFIG,
@@ -52,12 +55,14 @@ import {
       ShowroomEntity,
       LocationEntity,
       StorageManagerAssignmentEntity,
+      StockBalanceEntity,
     ]),
     BranchModule,
   ],
-  controllers: [InventoryLocationController],
+  controllers: [InventoryLocationController, InventoryLocationStockController],
   providers: [
     InventoryLocationService,
+    InventoryLocationStockService,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
@@ -81,6 +86,7 @@ import {
   ],
   exports: [
     InventoryLocationService,
+    InventoryLocationStockService,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,

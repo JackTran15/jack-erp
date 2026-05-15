@@ -35,6 +35,19 @@ export enum GoodsIssueStatus {
 
 export type { Product } from './product';
 
+export {
+  StockStateFilter,
+} from './stock-by-location';
+export type {
+  StockByLocationProvider,
+  StockByLocationItem,
+  StockByLocationStorageRef,
+  StockByLocationBranchRef,
+  StockByLocationLocationRef,
+  StockByLocationMeta,
+  StockByLocationResponse,
+} from './stock-by-location';
+
 export enum ImportJobStatus {
   PENDING = 'PENDING',
   VALIDATING = 'VALIDATING',
