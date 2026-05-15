@@ -1,3 +1,4 @@
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { CloseIcon } from "@erp/pos/components/icons/Icon";
 import { PosNumberInput } from "@erp/pos/components/form/PosNumberInput";
 import { PosQuantityInput } from "@erp/pos/components/form/PosQuantityInput";
@@ -17,6 +18,20 @@ export interface InvoiceLineItemRowProps {
   checkoutPane?: CheckoutPane;
   /** Show the red warning dot before SL (e.g. line is at stock cap). */
   hasWarning?: boolean;
+  /**
+   * When `=== line.lineId`, the row automatically focuses and selects the qty
+   * input (for the MISA flow: after pressing Enter to add a product, focus
+   * moves to the qty field of the newly added line).
+   */
+  autoFocusQty?: boolean;
+  /** Called after the row has consumed the focus event, so the parent can reset pendingFocusLineId. */
+  onAutoFocusConsumed?: () => void;
+  /**
+   * Enter on the qty input triggers this callback — the host uses it to return
+   * focus to the product search field, completing one "add product → change qty
+   * → search next product" cycle.
+   */
+  onCommitQty?: () => void;
   onSelect: (lineId: string) => void;
   onRemove: (lineId: string) => void;
   onChangeQty: (lineId: string, raw: string) => void;
@@ -31,6 +46,9 @@ export function InvoiceLineItemRow({
   selected,
   checkoutPane = CheckoutPane.PURCHASE,
   hasWarning,
+  autoFocusQty,
+  onAutoFocusConsumed,
+  onCommitQty,
   onSelect,
   onRemove,
   onChangeQty,
@@ -42,6 +60,25 @@ export function InvoiceLineItemRow({
     Boolean(line.isReturnCredit) || checkoutPane === CheckoutPane.RETURN;
   const displayQty = isReturnQuantityUi ? -line.qty : line.qty;
   const oversell = !isReturnQuantityUi && lineExceedsOnHandSnapshot(line);
+
+  const qtyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusQty) return;
+    const el = qtyInputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+    onAutoFocusConsumed?.();
+  }, [autoFocusQty, onAutoFocusConsumed]);
+
+  const handleQtyKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      qtyInputRef.current?.blur();
+      onCommitQty?.();
+    }
+  };
   return (
     <tr
       onClick={() => onSelect(line.lineId)}
@@ -70,6 +107,8 @@ export function InvoiceLineItemRow({
       </td>
       <td className="w-24 px-2">
         <PosQuantityInput
+          inputRef={qtyInputRef}
+          onKeyDown={handleQtyKeyDown}
           displayValue={displayQty}
           onChangeRaw={(raw) => onChangeQty(line.lineId, raw)}
           onBumpDown={onBumpQty ? () => onBumpQty(line.lineId, -1) : undefined}

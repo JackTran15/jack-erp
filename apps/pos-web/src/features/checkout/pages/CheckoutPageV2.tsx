@@ -118,6 +118,8 @@ export function CheckoutPageV2() {
 
   const productSearchRef = useRef<HTMLInputElement>(null);
   const customerSearchRef = useRef<HTMLInputElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
+  const addCustomerButtonRef = useRef<HTMLButtonElement>(null);
   const catalogSearchRef = useRef<HTMLInputElement>(null);
   const salespersonRef = useRef<HTMLInputElement>(null);
   const priceBookRef = useRef<HTMLInputElement>(null);
@@ -125,10 +127,15 @@ export function CheckoutPageV2() {
     null,
   );
   const lastActiveSessionIdRef = useRef<string | null>(null);
+  const [pendingQtyFocusLineId, setPendingQtyFocusLineId] = useState<
+    string | null
+  >(null);
+  const [createCustomerSucceeded, setCreateCustomerSucceeded] = useState(false);
 
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const removeSession = usePosCheckoutSessionStore((s) => s.removeSession);
+  const addSession = usePosCheckoutSessionStore((s) => s.addSession);
   const addDraft = usePosCheckoutSessionStore((s) => s.addDraft);
   const nextDraftSeq = usePosCheckoutSessionStore((s) => s.nextDraftSeq);
   const resetActiveSessionAfterCheckout = usePosCheckoutSessionStore(
@@ -379,6 +386,32 @@ export function CheckoutPageV2() {
     payment.debt,
   ]);
 
+  const allLinesForPriceCheck = useMemo(() => {
+    if (checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+      return [...purchaseCart, ...returnCart];
+    }
+    return purchaseCart;
+  }, [checkoutVariant, purchaseCart, returnCart]);
+
+  const handleSelectProduct = useCallback(
+    (p: PosCatalogLine, qty = 1) => {
+      const atDef = locationQtyFor(p);
+      if (atDef >= 1) {
+        const requested = clampPosCheckoutQtyNumber(qty);
+        const lineId = addProduct(p, requested);
+        setToolbar((s) => ({ ...s, query: "" }));
+        // MISA flow: focus chuyển sang ô SL của dòng vừa thêm (Bước 2).
+        // Khi user gõ SL xong + Enter, InvoiceLineItemRow gọi onCommitQty
+        // để focus quay lại ô tìm SP cho lần thêm tiếp theo (Bước 3).
+        if (lineId) setPendingQtyFocusLineId(lineId);
+        else productSearchRef.current?.focus();
+      } else {
+        setCartError("Hết tồn.");
+      }
+    },
+    [addProduct, setCartError, setToolbar],
+  );
+
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
       if (!payload) return;
@@ -391,6 +424,44 @@ export function CheckoutPageV2() {
     },
     [invoicePrinter],
   );
+
+  const handleSubmitProductQuery = useCallback(
+    (_q: string): boolean => {
+      const matched = filteredProducts;
+      if (matched.length === 1) {
+        const requested = clampPosCheckoutQtyNumber(toolbar.qty);
+        const lineId = addProduct(matched[0]!, requested);
+        setToolbar((s) => ({ ...s, query: "" }));
+        if (lineId) setPendingQtyFocusLineId(lineId);
+        else productSearchRef.current?.focus();
+      } else if (matched.length === 0) {
+        setCartError("Không tìm thấy hàng phù hợp.");
+      } else {
+        setCartError(
+          "Nhiều kết quả — chọn hàng bên dưới hoặc thu hẹp từ khóa.",
+        );
+      }
+      return true;
+    },
+    [addProduct, filteredProducts, toolbar.qty, setCartError, setToolbar],
+  );
+
+  const handleCatalogSelect = useCallback(
+    (product: CatalogProduct) => {
+      const lineId = handleCatalogSelectFromCart(product, catalog);
+      if (lineId) setPendingQtyFocusLineId(lineId);
+    },
+    [catalog, handleCatalogSelectFromCart],
+  );
+
+  const handleQtyAutoFocusConsumed = useCallback(() => {
+    setPendingQtyFocusLineId(null);
+  }, []);
+
+  const handleCommitQty = useCallback(() => {
+    productSearchRef.current?.focus();
+    productSearchRef.current?.select();
+  }, []);
 
   const handleCheckout = useCallback(
     (
@@ -606,38 +677,6 @@ export function CheckoutPageV2() {
     setAppliedPromotion,
   ]);
 
-  const handleSelectProduct = useCallback(
-    (p: PosCatalogLine, qty = 1) => {
-      const requested = clampPosCheckoutQtyNumber(qty);
-      addProduct(p, requested);
-      setToolbar((s) => ({ ...s, query: "" }));
-      productSearchRef.current?.focus();
-    },
-    [addProduct, setToolbar],
-  );
-
-  const handleSubmitProductQuery = useCallback(
-    (_q: string): boolean => {
-      const matched = filteredProducts;
-      if (matched.length === 1) {
-        const requested = clampPosCheckoutQtyNumber(toolbar.qty);
-        const line = matched[0]!;
-        addProduct(line, requested);
-        setToolbar((s) => ({ ...s, query: "" }));
-        productSearchRef.current?.focus();
-      }
-      return true;
-    },
-    [addProduct, filteredProducts, toolbar.qty, setToolbar],
-  );
-
-  const handleCatalogSelect = useCallback(
-    (product: CatalogProduct) => {
-      handleCatalogSelectFromCart(product, catalog);
-    },
-    [catalog, handleCatalogSelectFromCart],
-  );
-
   const handleRequestCancelInvoice = useCallback(() => {
     setCancelInvoiceDialogOpen(true);
   }, []);
@@ -679,6 +718,7 @@ export function CheckoutPageV2() {
   useCheckoutHotkeys({
     productSearchRef,
     customerSearchRef,
+    paymentAmountRef,
     catalogSearchRef,
     salespersonRef,
     priceBookRef,
@@ -687,7 +727,9 @@ export function CheckoutPageV2() {
       void finalizeCheckoutAndPrint();
     },
     onSaveDraft: isReturnExchangeInvoice ? undefined : handleSaveDraft,
+    onAddSession: addSession,
   });
+
 
   const quickExchangeReturnQty = useMemo(
     () => returnCart.reduce((s, l) => s + l.qty, 0),
@@ -763,9 +805,16 @@ export function CheckoutPageV2() {
 
       <CustomerCreateDialog
         open={createCustomerOpen}
-        onClose={() => setCreateCustomerOpen(false)}
+        onClose={() => {
+          setCreateCustomerOpen(false);
+          setCreateCustomerSucceeded(false);
+        }}
         defaultQuery={createDefaultQuery}
+        returnFocusTo={
+          createCustomerSucceeded ? paymentAmountRef : customerSearchRef
+        }
         onCreated={(c) => {
+          setCreateCustomerSucceeded(true);
           setCreateCustomerOpen(false);
           pickCustomer(c, `Đã tạo và chọn khách ${formatCustomerDisplay(c)}.`);
         }}
@@ -861,6 +910,9 @@ export function CheckoutPageV2() {
             lines={cart}
             selectedId={selectedLineId}
             isLineWarning={isLineWarning}
+            autoFocusQtyLineId={pendingQtyFocusLineId}
+            onAutoFocusConsumed={handleQtyAutoFocusConsumed}
+            onCommitQty={handleCommitQty}
             onSelect={setSelectedLineId}
             onRemove={removeLine}
             onChangeQty={updateQty}
@@ -921,6 +973,7 @@ export function CheckoutPageV2() {
 
         <PaymentSummaryPanel<CustomerRow>
           ref={customerSearchRef}
+          paymentAmountRef={paymentAmountRef}
           datetime={datetime}
           saleMode="Tại cửa hàng"
           customerQuery={customerQuery}
@@ -940,6 +993,7 @@ export function CheckoutPageV2() {
           )}
           onSubmitCustomerQuery={handleCustomerSubmitQuery}
           onAddCustomer={handleAddCustomer}
+          addCustomerButtonRef={addCustomerButtonRef}
           selectedCustomerLabel={
             selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null
           }
@@ -1009,6 +1063,12 @@ export function CheckoutPageV2() {
           onDebtChange={payment.handleDebtChange}
           note={payment.note}
           onNoteChange={payment.setNote}
+          qrPayment={{
+            holderName: "HOÀNG THỊ THU",
+            accountNumber: "005704060134345",
+            bankCode: "VIB",
+            amount: grandTotal,
+          }}
           printInvoice={payment.printInvoice}
           onPrintInvoiceChange={payment.setPrintInvoice}
           preorder={payment.preorder}

@@ -2,8 +2,10 @@ import {
   useCallback,
   useState,
   type FocusEvent,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import { ChevronDownIcon } from "@erp/pos/components/icons/Icon";
 import { cn } from "@erp/ui";
@@ -32,6 +34,10 @@ export interface PosQuantityInputProps {
   leading?: ReactNode;
   /** Rendered after the numeric field, before steppers when shown. */
   trailing?: ReactNode;
+  /** Forward to the native `<input>` so callers can focus/select imperatively. */
+  inputRef?: Ref<HTMLInputElement>;
+  /** Forwarded to the native `<input>` — e.g. Enter to commit. */
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 }
 
 const stepperBtn =
@@ -57,6 +63,8 @@ export function PosQuantityInput({
   className,
   leading,
   trailing,
+  inputRef,
+  onKeyDown,
 }: PosQuantityInputProps) {
   const showSteppers = Boolean(onBumpDown && onBumpUp);
   const hasAffixes = leading != null || trailing != null;
@@ -138,6 +146,7 @@ export function PosQuantityInput({
         ) : null}
         <div className="min-w-0 flex-1 px-0.5">
           <input
+            ref={inputRef}
             type="number"
             inputMode="numeric"
             disabled={disabled}
@@ -146,6 +155,7 @@ export function PosQuantityInput({
             value={displayValue}
             onChange={(e) => onChangeRaw(e.target.value)}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={onKeyDown}
             aria-label={ariaLabel}
             className={inputVariant}
           />

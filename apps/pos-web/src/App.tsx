@@ -1,3 +1,4 @@
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RequirePosAuth } from "./components/RequirePosAuth";
@@ -27,29 +28,34 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <Routes>
-          <Route path="/dang-nhap" element={<PosLoginPage />} />
-          <Route element={<RequirePosAuth />}>
-            <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
-            <Route element={<RequirePosBranch />}>
-            
-              <Route element={<AppPosLayout />}>
-                <Route path="/" element={<CheckoutPageV2 />} />
-                <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
-                <Route path="/return-goods" element={<ReturnGoodsPage />} />
-              </Route>
+      <HotkeysProvider
+        defaultOptions={{
+          hotkey: { preventDefault: true, ignoreInputs: false },
+        }}
+      >
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <Routes>
+            <Route path="/dang-nhap" element={<PosLoginPage />} />
+            <Route element={<RequirePosAuth />}>
+              <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
+              <Route element={<RequirePosBranch />}>
+                <Route element={<AppPosLayout />}>
+                  <Route path="/" element={<CheckoutPageV2 />} />
+                  <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
+                  <Route path="/return-goods" element={<ReturnGoodsPage />} />
+                </Route>
 
-              <Route  element={<PosShellLayout />}>
-                <Route path="/session" element={<SessionPage />} />
-                <Route path="/returns" element={<ReturnsPage />} />
-                <Route path="/exchange" element={<ExchangePage />} />
+                <Route element={<PosShellLayout />}>
+                  <Route path="/session" element={<SessionPage />} />
+                  <Route path="/returns" element={<ReturnsPage />} />
+                  <Route path="/exchange" element={<ExchangePage />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </HotkeysProvider>
     </QueryClientProvider>
   );
 }

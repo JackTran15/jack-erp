@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 type PosTextAlign = "left" | "right";
 type PosTextVariant = "boxed" | "underline" | "ghost";
@@ -24,6 +24,8 @@ export interface PosTextInputProps {
   ariaLabel?: string;
   className?: string;
   inputClassName?: string;
+  /** Forwarded to the native `<input>` so callers can focus/select imperatively. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -54,9 +56,11 @@ export function PosTextInput({
   ariaLabel,
   className,
   inputClassName,
+  inputRef,
 }: PosTextInputProps) {
   const input = (
     <input
+      ref={inputRef}
       id={id}
       type={type}
       value={value}

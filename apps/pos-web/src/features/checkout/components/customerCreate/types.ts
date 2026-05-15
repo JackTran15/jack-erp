@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import type { CustomerGenderEnum, CustomerRow } from "@erp/pos/lib/customerApi";
 
 export type CustomerDialogMode = "create" | "edit";
@@ -76,4 +77,11 @@ export interface CustomerCreateDialogProps {
 
   /** "+ Nhóm khách hàng" sub-flow trigger. Omit to hide the button. */
   onAddCustomerGroup?: () => void;
+
+  /**
+   * Ref tới element nhận focus sau khi dialog đóng — forwarded to
+   * `AppDialog.returnFocusTo`. Dùng cho hotkey flow (cancel/ESC → quay về ô
+   * search KH, tạo thành công → focus ô nhập tiền).
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }

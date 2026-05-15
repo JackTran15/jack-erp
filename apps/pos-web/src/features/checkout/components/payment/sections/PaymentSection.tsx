@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/form/PosTextarea";
 import type { PaymentMethodOption } from "../../types";
@@ -7,6 +8,7 @@ import { KeepChangeRow } from "../KeepChangeRow";
 import { PaymentMethodList, type PaymentLine } from "../PaymentMethodRow";
 import { PaymentSummaryBlock } from "../PaymentSummaryBlock";
 import { QrPaymentButton } from "../QrPaymentButton";
+import type { QrPaymentInfo } from "../VietQrPaymentDialog";
 import { SummaryRow } from "../SummaryRow";
 
 interface PaymentSectionProps {
@@ -19,6 +21,8 @@ interface PaymentSectionProps {
   onChangePaymentLines: (lines: PaymentLine[]) => void;
   onDepositClick?: () => void;
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  /** Ref forwarded to the amount input of the first payment line (for F12). */
+  paymentAmountRef?: Ref<HTMLInputElement>;
   isRefundFlow: boolean;
   /** Effective change-due-back (post `keepChange`). */
   changeAmount: number;
@@ -43,7 +47,8 @@ interface PaymentSectionProps {
   debtAmount: number;
   note: string;
   onNoteChange: (n: string) => void;
-  onPrintQr?: () => void;
+  /** Account + amount data shown inside the VietQR dialog. */
+  qrPayment: QrPaymentInfo;
 }
 
 export function PaymentSection({
@@ -56,6 +61,7 @@ export function PaymentSection({
   onChangePaymentLines,
   onDepositClick,
   paymentAmountReadOnly,
+  paymentAmountRef,
   isRefundFlow,
   changeAmount,
   shortageAmount,
@@ -70,7 +76,7 @@ export function PaymentSection({
   debtAmount,
   note,
   onNoteChange,
-  onPrintQr,
+  qrPayment,
 }: PaymentSectionProps) {
   // Signed net for styling: positive = change due, negative = shortage (sale).
   const netChangeDisplay = changeAmount - shortageAmount;
@@ -103,6 +109,7 @@ export function PaymentSection({
               methods={methods}
               onChange={onChangePaymentLines}
               amountReadOnly={paymentAmountReadOnly}
+              amountInputRef={paymentAmountRef}
             />
           </div>
         </>
@@ -179,7 +186,7 @@ export function PaymentSection({
         />
       </div>
       <div className="px-4 py-3">
-        <QrPaymentButton onClick={onPrintQr} />
+        <QrPaymentButton payment={qrPayment} />
       </div>
     </>
   );

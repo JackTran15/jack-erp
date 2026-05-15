@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { PosFormItem } from "@erp/pos/components/form/PosFormItem";
 import { PosRadioGroup } from "@erp/pos/components/form/PosRadioGroup";
 import { PosSectionBanner } from "@erp/pos/components/form/PosSectionBanner";
@@ -35,6 +36,8 @@ export interface BasicInfoSectionProps {
   codeError?: string;
   nameError?: string;
   onTouchName: () => void;
+  /** Forwarded to the "Khách hàng" input — caller uses it to auto-focus on dialog open. */
+  nameInputRef?: Ref<HTMLInputElement>;
 }
 
 /** "Thông tin cơ bản" — identity / contact / address grid. */
@@ -50,6 +53,7 @@ export function BasicInfoSection({
   codeError,
   nameError,
   onTouchName,
+  nameInputRef,
 }: BasicInfoSectionProps) {
   return (
     <>
@@ -83,6 +87,7 @@ export function BasicInfoSection({
           error={showNameError ? nameError : undefined}
         >
           <PosTextInput
+            inputRef={nameInputRef}
             id={ids.name}
             value={values.name}
             onChange={(v) => onChange("name", v)}

@@ -9,8 +9,11 @@ export interface KeepChangeRowProps {
 }
 
 /**
- * Keep-change checkbox row (customer waives return / excess). Styling matches
- * `DebtCheckRow`; amount column uses default text color.
+ * "Customer keeps the change" checkbox row. Mirrors `DebtCheckRow` styling
+ * but renders the right-hand value in muted gray (vs indigo on debt).
+ *
+ * Per spec 4.7.10 this row is hidden whenever a customer is selected — the
+ * caller (PaymentSummaryPanel) controls visibility.
  */
 export function KeepChangeRow({
   checked,

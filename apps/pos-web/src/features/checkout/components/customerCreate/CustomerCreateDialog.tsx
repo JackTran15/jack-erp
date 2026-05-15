@@ -74,6 +74,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
     onSubmitted,
     onCreated,
     onAddCustomerGroup,
+    returnFocusTo,
   } = props;
 
   const formId = useId();
@@ -123,6 +124,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
 
   /** Auto-generated code persisted across renders within a single open. */
   const generatedCodeRef = useRef<string>("");
+  /** Focus target khi dialog vừa mở — ô fullname. */
+  const nameInputRef = useRef<HTMLInputElement>(null);
   /**
    * Tracks the customer id we've already applied via the fetch effect so we
    * don't clobber the user's in-progress edits when the query refetches.
@@ -265,6 +268,8 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
       onClose={onClose}
       width={880}
       contentClassName="shadow-[0_20px_48px_rgba(0,0,0,0.16)]"
+      returnFocusTo={returnFocusTo}
+      initialFocusRef={nameInputRef}
     >
       <AppDialog.Header title={titleText} />
       <AppDialog.Body>
@@ -303,6 +308,7 @@ export function CustomerCreateDialog(props: CustomerCreateDialogProps) {
               codeError={errors.code}
               nameError={errors.name}
               onTouchName={handleTouchName}
+              nameInputRef={nameInputRef}
             />
 
             <MembershipSection

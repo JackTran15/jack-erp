@@ -127,19 +127,49 @@ export function useCheckoutSessionCart({
   );
 
   const addProduct = useCallback(
-    (product: PosCatalogLine, qtyToAdd = 1) => {
-      if (!session) return;
+    (product: PosCatalogLine, qtyToAdd = 1): string | null => {
+      if (!session) return null;
       const atLocation = locationQtyFor(product);
       const delta = clampPosCheckoutQtyNumber(Number(qtyToAdd) || 0);
+      if (atLocation < 1) {
+        setCartError("Hết tồn tại vị trí ưu tiên bán. Kiểm tra kho hàng.");
+        return null;
+      }
+
+      // Read the latest cart state from the store so we can compute the
+      // affected lineId BEFORE dispatching the update — caller (POS flow)
+      // needs the id to focus the qty input of the just-added line.
+      const latest = selectActiveSession(
+        usePosCheckoutSessionStore.getState(),
+      );
+      const targetList =
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+        activeCheckoutPane === CheckoutPane.RETURN
+          ? (latest?.returnCart ?? [])
+          : (latest?.purchaseCart ?? []);
+      const existing = targetList.find((l) => l.itemId === product.itemId);
+      let affectedLineId: string;
+      if (existing) {
+        if (existing.qty + delta > existing.maxQty) {
+          setCartError("Đã đạt tối đa tồn tại vị trí bán cho mặt hàng này.");
+          return null;
+        }
+        affectedLineId = existing.lineId;
+      } else {
+        affectedLineId = crypto.randomUUID();
+      }
+
       const apply = (prev: CartLine[]) => {
-        const existing = prev.find((l) => l.itemId === product.itemId);
-        if (existing) {
+        const existingInPrev = prev.find((l) => l.itemId === product.itemId);
+        if (existingInPrev) {
+          if (existingInPrev.qty + delta > existingInPrev.maxQty) return prev;
+          setCartError("");
           return prev.map((l) =>
             l.itemId === product.itemId ? { ...l, qty: l.qty + delta } : l,
           );
         }
         const newLine: CartLine = {
-          lineId: crypto.randomUUID(),
+          lineId: affectedLineId,
           itemId: product.itemId,
           name: product.name,
           code: product.code,
@@ -160,6 +190,7 @@ export function useCheckoutSessionCart({
       };
       targetCartUpdater(apply);
       announce(`Đã thêm ${product.name} vào giỏ hàng.`);
+      return affectedLineId;
     },
     [
       session,
@@ -173,10 +204,10 @@ export function useCheckoutSessionCart({
   );
 
   const handleCatalogSelect = useCallback(
-    (product: CatalogProduct, catalog: PosCatalogLine[]) => {
+    (product: CatalogProduct, catalog: PosCatalogLine[]): string | null => {
       const found = catalog.find((p) => p.itemId === product.id);
-      if (!found) return;
-      addProduct(found);
+      if (!found) return null;
+      return addProduct(found);
     },
     [addProduct],
   );

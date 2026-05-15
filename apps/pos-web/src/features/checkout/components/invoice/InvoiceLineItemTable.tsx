@@ -9,6 +9,16 @@ export interface InvoiceLineItemTableProps {
   checkoutPane?: CheckoutPane;
   /** Predicate to flag a row with the red warning dot. */
   isLineWarning?: (line: CartLine) => boolean;
+  /**
+   * When set, the matching row automatically focuses and selects its qty input
+   * (for the MISA flow: after pressing Enter to add a product, focus moves to
+   * the qty field of the newly added line).
+   */
+  autoFocusQtyLineId?: string | null;
+  /** Called after the row has consumed autoFocusQtyLineId — host should clear the state. */
+  onAutoFocusConsumed?: () => void;
+  /** Enter on the qty input → host returns focus to the product search field. */
+  onCommitQty?: () => void;
   onSelect: (lineId: string) => void;
   onRemove: (lineId: string) => void;
   onChangeQty: (lineId: string, raw: string) => void;
@@ -37,6 +47,9 @@ export function InvoiceLineItemTable({
   selectedId,
   checkoutPane = CheckoutPane.PURCHASE,
   isLineWarning,
+  autoFocusQtyLineId,
+  onAutoFocusConsumed,
+  onCommitQty,
   onSelect,
   onRemove,
   onChangeQty,
@@ -84,6 +97,9 @@ export function InvoiceLineItemTable({
                   line={line}
                   selected={selectedId === line.lineId}
                   hasWarning={isLineWarning?.(line)}
+                  autoFocusQty={autoFocusQtyLineId === line.lineId}
+                  onAutoFocusConsumed={onAutoFocusConsumed}
+                  onCommitQty={onCommitQty}
                   onSelect={onSelect}
                   onRemove={onRemove}
                   onChangeQty={onChangeQty}

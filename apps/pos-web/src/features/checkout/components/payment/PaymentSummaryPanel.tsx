@@ -4,7 +4,13 @@ import {
   PlusCircleIcon,
   QrIcon,
 } from "@erp/pos/components/icons/Icon";
-import { forwardRef, useMemo, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
@@ -23,6 +29,7 @@ import { DepositDialog } from "./DepositDialog";
 import { CustomerDetailDialog } from "./customerDetail/CustomerDetailDialog";
 import { PromotionSelectionModal } from "./promotion/PromotionSelectionModal";
 import type { PromotionItem } from "./promotion/types";
+import type { QrPaymentInfo } from "./VietQrPaymentDialog";
 import { CheckoutActionsSection } from "./sections/CheckoutActionsSection";
 import { CustomerSection } from "./sections/CustomerSection";
 import { PaymentSection } from "./sections/PaymentSection";
@@ -47,6 +54,12 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   customerRenderMeta?: (c: TCustomer) => ReactNode;
   onSubmitCustomerQuery?: (q: string) => boolean | void;
   onAddCustomer: () => void;
+  /**
+   * Ref to the "Add new customer" button — caller uses it to return focus to
+   * this button after closing `CustomerCreateDialog`. When not provided, the
+   * button still renders normally but without the ref attached.
+   */
+  addCustomerButtonRef?: RefObject<HTMLButtonElement | null>;
   onOpenCustomerDirectory?: () => void;
   /** Display name shown in the selected-customer chip when set. */
   selectedCustomerLabel?: string | null;
@@ -56,7 +69,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   customerFieldError?: string;
 
   /**
-   * Promotions shown inside the "Chương trình khuyến mãi" dialog. When
+   * Promotions shown inside the "Promotion Program" dialog. When
    * omitted (or empty) the dialog renders its empty state.
    */
   promotions?: PromotionItem[];
@@ -65,8 +78,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   /** Fired when the user confirms a selection in the dialog. */
   onApplyPromotion?: (promotion: PromotionItem | null) => void;
   /**
-   * "Thêm khuyến mại" — outline CTA inside the dialog. Omit to hide the
-   * "Khuyến mại khác" section entirely.
+   * "Add promotion" — outline CTA inside the dialog. Omit to hide the
+   * "Other promotions" section entirely.
    */
   onAddPromotion?: () => void;
   /**
@@ -77,13 +90,13 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onPromotionSearchChange?: (next: string) => void;
   /**
    * Optional callback for the legacy promo-menu (anchored to the chevron
-   * next to "Voucher / Quà tặng"). Receives one of "promo" | "voucher" |
+   * next to "Voucher / Gift"). Receives one of "promo" | "voucher" |
    * "discount". Omit to keep the menu silent.
    */
   onPickPromoOption?: (option: PromoMenuOption) => void;
   /**
-   * Optional payload + handlers for the "Mã ưu đãi và điểm" dialog opened
-   * from the menu's "Mã ưu đãi" entry. Forwarded directly to `PromoMenu`.
+   * Optional payload + handlers for the "Discount code & points" dialog opened
+   * from the menu's "Discount code" entry. Forwarded directly to `PromoMenu`.
    */
   discountPoint?: PromoMenuDiscountPoint;
   /**
@@ -92,7 +105,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
    */
   voucher?: PromoMenuVoucher;
 
-  /** Quick-action button: Quét QR khách. Omit to hide. */
+  /** Quick-action button: Scan customer QR. Omit to hide. */
   onScanCustomerQr?: () => void;
 
   /**
@@ -115,7 +128,7 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangeCustomerCard?: () => void;
   onRefreshCustomerPoints?: () => void;
 
-  /** Return flows: read-only đổi trả / mua thêm labels + qty (quick exchange + invoice return). */
+  /** Return flows: read-only return / purchase-more labels + qty (quick exchange + invoice return). */
   quickExchangeBadges?: {
     returnQuantity: number;
     purchaseQuantity: number;
@@ -134,6 +147,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   onChangePaymentLines: (lines: PaymentLine[]) => void;
   /** Optional read-only predicate forwarded to `PaymentMethodList`. */
   paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
+  /** Ref forwarded to the amount input of the first payment line (for F12). */
+  paymentAmountRef?: React.Ref<HTMLInputElement>;
   /** Effective change to give back (post `keepChange`). */
   changeAmount: number;
   /** Effective shortage (post `forgiveShortage`). */
@@ -146,6 +161,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   /**
    * When set with `onKeepChangeChange`, drives keep-change / forgive-shortage
    * rows: sale uses raw overpay vs raw shortage; refund uses one row for waive.
+   * Keep-change ("Customer keeps the change") is only rendered when no
+   * customer is selected (per spec 4.7.10).
    */
   keepChange?: boolean;
   onKeepChangeChange?: (next: boolean) => void;
@@ -159,8 +176,8 @@ export interface PaymentSummaryPanelProps<TCustomer> {
   note: string;
   onNoteChange: (n: string) => void;
 
-  // QR
-  onPrintQr?: () => void;
+  // QR — account + amount shown inside the VietQR dialog.
+  qrPayment: QrPaymentInfo;
 
   // Footer
   printInvoice: boolean;
@@ -203,6 +220,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     customerRenderMeta,
     onSubmitCustomerQuery,
     onAddCustomer,
+    addCustomerButtonRef,
     onOpenCustomerDirectory,
     selectedCustomerLabel,
     customerDebt,
@@ -235,6 +253,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     paymentLines,
     onChangePaymentLines,
     paymentAmountReadOnly,
+    paymentAmountRef,
     changeAmount,
     shortageAmount,
     rawChangeAmount,
@@ -246,7 +265,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
     onDebtChange,
     note,
     onNoteChange,
-    onPrintQr,
+    qrPayment,
     printInvoice,
     onPrintInvoiceChange,
     preorder,
@@ -263,7 +282,10 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   const amountDue = Math.max(0, total - deposit);
   const hasCustomer = Boolean(selectedCustomerLabel);
 
-  // Split-button on the customer row: gift opens promotion dialog; chevron opens PromoMenu.
+  // Split-button on the customer row:
+  //   • Gift icon ("Voucher / Gift") → promotion-selection dialog.
+  //   • Chevron secondary trigger → legacy `PromoMenu` (3 quick options).
+  // Both states live here so `customerActions` below can wire each trigger.
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
 
@@ -304,6 +326,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
         ariaLabel: "Thêm khách mới",
         icon: <PlusCircleIcon size={16} className="text-green-500" />,
         onClick: onAddCustomer,
+        triggerRef: addCustomerButtonRef,
         keepWhenSelected: false,
       },
       {
@@ -323,7 +346,9 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
             open={promoMenuOpen}
             onClose={() => setPromoMenuOpen(false)}
             onSelect={(opt) => {
-              // Discount option reuses the same modal as the gift primary action.
+              // "Promotion" reuses the same PromotionSelectionModal mounted
+              // for the gift split-button — single source of truth for the
+              // promotion picker.
               if (opt === PromoMenuOptionEnum.DISCOUNT) {
                 setPromotionDialogOpen(true);
               }
@@ -348,6 +373,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
   }, [
     hasCustomer,
     onAddCustomer,
+    addCustomerButtonRef,
     onOpenCustomerDirectory,
     onScanCustomerQr,
     onPickPromoOption,
@@ -430,6 +456,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           methods={methods}
           onChangePaymentLines={onChangePaymentLines}
           paymentAmountReadOnly={paymentAmountReadOnly}
+          paymentAmountRef={paymentAmountRef}
           isRefundFlow={isRefundFlow}
           changeAmount={changeAmount}
           shortageAmount={shortageAmount}
@@ -444,7 +471,7 @@ export const PaymentSummaryPanel = forwardRef(function PaymentSummaryPanel<
           debtAmount={debtAmount}
           note={note}
           onNoteChange={onNoteChange}
-          onPrintQr={onPrintQr}
+          qrPayment={qrPayment}
         />
       </div>
 

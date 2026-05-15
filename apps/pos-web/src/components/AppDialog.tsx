@@ -1,5 +1,5 @@
 import { cn, Dialog, DialogContent, DialogTitle } from "@erp/ui";
-import { CSSProperties, ReactNode } from "react";
+import { CSSProperties, ReactNode, RefObject, useEffect, useRef } from "react";
 
 export interface AppDialogProps {
   open: boolean;
@@ -10,6 +10,21 @@ export interface AppDialogProps {
   contentStyle?: CSSProperties;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
+  /**
+   * Ref to the element that receives focus when the dialog closes, overrides
+   * `document.activeElement` captured at open time. Use when the trigger may
+   * unmount (e.g. a button hidden by a filter after state changes) or when a
+   * hotkey-opened modal should return focus to a different element.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
+  /**
+   * Ref to the element that receives focus when the dialog opens, overrides
+   * the Radix default (first focusable). Use for form modals that want to
+   * focus directly on the primary input instead of the close button or a
+   * read-only field. If the element is an input/textarea, existing text will
+   * be selected so it can be typed over.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export interface AppDialogHeaderProps {
@@ -51,7 +66,21 @@ export function AppDialog({
   contentStyle,
   ariaLabelledBy,
   ariaDescribedBy,
+  returnFocusTo,
+  initialFocusRef,
 }: AppDialogProps) {
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      const active = document.activeElement;
+      previousFocusRef.current =
+        active instanceof HTMLElement ? active : null;
+    }
+    wasOpenRef.current = open;
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
@@ -59,6 +88,30 @@ export function AppDialog({
         aria-describedby={ariaDescribedBy}
         style={{ maxWidth: `${width}px`, ...contentStyle }}
         className={cn(BASE_CONTENT_CLASSES, contentClassName)}
+        onOpenAutoFocus={(event) => {
+          const target = initialFocusRef?.current;
+          if (target && typeof target.focus === "function") {
+            event.preventDefault();
+            target.focus();
+            if (
+              target instanceof HTMLInputElement ||
+              target instanceof HTMLTextAreaElement
+            ) {
+              target.select();
+            }
+          }
+        }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusTo?.current ?? previousFocusRef.current;
+          if (
+            target &&
+            document.contains(target) &&
+            typeof target.focus === "function"
+          ) {
+            event.preventDefault();
+            target.focus();
+          }
+        }}
       >
         {children}
       </DialogContent>
