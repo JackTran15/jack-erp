@@ -2,16 +2,12 @@ import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
-import { PosShellLayout } from "./components/layout/PosShellLayout/PosShellLayout";
 import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { CheckoutPageV2 } from "./pages/CheckoutPageV2";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
-import { SessionPage } from "./pages/SessionPage";
-import { ReturnsPage } from "./pages/ReturnsPage";
-import { ExchangePage } from "./pages/ExchangePage";
 import { PosLoginPage } from "./pages/PosLoginPage";
 import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 
@@ -43,12 +39,6 @@ export function App() {
                   <Route path="/" element={<CheckoutPageV2 />} />
                   <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
-                </Route>
-
-                <Route element={<PosShellLayout />}>
-                  <Route path="/session" element={<SessionPage />} />
-                  <Route path="/returns" element={<ReturnsPage />} />
-                  <Route path="/exchange" element={<ExchangePage />} />
                 </Route>
               </Route>
             </Route>
