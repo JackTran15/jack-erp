@@ -8,7 +8,7 @@ import {
 import {
   createPaymentLine,
   type PaymentLine,
-} from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
+} from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type {
   CashSuggestion,
   PaymentMethodOption,

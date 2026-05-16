@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { PaymentLine } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
+import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import {
   formatCustomerDisplay,
   type CustomerRow,

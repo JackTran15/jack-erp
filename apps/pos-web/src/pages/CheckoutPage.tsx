@@ -4,7 +4,7 @@ import { CheckoutAnnouncer } from "@erp/pos/components/page-components/Checkout/
 import { CheckoutDialogs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CheckoutDialogs";
 import { CheckoutLeftPane } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/CheckoutLeftPane";
 import { CheckoutRightPane } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/CheckoutRightPane";
-import { createPaymentLine } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
+import { createPaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
 import { useAnnounce } from "@erp/pos/hooks/page-hooks/checkout/use-announce";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";

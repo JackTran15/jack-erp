@@ -1,12 +1,12 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
-import { AlertBar } from "@erp/pos/components/page-components/Checkout/AlertBar/AlertBar";
-import { PanelCollapseHandle } from "@erp/pos/components/page-components/Checkout/Catalog/PanelCollapseHandle/PanelCollapseHandle";
-import { ProductCatalogGrid } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCatalogGrid/ProductCatalogGrid";
-import { ProductCatalogHeader } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCatalogHeader/ProductCatalogHeader";
-import { CheckoutExchangeTabs } from "@erp/pos/components/page-components/Checkout/Exchange/CheckoutExchangeTabs/CheckoutExchangeTabs";
-import { InvoiceLineItemTable } from "@erp/pos/components/page-components/Checkout/Invoice/InvoiceLineItemTable/InvoiceLineItemTable";
-import { POSToolbar } from "@erp/pos/components/page-components/Checkout/Toolbar/POSToolbar/POSToolbar";
+import { AlertBar } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/AlertBar/AlertBar";
+import { PanelCollapseHandle } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/PanelCollapseHandle/PanelCollapseHandle";
+import { ProductCatalogGrid } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCatalogGrid";
+import { ProductCatalogHeader } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogHeader/ProductCatalogHeader";
+import { CheckoutExchangeTabs } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/CheckoutExchangeTabs/CheckoutExchangeTabs";
+import { InvoiceLineItemTable } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemTable";
+import { POSToolbar } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/POSToolbar/POSToolbar";
 import type { PriceBook } from "@erp/pos/hooks/page-hooks/checkout/use-price-books";
 import type { ProductGroup } from "@erp/pos/hooks/page-hooks/checkout/use-product-groups";
 import type { Salesperson } from "@erp/pos/hooks/page-hooks/checkout/use-salespersons";
@@ -21,7 +21,7 @@ import {
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { type PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
   CheckoutPane,
   type usePosCheckoutSessionStore,
