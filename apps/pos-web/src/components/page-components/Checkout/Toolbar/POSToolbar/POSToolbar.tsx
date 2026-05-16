@@ -8,7 +8,7 @@ import {
   PosSelectSearch,
   type PosSelectSearchConfig,
 } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import { ProductSearchInput } from "@erp/pos/components/page-components/Checkout/Toolbar/ProductSearchInput/ProductSearchInput";
 import { ToggleField } from "@erp/pos/components/page-components/Checkout/Toolbar/ToggleField/ToggleField";
 import { PosQuantityInput } from "@erp/pos/components/common/PosQuantityInput/PosQuantityInput";

@@ -6,7 +6,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";

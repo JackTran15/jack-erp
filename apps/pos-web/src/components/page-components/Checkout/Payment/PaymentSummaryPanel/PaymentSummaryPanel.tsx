@@ -15,7 +15,7 @@ import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
 } from "@erp/pos/constants/checkout.constant";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import type { CashSuggestion, PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import type { CustomerActionItem } from "@erp/pos/components/page-components/Checkout/Payment/CustomerActions/CustomerActions";
 import { type PaymentLine } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";

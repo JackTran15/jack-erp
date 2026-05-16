@@ -28,7 +28,7 @@ import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/
 import { PanelCollapseHandle } from "@erp/pos/components/page-components/Checkout/Catalog/PanelCollapseHandle/PanelCollapseHandle";
 import { ProductCatalogGrid } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCatalogGrid/ProductCatalogGrid";
 import { ProductCatalogHeader } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCatalogHeader/ProductCatalogHeader";
-import { AlertBar } from "@erp/pos/components/page-components/Checkout/Common/AlertBar/AlertBar";
+import { AlertBar } from "@erp/pos/components/page-components/Checkout/AlertBar/AlertBar";
 import { CheckoutExchangeTabs } from "@erp/pos/components/page-components/Checkout/Exchange/CheckoutExchangeTabs/CheckoutExchangeTabs";
 import { InvoiceLineItemTable } from "@erp/pos/components/page-components/Checkout/Invoice/InvoiceLineItemTable/InvoiceLineItemTable";
 import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/Invoice/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";

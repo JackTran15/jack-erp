@@ -1,5 +1,5 @@
 import { ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { PriceBadge } from "@erp/pos/components/page-components/Checkout/Common/PriceBadge/PriceBadge";
+import { PriceBadge } from "@erp/pos/components/page-components/Checkout/PriceBadge/PriceBadge";
 import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 export interface ProductCardProps {

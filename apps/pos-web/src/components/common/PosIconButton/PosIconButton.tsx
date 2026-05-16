@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@erp/ui";
 
-export interface IconButtonProps
+export interface PosIconButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** The icon node to render (lucide-style component or SVG). */
   icon: ReactNode;
@@ -15,8 +15,8 @@ export interface IconButtonProps
  * Square 32×32 icon button with rounded corners. Hover lightens the bg.
  * Reusable for any icon-only action (close tab, scan barcode, refresh, etc).
  */
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  function IconButton(
+export const PosIconButton = forwardRef<HTMLButtonElement, PosIconButtonProps>(
+  function PosIconButton(
     { icon, ariaLabel, active, className, type = "button", ...rest },
     ref,
   ) {

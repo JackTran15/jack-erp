@@ -1,4 +1,4 @@
-import { DropdownButton } from "@erp/pos/components/page-components/Checkout/Common/DropdownButton/DropdownButton";
+import { DropdownButton } from "@erp/pos/components/page-components/Checkout/DropdownButton/DropdownButton";
 
 export interface PaymentSubTopBarProps {
   /** Pre-formatted datetime string, e.g. "05/05/2026 - 22:11". */

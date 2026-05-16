@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import { CustomerInputRow } from "@erp/pos/components/page-components/Checkout/Payment/CustomerInputRow/CustomerInputRow";
 import type { CustomerActionItem } from "@erp/pos/components/page-components/Checkout/Payment/CustomerActions/CustomerActions";
 import { PaymentSubTopBar } from "@erp/pos/components/page-components/Checkout/Payment/PaymentSubTopBar/PaymentSubTopBar";
