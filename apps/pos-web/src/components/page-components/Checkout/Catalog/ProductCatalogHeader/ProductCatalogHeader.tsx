@@ -4,7 +4,7 @@ import {
   PosSelectSearch,
   type PosSelectSearchConfig,
 } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
-import { SearchPopover, type SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import { SearchPopover, type SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 
 export interface ProductCatalogHeaderProps<TProduct, TGroup = never> {
   query: string;

@@ -1,10 +1,10 @@
 import { forwardRef, type ReactNode } from "react";
 import { BarcodeIcon, ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { IconButton } from "@erp/pos/components/page-components/Checkout/Common/IconButton/IconButton";
+import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import {
   SearchPopover,
   type SearchSuggestion,
-} from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+} from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 
 export interface ProductSearchInputProps<T> {
   value: string;
@@ -81,7 +81,7 @@ export const ProductSearchInput = forwardRef(function ProductSearchInput<T>(
         </button>
       }
       suffix={
-        <IconButton
+        <PosIconButton
           ariaLabel="Quét mã vạch"
           icon={<BarcodeIcon size={18} />}
           onClick={onScanBarcode}

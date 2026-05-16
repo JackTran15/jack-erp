@@ -1,5 +1,5 @@
 import { formatVnd } from "@erp/ui";
-import { CountBadge } from "@erp/pos/components/page-components/Checkout/Common/CountBadge/CountBadge";
+import { CountBadge } from "@erp/pos/components/page-components/Checkout/CountBadge/CountBadge";
 import { SummaryRow } from "@erp/pos/components/page-components/Checkout/Payment/SummaryRow/SummaryRow";
 
 export interface PaymentSummaryBlockProps {

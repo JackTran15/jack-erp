@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeftIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { KeyboardHint } from "@erp/pos/components/page-components/Checkout/Common/KeyboardHint/KeyboardHint";
+import { KeyboardHint } from "@erp/pos/components/page-components/Checkout/KeyboardHint/KeyboardHint";
 
 export interface PaymentCTAButtonsProps {
   /** Sale mode: save draft. Omitted when {@link onCancelInvoice} is used. */

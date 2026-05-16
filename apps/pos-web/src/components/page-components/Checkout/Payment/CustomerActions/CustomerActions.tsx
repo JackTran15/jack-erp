@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from "react";
-import { IconButton } from "@erp/pos/components/page-components/Checkout/Common/IconButton/IconButton";
+import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 
 /** Trigger for a split-button's secondary slot — usually a dropdown chevron. */
 export interface CustomerActionSecondary {
@@ -70,7 +70,7 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
             key={a.key}
             className="relative inline-flex items-center rounded-md"
           >
-            <IconButton
+            <PosIconButton
               ref={a.triggerRef}
               icon={a.icon}
               ariaLabel={a.ariaLabel}
@@ -83,7 +83,7 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
               aria-hidden="true"
               className="h-4 w-px bg-gray-200"
             />
-            <IconButton
+            <PosIconButton
               icon={a.secondary.icon}
               ariaLabel={a.secondary.ariaLabel}
               onClick={a.secondary.onClick}
@@ -94,7 +94,7 @@ export function CustomerActions({ actions }: CustomerActionsProps) {
             {a.popover}
           </div>
         ) : (
-          <IconButton
+          <PosIconButton
             key={a.key}
             ref={a.triggerRef}
             icon={a.icon}

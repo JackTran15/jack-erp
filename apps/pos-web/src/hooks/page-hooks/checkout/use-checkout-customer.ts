@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import { type CustomerRow, searchCustomers } from "@erp/pos/lib/common/customerApi";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 

@@ -3,7 +3,7 @@ import { UserIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import {
   SearchPopover,
   type SearchSuggestion,
-} from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
+} from "@erp/pos/components/page-components/Checkout/SearchPopover/SearchPopover";
 import { CustomerActions, type CustomerActionItem } from "@erp/pos/components/page-components/Checkout/Payment/CustomerActions/CustomerActions";
 
 export interface CustomerInputRowProps<T> {

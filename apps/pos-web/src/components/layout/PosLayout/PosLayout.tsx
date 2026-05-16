@@ -1,7 +1,7 @@
 import { cn } from "@erp/ui";
 import { ComponentType, useMemo, useRef, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { IconButton } from "@erp/pos/components/page-components/Checkout/Common/IconButton/IconButton";
+import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import {
   BellIcon,
   GridIcon,
@@ -209,7 +209,7 @@ export function PosLayout() {
                 onClose={() => handleCloseTab(tab.id)}
               />
             ))}
-            <IconButton
+            <PosIconButton
               ariaLabel="Thêm hóa đơn"
               icon={<PlusIcon size={16} />}
               onClick={handleAddTab}
@@ -220,10 +220,10 @@ export function PosLayout() {
 
          <div className="ml-auto flex items-center gap-1">
             <PosLocationIndicator location={branchName ?? 'Main brain'} />
-            <IconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
-            <IconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
+            <PosIconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
+            <PosIconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
             <PosUserMenu name={cashierDisplayName ?? 'Phan Thanh Hà'} />
-            <IconButton
+            <PosIconButton
               ref={appMenuTriggerRef}
               ariaLabel="Menu ứng dụng"
               icon={<GridIcon size={18} />}
