@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
 import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
-import { CheckoutPageV2 } from "./pages/CheckoutPageV2";
+import { CheckoutPage } from "./pages/CheckoutPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
@@ -35,7 +35,7 @@ export function App() {
               <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
               <Route element={<PosRequireBranch />}>
                 <Route element={<PosLayout />}>
-                  <Route path="/" element={<CheckoutPageV2 />} />
+                  <Route path="/" element={<CheckoutPage />} />
                   <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
                 </Route>

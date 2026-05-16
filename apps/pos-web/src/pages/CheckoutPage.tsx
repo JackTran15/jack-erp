@@ -113,7 +113,7 @@ function buildLocalSearch<T>(
   };
 }
 
-export function CheckoutPageV2() {
+export function CheckoutPage() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
 
   const productSearchRef = useRef<HTMLInputElement>(null);
