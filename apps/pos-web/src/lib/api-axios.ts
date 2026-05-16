@@ -4,7 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { resolveApiBaseUrl } from "./api-base";
-import { usePosBranchStore } from "../stores/usePosBranchStore";
+import { usePosBranchStore } from "../stores/common/branch.store";
 
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
