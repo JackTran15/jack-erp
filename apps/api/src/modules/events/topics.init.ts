@@ -19,6 +19,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   { topic: ERP_TOPICS.LOYALTY_POINTS_AWARD, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CASH_MOVEMENT_FROM_PAYMENT, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CUSTOMER_MERGED, numPartitions: 1, replicationFactor: 1 },
+  { topic: ERP_TOPICS.TEMP_WAREHOUSE_TRANSFER_REQUESTED, numPartitions: 3, replicationFactor: 1 },
 ];
 
 @Injectable()

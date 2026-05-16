@@ -47,6 +47,9 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.adjustment.submit', description: 'Submit inventory adjustments', module: 'inventory' },
   { key: 'inventory.adjustment.post', description: 'Post inventory adjustments', module: 'inventory' },
   { key: 'inventory.adjustment.cancel', description: 'Cancel inventory adjustments', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.read', description: 'View temp warehouse sessions and lines', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.write', description: 'Add, update and delete temp warehouse lines', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.close', description: 'Close temp warehouse sessions', module: 'inventory' },
   { key: 'inventory.manage', description: 'Manage inventory operations (broad scope)', module: 'inventory' },
 
   // Product

@@ -28,8 +28,11 @@ const IDS = {
   role: '40000000-0000-4000-8000-000000000001',
   storageMain: '50000000-0000-4000-8000-000000000001',
   storageReserve: '50000000-0000-4000-8000-000000000002',
+  storageShowroom: '50000000-0000-4000-8000-000000000003',
   locationMain: '60000000-0000-4000-8000-000000000001',
   locationReserve: '60000000-0000-4000-8000-000000000002',
+  locationShowroom: '60000000-0000-4000-8000-000000000003',
+  showroomMain: '55000000-0000-4000-8000-000000000001',
   providerDefault: '65000000-0000-4000-8000-000000000001',
   itemLaptop: '70000000-0000-4000-8000-000000000001',
   itemMonitor: '70000000-0000-4000-8000-000000000002',
@@ -242,7 +245,8 @@ async function seedInventoryData() {
       INSERT INTO storages (id, organization_id, branch_id, name, is_main_storage, created_by, created_at, updated_at)
       VALUES
         ($1, $2, $3, 'Main Warehouse', true, $4, NOW(), NOW()),
-        ($5, $2, $3, 'Reserve Warehouse', false, $4, NOW(), NOW())
+        ($5, $2, $3, 'Reserve Warehouse', false, $4, NOW(), NOW()),
+        ($6, $2, $3, 'Main Showroom Storage', false, $4, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -251,6 +255,7 @@ async function seedInventoryData() {
         IDS.branch,
         IDS.user,
         IDS.storageReserve,
+        IDS.storageShowroom,
       ],
     );
 
@@ -259,7 +264,8 @@ async function seedInventoryData() {
       INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type, is_active, created_by, created_at, updated_at)
       VALUES
         ($1, $2, $3, $4, 'A-01', 'Main Rack A1', 'RACK', true, $5, NOW(), NOW()),
-        ($6, $2, $3, $7, 'B-01', 'Reserve Rack B1', 'RACK', true, $5, NOW(), NOW())
+        ($6, $2, $3, $7, 'B-01', 'Reserve Rack B1', 'RACK', true, $5, NOW(), NOW()),
+        ($8, $2, $3, $9, 'SR-01', 'Main Showroom Floor', 'ZONE', true, $5, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -270,6 +276,23 @@ async function seedInventoryData() {
         IDS.user,
         IDS.locationReserve,
         IDS.storageReserve,
+        IDS.locationShowroom,
+        IDS.storageShowroom,
+      ],
+    );
+
+    await AppDataSource.query(
+      `
+      INSERT INTO showrooms (id, organization_id, branch_id, name, storage_id, is_main_showroom, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, 'Main Showroom', $4, true, $5, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        IDS.showroomMain,
+        IDS.organization,
+        IDS.branch,
+        IDS.storageShowroom,
+        IDS.user,
       ],
     );
 
