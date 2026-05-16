@@ -1,7 +1,7 @@
 import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
-import type { CustomerFormValues } from "@erp/pos/lib/checkout/customerCreate.types";
+import type { CustomerFormValues } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 

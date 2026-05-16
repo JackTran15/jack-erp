@@ -1,4 +1,4 @@
-import type { CustomerDetail } from "@erp/pos/lib/customerApi";
+import type { CustomerDetail } from "@erp/pos/lib/common/customerApi";
 import type { CustomerDetailData } from "./customerDetail.types";
 
 export interface MapCustomerDetailLookups {

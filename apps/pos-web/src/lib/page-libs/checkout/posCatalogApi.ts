@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http } from "@erp/pos/lib/common/http";
 
 export type PosCatalogLine = {
   itemId: string;

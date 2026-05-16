@@ -3,13 +3,13 @@ import {
   EMPTY_FAST_STOCK_TRANSFER_FILTERS,
   FAST_STOCK_TRANSFER_WAREHOUSE_OPTIONS,
   FAST_STOCK_TRANSFER_MOCK_ROWS,
-} from "@erp/pos/lib/fast-stock-transfer/mockData";
+} from "@erp/pos/lib/page-libs/fast-stock-transfer/mockData";
 import {
   FastStockTransferDialogRow,
   FastStockTransferFilters,
   FastStockTransferModeEnum,
   FastStockTransferRow,
-} from "@erp/pos/lib/fast-stock-transfer/fast-stock-transfer.types";
+} from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
 
 type FastStockTransferEditableDraft = Pick<
   FastStockTransferRow,

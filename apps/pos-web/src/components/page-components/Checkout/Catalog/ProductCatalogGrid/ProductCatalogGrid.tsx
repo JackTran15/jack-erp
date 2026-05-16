@@ -1,4 +1,4 @@
-import type { CatalogProduct } from "@erp/pos/lib/checkout/checkout.types";
+import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { ProductCard } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCard/ProductCard";
 
 export interface ProductCatalogGridProps {

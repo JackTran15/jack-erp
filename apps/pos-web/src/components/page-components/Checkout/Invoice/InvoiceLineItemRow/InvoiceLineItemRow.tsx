@@ -5,9 +5,9 @@ import { PosQuantityInput } from "@erp/pos/components/common/PosQuantityInput/Po
 import {
   lineExceedsOnHandSnapshot,
   lineTotal,
-} from "@erp/pos/lib/checkout/checkoutUtils";
+} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { cn, formatVnd } from "@erp/ui";
-import type { CartLine } from "@erp/pos/lib/checkout/checkout.types";
+import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/Checkout/Invoice/InvoiceLineItemWarningCell/InvoiceLineItemWarningCell";
 import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";
 

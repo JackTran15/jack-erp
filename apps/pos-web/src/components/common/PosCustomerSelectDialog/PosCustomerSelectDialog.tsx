@@ -15,7 +15,7 @@ import {
   generateCustomerCode,
   searchCustomers,
   type CustomerRow,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 
 type Props = {
   open: boolean;

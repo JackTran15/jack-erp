@@ -15,14 +15,14 @@ import type {
   VoucherFormResult,
   VoucherOption,
   VoucherSelectableItem,
-} from "@erp/pos/lib/checkout/voucher.types";
+} from "@erp/pos/lib/page-libs/checkout/voucher.types";
 import { FormRow } from "@erp/pos/components/page-components/Checkout/Payment/Voucher/FormRow/FormRow";
 import { QuantityStepper } from "@erp/pos/components/page-components/Checkout/Payment/Voucher/QuantityStepper/QuantityStepper";
 import { MetricColumn } from "@erp/pos/components/page-components/Checkout/Payment/Voucher/MetricColumn/MetricColumn";
 import { RadioOption } from "@erp/pos/components/page-components/Checkout/Payment/Voucher/RadioOption/RadioOption";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
 import { GroupTree } from "@erp/pos/components/page-components/Checkout/Payment/Voucher/GroupTree/GroupTree";
-import { toggleSet } from "@erp/pos/lib/checkout/voucher.toggleSet";
+import { toggleSet } from "@erp/pos/lib/page-libs/checkout/voucher.toggleSet";
 
 export interface VoucherDialogProps {
   open: boolean;

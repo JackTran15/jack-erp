@@ -1,10 +1,10 @@
 import { cn } from "@erp/ui";
-import type { PromotionItem } from "@erp/pos/lib/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
 import {
   kindLabel,
   resolvePromotionStatus,
   TONE_CLASS,
-} from "@erp/pos/lib/checkout/promotionPresentation";
+} from "@erp/pos/lib/page-libs/checkout/promotionPresentation";
 
 interface PromotionRowProps {
   promotion: PromotionItem;

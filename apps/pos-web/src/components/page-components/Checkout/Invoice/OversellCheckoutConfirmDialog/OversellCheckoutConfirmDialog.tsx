@@ -4,8 +4,8 @@ import {
   PosDataTable,
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
-import type { CartLine } from "@erp/pos/lib/checkout/checkout.types";
-import { qtyFormatter } from "@erp/pos/lib/checkout/checkoutUtils";
+import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { qtyFormatter } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { ProhibitedGlyphIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 
 export interface OversellCheckoutConfirmDialogProps {

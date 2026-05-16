@@ -3,8 +3,8 @@ import { useAnnounce } from "@erp/pos/hooks/page-hooks/checkout/use-announce";
 import {
   formatCustomerDisplay,
   type CustomerRow,
-} from "@erp/pos/lib/customerApi";
-import { type PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
+} from "@erp/pos/lib/common/customerApi";
+import { type PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import {
   CheckoutPane,
@@ -23,7 +23,7 @@ import {
 import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CustomerCreate/CustomerCreateDialog/CustomerCreateDialog";
 
 import { PosErrorDialog } from "@erp/pos/components/common/PosErrorDialog/PosErrorDialog";
-import { formatViDateTime } from "@erp/pos/lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/Checkout/CancelInvoiceConfirmDialog/CancelInvoiceConfirmDialog";
 import { PanelCollapseHandle } from "@erp/pos/components/page-components/Checkout/Catalog/PanelCollapseHandle/PanelCollapseHandle";
 import { ProductCatalogGrid } from "@erp/pos/components/page-components/Checkout/Catalog/ProductCatalogGrid/ProductCatalogGrid";
@@ -37,23 +37,23 @@ import {
   type PaymentLine,
 } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
 import { PaymentSummaryPanel } from "@erp/pos/components/page-components/Checkout/Payment/PaymentSummaryPanel/PaymentSummaryPanel";
-import type { PromotionItem } from "@erp/pos/lib/checkout/promotion.types";
-import type { InvoicePayload } from "@erp/pos/lib/checkout/printing/types";
+import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
+import type { InvoicePayload } from "@erp/pos/lib/page-libs/checkout/printing/types";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import { POSToolbar } from "@erp/pos/components/page-components/Checkout/Toolbar/POSToolbar/POSToolbar";
 import {
   CheckoutVariantEnum,
   type CatalogProduct,
   type DraftInvoice,
-} from "@erp/pos/lib/checkout/checkout.types";
+} from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutHotkeys } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-hotkeys";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
-import { buildCheckoutInvoicePayload } from "@erp/pos/lib/checkout/checkoutReceiptFactory";
-import { resetCheckoutSaleSession } from "@erp/pos/lib/checkout/checkoutSaleSession";
+import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
+import { resetCheckoutSaleSession } from "@erp/pos/lib/page-libs/checkout/checkoutSaleSession";
 import {
   formatOnHand,
   getOversellSaleLines,
@@ -62,8 +62,8 @@ import {
   paymentLabel,
   promoOptionLabel,
   resolvePaymentMethodLabel,
-} from "@erp/pos/lib/checkout/checkoutUtils";
-import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/checkout/posCheckoutQty";
+} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 
 interface Salesperson {
   id: string;

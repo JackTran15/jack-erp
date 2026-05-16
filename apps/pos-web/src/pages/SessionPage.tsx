@@ -7,7 +7,7 @@ import {
   Input,
   MoneyInput,
 } from "@erp/ui";
-import { formatCurrencyVnd } from "../lib/formatCurrency";
+import { formatCurrencyVnd } from "@erp/pos/lib/common/formatCurrency";
 
 export function SessionPage() {
   const openingCashId = useId();

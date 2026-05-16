@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearPosSession } from "@erp/pos/lib/posAuth";
+import { clearPosSession } from "@erp/pos/lib/common/posAuth";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
 export function PosShellLayout() {

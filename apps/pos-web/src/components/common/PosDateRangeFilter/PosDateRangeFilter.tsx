@@ -3,7 +3,7 @@ import { cn } from "@erp/ui";
 import { PosRadio } from "@erp/pos/components/common/PosRadio/PosRadio";
 import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { DATE_RANGE_FILTER_CHOICES } from "@erp/pos/constants/common.constant";
-import type { PosDateRangeFilterOption } from "@erp/pos/lib/dateRangeFilter";
+import type { PosDateRangeFilterOption } from "@erp/pos/lib/common/dateRangeFilter";
 
 interface PosDateRangeFilterProps {
   value: PosDateRangeFilterOption;

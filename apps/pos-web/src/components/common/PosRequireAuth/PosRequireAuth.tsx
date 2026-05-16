@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { isPosAuthenticated } from "@erp/pos/lib/posAuth";
+import { isPosAuthenticated } from "@erp/pos/lib/common/posAuth";
 
 export function PosRequireAuth() {
   const location = useLocation();

@@ -18,7 +18,7 @@ import {
   generateCustomerCode,
   type CustomerDetail,
   type CustomerGroupRow,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { CustomerGroupCreateDialog } from "@erp/pos/components/page-components/Checkout/CustomerCreate/CustomerGroupCreateDialog/CustomerGroupCreateDialog";
 import {
@@ -28,7 +28,7 @@ import {
   EMPTY_VALUES,
   seedFromQuery,
   userFacingError,
-} from "@erp/pos/lib/checkout/customerFormUtils";
+} from "@erp/pos/lib/page-libs/checkout/customerFormUtils";
 import { BasicInfoSection } from "@erp/pos/components/page-components/Checkout/CustomerCreate/BasicInfoSection/BasicInfoSection";
 import { MembershipSection } from "@erp/pos/components/page-components/Checkout/CustomerCreate/MembershipSection/MembershipSection";
 import { CompanySection } from "@erp/pos/components/page-components/Checkout/CustomerCreate/CompanySection/CompanySection";
@@ -36,7 +36,7 @@ import type {
   CustomerCreateDialogProps,
   CustomerFormValues,
   CustomerSelectOption,
-} from "@erp/pos/lib/checkout/customerCreate.types";
+} from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 
 /** Map BE customer record into the form's flat `CustomerFormValues` shape. */
 function detailToFormValues(c: CustomerDetail): Partial<CustomerFormValues> {

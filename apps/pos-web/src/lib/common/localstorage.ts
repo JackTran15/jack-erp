@@ -1,5 +1,5 @@
-import { APP_HEADER_PINNED_ITEM_LIMIT, PosMenuItem } from "../components/layout/PosLayout/PosLayout";
-import { APP_MENU_ITEMS } from "../constants/pos-menu.constant";
+import { APP_HEADER_PINNED_ITEM_LIMIT, PosMenuItem } from "@erp/pos/components/layout/PosLayout/PosLayout";
+import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
 
 const APP_HEADER_PINNED_STORAGE_KEY = "pos.appHeader.pinnedItemIds";
 

@@ -13,7 +13,7 @@ import {
   type CustomerDetail,
   type CustomerRow,
   type UpdateCustomerBody,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 
 /**
  * Shared TanStack Query key factory for a single customer record. Exported so

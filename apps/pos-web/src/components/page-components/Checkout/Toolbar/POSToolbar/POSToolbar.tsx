@@ -16,7 +16,7 @@ import {
   POS_CHECKOUT_QTY_MIN,
   clampPosCheckoutQtyNumber,
   safePosCheckoutQtyFromRaw,
-} from "@erp/pos/lib/checkout/posCheckoutQty";
+} from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 
 export interface POSToolbarState {
   query: string;

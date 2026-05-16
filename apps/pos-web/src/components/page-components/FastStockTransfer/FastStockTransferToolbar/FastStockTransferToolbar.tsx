@@ -5,7 +5,7 @@ import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInp
 import {
   FastStockTransferModeEnum,
   type FastStockTransferFilters,
-} from "@erp/pos/lib/fast-stock-transfer/fast-stock-transfer.types";
+} from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 
 interface FastStockTransferToolbarProps {

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
-import { type CustomerRow, searchCustomers } from "@erp/pos/lib/customerApi";
-import { customerSearchErrorMessage } from "@erp/pos/lib/checkout/checkoutUtils";
+import { type CustomerRow, searchCustomers } from "@erp/pos/lib/common/customerApi";
+import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 
 interface UseCheckoutCustomerInput {
   announce: (message: string) => void;

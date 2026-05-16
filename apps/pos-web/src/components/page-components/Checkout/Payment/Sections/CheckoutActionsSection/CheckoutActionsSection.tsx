@@ -1,4 +1,4 @@
-import type { CashSuggestion } from "@erp/pos/lib/checkout/checkout.types";
+import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { CashSuggestionList } from "@erp/pos/components/page-components/Checkout/Payment/CashSuggestionList/CashSuggestionList";
 import { PaymentCTAButtons } from "@erp/pos/components/page-components/Checkout/Payment/PaymentCTAButtons/PaymentCTAButtons";
 import { PrintAndOrderRow } from "@erp/pos/components/page-components/Checkout/Payment/PrintAndOrderRow/PrintAndOrderRow";

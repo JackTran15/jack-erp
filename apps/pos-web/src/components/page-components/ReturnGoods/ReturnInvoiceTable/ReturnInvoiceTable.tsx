@@ -5,14 +5,14 @@ import {
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
-import { formatViDateTime } from "@erp/pos/lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { ReturnInvoiceColumnKey } from "@erp/pos/constants/return-goods.constant";
-import { sumInvoiceTotals } from "@erp/pos/lib/return-goods/returnGoodsMath";
-import type { ReturnInvoiceFilters, ReturnInvoiceRow } from "@erp/pos/lib/return-goods/return-goods.types";
+import { sumInvoiceTotals } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
+import type { ReturnInvoiceFilters, ReturnInvoiceRow } from "@erp/pos/lib/page-libs/return-goods/return-goods.types";
 
 export interface ReturnInvoiceTableProps {
   rows: ReadonlyArray<ReturnInvoiceRow>;

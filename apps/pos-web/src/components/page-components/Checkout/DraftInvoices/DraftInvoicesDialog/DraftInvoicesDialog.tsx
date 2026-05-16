@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DraftInvoice } from "@erp/pos/lib/checkout/checkout.types";
+import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import {
   isInDateRange,
   type PosDateRangeFilterOption,
-} from "@erp/pos/lib/dateRangeFilter";
+} from "@erp/pos/lib/common/dateRangeFilter";
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/DraftInvoices/FilterBar/FilterBar";

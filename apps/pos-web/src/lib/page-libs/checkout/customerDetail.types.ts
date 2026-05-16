@@ -5,7 +5,7 @@ import type {
 import type {
   CustomerDetail,
   MembershipTierEnum,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 
 export {
   CustomerDetailTabKeyEnum,

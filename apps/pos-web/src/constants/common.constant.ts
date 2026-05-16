@@ -1,4 +1,4 @@
-import type { PosDateRangeFilterChoice } from "@erp/pos/lib/dateRangeFilter";
+import type { PosDateRangeFilterChoice } from "@erp/pos/lib/common/dateRangeFilter";
 
 export const DATE_RANGE_FILTER_CHOICES: ReadonlyArray<PosDateRangeFilterChoice> = [
   { value: "ALL", label: "Toàn bộ" },
