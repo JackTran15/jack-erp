@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { QrIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import {
-  PosVietQrPaymentDialog,
-  type QrPaymentInfo,
-} from "@erp/pos/components/common/PosVietQrPaymentDialog/PosVietQrPaymentDialog";
+import { PosVietQrPaymentDialog } from "@erp/pos/components/common/PosVietQrPaymentDialog/PosVietQrPaymentDialog";
+import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 
-export interface QrPaymentButtonProps {
-  /** Account + amount data shown inside the VietQR dialog. */
-  payment: QrPaymentInfo;
-}
+const QR_PAYMENT_CONFIG = {
+  holderName: "HOÀNG THỊ THU",
+  accountNumber: "005704060134345",
+  bankCode: "VIB",
+} as const;
 
-/** Outlined full-width button that opens the VietQR payment dialog. */
-export function QrPaymentButton({ payment }: QrPaymentButtonProps) {
+/**
+ * Outlined full-width button that opens the VietQR payment dialog. Account
+ * info hard-code; amount đọc từ grandTotal hook.
+ */
+export function QrPaymentButton() {
   const [open, setOpen] = useState(false);
+  const grandTotal = useCheckoutGrandTotal();
 
   return (
     <>
@@ -27,7 +30,7 @@ export function QrPaymentButton({ payment }: QrPaymentButtonProps) {
       <PosVietQrPaymentDialog
         open={open}
         onClose={() => setOpen(false)}
-        payment={payment}
+        payment={{ ...QR_PAYMENT_CONFIG, amount: grandTotal }}
       />
     </>
   );

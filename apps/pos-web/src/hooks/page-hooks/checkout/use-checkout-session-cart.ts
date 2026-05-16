@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import {
   CheckoutPane,
   selectActiveSession,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import {
   type CartLine,
   type CatalogProduct,
@@ -29,14 +30,10 @@ function isSignedNegativeQtyCart(
   );
 }
 
-interface UseCheckoutSessionCartInput {
-  announce: (message: string) => void;
-}
-
-export function useCheckoutSessionCart({
-  announce,
-}: UseCheckoutSessionCartInput) {
-  const [cartError, setCartError] = useState("");
+export function useCheckoutSessionCart() {
+  const announce = usePosCheckoutUiStore((s) => s.setAnnouncement);
+  const cartError = usePosCheckoutUiStore((s) => s.cartError);
+  const setCartError = usePosCheckoutUiStore((s) => s.setCartError);
 
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const session = usePosCheckoutSessionStore(selectActiveSession);

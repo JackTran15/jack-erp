@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@erp/ui";
 import { GiftIcon, ReceiptIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { useListKeyboardNavigation } from "@erp/pos/hooks/common/use-list-keyboard-navigation";
@@ -6,50 +6,22 @@ import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
 } from "@erp/pos/constants/checkout.constant";
+import { DiscountPointDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/DiscountPointDialog";
+import { VoucherDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/VoucherDialog";
+import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
-  DiscountPointDialog,
-  type DiscountPointDialogProps,
-} from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/DiscountPointDialog";
-import {
-  VoucherDialog,
-  type VoucherDialogProps,
-} from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/VoucherDialog";
-
-/**
- * Wiring for the "Mã ưu đãi và điểm" dialog mounted by `PromoMenu`. Clicking
- * the "Mã ưu đãi" entry opens this dialog automatically — the host only has
- * to feed it data + handlers (or omit `discountPoint` entirely to use a
- * minimal guest-state dialog).
- */
-export type PromoMenuDiscountPoint = Omit<
-  DiscountPointDialogProps,
-  "open" | "onClose"
->;
-
-/**
- * Wiring for the "Voucher" dialog mounted by `PromoMenu`. Clicking the
- * "Voucher" entry opens this dialog automatically — the host feeds data /
- * handlers (or omits `voucher` to use the empty-state form).
- */
-export type PromoMenuVoucher = Omit<VoucherDialogProps, "open" | "onClose">;
+  computeVoucherLineSource,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 
 export interface PromoMenuProps {
   /** Visibility — caller (PaymentSummaryPanel) owns the open state. */
   open: boolean;
   /** Close on outside click / Esc / option pick. */
   onClose: () => void;
-  /** Pick handler — receives the option key. Caller may close in response. */
-  onSelect: (option: PromoMenuOption) => void;
-  /**
-   * Optional payload + handlers for the "Mã ưu đãi và điểm" dialog. When
-   * omitted the dialog still opens but with placeholder member data.
-   */
-  discountPoint?: PromoMenuDiscountPoint;
-  /**
-   * Optional payload + handlers for the "Voucher" dialog. When omitted the
-   * dialog still opens with an empty form.
-   */
-  voucher?: PromoMenuVoucher;
 }
 
 interface MenuItem {
@@ -73,28 +45,25 @@ const ITEMS: MenuItem[] = [
 ];
 
 /**
- * Small popover anchored under the customer-search action group, matching
- * State 4 in the spec. Caller positions / mounts this — internally it just
- * handles outside-click and Esc dismissal.
- *
- * Two entries are special-cased to open companion dialogs:
- *   • "Mã ưu đãi" → `DiscountPointDialog` (membership + voucher search)
- *   • "Voucher"   → `VoucherDialog` (apply voucher to invoice / items / groups)
- * Selection still propagates via `onSelect` for any side-effects the host
- * wants to attach (announcements, analytics, …).
+ * Small popover anchored under the customer-search action group. Two entries
+ * special-case to open companion dialogs (DiscountPointDialog, VoucherDialog);
+ * còn lại các handlers (announce, voucher data) đọc trực tiếp từ promotion
+ * hook + session/customer stores.
  */
-export function PromoMenu({
-  open,
-  onClose,
-  onSelect,
-  discountPoint,
-  voucher,
-}: PromoMenuProps) {
+export function PromoMenu({ open, onClose }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  // Dialog state lives inside the menu so the host doesn't need to wire it
-  // explicitly — the menu is the single owner of "click X → show dialog X".
+  const { pickPromoOption, searchVoucher, applyVoucher } = useCheckoutPromotion();
+  const selectedCustomer = usePosCheckoutCustomerStore(
+    (s) => s.selectedCustomer,
+  );
+  const sessionState = usePosCheckoutSessionStore();
+  const voucherLines = useMemo(
+    () => computeVoucherLineSource(sessionState),
+    [sessionState],
+  );
+
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
 
@@ -102,10 +71,10 @@ export function PromoMenu({
     (key: PromoMenuOption) => {
       if (key === PromoMenuOptionEnum.PROMO) setDiscountDialogOpen(true);
       if (key === PromoMenuOptionEnum.VOUCHER) setVoucherDialogOpen(true);
-      onSelect(key);
+      pickPromoOption(key);
       onClose();
     },
-    [onSelect, onClose],
+    [pickPromoOption, onClose],
   );
 
   const { highlightIdx, setHighlightIdx, handleKeyDown } =
@@ -122,9 +91,6 @@ export function PromoMenu({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      // PromoMenu is a popover with no dedicated focusable trigger — focus can
-      // be anywhere (e.g. the customer search field). Ignore if the user is
-      // typing in another input so native Arrow/Enter still work in those fields.
       const target = e.target as HTMLElement | null;
       const inOtherInput =
         target &&
@@ -142,7 +108,6 @@ export function PromoMenu({
     };
   }, [open, onClose, handleKeyDown]);
 
-  // Scroll the highlighted item into view (only when needed — the list is short so this rarely fires).
   useEffect(() => {
     if (!open || highlightIdx < 0) return;
     const el = itemRefs.current[highlightIdx];
@@ -198,13 +163,32 @@ export function PromoMenu({
       <DiscountPointDialog
         open={discountDialogOpen}
         onClose={() => setDiscountDialogOpen(false)}
-        {...discountPoint}
+        data={
+          selectedCustomer
+            ? {
+                member: {
+                  name: formatCustomerDisplay(selectedCustomer),
+                  cardNumber: selectedCustomer.id,
+                },
+              }
+            : undefined
+        }
+        onSearchVoucher={searchVoucher}
       />
 
       <VoucherDialog
         open={voucherDialogOpen}
         onClose={() => setVoucherDialogOpen(false)}
-        {...voucher}
+        data={{
+          items: voucherLines.map((l) => ({
+            id: l.lineId,
+            name: l.name,
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+            lineTotal: lineTotal(l),
+          })),
+        }}
+        onApply={applyVoucher}
       />
     </>
   );

@@ -1,77 +1,60 @@
-import { forwardRef, type ReactNode } from "react";
+import type { RefObject } from "react";
 import { UserIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
-  PosSearchPopover,
-  type SearchSuggestion,
-} from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import { PosCustomerActions, type CustomerActionItem } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
+  PosCustomerActions,
+  type CustomerActionItem,
+} from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
+import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
+import {
+  formatCustomerDisplay,
+  type CustomerRow,
+} from "@erp/pos/lib/common/customerApi";
 
-export interface CustomerInputRowProps<T> {
-  value: string;
-  onChange: (next: string) => void;
-
-  /** Async customer search. */
-  search: (q: string) => Promise<SearchSuggestion<T>[]>;
-  /** Called when a customer suggestion is picked. */
-  onSelect: (item: T) => void;
-  itemKey: (item: T) => string;
-  renderItem: (item: T) => ReactNode;
-  renderMeta?: (item: T) => ReactNode;
-  /** Enter pressed without highlight (used to trigger create-or-error flow). */
-  onSubmitQuery?: (q: string) => boolean | void;
-
-  /**
-   * Action buttons rendered to the right of the input. The same array is
-   * used by `SelectedCustomerCard` so the icons remain visible when a
-   * customer is selected. Pass an empty array (or omit) to hide.
-   */
+export interface CustomerInputRowProps {
+  inputRef: RefObject<HTMLInputElement | null>;
+  /** Actions hiển thị bên phải input (QR / Add / Voucher group). */
   actions?: CustomerActionItem[];
-
-  /** Empty-state link inside the popover (e.g. "Tạo khách mới"). */
-  emptyAction?: { label: string; onClick: (currentQuery: string) => void };
-
-  placeholder?: string;
-  minChars?: number;
-  debounceMs?: number;
 }
 
 /**
- * Customer search row at the top of the payment panel. Leading user icon,
- * trailing action group rendered via the shared `CustomerActions` component.
+ * Customer search row at the top of the payment panel. Leading user icon.
+ * Concrete cho CustomerRow — đọc state + handlers từ customer hook.
  */
-export const CustomerInputRow = forwardRef(function CustomerInputRow<T>(
-  {
-    value,
-    onChange,
-    search,
-    onSelect,
-    itemKey,
-    renderItem,
-    renderMeta,
-    onSubmitQuery,
-    actions = [],
-    emptyAction,
-    placeholder = "(F4) SDT, tên khách hàng",
-    minChars = 2,
-    debounceMs = 350,
-  }: CustomerInputRowProps<T>,
-  ref: React.Ref<HTMLInputElement>,
-) {
+export function CustomerInputRow({ inputRef, actions = [] }: CustomerInputRowProps) {
+  const {
+    customerQuery,
+    setCustomerQuery,
+    setCustomerFieldError,
+    customerSearchAdapter,
+    pickCustomer,
+    handleCustomerSubmitQuery,
+    handleAddCustomer,
+  } = useCheckoutCustomer();
+
   return (
-    <PosSearchPopover<T>
-      inputRef={ref}
-      value={value}
-      onValueChange={onChange}
-      search={search}
-      onSelect={onSelect}
-      itemKey={itemKey}
-      renderItem={renderItem}
-      renderMeta={renderMeta}
-      onSubmitQuery={onSubmitQuery}
-      placeholder={placeholder}
-      minChars={minChars}
-      debounceMs={debounceMs}
-      emptyAction={emptyAction}
+    <PosSearchPopover<CustomerRow>
+      inputRef={inputRef}
+      value={customerQuery}
+      onValueChange={(q) => {
+        setCustomerQuery(q);
+        setCustomerFieldError("");
+      }}
+      search={customerSearchAdapter}
+      onSelect={(c) => pickCustomer(c)}
+      itemKey={(c) => c.id}
+      renderItem={(c) => formatCustomerDisplay(c)}
+      renderMeta={(c) => (
+        <>
+          {c.phone ?? "—"}
+          {c.email ? ` · ${c.email}` : ""}
+        </>
+      )}
+      onSubmitQuery={handleCustomerSubmitQuery}
+      emptyAction={{ label: "Tạo khách mới", onClick: handleAddCustomer }}
+      placeholder="(F4) SDT, tên khách hàng"
+      minChars={2}
+      debounceMs={350}
       containerClassName="flex h-12 items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
       inputClassName="h-9 min-w-0 flex-1 bg-transparent text-[13px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
       prefix={
@@ -85,6 +68,4 @@ export const CustomerInputRow = forwardRef(function CustomerInputRow<T>(
       suffix={<PosCustomerActions actions={actions} />}
     />
   );
-}) as <T>(
-  props: CustomerInputRowProps<T> & { ref?: React.Ref<HTMLInputElement> },
-) => ReturnType<React.FC>;
+}

@@ -1,70 +1,49 @@
+import { useCallback, useMemo } from "react";
 import {
-  useCallback,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
-import {
-  createPaymentLine,
   type PaymentLine,
 } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import type {
-  CashSuggestion,
-  PaymentMethodOption,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
+import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import {
+  PAYMENT_METHODS,
+  PaymentMethodEnum,
+} from "@erp/pos/constants/checkout.constant";
 import { buildSuggestions } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   derivePaymentDisplay,
   settlementAbsFromGrand,
 } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
+import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
-interface UseCheckoutPaymentInput {
-  /** Raw cart total (BEFORE subtracting deposit). */
-  grandTotal: number;
-  methods: readonly PaymentMethodOption[];
-  /** Surface error messages (e.g. "must pick customer first"). */
-  onError: (message: string) => void;
-}
+type Updater<T> = T | ((prev: T) => T);
 
 interface UseCheckoutPaymentResult {
   paymentLines: PaymentLine[];
-  setPaymentLines: Dispatch<SetStateAction<PaymentLine[]>>;
-  /**
-   * Waive / forgive residual (only when debt is off — debt hides this path).
-   */
+  setPaymentLines: (value: Updater<PaymentLine[]>) => void;
   keepChange: boolean;
-  setKeepChange: Dispatch<SetStateAction<boolean>>;
-  /** Stable callback to set keepChange=false (used when customer is picked). */
+  setKeepChange: (value: Updater<boolean>) => void;
   clearKeepChange: () => void;
   debt: boolean;
-  setDebt: Dispatch<SetStateAction<boolean>>;
-  /**
-   * Toggle debt. Requires `selectedCustomer` at call time — if missing while
-   * enabling, fires `onError` and does NOT update state.
-   */
+  setDebt: (value: Updater<boolean>) => void;
   handleDebtChange: (
     next: boolean,
     selectedCustomer: CustomerRow | null,
   ) => void;
-  /** Surface "must select customer" error from the deposit input. */
   handleRequireCustomerForDeposit: () => void;
   note: string;
-  setNote: Dispatch<SetStateAction<string>>;
+  setNote: (value: Updater<string>) => void;
   printInvoice: boolean;
-  setPrintInvoice: Dispatch<SetStateAction<boolean>>;
+  setPrintInvoice: (value: Updater<boolean>) => void;
   preorder: boolean;
-  setPreorder: Dispatch<SetStateAction<boolean>>;
+  setPreorder: (value: Updater<boolean>) => void;
   selectedSuggestionId: string | null;
-  setSelectedSuggestionId: Dispatch<SetStateAction<string | null>>;
-  /** Deposit deducted from raw grandTotal to derive settlement. */
+  setSelectedSuggestionId: (value: Updater<string | null>) => void;
   deposit: number;
-  setDeposit: Dispatch<SetStateAction<number>>;
-  /** `grandTotal - deposit`. Drives all payment math. */
+  setDeposit: (value: Updater<number>) => void;
+  grandTotal: number;
   settlementGrandTotal: number;
-  /** `|settlementGrandTotal|`. */
   settlementAbs: number;
   totalPaid: number;
   rawChangeAmount: number;
@@ -80,23 +59,44 @@ interface UseCheckoutPaymentResult {
   handleChangePaymentLines: (next: PaymentLine[]) => void;
 }
 
-export function useCheckoutPayment({
-  grandTotal,
-  methods,
-  onError,
-}: UseCheckoutPaymentInput): UseCheckoutPaymentResult {
-  const [paymentLines, setPaymentLines] = useState<PaymentLine[]>(() => [
-    createPaymentLine(PaymentMethodEnum.CASH),
-  ]);
-  const [keepChange, setKeepChange] = useState(false);
-  const [debt, setDebt] = useState(false);
-  const [note, setNote] = useState("");
-  const [printInvoice, setPrintInvoice] = useState(true);
-  const [preorder, setPreorder] = useState(false);
-  const [selectedSuggestionId, setSelectedSuggestionId] = useState<
-    string | null
-  >(null);
-  const [deposit, setDeposit] = useState(0);
+/**
+ * Adapter đọc payment store + tính derived. Zero-input — `grandTotal` lấy từ
+ * session store (`useCheckoutGrandTotal`), `methods` dùng `PAYMENT_METHODS`
+ * const, `onError` ghi vào ui store qua `setCartError`.
+ */
+export function useCheckoutPayment(): UseCheckoutPaymentResult {
+  const grandTotal = useCheckoutGrandTotal();
+
+  const paymentLines = usePosCheckoutPaymentStore((s) => s.paymentLines);
+  const keepChange = usePosCheckoutPaymentStore((s) => s.keepChange);
+  const debt = usePosCheckoutPaymentStore((s) => s.debt);
+  const note = usePosCheckoutPaymentStore((s) => s.note);
+  const printInvoice = usePosCheckoutPaymentStore((s) => s.printInvoice);
+  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
+  const selectedSuggestionId = usePosCheckoutPaymentStore(
+    (s) => s.selectedSuggestionId,
+  );
+  const deposit = usePosCheckoutPaymentStore((s) => s.deposit);
+
+  const setPaymentLines = usePosCheckoutPaymentStore((s) => s.setPaymentLines);
+  const setKeepChange = usePosCheckoutPaymentStore((s) => s.setKeepChange);
+  const clearKeepChange = usePosCheckoutPaymentStore(
+    (s) => s.clearKeepChange,
+  );
+  const setDebt = usePosCheckoutPaymentStore((s) => s.setDebt);
+  const setNote = usePosCheckoutPaymentStore((s) => s.setNote);
+  const setPrintInvoice = usePosCheckoutPaymentStore((s) => s.setPrintInvoice);
+  const setPreorder = usePosCheckoutPaymentStore((s) => s.setPreorder);
+  const setSelectedSuggestionId = usePosCheckoutPaymentStore(
+    (s) => s.setSelectedSuggestionId,
+  );
+  const setDeposit = usePosCheckoutPaymentStore((s) => s.setDeposit);
+  const handleChangePaymentLines = usePosCheckoutPaymentStore(
+    (s) => s.handleChangePaymentLines,
+  );
+  const handlePickSuggestion = usePosCheckoutPaymentStore(
+    (s) => s.handlePickSuggestion,
+  );
 
   const settlementGrandTotal = grandTotal - deposit;
   const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
@@ -130,37 +130,17 @@ export function useCheckoutPayment({
   const primaryMethod = paymentLines[0]?.method ?? PaymentMethodEnum.CASH;
   const primaryMethodLabel = useMemo(
     () =>
-      methods.find((m) => m.value === primaryMethod)?.label ??
+      PAYMENT_METHODS.find((m) => m.value === primaryMethod)?.label ??
       String(primaryMethod),
-    [methods, primaryMethod],
+    [primaryMethod],
   );
-
-  const handlePickSuggestion = useCallback((s: CashSuggestion) => {
-    setSelectedSuggestionId(s.id);
-    setPaymentLines((prev) => {
-      const cashIdx = prev.findIndex((l) => l.method === PaymentMethodEnum.CASH);
-      if (cashIdx === -1) {
-        return [createPaymentLine(PaymentMethodEnum.CASH, s.amount), ...prev];
-      }
-      return prev.map((l, i) =>
-        i === cashIdx ? { ...l, amount: s.amount } : l,
-      );
-    });
-  }, []);
-
-  const handleChangePaymentLines = useCallback((next: PaymentLine[]) => {
-    setPaymentLines(next);
-    setSelectedSuggestionId(null);
-  }, []);
-
-  const clearKeepChange = useCallback(() => {
-    setKeepChange(false);
-  }, []);
 
   const handleDebtChange = useCallback(
     (next: boolean, selectedCustomer: CustomerRow | null) => {
       if (next && !selectedCustomer) {
-        onError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
+        usePosCheckoutUiStore
+          .getState()
+          .setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
         return;
       }
       if (next) {
@@ -168,12 +148,14 @@ export function useCheckoutPayment({
       }
       setDebt(next);
     },
-    [onError],
+    [setKeepChange, setDebt],
   );
 
   const handleRequireCustomerForDeposit = useCallback(() => {
-    onError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
-  }, [onError]);
+    usePosCheckoutUiStore
+      .getState()
+      .setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
+  }, []);
 
   return {
     paymentLines,
@@ -195,6 +177,7 @@ export function useCheckoutPayment({
     setSelectedSuggestionId,
     deposit,
     setDeposit,
+    grandTotal,
     settlementGrandTotal,
     settlementAbs,
     totalPaid,

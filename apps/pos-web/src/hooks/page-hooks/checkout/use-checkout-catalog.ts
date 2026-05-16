@@ -1,15 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useCallback, useMemo } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
+
+type Updater<T> = T | ((prev: T) => T);
 
 interface ToolbarState {
   query: string;
@@ -21,15 +17,14 @@ interface UseCheckoutCatalogResult {
   catalog: PosCatalogLine[];
   catalogLoading: boolean;
   catalogError: string;
-  loadCatalog: () => Promise<void>;
   toolbar: ToolbarState;
-  setToolbar: Dispatch<SetStateAction<ToolbarState>>;
+  setToolbar: (value: Updater<ToolbarState>) => void;
   catalogQuery: string;
-  setCatalogQuery: Dispatch<SetStateAction<string>>;
+  setCatalogQuery: (value: Updater<string>) => void;
   catalogGroup: string | undefined;
-  setCatalogGroup: Dispatch<SetStateAction<string | undefined>>;
+  setCatalogGroup: (value: Updater<string | undefined>) => void;
   catalogCollapsed: boolean;
-  setCatalogCollapsed: Dispatch<SetStateAction<boolean>>;
+  setCatalogCollapsed: (value: Updater<boolean>) => void;
   filteredProducts: PosCatalogLine[];
   catalogProducts: CatalogProduct[];
   productSearchAdapter: (
@@ -37,44 +32,30 @@ interface UseCheckoutCatalogResult {
   ) => Promise<SearchSuggestion<PosCatalogLine>[]>;
 }
 
-export function useCheckoutCatalog(
-  branchId: string,
-): UseCheckoutCatalogResult {
-  const [catalog, setCatalog] = useState<PosCatalogLine[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState("");
-  const [toolbar, setToolbar] = useState<ToolbarState>({
-    query: "",
-    qty: 1,
-    splitLine: false,
-  });
-  const [catalogQuery, setCatalogQuery] = useState("");
-  const [catalogGroup, setCatalogGroup] = useState<string | undefined>(
-    undefined,
+/**
+ * Zero-input adapter. Trigger fetch nằm ở `useCheckoutCatalogLoader(branchId)`
+ * (Page gọi); adapter này chỉ đọc state + tính derived.
+ */
+export function useCheckoutCatalog(): UseCheckoutCatalogResult {
+  const catalog = usePosCheckoutCatalogStore((s) => s.catalog);
+  const catalogLoading = usePosCheckoutCatalogStore((s) => s.catalogLoading);
+  const catalogError = usePosCheckoutCatalogStore((s) => s.catalogError);
+  const toolbar = usePosCheckoutCatalogStore((s) => s.toolbar);
+  const setToolbar = usePosCheckoutCatalogStore((s) => s.setToolbar);
+  const catalogQuery = usePosCheckoutCatalogStore((s) => s.catalogQuery);
+  const setCatalogQuery = usePosCheckoutCatalogStore(
+    (s) => s.setCatalogQuery,
   );
-  const [catalogCollapsed, setCatalogCollapsed] = useState(false);
-
-  const loadCatalog = useCallback(async () => {
-    setCatalogError("");
-    setCatalogLoading(true);
-    try {
-      const rows = await fetchPosCatalog(branchId);
-      setCatalog(rows);
-    } catch (e) {
-      setCatalog([]);
-      setCatalogError(
-        e instanceof Error
-          ? `Không tải được tồn kho: ${e.message}`
-          : "Không tải được tồn kho.",
-      );
-    } finally {
-      setCatalogLoading(false);
-    }
-  }, [branchId]);
-
-  useEffect(() => {
-    void loadCatalog();
-  }, [loadCatalog]);
+  const catalogGroup = usePosCheckoutCatalogStore((s) => s.catalogGroup);
+  const setCatalogGroup = usePosCheckoutCatalogStore(
+    (s) => s.setCatalogGroup,
+  );
+  const catalogCollapsed = usePosCheckoutCatalogStore(
+    (s) => s.catalogCollapsed,
+  );
+  const setCatalogCollapsed = usePosCheckoutCatalogStore(
+    (s) => s.setCatalogCollapsed,
+  );
 
   const filteredProducts = useMemo(() => {
     return catalog.filter((p) => matchesCatalogQuery(p, toolbar.query));
@@ -103,7 +84,6 @@ export function useCheckoutCatalog(
     catalog,
     catalogLoading,
     catalogError,
-    loadCatalog,
     toolbar,
     setToolbar,
     catalogQuery,

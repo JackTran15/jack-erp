@@ -1,27 +1,60 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import { type CustomerRow, searchCustomers } from "@erp/pos/lib/common/customerApi";
+import {
+  formatCustomerDisplay,
+  searchCustomers,
+  type CustomerRow,
+} from "@erp/pos/lib/common/customerApi";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
+import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
-interface UseCheckoutCustomerInput {
-  announce: (message: string) => void;
-  formatCustomerLabel: (customer: CustomerRow) => string;
-  onCustomerSelected?: (customer: CustomerRow) => void;
-}
-
-export function useCheckoutCustomer({
-  announce,
-  formatCustomerLabel,
-  onCustomerSelected,
-}: UseCheckoutCustomerInput) {
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(
-    null,
+/**
+ * Zero-input adapter cho customer state + dialog handlers.
+ * `announce` đọc từ ui store, `clearKeepChange` gọi từ payment store khi pick.
+ */
+export function useCheckoutCustomer() {
+  const selectedCustomer = usePosCheckoutCustomerStore(
+    (s) => s.selectedCustomer,
   );
-  const [customerQuery, setCustomerQuery] = useState("");
-  const [customerFieldError, setCustomerFieldError] = useState("");
-  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [createDefaultQuery, setCreateDefaultQuery] = useState("");
-  const [editCustomerOpen, setEditCustomerOpen] = useState(false);
+  const setSelectedCustomer = usePosCheckoutCustomerStore(
+    (s) => s.setSelectedCustomer,
+  );
+  const customerQuery = usePosCheckoutCustomerStore((s) => s.customerQuery);
+  const setCustomerQuery = usePosCheckoutCustomerStore(
+    (s) => s.setCustomerQuery,
+  );
+  const customerFieldError = usePosCheckoutCustomerStore(
+    (s) => s.customerFieldError,
+  );
+  const setCustomerFieldError = usePosCheckoutCustomerStore(
+    (s) => s.setCustomerFieldError,
+  );
+  const createCustomerOpen = usePosCheckoutCustomerStore(
+    (s) => s.createCustomerOpen,
+  );
+  const setCreateCustomerOpen = usePosCheckoutCustomerStore(
+    (s) => s.setCreateCustomerOpen,
+  );
+  const createDefaultQuery = usePosCheckoutCustomerStore(
+    (s) => s.createDefaultQuery,
+  );
+  const setCreateDefaultQuery = usePosCheckoutCustomerStore(
+    (s) => s.setCreateDefaultQuery,
+  );
+  const editCustomerOpen = usePosCheckoutCustomerStore(
+    (s) => s.editCustomerOpen,
+  );
+  const setEditCustomerOpen = usePosCheckoutCustomerStore(
+    (s) => s.setEditCustomerOpen,
+  );
+  const pickCustomerAction = usePosCheckoutCustomerStore(
+    (s) => s.pickCustomer,
+  );
+  const clearCustomerAction = usePosCheckoutCustomerStore(
+    (s) => s.clearCustomer,
+  );
 
   const customerSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<CustomerRow>[]> => {
@@ -33,13 +66,15 @@ export function useCheckoutCustomer({
 
   const pickCustomer = useCallback(
     (c: CustomerRow, announceMessage?: string) => {
-      setSelectedCustomer(c);
-      setCustomerFieldError("");
-      setCustomerQuery(c.name?.trim() ?? "");
-      onCustomerSelected?.(c);
-      announce(announceMessage ?? `Đã chọn khách ${formatCustomerLabel(c)}.`);
+      pickCustomerAction(c);
+      usePosCheckoutPaymentStore.getState().clearKeepChange();
+      usePosCheckoutUiStore
+        .getState()
+        .setAnnouncement(
+          announceMessage ?? `Đã chọn khách ${formatCustomerDisplay(c)}.`,
+        );
     },
-    [announce, formatCustomerLabel, onCustomerSelected],
+    [pickCustomerAction],
   );
 
   const handleCustomerSubmitQuery = useCallback(
@@ -69,20 +104,54 @@ export function useCheckoutCustomer({
       })();
       return true;
     },
-    [pickCustomer],
+    [
+      pickCustomer,
+      setCustomerFieldError,
+      setCreateDefaultQuery,
+      setCreateCustomerOpen,
+    ],
   );
 
   const handleClearCustomer = useCallback(() => {
-    setSelectedCustomer(null);
-    setCustomerQuery("");
-    setCustomerFieldError("");
-    announce("Khách lẻ.");
-  }, [announce]);
+    clearCustomerAction();
+    usePosCheckoutUiStore.getState().setAnnouncement("Khách lẻ.");
+  }, [clearCustomerAction]);
 
   const handleAddCustomer = useCallback(() => {
     setCreateDefaultQuery(customerQuery.trim());
     setCreateCustomerOpen(true);
-  }, [customerQuery]);
+  }, [customerQuery, setCreateDefaultQuery, setCreateCustomerOpen]);
+
+  const handleEditCustomer = useCallback(() => {
+    setEditCustomerOpen(true);
+  }, [setEditCustomerOpen]);
+
+  // Dialog lifecycle handlers
+  const closeCreateDialog = useCallback(() => {
+    setCreateCustomerOpen(false);
+    usePosCheckoutUiStore.getState().setCreateCustomerSucceeded(false);
+  }, [setCreateCustomerOpen]);
+
+  const handleCustomerCreated = useCallback(
+    (c: CustomerRow) => {
+      usePosCheckoutUiStore.getState().setCreateCustomerSucceeded(true);
+      setCreateCustomerOpen(false);
+      pickCustomer(c, `Đã tạo và chọn khách ${formatCustomerDisplay(c)}.`);
+    },
+    [pickCustomer, setCreateCustomerOpen],
+  );
+
+  const closeEditDialog = useCallback(() => {
+    setEditCustomerOpen(false);
+  }, [setEditCustomerOpen]);
+
+  const handleCustomerSubmitted = useCallback(
+    (c: CustomerRow) => {
+      setEditCustomerOpen(false);
+      pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
+    },
+    [pickCustomer, setEditCustomerOpen],
+  );
 
   return {
     selectedCustomer,
@@ -102,5 +171,10 @@ export function useCheckoutCustomer({
     handleCustomerSubmitQuery,
     handleClearCustomer,
     handleAddCustomer,
+    handleEditCustomer,
+    closeCreateDialog,
+    handleCustomerCreated,
+    closeEditDialog,
+    handleCustomerSubmitted,
   };
 }

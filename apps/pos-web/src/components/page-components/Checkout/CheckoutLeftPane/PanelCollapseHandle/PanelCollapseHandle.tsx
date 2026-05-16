@@ -1,23 +1,21 @@
 import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { cn } from "@erp/ui";
-
-export interface PanelCollapseHandleProps {
-  collapsed: boolean;
-  onToggle: () => void;
-}
+import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 
 /**
  * Horizontal divider between the invoice table and the product catalog.
- * Click to toggle catalog visibility (resize support omitted — pure UI).
+ * Click to toggle catalog visibility — đọc/set catalogCollapsed từ store.
  */
-export function PanelCollapseHandle({
-  collapsed,
-  onToggle,
-}: PanelCollapseHandleProps) {
+export function PanelCollapseHandle() {
+  const collapsed = usePosCheckoutCatalogStore((s) => s.catalogCollapsed);
+  const setCatalogCollapsed = usePosCheckoutCatalogStore(
+    (s) => s.setCatalogCollapsed,
+  );
+
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={() => setCatalogCollapsed((c) => !c)}
       aria-label={collapsed ? "Mở rộng tư vấn bán hàng" : "Thu gọn tư vấn bán hàng"}
       aria-expanded={!collapsed}
       className="flex h-6 w-full cursor-pointer items-center justify-center border-y border-gray-200 bg-gray-100 transition-colors hover:bg-gray-200"

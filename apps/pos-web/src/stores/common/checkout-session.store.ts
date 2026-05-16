@@ -7,6 +7,8 @@ import {
   type DraftInvoice,
   type DraftInvoicePayment,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
+import { getOversellSaleLines } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 
 const STORAGE_KEY = "pos-checkout-sessions";
 const STORE_VERSION = 1;
@@ -421,4 +423,153 @@ export function selectActiveSession(
   state: PosCheckoutSessionState,
 ): InvoiceSession | undefined {
   return state.sessions.find((s) => s.id === state.activeSessionId);
+}
+
+export function selectCheckoutVariant(
+  state: PosCheckoutSessionState,
+): CheckoutVariantEnum {
+  return selectActiveSession(state)?.checkoutVariant ?? CheckoutVariantEnum.SALE;
+}
+
+export function selectActiveCheckoutPane(
+  state: PosCheckoutSessionState,
+): CheckoutPane {
+  return selectActiveSession(state)?.activeCheckoutPane ?? CheckoutPane.RETURN;
+}
+
+const EMPTY_CART: CartLine[] = [];
+
+export function selectPurchaseCart(state: PosCheckoutSessionState): CartLine[] {
+  return selectActiveSession(state)?.purchaseCart ?? EMPTY_CART;
+}
+
+export function selectReturnCart(state: PosCheckoutSessionState): CartLine[] {
+  return selectActiveSession(state)?.returnCart ?? EMPTY_CART;
+}
+
+export function selectHasAnyCartLines(state: PosCheckoutSessionState): boolean {
+  const session = selectActiveSession(state);
+  if (!session) return false;
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return session.purchaseCart.length + session.returnCart.length > 0;
+  }
+  return session.purchaseCart.length > 0;
+}
+
+export function selectIsReturnExchangeInvoice(
+  state: PosCheckoutSessionState,
+): boolean {
+  const variant = selectCheckoutVariant(state);
+  return (
+    variant === CheckoutVariantEnum.QUICK_EXCHANGE ||
+    variant === CheckoutVariantEnum.INVOICE_RETURN
+  );
+}
+
+export function selectInvoiceTableCheckoutPane(
+  state: PosCheckoutSessionState,
+): CheckoutPane {
+  const session = selectActiveSession(state);
+  if (
+    session?.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+    session.activeCheckoutPane === CheckoutPane.RETURN
+  ) {
+    return CheckoutPane.RETURN;
+  }
+  return CheckoutPane.PURCHASE;
+}
+
+export function selectItemCountForPayment(
+  state: PosCheckoutSessionState,
+): number {
+  const session = selectActiveSession(state);
+  if (!session) return 0;
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return session.purchaseCart.length + session.returnCart.length;
+  }
+  return session.purchaseCart.length;
+}
+
+export function selectGrandTotal(state: PosCheckoutSessionState): number {
+  const session = selectActiveSession(state);
+  if (!session) return 0;
+  return netSessionGrandTotal(
+    session.checkoutVariant,
+    session.purchaseCart,
+    session.returnCart,
+  );
+}
+
+/**
+ * Selectors below return new arrays/objects on every call. Use inside `useMemo`
+ * or call via `useStore.getState()` inside event handlers — không subscribe trực tiếp
+ * (subscribe sẽ trigger re-render mỗi lần state đổi vì reference identity khác).
+ */
+
+export function computeReceiptLines(
+  state: PosCheckoutSessionState,
+): CartLine[] {
+  const session = selectActiveSession(state);
+  if (!session) return [];
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return [...session.returnCart, ...session.purchaseCart];
+  }
+  return session.purchaseCart;
+}
+
+export function computeVoucherLineSource(
+  state: PosCheckoutSessionState,
+): CartLine[] {
+  const session = selectActiveSession(state);
+  if (!session) return [];
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return [...session.purchaseCart, ...session.returnCart];
+  }
+  return session.purchaseCart;
+}
+
+export function computeLinesForDraftSingle(
+  state: PosCheckoutSessionState,
+): CartLine[] {
+  const session = selectActiveSession(state);
+  if (!session) return [];
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return [...session.returnCart, ...session.purchaseCart];
+  }
+  return session.purchaseCart;
+}
+
+export interface QuickExchangeBadgesValue {
+  returnQuantity: number;
+  purchaseQuantity: number;
+}
+
+export function computeQuickExchangeBadges(
+  state: PosCheckoutSessionState,
+): QuickExchangeBadgesValue | null {
+  const session = selectActiveSession(state);
+  if (!session) return null;
+  if (session.checkoutVariant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+    return {
+      returnQuantity: session.returnCart.reduce((s, l) => s + l.qty, 0),
+      purchaseQuantity: session.purchaseCart.reduce((s, l) => s + l.qty, 0),
+    };
+  }
+  if (session.checkoutVariant === CheckoutVariantEnum.INVOICE_RETURN) {
+    return {
+      returnQuantity: session.purchaseCart
+        .filter((l) => l.isReturnCredit)
+        .reduce((s, l) => s + l.qty, 0),
+      purchaseQuantity: session.purchaseCart
+        .filter((l) => !l.isReturnCredit)
+        .reduce((s, l) => s + l.qty, 0),
+    };
+  }
+  return null;
+}
+
+export function computeOversellLines(
+  state: PosCheckoutSessionState,
+): CartLine[] {
+  return getOversellSaleLines(selectPurchaseCart(state));
 }

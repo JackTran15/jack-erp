@@ -23,8 +23,8 @@ import type {
   InvoiceTabItem,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/DraftInvoicesDialog";
-import { useAnnounce } from "@erp/pos/hooks/page-hooks/checkout/use-announce";
 import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/common/localstorage";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 
 export interface PosMenuItem {
@@ -80,7 +80,8 @@ export function PosLayout() {
   );
   const removeDraft = usePosCheckoutSessionStore((s) => s.removeDraft);
 
-  const { message: announcement, announce } = useAnnounce();
+  const announcement = usePosCheckoutUiStore((s) => s.announcement);
+  const announce = usePosCheckoutUiStore((s) => s.setAnnouncement);
 
   const tabs = useMemo<InvoiceTabItem[]>(() => {
     const fromSessions = sessions.map((s) => ({

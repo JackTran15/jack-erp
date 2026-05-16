@@ -1,77 +1,63 @@
 import { useCallback } from "react";
 
-import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import {
-  formatCustomerDisplay,
-  type CustomerRow,
-} from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
 import {
   CheckoutVariantEnum,
-  type CartLine,
   type DraftInvoice,
-  type PaymentMethodOption,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { resolvePaymentMethodLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-
-export interface UseCheckoutDraftInput {
-  hasAnyCartLines: boolean;
-  checkoutVariant: CheckoutVariantEnum;
-  grandTotal: number;
-  purchaseCart: ReadonlyArray<CartLine>;
-  returnCart: ReadonlyArray<CartLine>;
-  linesForDraftSingle: ReadonlyArray<CartLine>;
-  selectedCustomer: CustomerRow | null;
-  paymentLines: ReadonlyArray<PaymentLine>;
-  methods: readonly PaymentMethodOption[];
-  announce: (msg: string) => void;
-  addDraft: (draft: DraftInvoice) => void;
-  nextDraftSeq: () => number;
-  resetActiveSessionAfterCheckout: () => void;
-  onAfterSave: () => void;
-}
+import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
+import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
+import {
+  computeLinesForDraftSingle,
+  selectGrandTotal,
+  selectHasAnyCartLines,
+  selectCheckoutVariant,
+  selectPurchaseCart,
+  selectReturnCart,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
+import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutDraftResult {
   saveDraft: () => void;
 }
 
-export const useCheckoutDraft = (
-  input: UseCheckoutDraftInput,
-): UseCheckoutDraftResult => {
-  const {
-    hasAnyCartLines,
-    checkoutVariant,
-    grandTotal,
-    purchaseCart,
-    returnCart,
-    linesForDraftSingle,
-    selectedCustomer,
-    paymentLines,
-    methods,
-    announce,
-    addDraft,
-    nextDraftSeq,
-    resetActiveSessionAfterCheckout,
-    onAfterSave,
-  } = input;
-
+/**
+ * Zero-input adapter: đọc cart/payment/customer từ stores, snapshot DraftInvoice
+ * và push vào session store. Sau đó reset session + ui draft.
+ */
+export const useCheckoutDraft = (): UseCheckoutDraftResult => {
   const saveDraft = useCallback(() => {
-    if (!hasAnyCartLines) return;
+    const sessionState = usePosCheckoutSessionStore.getState();
+    if (!selectHasAnyCartLines(sessionState)) return;
+
+    const checkoutVariant = selectCheckoutVariant(sessionState);
+    const purchaseCart = selectPurchaseCart(sessionState);
+    const returnCart = selectReturnCart(sessionState);
+    const grandTotal = selectGrandTotal(sessionState);
+    const linesForDraftSingle = computeLinesForDraftSingle(sessionState);
+
+    const selectedCustomer =
+      usePosCheckoutCustomerStore.getState().selectedCustomer;
+    const paymentLines = usePosCheckoutPaymentStore.getState().paymentLines;
 
     const now = new Date();
     const yy = String(now.getFullYear() % 100).padStart(2, "0");
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const seq = String(nextDraftSeq()).padStart(4, "0");
+    const seq = String(sessionState.nextDraftSeq()).padStart(4, "0");
     const invoiceNumber = `${yy}${mm}${dd}${seq}`;
 
-    const paymentsSnapshot =
-      paymentLines
-        .filter((l) => l.amount > 0)
-        .map((l) => ({
-          method: l.method,
-          label: resolvePaymentMethodLabel(l.method, methods),
-          amount: l.amount,
-        })) ?? [];
+    const paymentsSnapshot = paymentLines
+      .filter((l) => l.amount > 0)
+      .map((l) => ({
+        method: l.method,
+        label: resolvePaymentMethodLabel(l.method, PAYMENT_METHODS),
+        amount: l.amount,
+      }));
 
     const snapshot: DraftInvoice = {
       id: crypto.randomUUID(),
@@ -96,26 +82,13 @@ export const useCheckoutDraft = (
           : undefined,
     };
 
-    addDraft(snapshot);
-    announce(`Đã lưu tạm hóa đơn ${invoiceNumber}.`);
-    resetActiveSessionAfterCheckout();
-    onAfterSave();
-  }, [
-    addDraft,
-    announce,
-    checkoutVariant,
-    grandTotal,
-    hasAnyCartLines,
-    linesForDraftSingle,
-    methods,
-    nextDraftSeq,
-    paymentLines,
-    purchaseCart,
-    returnCart,
-    resetActiveSessionAfterCheckout,
-    selectedCustomer,
-    onAfterSave,
-  ]);
+    sessionState.addDraft(snapshot);
+    usePosCheckoutUiStore
+      .getState()
+      .setAnnouncement(`Đã lưu tạm hóa đơn ${invoiceNumber}.`);
+    sessionState.resetActiveSessionAfterCheckout();
+    resetCheckoutDraftState();
+  }, []);
 
   return { saveDraft };
 };

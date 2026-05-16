@@ -9,52 +9,44 @@ import {
 import { cn, formatVnd } from "@erp/ui";
 import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemWarningCell/InvoiceLineItemWarningCell";
+import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
+import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface InvoiceLineItemRowProps {
   index: number;
   line: CartLine;
-  selected: boolean;
   checkoutPane?: CheckoutPane;
-  /** Show the red warning dot before SL (e.g. line is at stock cap). */
-  hasWarning?: boolean;
-  /**
-   * When `=== line.lineId`, the row automatically focuses and selects the qty
-   * input (for the MISA flow: after pressing Enter to add a product, focus
-   * moves to the qty field of the newly added line).
-   */
-  autoFocusQty?: boolean;
-  /** Called after the row has consumed the focus event, so the parent can reset pendingFocusLineId. */
-  onAutoFocusConsumed?: () => void;
-  /**
-   * Enter on the qty input triggers this callback — the host uses it to return
-   * focus to the product search field, completing one "add product → change qty
-   * → search next product" cycle.
-   */
-  onCommitQty?: () => void;
-  onSelect: (lineId: string) => void;
-  onRemove: (lineId: string) => void;
-  onChangeQty: (lineId: string, raw: string) => void;
-  onBumpQty?: (lineId: string, delta: number) => void;
-  onChangeUnitPrice: (lineId: string, raw: string) => void;
 }
 
-/** Single editable row inside the invoice line item table. */
+/**
+ * Single editable row inside the invoice line item table. Đọc selected /
+ * warning / autofocus signals từ stores+hooks; handlers từ cart hook.
+ */
 export function InvoiceLineItemRow({
   index,
   line,
-  selected,
   checkoutPane = CheckoutPane.PURCHASE,
-  hasWarning,
-  autoFocusQty,
-  onAutoFocusConsumed,
-  onCommitQty,
-  onSelect,
-  onRemove,
-  onChangeQty,
-  onBumpQty,
-  onChangeUnitPrice,
 }: InvoiceLineItemRowProps) {
+  const {
+    selectedLineId,
+    isLineWarning,
+    updateQty,
+    bumpQty,
+    updateUnitPrice,
+    removeLine,
+    setSelectedLineId,
+  } = useCheckoutSessionCart();
+  const { commitQty, consumeQtyAutoFocus } = useCheckoutCartActions();
+  const pendingQtyFocusLineId = usePosCheckoutUiStore(
+    (s) => s.pendingQtyFocusLineId,
+  );
+
+  const selected = selectedLineId === line.lineId;
+  const hasWarning = isLineWarning(line);
+  const autoFocusQty = pendingQtyFocusLineId === line.lineId;
+
   const rowTotal = lineTotal(line);
   const isReturnQuantityUi =
     Boolean(line.isReturnCredit) || checkoutPane === CheckoutPane.RETURN;
@@ -69,19 +61,20 @@ export function InvoiceLineItemRow({
     if (!el) return;
     el.focus();
     el.select();
-    onAutoFocusConsumed?.();
-  }, [autoFocusQty, onAutoFocusConsumed]);
+    consumeQtyAutoFocus();
+  }, [autoFocusQty, consumeQtyAutoFocus]);
 
   const handleQtyKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       qtyInputRef.current?.blur();
-      onCommitQty?.();
+      commitQty();
     }
   };
+
   return (
     <tr
-      onClick={() => onSelect(line.lineId)}
+      onClick={() => setSelectedLineId(line.lineId)}
       className={cn(
         "h-12 cursor-pointer text-sm text-gray-900 transition-colors",
         selected
@@ -110,13 +103,11 @@ export function InvoiceLineItemRow({
           inputRef={qtyInputRef}
           onKeyDown={handleQtyKeyDown}
           displayValue={displayQty}
-          onChangeRaw={(raw) => onChangeQty(line.lineId, raw)}
-          onBumpDown={onBumpQty ? () => onBumpQty(line.lineId, -1) : undefined}
-          onBumpUp={onBumpQty ? () => onBumpQty(line.lineId, 1) : undefined}
+          onChangeRaw={(raw) => updateQty(line.lineId, raw)}
+          onBumpDown={() => bumpQty(line.lineId, -1)}
+          onBumpUp={() => bumpQty(line.lineId, 1)}
           bumpDownDisabled={line.qty <= 1}
-          bumpUpDisabled={
-            isReturnQuantityUi ? line.qty >= line.maxQty : false
-          }
+          bumpUpDisabled={isReturnQuantityUi ? line.qty >= line.maxQty : false}
           min={isReturnQuantityUi ? -Math.max(line.maxQty, 1) : 1}
           max={isReturnQuantityUi ? -1 : undefined}
           itemLabel={line.name}
@@ -129,7 +120,7 @@ export function InvoiceLineItemRow({
         <PosNumberInput
           step={1000}
           value={line.unitPrice || 0}
-          onChange={(v) => onChangeUnitPrice(line.lineId, v.toString())}
+          onChange={(v) => updateUnitPrice(line.lineId, v.toString())}
           ariaLabel={`Đơn giá ${line.name}`}
           variant="underline"
           className="w-full"
@@ -144,7 +135,7 @@ export function InvoiceLineItemRow({
           aria-label={`Xóa ${line.name}`}
           onClick={(e) => {
             e.stopPropagation();
-            onRemove(line.lineId);
+            removeLine(line.lineId);
           }}
           className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
         >

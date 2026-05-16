@@ -1,21 +1,23 @@
 import { ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PriceBadge } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCard/PriceBadge/PriceBadge";
+import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 export interface ProductCardProps {
   product: CatalogProduct;
-  onSelect: (product: CatalogProduct) => void;
 }
 
 /**
  * Single product tile: square-ish image area with a placeholder bag icon,
- * price pill in the bottom-left corner, name underneath.
+ * price pill in the bottom-left corner, name underneath. Click → cart-actions
+ * hook thêm sản phẩm vào hóa đơn (focus signal vào qty input của row mới).
  */
-export function ProductCard({ product, onSelect }: ProductCardProps) {
+export function ProductCard({ product }: ProductCardProps) {
+  const { addProductByCatalogCard } = useCheckoutCartActions();
   return (
     <button
       type="button"
-      onClick={() => onSelect(product)}
+      onClick={() => addProductByCatalogCard(product)}
       className="group w-full flex h-[120px] flex-col overflow-hidden rounded-md border border-transparent bg-white text-left transition-all hover:border-indigo-500 hover:shadow-sm focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30"
     >
       <div className="relative flex flex-1 items-center justify-center bg-gray-300">

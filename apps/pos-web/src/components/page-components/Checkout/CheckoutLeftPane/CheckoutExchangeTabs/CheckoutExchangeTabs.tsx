@@ -1,18 +1,20 @@
 import { cn } from "@erp/ui";
-import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";
-
-export interface CheckoutExchangeTabsProps {
-  activeCheckoutPane: CheckoutPane;
-  onSelectCheckoutPane: (pane: CheckoutPane) => void;
-}
+import {
+  CheckoutPane,
+  selectActiveCheckoutPane,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 /**
  * "Trả hàng" / "Mua thêm" — only for quick-exchange checkout mode.
+ * Đọc và set activeCheckoutPane trực tiếp từ session store.
  */
-export function CheckoutExchangeTabs({
-  activeCheckoutPane,
-  onSelectCheckoutPane,
-}: CheckoutExchangeTabsProps) {
+export function CheckoutExchangeTabs() {
+  const activeCheckoutPane = usePosCheckoutSessionStore(selectActiveCheckoutPane);
+  const setActiveCheckoutPane = usePosCheckoutSessionStore(
+    (s) => s.setActiveCheckoutPane,
+  );
+
   return (
     <div
       role="tablist"
@@ -29,7 +31,7 @@ export function CheckoutExchangeTabs({
             ? "bg-orange-50/90 text-orange-600"
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
         )}
-        onClick={() => onSelectCheckoutPane(CheckoutPane.RETURN)}
+        onClick={() => setActiveCheckoutPane(CheckoutPane.RETURN)}
       >
         Trả hàng
         {activeCheckoutPane === CheckoutPane.RETURN ? (
@@ -46,7 +48,7 @@ export function CheckoutExchangeTabs({
             ? "bg-emerald-50/90 text-emerald-800"
             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
         )}
-        onClick={() => onSelectCheckoutPane(CheckoutPane.PURCHASE)}
+        onClick={() => setActiveCheckoutPane(CheckoutPane.PURCHASE)}
       >
         Mua thêm
         {activeCheckoutPane === CheckoutPane.PURCHASE ? (
