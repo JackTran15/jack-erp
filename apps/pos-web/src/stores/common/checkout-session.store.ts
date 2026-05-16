@@ -6,7 +6,7 @@ import {
   coerceCheckoutVariant,
   type DraftInvoice,
   type DraftInvoicePayment,
-} from "@erp/pos/lib/checkout/checkout.types";
+} from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 const STORAGE_KEY = "pos-checkout-sessions";
 const STORE_VERSION = 1;

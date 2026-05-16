@@ -5,9 +5,9 @@ import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/Po
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
 import { CalendarIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { CustomerGenderEnum } from "@erp/pos/lib/customerApi";
-import { GENDER_OPTIONS } from "@erp/pos/lib/checkout/customerFormUtils";
-import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/lib/checkout/customerCreate.types";
+import { CustomerGenderEnum } from "@erp/pos/lib/common/customerApi";
+import { GENDER_OPTIONS } from "@erp/pos/lib/page-libs/checkout/customerFormUtils";
+import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 

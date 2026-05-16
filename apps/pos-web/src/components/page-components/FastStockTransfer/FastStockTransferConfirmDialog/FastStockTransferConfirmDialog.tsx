@@ -4,7 +4,7 @@ import {
   PosDataTable,
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
-import type { FastStockTransferDialogRow } from "@erp/pos/lib/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferDialogRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
 
 interface FastStockTransferConfirmDialogProps {
   open: boolean;

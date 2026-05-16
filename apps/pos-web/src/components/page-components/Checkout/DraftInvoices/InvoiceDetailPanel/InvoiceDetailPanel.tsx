@@ -1,6 +1,6 @@
 import { cn, formatVnd } from "@erp/ui";
-import type { DraftInvoice } from "@erp/pos/lib/checkout/checkout.types";
-import { DRAFT_ZIGZAG_CLIP_PATH, draftLineDescription } from "@erp/pos/lib/checkout/draftInvoices.viewUtils";
+import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { DRAFT_ZIGZAG_CLIP_PATH, draftLineDescription } from "@erp/pos/lib/page-libs/checkout/draftInvoices.viewUtils";
 
 interface InvoiceDetailPanelProps {
   draft: DraftInvoice | null;

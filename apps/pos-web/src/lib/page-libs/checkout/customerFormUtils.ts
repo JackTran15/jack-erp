@@ -5,7 +5,7 @@ import {
   type CreateCustomerBody,
   type CreateMembershipCardInlineBody,
   type UpdateCustomerBody,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 import type { CustomerFormValues, CustomerSelectOption } from "./customerCreate.types";
 
 export const DEFAULT_PROVINCES: CustomerSelectOption[] = [

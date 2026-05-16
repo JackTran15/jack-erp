@@ -4,19 +4,19 @@ import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-sess
 import {
   isInDateRange,
   type PosDateRangeFilterOption,
-} from "@erp/pos/lib/dateRangeFilter";
+} from "@erp/pos/lib/common/dateRangeFilter";
 import { EMPTY_RETURN_INVOICE_FILTERS } from "@erp/pos/constants/return-goods.constant";
-import { getMockReturnInvoices } from "@erp/pos/lib/return-goods/mockData";
-import { buildInvoiceReturnCartLines } from "@erp/pos/lib/return-goods/toCheckoutCartLines";
+import { getMockReturnInvoices } from "@erp/pos/lib/page-libs/return-goods/mockData";
+import { buildInvoiceReturnCartLines } from "@erp/pos/lib/page-libs/return-goods/toCheckoutCartLines";
 import {
   clampReturnQty,
   sumSelectedReturnTotal,
-} from "@erp/pos/lib/return-goods/returnGoodsMath";
+} from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
 import type {
   ReturnInvoiceFilters,
   ReturnInvoiceRow,
   ReturnableItem,
-} from "@erp/pos/lib/return-goods/return-goods.types";
+} from "@erp/pos/lib/page-libs/return-goods/return-goods.types";
 
 interface UseReturnGoodsResult {
   /** Date-range pill at top-left of the page. */

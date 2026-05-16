@@ -7,8 +7,8 @@ import {
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
-import { clampReturnQty } from "@erp/pos/lib/return-goods/returnGoodsMath";
-import type { ReturnInvoiceRow, ReturnableItem } from "@erp/pos/lib/return-goods/return-goods.types";
+import { clampReturnQty } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
+import type { ReturnInvoiceRow, ReturnableItem } from "@erp/pos/lib/page-libs/return-goods/return-goods.types";
 
 export interface ReturnItemsDialogProps {
   open: boolean;

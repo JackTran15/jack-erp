@@ -1,6 +1,6 @@
 import { InfoSectionGroup, type InfoRow } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/InfoSectionGroup/InfoSectionGroup";
-import { CustomerGenderEnum } from "@erp/pos/lib/customerApi";
-import type { CustomerDetailData } from "@erp/pos/lib/checkout/customerDetail.types";
+import { CustomerGenderEnum } from "@erp/pos/lib/common/customerApi";
+import type { CustomerDetailData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface InfoTabProps {
   data: CustomerDetailData;

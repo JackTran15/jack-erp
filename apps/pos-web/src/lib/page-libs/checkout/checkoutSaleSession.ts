@@ -5,7 +5,7 @@ import {
 } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
 import type { CartLine } from "./checkout.types";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
-import type { CustomerRow } from "@erp/pos/lib/customerApi";
+import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
 
 interface ResetCheckoutSaleSessionInput {
   /** Optional when cart lives in Zustand (`usePosCheckoutSessionStore`). */

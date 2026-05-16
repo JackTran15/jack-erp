@@ -1,5 +1,5 @@
 import { PosDateRangeFilter } from "@erp/pos/components/common/PosDateRangeFilter/PosDateRangeFilter";
-import type { PosDateRangeFilterOption } from "@erp/pos/lib/dateRangeFilter";
+import type { PosDateRangeFilterOption } from "@erp/pos/lib/common/dateRangeFilter";
 import { cn } from "@erp/ui";
 import { SearchIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 

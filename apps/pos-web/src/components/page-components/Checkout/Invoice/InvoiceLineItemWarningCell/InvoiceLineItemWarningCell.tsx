@@ -1,6 +1,6 @@
 import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@erp/ui";
 import type { ComponentPropsWithoutRef } from "react";
-import { qtyFormatter } from "@erp/pos/lib/checkout/checkoutUtils";
+import { qtyFormatter } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 
 export interface InvoiceLineItemWarningCellProps {
   hasWarning?: boolean;

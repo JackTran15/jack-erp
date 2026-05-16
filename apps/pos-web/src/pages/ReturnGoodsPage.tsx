@@ -1,7 +1,7 @@
 import { PosPaginationBar } from "@erp/pos/components/common/PosPaginationBar/PosPaginationBar";
 import { PosDateRangeFilter } from "@erp/pos/components/common/PosDateRangeFilter/PosDateRangeFilter";
 import { ExchangeClipboardIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { formatViDateTime } from "@erp/pos/lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 import { useState } from "react";

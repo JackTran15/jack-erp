@@ -4,10 +4,10 @@ import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem"
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
 import { useCreateCustomerGroup } from "@erp/pos/hooks/page-hooks/checkout/use-customer-groups";
-import { type CustomerGroupRow } from "@erp/pos/lib/customerApi";
+import { type CustomerGroupRow } from "@erp/pos/lib/common/customerApi";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
-import { userFacingError } from "@erp/pos/lib/checkout/customerFormUtils";
-import type { CustomerSelectOption } from "@erp/pos/lib/checkout/customerCreate.types";
+import { userFacingError } from "@erp/pos/lib/page-libs/checkout/customerFormUtils";
+import type { CustomerSelectOption } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 
 const LABEL_CLASS = "w-[110px] shrink-0 text-sm text-gray-700";
 

@@ -1,4 +1,4 @@
-import type { CartLine } from "@erp/pos/lib/checkout/checkout.types";
+import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import type { ReturnInvoiceRow } from "./return-goods.types";
 
 /**

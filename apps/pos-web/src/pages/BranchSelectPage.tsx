@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBranchById, type BranchRow } from "../lib/branchApi";
-import { parseAccessTokenPayload } from "../lib/parseJwt";
+import { getBranchById, type BranchRow } from "@erp/pos/lib/common/branchApi";
+import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
 import { usePosBranchStore } from "../stores/common/branch.store";
 
 type BranchOption = { id: string; name: string };

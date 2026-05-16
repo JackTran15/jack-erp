@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getStoredOrganizationId, isPosAuthenticated, loginPos } from "../lib/posAuth";
+import { getStoredOrganizationId, isPosAuthenticated, loginPos } from "@erp/pos/lib/common/posAuth";
 
 const DEFAULT_DEV_ORG_ID = "10000000-0000-4000-8000-000000000001";
 

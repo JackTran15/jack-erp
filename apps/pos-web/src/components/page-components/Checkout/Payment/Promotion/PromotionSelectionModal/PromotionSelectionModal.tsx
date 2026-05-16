@@ -7,7 +7,7 @@ import { PlusCircleIcon, SearchIcon } from "@erp/pos/components/common/PosIcons/
 import { PromotionTable } from "@erp/pos/components/page-components/Checkout/Payment/Promotion/PromotionTable/PromotionTable";
 import type {
   PromotionItem,
-} from "@erp/pos/lib/checkout/promotion.types";
+} from "@erp/pos/lib/page-libs/checkout/promotion.types";
 
 export interface PromotionSelectionModalProps {
   open: boolean;

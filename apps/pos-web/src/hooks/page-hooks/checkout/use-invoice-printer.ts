@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { BrowserWindowInvoicePrinter } from "@erp/pos/lib/checkout/printing/BrowserWindowInvoicePrinter";
-import type { InvoicePrinter } from "@erp/pos/lib/checkout/printing/InvoicePrinter";
+import { BrowserWindowInvoicePrinter } from "@erp/pos/lib/page-libs/checkout/printing/BrowserWindowInvoicePrinter";
+import type { InvoicePrinter } from "@erp/pos/lib/page-libs/checkout/printing/InvoicePrinter";
 
 /**
  * Module-level override. Production code can inject a different printer

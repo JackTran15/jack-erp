@@ -3,7 +3,7 @@ import { cn, formatVnd } from "@erp/ui";
 import { CloseIcon, PlusCircleIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { PaymentMethod, PaymentMethodOption } from "@erp/pos/lib/checkout/checkout.types";
+import type { PaymentMethod, PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 /**
  * One payment-method line: the user can split a sale across N methods, each

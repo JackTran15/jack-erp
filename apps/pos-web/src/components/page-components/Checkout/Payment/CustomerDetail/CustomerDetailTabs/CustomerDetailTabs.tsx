@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { CustomerDetailTabKeyEnum } from "@erp/pos/constants/checkout.constant";
-import type { CustomerDetailTabKey } from "@erp/pos/lib/checkout/customerDetail.types";
+import type { CustomerDetailTabKey } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface CustomerDetailTabsProps {
   activeTab: CustomerDetailTabKey;

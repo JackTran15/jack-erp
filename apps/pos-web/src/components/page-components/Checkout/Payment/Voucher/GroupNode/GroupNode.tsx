@@ -1,4 +1,4 @@
-import type { VoucherSelectableGroup } from "@erp/pos/lib/checkout/voucher.types";
+import type { VoucherSelectableGroup } from "@erp/pos/lib/page-libs/checkout/voucher.types";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 
 interface GroupNodeProps {

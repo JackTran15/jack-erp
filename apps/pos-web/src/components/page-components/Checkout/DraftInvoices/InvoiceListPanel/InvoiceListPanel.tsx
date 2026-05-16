@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import type { DraftInvoice } from "@erp/pos/lib/checkout/checkout.types";
+import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { DraftRow } from "@erp/pos/components/page-components/Checkout/DraftInvoices/DraftRow/DraftRow";
 
 interface InvoiceListPanelProps {

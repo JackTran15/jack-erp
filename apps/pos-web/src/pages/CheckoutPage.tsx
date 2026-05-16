@@ -15,11 +15,11 @@ import {
   formatCustomerDisplay,
   searchCustomers,
   type CustomerRow,
-} from "../lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 import { MoneyInput } from "@erp/ui";
-import { formatCurrencyVnd } from "../lib/formatCurrency";
+import { formatCurrencyVnd } from "@erp/pos/lib/common/formatCurrency";
 import { usePosBranchStore } from "../stores/common/branch.store";
-import { fetchPosCatalog, type PosCatalogLine } from "../lib/posCatalogApi";
+import { fetchPosCatalog, type PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import { useAnnounce } from "../hooks/page-hooks/checkout/use-announce";
 
 const qtyFormatter = new Intl.NumberFormat("vi-VN", {

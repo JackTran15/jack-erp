@@ -12,13 +12,13 @@ import {
 import type {
   CashSuggestion,
   PaymentMethodOption,
-} from "@erp/pos/lib/checkout/checkout.types";
+} from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
-import { buildSuggestions } from "@erp/pos/lib/checkout/checkoutUtils";
+import { buildSuggestions } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   derivePaymentDisplay,
   settlementAbsFromGrand,
-} from "@erp/pos/lib/checkout/checkoutSettlement";
+} from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 
 interface UseCheckoutPaymentInput {
   grandTotal: number;

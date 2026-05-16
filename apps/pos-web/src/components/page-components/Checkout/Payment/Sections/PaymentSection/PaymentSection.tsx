@@ -1,7 +1,7 @@
 import type { Ref } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/common/PosTextarea/PosTextarea";
-import type { PaymentMethodOption } from "@erp/pos/lib/checkout/checkout.types";
+import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { DebtCheckRow } from "@erp/pos/components/page-components/Checkout/Payment/DebtCheckRow/DebtCheckRow";
 import { ForgiveShortageRow } from "@erp/pos/components/page-components/Checkout/Payment/ForgiveShortageRow/ForgiveShortageRow";
 import { KeepChangeRow } from "@erp/pos/components/page-components/Checkout/Payment/KeepChangeRow/KeepChangeRow";

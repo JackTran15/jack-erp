@@ -7,10 +7,10 @@ import { useCustomerGroups } from "@erp/pos/hooks/page-hooks/checkout/use-custom
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/DebtTab/DebtTab";
 import { InfoTab } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/InfoTab/InfoTab";
-import { mapCustomerToDetailData } from "@erp/pos/lib/checkout/mapCustomerDetail";
+import { mapCustomerToDetailData } from "@erp/pos/lib/page-libs/checkout/mapCustomerDetail";
 import { OverviewTab } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/OverviewTab/OverviewTab";
 import { PurchaseHistoryTab } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/PurchaseHistoryTab/PurchaseHistoryTab";
-import type { CustomerDetailData, CustomerDetailTabKey } from "@erp/pos/lib/checkout/customerDetail.types";
+import type { CustomerDetailData, CustomerDetailTabKey } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface CustomerDetailDialogProps {
   open: boolean;

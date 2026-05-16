@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import type { PromotionItem } from "@erp/pos/lib/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
 import { PromotionRow } from "@erp/pos/components/page-components/Checkout/Payment/Promotion/PromotionRow/PromotionRow";
 
 interface PromotionTableProps {

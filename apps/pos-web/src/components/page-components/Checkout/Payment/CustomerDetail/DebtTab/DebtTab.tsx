@@ -1,7 +1,7 @@
 import { PosDataTable, type PosDataTableColumn } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
 import { PosPaginationBar } from "@erp/pos/components/common/PosPaginationBar/PosPaginationBar";
-import { formatViDateTime } from "@erp/pos/lib/dateTime";
+import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { formatVnd } from "@erp/ui";
 import { useMemo, useState } from "react";
 import { DebtTypeFilterEnum } from "@erp/pos/constants/checkout.constant";
@@ -10,7 +10,7 @@ import {
   FilterOperatorTypeEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { DebtEntry } from "@erp/pos/lib/checkout/customerDetail.types";
+import type { DebtEntry } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface DebtTabProps {
   rows: DebtEntry[];

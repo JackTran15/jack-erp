@@ -1,5 +1,5 @@
 import { formatVnd } from "@erp/ui";
-import type { CashSuggestion } from "@erp/pos/lib/checkout/checkout.types";
+import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 export interface CashSuggestionListProps {
   label?: string;

@@ -10,7 +10,7 @@ import {
   listCustomerGroups,
   type CreateCustomerGroupBody,
   type CustomerGroupRow,
-} from "@erp/pos/lib/customerApi";
+} from "@erp/pos/lib/common/customerApi";
 
 /**
  * Shared TanStack Query key for the customer-group list. Exported so that

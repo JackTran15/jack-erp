@@ -6,7 +6,7 @@ import {
   PlusCircleSolidIcon,
   ScanFrameIcon,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
-import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/lib/checkout/customerCreate.types";
+import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 

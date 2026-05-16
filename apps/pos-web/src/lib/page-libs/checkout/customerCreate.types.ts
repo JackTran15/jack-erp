@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { CustomerGenderEnum, CustomerRow } from "@erp/pos/lib/customerApi";
+import type { CustomerGenderEnum, CustomerRow } from "@erp/pos/lib/common/customerApi";
 
 export type CustomerDialogMode = "create" | "edit";
 

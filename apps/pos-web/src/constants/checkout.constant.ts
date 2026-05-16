@@ -1,4 +1,4 @@
-import type { PaymentMethodOption } from "@erp/pos/lib/checkout/checkout.types";
+import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
 // ============================================================================
 // Customer (purchase history, debt, detail tabs)

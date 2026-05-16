@@ -1,4 +1,4 @@
-import type { CartLine } from "@erp/pos/lib/checkout/checkout.types";
+import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { TooltipProvider } from "@erp/ui";
 import { InvoiceLineItemRow } from "@erp/pos/components/page-components/Checkout/Invoice/InvoiceLineItemRow/InvoiceLineItemRow";
 import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";

@@ -21,10 +21,10 @@ import { InvoiceTab } from "@erp/pos/components/page-components/Checkout/Topbar/
 import type {
   DraftInvoice,
   InvoiceTabItem,
-} from "@erp/pos/lib/checkout/checkout.types";
+} from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/DraftInvoices/DraftInvoicesDialog/DraftInvoicesDialog";
 import { useAnnounce } from "@erp/pos/hooks/page-hooks/checkout/use-announce";
-import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/localstorage";
+import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/common/localstorage";
 
 
 export interface PosMenuItem {

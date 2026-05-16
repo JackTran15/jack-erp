@@ -7,7 +7,7 @@ import type {
 } from "./checkout.types";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
 import { PromoMenuOptionEnum } from "@erp/pos/constants/checkout.constant";
-import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 
 export const qtyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 2,

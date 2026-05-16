@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { LayersIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import type { MemberCardData } from "@erp/pos/lib/checkout/discountPoint.types";
+import type { MemberCardData } from "@erp/pos/lib/page-libs/checkout/discountPoint.types";
 
 interface MemberCardTealProps {
   member?: MemberCardData;

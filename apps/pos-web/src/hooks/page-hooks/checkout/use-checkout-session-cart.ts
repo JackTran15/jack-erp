@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { PosCatalogLine } from "@erp/pos/lib/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
 import {
   CheckoutPane,
   selectActiveSession,
@@ -9,15 +9,15 @@ import {
   type CartLine,
   type CatalogProduct,
   CheckoutVariantEnum,
-} from "@erp/pos/lib/checkout/checkout.types";
-import { isCartLineWarning, locationQtyFor } from "@erp/pos/lib/checkout/checkoutUtils";
+} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { isCartLineWarning, locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
   POS_CHECKOUT_QTY_MIN,
   safePosCheckoutQtyFromRaw,
-} from "@erp/pos/lib/checkout/posCheckoutQty";
-import { clampReturnQty } from "@erp/pos/lib/return-goods/returnGoodsMath";
-import { netSessionGrandTotal } from "@erp/pos/lib/checkout/checkoutSessionTotals";
+} from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
+import { clampReturnQty } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
+import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 
 function isSignedNegativeQtyCart(
   variant: CheckoutVariantEnum,

@@ -4,7 +4,7 @@ import {
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
-import type { FastStockTransferFilters, FastStockTransferRow } from "@erp/pos/lib/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferFilters, FastStockTransferRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
 import {

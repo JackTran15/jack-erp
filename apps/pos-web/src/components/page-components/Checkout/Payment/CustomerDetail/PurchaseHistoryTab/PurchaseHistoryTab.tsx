@@ -13,8 +13,8 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/StatusBadge/StatusBadge";
-import { formatViDateTime } from "@erp/pos/lib/dateTime";
-import type { PurchaseHistoryEntry } from "@erp/pos/lib/checkout/customerDetail.types";
+import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+import type { PurchaseHistoryEntry } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface PurchaseHistoryTabProps {
   rows: PurchaseHistoryEntry[];

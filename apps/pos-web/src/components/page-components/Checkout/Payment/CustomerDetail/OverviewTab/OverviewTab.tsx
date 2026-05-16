@@ -1,6 +1,6 @@
 import { CustomerStatsPanel } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/CustomerStatsPanel/CustomerStatsPanel";
 import { MembershipCard } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/MembershipCard/MembershipCard";
-import type { CustomerDetailData } from "@erp/pos/lib/checkout/customerDetail.types";
+import type { CustomerDetailData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
 
 export interface OverviewTabProps {
   data: CustomerDetailData;

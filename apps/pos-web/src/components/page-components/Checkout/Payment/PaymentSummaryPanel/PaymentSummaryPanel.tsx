@@ -16,7 +16,7 @@ import {
   type PromoMenuOption,
 } from "@erp/pos/constants/checkout.constant";
 import type { SearchSuggestion } from "@erp/pos/components/page-components/Checkout/Common/SearchPopover/SearchPopover";
-import type { CashSuggestion, PaymentMethodOption } from "@erp/pos/lib/checkout/checkout.types";
+import type { CashSuggestion, PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import type { CustomerActionItem } from "@erp/pos/components/page-components/Checkout/Payment/CustomerActions/CustomerActions";
 import { type PaymentLine } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
 import {
@@ -28,7 +28,7 @@ import { QuickExchangeBadges } from "@erp/pos/components/page-components/Checkou
 import { DepositDialog } from "@erp/pos/components/page-components/Checkout/Payment/DepositDialog/DepositDialog";
 import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/Payment/CustomerDetail/CustomerDetailDialog/CustomerDetailDialog";
 import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/Payment/Promotion/PromotionSelectionModal/PromotionSelectionModal";
-import type { PromotionItem } from "@erp/pos/lib/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
 import type { QrPaymentInfo } from "@erp/pos/components/page-components/Checkout/Payment/VietQrPaymentDialog/VietQrPaymentDialog";
 import { CheckoutActionsSection } from "@erp/pos/components/page-components/Checkout/Payment/Sections/CheckoutActionsSection/CheckoutActionsSection";
 import { CustomerSection } from "@erp/pos/components/page-components/Checkout/Payment/Sections/CustomerSection/CustomerSection";

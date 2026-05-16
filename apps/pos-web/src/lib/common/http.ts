@@ -1,4 +1,4 @@
-import { usePosBranchStore } from "../stores/common/branch.store";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { resolveApiBaseUrl } from "./api-base";
 
 const ACCESS_TOKEN_KEY = "access_token";
