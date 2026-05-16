@@ -25,9 +25,9 @@ import {
   type PromoMenuVoucher,
 } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/PromoMenu";
 import { QuickExchangeBadges } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/QuickExchangeBadges/QuickExchangeBadges";
-import { DepositDialog } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/DepositDialog/DepositDialog";
-import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/CustomerDetailDialog/CustomerDetailDialog";
-import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromotionSelectionModal/PromotionSelectionModal";
+import { DepositDialog } from "@erp/pos/components/page-components/Checkout/Dialog/DepositDialog/DepositDialog";
+import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/Dialog/CustomerDetailDialog/CustomerDetailDialog";
+import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/Dialog/PromotionSelectionModal/PromotionSelectionModal";
 import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
 import type { QrPaymentInfo } from "@erp/pos/components/common/PosVietQrPaymentDialog/PosVietQrPaymentDialog";
 import { CheckoutActionsSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/CheckoutActionsSection";
