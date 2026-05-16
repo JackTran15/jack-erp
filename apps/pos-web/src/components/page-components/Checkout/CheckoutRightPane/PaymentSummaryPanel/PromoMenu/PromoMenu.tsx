@@ -9,11 +9,11 @@ import {
 import {
   DiscountPointDialog,
   type DiscountPointDialogProps,
-} from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/DiscountPointDialog/DiscountPointDialog";
+} from "@erp/pos/components/page-components/Checkout/Dialog/DiscountPointDialog/DiscountPointDialog";
 import {
   VoucherDialog,
   type VoucherDialogProps,
-} from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/VoucherDialog/VoucherDialog";
+} from "@erp/pos/components/page-components/Checkout/Dialog/VoucherDialog/VoucherDialog";
 
 /**
  * Wiring for the "Mã ưu đãi và điểm" dialog mounted by `PromoMenu`. Clicking

@@ -22,7 +22,7 @@ import type {
   DraftInvoice,
   InvoiceTabItem,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/DraftInvoices/DraftInvoicesDialog/DraftInvoicesDialog";
+import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/Dialog/DraftInvoicesDialog/DraftInvoicesDialog";
 import { useAnnounce } from "@erp/pos/hooks/page-hooks/checkout/use-announce";
 import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/common/localstorage";
 

@@ -1,7 +1,7 @@
 import { PosErrorDialog } from "@erp/pos/components/common/PosErrorDialog/PosErrorDialog";
-import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CancelInvoiceConfirmDialog/CancelInvoiceConfirmDialog";
-import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerCreateDialog";
-import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";
+import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/Checkout/Dialog/CancelInvoiceConfirmDialog/CancelInvoiceConfirmDialog";
+import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/Dialog/CustomerCreateDialog/CustomerCreateDialog";
+import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/Dialog/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";
 import type { CustomerCreateDialogProps } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
 import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 
