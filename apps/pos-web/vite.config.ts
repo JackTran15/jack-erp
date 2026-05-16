@@ -12,4 +12,9 @@ export default defineConfig({
   server: {
     port: 3001,
   },
+  preview: {
+    port: 3001,
+    host: true,
+    allowedHosts: ["jack-erp-pos.ducanhzed.com"],
+  },
 });

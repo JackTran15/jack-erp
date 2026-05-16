@@ -33,9 +33,14 @@ import { PromotionModule } from './modules/promotion/promotion.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // Resolve from this package root so `pnpm dev:api` from monorepo root still loads apps/api/.env
+      // Resolve from this package root so `pnpm dev:api` from monorepo root still loads apps/api/.env.
+      // NestJS ConfigModule honours the FIRST file that defines a given key, so order matters:
+      //   1. apps/api/.env            — per-package override (legacy, optional)
+      //   2. <monorepo-root>/.env     — where credentials actually live now
+      //   3. apps/api/.env.example    — last-resort placeholder defaults
       envFilePath: [
         join(__dirname, '..', '.env'),
+        join(__dirname, '..', '..', '..', '.env'),
         join(__dirname, '..', '.env.example'),
       ],
     }),

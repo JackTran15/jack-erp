@@ -13,6 +13,7 @@ import {
   publishEvent,
   publishBatch as kafkaPublishBatch,
 } from '@erp/shared-kafka-client';
+import { resolveKafkaConfig } from './kafka-config';
 
 @Injectable()
 export class EventPublisher implements OnModuleInit, OnModuleDestroy {
@@ -21,15 +22,20 @@ export class EventPublisher implements OnModuleInit, OnModuleDestroy {
   private producer: Producer;
 
   constructor(private readonly config: ConfigService) {
-    const brokers = this.config
-      .get<string>('KAFKA_BROKERS', 'localhost:9092')
-      .split(',')
-      .map((b) => b.trim());
+    const { clientId, brokers, ssl, sasl } = resolveKafkaConfig(this.config);
 
-    const clientId = this.config.get<string>('KAFKA_CLIENT_ID', 'erp-api');
-
-    this.kafka = createKafkaClient({ clientId, brokers });
+    this.kafka = createKafkaClient({ clientId, brokers, ssl, sasl });
     this.producer = createProducer(this.kafka, { idempotent: true });
+
+    const saslDescription = !sasl
+      ? 'disabled'
+      : 'username' in sasl
+        ? `${sasl.mechanism} as ${sasl.username}`
+        : sasl.mechanism;
+
+    this.logger.log(
+      `Kafka client configured: brokers=${brokers.join(',')} ssl=${ssl} sasl=${saslDescription}`,
+    );
   }
 
   async onModuleInit(): Promise<void> {
