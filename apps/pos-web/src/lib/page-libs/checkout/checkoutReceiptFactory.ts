@@ -1,4 +1,4 @@
-import type { PaymentLine } from "@erp/pos/components/page-components/Checkout/Payment/PaymentMethodRow/PaymentMethodRow";
+import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { InvoicePayload } from "./printing/types";
 import type {
   CartLine,

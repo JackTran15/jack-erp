@@ -3,7 +3,7 @@ import { forwardRef } from "react";
 import {
   PaymentSummaryPanel,
   type PaymentSummaryPanelProps,
-} from "@erp/pos/components/page-components/Checkout/Payment/PaymentSummaryPanel/PaymentSummaryPanel";
+} from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PaymentSummaryPanel";
 import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
 
 export type CheckoutRightPaneProps = PaymentSummaryPanelProps<CustomerRow>;
