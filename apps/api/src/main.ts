@@ -9,6 +9,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
+  // Silently short-circuit favicon probes so they don't trip the global
+  // HttpExceptionFilter (and drop a 404 stack into the logs on every page load).
+  app.use('/favicon.ico', (_req: any, res: any) => res.status(204).end());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,7 +21,16 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  // Reflect the request Origin instead of using '*' so credentialed requests
+  // (cookies, Authorization) still work — browsers reject Access-Control-Allow-
+  // Origin: '*' when credentials are involved. `origin: true` echoes whatever
+  // Origin the client sent, which is effectively "allow every domain".
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['X-Request-Id', 'X-Total-Count'],
+  });
 
   const configService = app.get(ConfigService);
   const redisIoAdapter = new RedisIoAdapter(app, configService);

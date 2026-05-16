@@ -19,4 +19,9 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  preview: {
+    port: 3000,
+    host: true,
+    allowedHosts: ["jack-erp-backoffice.ducanhzed.com"],
+  },
 });
