@@ -19,10 +19,14 @@ import {
   derivePaymentDisplay,
   settlementAbsFromGrand,
 } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
+import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
 
 interface UseCheckoutPaymentInput {
+  /** Raw cart total (BEFORE subtracting deposit). */
   grandTotal: number;
   methods: readonly PaymentMethodOption[];
+  /** Surface error messages (e.g. "must pick customer first"). */
+  onError: (message: string) => void;
 }
 
 interface UseCheckoutPaymentResult {
@@ -33,8 +37,20 @@ interface UseCheckoutPaymentResult {
    */
   keepChange: boolean;
   setKeepChange: Dispatch<SetStateAction<boolean>>;
+  /** Stable callback to set keepChange=false (used when customer is picked). */
+  clearKeepChange: () => void;
   debt: boolean;
   setDebt: Dispatch<SetStateAction<boolean>>;
+  /**
+   * Toggle debt. Requires `selectedCustomer` at call time — if missing while
+   * enabling, fires `onError` and does NOT update state.
+   */
+  handleDebtChange: (
+    next: boolean,
+    selectedCustomer: CustomerRow | null,
+  ) => void;
+  /** Surface "must select customer" error from the deposit input. */
+  handleRequireCustomerForDeposit: () => void;
   note: string;
   setNote: Dispatch<SetStateAction<string>>;
   printInvoice: boolean;
@@ -43,6 +59,13 @@ interface UseCheckoutPaymentResult {
   setPreorder: Dispatch<SetStateAction<boolean>>;
   selectedSuggestionId: string | null;
   setSelectedSuggestionId: Dispatch<SetStateAction<string | null>>;
+  /** Deposit deducted from raw grandTotal to derive settlement. */
+  deposit: number;
+  setDeposit: Dispatch<SetStateAction<number>>;
+  /** `grandTotal - deposit`. Drives all payment math. */
+  settlementGrandTotal: number;
+  /** `|settlementGrandTotal|`. */
+  settlementAbs: number;
   totalPaid: number;
   rawChangeAmount: number;
   rawShortageAmount: number;
@@ -60,6 +83,7 @@ interface UseCheckoutPaymentResult {
 export function useCheckoutPayment({
   grandTotal,
   methods,
+  onError,
 }: UseCheckoutPaymentInput): UseCheckoutPaymentResult {
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>(() => [
     createPaymentLine(PaymentMethodEnum.CASH),
@@ -72,14 +96,16 @@ export function useCheckoutPayment({
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<
     string | null
   >(null);
+  const [deposit, setDeposit] = useState(0);
+
+  const settlementGrandTotal = grandTotal - deposit;
+  const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
+  const isRefundFlow = settlementGrandTotal < 0;
 
   const totalPaid = useMemo(
     () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
     [paymentLines],
   );
-
-  const settlementAbs = settlementAbsFromGrand(grandTotal);
-  const isRefundFlow = grandTotal < 0;
 
   const rawChangeAmount = Math.max(0, totalPaid - settlementAbs);
   const rawShortageAmount = Math.max(0, settlementAbs - totalPaid);
@@ -87,19 +113,19 @@ export function useCheckoutPayment({
   const { changeAmount, shortageAmount, debtAmount } = useMemo(
     () =>
       derivePaymentDisplay({
-        grandTotal,
+        grandTotal: settlementGrandTotal,
         totalPaid,
         keepChange,
         debt,
       }),
-    [grandTotal, totalPaid, keepChange, debt],
+    [settlementGrandTotal, totalPaid, keepChange, debt],
   );
 
-  const isShort = grandTotal > 0 && rawShortageAmount > 0;
+  const isShort = settlementGrandTotal > 0 && rawShortageAmount > 0;
 
   const suggestions = useMemo(
-    () => buildSuggestions(isRefundFlow ? settlementAbs : grandTotal),
-    [grandTotal, isRefundFlow, settlementAbs],
+    () => buildSuggestions(isRefundFlow ? settlementAbs : settlementGrandTotal),
+    [settlementGrandTotal, isRefundFlow, settlementAbs],
   );
   const primaryMethod = paymentLines[0]?.method ?? PaymentMethodEnum.CASH;
   const primaryMethodLabel = useMemo(
@@ -127,13 +153,38 @@ export function useCheckoutPayment({
     setSelectedSuggestionId(null);
   }, []);
 
+  const clearKeepChange = useCallback(() => {
+    setKeepChange(false);
+  }, []);
+
+  const handleDebtChange = useCallback(
+    (next: boolean, selectedCustomer: CustomerRow | null) => {
+      if (next && !selectedCustomer) {
+        onError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
+        return;
+      }
+      if (next) {
+        setKeepChange(false);
+      }
+      setDebt(next);
+    },
+    [onError],
+  );
+
+  const handleRequireCustomerForDeposit = useCallback(() => {
+    onError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
+  }, [onError]);
+
   return {
     paymentLines,
     setPaymentLines,
     keepChange,
     setKeepChange,
+    clearKeepChange,
     debt,
     setDebt,
+    handleDebtChange,
+    handleRequireCustomerForDeposit,
     note,
     setNote,
     printInvoice,
@@ -142,6 +193,10 @@ export function useCheckoutPayment({
     setPreorder,
     selectedSuggestionId,
     setSelectedSuggestionId,
+    deposit,
+    setDeposit,
+    settlementGrandTotal,
+    settlementAbs,
     totalPaid,
     rawChangeAmount,
     rawShortageAmount,
