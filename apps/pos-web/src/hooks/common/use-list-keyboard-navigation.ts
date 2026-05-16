@@ -41,8 +41,8 @@ export interface UseListKeyboardNavigationResult {
 /**
  * Generic keyboard navigation hook for dropdown / popover menus.
  *
- * Extracted from the repeated pattern in `SearchPopover` / `SearchSelectInput`
- * to be reused in `PosSelect` and `PromoMenu`. Agnostic to UI rendering —
+ * Extracted from the repeated pattern in `SearchPopover` to be reused in
+ * `PosSelect` and `PromoMenu`. Agnostic to UI rendering —
  * callers apply highlight class + aria-selected based on `highlightIdx`.
  *
  * Behaviour:

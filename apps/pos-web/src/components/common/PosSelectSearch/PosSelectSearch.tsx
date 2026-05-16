@@ -79,9 +79,9 @@ export interface PosSelectSearchProps<T> {
 
 /**
  * Generic combobox where the input is both the trigger and the search field.
- * Mirrors the {@link SearchSelectInput} pattern: callers provide a `search`
- * adapter plus `renderItem` / `renderMeta` / `renderSelected` / `itemKey` so
- * the menu can be populated with arbitrary item types.
+ * Callers provide a `search` adapter plus `renderItem` / `renderMeta` /
+ * `renderSelected` / `itemKey` so the menu can be populated with arbitrary
+ * item types.
  *
  * Behavior:
  *  - When closed and a value is set, the input shows `renderSelected(value)`.
