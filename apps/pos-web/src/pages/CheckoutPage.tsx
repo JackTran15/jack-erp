@@ -7,10 +7,10 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { CustomerCreateDialog } from "../features/checkout/components/customerCreate";
-import { CustomerSelectDialog } from "../components/CustomerSelectDialog";
-import { SearchSelectInput } from "../components/SearchSelectInput";
-import type { SearchSelectSuggestion } from "../components/SearchSelectInput";
+import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CustomerCreate/CustomerCreateDialog/CustomerCreateDialog";
+import { PosCustomerSelectDialog } from "@erp/pos/components/common/PosCustomerSelectDialog/PosCustomerSelectDialog";
+import { SearchSelectInput } from "@erp/pos/components/page-components/Checkout/SearchSelectInput/SearchSelectInput";
+import type { SearchSelectSuggestion } from "@erp/pos/components/page-components/Checkout/SearchSelectInput/SearchSelectInput";
 import {
   formatCustomerDisplay,
   searchCustomers,
@@ -18,9 +18,9 @@ import {
 } from "../lib/customerApi";
 import { MoneyInput } from "@erp/ui";
 import { formatCurrencyVnd } from "../lib/formatCurrency";
-import { usePosBranchStore } from "../stores/usePosBranchStore";
+import { usePosBranchStore } from "../stores/common/branch.store";
 import { fetchPosCatalog, type PosCatalogLine } from "../lib/posCatalogApi";
-import { useAnnounce } from "../hooks/useAnnounce";
+import { useAnnounce } from "../hooks/page-hooks/checkout/use-announce";
 
 const qtyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 2,
@@ -391,7 +391,7 @@ export function CheckoutPage() {
         }}
       />
 
-      <CustomerSelectDialog
+      <PosCustomerSelectDialog
         open={customerDialogOpen}
         onClose={() => setCustomerDialogOpen(false)}
         onSelected={(c) => {

@@ -17,10 +17,10 @@ import {
   TruckIcon,
   WarehouseOutIcon,
   type IconProps,
-} from "@erp/pos/components/icons/Icon";
-import { AppMenuItem } from "@erp/pos/components/layout/AppPosLayout/AppPosLayout";
+} from "@erp/pos/components/common/PosIcons/PosIcons";
+import { PosMenuItem } from "@erp/pos/components/layout/PosLayout/PosLayout";
 
-export const APP_MENU_ITEMS: AppMenuItem[] = [
+export const APP_MENU_ITEMS: PosMenuItem[] = [
   {
     id: "ban-hang",
     label: "Bán hàng",

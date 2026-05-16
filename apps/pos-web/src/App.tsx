@@ -1,19 +1,19 @@
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { RequirePosAuth } from "./components/RequirePosAuth";
-import { PosShellLayout } from "./components/PosShellLayout";
-import { RequirePosBranch } from "./components/RequirePosBranch";
+import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
+import { PosShellLayout } from "./components/layout/PosShellLayout/PosShellLayout";
+import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
-import { CheckoutPageV2 } from "./features/checkout/pages/CheckoutPageV2";
-import { FastStockTransferPage } from "./features/fast-stock-transfer/pages/FastStockTransferPage";
-import { ReturnGoodsPage } from "./features/return-goods/pages/ReturnGoodsPage";
+import { CheckoutPageV2 } from "./pages/CheckoutPageV2";
+import { FastStockTransferPage } from "./pages/FastStockTransferPage";
+import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 import { SessionPage } from "./pages/SessionPage";
 import { ReturnsPage } from "./pages/ReturnsPage";
 import { ExchangePage } from "./pages/ExchangePage";
 import { PosLoginPage } from "./pages/PosLoginPage";
-import { AppPosLayout } from "./components/layout/AppPosLayout/AppPosLayout";
+import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,10 +36,10 @@ export function App() {
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/dang-nhap" element={<PosLoginPage />} />
-            <Route element={<RequirePosAuth />}>
+            <Route element={<PosRequireAuth />}>
               <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
-              <Route element={<RequirePosBranch />}>
-                <Route element={<AppPosLayout />}>
+              <Route element={<PosRequireBranch />}>
+                <Route element={<PosLayout />}>
                   <Route path="/" element={<CheckoutPageV2 />} />
                   <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
