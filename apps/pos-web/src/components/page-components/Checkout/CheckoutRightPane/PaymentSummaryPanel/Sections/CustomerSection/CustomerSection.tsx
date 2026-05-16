@@ -1,87 +1,38 @@
-import type { ReactNode } from "react";
-import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import { CustomerInputRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/CustomerInputRow/CustomerInputRow";
+import type { RefObject } from "react";
+
 import type { CustomerActionItem } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
+import { CustomerInputRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/CustomerInputRow/CustomerInputRow";
 import { PaymentSubTopBar } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/PaymentSubTopBar/PaymentSubTopBar";
 import { SelectedCustomerCard } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/SelectedCustomerCard/SelectedCustomerCard";
+import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 
-interface CustomerSectionProps<TCustomer> {
-  datetime: string;
-  saleMode: string;
-  onPickSaleMode?: () => void;
-  hasCustomer: boolean;
-  selectedCustomerLabel?: string | null;
-  customerDebt?: number | null;
-  onClearCustomer?: () => void;
-  customerActions: CustomerActionItem[];
-  onOpenCustomerDetail: () => void;
-  customerInputRef: React.Ref<HTMLInputElement>;
-  customerQuery: string;
-  onCustomerQueryChange: (q: string) => void;
-  customerSearch: (q: string) => Promise<SearchSuggestion<TCustomer>[]>;
-  onSelectCustomer: (c: TCustomer) => void;
-  customerItemKey: (c: TCustomer) => string;
-  customerRenderItem: (c: TCustomer) => ReactNode;
-  customerRenderMeta?: (c: TCustomer) => ReactNode;
-  onSubmitCustomerQuery?: (q: string) => boolean | void;
-  onAddCustomer: () => void;
-  customerFieldError?: string;
+interface CustomerSectionProps {
+  customerInputRef: RefObject<HTMLInputElement | null>;
+  /** Action group (QR / Add / Voucher) — kế hợp UI state ở PaymentSummaryPanel. */
+  actions?: CustomerActionItem[];
 }
 
-export function CustomerSection<TCustomer>({
-  datetime,
-  saleMode,
-  onPickSaleMode,
-  hasCustomer,
-  selectedCustomerLabel,
-  customerDebt,
-  onClearCustomer,
-  customerActions,
-  onOpenCustomerDetail,
+/**
+ * Header section của payment panel: sub-topbar (datetime+saleMode) + customer
+ * search/selected card + field error. Đọc selectedCustomer + customerFieldError
+ * từ customer hook.
+ */
+export function CustomerSection({
   customerInputRef,
-  customerQuery,
-  onCustomerQueryChange,
-  customerSearch,
-  onSelectCustomer,
-  customerItemKey,
-  customerRenderItem,
-  customerRenderMeta,
-  onSubmitCustomerQuery,
-  onAddCustomer,
-  customerFieldError,
-}: CustomerSectionProps<TCustomer>) {
+  actions,
+}: CustomerSectionProps) {
+  const { selectedCustomer, customerFieldError } = useCheckoutCustomer();
+
   return (
     <>
       <div className="px-4">
-        <PaymentSubTopBar
-          datetime={datetime}
-          saleMode={saleMode}
-          onPickSaleMode={onPickSaleMode}
-        />
+        <PaymentSubTopBar />
       </div>
       <div className="relative px-4 py-2">
-        {hasCustomer ? (
-          <SelectedCustomerCard
-            name={selectedCustomerLabel ?? ""}
-            debt={customerDebt}
-            onClear={onClearCustomer ?? (() => {})}
-            actions={customerActions}
-            onClick={onOpenCustomerDetail}
-          />
+        {selectedCustomer ? (
+          <SelectedCustomerCard actions={actions} />
         ) : (
-          <CustomerInputRow<TCustomer>
-            ref={customerInputRef}
-            value={customerQuery}
-            onChange={onCustomerQueryChange}
-            search={customerSearch}
-            onSelect={onSelectCustomer}
-            itemKey={customerItemKey}
-            renderItem={customerRenderItem}
-            renderMeta={customerRenderMeta}
-            onSubmitQuery={onSubmitCustomerQuery}
-            actions={customerActions}
-            emptyAction={{ label: "Tạo khách mới", onClick: onAddCustomer }}
-          />
+          <CustomerInputRow inputRef={customerInputRef} actions={actions} />
         )}
         {customerFieldError ? (
           <p className="mt-1 text-[12px] text-red-600" role="alert">

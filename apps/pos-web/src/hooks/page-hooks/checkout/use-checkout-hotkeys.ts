@@ -1,101 +1,78 @@
 import type { RefObject } from "react";
 import { POS_HOTKEYS } from "@erp/pos/constants/hotkeys.constant";
 import { usePosHotkey } from "@erp/pos/hooks/common/use-pos-hotkey";
+import { useCheckoutDraft } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-draft";
+import { useCheckoutFinalize } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-finalize";
+import {
+  selectHasAnyCartLines,
+  selectIsReturnExchangeInvoice,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
-interface UseCheckoutHotkeysInput {
-  /** Product search input (POSToolbar). F3 focuses here. */
-  productSearchRef: RefObject<HTMLInputElement | null>;
-  /** Customer search input (PaymentSummaryPanel). F4 focuses here. */
-  customerSearchRef: RefObject<HTMLInputElement | null>;
-  /** Amount input of the first payment line. F12 focuses and selects here. */
-  paymentAmountRef: RefObject<HTMLInputElement | null>;
-  /** Catalog filter input. Shift+F3 focuses here. */
-  catalogSearchRef?: RefObject<HTMLInputElement | null>;
-  /** Salesperson picker trigger. Alt+N focuses here. */
-  salespersonRef?: RefObject<HTMLInputElement | null>;
-  /** Price book picker trigger. Alt+B focuses here. */
-  priceBookRef?: RefObject<HTMLInputElement | null>;
-  /** F9 only fires when the cart has at least one line. */
-  hasCartItems: boolean;
-  /** Complete the invoice (F9). */
-  onCheckout: () => void;
-  /** Save as draft (F10). Pass `undefined` to disable (e.g. in return/exchange mode). */
-  onSaveDraft?: () => void;
-  /** Create a new invoice (Alt+1). Pass `undefined` to disable. */
-  onAddSession?: () => void;
+export interface CheckoutHotkeyRefs {
+  productSearch: RefObject<HTMLInputElement | null>;
+  customerSearch: RefObject<HTMLInputElement | null>;
+  paymentAmount: RefObject<HTMLInputElement | null>;
+  catalogSearch: RefObject<HTMLInputElement | null>;
+  salesperson: RefObject<HTMLInputElement | null>;
+  priceBook: RefObject<HTMLInputElement | null>;
 }
 
 /**
- * Registers all keyboard shortcuts for the Checkout page (CheckoutPageV2).
+ * Register hotkeys cho Checkout. Đọc state/handlers từ stores+hooks nội bộ,
+ * caller chỉ truyền `refs` (focus management ở Page).
  *
- * Each key is declared via `usePosHotkey(POS_HOTKEYS.checkout.*, callback)`.
- * Never access `useHotkey` from TanStack directly — always go through the
- * registry so every key has a description and appears in devtools.
- *
- * Keys (Phase 1 — MISA flow):
- *   - F3  : Focus product search input
- *   - F4  : Focus customer search input
- *   - F9  : Complete & print invoice (only when cart is not empty)
- *   - F10 : Save as draft (only when `onSaveDraft` is provided)
- *   - F12 : Focus the amount input of the first payment line (CASH)
+ * F3 / F4 / F9 / F10 / F12 / Shift+F3 / Alt+N / Alt+B / Alt+1
  */
-export function useCheckoutHotkeys({
-  productSearchRef,
-  customerSearchRef,
-  paymentAmountRef,
-  catalogSearchRef,
-  salespersonRef,
-  priceBookRef,
-  hasCartItems,
-  onCheckout,
-  onSaveDraft,
-  onAddSession,
-}: UseCheckoutHotkeysInput): void {
+export function useCheckoutHotkeys({ refs }: { refs: CheckoutHotkeyRefs }): void {
+  const { finalizeCheckoutAndPrint } = useCheckoutFinalize();
+  const { saveDraft } = useCheckoutDraft();
+
+  const addSession = usePosCheckoutSessionStore((s) => s.addSession);
+  const hasCartItems = usePosCheckoutSessionStore(selectHasAnyCartLines);
+  const isReturnExchange = usePosCheckoutSessionStore(
+    selectIsReturnExchangeInvoice,
+  );
+
   usePosHotkey(POS_HOTKEYS.checkout.focusProductSearch, () => {
-    productSearchRef.current?.focus();
-    productSearchRef.current?.select();
+    refs.productSearch.current?.focus();
+    refs.productSearch.current?.select();
   });
 
   usePosHotkey(POS_HOTKEYS.checkout.focusCustomerSearch, () => {
-    customerSearchRef.current?.focus();
-    customerSearchRef.current?.select();
+    refs.customerSearch.current?.focus();
+    refs.customerSearch.current?.select();
   });
 
   usePosHotkey(POS_HOTKEYS.checkout.focusPayment, () => {
-    paymentAmountRef.current?.focus();
-    paymentAmountRef.current?.select();
+    refs.paymentAmount.current?.focus();
+    refs.paymentAmount.current?.select();
   });
 
+  usePosHotkey(POS_HOTKEYS.checkout.focusCatalogSearch, () => {
+    refs.catalogSearch.current?.focus();
+    refs.catalogSearch.current?.select();
+  });
+
+  usePosHotkey(POS_HOTKEYS.checkout.focusSalesperson, () =>
+    refs.salesperson.current?.focus(),
+  );
+
+  usePosHotkey(POS_HOTKEYS.checkout.focusPriceBook, () =>
+    refs.priceBook.current?.focus(),
+  );
+
   usePosHotkey(
-    POS_HOTKEYS.checkout.focusCatalogSearch,
+    POS_HOTKEYS.checkout.completeCheckout,
     () => {
-      catalogSearchRef?.current?.focus();
-      catalogSearchRef?.current?.select();
+      void finalizeCheckoutAndPrint();
     },
-    { enabled: Boolean(catalogSearchRef) },
+    { enabled: hasCartItems },
   );
 
-  usePosHotkey(
-    POS_HOTKEYS.checkout.focusSalesperson,
-    () => salespersonRef?.current?.focus(),
-    { enabled: Boolean(salespersonRef) },
-  );
-
-  usePosHotkey(
-    POS_HOTKEYS.checkout.focusPriceBook,
-    () => priceBookRef?.current?.focus(),
-    { enabled: Boolean(priceBookRef) },
-  );
-
-  usePosHotkey(POS_HOTKEYS.checkout.completeCheckout, () => onCheckout(), {
-    enabled: hasCartItems,
+  usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => saveDraft(), {
+    enabled: !isReturnExchange,
   });
 
-  usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => onSaveDraft?.(), {
-    enabled: Boolean(onSaveDraft),
-  });
-
-  usePosHotkey(POS_HOTKEYS.checkout.addSession, () => onAddSession?.(), {
-    enabled: Boolean(onAddSession),
-  });
+  usePosHotkey(POS_HOTKEYS.checkout.addSession, () => addSession());
 }

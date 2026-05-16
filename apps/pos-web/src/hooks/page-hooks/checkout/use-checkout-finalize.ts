@@ -1,15 +1,8 @@
 import { useCallback, type FormEvent } from "react";
 
-import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
-import {
-  formatCustomerDisplay,
-  type CustomerRow,
-} from "@erp/pos/lib/common/customerApi";
-import type {
-  CartLine,
-  PaymentMethodOption,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import {
   getOversellSaleLines,
@@ -17,31 +10,16 @@ import {
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { validateCheckout } from "@erp/pos/lib/page-libs/checkout/checkoutValidation";
 import type { InvoicePayload } from "@erp/pos/lib/page-libs/checkout/printing/types";
-
-export interface UseCheckoutFinalizeInput {
-  hasAnyCartLines: boolean;
-  selectedCustomer: CustomerRow | null;
-  purchaseCart: CartLine[];
-  receiptLines: CartLine[];
-  grandTotal: number;
-  settlementGrandTotal: number;
-  settlementAbs: number;
-  paymentLines: PaymentLine[];
-  methods: readonly PaymentMethodOption[];
-  totalPaid: number;
-  changeAmount: number;
-  shortageAmount: number;
-  keepChange: boolean;
-  debt: boolean;
-  primaryMethod: PaymentLine["method"];
-  primaryMethodLabel: string;
-  printInvoice: boolean;
-  announce: (msg: string) => void;
-  resetActiveSessionAfterCheckout: () => void;
-  onValidationError: (message: string) => void;
-  onOversellDetected: () => void;
-  onAfterCheckout: () => void;
-}
+import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
+import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
+import {
+  computeReceiptLines,
+  selectHasAnyCartLines,
+  selectPurchaseCart,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutFinalizeResult {
   finalizeCheckoutAndPrint: (options?: {
@@ -49,58 +27,35 @@ export interface UseCheckoutFinalizeResult {
   }) => Promise<void>;
 }
 
-export const useCheckoutFinalize = (
-  input: UseCheckoutFinalizeInput,
-): UseCheckoutFinalizeResult => {
-  const {
-    hasAnyCartLines,
-    selectedCustomer,
-    purchaseCart,
-    receiptLines,
-    grandTotal,
-    settlementGrandTotal,
-    settlementAbs,
-    paymentLines,
-    methods,
-    totalPaid,
-    changeAmount,
-    shortageAmount,
-    keepChange,
-    debt,
-    primaryMethod,
-    primaryMethodLabel,
-    printInvoice,
-    announce,
-    resetActiveSessionAfterCheckout,
-    onValidationError,
-    onOversellDetected,
-    onAfterCheckout,
-  } = input;
-
+/**
+ * Zero-input adapter: đọc cart/payment/customer/ui từ stores, return
+ * `finalizeCheckoutAndPrint(options?)` cho component gọi.
+ */
+export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
+  const payment = useCheckoutPayment();
   const invoicePrinter = useInvoicePrinter();
 
   const buildReceiptPayload = useCallback((): InvoicePayload | null => {
+    const sessionState = usePosCheckoutSessionStore.getState();
     return buildCheckoutInvoicePayload({
-      printInvoice,
-      cart: receiptLines,
-      grandTotal,
-      totalPaid,
-      paymentLines,
-      primaryMethodLabel,
-      methods,
-      keepChange,
-      debt,
+      printInvoice: payment.printInvoice,
+      cart: computeReceiptLines(sessionState),
+      grandTotal: payment.grandTotal,
+      totalPaid: payment.totalPaid,
+      paymentLines: payment.paymentLines,
+      primaryMethodLabel: payment.primaryMethodLabel,
+      methods: PAYMENT_METHODS,
+      keepChange: payment.keepChange,
+      debt: payment.debt,
     });
   }, [
-    printInvoice,
-    receiptLines,
-    grandTotal,
-    totalPaid,
-    paymentLines,
-    primaryMethodLabel,
-    methods,
-    keepChange,
-    debt,
+    payment.printInvoice,
+    payment.grandTotal,
+    payment.totalPaid,
+    payment.paymentLines,
+    payment.primaryMethodLabel,
+    payment.keepChange,
+    payment.debt,
   ]);
 
   const printReceiptIfNeeded = useCallback(
@@ -122,62 +77,57 @@ export const useCheckoutFinalize = (
       options?: { bypassOversellModal?: boolean },
     ): boolean => {
       e.preventDefault();
+      const sessionState = usePosCheckoutSessionStore.getState();
+      const selectedCustomer =
+        usePosCheckoutCustomerStore.getState().selectedCustomer;
+      const purchaseCart = selectPurchaseCart(sessionState);
       const result = validateCheckout({
-        hasAnyCartLines,
-        debt,
-        keepChange,
+        hasAnyCartLines: selectHasAnyCartLines(sessionState),
+        debt: payment.debt,
+        keepChange: payment.keepChange,
         selectedCustomer,
         purchaseCart,
-        settlementGrandTotal,
-        settlementAbs,
-        totalPaid,
-        changeAmount,
-        shortageAmount,
+        settlementGrandTotal: payment.settlementGrandTotal,
+        settlementAbs: payment.settlementAbs,
+        totalPaid: payment.totalPaid,
+        changeAmount: payment.changeAmount,
+        shortageAmount: payment.shortageAmount,
       });
+      const ui = usePosCheckoutUiStore.getState();
       if (!result.ok) {
-        onValidationError(result.message);
+        ui.setCartError(result.message);
         return false;
       }
       if (
         !options?.bypassOversellModal &&
         getOversellSaleLines(purchaseCart).length > 0
       ) {
-        onOversellDetected();
+        ui.openOversell();
         return false;
       }
       const who = selectedCustomer
         ? ` cho ${formatCustomerDisplay(selectedCustomer)}`
         : " (khách lẻ)";
-      announce(
+      ui.setAnnouncement(
         `Đã ghi nhận thanh toán${who}, ${new Intl.NumberFormat("vi-VN", {
           style: "currency",
           currency: "VND",
           maximumFractionDigits: 0,
-        }).format(
-          settlementGrandTotal,
-        )}, ${paymentLabel(primaryMethod)}.`,
+        }).format(payment.settlementGrandTotal)}, ${paymentLabel(payment.primaryMethod)}.`,
       );
-      resetActiveSessionAfterCheckout();
-      onAfterCheckout();
+      usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
+      resetCheckoutDraftState();
       return true;
     },
     [
-      announce,
-      changeAmount,
-      debt,
-      keepChange,
-      primaryMethod,
-      shortageAmount,
-      hasAnyCartLines,
-      purchaseCart,
-      resetActiveSessionAfterCheckout,
-      selectedCustomer,
-      settlementGrandTotal,
-      settlementAbs,
-      totalPaid,
-      onAfterCheckout,
-      onValidationError,
-      onOversellDetected,
+      payment.debt,
+      payment.keepChange,
+      payment.settlementGrandTotal,
+      payment.settlementAbs,
+      payment.totalPaid,
+      payment.changeAmount,
+      payment.shortageAmount,
+      payment.primaryMethod,
     ],
   );
 

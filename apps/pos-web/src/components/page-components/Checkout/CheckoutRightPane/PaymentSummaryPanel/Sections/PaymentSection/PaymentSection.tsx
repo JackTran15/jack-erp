@@ -1,96 +1,62 @@
-import type { Ref } from "react";
+import type { RefObject } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/common/PosTextarea/PosTextarea";
-import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
 import { DebtCheckRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/DebtCheckRow/DebtCheckRow";
 import { ForgiveShortageRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/ForgiveShortageRow/ForgiveShortageRow";
 import { KeepChangeRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/KeepChangeRow/KeepChangeRow";
-import { PosPaymentMethodList, type PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
+import { PosPaymentMethodList } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { PaymentSummaryBlock } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/PaymentSummaryBlock/PaymentSummaryBlock";
 import { QrPaymentButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/QrPaymentButton/QrPaymentButton";
-import type { QrPaymentInfo } from "@erp/pos/components/common/PosVietQrPaymentDialog/PosVietQrPaymentDialog";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
+import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 
 interface PaymentSectionProps {
-  itemCount: number;
-  total: number;
-  deposit: number;
-  amountDue: number;
-  paymentLines: PaymentLine[];
-  methods: readonly PaymentMethodOption[];
-  onChangePaymentLines: (lines: PaymentLine[]) => void;
-  onDepositClick?: () => void;
-  paymentAmountReadOnly?: (line: PaymentLine, index: number) => boolean;
-  /** Ref forwarded to the amount input of the first payment line (for F12). */
-  paymentAmountRef?: Ref<HTMLInputElement>;
-  isRefundFlow: boolean;
-  /** Effective change-due-back (post `keepChange`). */
-  changeAmount: number;
-  /** Effective shortage (post `forgiveShortage`). */
-  shortageAmount: number;
-
-  /**
-   * Single `keepChange` flag: sale shows one of two rows from raw deltas;
-   * refund uses one row for waive remainder or excess payout.
-   */
-  showKeepChange: boolean;
-  showForgiveShortage: boolean;
-  keepChange?: boolean;
-  onKeepChangeChange?: (next: boolean) => void;
-  /** Raw change amount — shown in the row's right column when checked. */
-  rawChangeAmount: number;
-  /** Raw shortage amount — shown in the row's right column when checked. */
-  rawShortageAmount: number;
-
-  debt: boolean;
-  onDebtChange: (next: boolean) => void;
-  debtAmount: number;
-  note: string;
-  onNoteChange: (n: string) => void;
-  /** Account + amount data shown inside the VietQR dialog. */
-  qrPayment: QrPaymentInfo;
+  paymentAmountRef: RefObject<HTMLInputElement | null>;
+  /** Mở deposit dialog ở PaymentSummaryPanel level. */
+  onDepositClick: () => void;
 }
 
+/**
+ * Payment block: summary (total/deposit) → còn phải thu + payment method list →
+ * trả lại khách → keep-change/forgive/debt rows → note + QR button. Đọc payment
+ * raw + derived qua hook; quyết định row visibility dựa trên rawAmounts.
+ */
 export function PaymentSection({
-  itemCount,
-  total,
-  deposit,
-  amountDue,
-  paymentLines,
-  methods,
-  onChangePaymentLines,
-  onDepositClick,
-  paymentAmountReadOnly,
   paymentAmountRef,
-  isRefundFlow,
-  changeAmount,
-  shortageAmount,
-  showKeepChange,
-  showForgiveShortage,
-  keepChange,
-  onKeepChangeChange,
-  rawChangeAmount,
-  rawShortageAmount,
-  debt,
-  onDebtChange,
-  debtAmount,
-  note,
-  onNoteChange,
-  qrPayment,
+  onDepositClick,
 }: PaymentSectionProps) {
-  // Signed net for styling: positive = change due, negative = shortage (sale).
+  const {
+    deposit,
+    grandTotal: total,
+    paymentLines,
+    handleChangePaymentLines,
+    changeAmount,
+    shortageAmount,
+    rawChangeAmount,
+    rawShortageAmount,
+    debt,
+    note,
+    setNote,
+  } = useCheckoutPayment();
+
+  const amountDue = Math.max(0, total - deposit);
+  const isRefundFlow = total < 0;
   const netChangeDisplay = changeAmount - shortageAmount;
   const refundDisplayAmount = Math.max(0, -total);
+
+  const showKeepChange =
+    !debt &&
+    (isRefundFlow
+      ? rawChangeAmount > 0 || rawShortageAmount > 0
+      : rawChangeAmount > 0);
+  const showForgiveShortage =
+    !debt && !isRefundFlow && rawShortageAmount > 0;
+
   return (
     <>
       <div className="px-4">
-        <PaymentSummaryBlock
-          itemCount={itemCount}
-          total={total}
-          deposit={deposit}
-          amountDue={amountDue}
-          onDepositClick={onDepositClick}
-        />
+        <PaymentSummaryBlock onDepositClick={onDepositClick} />
       </div>
       {!isRefundFlow ? (
         <>
@@ -106,9 +72,8 @@ export function PaymentSection({
           <div className="border-t border-gray-200 px-4">
             <PosPaymentMethodList
               lines={paymentLines}
-              methods={methods}
-              onChange={onChangePaymentLines}
-              amountReadOnly={paymentAmountReadOnly}
+              methods={PAYMENT_METHODS}
+              onChange={handleChangePaymentLines}
               amountInputRef={paymentAmountRef}
             />
           </div>
@@ -141,52 +106,27 @@ export function PaymentSection({
           <div className="border-t border-gray-200 px-4">
             <PosPaymentMethodList
               lines={paymentLines}
-              methods={methods}
-              onChange={onChangePaymentLines}
-              amountReadOnly={paymentAmountReadOnly}
+              methods={PAYMENT_METHODS}
+              onChange={handleChangePaymentLines}
             />
           </div>
         </>
       ) : null}
       <div className="border-t border-gray-200 px-4">
-        {showKeepChange ? (
-          <KeepChangeRow
-            checked={keepChange ?? false}
-            onChange={onKeepChangeChange ?? (() => {})}
-            amount={
-              keepChange
-                ? isRefundFlow
-                  ? rawShortageAmount > 0
-                    ? rawShortageAmount
-                    : rawChangeAmount
-                  : rawChangeAmount
-                : 0
-            }
-          />
-        ) : null}
-        {showForgiveShortage ? (
-          <ForgiveShortageRow
-            checked={keepChange ?? false}
-            onChange={onKeepChangeChange ?? (() => {})}
-            amount={keepChange ? rawShortageAmount : 0}
-          />
-        ) : null}
-        <DebtCheckRow
-          checked={debt}
-          onChange={onDebtChange}
-          amount={debtAmount}
-        />
+        {showKeepChange ? <KeepChangeRow /> : null}
+        {showForgiveShortage ? <ForgiveShortageRow /> : null}
+        <DebtCheckRow />
       </div>
       <div className="border-t border-b border-gray-200 px-4">
         <PosTextarea
           value={note}
-          onChange={onNoteChange}
+          onChange={setNote}
           placeholder="Ghi chú ..."
           rows={2}
         />
       </div>
       <div className="px-4 py-3">
-        <QrPaymentButton payment={qrPayment} />
+        <QrPaymentButton />
       </div>
     </>
   );

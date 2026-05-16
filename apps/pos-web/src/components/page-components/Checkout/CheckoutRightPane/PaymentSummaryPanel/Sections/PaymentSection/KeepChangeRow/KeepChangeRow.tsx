@@ -1,36 +1,25 @@
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { formatVnd } from "@erp/ui";
-
-export interface KeepChangeRowProps {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  /** Amount column on the right — typically 0 in observed states. */
-  amount?: number;
-}
+import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 
 /**
- * "Customer keeps the change" checkbox row. Mirrors `DebtCheckRow` styling
- * but renders the right-hand value in muted gray (vs indigo on debt).
- *
- * Per spec 4.7.10 this row is hidden whenever a customer is selected — the
- * caller (PaymentSummaryPanel) controls visibility.
+ * "Customer keeps the change" checkbox row. Đọc keepChange + rawChangeAmount
+ * từ payment hook. Visibility được kiểm soát bởi PaymentSection.
  */
-export function KeepChangeRow({
-  checked,
-  onChange,
-  amount = 0,
-}: KeepChangeRowProps) {
+export function KeepChangeRow() {
+  const { keepChange, setKeepChange, rawChangeAmount } = useCheckoutPayment();
+
   return (
     <label className="flex h-10 cursor-pointer items-center justify-between gap-3 px-0 text-sm text-gray-900">
       <span className="inline-flex items-center gap-2">
         <PosCheckbox
-          checked={checked}
-          onChange={onChange}
+          checked={keepChange}
+          onChange={setKeepChange}
           ariaLabel="Khách không lấy tiền thừa"
         />
         Khách không lấy tiền thừa
       </span>
-      <span className="text-gray-900">{formatVnd(amount)}</span>
+      <span className="text-gray-900">{formatVnd(rawChangeAmount)}</span>
     </label>
   );
 }

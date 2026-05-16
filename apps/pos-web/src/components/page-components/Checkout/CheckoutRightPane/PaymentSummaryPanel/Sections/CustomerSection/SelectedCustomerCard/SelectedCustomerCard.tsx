@@ -1,54 +1,38 @@
 import { CloseIcon, UserIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { formatVnd } from "@erp/ui";
-import { PosCustomerActions, type CustomerActionItem } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
+import {
+  PosCustomerActions,
+  type CustomerActionItem,
+} from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
+import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
 
 export interface SelectedCustomerCardProps {
-  /** Customer display name. */
-  name: string;
-  /** Outstanding debt — when null/undefined the row is hidden. */
-  debt?: number | null;
-  /** Required: clear the selection and return to search mode. */
-  onClear: () => void;
-  /**
-   * Same actions that the search row shows — keeps the QR / voucher / future
-   * buttons visible after a customer has been selected. Empty array hides them.
-   */
+  /** Actions group (Voucher / quà tặng nếu đã chọn khách). */
   actions?: CustomerActionItem[];
-  /**
-   * When provided, the avatar+name area becomes clickable (e.g. to open the
-   * customer detail dialog). The action group and clear button stay
-   * independent of this click target.
-   */
-  onClick?: () => void;
 }
 
 /**
  * Compact "selected customer" chip rendered inside the customer field area
- * after a customer is picked. Mirrors State 3 in PaymentSummaryPanel_update.md
- * — avatar + name (bold) + "Dư nợ: …" sub-line + action group + clear button.
+ * after a customer is picked. Đọc customer từ store; click name → mở edit
+ * dialog. Customer debt hiện chưa có data → ẩn (truyền null xuống).
  */
-export function SelectedCustomerCard({
-  name,
-  debt,
-  onClear,
-  actions = [],
-  onClick,
-}: SelectedCustomerCardProps) {
-  const hasClick = typeof onClick === "function";
-  const Tag: "button" | "div" = hasClick ? "button" : "div";
+export function SelectedCustomerCard({ actions = [] }: SelectedCustomerCardProps) {
+  const { selectedCustomer, handleClearCustomer, handleEditCustomer } =
+    useCheckoutCustomer();
+
+  if (!selectedCustomer) return null;
+
+  const name = formatCustomerDisplay(selectedCustomer);
+  const debt: number | null = null;
 
   return (
     <div className="flex h-12 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3">
-      <Tag
-        type={hasClick ? "button" : undefined}
-        onClick={onClick}
-        aria-label={hasClick ? `Xem chi tiết khách ${name}` : undefined}
-        className={
-          "flex min-w-0 flex-1 items-center gap-2 text-left " +
-          (hasClick
-            ? "rounded-md outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-indigo-500/40"
-            : "")
-        }
+      <button
+        type="button"
+        onClick={handleEditCustomer}
+        aria-label={`Xem chi tiết khách ${name}`}
+        className="flex min-w-0 flex-1 items-center gap-2 text-left rounded-md outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-indigo-500/40"
       >
         <span
           aria-hidden="true"
@@ -66,11 +50,11 @@ export function SelectedCustomerCard({
             </span>
           ) : null}
         </span>
-      </Tag>
+      </button>
       <PosCustomerActions actions={actions} />
       <button
         type="button"
-        onClick={onClear}
+        onClick={handleClearCustomer}
         aria-label={`Xóa khách ${name}`}
         className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50"
       >

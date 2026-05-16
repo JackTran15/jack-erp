@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
 import {
@@ -13,6 +13,8 @@ import {
   useSalespersons,
   type Salesperson,
 } from "@erp/pos/hooks/page-hooks/checkout/use-salespersons";
+import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
+import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface CheckoutMeta {
   salespersons: ReadonlyArray<Salesperson>;
@@ -32,18 +34,28 @@ export interface CheckoutMeta {
   productGroupSearch: ReturnType<typeof buildLocalSearch<ProductGroup>>;
 }
 
-export const useCheckoutMeta = (
-  catalogGroupId: string | undefined,
-): CheckoutMeta => {
+/**
+ * Zero-input adapter: `selectedSalesperson/PriceBook` từ ui store,
+ * `selectedProductGroup` derive từ `catalogGroup` (catalog store) +
+ * `productGroups` (static hook).
+ */
+export const useCheckoutMeta = (): CheckoutMeta => {
   const { salespersons } = useSalespersons();
   const { priceBooks } = usePriceBooks();
   const { productGroups } = useProductGroups();
 
-  const [selectedSalesperson, setSelectedSalesperson] =
-    useState<Salesperson | null>(null);
-  const [selectedPriceBook, setSelectedPriceBook] = useState<PriceBook | null>(
-    null,
+  const selectedSalesperson = usePosCheckoutUiStore(
+    (s) => s.selectedSalesperson,
   );
+  const setSelectedSalesperson = usePosCheckoutUiStore(
+    (s) => s.setSelectedSalesperson,
+  );
+  const selectedPriceBook = usePosCheckoutUiStore((s) => s.selectedPriceBook);
+  const setSelectedPriceBook = usePosCheckoutUiStore(
+    (s) => s.setSelectedPriceBook,
+  );
+
+  const catalogGroupId = usePosCheckoutCatalogStore((s) => s.catalogGroup);
 
   const selectedProductGroup = useMemo<ProductGroup | null>(
     () => productGroups.find((g) => g.id === catalogGroupId) ?? null,

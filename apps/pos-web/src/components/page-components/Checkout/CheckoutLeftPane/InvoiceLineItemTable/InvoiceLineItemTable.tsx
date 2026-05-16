@@ -1,30 +1,10 @@
-import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { TooltipProvider } from "@erp/ui";
 import { InvoiceLineItemRow } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemRow";
-import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";
-
-export interface InvoiceLineItemTableProps {
-  lines: CartLine[];
-  selectedId?: string | null;
-  checkoutPane?: CheckoutPane;
-  /** Predicate to flag a row with the red warning dot. */
-  isLineWarning?: (line: CartLine) => boolean;
-  /**
-   * When set, the matching row automatically focuses and selects its qty input
-   * (for the MISA flow: after pressing Enter to add a product, focus moves to
-   * the qty field of the newly added line).
-   */
-  autoFocusQtyLineId?: string | null;
-  /** Called after the row has consumed autoFocusQtyLineId — host should clear the state. */
-  onAutoFocusConsumed?: () => void;
-  /** Enter on the qty input → host returns focus to the product search field. */
-  onCommitQty?: () => void;
-  onSelect: (lineId: string) => void;
-  onRemove: (lineId: string) => void;
-  onChangeQty: (lineId: string, raw: string) => void;
-  onBumpQty?: (lineId: string, delta: number) => void;
-  onChangeUnitPrice: (lineId: string, raw: string) => void;
-}
+import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
+import {
+  selectInvoiceTableCheckoutPane,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
   { label: "STT", align: "center" },
@@ -39,23 +19,15 @@ const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
 ];
 
 /**
- * Invoice line items table. Header is sticky-ish (sticky bg) so the rows
- * scroll under it. Pure presentational — caller owns the data.
+ * Invoice line items table. Đọc trực tiếp cart/selectedLineId từ session-cart
+ * hook. Row component tự consume các handler từ cart-actions hook.
  */
-export function InvoiceLineItemTable({
-  lines,
-  selectedId,
-  checkoutPane = CheckoutPane.PURCHASE,
-  isLineWarning,
-  autoFocusQtyLineId,
-  onAutoFocusConsumed,
-  onCommitQty,
-  onSelect,
-  onRemove,
-  onChangeQty,
-  onBumpQty,
-  onChangeUnitPrice,
-}: InvoiceLineItemTableProps) {
+export function InvoiceLineItemTable() {
+  const { cart } = useCheckoutSessionCart();
+  const checkoutPane = usePosCheckoutSessionStore(
+    selectInvoiceTableCheckoutPane,
+  );
+
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex-1 overflow-auto bg-white">
@@ -80,7 +52,7 @@ export function InvoiceLineItemTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {lines.length === 0 ? (
+            {cart.length === 0 ? (
               <tr>
                 <td
                   colSpan={HEADERS.length}
@@ -90,21 +62,11 @@ export function InvoiceLineItemTable({
                 </td>
               </tr>
             ) : (
-              lines.map((line, i) => (
+              cart.map((line, i) => (
                 <InvoiceLineItemRow
                   key={line.lineId}
                   index={i + 1}
                   line={line}
-                  selected={selectedId === line.lineId}
-                  hasWarning={isLineWarning?.(line)}
-                  autoFocusQty={autoFocusQtyLineId === line.lineId}
-                  onAutoFocusConsumed={onAutoFocusConsumed}
-                  onCommitQty={onCommitQty}
-                  onSelect={onSelect}
-                  onRemove={onRemove}
-                  onChangeQty={onChangeQty}
-                  onBumpQty={onBumpQty}
-                  onChangeUnitPrice={onChangeUnitPrice}
                   checkoutPane={checkoutPane}
                 />
               ))
