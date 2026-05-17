@@ -1,14 +1,14 @@
-import { useMemo } from "react";
-import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import {
   PosDataTable,
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
-import type { FastStockTransferDialogRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
+import type { FastStockTransferConfirmRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import { useMemo } from "react";
 
 interface FastStockTransferConfirmDialogProps {
   open: boolean;
-  rows: ReadonlyArray<FastStockTransferDialogRow>;
+  rows: ReadonlyArray<FastStockTransferConfirmRow>;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -20,7 +20,7 @@ export function FastStockTransferConfirmDialog({
   onConfirm,
 }: FastStockTransferConfirmDialogProps) {
   const columns = useMemo<
-    ReadonlyArray<PosDataTableColumn<FastStockTransferDialogRow>>
+    ReadonlyArray<PosDataTableColumn<FastStockTransferConfirmRow>>
   >(
     () => [
       {
@@ -51,8 +51,8 @@ export function FastStockTransferConfirmDialog({
   return (
     <PosDialog open={open} onClose={onClose} width={920}>
       <PosDialog.Header title="Xử lý chuyển kho" />
-      <PosDialog.Body className="px-3 py-0">
-        <PosDataTable<FastStockTransferDialogRow>
+      <PosDialog.Body className="flex flex-col gap-3 px-3 py-0">
+        <PosDataTable<FastStockTransferConfirmRow>
           columns={columns}
           dataSource={rows}
           rowKey={(row) => row.id}

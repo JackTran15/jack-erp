@@ -1,5 +1,9 @@
 import { cn } from "@erp/ui";
 import type { ReactNode } from "react";
+import {
+  posFormItemLabelTopPad,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
 
 export interface PosFormItemProps {
   /** Label content — usually a string, but ReactNode is supported. */
@@ -17,6 +21,8 @@ export interface PosFormItemProps {
    * has multiple rows (e.g. a stacked address group).
    */
   alignTop?: boolean;
+  /** Matches row-control `size` for horizontal `alignTop` label offset. */
+  controlSize?: PosFormSize;
   className?: string;
   labelClassName?: string;
   contentClassName?: string;
@@ -36,6 +42,7 @@ export function PosFormItem({
   error,
   layout = "vertical",
   alignTop,
+  controlSize = "md",
   className,
   labelClassName,
   contentClassName,
@@ -54,7 +61,9 @@ export function PosFormItem({
         htmlFor={htmlFor}
         className={cn(
           layout === "horizontal" && "shrink-0",
-          layout === "horizontal" && alignTop && "pt-2",
+          layout === "horizontal" &&
+            alignTop &&
+            posFormItemLabelTopPad[controlSize],
           labelClassName,
         )}
       >

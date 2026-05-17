@@ -1,6 +1,19 @@
 import { cn } from "@erp/ui";
 import type { ReactNode } from "react";
 import { PosRadio } from "@erp/pos/components/common/PosRadio/PosRadio";
+import {
+  posFormHeight,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
+
+export type PosRadioGroupSize = PosFormSize;
+
+const radioGroupLabel: Record<PosRadioGroupSize, string> = {
+  sm: "text-sm",
+  md: "text-sm",
+  lg: "text-base",
+  xl: "text-lg",
+};
 
 export interface PosRadioGroupOption<TValue extends string> {
   value: TValue;
@@ -14,10 +27,9 @@ export interface PosRadioGroupProps<TValue extends string> {
   onChange: (next: TValue) => void;
   options: ReadonlyArray<PosRadioGroupOption<TValue>>;
   layout?: "horizontal" | "vertical";
-  size?: "sm" | "md";
+  size?: PosRadioGroupSize;
   ariaLabel?: string;
   className?: string;
-  /** Optional class merged onto every option `<label>`. */
   optionClassName?: string;
 }
 
@@ -38,7 +50,8 @@ export function PosRadioGroup<TValue extends string>({
       aria-label={ariaLabel}
       className={cn(
         "flex",
-        layout === "horizontal" && "h-8 items-center gap-6",
+        layout === "horizontal" &&
+          cn("items-center gap-6", posFormHeight[size]),
         layout === "vertical" && "flex-col gap-2",
         className,
       )}
@@ -49,7 +62,8 @@ export function PosRadioGroup<TValue extends string>({
           <label
             key={opt.value}
             className={cn(
-              "inline-flex items-center gap-2 text-[14px] text-gray-900",
+              "inline-flex items-center gap-2 text-gray-900",
+              radioGroupLabel[size],
               opt.disabled
                 ? "cursor-not-allowed text-gray-400"
                 : "cursor-pointer",

@@ -1,3 +1,4 @@
+import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { cn } from "@erp/ui";
 import {
   useEffect,
@@ -9,7 +10,40 @@ import {
   type Ref,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import {
+  posFormFieldClass,
+  posFormHeight,
+  posFormPadX,
+  posFormRadius,
+  posFormRowClass,
+  posFormUnderlineShadow,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
+
+export type PosSelectSearchSize = PosFormSize;
+
+export type PosSelectSearchVariant = "boxed" | "underline";
+
+const selectSearchVariant: Record<
+  PosSelectSearchVariant,
+  (size: PosSelectSearchSize, open: boolean) => string
+> = {
+  boxed: (size, open) =>
+    cn(
+      posFormRowClass,
+      "border border-gray-200 bg-white text-gray-700 transition-[border-color,box-shadow] duration-150 ease-out hover:border-gray-300 focus-within:border-[#5C6BC0]",
+      posFormHeight[size],
+      posFormRadius[size],
+      open && "ring-2 ring-[#5C6BC0]/30",
+    ),
+  underline: (size, open) =>
+    cn(
+      posFormRowClass,
+      "border-b border-transparent bg-transparent transition-[box-shadow] duration-150 ease-out",
+      posFormUnderlineShadow(false, open),
+      posFormHeight[size],
+    ),
+};
 
 export interface PosSelectSearchSuggestion<T> {
   item: T;
@@ -33,6 +67,8 @@ export interface PosSelectSearchConfig<T> {
   /** Forwarded to the underlying input — used by hotkeys to focus the field. */
   inputRef?: Ref<HTMLInputElement>;
   disabled?: boolean;
+  size?: PosSelectSearchSize;
+  variant?: PosSelectSearchVariant;
 }
 
 export interface PosSelectSearchProps<T> {
@@ -71,10 +107,14 @@ export interface PosSelectSearchProps<T> {
   className?: string;
   /** Applied to the floating menu. */
   menuClassName?: string;
+  /** Gọi khi người dùng gõ — dùng cho tìm kiếm catalog async phía ngoài. */
+  onQueryChange?: (query: string) => void;
   /** Position of the floating menu — "bottom" (default) or "top". */
   position?: "bottom" | "top";
   /** Forwarded to the underlying input — used by hotkeys to focus the field. */
   ref?: Ref<HTMLInputElement>;
+  size?: PosSelectSearchSize;
+  variant?: PosSelectSearchVariant;
 }
 
 /**
@@ -106,8 +146,11 @@ export function PosSelectSearch<T>({
   ariaLabel,
   className,
   menuClassName,
+  onQueryChange,
   position = "bottom",
   ref,
+  size = "md",
+  variant = "boxed",
 }: PosSelectSearchProps<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -243,13 +286,14 @@ export function PosSelectSearch<T>({
     <div
       ref={rootRef}
       className={cn(
-        "relative inline-flex h-9 items-center gap-1 rounded-md border border-gray-200 bg-white text-gray-700 transition-colors hover:border-gray-300 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20",
+        selectSearchVariant[variant](size, open),
+        posFormPadX[size],
         disabled && "cursor-not-allowed opacity-60",
         className,
       )}
     >
       {leadingIcon ? (
-        <span className="flex shrink-0 items-center pl-2.5 pr-1 text-gray-500">
+        <span className="flex shrink-0 items-center text-gray-500">
           {leadingIcon}
         </span>
       ) : null}
@@ -269,17 +313,19 @@ export function PosSelectSearch<T>({
           if (!open) openMenu();
         }}
         onChange={(e) => {
-          setQuery(e.target.value);
+          const next = e.target.value;
+          setQuery(next);
+          onQueryChange?.(next);
           setHighlightIdx(-1);
           if (!open) setOpen(true);
         }}
         onKeyDown={handleKeyDown}
         className={cn(
-          "min-w-0 flex-1 bg-transparent text-[13px] text-gray-900 placeholder:italic placeholder:text-gray-400 focus:outline-none",
-          leadingIcon ? "px-1" : "pl-2.5 pr-1",
+          posFormFieldClass,
+          "placeholder:italic placeholder:text-gray-400",
         )}
       />
-      <span className="flex shrink-0 items-center pr-2 text-gray-400">
+      <span className="flex shrink-0 items-center text-gray-400">
         <ChevronDownIcon
           size={14}
           className={cn("transition-transform", open && "rotate-180")}

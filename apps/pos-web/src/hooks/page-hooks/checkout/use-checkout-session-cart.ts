@@ -11,7 +11,10 @@ import {
   type CatalogProduct,
   CheckoutVariantEnum,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import { isCartLineWarning, locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import {
+  isCartLineWarning,
+  locationQtyFor,
+} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   clampPosCheckoutQtyNumber,
   POS_CHECKOUT_QTY_MIN,
@@ -36,6 +39,7 @@ export function useCheckoutSessionCart() {
   const setCartError = usePosCheckoutUiStore((s) => s.setCartError);
 
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
+
   const session = usePosCheckoutSessionStore(selectActiveSession);
 
   const variant: CheckoutVariantEnum =
@@ -136,9 +140,7 @@ export function useCheckoutSessionCart() {
       // Read the latest cart state from the store so we can compute the
       // affected lineId BEFORE dispatching the update — caller (POS flow)
       // needs the id to focus the qty input of the just-added line.
-      const latest = selectActiveSession(
-        usePosCheckoutSessionStore.getState(),
-      );
+      const latest = selectActiveSession(usePosCheckoutSessionStore.getState());
       const targetList =
         variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
         activeCheckoutPane === CheckoutPane.RETURN
@@ -335,7 +337,6 @@ export function useCheckoutSessionCart() {
     },
     selectedLineId,
     setSelectedLineId,
-    cartError,
     setCartError,
     grandTotal,
     addProduct,
