@@ -1,5 +1,11 @@
 import { cn } from "@erp/ui";
-import { ComponentType, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  ComponentType,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import {
@@ -23,9 +29,11 @@ import type {
   InvoiceTabItem,
 } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/DraftInvoicesDialog";
-import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/common/localstorage";
+import {
+  readPinnedItems,
+  writePinnedItems,
+} from "@erp/pos/lib/common/localstorage";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
-
 
 export interface PosMenuItem {
   id: string;
@@ -178,20 +186,24 @@ export function PosLayout() {
 
   return (
     <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
-      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 h-12 gap-3 bg-white px-3" >
+      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 h-12 gap-3 bg-white px-3">
         <div className="flex items-center gap-2">
-          <div onClick={() => navigate('/')} className="cursor-pointer">
+          <div onClick={() => navigate("/")} className="cursor-pointer">
             <PosLogo />
           </div>
-          {visiblePinnedItems.map(item => {
+          {visiblePinnedItems.map((item) => {
             const isActive = item.id === activeItemId;
-              return <PosPinnedButton
-                  key={item.id}
-                  item={item}
-                  active={isActive}
-                  onClick={item.route ? () => handlePinnedItemClick(item) : undefined}
-                />
-            })}
+            return (
+              <PosPinnedButton
+                key={item.id}
+                item={item}
+                active={isActive}
+                onClick={
+                  item.route ? () => handlePinnedItemClick(item) : undefined
+                }
+              />
+            );
+          })}
         </div>
 
         {showInvoiceTabs && (
@@ -219,27 +231,27 @@ export function PosLayout() {
           </nav>
         )}
 
-         <div className="ml-auto flex items-center gap-1">
-            <PosLocationIndicator location={branchName ?? 'Main brain'} />
-            <PosIconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
-            <PosIconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
-            <PosUserMenu name={cashierDisplayName ?? 'Phan Thanh Hà'} />
-            <PosIconButton
-              ref={appMenuTriggerRef}
-              ariaLabel="Menu ứng dụng"
-              icon={<GridIcon size={18} />}
-              active={appMenuOpen}
-              aria-expanded={appMenuOpen}
-              aria-haspopup="menu"
-              onClick={() => setAppMenuOpen((v) => !v)}
-            />
-            <PosMenuPopover
-              open={appMenuOpen}
-              onClose={() => setAppMenuOpen(false)}
-              triggerRef={appMenuTriggerRef}
-              pinnedItemIds={pinnedItemIds}
-              onTogglePin={handleTogglePin}
-            />
+        <div className="ml-auto flex items-center gap-1">
+          <PosLocationIndicator location={branchName ?? "Main brain"} />
+          <PosIconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
+          <PosIconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
+          <PosUserMenu name={cashierDisplayName ?? "Phan Thanh Hà"} />
+          <PosIconButton
+            ref={appMenuTriggerRef}
+            ariaLabel="Menu ứng dụng"
+            icon={<GridIcon size={18} />}
+            active={appMenuOpen}
+            aria-expanded={appMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setAppMenuOpen((v) => !v)}
+          />
+          <PosMenuPopover
+            open={appMenuOpen}
+            onClose={() => setAppMenuOpen(false)}
+            triggerRef={appMenuTriggerRef}
+            pinnedItemIds={pinnedItemIds}
+            onTogglePin={handleTogglePin}
+          />
         </div>
       </header>
 
@@ -260,7 +272,7 @@ export function PosLayout() {
         onDelete={handleDeleteDraft}
       />
 
-      <Outlet/>
+      <Outlet />
     </div>
   );
 }
@@ -269,7 +281,8 @@ const CHECKOUT_PATHS = new Set(["/"]);
 
 export function resolveSelectedPosMenuItemId(pathname: string): string {
   const match = APP_MENU_ITEMS.find(
-    (item) => item.route && item.route !== "/" && pathname.startsWith(item.route),
+    (item) =>
+      item.route && item.route !== "/" && pathname.startsWith(item.route),
   );
   if (match) return match.id;
   if (CHECKOUT_PATHS.has(pathname)) return "ban-hang";

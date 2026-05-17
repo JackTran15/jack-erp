@@ -31,9 +31,13 @@ export interface FormatViDateTimeOptions {
 }
 
 export function formatViDateTime(
-  d: Date,
+  input: Date | string,
   options: FormatViDateTimeOptions = {},
 ): string {
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) {
+    return typeof input === "string" ? input : "";
+  }
   const { separator = "dash", withSeconds = false } = options;
   if (withSeconds) return viDateTimeWithSecondsFormatter.format(d).replace(",", "");
   const parts = partsOf(d);
