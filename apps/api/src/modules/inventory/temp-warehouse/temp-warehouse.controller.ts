@@ -5,6 +5,7 @@ import {
   Patch,
   Delete,
   Body,
+  HttpCode,
   Param,
   Query,
   ParseUUIDPipe,
@@ -14,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiHeader, ApiOperation } from '@nestjs/swagger';
 import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { RequirePermission } from '../../auth/decorators';
+import { RequirePermission, RequireBranchScope } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
@@ -23,6 +24,8 @@ import { AddTempWarehouseLineDto } from './dto/add-line.dto';
 import { UpdateTempWarehouseLineDto } from './dto/update-line.dto';
 import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
 import { CloseTempWarehouseSessionDto } from './dto/close-session.dto';
+import { ListCarriersQueryDto } from './dto/list-carriers.query';
+import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
 
 @ApiTags('Inventory · Temp Warehouse')
 @ApiHeader({
@@ -119,5 +122,34 @@ export class TempWarehouseController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.closeSession(id, dto, actor);
+  }
+
+  @Post('sessions/:id/transfer-lines')
+  @HttpCode(202)
+  @ApiOperation({
+    summary:
+      'Materialize the listed ACTIVE lines into stock transfer(s) without closing the session. Idempotent on the (sessionId, direction, sorted lineIds) tuple.',
+  })
+  @RequirePermission('inventory.temp-warehouse.close')
+  transferLines(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TransferTempWarehouseLinesDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.transferLines(id, dto, actor);
+  }
+
+  @Get('carriers')
+  @ApiOperation({
+    summary:
+      'List active users assigned to the given branch — used by the FE carrier picker',
+  })
+  @RequirePermission('inventory.temp-warehouse.read')
+  @RequireBranchScope()
+  listCarriers(
+    @Query() query: ListCarriersQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.listCarriersForBranch(query, actor);
   }
 }

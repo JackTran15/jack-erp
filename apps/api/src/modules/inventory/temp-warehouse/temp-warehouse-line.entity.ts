@@ -43,12 +43,21 @@ export class TempWarehouseLineEntity extends BaseEntity {
     type: 'varchar',
     length: 20,
     default: TempWarehouseLineStatus.ACTIVE,
-    comment: 'ACTIVE | DELETED | AUTO_BALANCED',
+    comment: 'ACTIVE | DELETED | AUTO_BALANCED | TRANSFERRED',
   })
   status: TempWarehouseLineStatus;
 
   @Column({ name: 'superseded_by_id', type: 'uuid', nullable: true })
   supersededById?: string | null;
+
+  @Column({
+    name: 'transfer_id',
+    type: 'uuid',
+    nullable: true,
+    comment:
+      'Set when this line was consumed by a partial stock transfer; null while the line is ACTIVE in the working set.',
+  })
+  transferId?: string | null;
 
   @Column({ type: 'text', nullable: true })
   notes?: string | null;

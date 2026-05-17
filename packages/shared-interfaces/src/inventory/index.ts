@@ -62,6 +62,12 @@ export enum TempWarehouseLineStatus {
   ACTIVE = 'ACTIVE',
   DELETED = 'DELETED',
   AUTO_BALANCED = 'AUTO_BALANCED',
+  TRANSFERRED = 'TRANSFERRED',
+}
+
+export enum TempWarehouseTransferKind {
+  FULL = 'FULL',
+  PARTIAL = 'PARTIAL',
 }
 
 export enum TempWarehouseDirection {
@@ -99,6 +105,12 @@ export interface TempWarehouseTransferRequestedPayload {
     roles: string[];
   };
   requestedAt: string;
+  /**
+   * Undefined or FULL = published by closeSession(CREATE_TRANSFERS) — consumer updates session-level transferW2sId/S2WId.
+   * PARTIAL = published by transferLines — consumer flips the listed lines to TRANSFERRED and stores transferId per line; session-level fields untouched.
+   */
+  kind?: TempWarehouseTransferKind;
+  notes?: string;
 }
 
 export interface Provider {

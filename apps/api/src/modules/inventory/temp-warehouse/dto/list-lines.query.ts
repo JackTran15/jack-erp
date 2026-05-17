@@ -36,13 +36,19 @@ export class ListTempWarehouseLinesQueryDto {
   hideOffsetting?: boolean = false;
 
   @ApiPropertyOptional({
-    description: 'Filter by line status; use ALL to return every status',
-    enum: [...Object.values(TempWarehouseLineStatus), 'ALL'],
+    description:
+      'Filter by line status; use ALL to return every status. TRANSFERRED lines are always excluded — query stock_transfers via temp_warehouse_lines.transfer_id for that audit trail.',
+    enum: [
+      ...Object.values(TempWarehouseLineStatus).filter(
+        (s) => s !== TempWarehouseLineStatus.TRANSFERRED,
+      ),
+      'ALL',
+    ],
     default: TempWarehouseLineStatus.ACTIVE,
   })
   @IsOptional()
   @IsString()
-  status?: TempWarehouseLineStatus | 'ALL';
+  status?: Exclude<TempWarehouseLineStatus, TempWarehouseLineStatus.TRANSFERRED> | 'ALL';
 
   @ApiPropertyOptional({ enum: TempWarehouseDirection })
   @IsOptional()

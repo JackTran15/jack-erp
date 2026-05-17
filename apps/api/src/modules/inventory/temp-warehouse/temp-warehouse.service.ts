@@ -6,14 +6,16 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, QueryFailedError } from 'typeorm';
+import { DataSource, In, Not, Repository, QueryFailedError } from 'typeorm';
 import { v5 as uuidv5 } from 'uuid';
+import { createHash } from 'crypto';
 import {
   DomainEventType,
   TempWarehouseCloseMode,
   TempWarehouseDirection,
   TempWarehouseLineStatus,
   TempWarehouseSessionStatus,
+  TempWarehouseTransferKind,
   TempWarehouseTransferProcessingStatus,
   TempWarehouseTransferRequestedPayload,
 } from '@erp/shared-interfaces';
@@ -26,11 +28,14 @@ import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ItemEntity } from '../location/item.entity';
 import { LocationEntity } from '../location/location.entity';
 import { UserEntity } from '../../auth/user.entity';
+import { UserBranchAssignmentEntity } from '../../branch/user-branch-assignment.entity';
 import { BranchLocationResolverService } from './branch-location-resolver.service';
 import { AddTempWarehouseLineDto } from './dto/add-line.dto';
 import { UpdateTempWarehouseLineDto } from './dto/update-line.dto';
 import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
 import { CloseTempWarehouseSessionDto } from './dto/close-session.dto';
+import { ListCarriersQueryDto } from './dto/list-carriers.query';
+import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
 
 export interface PublicUser {
   id: string;
@@ -111,6 +116,8 @@ export class TempWarehouseService {
     private readonly stockBalanceRepo: Repository<StockBalanceEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(UserBranchAssignmentEntity)
+    private readonly userBranchRepo: Repository<UserBranchAssignmentEntity>,
     @InjectRepository(ItemEntity)
     private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(LocationEntity)
@@ -143,7 +150,6 @@ export class TempWarehouseService {
   > {
     const session = await this.sessionRepo.findOne({
       where: { id, organizationId: actor.organizationId },
-      relations: ['lines'],
     });
     if (!session) {
       throw new NotFoundException({
@@ -151,13 +157,71 @@ export class TempWarehouseService {
         message: `Temp warehouse session ${id} not found`,
       });
     }
-    const rawLines = session.lines ?? [];
+    // Hard-exclude TRANSFERRED — lines consumed by a partial transfer are no longer part of the working set.
+    const rawLines = await this.lineRepo.find({
+      where: {
+        sessionId: id,
+        organizationId: actor.organizationId,
+        status: Not(TempWarehouseLineStatus.TRANSFERRED),
+      },
+      order: { createdAt: 'DESC' },
+    });
     const lines = await this.attachLineRelations(
       rawLines,
       session,
       actor.organizationId,
     );
     return { ...session, lines };
+  }
+
+  // ─── Carrier list ──────────────────────────────────────────────────
+
+  async listCarriersForBranch(
+    query: ListCarriersQueryDto,
+    actor: ActorContext,
+  ): Promise<{
+    data: PublicUser[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+
+    const qb = this.userRepo
+      .createQueryBuilder('u')
+      .innerJoin(
+        UserBranchAssignmentEntity,
+        'uba',
+        'uba.user_id = u.id AND uba.branch_id = :branchId AND uba.organization_id = :orgId',
+        { branchId: query.branchId, orgId: actor.organizationId },
+      )
+      .where('u.organization_id = :orgId', { orgId: actor.organizationId })
+      .andWhere('u.is_active = TRUE');
+
+    if (query.search && query.search.trim().length > 0) {
+      const term = `%${query.search.trim()}%`;
+      qb.andWhere(
+        '(u.first_name ILIKE :term OR u.last_name ILIKE :term OR u.email ILIKE :term)',
+        { term },
+      );
+    }
+
+    const [users, total] = await qb
+      .orderBy('u.first_name', 'ASC')
+      .addOrderBy('u.last_name', 'ASC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
+
+    const data: PublicUser[] = users.map((u) => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+    }));
+
+    return { data, total, page, pageSize };
   }
 
   // ─── Add line (auto-open session) ───────────────────────────────────
@@ -428,23 +492,36 @@ export class TempWarehouseService {
         ? undefined
         : (query.status as TempWarehouseLineStatus);
 
-    const where: Record<string, unknown> = {
-      sessionId,
-      organizationId: actor.organizationId,
-    };
-    if (statusFilter) where.status = statusFilter;
-    else if (!query.status) where.status = TempWarehouseLineStatus.ACTIVE;
-    if (query.direction) where.direction = query.direction;
-
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    const [rawLines, total] = await this.lineRepo.findAndCount({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      order: { createdAt: 'DESC' },
-    });
+    // Hard-exclude TRANSFERRED from every raw-mode listing, including status=ALL.
+    const qb = this.lineRepo
+      .createQueryBuilder('l')
+      .where('l.session_id = :sessionId', { sessionId })
+      .andWhere('l.organization_id = :orgId', {
+        orgId: actor.organizationId,
+      })
+      .andWhere('l.status != :transferred', {
+        transferred: TempWarehouseLineStatus.TRANSFERRED,
+      });
+
+    if (statusFilter) {
+      qb.andWhere('l.status = :status', { status: statusFilter });
+    } else if (!query.status) {
+      qb.andWhere('l.status = :active', {
+        active: TempWarehouseLineStatus.ACTIVE,
+      });
+    }
+    if (query.direction) {
+      qb.andWhere('l.direction = :direction', { direction: query.direction });
+    }
+
+    const [rawLines, total] = await qb
+      .orderBy('l.created_at', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
 
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId, organizationId: actor.organizationId },
@@ -865,6 +942,7 @@ export class TempWarehouseService {
     direction: TempWarehouseDirection,
     lines: TempWarehouseLineEntity[],
     actor: ActorContext,
+    extra?: { kind?: TempWarehouseTransferKind; notes?: string },
   ): TempWarehouseTransferRequestedPayload {
     const isW2s = direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
     return {
@@ -892,6 +970,8 @@ export class TempWarehouseService {
         roles: actor.roles,
       },
       requestedAt: new Date().toISOString(),
+      ...(extra?.kind ? { kind: extra.kind } : {}),
+      ...(extra?.notes ? { notes: extra.notes } : {}),
     };
   }
 
@@ -1008,6 +1088,205 @@ export class TempWarehouseService {
   ): Promise<TempWarehouseSessionEntity | null> {
     return this.sessionRepo.findOne({
       where: { id: sessionId, organizationId },
+    });
+  }
+
+  // ─── Partial transfer ──────────────────────────────────────────────
+
+  async transferLines(
+    sessionId: string,
+    dto: TransferTempWarehouseLinesDto,
+    actor: ActorContext,
+  ): Promise<{
+    session: TempWarehouseSessionEntity;
+    publishedEvents: {
+      direction: TempWarehouseDirection;
+      eventId: string;
+      lineIds: string[];
+    }[];
+  }> {
+    type PublishItem = {
+      direction: TempWarehouseDirection;
+      lineIds: string[];
+      payload: TempWarehouseTransferRequestedPayload;
+    };
+
+    const { session, publishPlan } = await this.dataSource.transaction(
+      async (manager) => {
+        const found = await manager.findOne(TempWarehouseSessionEntity, {
+          where: { id: sessionId, organizationId: actor.organizationId },
+        });
+        if (!found) {
+          throw new NotFoundException({
+            code: 'TEMP_WAREHOUSE_SESSION_NOT_FOUND',
+            message: `Session ${sessionId} not found`,
+          });
+        }
+        if (found.status !== TempWarehouseSessionStatus.ACTIVE) {
+          throw new ConflictException({
+            code: 'TEMP_WAREHOUSE_SESSION_CLOSED',
+            message: `Session ${sessionId} is not ACTIVE (current=${found.status}); partial transfer is only allowed on ACTIVE sessions`,
+          });
+        }
+
+        // Canonicalize input — sort + dedupe so retries with reordered or duplicated IDs collide on the same eventId.
+        const uniqueLineIds = [...new Set(dto.lineIds)].sort();
+
+        const loaded = await manager.find(TempWarehouseLineEntity, {
+          where: {
+            id: In(uniqueLineIds),
+            sessionId,
+            organizationId: actor.organizationId,
+          },
+        });
+
+        const loadedById = new Map(loaded.map((l) => [l.id, l]));
+        const missing = uniqueLineIds.filter((id) => !loadedById.has(id));
+        if (missing.length > 0) {
+          throw new BadRequestException({
+            code: 'TEMP_WAREHOUSE_LINES_NOT_FOUND_IN_SESSION',
+            message: `Lines not found in session ${sessionId}: ${missing.join(', ')}`,
+            missingLineIds: missing,
+          });
+        }
+
+        const notTransferable = loaded.filter(
+          (l) => l.status !== TempWarehouseLineStatus.ACTIVE,
+        );
+        if (notTransferable.length > 0) {
+          throw new BadRequestException({
+            code: 'TEMP_WAREHOUSE_LINES_NOT_TRANSFERABLE',
+            message: `Lines are not ACTIVE and cannot be transferred`,
+            offendingLines: notTransferable.map((l) => ({
+              id: l.id,
+              status: l.status,
+            })),
+          });
+        }
+
+        const w2sLines = loaded.filter(
+          (l) => l.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        );
+        const s2wLines = loaded.filter(
+          (l) => l.direction === TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+        );
+
+        const plan: PublishItem[] = [];
+        if (w2sLines.length > 0) {
+          plan.push({
+            direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+            lineIds: w2sLines.map((l) => l.id),
+            payload: this.buildEventPayload(
+              found,
+              TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+              w2sLines,
+              actor,
+              { kind: TempWarehouseTransferKind.PARTIAL, notes: dto.notes },
+            ),
+          });
+        }
+        if (s2wLines.length > 0) {
+          plan.push({
+            direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+            lineIds: s2wLines.map((l) => l.id),
+            payload: this.buildEventPayload(
+              found,
+              TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+              s2wLines,
+              actor,
+              { kind: TempWarehouseTransferKind.PARTIAL, notes: dto.notes },
+            ),
+          });
+        }
+
+        return { session: found, publishPlan: plan };
+      },
+    );
+
+    // Publish after commit. Deterministic eventId keyed on sorted lineIds so:
+    //   - Same body (same subset) → same eventId → consumer dedupes via processed_events.
+    //   - Different subset → different eventId → independent transfer.
+    const publishedEvents: {
+      direction: TempWarehouseDirection;
+      eventId: string;
+      lineIds: string[];
+    }[] = [];
+    for (const item of publishPlan) {
+      const sortedIds = [...item.lineIds].sort();
+      const hash = createHash('sha256')
+        .update(sortedIds.join(','))
+        .digest('hex')
+        .slice(0, 32);
+      const eventId = uuidv5(
+        `${session.id}:${item.direction}:partial:${hash}`,
+        TEMP_WAREHOUSE_EVENT_NAMESPACE,
+      );
+      try {
+        await this.eventPublisher.publish(
+          ERP_TOPICS.TEMP_WAREHOUSE_TRANSFER_REQUESTED,
+          {
+            eventId,
+            eventType: DomainEventType.TEMP_WAREHOUSE_TRANSFER_REQUESTED,
+            timestamp: new Date().toISOString(),
+            organizationId: item.payload.organizationId,
+            branchId: item.payload.branchId,
+            correlationId: session.id,
+            payload: item.payload,
+          },
+          `${session.id}:${item.direction}:partial:${hash}`,
+        );
+        publishedEvents.push({
+          direction: item.direction,
+          eventId,
+          lineIds: sortedIds,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Failed to publish partial-transfer event for session=${session.id} direction=${item.direction}: ${msg}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        throw err;
+      }
+    }
+
+    return { session, publishedEvents };
+  }
+
+  /**
+   * Flip the listed lines from ACTIVE to TRANSFERRED with the resulting transferId.
+   * Called by the partial-transfer consumer after the stock transfer is POSTED.
+   * Filter status=ACTIVE so replays never override an already-recorded transferId.
+   */
+  async markLinesTransferred(
+    sessionId: string,
+    lineIds: string[],
+    transferId: string,
+    organizationId: string,
+  ): Promise<void> {
+    if (lineIds.length === 0) return;
+    await this.lineRepo.update(
+      {
+        id: In(lineIds),
+        sessionId,
+        organizationId,
+        status: TempWarehouseLineStatus.ACTIVE,
+      },
+      {
+        status: TempWarehouseLineStatus.TRANSFERRED,
+        transferId,
+      },
+    );
+  }
+
+  /** Consumer-side lookup for the partial-transfer defensive replay check. */
+  async findLinesByIds(
+    lineIds: string[],
+    organizationId: string,
+  ): Promise<TempWarehouseLineEntity[]> {
+    if (lineIds.length === 0) return [];
+    return this.lineRepo.find({
+      where: { id: In(lineIds), organizationId },
     });
   }
 }
