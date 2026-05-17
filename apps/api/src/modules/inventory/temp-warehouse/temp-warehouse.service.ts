@@ -6,7 +6,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Not, Repository, QueryFailedError } from 'typeorm';
+import {
+  DataSource,
+  ILike,
+  In,
+  Not,
+  Repository,
+  QueryFailedError,
+} from 'typeorm';
 import { v5 as uuidv5 } from 'uuid';
 import { createHash } from 'crypto';
 import {
@@ -188,31 +195,40 @@ export class TempWarehouseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    const qb = this.userRepo
-      .createQueryBuilder('u')
-      .innerJoin(
-        UserBranchAssignmentEntity,
-        'uba',
-        'uba.user_id = u.id AND uba.branch_id = :branchId AND uba.organization_id = :orgId',
-        { branchId: query.branchId, orgId: actor.organizationId },
-      )
-      .where('u.organization_id = :orgId', { orgId: actor.organizationId })
-      .andWhere('u.is_active = TRUE');
+    const assignments = await this.userBranchRepo.find({
+      where: {
+        branchId: query.branchId,
+        organizationId: actor.organizationId,
+      },
+      select: ['userId'],
+    });
 
-    if (query.search && query.search.trim().length > 0) {
-      const term = `%${query.search.trim()}%`;
-      qb.andWhere(
-        '(u.first_name ILIKE :term OR u.last_name ILIKE :term OR u.email ILIKE :term)',
-        { term },
-      );
+    const userIds = assignments.map((a) => a.userId);
+    if (userIds.length === 0) {
+      return { data: [], total: 0, page, pageSize };
     }
 
-    const [users, total] = await qb
-      .orderBy('u.first_name', 'ASC')
-      .addOrderBy('u.last_name', 'ASC')
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+    const baseWhere = {
+      id: In(userIds),
+      organizationId: actor.organizationId,
+      isActive: true,
+    } as const;
+
+    const search = query.search?.trim();
+    const where = search
+      ? [
+          { ...baseWhere, firstName: ILike(`%${search}%`) },
+          { ...baseWhere, lastName: ILike(`%${search}%`) },
+          { ...baseWhere, email: ILike(`%${search}%`) },
+        ]
+      : baseWhere;
+
+    const [users, total] = await this.userRepo.findAndCount({
+      where,
+      order: { firstName: 'ASC', lastName: 'ASC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
 
     const data: PublicUser[] = users.map((u) => ({
       id: u.id,
