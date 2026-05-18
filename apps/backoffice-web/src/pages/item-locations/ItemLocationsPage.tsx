@@ -1,16 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AppModal,
   Button,
   DocumentListShell,
   Input,
   PageToolbar,
-  Textarea,
   type ToolbarItem,
 } from "@erp/ui";
+import { LocationType } from "@erp/shared-interfaces";
 import {
-  Boxes,
-  CloudUpload,
   Copy,
   HelpCircle,
   Pencil,
@@ -21,30 +19,58 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { apiClient } from "../../lib/api-axios";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import {
-  MOCK_ITEM_LOCATIONS,
-  STATUS_LABEL,
-  STOCK_STATUS_LABEL,
-  STORAGE_OPTIONS,
-  type ItemLocation,
-} from "./ItemLocationsPage.fixtures";
 
-// ─── Filters ─────────────────────────────────────────────────────────────────
+interface InventoryLocation {
+  id: string;
+  code: string;
+  name: string;
+  storageId: string;
+  branchId: string;
+  type: LocationType;
+  isActive: boolean;
+}
 
-const FILTER_KEYS = ["code", "name", "description"] as const;
+interface InventoryStorage {
+  id: string;
+  name: string;
+  branchId: string;
+  isMainStorage?: boolean;
+}
+
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
+  [LocationType.SHELF]: "Kệ",
+  [LocationType.RACK]: "Giá",
+  [LocationType.BIN]: "Thùng",
+  [LocationType.ZONE]: "Khu vực",
+};
+
+const STATUS_LABEL = {
+  ACTIVE: "Đang hoạt động",
+  INACTIVE: "Ngừng hoạt động",
+} as const;
+
+const FILTER_KEYS = ["code", "name"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
@@ -57,10 +83,17 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
+  );
+}
 
 export function ItemLocationsPage() {
-  const [locations, setLocations] = useState<ItemLocation[]>(MOCK_ITEM_LOCATIONS);
+  const [locations, setLocations] = useState<PaginatedResponse<InventoryLocation> | null>(null);
+  const [storages, setStorages] = useState<InventoryStorage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>({
     ...DEFAULT_PAGINATION,
     pageSize: 50,
@@ -68,70 +101,163 @@ export function ItemLocationsPage() {
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [storageFilter, setStorageFilter] = useState<string>("");
-  const [stockFilter, setStockFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<
-    | { mode: "create"; initial?: ItemLocation }
-    | { mode: "edit"; initial: ItemLocation }
+    | { mode: "create"; initial?: Partial<InventoryLocation> }
+    | { mode: "edit"; initial: InventoryLocation }
     | null
   >(null);
-  const [confirmDelete, setConfirmDelete] = useState<ItemLocation | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
 
-  const selected = useMemo(
-    () => locations.find((l) => l.id === selectedId) ?? null,
-    [locations, selectedId],
-  );
+  const loadStorages = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+        "/inventory/storages?page=1&pageSize=200",
+      );
+      setStorages(data.data);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
+  }, []);
 
-  // ─── Filtering ───────────────────────────────────────────────────────────
+  const loadLocations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        pageSize: String(pagination.pageSize),
+      });
+      if (storageFilter) params.set("storageId", storageFilter);
+      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+        `/inventory/locations?${params}`,
+      );
+      setLocations(data);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.pageSize, storageFilter]);
 
-  const filtered = useMemo(() => {
-    return locations.filter((row) => {
-      if (storageFilter && row.storageId !== storageFilter) return false;
-      if (stockFilter && row.stockStatus !== stockFilter) return false;
-      if (statusFilter && row.status !== statusFilter) return false;
-      for (const key of FILTER_KEYS) {
-        const filter = columnFilters[key];
-        if (!filter.value.trim()) continue;
-        if (!applyColumnFilter(toComparableText(row[key]), filter)) return false;
-      }
-      return true;
-    });
-  }, [locations, columnFilters, storageFilter, stockFilter, statusFilter]);
+  useEffect(() => {
+    void loadStorages();
+  }, [loadStorages]);
 
-  const paged = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filtered.slice(start, start + pagination.pageSize);
-  }, [filtered, pagination]);
+  useEffect(() => {
+    void loadLocations();
+  }, [loadLocations]);
 
   const storageNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of STORAGE_OPTIONS) m.set(s.id, s.name);
+    for (const s of storages) m.set(s.id, s.name);
     return m;
-  }, []);
+  }, [storages]);
 
-  // ─── Mutations ───────────────────────────────────────────────────────────
+  const selected = useMemo(
+    () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
+    [locations, selectedId],
+  );
 
-  const handleSave = (input: ItemLocationDraft, mode: "create" | "edit") => {
-    setLocations((prev) => {
-      if (mode === "edit" && input.id) {
-        return prev.map((l) => (l.id === input.id ? toRecord(input, l) : l));
+  const filteredRows = useMemo(() => {
+    const rows = locations?.data ?? [];
+    return rows.filter((row) => {
+      if (statusFilter === "active" && !row.isActive) return false;
+      if (statusFilter === "inactive" && row.isActive) return false;
+      for (const key of FILTER_KEYS) {
+        const filter = columnFilters[key];
+        if (!filter.value.trim()) continue;
+        const text = String(row[key] ?? "").toLowerCase();
+        const value = filter.value.toLowerCase();
+        const matches =
+          filter.mode === "equals"
+            ? text === value
+            : filter.mode === "startsWith"
+              ? text.startsWith(value)
+              : filter.mode === "endsWith"
+                ? text.endsWith(value)
+                : filter.mode === "notContains"
+                  ? !text.includes(value)
+                  : text.includes(value);
+        if (!matches) return false;
       }
-      const id = `loc-${input.code || Date.now()}`;
-      return [{ ...toRecord(input, undefined), id }, ...prev];
+      return true;
     });
-    toast.success(mode === "edit" ? "Đã cập nhật vị trí." : "Đã tạo vị trí mới.");
-  };
+  }, [locations, columnFilters, statusFilter]);
 
-  const handleDelete = (loc: ItemLocation) => {
-    setLocations((prev) => prev.filter((l) => l.id !== loc.id));
-    if (selectedId === loc.id) setSelectedId(null);
-    setConfirmDelete(null);
-    toast.success("Đã xóa vị trí.");
-  };
+  const handleCreate = useCallback(
+    async (draft: LocationDraft) => {
+      const branchId = getActiveBranchId();
+      if (!branchId) {
+        toast.error("Chưa chọn chi nhánh đang hoạt động.");
+        return false;
+      }
+      setSaving(true);
+      try {
+        await apiClient.post("/inventory/locations", {
+          code: draft.code,
+          name: draft.name,
+          storageId: draft.storageId,
+          branchId,
+          type: draft.type,
+        });
+        toast.success("Đã tạo vị trí mới.");
+        await loadLocations();
+        return true;
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [loadLocations],
+  );
 
-  // ─── Toolbar ─────────────────────────────────────────────────────────────
+  const handleUpdate = useCallback(
+    async (id: string, draft: LocationDraft) => {
+      setSaving(true);
+      try {
+        await apiClient.patch(`/inventory/locations/${id}`, {
+          name: draft.name,
+          type: draft.type,
+        });
+        toast.success("Đã cập nhật vị trí.");
+        await loadLocations();
+        return true;
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [loadLocations],
+  );
+
+  const handleDeactivate = useCallback(
+    async (loc: InventoryLocation) => {
+      setSaving(true);
+      try {
+        await apiClient.patch(`/inventory/locations/${loc.id}`, {
+          isActive: false,
+        });
+        toast.success("Đã ngừng hoạt động vị trí.");
+        if (selectedId === loc.id) setSelectedId(null);
+        setConfirmDelete(null);
+        await loadLocations();
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [loadLocations, selectedId],
+  );
 
   const toolbarItems: ToolbarItem[] = [
     {
@@ -149,7 +275,7 @@ export function ItemLocationsPage() {
         if (!selected) return;
         setDialogState({
           mode: "create",
-          initial: { ...selected, id: "", code: "", name: "" },
+          initial: { ...selected, id: undefined, code: "", name: "" },
         });
       },
     },
@@ -162,50 +288,46 @@ export function ItemLocationsPage() {
     },
     {
       id: "delete",
-      label: "Xóa",
+      label: "Ngừng hoạt động",
       icon: Trash2,
       variant: "danger",
-      disabled: !selected,
+      disabled: !selected || !selected.isActive,
       onClick: () => selected && setConfirmDelete(selected),
     },
     {
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => toast.info("Dữ liệu đã được làm mới."),
-    },
-    {
-      id: "arrange",
-      label: "Xếp vị trí hàng hóa",
-      icon: Boxes,
-      onClick: () => toast.info("Tính năng xếp vị trí hàng hóa sẽ được bổ sung."),
-    },
-    {
-      id: "import",
-      label: "Nhập khẩu",
-      icon: CloudUpload,
-      onClick: () => toast.info("Tính năng nhập khẩu sẽ được bổ sung."),
+      onClick: () => void loadLocations(),
     },
   ];
 
-  // ─── Columns ─────────────────────────────────────────────────────────────
-
-  const columns: TableColumn<ItemLocation>[] = [
+  const columns: TableColumn<InventoryLocation>[] = [
     {
       key: "code",
       label: "Mã vị trí",
       width: 140,
-      render: (row) => row.code,
-    },
-    {
-      key: "name",
-      label: "Tên vị trí",
-      width: 180,
       render: (row) => (
         <button
           type="button"
           className="text-primary hover:underline"
-          onClick={() => setDialogState({ mode: "edit", initial: row })}
+          onClick={() => setStockDialogLoc(row)}
+          title="Xem danh sách hàng hóa tại vị trí này"
+        >
+          {row.code}
+        </button>
+      ),
+    },
+    {
+      key: "name",
+      label: "Tên vị trí",
+      width: 200,
+      render: (row) => (
+        <button
+          type="button"
+          className="text-primary hover:underline"
+          onClick={() => setStockDialogLoc(row)}
+          title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.name}
         </button>
@@ -218,27 +340,26 @@ export function ItemLocationsPage() {
       render: (row) => storageNameById.get(row.storageId) ?? row.storageId,
     },
     {
-      key: "description",
-      label: "Mô tả",
-      render: (row) => row.description ?? "",
-    },
-    {
-      key: "stockStatus",
-      label: "Xếp hàng hóa",
-      width: 140,
-      render: (row) => STOCK_STATUS_LABEL[row.stockStatus],
+      key: "type",
+      label: "Loại",
+      width: 120,
+      render: (row) => LOCATION_TYPE_LABEL[row.type] ?? row.type,
     },
     {
       key: "status",
       label: "Trạng thái",
       width: 160,
-      render: (row) => STATUS_LABEL[row.status],
+      render: (row) => (row.isActive ? STATUS_LABEL.ACTIVE : STATUS_LABEL.INACTIVE),
     },
   ];
 
   const columnFilterControl = useMemo(
     () => ({
-      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      filters: {
+        ...(columnFilters as unknown as Record<string, ColumnFilter>),
+        storage: { mode: "equals" as ColumnFilterMode, value: storageFilter },
+        status: { mode: "equals" as ColumnFilterMode, value: statusFilter },
+      },
       onModeChange: (key: string, mode: ColumnFilterMode) => {
         if (!FILTER_KEYS.includes(key as FilterKey)) return;
         setColumnFilters((prev) => ({
@@ -247,6 +368,15 @@ export function ItemLocationsPage() {
         }));
       },
       onValueChange: (key: string, value: string) => {
+        if (key === "storage") {
+          setStorageFilter(value);
+          setPagination((p) => ({ ...p, page: 1 }));
+          return;
+        }
+        if (key === "status") {
+          setStatusFilter(value as "" | "active" | "inactive");
+          return;
+        }
         if (!FILTER_KEYS.includes(key as FilterKey)) return;
         setColumnFilters((prev) => ({
           ...prev,
@@ -254,10 +384,8 @@ export function ItemLocationsPage() {
         }));
       },
     }),
-    [columnFilters],
+    [columnFilters, storageFilter, statusFilter],
   );
-
-  // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -269,18 +397,19 @@ export function ItemLocationsPage() {
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
-            total={filtered.length}
+            total={locations?.total ?? 0}
             onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
             onPageSizeChange={(nextPageSize) =>
               setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
             }
+            onRefresh={() => void loadLocations()}
           />
         }
       >
         <BaseDataTable
           columns={columns}
-          rows={paged}
-          loading={false}
+          rows={filteredRows}
+          loading={loading}
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
@@ -297,22 +426,7 @@ export function ItemLocationsPage() {
               />
             ),
           }}
-          columnFilterControl={{
-            ...columnFilterControl,
-            filters: {
-              ...columnFilterControl.filters,
-              storage: { mode: "equals", value: storageFilter },
-              stockStatus: { mode: "equals", value: stockFilter },
-              status: { mode: "equals", value: statusFilter },
-            },
-            onValueChange: (key, value) => {
-              if (key === "storage") setStorageFilter(value);
-              else if (key === "stockStatus") setStockFilter(value);
-              else if (key === "status") setStatusFilter(value);
-              else columnFilterControl.onValueChange(key, value);
-            },
-            onModeChange: columnFilterControl.onModeChange,
-          }}
+          columnFilterControl={columnFilterControl}
         />
       </DocumentListShell>
 
@@ -320,10 +434,16 @@ export function ItemLocationsPage() {
         <ItemLocationFormDialog
           mode={dialogState.mode}
           initial={dialogState.initial}
+          storages={storages}
+          saving={saving}
           onClose={() => setDialogState(null)}
-          onSave={(draft, intent) => {
-            handleSave(draft, dialogState.mode);
-            if (intent === "save-and-add") {
+          onSave={async (draft, intent) => {
+            const ok =
+              dialogState.mode === "edit"
+                ? await handleUpdate(dialogState.initial.id, draft)
+                : await handleCreate(draft);
+            if (!ok) return;
+            if (intent === "save-and-add" && dialogState.mode === "create") {
               setDialogState({ mode: "create" });
             } else {
               setDialogState(null);
@@ -334,55 +454,53 @@ export function ItemLocationsPage() {
 
       {confirmDelete && (
         <ConfirmActionModal
-          title="Xóa vị trí hàng hóa"
-          message={`Xác nhận xóa vị trí ${confirmDelete.code}?`}
-          confirmLabel="Xóa"
+          title="Ngừng hoạt động vị trí"
+          message={`Vị trí ${confirmDelete.code} sẽ không nhận thêm hàng mới. Tiếp tục?`}
+          confirmLabel="Ngừng hoạt động"
           cancelLabel="Quay lại"
+          loading={saving}
           onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => handleDelete(confirmDelete)}
+          onConfirm={() => handleDeactivate(confirmDelete)}
+        />
+      )}
+
+      {stockDialogLoc && (
+        <LocationStockItemsDialog
+          locationId={stockDialogLoc.id}
+          fallbackTitle={`${storageNameById.get(stockDialogLoc.storageId) ?? ""} - ${stockDialogLoc.code}`}
+          onClose={() => setStockDialogLoc(null)}
         />
       )}
     </>
   );
 }
 
-// ─── Form dialog ─────────────────────────────────────────────────────────────
-
-interface ItemLocationDraft {
-  id?: string;
+interface LocationDraft {
   code: string;
   name: string;
   storageId: string;
-  description: string;
-}
-
-function toRecord(draft: ItemLocationDraft, existing: ItemLocation | undefined): ItemLocation {
-  return {
-    id: existing?.id ?? draft.id ?? `loc-${draft.code}`,
-    code: draft.code,
-    name: draft.name,
-    storageId: draft.storageId,
-    description: draft.description || undefined,
-    stockStatus: existing?.stockStatus ?? "EMPTY",
-    status: existing?.status ?? "ACTIVE",
-  };
+  type: LocationType;
 }
 
 function ItemLocationFormDialog({
   mode,
   initial,
+  storages,
+  saving,
   onClose,
   onSave,
 }: {
   mode: "create" | "edit";
-  initial?: ItemLocation;
+  initial?: Partial<InventoryLocation>;
+  storages: InventoryStorage[];
+  saving: boolean;
   onClose: () => void;
-  onSave: (draft: ItemLocationDraft, intent: "save" | "save-and-add") => void;
+  onSave: (draft: LocationDraft, intent: "save" | "save-and-add") => void;
 }) {
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
-  const [storageId, setStorageId] = useState(initial?.storageId ?? STORAGE_OPTIONS[0]?.id ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [storageId, setStorageId] = useState(initial?.storageId ?? storages[0]?.id ?? "");
+  const [type, setType] = useState<LocationType>(initial?.type ?? LocationType.SHELF);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (intent: "save" | "save-and-add") => {
@@ -393,20 +511,20 @@ function ItemLocationFormDialog({
     setError(null);
     onSave(
       {
-        id: initial?.id,
         code: code.trim(),
         name: name.trim(),
         storageId,
-        description: description.trim(),
+        type,
       },
       intent,
     );
     if (intent === "save-and-add") {
       setCode("");
       setName("");
-      setDescription("");
     }
   };
+
+  const isEdit = mode === "edit";
 
   return (
     <AppModal
@@ -414,7 +532,7 @@ function ItemLocationFormDialog({
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title={mode === "create" ? "Thêm mới vị trí hàng hóa" : "Sửa vị trí hàng hóa"}
+      title={isEdit ? "Sửa vị trí hàng hóa" : "Thêm mới vị trí hàng hóa"}
       defaultWidth={560}
       defaultHeight={460}
       footer={
@@ -427,17 +545,22 @@ function ItemLocationFormDialog({
             Trợ giúp
           </button>
           <div className="flex items-center gap-2">
-            <Button type="button" onClick={() => submit("save")}>
+            <Button type="button" disabled={saving} onClick={() => submit("save")}>
               <Save className="mr-1.5 h-4 w-4" />
-              Lưu
+              {saving ? "Đang lưu…" : "Lưu"}
             </Button>
-            {mode === "create" ? (
-              <Button type="button" variant="outline" onClick={() => submit("save-and-add")}>
+            {!isEdit ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => submit("save-and-add")}
+              >
                 <Plus className="mr-1.5 h-4 w-4" />
                 Lưu và thêm mới
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
               <X className="mr-1.5 h-4 w-4" />
               Hủy bỏ
             </Button>
@@ -454,6 +577,7 @@ function ItemLocationFormDialog({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Vd: A01.01"
+            disabled={isEdit}
           />
         </FieldRow>
 
@@ -461,17 +585,21 @@ function ItemLocationFormDialog({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Vd: A01.01"
+            placeholder="Vd: Kệ A01 tầng 1"
           />
         </FieldRow>
 
         <FieldRow label="Thuộc kho" required>
           <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={storageId}
             onChange={(e) => setStorageId(e.target.value)}
+            disabled={isEdit}
           >
-            {STORAGE_OPTIONS.map((s) => (
+            {storages.length === 0 ? (
+              <option value="">Chưa có kho — tạo kho trước</option>
+            ) : null}
+            {storages.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -479,12 +607,18 @@ function ItemLocationFormDialog({
           </select>
         </FieldRow>
 
-        <FieldRow label="Mô tả">
-          <Textarea
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+        <FieldRow label="Loại vị trí">
+          <select
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={type}
+            onChange={(e) => setType(e.target.value as LocationType)}
+          >
+            {Object.values(LocationType).map((t) => (
+              <option key={t} value={t}>
+                {LOCATION_TYPE_LABEL[t]}
+              </option>
+            ))}
+          </select>
         </FieldRow>
       </div>
     </AppModal>
@@ -510,4 +644,3 @@ function FieldRow({
     </div>
   );
 }
-

@@ -33,6 +33,14 @@ class TransferLineDto {
   @IsUUID()
   itemId: string;
 
+  @IsOptional()
+  @IsUUID()
+  sourceLocationId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  destinationLocationId?: string;
+
   @IsNumber()
   @Min(0.01)
   quantity: number;

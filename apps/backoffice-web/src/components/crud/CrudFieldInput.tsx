@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { FieldDefinition } from "@erp/shared-interfaces";
-import { FormField, Input } from "@erp/ui";
+import { FormField, Input, MoneyInput } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
 
 function ControlRow({
@@ -98,6 +98,23 @@ export function CrudFieldInput({
   }
 
   if (field.type === "number") {
+    if (field.numberFormat === "money") {
+      const moneyValue =
+        value === undefined || value === null || value === ""
+          ? ""
+          : Number(value);
+      return (
+        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+          <ControlRow trailing={trailing}>
+            <MoneyInput
+              id={inputId}
+              value={moneyValue as number | ""}
+              onChange={(next) => onChange(next === "" ? "" : next)}
+            />
+          </ControlRow>
+        </FormField>
+      );
+    }
     return (
       <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
         <ControlRow trailing={trailing}>

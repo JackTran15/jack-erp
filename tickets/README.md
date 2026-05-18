@@ -22,6 +22,8 @@ flowchart LR
   E6["EPIC-006 ProductVariantsCatalog"] --> E7
   E3 --> E10["EPIC-010 ItemManagementEnhancement"]
   E6 --> E10
+  E3 --> E13["EPIC-013 StockByLocationQueryApi"]
+  E10 --> E13
 ```
 
 ## Ticket Dependency Graph
@@ -147,5 +149,25 @@ flowchart LR
   T61 --> T66
   T63 --> T66
   T64 --> T66
+```
+
+## EPIC-013 Stock-by-Location Query API (Phase 1)
+
+- [EPIC-013 Stock-by-Location Query API](./epics/EPIC-013-stock-by-location-api.md)
+- Tickets: [TKT-067](./tickets/TKT-067-stock-by-location-service.md) – [TKT-069](./tickets/TKT-069-stock-by-location-test-plan.md)
+
+| Ticket | Mô tả |
+|---|---|
+| [TKT-067](./tickets/TKT-067-stock-by-location-service.md) | DTO + Service: query builder + filter mapping + computed `belowMin` |
+| [TKT-068](./tickets/TKT-068-stock-by-location-controller.md) | Controller `GET /inventory/locations/:locationId/stock-items` + Swagger + OpenAPI regen |
+| [TKT-069](./tickets/TKT-069-stock-by-location-test-plan.md) | Test plan (unit + e2e) + DoD gate |
+
+### Ticket dependency graph (EPIC-013)
+
+```mermaid
+flowchart LR
+  T67["TKT-067 DTO & Service"] --> T68["TKT-068 Controller + OpenAPI"]
+  T68 --> T69["TKT-069 Test plan + DoD"]
+  T67 --> T69
 ```
 

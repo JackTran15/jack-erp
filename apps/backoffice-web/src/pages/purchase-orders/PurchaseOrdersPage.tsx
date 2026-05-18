@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AppModal,
   Button,
   DocumentFormDialog,
   DocumentListShell,
@@ -41,6 +40,15 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
+import { LookupField } from "../../components/forms/LookupField";
+import {
+  QuickCreateItemDialog,
+  QuickCreateLocationDialog,
+  QuickCreateProviderDialog,
+  type QuickItem,
+  type QuickLocation,
+  type QuickProvider,
+} from "../../components/forms/QuickCreateDialogs";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -49,39 +57,62 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import { MOCK_PURCHASE_ORDERS } from "./PurchaseOrdersPage.fixtures";
 
-type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
+type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
+type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
 
-interface PurchaseOrderLine {
+interface GoodsReceiptLine {
   id: string;
   itemId: string;
-  orderedQuantity: number;
-  receivedQuantity: number;
-  unitPrice: number;
-  notes?: string;
-  // replace with real fields from API calls
+  locationId: string;
+  binId?: string | null;
+  uomCode: string;
+  quantity: number | string;
+  unitPrice: number | string;
+  lineTotal?: number | string;
+  note?: string | null;
+  /** Eager-loaded from BE — present on read endpoints. */
+  item?: { id: string; code: string; name: string; unit?: string } | null;
+  location?: { id: string; code: string; name: string; storageId?: string } | null;
+}
+
+interface GoodsReceipt {
+  id: string;
+  documentNumber?: string | null;
+  status: GoodsReceiptStatus;
+  purpose: GoodsReceiptPurpose;
+  providerId?: string | null;
+  providerName?: string;
+  provider?: { id: string; code: string; name: string } | null;
+  deliveredBy?: string | null;
+  reason?: string | null;
+  description?: string | null;
+  referenceId?: string | null;
+  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | null;
+  sourceBranchId?: string | null;
+  receivedAt: string;
+  locationId: string;
+  location?: { id: string; code: string; name: string; storageId?: string } | null;
+  attachmentIds?: string[];
+  lines: GoodsReceiptLine[];
+  cashPaymentId?: string | null;
+  cashReceiptId?: string | null;
+  postedAt?: string | null;
+  postedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Aliases for the existing component-internal names to keep diffs small. */
+type PurchaseOrderStatus = GoodsReceiptStatus;
+type PurchaseOrderLine = GoodsReceiptLine & {
   itemCode?: string;
   itemName?: string;
   warehouse?: string;
   position?: string;
   unit?: string;
-}
-
-interface PurchaseOrder {
-  id: string;
-  documentNumber?: string;
-  providerId: string;
-  providerName?: string;
-  locationId: string;
-  status: PurchaseOrderStatus;
-  expectedDate?: string;
-  notes?: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  lines: PurchaseOrderLine[];
-  createdAt: string;
-}
+};
+type PurchaseOrder = GoodsReceipt;
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -103,19 +134,26 @@ interface InventoryLocation {
   storageId: string;
 }
 
+interface InventoryStorage {
+  id: string;
+  name: string;
+  branchId: string;
+}
+
 interface InventoryItem {
   id: string;
   name: string;
   code: string;
   unit: string;
+  /** Default purchase price (from item master) — used to auto-fill Đơn giá. */
+  purchasePrice?: number | string | null;
 }
 
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "Nháp",
-  APPROVED: "Đã duyệt",
-  RECEIVING: "Đang nhận",
-  RECEIVED: "Đã nhận đủ",
+  DRAFT: "Chưa duyệt",
+  POSTED: "Đã duyệt",
   CANCELLED: "Đã huỷ",
+  REVERSED: "Đã đảo bút",
 };
 
 const FILTER_KEYS = [
@@ -137,8 +175,10 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   }, {} as Record<FilterKey, ColumnFilter>);
 }
 
-function lineSubtotal(l: { orderedQuantity: number; unitPrice: number }): number {
-  return Number(l.orderedQuantity) * Number(l.unitPrice);
+function lineSubtotal(l: { quantity: number | string; unitPrice: number | string; lineTotal?: number | string }): number {
+  if (l.lineTotal !== undefined && l.lineTotal !== null && l.lineTotal !== "")
+    return Number(l.lineTotal);
+  return Number(l.quantity) * Number(l.unitPrice);
 }
 
 function orderTotal(o: PurchaseOrder): number {
@@ -148,6 +188,7 @@ function orderTotal(o: PurchaseOrder): number {
 export function PurchaseOrdersPage() {
   const [records, setRecords] = useState<PaginatedResponse<PurchaseOrder> | null>(null);
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
+  const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
@@ -171,27 +212,12 @@ export function PurchaseOrdersPage() {
         pageSize: String(pagination.pageSize),
       });
       const { data } = await apiClient.get<PaginatedResponse<PurchaseOrder>>(
-        `/inventory/purchase-orders?${params}`,
+        `/goods-receipts?${params}`,
       );
-      // Replace with real data from API calls
-      if (data.data.length === 0) {
-        setRecords({
-          data: MOCK_PURCHASE_ORDERS as unknown as PurchaseOrder[],
-          total: MOCK_PURCHASE_ORDERS.length,
-          page: 1,
-          pageSize: pagination.pageSize,
-        });
-      } else {
-        setRecords(data);
-      }
-    } catch {
-      // Replace with real data from API calls
-      setRecords({
-        data: MOCK_PURCHASE_ORDERS as unknown as PurchaseOrder[],
-        total: MOCK_PURCHASE_ORDERS.length,
-        page: 1,
-        pageSize: pagination.pageSize,
-      });
+      setRecords(data);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
@@ -208,6 +234,17 @@ export function PurchaseOrdersPage() {
     }
   }, []);
 
+  const loadStorages = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+        "/inventory/storages?page=1&pageSize=200",
+      );
+      setStorages(data.data);
+    } catch {
+      // best-effort — Storage names will fall back to id in detail panel
+    }
+  }, []);
+
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
@@ -216,12 +253,22 @@ export function PurchaseOrdersPage() {
     void loadProviders();
   }, [loadProviders]);
 
+  useEffect(() => {
+    void loadStorages();
+  }, [loadStorages]);
+
+  const storageNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of storages) map.set(s.id, s.name);
+    return map;
+  }, [storages]);
+
   const providerNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of providers) map.set(p.id, p.name);
-      // replace with real data from API calls
     for (const order of records?.data ?? []) {
-      if (order.providerName) map.set(order.providerId, order.providerName);
+      if (order.providerName && order.providerId)
+        map.set(order.providerId, order.providerName);
     }
     return map;
   }, [providers, records]);
@@ -240,7 +287,7 @@ export function PurchaseOrdersPage() {
   const handleApprove = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
-      await apiClient.post(`/inventory/purchase-orders/${order.id}/approve`);
+      await apiClient.post(`/goods-receipts/${order.id}/post`);
       await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -252,7 +299,7 @@ export function PurchaseOrdersPage() {
   const handleDelete = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
-      await apiClient.post(`/inventory/purchase-orders/${order.id}/cancel`);
+      await apiClient.delete(`/goods-receipts/${order.id}`);
       setConfirmDelete(null);
       if (selectedId === order.id) setSelectedId(null);
       await reloadAfterMutation();
@@ -313,8 +360,12 @@ export function PurchaseOrdersPage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
+      // Allow deleting any non-terminal row. BE cancel() handles POSTED by
+      // reversing the stock movements before soft-deleting.
       disabled:
-        !selectedOrder || (selectedOrder.status !== "DRAFT" && selectedOrder.status !== "APPROVED"),
+        !selectedOrder ||
+        selectedOrder.status === "CANCELLED" ||
+        selectedOrder.status === "REVERSED",
       onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
     },
     { id: "sep1", type: "separator" },
@@ -336,37 +387,39 @@ export function PurchaseOrdersPage() {
       label: "Ngày",
       width: 110,
       render: (row) =>
-        row.expectedDate
-          ? new Date(row.expectedDate).toLocaleDateString("vi-VN")
+        row.receivedAt
+          ? new Date(row.receivedAt).toLocaleDateString("vi-VN")
           : new Date(row.createdAt).toLocaleDateString("vi-VN"),
     },
     {
       key: "documentNumber",
       label: "Số phiếu nhập",
       width: 140,
-      render: (row) =>
-        row.documentNumber ? (
-          <button
-            type="button"
-            className="text-primary hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedId(row.id);
-              setEditingOrder(row);
-              setDialogMode("view");
-            }}
-          >
-            {row.documentNumber}
-          </button>
-        ) : (
-          <span className="text-muted-foreground italic">Chưa duyệt</span>
-        ),
+      render: (row) => (
+        <button
+          type="button"
+          className="text-primary hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedId(row.id);
+            setEditingOrder(row);
+            setDialogMode("view");
+          }}
+          title={row.documentNumber ?? row.id}
+        >
+          {/* Receipts created before the BE switch may still have null docNumber;
+              fall back to a short id slice so the row stays clickable. */}
+          {row.documentNumber ?? `#${row.id.slice(0, 8)}`}
+        </button>
+      ),
     },
     {
       key: "subject",
       label: "Đối tượng",
       width: 180,
-      render: (row) => providerNameById.get(row.providerId) ?? row.providerId,
+      render: (row) =>
+        row.provider?.name ??
+        (row.providerId ? providerNameById.get(row.providerId) ?? row.providerId : "—"),
     },
     {
       key: "totalAmount",
@@ -379,19 +432,22 @@ export function PurchaseOrdersPage() {
     {
       key: "notes",
       label: "Diễn giải",
-      render: (row) => row.notes ?? "",
+      render: (row) => row.description ?? "",
     },
     {
       key: "reason",
       label: "Lý do",
       width: 160,
-      render: () => "",
+      render: (row) => row.reason ?? "",
     },
     {
       key: "documentType",
       label: "Loại chứng từ",
       width: 200,
-      render: () => "Phiếu nhập kho khác",
+      render: (row) =>
+        row.purpose === "TRANSFER_IN"
+          ? "Điều chuyển từ cửa hàng khác"
+          : "Phiếu nhập kho khác",
     },
   ];
 
@@ -416,6 +472,21 @@ export function PurchaseOrdersPage() {
     () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
     [records],
   );
+
+  /** Preview the next document number based on max numeric suffix in current list.
+   *  Format: NK + 6-digit zero-padded. Empty list → NK000001. */
+  const nextDocumentNumber = useMemo(() => {
+    const rows = records?.data ?? [];
+    let max = 0;
+    for (const row of rows) {
+      const m = row.documentNumber?.match(/(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    return `NK${String(max + 1).padStart(6, "0")}`;
+  }, [records]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -449,7 +520,9 @@ export function PurchaseOrdersPage() {
             }
           />
         }
-        detailPanel={<DetailPanel order={selectedOrder} />}
+        detailPanel={
+          <DetailPanel order={selectedOrder} storageNameById={storageNameById} />
+        }
       >
         <BaseDataTable
           columns={columns}
@@ -480,7 +553,9 @@ export function PurchaseOrdersPage() {
           mode={dialogMode}
           initial={editingOrder}
           providers={providers}
+          storages={storages}
           actionLoading={!!actionLoading}
+          previewDocumentNumber={nextDocumentNumber}
           onClose={() => {
             setDialogMode(null);
             setEditingOrder(null);
@@ -512,7 +587,13 @@ export function PurchaseOrdersPage() {
 
 // ─── Detail panel (selected order's lines) ───────────────────────────────────
 
-function DetailPanel({ order }: { order: PurchaseOrder | null }) {
+function DetailPanel({
+  order,
+  storageNameById,
+}: {
+  order: PurchaseOrder | null;
+  storageNameById: Map<string, string>;
+}) {
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
@@ -531,36 +612,41 @@ function DetailPanel({ order }: { order: PurchaseOrder | null }) {
               <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
               <th className="border-r px-2 py-1.5 text-left font-medium">Vị trí</th>
               <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">SL theo chứng từ</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">SL thực tế</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
               <th className="border-r px-2 py-1.5 text-right font-medium">Đơn giá</th>
               <th className="border-r px-2 py-1.5 text-right font-medium">Thành tiền</th>
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
             </tr>
           </thead>
           <tbody>
-            {order.lines.map((line) => (
+            {order.lines.map((rawLine) => {
+              const line = rawLine as PurchaseOrderLine;
+              const itemCode = line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
+              const itemName = line.item?.name ?? line.itemName ?? "—";
+              const storageId = line.location?.storageId ?? order.location?.storageId;
+              const storageName = storageId
+                ? storageNameById.get(storageId) ?? storageId.slice(0, 8)
+                : "—";
+              const binCode = line.location?.code ?? line.location?.name ?? "—";
+              const unitLabel = line.item?.unit ?? line.unit ?? line.uomCode ?? "—";
+              return (
               <tr key={line.id} className="border-b">
-                <td className="border-r px-2 py-1 font-mono text-xs">
-                  {line.itemCode ?? line.itemId.slice(0, 8)}
-                </td>
-                <td className="border-r px-2 py-1">{line.itemName ?? "—"}</td>
-                <td className="border-r px-2 py-1">
-                  {line.warehouse ?? order.locationId.slice(0, 8)}
-                </td>
-                <td className="border-r px-2 py-1">{line.position ?? "—"}</td>
-                <td className="border-r px-2 py-1">{line.unit ?? "Đôi"}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">{line.orderedQuantity}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">{line.receivedQuantity}</td>
+                <td className="border-r px-2 py-1 font-mono text-xs">{itemCode}</td>
+                <td className="border-r px-2 py-1">{itemName}</td>
+                <td className="border-r px-2 py-1">{storageName}</td>
+                <td className="border-r px-2 py-1 font-mono text-xs">{binCode}</td>
+                <td className="border-r px-2 py-1">{unitLabel}</td>
+                <td className="border-r px-2 py-1 text-right tabular-nums">{Number(line.quantity)}</td>
                 <td className="border-r px-2 py-1 text-right tabular-nums">
-                  {formatMoneyInteger(line.unitPrice)}
+                  {formatMoneyInteger(Number(line.unitPrice))}
                 </td>
                 <td className="border-r px-2 py-1 text-right tabular-nums">
                   {formatMoneyInteger(lineSubtotal(line))}
                 </td>
-                <td className="px-2 py-1">{line.notes ?? ""}</td>
+                <td className="px-2 py-1">{line.note ?? ""}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -574,6 +660,9 @@ interface FormLine {
   itemId: string;
   itemLabel: string;
   unit: string;
+  /** Bin / shelf location ("Vị trí") within the receipt's warehouse. */
+  locationId: string;
+  locationLabel: string;
   orderedQuantity: number;
   unitPrice: number;
   notes: string;
@@ -583,6 +672,8 @@ const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
   unit: "",
+  locationId: "",
+  locationLabel: "",
   orderedQuantity: 1,
   unitPrice: 0,
   notes: "",
@@ -592,7 +683,9 @@ function PurchaseOrderFormDialog({
   mode,
   initial,
   providers,
+  storages,
   actionLoading,
+  previewDocumentNumber,
   onClose,
   onSaved,
   onApprove,
@@ -601,7 +694,9 @@ function PurchaseOrderFormDialog({
   mode: "create" | "edit" | "view";
   initial: PurchaseOrder | null;
   providers: InventoryProvider[];
+  storages: InventoryStorage[];
   actionLoading: boolean;
+  previewDocumentNumber?: string;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
   onApprove?: () => void;
@@ -609,72 +704,203 @@ function PurchaseOrderFormDialog({
 }) {
   const isView = mode === "view";
 
-  const initialProviderLabel = useMemo(() => {
-    if (!initial) return "";
+  const initialProvider = useMemo(() => {
+    if (!initial || !initial.providerId) return { code: "", name: "" };
+    if (initial.provider) return { code: initial.provider.code, name: initial.provider.name };
     const p = providers.find((x) => x.id === initial.providerId);
-    return p ? `${p.code} · ${p.name}` : initial.providerId;
+    return p ? { code: p.code, name: p.name } : { code: initial.providerId ?? "", name: "" };
   }, [initial, providers]);
 
   const [providerId, setProviderId] = useState(initial?.providerId ?? "");
-  const [providerQuery, setProviderQuery] = useState(initialProviderLabel);
-  const [locationId, setLocationId] = useState(initial?.locationId ?? "");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">("OTHER");
-  const [reason, setReason] = useState("");
-  const [deliveryPerson, setDeliveryPerson] = useState("");
-  const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [docDate, setDocDate] = useState(initial?.expectedDate ?? new Date().toISOString().slice(0, 10));
-  const [docTime, setDocTime] = useState(() => {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  });
+  const [providerCode, setProviderCode] = useState(initialProvider.code);
+  const [providerName, setProviderName] = useState(initialProvider.name);
+  /**
+   * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
+   * the receipt header for legacy reasons, but the UI lets users pick a
+   * warehouse here and a bin per-line. On save the header `locationId` is
+   * derived from the first line's bin so the existing NOT NULL column stays
+   * happy without a schema migration.
+   */
+  const initialStorageId =
+    initial?.location?.storageId ?? "";
+  const initialStorageLabel =
+    initial && initial.location && initial.location.storageId
+      ? storages.find((s) => s.id === initial.location!.storageId)?.name ?? ""
+      : "";
+  const [storageId, setStorageId] = useState(initialStorageId);
+  const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
+  const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
+    initial?.purpose === "TRANSFER_IN" ? "TRANSFER" : "OTHER",
+  );
+  const [sourceBranchId, setSourceBranchId] = useState(initial?.sourceBranchId ?? "");
+  const [sourceBranchLabel, setSourceBranchLabel] = useState("");
+  const [reason, setReason] = useState(initial?.reason ?? "");
+  const [deliveryPerson, setDeliveryPerson] = useState(initial?.deliveredBy ?? "");
+  const [notes, setNotes] = useState(initial?.description ?? "");
+  const initialReceivedAt = initial?.receivedAt ? new Date(initial.receivedAt) : new Date();
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const [docDate, setDocDate] = useState(
+    `${initialReceivedAt.getFullYear()}-${pad2(initialReceivedAt.getMonth() + 1)}-${pad2(initialReceivedAt.getDate())}`,
+  );
+  const [docTime, setDocTime] = useState(
+    `${pad2(initialReceivedAt.getHours())}:${pad2(initialReceivedAt.getMinutes())}`,
+  );
   const [lines, setLines] = useState<FormLine[]>(() =>
     initial
       ? initial.lines.map((l) => ({
           itemId: l.itemId,
-          itemLabel: l.itemId.slice(0, 8),
-          unit: "",
-          orderedQuantity: Number(l.orderedQuantity),
+          itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+          unit: l.uomCode ?? "",
+          locationId: l.locationId,
+          locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
+          orderedQuantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice),
-          notes: l.notes ?? "",
+          notes: l.note ?? "",
         }))
       : [emptyLine()],
   );
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
+  const [quickProviderOpen, setQuickProviderOpen] = useState(false);
+  /** Line index that triggered the quick-create-location dialog, or null. */
+  const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
+  const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
+  const [storageCache, setStorageCache] = useState<
+    Array<{ id: string; name: string; branchId: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<
+          PaginatedResponse<{ id: string; name: string; branchId: string }>
+        >("/inventory/storages?page=1&pageSize=200");
+        if (!cancelled) setStorageCache(data.data);
+      } catch {
+        // best-effort — quick-create location modal will show empty list
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
 
-  const searchProviders = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-      `/inventory/providers?${params}`,
-    );
-    return data.data;
-  }, []);
+  const searchProviders = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 8;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
+        `/inventory/providers?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [],
+  );
 
-  const searchLocations = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-      `/inventory/locations?${params}`,
-    );
-    return data.data;
-  }, []);
+  const searchStorages = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const q = query.trim().toLowerCase();
+      // Storages list is small — filter the cached page client-side rather
+      // than hitting the API on every keystroke. The page-level fetch
+      // already pulls up to 200 storages, which covers all real orgs.
+      const filtered = q
+        ? storages.filter((s) => s.name.toLowerCase().includes(q))
+        : storages;
+      const effectivePageSize = pageSize ?? 8;
+      const start = (page - 1) * effectivePageSize;
+      const items = filtered.slice(start, start + effectivePageSize);
+      return {
+        items,
+        hasMore: start + effectivePageSize < filtered.length,
+        total: filtered.length,
+      };
+    },
+    [storages],
+  );
 
-  const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
-      `/inventory/items?${params}`,
-    );
-    return data.data;
-  }, []);
+  const searchLocationsForStorage = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      if (!storageId) return { items: [], hasMore: false, total: 0 };
+      const effectivePageSize = pageSize ?? 20;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+        storageId,
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+        `/inventory/locations?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [storageId],
+  );
+
+  const searchItems = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 10;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
+        `/inventory/items?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [],
+  );
+
+  const searchBranches = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 8;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data } = await apiClient.get<
+        PaginatedResponse<{ id: string; name: string; address?: string | null }>
+      >(`/branches?${params}`);
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [],
+  );
 
   const totalQty = lines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
   const totalAmount = lines.reduce(
@@ -682,37 +908,94 @@ function PurchaseOrderFormDialog({
     0,
   );
 
-  const handleSave = useCallback(async () => {
-    if (!providerId || !locationId || lines.some((l) => !l.itemId)) {
-      setError("Vui lòng chọn đối tượng, kho và mặt hàng hợp lệ.");
-      return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (purpose === "OTHER" && !providerId) {
+      toast.error("Vui lòng chọn đối tượng (NCC).");
+      return false;
+    }
+    if (!storageId) {
+      toast.error("Vui lòng chọn kho nhập.");
+      return false;
+    }
+    if (lines.some((l) => !l.itemId)) {
+      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
+      return false;
     }
     setSaving(true);
-    setError(null);
     try {
-      if (initial && mode === "edit") {
-        // No edit endpoint in current API; fall through to create
+      const needsFallback = lines.some((l) => !l.locationId);
+      let fallbackLocationId = "";
+      if (needsFallback) {
+        const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+          `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
+        );
+        const first = data.data[0];
+        if (!first) {
+          toast.error("Kho đã chọn chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+          setSaving(false);
+          return false;
+        }
+        fallbackLocationId = first.id;
       }
-      await apiClient.post("/inventory/purchase-orders", {
-        providerId,
-        locationId,
-        expectedDate: docDate || undefined,
-        notes: notes || undefined,
-        lines: lines.map((l) => ({
+
+      const resolvedLines = lines.map((l) => ({
+        ...l,
+        locationId: l.locationId || fallbackLocationId,
+      }));
+
+      const receivedAtIso = combineDateTimeISO(docDate, docTime);
+      // The header.locationId is a legacy anchor — pick any concrete bin so
+      // the backend's NOT NULL stays satisfied. Lines carry the real bin per
+      // row (with fallback applied above).
+      const headerLocationId = resolvedLines[0]?.locationId ?? fallbackLocationId;
+      const payload = {
+        purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
+        providerId: providerId || undefined,
+        deliveredBy: deliveryPerson || undefined,
+        reason: reason || undefined,
+        description: notes || undefined,
+        sourceBranchId: purpose === "TRANSFER" ? sourceBranchId || undefined : undefined,
+        receivedAt: receivedAtIso,
+        locationId: headerLocationId,
+        lines: resolvedLines.map((l) => ({
           itemId: l.itemId,
-          orderedQuantity: Number(l.orderedQuantity),
+          locationId: l.locationId,
+          uomCode: l.unit || "Cái",
+          quantity: Number(l.orderedQuantity),
           unitPrice: Number(l.unitPrice),
-          notes: l.notes || undefined,
+          note: l.notes || undefined,
         })),
-      });
+      };
+      if (initial && mode === "edit") {
+        await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
+      } else {
+        await apiClient.post("/goods-receipts", payload);
+      }
       setDirty(false);
+      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã tạo phiếu nhập kho.");
       await onSaved();
+      return true;
     } catch (err) {
-      setError(getUserFacingApiErrorMessage(err));
+      toast.error(getUserFacingApiErrorMessage(err));
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [providerId, locationId, lines, docDate, notes, initial, mode, onSaved]);
+  }, [
+    purpose,
+    providerId,
+    storageId,
+    lines,
+    docDate,
+    docTime,
+    notes,
+    reason,
+    deliveryPerson,
+    sourceBranchId,
+    initial,
+    mode,
+    onSaved,
+  ]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -724,8 +1007,8 @@ function PurchaseOrderFormDialog({
 
   const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
     if (choice === "save") {
-      await handleSave();
-      onClose();
+      const ok = await handleSave();
+      if (ok) onClose();
     } else if (choice === "discard") {
       onClose();
     }
@@ -735,23 +1018,6 @@ function PurchaseOrderFormDialog({
     { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
     { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
     { id: "sep1", type: "separator" },
-    {
-      id: "new",
-      label: "Thêm mới",
-      icon: Plus,
-      onClick: () => {
-        setProviderId("");
-        setProviderQuery("");
-        setLocationId("");
-        setLocationQuery("");
-        setReason("");
-        setDeliveryPerson("");
-        setNotes("");
-        setLines([emptyLine()]);
-        setDirty(false);
-        setError(null);
-      },
-    },
     {
       id: "edit",
       label: "Sửa",
@@ -792,21 +1058,36 @@ function PurchaseOrderFormDialog({
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 160,
+      width: 220,
       placeholder: "Tìm mã hoặc tên",
       renderEditor: (row, idx) => (
-        <SearchListingInput
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn hàng hóa"
+          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
           onValueChange={(val) => {
-            setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, itemLabel: val, itemId: "" } : l)));
+            setLines((prev) =>
+              prev.map((l, i) => (i === idx ? { ...l, itemLabel: val, itemId: "" } : l)),
+            );
             markDirty();
           }}
           onSelect={(item) => {
+            const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
               prev.map((l, i) =>
                 i === idx
-                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  ? {
+                      ...l,
+                      itemId: item.id,
+                      itemLabel: item.code,
+                      unit: item.unit,
+                      // Only overwrite if current price is 0 — preserve user's manual edits.
+                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                    }
                   : l,
               ),
             );
@@ -816,6 +1097,14 @@ function PurchaseOrderFormDialog({
           itemKey={(item) => item.id}
           renderItem={(item) => item.name}
           renderMeta={(item) => `${item.code} · ${item.unit}`}
+          columns={[
+            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
+            { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
+            { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
+          ]}
+          disabled={isView}
+          onCreateNew={isView ? undefined : () => setQuickItemLineIdx(idx)}
+          className="h-full"
         />
       ),
     },
@@ -826,8 +1115,61 @@ function PurchaseOrderFormDialog({
       type: "readonly",
       getValue: (row) => row.itemLabel,
     },
-    { key: "warehouse", label: "Kho", width: 140, type: "readonly", getValue: () => "" },
-    { key: "position", label: "Vị trí", width: 100, type: "readonly", getValue: () => "" },
+    {
+      key: "warehouse",
+      label: "Kho",
+      width: 140,
+      type: "readonly",
+      getValue: () => storageQuery,
+    },
+    {
+      key: "position",
+      label: "Vị trí",
+      width: 160,
+      placeholder: storageId ? "Chọn vị trí" : "Chọn kho trước",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn vị trí"
+          searchModalPlaceholder="Nhập mã hoặc tên vị trí"
+          dropdownMinWidth={360}
+          placeholder={storageId ? "Chọn vị trí" : "Chọn kho trước"}
+          value={row.locationLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, locationLabel: val, locationId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(loc) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, locationId: loc.id, locationLabel: loc.code }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchLocationsForStorage}
+          itemKey={(loc) => loc.id}
+          renderItem={(loc) => loc.name}
+          renderMeta={(loc) => loc.code}
+          columns={[
+            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
+            { key: "name", label: "Tên vị trí", render: (l) => l.name },
+          ]}
+          disabled={isView || !storageId}
+          onCreateNew={
+            isView || !storageId ? undefined : () => setQuickLocationLineIdx(idx)
+          }
+          className="h-full"
+        />
+      ),
+    },
     { key: "unit", label: "Đơn vị tính", width: 90, type: "readonly", getValue: (r) => r.unit || "Đôi" },
     {
       key: "orderedQuantity",
@@ -878,7 +1220,7 @@ function PurchaseOrderFormDialog({
         title={mode === "create" ? "Thêm mới phiếu nhập kho" : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`}
         toolbarItems={dialogToolbar}
         purpose={
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <span className="text-muted-foreground">Mục đích nhập kho</span>
             <label className="flex items-center gap-1.5">
               <input
@@ -886,6 +1228,8 @@ function PurchaseOrderFormDialog({
                 checked={purpose === "OTHER"}
                 onChange={() => {
                   setPurpose("OTHER");
+                  setSourceBranchId("");
+                  setSourceBranchLabel("");
                   markDirty();
                 }}
                 disabled={isView}
@@ -904,30 +1248,90 @@ function PurchaseOrderFormDialog({
               />
               Điều chuyển từ cửa hàng khác
             </label>
+            {purpose === "TRANSFER" ? (
+              <>
+                <div className="w-[260px]">
+                  <LookupField
+                    enableSearchModal
+                    searchModalTitle="Chọn cửa hàng nguồn"
+                    searchModalPlaceholder="Nhập tên cửa hàng"
+                    placeholder="Chọn cửa hàng nguồn"
+                    value={sourceBranchLabel}
+                    onValueChange={(v) => {
+                      setSourceBranchLabel(v);
+                      setSourceBranchId("");
+                    }}
+                    onSelect={(b) => {
+                      setSourceBranchId(b.id);
+                      setSourceBranchLabel(b.name);
+                      setNotes(`Nhập kho hàng hóa điều chuyển từ cửa hàng ${b.name}`);
+                      markDirty();
+                    }}
+                    search={searchBranches}
+                    itemKey={(b) => b.id}
+                    renderItem={(b) => b.name}
+                    renderMeta={(b) => b.address ?? ""}
+                    columns={[
+                      { key: "name", label: "Tên cửa hàng", render: (b) => b.name },
+                      { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                    ]}
+                    disabled={isView}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled
+                >
+                  Chọn chứng từ điều chuyển
+                </Button>
+              </>
+            ) : null}
           </div>
         }
         generalInfo={
           <>
             <FieldRow label="Đối tượng">
-              <SearchListingInput
-                placeholder="Tìm đối tượng"
-                value={providerQuery}
-                onValueChange={(v) => {
-                  setProviderQuery(v);
-                  setProviderId("");
-                  markDirty();
-                }}
-                onSelect={(p) => {
-                  setProviderId(p.id);
-                  setProviderQuery(`${p.code} · ${p.name}`);
-                  markDirty();
-                }}
-                search={searchProviders}
-                itemKey={(p) => p.id}
-                renderItem={(p) => p.name}
-                renderMeta={(p) => p.code}
-                disabled={isView}
-              />
+              <div className="flex items-stretch gap-2">
+                <LookupField
+                  enableSearchModal
+                  searchModalTitle="Chọn đối tượng"
+                  searchModalPlaceholder="Nhập mã hoặc tên nhà cung cấp"
+                  className="w-[180px]"
+                  dropdownMinWidth={500}
+                  value={providerCode}
+                  onValueChange={(v) => {
+                    setProviderCode(v);
+                    setProviderId("");
+                    setProviderName("");
+                    markDirty();
+                  }}
+                  onSelect={(p) => {
+                    setProviderId(p.id);
+                    setProviderCode(p.code);
+                    setProviderName(p.name);
+                    markDirty();
+                  }}
+                  search={searchProviders}
+                  itemKey={(p) => p.id}
+                  renderItem={(p) => p.name}
+                  renderMeta={(p) => p.code}
+                  columns={[
+                    { key: "code", label: "Mã", className: "w-[160px] font-mono", render: (p) => p.code },
+                    { key: "name", label: "Tên", render: (p) => p.name },
+                  ]}
+                  disabled={isView}
+                  onCreateNew={isView ? undefined : () => setQuickProviderOpen(true)}
+                />
+                <Input
+                  className="flex-1"
+                  placeholder="Tên đối tượng"
+                  value={providerName}
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
             </FieldRow>
             <FieldRow label="Người giao">
               <Input
@@ -939,16 +1343,18 @@ function PurchaseOrderFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            <FieldRow label="Lý do">
-              <Input
-                value={reason}
-                onChange={(e) => {
-                  setReason(e.target.value);
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-            </FieldRow>
+            {purpose === "TRANSFER" ? null : (
+              <FieldRow label="Lý do">
+                <Input
+                  value={reason}
+                  onChange={(e) => {
+                    setReason(e.target.value);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+              </FieldRow>
+            )}
             <FieldRow label="Diễn giải">
               <Input
                 value={notes}
@@ -972,7 +1378,11 @@ function PurchaseOrderFormDialog({
         documentInfo={
           <>
             <FieldRow label="Số phiếu nhập">
-              <Input value={initial?.documentNumber ?? ""} readOnly />
+              <Input
+                value={initial?.documentNumber ?? previewDocumentNumber ?? ""}
+                readOnly
+                title={initial?.documentNumber ? undefined : "Số dự kiến — hệ thống sẽ chốt khi lưu"}
+              />
             </FieldRow>
             <FieldRow label="Ngày nhập">
               <Input
@@ -997,23 +1407,32 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Kho">
-              <SearchListingInput
+              <LookupField
+                enableSearchModal
+                searchModalTitle="Chọn kho"
+                searchModalPlaceholder="Nhập tên kho"
                 placeholder="Chọn kho"
-                value={locationQuery}
+                value={storageQuery}
                 onValueChange={(v) => {
-                  setLocationQuery(v);
-                  setLocationId("");
+                  setStorageQuery(v);
+                  setStorageId("");
                   markDirty();
                 }}
-                onSelect={(loc) => {
-                  setLocationId(loc.id);
-                  setLocationQuery(`${loc.code} · ${loc.name}`);
+                onSelect={(s) => {
+                  setStorageId(s.id);
+                  setStorageQuery(s.name);
+                  // Reset per-line bin selection — bins from a different
+                  // warehouse cannot move into the newly chosen warehouse.
+                  setLines((prev) =>
+                    prev.map((l) => ({ ...l, locationId: "", locationLabel: "" })),
+                  );
                   markDirty();
                 }}
-                search={searchLocations}
-                itemKey={(loc) => loc.id}
-                renderItem={(loc) => loc.name}
-                renderMeta={(loc) => loc.code}
+                search={searchStorages}
+                itemKey={(s) => s.id}
+                renderItem={(s) => s.name}
+                renderMeta={() => ""}
+                columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
                 disabled={isView}
               />
             </FieldRow>
@@ -1072,20 +1491,75 @@ function PurchaseOrderFormDialog({
         }
       />
 
-      {error && (
-        <AppModal open onOpenChange={() => setError(null)} title="Lỗi" defaultWidth={420} defaultHeight={220}>
-          <p className="text-sm text-destructive">{error}</p>
-        </AppModal>
-      )}
-
       <UnsavedChangesDialog
         open={unsavedOpen}
         onOpenChange={setUnsavedOpen}
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
       />
+
+      <QuickCreateProviderDialog
+        open={quickProviderOpen}
+        onClose={() => setQuickProviderOpen(false)}
+        onCreated={(p: QuickProvider) => {
+          setProviderId(p.id);
+          setProviderCode(p.code);
+          setProviderName(p.name);
+          markDirty();
+        }}
+      />
+
+      <QuickCreateLocationDialog
+        open={quickLocationLineIdx !== null}
+        onClose={() => setQuickLocationLineIdx(null)}
+        onCreated={(loc: QuickLocation) => {
+          const idx = quickLocationLineIdx;
+          if (idx === null) return;
+          setLines((prev) =>
+            prev.map((l, i) =>
+              i === idx ? { ...l, locationId: loc.id, locationLabel: loc.code } : l,
+            ),
+          );
+          setQuickLocationLineIdx(null);
+          markDirty();
+        }}
+        storages={storageCache}
+      />
+
+      <QuickCreateItemDialog
+        open={quickItemLineIdx !== null}
+        onClose={() => setQuickItemLineIdx(null)}
+        onCreated={(item: QuickItem) => {
+          const idx = quickItemLineIdx;
+          if (idx === null) return;
+          setLines((prev) =>
+            prev.map((l, i) =>
+              i === idx
+                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                : l,
+            ),
+          );
+          setQuickItemLineIdx(null);
+          markDirty();
+        }}
+      />
     </>
   );
+}
+
+function combineDateTimeISO(date: string, time: string): string {
+  // date = YYYY-MM-DD, time = HH:mm
+  const safeDate = date || new Date().toISOString().slice(0, 10);
+  const safeTime = (time && time.length >= 4 ? time : "00:00").slice(0, 5);
+  // Build local-time ISO with timezone offset, e.g. 2026-05-14T21:23:00+07:00
+  const d = new Date(`${safeDate}T${safeTime}:00`);
+  const tz = -d.getTimezoneOffset();
+  const sign = tz >= 0 ? "+" : "-";
+  const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, "0");
+  const offsetH = pad(tz / 60);
+  const offsetM = pad(tz % 60);
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00${sign}${offsetH}:${offsetM}`;
 }
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {

@@ -33,7 +33,62 @@ export enum GoodsIssueStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum GoodsIssuePurpose {
+  OTHER = 'OTHER',
+  SALE = 'SALE',
+  TRANSFER_OUT = 'TRANSFER_OUT',
+  DISPOSAL = 'DISPOSAL',
+}
+
+export enum IssueReasonPurpose {
+  OTHER = 'OTHER',
+  DISPOSAL = 'DISPOSAL',
+}
+
+export enum StockTakeStatus {
+  DRAFT = 'DRAFT',
+  POSTED = 'POSTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TransferOrderStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  EXECUTED = 'EXECUTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum GoodsReceiptStatus {
+  DRAFT = 'DRAFT',
+  POSTED = 'POSTED',
+  CANCELLED = 'CANCELLED',
+  REVERSED = 'REVERSED',
+}
+
+export enum GoodsReceiptPurpose {
+  OTHER = 'OTHER',
+  TRANSFER_IN = 'TRANSFER_IN',
+}
+
+export enum GoodsReceiptReferenceType {
+  PURCHASE_ORDER = 'PURCHASE_ORDER',
+  STOCK_TRANSFER = 'STOCK_TRANSFER',
+}
+
 export type { Product } from './product';
+
+export {
+  StockStateFilter,
+} from './stock-by-location';
+export type {
+  StockByLocationProvider,
+  StockByLocationItem,
+  StockByLocationStorageRef,
+  StockByLocationBranchRef,
+  StockByLocationLocationRef,
+  StockByLocationMeta,
+  StockByLocationResponse,
+} from './stock-by-location';
 
 export enum ImportJobStatus {
   PENDING = 'PENDING',

@@ -287,7 +287,9 @@ describe('DocumentNumberingService', () => {
 
       const result = await service.generate(DocumentType.INVOICE, undefined, actor);
 
-      expect(result).toBe('INV-0011');
+      // Continuous rules (no date, no suffix) join directly — see
+      // formatDocumentNumber. Was "INV-0011" before that change.
+      expect(result).toBe('INV0011');
     });
   });
 });

@@ -16,7 +16,15 @@ import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { StockLedgerService } from './stock-ledger.service';
 import { StockMovementType } from '@erp/shared-interfaces';
-import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
+
+function parseBool(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const v = String(value).toLowerCase();
+  return v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : undefined;
+}
 
 export class BalanceQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -30,6 +38,15 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   locationId?: string;
+
+  @IsOptional()
+  @IsString()
+  storageId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  belowMin?: boolean;
 }
 
 export class LedgerQueryDto extends PaginationQueryDto {

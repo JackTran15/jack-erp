@@ -23,11 +23,11 @@ export const INVENTORY_TABS: (PageTabItem & {
   { id: "transfer-in", label: "Điều chuyển từ cửa hàng khác", href: "#", comingSoon: true },
   { id: "goods-issues", label: "Xuất kho", href: "/inventory/goods-issues" },
   { id: "stock-transfer", label: "Chuyển kho", href: "/inventory/stock-transfers" },
-  { id: "transfer-order", label: "Lệnh điều chuyển", href: "#", comingSoon: true },
-  { id: "stock-take", label: "Kiểm kê kho", href: "#", comingSoon: true },
+  { id: "transfer-order", label: "Lệnh điều chuyển", href: "/inventory/transfer-orders" },
+  { id: "stock-take", label: "Kiểm kê kho", href: "/inventory/stock-takes" },
   { id: "stock-summary", label: "Tổng hợp tồn kho", href: "/inventory-management" },
   { id: "item-locations", label: "Vị trí hàng hóa", href: "/inventory/item-locations" },
-  { id: "item-location-details", label: "Chi tiết vị trí hàng hóa", href: "#", comingSoon: true },
+  { id: "item-location-details", label: "Chi tiết vị trí hàng hóa", href: "/inventory/item-location-details" },
 ];
 
 export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
