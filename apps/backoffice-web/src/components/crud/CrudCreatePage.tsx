@@ -91,10 +91,18 @@ export function CrudCreatePage() {
     event.preventDefault();
     if (!validate()) return;
 
-    const payload: Record<string, unknown> = {};
-    editableFields.forEach((field) => {
-      payload[field.key] = values[field.key];
-    });
+    // For inventory-items the form maintains extra keys (barcodes/units/providers/
+    // threshold/initialStock/...) in `values` that aren't part of `editableFields`.
+    // Send the whole values map; the API DTO's whitelist rejects unknown keys.
+    let payload: Record<string, unknown>;
+    if (entityKey === "inventory-items") {
+      payload = { ...values };
+    } else {
+      payload = {};
+      editableFields.forEach((field) => {
+        payload[field.key] = values[field.key];
+      });
+    }
 
     await createMutation.mutateAsync(payload);
     navigate(`/admin/${entityKey}`, { replace: true });

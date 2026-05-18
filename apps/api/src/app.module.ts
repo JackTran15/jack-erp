@@ -27,6 +27,10 @@ import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
+import { IssueReasonModule } from './modules/inventory/issue-reason/issue-reason.module';
+import { GoodsReceiptModule } from './modules/inventory/goods-receipt/goods-receipt.module';
+import { StockTakeModule } from './modules/inventory/stock-take/stock-take.module';
+import { TransferOrderModule } from './modules/inventory/transfer-order/transfer-order.module';
 import { ProductModule } from './modules/inventory/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 
@@ -85,6 +89,10 @@ import { PromotionModule } from './modules/promotion/promotion.module';
     ReportingModule,
     PurchaseOrderModule,
     GoodsIssueModule,
+    IssueReasonModule,
+    GoodsReceiptModule,
+    StockTakeModule,
+    TransferOrderModule,
     ProductModule,
     PromotionModule,
   ],

@@ -74,7 +74,7 @@ export function DocumentFormDialog({
         {!collapsed ? (
           <div className="shrink-0 border-b px-4 pt-3">
             {purpose ? <div className="mb-3">{purpose}</div> : null}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[7fr_3fr]">
               <section>
                 <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Thông tin chung

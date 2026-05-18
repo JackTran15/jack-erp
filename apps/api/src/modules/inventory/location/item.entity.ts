@@ -5,6 +5,7 @@ import { ProductEntity } from '../product/product.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
+import { ItemUnitEntity } from './item-unit.entity';
 
 /** A stockable product or material tracked in inventory. Identified by unique code per organization. */
 @Entity('items')
@@ -60,6 +61,33 @@ export class ItemEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true, comment: 'Material composition / fabric / ingredients' })
   composition?: string;
 
+  @Column({ length: 100, nullable: true, comment: 'Brand name (e.g. Samsung, Nike)' })
+  brand?: string;
+
+  @Column({ name: 'item_type', length: 100, nullable: true, comment: 'Free-text grouping label (Nhóm hàng)' })
+  itemType?: string;
+
+  @Column({ name: 'package_weight_gram', type: 'decimal', precision: 18, scale: 2, nullable: true, comment: 'Package gross weight in grams' })
+  packageWeightGram?: number;
+
+  @Column({ name: 'package_length_cm', type: 'decimal', precision: 18, scale: 2, nullable: true })
+  packageLengthCm?: number;
+
+  @Column({ name: 'package_width_cm', type: 'decimal', precision: 18, scale: 2, nullable: true })
+  packageWidthCm?: number;
+
+  @Column({ name: 'package_height_cm', type: 'decimal', precision: 18, scale: 2, nullable: true })
+  packageHeightCm?: number;
+
+  @Column({ name: 'is_gold_silver', default: false, comment: 'Mặt hàng vàng/bạc — special pricing rules apply' })
+  isGoldSilver: boolean;
+
+  @Column({ name: 'odd_size', length: 100, nullable: true, comment: 'Đầy size — free-text size descriptor' })
+  oddSize?: string;
+
+  @Column({ name: 'manage_barcode_per_unit', default: false, comment: 'When true, separate barcodes are kept per conversion unit' })
+  manageBarcodePerUnit: boolean;
+
   @Column({ name: 'product_id', type: 'uuid', nullable: true, comment: 'FK to products — null for legacy items without a parent product' })
   productId?: string;
 
@@ -78,4 +106,7 @@ export class ItemEntity extends BaseEntity {
 
   @OneToMany(() => ItemStockThresholdEntity, (t) => t.item)
   thresholds?: ItemStockThresholdEntity[];
+
+  @OneToMany(() => ItemUnitEntity, (u) => u.item)
+  units?: ItemUnitEntity[];
 }

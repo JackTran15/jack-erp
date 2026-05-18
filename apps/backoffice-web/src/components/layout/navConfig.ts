@@ -92,7 +92,10 @@ export const navConfig: NavModule[] = [
           { to: "/inventory/purchase-orders", label: "Nhập kho", },
           { to: "/inventory/goods-issues", label: "Xuất kho", },
           { to: "/inventory/stock-transfers", label: "Chuyển kho", },
+          { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển", },
+          { to: "/inventory/stock-takes", label: "Kiểm kê kho", },
           { to: "/inventory/item-locations", label: "Vị trí hàng hóa", },
+          { to: "/inventory/item-location-details", label: "Chi tiết vị trí", },
         ],
       },
     ],
@@ -197,7 +200,7 @@ export const navConfig: NavModule[] = [
         id: "catalog-goods",
         label: "HÀNG HÓA",
         children: [
-          { to: "/admin/inventory-item-groups", label: "Nhóm hàng hoá" },
+          { to: "/admin/inventory-item-categories", label: "Nhóm hàng hoá" },
           { to: "/admin/inventory-items", label: "Hàng hoá" },
           {
             to: "/admin/inventory-item-units", label: "Đơn vị tính" },

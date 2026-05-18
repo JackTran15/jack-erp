@@ -2,11 +2,13 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import {
+  GoodsIssuePurpose,
   GoodsIssueStatus,
   StockMovementType,
   DocumentType,
@@ -16,14 +18,20 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
+import { BranchEntity } from '../../branch/branch.entity';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
 export interface CreateGoodsIssueDto {
   locationId: string;
-  reason: string;
+  providerId?: string;
+  purpose?: GoodsIssuePurpose;
+  reasonId?: string;
+  targetBranchId?: string;
+  reason?: string; // optional override / legacy
   notes?: string;
-  lines: { itemId: string; quantity: number; notes?: string }[];
+  lines: { itemId: string; quantity: number; unitPrice?: number; notes?: string }[];
 }
 
 export interface GoodsIssueQuery extends PaginationQuery {
@@ -46,6 +54,10 @@ export class GoodsIssueService {
   constructor(
     @InjectRepository(GoodsIssueEntity)
     private readonly giRepo: Repository<GoodsIssueEntity>,
+    @InjectRepository(IssueReasonEntity)
+    private readonly reasonRepo: Repository<IssueReasonEntity>,
+    @InjectRepository(BranchEntity)
+    private readonly branchRepo: Repository<BranchEntity>,
     private readonly dataSource: DataSource,
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
@@ -62,25 +74,50 @@ export class GoodsIssueService {
       }
     }
 
+    const purpose = dto.purpose ?? GoodsIssuePurpose.OTHER;
+    const { reasonText, reasonId, targetBranchId } = await this.resolveReasonContext(
+      purpose,
+      dto,
+      actor,
+    );
+
+    const documentNumber = await this.documentNumberingService.generate(
+      DocumentType.GOODS_ISSUE,
+      actor.branchId,
+      actor,
+    );
+
     const gi = this.giRepo.create({
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
+      documentNumber,
       locationId: dto.locationId,
-      reason: dto.reason,
+      providerId: dto.providerId,
+      purpose,
+      reason: reasonText,
+      reasonId,
+      targetBranchId,
       notes: dto.notes,
       status: GoodsIssueStatus.DRAFT,
       lines: dto.lines.map((l) => {
         const line = new GoodsIssueLineEntity();
         line.itemId = l.itemId;
         line.quantity = l.quantity;
+
+        const unitPrice = Number(l.unitPrice ?? 0);
+        const qty = Number(l.quantity);
+        line.unitPrice = unitPrice.toFixed(2);
+        line.lineTotal = (qty * unitPrice).toFixed(2);
         line.notes = l.notes;
         return line;
       }),
     });
 
     const saved = await this.giRepo.save(gi);
-    this.logger.log(`Goods issue ${saved.id} created as DRAFT`);
+    this.logger.log(
+      `Goods issue ${saved.id} created as DRAFT ${documentNumber} (purpose=${purpose})`,
+    );
     return saved;
   }
 
@@ -101,11 +138,13 @@ export class GoodsIssueService {
     const gi = await this.findOrFail(id, actor.organizationId);
     this.validateTransition(gi.status, GoodsIssueStatus.POSTED);
 
-    const documentNumber = await this.documentNumberingService.generate(
-      DocumentType.GOODS_ISSUE,
-      gi.branchId,
-      actor,
-    );
+    const documentNumber =
+      gi.documentNumber ??
+      (await this.documentNumberingService.generate(
+        DocumentType.GOODS_ISSUE,
+        gi.branchId,
+        actor,
+      ));
 
     const branchId = gi.branchId ?? actor.branchId;
     if (!branchId) {
@@ -142,7 +181,34 @@ export class GoodsIssueService {
 
   async cancel(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
     const gi = await this.findOrFail(id, actor.organizationId);
-    this.validateTransition(gi.status, GoodsIssueStatus.CANCELLED);
+
+    if (gi.status === GoodsIssueStatus.CANCELLED) {
+      throw new ConflictException('Phiếu đã huỷ, không thể xoá lại');
+    }
+
+    if (gi.status === GoodsIssueStatus.POSTED) {
+      const branchId = gi.branchId ?? actor.branchId;
+      if (!branchId) {
+        throw new BadRequestException(
+          'Không xác định được chi nhánh để đảo bút tồn kho',
+        );
+      }
+      await this.dataSource.transaction(async () => {
+        const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
+          itemId: line.itemId,
+          locationId: gi.locationId,
+          branchId,
+          organizationId: gi.organizationId,
+          movementType: StockMovementType.ADJUSTMENT_INCREASE,
+          quantity: Number(line.quantity),
+          referenceType: 'GOODS_ISSUE',
+          referenceId: gi.id,
+          notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
+          actorContext: actor,
+        }));
+        await this.ledgerService.recordBatchMovements(reversals);
+      });
+    }
 
     gi.status = GoodsIssueStatus.CANCELLED;
     const saved = await this.giRepo.save(gi);
@@ -156,7 +222,13 @@ export class GoodsIssueService {
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {
     const where: Record<string, unknown> = { organizationId: query.organizationId };
-    if (query.status) where.status = query.status;
+    if (query.status) {
+      where.status = query.status;
+    } else {
+      // GoodsIssueEntity has no soft-delete column, so we hide cancelled rows
+      // here. Callers wanting the full set can filter explicitly by status.
+      where.status = Not(GoodsIssueStatus.CANCELLED);
+    }
     if (query.branchId) where.branchId = query.branchId;
 
     const [data, total] = await this.giRepo.findAndCount({
@@ -170,6 +242,53 @@ export class GoodsIssueService {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────
+
+  private async resolveReasonContext(
+    purpose: GoodsIssuePurpose,
+    dto: CreateGoodsIssueDto,
+    actor: ActorContext,
+  ): Promise<{ reasonText: string; reasonId?: string; targetBranchId?: string }> {
+    switch (purpose) {
+      case GoodsIssuePurpose.OTHER:
+      case GoodsIssuePurpose.DISPOSAL: {
+        if (!dto.reasonId) {
+          throw new BadRequestException('Vui lòng chọn lý do xuất kho');
+        }
+        const reason = await this.reasonRepo.findOne({
+          where: { id: dto.reasonId, organizationId: actor.organizationId },
+        });
+        if (!reason) {
+          throw new BadRequestException(`Lý do xuất kho ${dto.reasonId} không tồn tại`);
+        }
+        return { reasonText: reason.name, reasonId: reason.id };
+      }
+      case GoodsIssuePurpose.TRANSFER_OUT: {
+        if (!dto.targetBranchId) {
+          throw new BadRequestException(
+            'Vui lòng chọn cửa hàng đích để điều chuyển',
+          );
+        }
+        const branch = await this.branchRepo.findOne({
+          where: { id: dto.targetBranchId, organizationId: actor.organizationId },
+        });
+        if (!branch) {
+          throw new BadRequestException(
+            `Chi nhánh ${dto.targetBranchId} không tồn tại`,
+          );
+        }
+        return {
+          reasonText: `Điều chuyển đến cửa hàng ${branch.name}`,
+          targetBranchId: branch.id,
+        };
+      }
+      case GoodsIssuePurpose.SALE: {
+        // POS flow — preserves any reason text passed in
+        return { reasonText: dto.reason ?? 'Bán hàng' };
+      }
+      default:
+        return { reasonText: dto.reason ?? 'Khác' };
+    }
+  }
 
   private async findOrFail(id: string, organizationId: string): Promise<GoodsIssueEntity> {
     const gi = await this.giRepo.findOne({ where: { id, organizationId } });

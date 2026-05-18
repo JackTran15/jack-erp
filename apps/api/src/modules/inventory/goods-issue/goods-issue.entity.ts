@@ -1,6 +1,10 @@
-import { Entity, Column, OneToMany, Index } from 'typeorm';
-import { GoodsIssueStatus } from '@erp/shared-interfaces';
+import { Entity, Column, OneToMany, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
+import { BranchEntity } from '../../branch/branch.entity';
+import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
+import { LocationEntity } from '../location/location.entity';
+import { ProviderEntity } from '../location/provider.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
 /** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → APPROVED → POSTED | CANCELLED */
@@ -13,11 +17,39 @@ export class GoodsIssueEntity extends BaseEntity {
   @Column({ name: 'location_id', type: 'uuid', comment: 'Source storage location' })
   locationId: string;
 
-  @Column({ comment: 'Reason for issuance (e.g. bán hàng, nội bộ, mẫu)' })
+  @ManyToOne(() => LocationEntity, { eager: true })
+  @JoinColumn({ name: 'location_id' })
+  location?: LocationEntity;
+
+  @Column({ name: 'provider_id', type: 'uuid', nullable: true, comment: 'FK to providers — the "Đối tượng" counterparty (NCC/đối tác)' })
+  providerId?: string;
+
+  @ManyToOne(() => ProviderEntity, { eager: true, nullable: true })
+  @JoinColumn({ name: 'provider_id' })
+  provider?: ProviderEntity;
+
+  @Column({ comment: 'Denormalized reason text (auto-filled from reasonRef.name or targetBranch.name)' })
   reason: string;
+
+  @Column({ name: 'reason_id', type: 'uuid', nullable: true, comment: 'FK to issue_reasons — required for purpose=OTHER|DISPOSAL' })
+  reasonId?: string;
+
+  @ManyToOne(() => IssueReasonEntity, { eager: true, nullable: true })
+  @JoinColumn({ name: 'reason_id' })
+  reasonRef?: IssueReasonEntity;
+
+  @Column({ name: 'target_branch_id', type: 'uuid', nullable: true, comment: 'FK to branches — required for purpose=TRANSFER_OUT' })
+  targetBranchId?: string;
+
+  @ManyToOne(() => BranchEntity, { eager: true, nullable: true })
+  @JoinColumn({ name: 'target_branch_id' })
+  targetBranch?: BranchEntity;
 
   @Column({ type: 'enum', enum: GoodsIssueStatus, default: GoodsIssueStatus.DRAFT })
   status: GoodsIssueStatus;
+
+  @Column({ type: 'enum', enum: GoodsIssuePurpose, default: GoodsIssuePurpose.OTHER, comment: 'Mục đích xuất kho: OTHER | SALE | TRANSFER_OUT | DISPOSAL' })
+  purpose: GoodsIssuePurpose;
 
   @Column({ nullable: true, comment: 'Free-text notes' })
   notes?: string;

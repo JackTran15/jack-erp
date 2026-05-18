@@ -45,8 +45,44 @@ export interface LedgerQuery extends PaginationQuery {
 export interface BalanceQuery extends PaginationQuery {
   itemId?: string;
   locationId?: string;
+  storageId?: string;
   branchId?: string;
+  /** Partial match on item code or name (case-insensitive). */
+  search?: string;
+  /** Only return rows where quantity < minQty (threshold). */
+  belowMin?: boolean;
   organizationId: string;
+}
+
+export interface StockBalanceSummaryRow {
+  id: string;
+  organizationId: string;
+  branchId?: string;
+  itemId: string;
+  locationId: string;
+  quantity: number;
+  lastMovementAt?: Date | null;
+  item: {
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    isActive: boolean;
+    isPosVisible: boolean;
+    categoryName: string | null;
+  };
+  location: {
+    id: string;
+    code: string;
+    name: string;
+    storageId: string;
+    storageName: string;
+  };
+  threshold: {
+    minQty: number | null;
+    maxQty: number | null;
+  };
+  belowMin: boolean;
 }
 
 @Injectable()
@@ -177,23 +213,130 @@ export class StockLedgerService {
 
   async getBalances(
     query: BalanceQuery,
-  ): Promise<PaginatedResponse<StockBalanceEntity>> {
-    const where: Record<string, unknown> = {
-      organizationId: query.organizationId,
-    };
-    if (query.branchId) where.branchId = query.branchId;
-    if (query.itemId) where.itemId = query.itemId;
-    if (query.locationId) where.locationId = query.locationId;
+  ): Promise<PaginatedResponse<StockBalanceSummaryRow>> {
+    const page = Math.max(1, Number(query.page ?? 1));
+    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 50)));
 
-    const [data, total] = await this.balanceRepo.findAndCount({
-      where,
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { lastMovementAt: 'DESC' },
+    const qb = this.balanceRepo
+      .createQueryBuilder('sb')
+      .innerJoin('items', 'item', 'item.id = sb.item_id')
+      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
+      .innerJoin('storages', 'storage', 'storage.id = loc.storage_id')
+      .leftJoin(
+        'inventory_item_categories',
+        'cat',
+        'cat.id = item.category_id',
+      )
+      .leftJoin(
+        'item_stock_thresholds',
+        'th',
+        'th.item_id = sb.item_id AND th.location_id = sb.location_id',
+      )
+      .where('sb.organization_id = :organizationId', {
+        organizationId: query.organizationId,
+      });
+
+    if (query.branchId) {
+      qb.andWhere('sb.branch_id = :branchId', { branchId: query.branchId });
+    }
+    if (query.itemId) {
+      qb.andWhere('sb.item_id = :itemId', { itemId: query.itemId });
+    }
+    if (query.locationId) {
+      qb.andWhere('sb.location_id = :locationId', {
+        locationId: query.locationId,
+      });
+    }
+    if (query.storageId) {
+      qb.andWhere('loc.storage_id = :storageId', {
+        storageId: query.storageId,
+      });
+    }
+    if (query.search && query.search.trim()) {
+      const q = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere('(LOWER(item.code) LIKE :q OR LOWER(item.name) LIKE :q)', {
+        q,
+      });
+    }
+    if (query.belowMin) {
+      qb.andWhere('th.min_qty IS NOT NULL AND sb.quantity < th.min_qty');
+    }
+
+    qb.select([
+      'sb.id AS id',
+      'sb.organization_id AS "organizationId"',
+      'sb.branch_id AS "branchId"',
+      'sb.item_id AS "itemId"',
+      'sb.location_id AS "locationId"',
+      'sb.quantity AS quantity',
+      'sb.last_movement_at AS "lastMovementAt"',
+      'item.code AS "itemCode"',
+      'item.name AS "itemName"',
+      'item.unit AS "itemUnit"',
+      'item.is_active AS "itemIsActive"',
+      'item.is_pos_visible AS "itemIsPosVisible"',
+      'cat.name AS "categoryName"',
+      'loc.code AS "locationCode"',
+      'loc.name AS "locationName"',
+      'loc.storage_id AS "storageId"',
+      'storage.name AS "storageName"',
+      'th.min_qty AS "minQty"',
+      'th.max_qty AS "maxQty"',
+    ]);
+
+    const sortBy = (query.sortBy ?? 'lastMovementAt') as string;
+    const sortMap: Record<string, string> = {
+      itemCode: 'item.code',
+      itemName: 'item.name',
+      quantity: 'sb.quantity',
+      lastMovementAt: 'sb.last_movement_at',
+      locationName: 'loc.name',
+      storageName: 'storage.name',
+    };
+    const sortExpr = sortMap[sortBy] ?? 'sb.last_movement_at';
+    qb.orderBy(sortExpr, (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC');
+
+    qb.offset((page - 1) * pageSize).limit(pageSize);
+
+    const [rows, total] = await Promise.all([
+      qb.getRawMany<Record<string, unknown>>(),
+      qb.getCount(),
+    ]);
+
+    const data: StockBalanceSummaryRow[] = rows.map((r) => {
+      const quantity = Number(r.quantity);
+      const minQty = r.minQty === null ? null : Number(r.minQty);
+      const maxQty = r.maxQty === null ? null : Number(r.maxQty);
+      return {
+        id: String(r.id),
+        organizationId: String(r.organizationId),
+        branchId: r.branchId ? String(r.branchId) : undefined,
+        itemId: String(r.itemId),
+        locationId: String(r.locationId),
+        quantity,
+        lastMovementAt: r.lastMovementAt ? new Date(r.lastMovementAt as string) : null,
+        item: {
+          id: String(r.itemId),
+          code: String(r.itemCode),
+          name: String(r.itemName),
+          unit: String(r.itemUnit),
+          isActive: Boolean(r.itemIsActive),
+          isPosVisible: Boolean(r.itemIsPosVisible),
+          categoryName: r.categoryName ? String(r.categoryName) : null,
+        },
+        location: {
+          id: String(r.locationId),
+          code: String(r.locationCode),
+          name: String(r.locationName),
+          storageId: String(r.storageId),
+          storageName: String(r.storageName),
+        },
+        threshold: { minQty, maxQty },
+        belowMin: minQty !== null && quantity < minQty,
+      };
     });
-    return { data, total, page: query.page, pageSize: query.pageSize };
+
+    return { data, total, page, pageSize };
   }
 
   async getLedgerEntries(

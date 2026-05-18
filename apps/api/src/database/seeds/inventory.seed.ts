@@ -171,7 +171,7 @@ async function seedInventoryData() {
         ($2, $5, NULL, '1121', 'Tiền gửi ngân hàng',  'ASSET',   true, $5, NOW(), NOW()),
         ($3, $5, NULL, '5111', 'Doanh thu bán hàng',  'REVENUE', true, $5, NOW(), NOW()),
         ($4, $5, NULL, '1311', 'Phải thu khách hàng', 'ASSET',   true, $5, NOW(), NOW())
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (organization_id, code) DO NOTHING
       `,
       [IDS.accountCash, IDS.accountBank, IDS.accountRevenue, IDS.accountReceivable, IDS.organization],
     );
@@ -303,6 +303,20 @@ async function seedInventoryData() {
       ON CONFLICT (id) DO NOTHING
       `,
       [IDS.providerDefault, IDS.organization, IDS.user],
+    );
+
+    // Seed default DISPOSAL reasons for the demo org.
+    await AppDataSource.query(
+      `
+      INSERT INTO issue_reasons (id, organization_id, code, name, purpose, is_active, created_by, created_at, updated_at)
+      VALUES
+        (uuid_generate_v4(), $1, 'HONG_BAO_QUAN', 'Hàng hỏng do bảo quản chưa tốt', 'DISPOSAL', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'HET_HAN', 'Hàng hỏng do hết hạn sử dụng', 'DISPOSAL', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'XUAT_MAU', 'Xuất hàng mẫu', 'OTHER', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'XUAT_NOI_BO', 'Xuất sử dụng nội bộ', 'OTHER', true, $2, NOW(), NOW())
+      ON CONFLICT (organization_id, code) DO NOTHING
+      `,
+      [IDS.organization, IDS.user],
     );
 
     // Create "Hardware" category for the two demo items.

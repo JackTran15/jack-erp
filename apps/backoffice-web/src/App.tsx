@@ -30,6 +30,9 @@ import { TransferSummaryReportPage } from "./pages/reports/storage/TransferSumma
 import { TransferByBranchReportPage } from "./pages/reports/storage/TransferByBranchReportPage";
 import { TemporaryIssuesReportPage } from "./pages/reports/storage/TemporaryIssuesReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
+import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
+import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
+import { TransferOrdersPage } from "./pages/transfer-orders/TransferOrdersPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
 import { StockTransferPage } from "./pages/stock-transfer/StockTransferPage";
@@ -102,6 +105,18 @@ export function App() {
                 <Route
                   path="/inventory/storages"
                   element={<StoragesPage />}
+                />
+                <Route
+                  path="/inventory/item-location-details"
+                  element={<ItemLocationDetailsPage />}
+                />
+                <Route
+                  path="/inventory/stock-takes"
+                  element={<StockTakesPage />}
+                />
+                <Route
+                  path="/inventory/transfer-orders"
+                  element={<TransferOrdersPage />}
                 />
                 <Route
                   path="/onboarding/org-registration"
