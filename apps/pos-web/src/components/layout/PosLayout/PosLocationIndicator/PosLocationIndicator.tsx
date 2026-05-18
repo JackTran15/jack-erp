@@ -1,32 +1,35 @@
-import { cn } from "@erp/ui";
-import {
-  ChevronDownIcon,
-  MapPinIcon,
-} from "@erp/pos/components/common/PosIcons/PosIcons";
+import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
+import { MapPinIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
-export interface LocationIndicatorProps {
-  location: string;
-  onClick?: () => void;
+interface BranchOption {
+  id: string;
+  name: string;
 }
 
-/** Compact location switcher — pin icon + name + chevron. */
-export function PosLocationIndicator({
-  location,
-  onClick,
-}: LocationIndicatorProps) {
+/**
+ * Branch indicator in the POS topbar. Reads the active branch from the branch
+ * store and renders it as a single-option {@link PosSelect}. Branch switching
+ * lives on the dedicated `/chon-chi-nhanh` page.
+ */
+export function PosLocationIndicator() {
+  const branchId = usePosBranchStore((s) => s.branchId);
+  const branchName = usePosBranchStore((s) => s.branchName);
+  const current: BranchOption | null =
+    branchId && branchName ? { id: branchId, name: branchName } : null;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 text-[13px] text-gray-700 transition-colors",
-        "hover:border-gray-200 hover:bg-gray-50",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40",
-      )}
-    >
-      <MapPinIcon size={14} className="text-gray-500" />
-      <span className="flex-1 whitespace-nowrap text-left">{location}</span>
-      <ChevronDownIcon size={14} className="text-gray-400" />
-    </button>
+    <PosSelect<BranchOption>
+      items={current ? [current] : []}
+      value={current}
+      onChange={() => {}}
+      itemKey={(b) => b.id}
+      renderItem={(b) => b.name}
+      ariaLabel="Chi nhánh"
+      placeholder="Chọn chi nhánh"
+      emptyText="Không có chi nhánh"
+      prefix={<MapPinIcon size={14} className="text-gray-500" />}
+      className="min-w-[180px]"
+    />
   );
 }
