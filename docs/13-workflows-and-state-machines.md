@@ -98,3 +98,23 @@ Transition rules:
 - Illegal transitions are blocked at service layer.
 - State transitions and side effects are deterministic.
 - Audit trail is complete for all transition actions.
+
+## Return / Exchange Lifecycle (EPIC-011)
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT_RETURN: POST /invoices/returns (mode=quick|regular)
+  [*] --> DRAFT_EXCHANGE: POST /invoices/exchanges
+  DRAFT_RETURN --> PAID: POST /:id/checkout-return
+  DRAFT_EXCHANGE --> PAID: POST /:id/checkout-return
+  PAID --> [*]
+```
+
+- Type = `RETURN` or `EXCHANGE` set at draft creation, immutable.
+- `originalInvoiceId` required for `mode=regular` RETURN and all EXCHANGE; null for `mode=quick` RETURN.
+- On checkout-return transition (DRAFT → PAID):
+  - validate `refundMethod × netAmount` matrix (see [docs/plan-return-exchange.md](./plan-return-exchange.md))
+  - atomic `UPDATE invoice_items SET returned_quantity += :delta WHERE returned_quantity + :delta <= quantity` on each referenced original SALE line; concurrent partial returns racing the same line → second throws `ConflictException` (409)
+  - publish 4–6 async fan-out events depending on refundMethod and netAmount sign
+- Reversing / cancelling a posted RETURN or EXCHANGE is **out of scope v1**. To correct a posted return, post a new offsetting transaction (reversal-only policy).
+- COGS reversal in the journal entry is **out of scope v1** (SALE flow does not post COGS).

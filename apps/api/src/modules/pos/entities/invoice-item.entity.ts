@@ -1,10 +1,16 @@
-import { Entity, Column, Index } from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
+
+export enum ItemDirection {
+  OUT = 'OUT',
+  IN  = 'IN',
+}
 
 /** Single line item on a POS invoice. Snapshot columns preserve pricing at the time of sale. */
 @Entity('invoice_items')
 @Index(['invoiceId'])
 @Index(['itemId'])
+@Index('IDX_invoice_items_original_item', ['originalInvoiceItemId'])
 export class InvoiceItemEntity extends BaseEntity {
   @Column({ name: 'invoice_id', type: 'uuid', comment: 'Parent invoice this line belongs to' })
   invoiceId: string;
@@ -41,6 +47,19 @@ export class InvoiceItemEntity extends BaseEntity {
 
   @Column({ name: 'line_total', type: 'numeric', precision: 18, scale: 2, comment: 'Final line amount (quantity × unitPrice − lineDiscount)' })
   lineTotal: number;
+
+  @Column({ type: 'enum', enum: ItemDirection, default: ItemDirection.OUT, comment: 'OUT = outflow (SALE / EXCHANGE new), IN = inflow (RETURN / EXCHANGE return)' })
+  direction: ItemDirection;
+
+  @Column({ name: 'returned_quantity', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Accumulator on the original SALE line: total qty already returned via RETURN/EXCHANGE' })
+  returnedQuantity: number;
+
+  @Column({ name: 'original_invoice_item_id', type: 'uuid', nullable: true, comment: 'For RETURN/EXCHANGE IN lines: FK to the original SALE invoice_item' })
+  originalInvoiceItemId?: string;
+
+  @ManyToOne(() => InvoiceItemEntity, { nullable: true })
+  @JoinColumn({ name: 'original_invoice_item_id' })
+  originalInvoiceItem?: InvoiceItemEntity;
 
   @Column({ type: 'text', nullable: true, comment: 'Free-text note for this line item' })
   note?: string;

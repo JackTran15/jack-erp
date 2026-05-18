@@ -12,6 +12,29 @@ export enum PaymentMethod {
   OTHER = 'OTHER',
 }
 
+export enum InvoiceType {
+  SALE = 'SALE',
+  RETURN = 'RETURN',
+  EXCHANGE = 'EXCHANGE',
+}
+
+export enum RefundMethod {
+  CASH = 'CASH',
+  STORE_CREDIT = 'STORE_CREDIT',
+  OFFSET = 'OFFSET',
+}
+
+export enum ItemDirection {
+  OUT = 'OUT',
+  IN = 'IN',
+}
+
+export enum CustomerCreditStatus {
+  OPEN = 'OPEN',
+  CONSUMED = 'CONSUMED',
+  EXPIRED = 'EXPIRED',
+}
+
 export interface PosSession {
   id: string;
   organizationId: string;
