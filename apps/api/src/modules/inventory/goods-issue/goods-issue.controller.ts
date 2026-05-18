@@ -15,7 +15,7 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
-import { GoodsIssueStatus } from '@erp/shared-interfaces';
+import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
 import {
   IsString,
   IsUUID,
@@ -37,6 +37,13 @@ class GoodsIssueLineDto {
   @Min(0.01)
   quantity: number;
 
+  /** Per-line unit price (e.g. selling price for SALE, cost for DISPOSAL).
+   *  Optional — 0 is acceptable for purely qty-based movements. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+
   @IsOptional()
   @IsString()
   notes?: string;
@@ -46,8 +53,25 @@ class CreateGoodsIssueDto {
   @IsUUID()
   locationId: string;
 
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  @IsOptional()
+  @IsEnum(GoodsIssuePurpose)
+  purpose?: GoodsIssuePurpose;
+
+  @IsOptional()
+  @IsUUID()
+  reasonId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  targetBranchId?: string;
+
+  @IsOptional()
   @IsString()
-  reason: string;
+  reason?: string;
 
   @IsOptional()
   @IsString()

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 
 export type PosCatalogLineDto = {
   itemId: string;
@@ -10,7 +11,7 @@ export type PosCatalogLineDto = {
   sellingPrice: number;
   /** Tổng tồn tại chi nhánh (cộng mọi vị trí lưu). */
   quantityOnHand: number;
-  locations: { locationId: string; quantity: number }[];
+  locations: { locationId: string; name: string; quantity: number }[];
   /** Vị trí ưu tiên trừ khi bán (kho còn nhiều nhất). */
   defaultLocationId: string;
 };
@@ -23,6 +24,7 @@ export class PosCatalogService {
     branchId: string,
     actor: ActorContext,
     search?: string,
+    direction?: PosCatalogDirection,
   ): Promise<PosCatalogLineDto[]> {
     const orgId = actor.organizationId;
     const raw = search?.trim() ?? '';
@@ -39,15 +41,23 @@ export class PosCatalogService {
     const rows: Array<{
       itemId: string;
       locationId: string;
+      locationName: string | null;
       quantity: string;
+      isShowroom: boolean;
       code: string;
       name: string;
       unit: string;
       sellingPrice: string;
     }> = await this.dataSource.query(
-      `SELECT sb.item_id AS "itemId",
-              sb.location_id AS "locationId",
+      `SELECT sb.item_id        AS "itemId",
+              sb.location_id    AS "locationId",
               sb.quantity::text AS "quantity",
+              l.name            AS "locationName",
+              EXISTS (
+                SELECT 1 FROM showrooms sr
+                WHERE sr.storage_id = l.storage_id
+                  AND sr.organization_id = sb.organization_id
+              ) AS "isShowroom",
               i.code,
               i.name,
               i.unit,
@@ -55,6 +65,8 @@ export class PosCatalogService {
        FROM stock_balances sb
        INNER JOIN items i
          ON i.id = sb.item_id AND i.organization_id = sb.organization_id
+       LEFT JOIN locations l
+         ON l.id = sb.location_id
        WHERE sb.organization_id = $1
          AND sb.branch_id = $2
          AND i.is_active = true
@@ -63,6 +75,14 @@ export class PosCatalogService {
        ORDER BY i.name ASC, sb.location_id ASC`,
       params,
     );
+
+    const filteredRows = direction
+      ? rows.filter((r) =>
+          direction === PosCatalogDirection.SHOWROOM
+            ? r.isShowroom === true
+            : r.isShowroom === false,
+        )
+      : rows;
 
     const byItem = new Map<
       string,
@@ -73,11 +93,11 @@ export class PosCatalogService {
         unit: string;
         sellingPrice: number;
         quantityOnHand: number;
-        locations: { locationId: string; quantity: number }[];
+        locations: { locationId: string; name: string; quantity: number }[];
       }
     >();
 
-    for (const r of rows) {
+    for (const r of filteredRows) {
       const qty = Number(r.quantity);
       if (!byItem.has(r.itemId)) {
         byItem.set(r.itemId, {
@@ -92,7 +112,11 @@ export class PosCatalogService {
       }
       const a = byItem.get(r.itemId)!;
       a.quantityOnHand += qty;
-      a.locations.push({ locationId: r.locationId, quantity: qty });
+      a.locations.push({
+        locationId: r.locationId,
+        name: r.locationName ?? '',
+        quantity: qty,
+      });
     }
 
     const result: PosCatalogLineDto[] = [];

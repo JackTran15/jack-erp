@@ -9,6 +9,7 @@ export const ERP_TOPICS = {
   LOYALTY_POINTS_AWARD: 'erp.loyalty.points.award',
   CASH_MOVEMENT_FROM_PAYMENT: 'erp.cash.movement.from.payment',
   CUSTOMER_MERGED: 'erp.customer.merged',
+  TEMP_WAREHOUSE_TRANSFER_REQUESTED: 'erp.temp-warehouse.transfer-requested',
 } as const;
 
 export type ErpTopic = (typeof ERP_TOPICS)[keyof typeof ERP_TOPICS];

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import {
   Dialog,
   DialogContent,
@@ -326,14 +327,47 @@ function AppModal({
     />
   );
 
+
+  const overlay =
+    open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-40 bg-black/40"
+          />,
+          document.body,
+        )
+      : null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      {overlay}
       <DialogContent
         ref={contentRef}
         showCloseButton={false}
         freePosition
         className={cn("gap-0 p-0 [contain:layout_paint]", className)}
         style={frameStyle}
+        onPointerDownOutside={(event) => {
+          const target = event.target as Element | null;
+          if (
+            target &&
+            (target.closest("[data-lookup-popover]") ||
+              target.closest('[role="dialog"]'))
+          ) {
+            event.preventDefault();
+          }
+        }}
+        onInteractOutside={(event) => {
+          const target = event.target as Element | null;
+          if (
+            target &&
+            (target.closest("[data-lookup-popover]") ||
+              target.closest('[role="dialog"]'))
+          ) {
+            event.preventDefault();
+          }
+        }}
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
           {!maximized ? (

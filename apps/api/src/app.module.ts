@@ -21,11 +21,16 @@ import { AccountingModule } from './modules/accounting/accounting.module';
 import { StockLedgerModule } from './modules/inventory/ledger/stock-ledger.module';
 import { StockTransferModule } from './modules/inventory/transfer/stock-transfer.module';
 import { StockAdjustmentModule } from './modules/inventory/adjustment/stock-adjustment.module';
+import { TempWarehouseModule } from './modules/inventory/temp-warehouse/temp-warehouse.module';
 import { InventoryCsvModule } from './modules/inventory/csv/inventory-csv.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
+import { IssueReasonModule } from './modules/inventory/issue-reason/issue-reason.module';
+import { GoodsReceiptModule } from './modules/inventory/goods-receipt/goods-receipt.module';
+import { StockTakeModule } from './modules/inventory/stock-take/stock-take.module';
+import { TransferOrderModule } from './modules/inventory/transfer-order/transfer-order.module';
 import { ProductModule } from './modules/inventory/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 
@@ -33,9 +38,14 @@ import { PromotionModule } from './modules/promotion/promotion.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // Resolve from this package root so `pnpm dev:api` from monorepo root still loads apps/api/.env
+      // Resolve from this package root so `pnpm dev:api` from monorepo root still loads apps/api/.env.
+      // NestJS ConfigModule honours the FIRST file that defines a given key, so order matters:
+      //   1. apps/api/.env            — per-package override (legacy, optional)
+      //   2. <monorepo-root>/.env     — where credentials actually live now
+      //   3. apps/api/.env.example    — last-resort placeholder defaults
       envFilePath: [
         join(__dirname, '..', '.env'),
+        join(__dirname, '..', '..', '..', '.env'),
         join(__dirname, '..', '.env.example'),
       ],
     }),
@@ -73,11 +83,16 @@ import { PromotionModule } from './modules/promotion/promotion.module';
     StockLedgerModule,
     StockTransferModule,
     StockAdjustmentModule,
+    TempWarehouseModule,
     InventoryCsvModule,
     PosModule,
     ReportingModule,
     PurchaseOrderModule,
     GoodsIssueModule,
+    IssueReasonModule,
+    GoodsReceiptModule,
+    StockTakeModule,
+    TransferOrderModule,
     ProductModule,
     PromotionModule,
   ],

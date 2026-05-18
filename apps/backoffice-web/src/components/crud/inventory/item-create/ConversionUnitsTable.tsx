@@ -1,34 +1,37 @@
-import { useState } from "react";
-import { Button, Input } from "@erp/ui";
+import { Button, Input, MoneyInput } from "@erp/ui";
 import { Plus, Trash2 } from "lucide-react";
 
-/** Placeholder table for conversion units (when backend supports it). */
-export function ConversionUnitsTable() {
-  const [rows, setRows] = useState<
-    Array<{
-      id: string;
-      unitName: string;
-      ratio: string;
-      description: string;
-      buyPrice: string;
-      sellPrice: string;
-      defaultSell: boolean;
-      defaultBuy: boolean;
-    }>
-  >([
-    {
-      id: "row-1",
-      unitName: "",
-      ratio: "0",
-      description: "",
-      buyPrice: "0",
-      sellPrice: "0",
-      defaultSell: false,
-      defaultBuy: false,
-    },
-  ]);
+export interface ConversionUnitRow {
+  id: string;
+  unitName: string;
+  ratio: string;
+  description: string;
+  buyPrice: string;
+  sellPrice: string;
+  defaultSell: boolean;
+  defaultBuy: boolean;
+}
 
-  const updateRow = (id: string, patch: Partial<(typeof rows)[number]>) => {
+interface Props {
+  rows: ConversionUnitRow[];
+  setRows: React.Dispatch<React.SetStateAction<ConversionUnitRow[]>>;
+}
+
+export function createBlankConversionUnitRow(): ConversionUnitRow {
+  return {
+    id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    unitName: "",
+    ratio: "0",
+    description: "",
+    buyPrice: "0",
+    sellPrice: "0",
+    defaultSell: false,
+    defaultBuy: false,
+  };
+}
+
+export function ConversionUnitsTable({ rows, setRows }: Props) {
+  const updateRow = (id: string, patch: Partial<ConversionUnitRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
@@ -37,19 +40,7 @@ export function ConversionUnitsTable() {
   };
 
   const addRow = () => {
-    setRows((prev) => [
-      ...prev,
-      {
-        id: `row-${Date.now()}`,
-        unitName: "",
-        ratio: "0",
-        description: "",
-        buyPrice: "0",
-        sellPrice: "0",
-        defaultSell: false,
-        defaultBuy: false,
-      },
-    ]);
+    setRows((prev) => [...prev, createBlankConversionUnitRow()]);
   };
 
   return (
@@ -93,21 +84,21 @@ export function ConversionUnitsTable() {
                   />
                 </td>
                 <td className="px-2 py-1.5">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
+                  <MoneyInput
                     className="text-right"
-                    value={row.buyPrice}
-                    onChange={(e) => updateRow(row.id, { buyPrice: e.target.value })}
+                    value={row.buyPrice === "" ? "" : Number(row.buyPrice)}
+                    onChange={(v) =>
+                      updateRow(row.id, { buyPrice: v === "" ? "" : String(v) })
+                    }
                   />
                 </td>
                 <td className="px-2 py-1.5">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
+                  <MoneyInput
                     className="text-right"
-                    value={row.sellPrice}
-                    onChange={(e) => updateRow(row.id, { sellPrice: e.target.value })}
+                    value={row.sellPrice === "" ? "" : Number(row.sellPrice)}
+                    onChange={(v) =>
+                      updateRow(row.id, { sellPrice: v === "" ? "" : String(v) })
+                    }
                   />
                 </td>
                 <td className="px-2 py-1.5 text-center">

@@ -1,18 +1,15 @@
+import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { RequirePosAuth } from "./components/RequirePosAuth";
-import { PosShellLayout } from "./components/PosShellLayout";
-import { RequirePosBranch } from "./components/RequirePosBranch";
+import { Toaster } from "sonner";
+import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
+import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
+import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
-import { CheckoutPageV2 } from "./features/checkout/pages/CheckoutPageV2";
-import { FastStockTransferPage } from "./features/fast-stock-transfer/pages/FastStockTransferPage";
-import { ReturnGoodsPage } from "./features/return-goods/pages/ReturnGoodsPage";
-import { SessionPage } from "./pages/SessionPage";
-import { ReturnsPage } from "./pages/ReturnsPage";
-import { ExchangePage } from "./pages/ExchangePage";
+import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
-import { AppPosLayout } from "./components/layout/AppPosLayout/AppPosLayout";
+import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,29 +24,40 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <Routes>
-          <Route path="/dang-nhap" element={<PosLoginPage />} />
-          <Route element={<RequirePosAuth />}>
-            <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
-            <Route element={<RequirePosBranch />}>
-            
-              <Route element={<AppPosLayout />}>
-                <Route path="/" element={<CheckoutPageV2 />} />
-                <Route path="/fast-stock-transfer" element={<FastStockTransferPage />} />
-                <Route path="/return-goods" element={<ReturnGoodsPage />} />
-              </Route>
-
-              <Route  element={<PosShellLayout />}>
-                <Route path="/session" element={<SessionPage />} />
-                <Route path="/returns" element={<ReturnsPage />} />
-                <Route path="/exchange" element={<ExchangePage />} />
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        expand={false}
+        visibleToasts={1}
+        gap={16}
+        style={{ zIndex: 11000 }}
+      />
+      <HotkeysProvider
+        defaultOptions={{
+          hotkey: { preventDefault: true, ignoreInputs: false },
+        }}
+      >
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <Routes>
+            <Route path="/dang-nhap" element={<PosLoginPage />} />
+            <Route element={<PosRequireAuth />}>
+              <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
+              <Route element={<PosRequireBranch />}>
+                <Route element={<PosLayout />}>
+                  <Route path="/" element={<CheckoutPage />} />
+                  <Route
+                    path="/fast-stock-transfer"
+                    element={<FastStockTransferPage />}
+                  />
+                  <Route path="/return-goods" element={<ReturnGoodsPage />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </HotkeysProvider>
     </QueryClientProvider>
   );
 }

@@ -6,7 +6,9 @@ import { StockStateFilter, LocationType } from '@erp/shared-interfaces';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import { ProductStorageLocationService } from '../product/product-storage-location.service';
 import { ItemBarcodeEntity } from './item-barcode.entity';
+import { ItemEntity } from './item.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
@@ -89,6 +91,8 @@ describe('InventoryLocationStockService', () => {
   let thresholdRepo: { find: jest.Mock };
   let barcodeRepo: { find: jest.Mock };
   let itemProviderRepo: { find: jest.Mock };
+  let itemRepo: { findOne: jest.Mock };
+  let pslService: { validateAndAssignByLocation: jest.Mock };
 
   function setup(opts: {
     location?: typeof locationEntity | null;
@@ -129,6 +133,10 @@ describe('InventoryLocationStockService', () => {
     thresholdRepo = { find: jest.fn().mockResolvedValue([]) };
     barcodeRepo = { find: jest.fn().mockResolvedValue([]) };
     itemProviderRepo = { find: jest.fn().mockResolvedValue([]) };
+    itemRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    pslService = {
+      validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -149,6 +157,14 @@ describe('InventoryLocationStockService', () => {
         {
           provide: getRepositoryToken(ItemProviderEntity),
           useValue: itemProviderRepo,
+        },
+        {
+          provide: getRepositoryToken(ItemEntity),
+          useValue: itemRepo,
+        },
+        {
+          provide: ProductStorageLocationService,
+          useValue: pslService,
         },
       ],
     }).compile();

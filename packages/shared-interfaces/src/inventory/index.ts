@@ -1,39 +1,92 @@
 export enum StockMovementType {
-  SALE_ISSUE = 'SALE_ISSUE',
-  RETURN_IN = 'RETURN_IN',
-  EXCHANGE_IN = 'EXCHANGE_IN',
-  EXCHANGE_OUT = 'EXCHANGE_OUT',
-  TRANSFER_IN = 'TRANSFER_IN',
-  TRANSFER_OUT = 'TRANSFER_OUT',
-  ADJUSTMENT_INCREASE = 'ADJUSTMENT_INCREASE',
-  ADJUSTMENT_DECREASE = 'ADJUSTMENT_DECREASE',
-  PURCHASE_RECEIPT = 'PURCHASE_RECEIPT',
-  GOODS_ISSUE = 'GOODS_ISSUE',
+  SALE_ISSUE = "SALE_ISSUE",
+  RETURN_IN = "RETURN_IN",
+  EXCHANGE_IN = "EXCHANGE_IN",
+  EXCHANGE_OUT = "EXCHANGE_OUT",
+  TRANSFER_IN = "TRANSFER_IN",
+  TRANSFER_OUT = "TRANSFER_OUT",
+  ADJUSTMENT_INCREASE = "ADJUSTMENT_INCREASE",
+  ADJUSTMENT_DECREASE = "ADJUSTMENT_DECREASE",
+  PURCHASE_RECEIPT = "PURCHASE_RECEIPT",
+  GOODS_ISSUE = "GOODS_ISSUE",
 }
 
 export enum TransferStatus {
-  DRAFT = 'DRAFT',
-  APPROVED = 'APPROVED',
-  POSTED = 'POSTED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  APPROVED = "APPROVED",
+  POSTED = "POSTED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum PurchaseOrderStatus {
-  DRAFT = 'DRAFT',
-  APPROVED = 'APPROVED',
-  RECEIVING = 'RECEIVING',
-  RECEIVED = 'RECEIVED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  APPROVED = "APPROVED",
+  RECEIVING = "RECEIVING",
+  RECEIVED = "RECEIVED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum GoodsIssueStatus {
-  DRAFT = 'DRAFT',
-  APPROVED = 'APPROVED',
-  POSTED = 'POSTED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  APPROVED = "APPROVED",
+  POSTED = "POSTED",
+  CANCELLED = "CANCELLED",
 }
 
-export type { Product } from './product';
+export enum GoodsIssuePurpose {
+  OTHER = "OTHER",
+  SALE = "SALE",
+  TRANSFER_OUT = "TRANSFER_OUT",
+  DISPOSAL = "DISPOSAL",
+}
+
+export enum IssueReasonPurpose {
+  OTHER = "OTHER",
+  DISPOSAL = "DISPOSAL",
+}
+
+export enum StockTakeStatus {
+  DRAFT = "DRAFT",
+  POSTED = "POSTED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum TransferOrderStatus {
+  DRAFT = "DRAFT",
+  APPROVED = "APPROVED",
+  EXECUTED = "EXECUTED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum GoodsReceiptStatus {
+  DRAFT = "DRAFT",
+  POSTED = "POSTED",
+  CANCELLED = "CANCELLED",
+  REVERSED = "REVERSED",
+}
+
+export enum GoodsReceiptPurpose {
+  OTHER = "OTHER",
+  TRANSFER_IN = "TRANSFER_IN",
+}
+
+export enum GoodsReceiptReferenceType {
+  PURCHASE_ORDER = "PURCHASE_ORDER",
+  STOCK_TRANSFER = "STOCK_TRANSFER",
+}
+
+export type { Product } from "./product";
+
+export { StockStateFilter } from "./stock-by-location";
+export type {
+  StockByLocationProvider,
+  StockByLocationItem,
+  StockByLocationStorageRef,
+  StockByLocationBranchRef,
+  StockByLocationLocationRef,
+  StockByLocationMeta,
+  StockByLocationResponse,
+} from "./stock-by-location";
 
 export {
   StockStateFilter,
@@ -49,21 +102,55 @@ export type {
 } from './stock-by-location';
 
 export enum ImportJobStatus {
-  PENDING = 'PENDING',
-  VALIDATING = 'VALIDATING',
-  VALIDATED = 'VALIDATED',
-  IMPORTING = 'IMPORTING',
-  COMMITTING = 'COMMITTING',
-  COMMITTED = 'COMMITTED',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
+  PENDING = "PENDING",
+  VALIDATING = "VALIDATING",
+  VALIDATED = "VALIDATED",
+  IMPORTING = "IMPORTING",
+  COMMITTING = "COMMITTING",
+  COMMITTED = "COMMITTED",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
 }
 
 export enum LocationType {
-  SHELF = 'SHELF',
-  RACK = 'RACK',
-  BIN = 'BIN',
-  ZONE = 'ZONE',
+  SHELF = "SHELF",
+  RACK = "RACK",
+  BIN = "BIN",
+  ZONE = "ZONE",
+}
+
+export * from "./temp-warehouse";
+
+import { TempWarehouseDirection } from "./temp-warehouse";
+
+export enum TempWarehouseTransferKind {
+  FULL = "FULL",
+  PARTIAL = "PARTIAL",
+}
+
+export interface TempWarehouseTransferRequestedPayload {
+  sessionId: string;
+  organizationId: string;
+  branchId: string;
+  direction: TempWarehouseDirection;
+  sourceLocationId: string;
+  destinationLocationId: string;
+  sourceBranchId: string;
+  destinationBranchId: string;
+  lines: { tempWarehouseLineId: string; itemId: string; quantity: number }[];
+  actor: {
+    userId: string;
+    organizationId: string;
+    branchId?: string;
+    roles: string[];
+  };
+  requestedAt: string;
+  /**
+   * Undefined or FULL = published by closeSession(CREATE_TRANSFERS) — consumer updates session-level transferW2sId/S2WId.
+   * PARTIAL = published by transferLines — consumer flips the listed lines to TRANSFERRED and stores transferId per line; session-level fields untouched.
+   */
+  kind?: TempWarehouseTransferKind;
+  notes?: string;
 }
 
 export interface Provider {
@@ -249,7 +336,7 @@ export interface ImportJobRow {
   rowNumber: number;
   data: Record<string, unknown>;
   error?: string;
-  status: 'PENDING' | 'SUCCESS' | 'ERROR';
+  status: "PENDING" | "SUCCESS" | "ERROR";
 }
 
 export interface PurchaseOrderLine {

@@ -2,6 +2,8 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource, TypeOrmModule } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { BranchModule } from '../../branch/branch.module';
+import { StockLedgerModule } from '../ledger/stock-ledger.module';
+import { ProductModule } from '../product/product.module';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
@@ -9,6 +11,7 @@ import { ProviderEntity } from './provider.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
+import { ItemUnitEntity } from './item-unit.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
 import { LocationEntity } from './location.entity';
@@ -51,6 +54,7 @@ import {
       ItemProviderEntity,
       ItemBarcodeEntity,
       ItemStockThresholdEntity,
+      ItemUnitEntity,
       StorageEntity,
       ShowroomEntity,
       LocationEntity,
@@ -58,6 +62,8 @@ import {
       StockBalanceEntity,
     ]),
     BranchModule,
+    StockLedgerModule,
+    ProductModule,
   ],
   controllers: [InventoryLocationController, InventoryLocationStockController],
   providers: [

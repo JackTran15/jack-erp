@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AppModal,
   Button,
   DocumentFormDialog,
   DocumentListShell,
@@ -40,7 +39,18 @@ import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
-import { SearchListingInput } from "../../components/forms/SearchListingInput";
+import { LookupField } from "../../components/forms/LookupField";
+import {
+  QuickCreateItemDialog,
+  QuickCreateIssueReasonDialog,
+  QuickCreateLocationDialog,
+  QuickCreateProviderDialog,
+  type IssueReasonPurpose as ReasonBucket,
+  type QuickIssueReason,
+  type QuickItem,
+  type QuickLocation,
+  type QuickProvider,
+} from "../../components/forms/QuickCreateDialogs";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -49,21 +59,28 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import { MOCK_GOODS_ISSUES } from "./GoodsIssuePage.fixtures";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
+
+export type GoodsIssuePurposeUI =
+  | "OTHER"
+  | "SALE"
+  | "TRANSFER_OUT"
+  | "DISPOSAL";
 
 interface GoodsIssueLine {
   id: string;
   itemId: string;
-  quantity: number;
-  unitPrice?: number;
+  quantity: number | string;
+  unitPrice?: number | string;
+  lineTotal?: number | string;
   notes?: string;
   itemCode?: string;
   itemName?: string;
   warehouse?: string;
   position?: string;
   unit?: string;
+  item?: { id: string; code: string; name: string; unit?: string; purchasePrice?: number | string | null } | null;
 }
 
 interface GoodsIssue {
@@ -71,8 +88,16 @@ interface GoodsIssue {
   documentNumber?: string;
   customerId?: string;
   customerName?: string;
+  providerId?: string | null;
+  provider?: { id: string; code: string; name: string } | null;
   locationId: string;
+  location?: { id: string; code: string; name: string; storageId?: string } | null;
+  purpose?: GoodsIssuePurposeUI;
   reason?: string;
+  reasonId?: string;
+  reasonRef?: { id: string; code: string; name: string } | null;
+  targetBranchId?: string;
+  targetBranch?: { id: string; name: string } | null;
   status: GoodsIssueStatus;
   issueDate?: string;
   notes?: string;
@@ -110,6 +135,14 @@ interface InventoryItem {
   name: string;
   code: string;
   unit: string;
+  /** Default purchase price (from item master) — used to auto-fill Đơn giá. */
+  purchasePrice?: number | string | null;
+}
+
+interface InventoryStorage {
+  id: string;
+  name: string;
+  branchId: string;
 }
 
 const FILTER_KEYS = [
@@ -131,8 +164,40 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   }, {} as Record<FilterKey, ColumnFilter>);
 }
 
-function lineSubtotal(l: { quantity: number; unitPrice?: number }): number {
+function lineSubtotal(l: {
+  quantity: number | string;
+  unitPrice?: number | string;
+  lineTotal?: number | string;
+}): number {
+  if (l.lineTotal !== undefined && l.lineTotal !== null && l.lineTotal !== "")
+    return Number(l.lineTotal);
   return Number(l.quantity) * Number(l.unitPrice ?? 0);
+}
+
+const PURPOSE_LABELS: Record<GoodsIssuePurposeUI, string> = {
+  OTHER: "Xuất khác",
+  SALE: "Phiếu xuất kho bán hàng",
+  TRANSFER_OUT: "Điều chuyển đến cửa hàng khác",
+  DISPOSAL: "Hủy hàng",
+};
+
+const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
+  "OTHER",
+  "TRANSFER_OUT",
+  "DISPOSAL",
+];
+
+interface BranchOption {
+  id: string;
+  name: string;
+  address?: string | null;
+}
+
+interface IssueReasonOption {
+  id: string;
+  code: string;
+  name: string;
+  purpose: "OTHER" | "DISPOSAL";
 }
 
 function issueTotal(o: GoodsIssue): number {
@@ -142,6 +207,7 @@ function issueTotal(o: GoodsIssue): number {
 export function GoodsIssuePage() {
   const [records, setRecords] = useState<PaginatedResponse<GoodsIssue> | null>(null);
   const [customers, setCustomers] = useState<InventoryProvider[]>([]);
+  const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
@@ -168,25 +234,10 @@ export function GoodsIssuePage() {
       const { data } = await apiClient.get<PaginatedResponse<GoodsIssue>>(
         `/inventory/goods-issues?${params}`,
       );
-      // Replace with real data from API calls
-      if (data.data.length === 0) {
-        setRecords({
-          data: MOCK_GOODS_ISSUES as unknown as GoodsIssue[],
-          total: MOCK_GOODS_ISSUES.length,
-          page: 1,
-          pageSize: pagination.pageSize,
-        });
-      } else {
-        setRecords(data);
-      }
-    } catch {
-      // Replace with real data from API calls
-      setRecords({
-        data: MOCK_GOODS_ISSUES as unknown as GoodsIssue[],
-        total: MOCK_GOODS_ISSUES.length,
-        page: 1,
-        pageSize: pagination.pageSize,
-      });
+      setRecords(data);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
@@ -203,6 +254,17 @@ export function GoodsIssuePage() {
     }
   }, []);
 
+  const loadStorages = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+        "/inventory/storages?page=1&pageSize=200",
+      );
+      setStorages(data.data);
+    } catch {
+      // best-effort
+    }
+  }, []);
+
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
@@ -210,6 +272,10 @@ export function GoodsIssuePage() {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  useEffect(() => {
+    void loadStorages();
+  }, [loadStorages]);
 
   const customerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -220,6 +286,12 @@ export function GoodsIssuePage() {
     }
     return map;
   }, [customers, records]);
+
+  const storageNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of storages) map.set(s.id, s.name);
+    return map;
+  }, [storages]);
 
   const selectedIssue = useMemo(
     () => records?.data.find((o) => o.id === selectedId) ?? null,
@@ -321,9 +393,9 @@ export function GoodsIssuePage() {
       label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      disabled:
-        !selectedIssue ||
-        (selectedIssue.status !== "DRAFT" && selectedIssue.status !== "APPROVED"),
+      // Allow deleting any non-cancelled row. BE cancel() handles POSTED by
+      // reversing the stock movements before marking the doc cancelled.
+      disabled: !selectedIssue || selectedIssue.status === "CANCELLED",
       onClick: () => selectedIssue && setConfirmDelete(selectedIssue),
     },
     { id: "sep1", type: "separator" },
@@ -360,31 +432,38 @@ export function GoodsIssuePage() {
       key: "documentNumber",
       label: "Số phiếu xuất",
       width: 140,
-      render: (row) =>
-        row.documentNumber ? (
-          <button
-            type="button"
-            className="text-primary hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedId(row.id);
-              setEditingIssue(row);
-              setDialogMode("view");
-            }}
-          >
-            {row.documentNumber}
-          </button>
-        ) : (
-          <span className="text-muted-foreground italic">Chưa xuất kho</span>
-        ),
+      render: (row) => (
+        <button
+          type="button"
+          className="text-primary hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedId(row.id);
+            setEditingIssue(row);
+            setDialogMode("view");
+          }}
+          title={row.documentNumber ?? row.id}
+        >
+          {/* Pre-BE-change rows may still have null docNumber — show short id
+              so the cell stays clickable. New rows always carry the number. */}
+          {row.documentNumber ?? `#${row.id.slice(0, 8)}`}
+        </button>
+      ),
     },
     {
       key: "subject",
       label: "Đối tượng",
       width: 180,
-      render: (row) =>
-        row.customerName ??
-        (row.customerId ? customerNameById.get(row.customerId) ?? row.customerId : ""),
+      render: (row) => {
+        // Prefer the explicit provider pick stored on the row. Fall back to
+        // targetBranch for TRANSFER_OUT phiếu created before provider was
+        // added, and finally to the page-level provider name cache.
+        if (row.provider?.name) return row.provider.name;
+        if (row.providerId)
+          return customerNameById.get(row.providerId) ?? row.providerId;
+        if (row.purpose === "TRANSFER_OUT") return row.targetBranch?.name ?? "—";
+        return row.customerName ?? "—";
+      },
     },
     {
       key: "totalAmount",
@@ -409,7 +488,7 @@ export function GoodsIssuePage() {
       key: "documentType",
       label: "Loại chứng từ",
       width: 200,
-      render: (row) => row.documentType ?? "Phiếu xuất kho bán hàng",
+      render: (row) => PURPOSE_LABELS[row.purpose ?? "OTHER"],
     },
   ];
 
@@ -434,6 +513,19 @@ export function GoodsIssuePage() {
     () => (records?.data ?? []).reduce((s, r) => s + issueTotal(r), 0),
     [records],
   );
+
+  const nextDocumentNumber = useMemo(() => {
+    const rows = records?.data ?? [];
+    let max = 0;
+    for (const row of rows) {
+      const m = row.documentNumber?.match(/(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    return `GI${String(max + 1).padStart(6, "0")}`;
+  }, [records]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -467,7 +559,9 @@ export function GoodsIssuePage() {
             }
           />
         }
-        detailPanel={<DetailPanel issue={selectedIssue} />}
+        detailPanel={
+          <DetailPanel issue={selectedIssue} storageNameById={storageNameById} />
+        }
       >
         <BaseDataTable
           columns={columns}
@@ -498,6 +592,8 @@ export function GoodsIssuePage() {
           mode={dialogMode}
           initial={editingIssue}
           customers={customers}
+          storages={storages}
+          previewDocumentNumber={nextDocumentNumber}
           actionLoading={!!actionLoading}
           onClose={() => {
             setDialogMode(null);
@@ -543,7 +639,13 @@ export function GoodsIssuePage() {
 
 // ─── Detail panel (selected issue's lines) ───────────────────────────────────
 
-function DetailPanel({ issue }: { issue: GoodsIssue | null }) {
+function DetailPanel({
+  issue,
+  storageNameById,
+}: {
+  issue: GoodsIssue | null;
+  storageNameById: Map<string, string>;
+}) {
   return (
     <div className="px-4 py-3">
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
@@ -569,27 +671,33 @@ function DetailPanel({ issue }: { issue: GoodsIssue | null }) {
             </tr>
           </thead>
           <tbody>
-            {issue.lines.map((line) => (
-              <tr key={line.id} className="border-b">
-                <td className="border-r px-2 py-1 font-mono text-xs">
-                  {line.itemCode ?? line.itemId.slice(0, 8)}
-                </td>
-                <td className="border-r px-2 py-1">{line.itemName ?? "—"}</td>
-                <td className="border-r px-2 py-1">
-                  {line.warehouse ?? issue.locationId.slice(0, 8)}
-                </td>
-                <td className="border-r px-2 py-1">{line.position ?? "—"}</td>
-                <td className="border-r px-2 py-1">{line.unit ?? "Đôi"}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">{line.quantity}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">
-                  {formatMoneyInteger(line.unitPrice ?? 0)}
-                </td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">
-                  {formatMoneyInteger(lineSubtotal(line))}
-                </td>
-                <td className="px-2 py-1">{line.notes ?? ""}</td>
-              </tr>
-            ))}
+            {issue.lines.map((line) => {
+              const itemCode = line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
+              const itemName = line.item?.name ?? line.itemName ?? "—";
+              const unitLabel = line.item?.unit ?? line.unit ?? "—";
+              const storageId = issue.location?.storageId;
+              const storageName = storageId
+                ? storageNameById.get(storageId) ?? storageId.slice(0, 8)
+                : "—";
+              const binCode = issue.location?.code ?? "—";
+              return (
+                <tr key={line.id} className="border-b">
+                  <td className="border-r px-2 py-1 font-mono text-xs">{itemCode}</td>
+                  <td className="border-r px-2 py-1">{itemName}</td>
+                  <td className="border-r px-2 py-1">{storageName}</td>
+                  <td className="border-r px-2 py-1 font-mono text-xs">{binCode}</td>
+                  <td className="border-r px-2 py-1">{unitLabel}</td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">{Number(line.quantity)}</td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {formatMoneyInteger(Number(line.unitPrice ?? 0))}
+                  </td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {formatMoneyInteger(lineSubtotal(line))}
+                  </td>
+                  <td className="px-2 py-1">{line.notes ?? ""}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -603,6 +711,8 @@ interface FormLine {
   itemId: string;
   itemLabel: string;
   unit: string;
+  locationId: string;
+  locationLabel: string;
   quantity: number;
   unitPrice: number;
   notes: string;
@@ -612,6 +722,8 @@ const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
   unit: "",
+  locationId: "",
+  locationLabel: "",
   quantity: 1,
   unitPrice: 0,
   notes: "",
@@ -621,6 +733,8 @@ function GoodsIssueFormDialog({
   mode,
   initial,
   customers,
+  storages,
+  previewDocumentNumber,
   actionLoading,
   onClose,
   onSaved,
@@ -631,6 +745,8 @@ function GoodsIssueFormDialog({
   mode: "create" | "edit" | "view";
   initial: GoodsIssue | null;
   customers: InventoryProvider[];
+  storages: InventoryStorage[];
+  previewDocumentNumber?: string;
   actionLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
@@ -640,21 +756,64 @@ function GoodsIssueFormDialog({
 }) {
   const isView = mode === "view";
 
-  const initialCustomerLabel = useMemo(() => {
-    if (!initial) return "";
-    if (initial.customerName) return initial.customerName;
+  // Resolve the eager-loaded provider first, then fall back to a customer lookup
+  // for legacy rows that pre-date the provider column.
+  const initialCustomer = useMemo(() => {
+    if (!initial) return { id: "", code: "", name: "" };
+    if (initial.provider) {
+      return {
+        id: initial.provider.id,
+        code: initial.provider.code,
+        name: initial.provider.name,
+      };
+    }
+    if (initial.providerId) {
+      const c = customers.find((x) => x.id === initial.providerId);
+      return c
+        ? { id: c.id, code: c.code, name: c.name }
+        : { id: initial.providerId, code: "", name: "" };
+    }
+    if (initial.customerName) {
+      const c = customers.find((x) => x.id === initial.customerId);
+      return {
+        id: initial.customerId ?? "",
+        code: c?.code ?? "",
+        name: initial.customerName,
+      };
+    }
     const c = customers.find((x) => x.id === initial.customerId);
-    return c ? `${c.code} · ${c.name}` : initial.customerId ?? "";
+    return c
+      ? { id: c.id, code: c.code, name: c.name }
+      : { id: "", code: "", name: "" };
   }, [initial, customers]);
 
-  const [customerId, setCustomerId] = useState(initial?.customerId ?? "");
-  const [customerQuery, setCustomerQuery] = useState(initialCustomerLabel);
-  const [locationId, setLocationId] = useState(initial?.locationId ?? "");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [purpose, setPurpose] = useState<"OTHER" | "SALE">("OTHER");
-  const [reason, setReason] = useState(initial?.reason ?? "");
-  const [receiver, setReceiver] = useState("");
+  const [customerId, setCustomerId] = useState(initialCustomer.id);
+  const [customerCode, setCustomerCode] = useState(initialCustomer.code);
+  const [customerName, setCustomerName] = useState(initialCustomer.name);
+  // Storage derived from the saved location's parent. Cached storages let us
+  // resolve a name immediately on open; the picker will reset both if user
+  // changes warehouse later.
+  const initialStorageId = initial?.location?.storageId ?? "";
+  const initialStorageName =
+    initialStorageId
+      ? storages.find((s) => s.id === initialStorageId)?.name ?? ""
+      : "";
+  const [storageId, setStorageId] = useState(initialStorageId);
+  const [storageQuery, setStorageQuery] = useState(initialStorageName);
+  const [purpose, setPurpose] = useState<GoodsIssuePurposeUI>(
+    initial?.purpose && MANUAL_PURPOSES.includes(initial.purpose)
+      ? initial.purpose
+      : "OTHER",
+  );
+  const [reasonId, setReasonId] = useState(initial?.reasonId ?? "");
+  const [reasonLabel, setReasonLabel] = useState(
+    initial?.reasonId ? initial?.reason ?? "" : "",
+  );
+  const [targetBranchId, setTargetBranchId] = useState(initial?.targetBranchId ?? "");
+  const [targetBranchLabel, setTargetBranchLabel] = useState("");
+  const [deliveryPerson, setDeliveryPerson] = useState("");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const notesAutoFilledRef = useRef(false);
   const [docDate, setDocDate] = useState(
     initial?.issueDate ?? new Date().toISOString().slice(0, 10),
   );
@@ -666,8 +825,15 @@ function GoodsIssueFormDialog({
     initial
       ? initial.lines.map((l) => ({
           itemId: l.itemId,
-          itemLabel: l.itemCode ?? l.itemId.slice(0, 8),
-          unit: l.unit ?? "",
+          // Prefer the eager-loaded item code; fall back to the legacy
+          // flat itemCode field or a short id slice as last resort.
+          itemLabel: l.item?.code ?? l.itemCode ?? l.itemId.slice(0, 8),
+          unit: l.item?.unit ?? l.unit ?? "",
+          // Goods-issue lines all share the header bin — mirror it into each
+          // form row so the Vị trí column shows the actual bin instead of
+          // an empty placeholder.
+          locationId: initial.locationId,
+          locationLabel: initial.location?.code ?? "",
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice ?? 0),
           notes: l.notes ?? "",
@@ -676,39 +842,171 @@ function GoodsIssueFormDialog({
   );
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+  /** Line index that triggered the quick-create-location dialog, or null. */
+  const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
+  const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
+  const [quickReasonBucket, setQuickReasonBucket] = useState<ReasonBucket | null>(
+    null,
+  );
+  const [storageCache, setStorageCache] = useState<
+    Array<{ id: string; name: string; branchId: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<
+          PaginatedResponse<{ id: string; name: string; branchId: string }>
+        >("/inventory/storages?page=1&pageSize=200");
+        if (!cancelled) setStorageCache(data.data);
+      } catch {
+        // best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
 
-  const searchCustomers = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-      `/inventory/providers?${params}`,
-    );
-    return data.data;
-  }, []);
+  const handlePurposeChange = (next: GoodsIssuePurposeUI) => {
+    if (next === purpose) return;
+    setPurpose(next);
+    setReasonId("");
+    setReasonLabel("");
+    setTargetBranchId("");
+    setTargetBranchLabel("");
+    if (notesAutoFilledRef.current) {
+      setNotes("");
+      notesAutoFilledRef.current = false;
+    }
+    markDirty();
+  };
 
-  const searchLocations = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-      `/inventory/locations?${params}`,
-    );
-    return data.data;
-  }, []);
+  const searchCustomers = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 8;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
+        `/inventory/providers?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+    },
+    [],
+  );
 
-  const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8", search: query.trim() });
-    const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
-      `/inventory/items?${params}`,
-    );
-    return data.data;
-  }, []);
+  const searchStorages = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const q = query.trim().toLowerCase();
+      const filtered = q
+        ? storages.filter((s) => s.name.toLowerCase().includes(q))
+        : storages;
+      const effectivePageSize = pageSize ?? 8;
+      const start = (page - 1) * effectivePageSize;
+      const items = filtered.slice(start, start + effectivePageSize);
+      return {
+        items,
+        hasMore: start + effectivePageSize < filtered.length,
+        total: filtered.length,
+      };
+    },
+    [storages],
+  );
+
+  const searchLocationsForStorage = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      if (!storageId) return { items: [], hasMore: false, total: 0 };
+      const effectivePageSize = pageSize ?? 20;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+        storageId,
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+        `/inventory/locations?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+    },
+    [storageId],
+  );
+
+  const searchItems = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 10;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        search: query.trim(),
+      });
+      const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
+        `/inventory/items?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [],
+  );
+
+  const searchBranches = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 8;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data } = await apiClient.get<PaginatedResponse<BranchOption>>(
+        `/branches?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+    },
+    [],
+  );
+
+  const reasonBucket: ReasonBucket | null =
+    purpose === "OTHER" ? "OTHER" : purpose === "DISPOSAL" ? "DISPOSAL" : null;
+
+  const searchReasons = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      if (!reasonBucket) return { items: [], hasMore: false, total: 0 };
+      const effectivePageSize = pageSize ?? 20;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+        purpose: reasonBucket,
+        activeOnly: "true",
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data } = await apiClient.get<PaginatedResponse<IssueReasonOption>>(
+        `/inventory/issue-reasons?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+    },
+    [reasonBucket],
+  );
 
   const totalQty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
   const totalAmount = lines.reduce(
@@ -716,32 +1014,67 @@ function GoodsIssueFormDialog({
     0,
   );
 
-  const handleSave = useCallback(async () => {
-    if (!locationId || lines.some((l) => !l.itemId)) {
-      setError("Vui lòng chọn kho xuất và mặt hàng hợp lệ.");
-      return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    // Toasts (not modal) — same reason as goods-receipt: AppModal validation
+    // dialogs got stacked under the unsaved-changes confirm and disappeared.
+    if (!storageId) {
+      toast.error("Vui lòng chọn kho xuất.");
+      return false;
+    }
+    if (lines.some((l) => !l.itemId)) {
+      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
+      return false;
+    }
+    if ((purpose === "OTHER" || purpose === "DISPOSAL") && !reasonId) {
+      toast.error("Vui lòng chọn lý do xuất kho.");
+      return false;
+    }
+    if (purpose === "TRANSFER_OUT" && !targetBranchId) {
+      toast.error("Vui lòng chọn cửa hàng đích để điều chuyển.");
+      return false;
     }
     setSaving(true);
-    setError(null);
     try {
+      let headerLocationId = lines.find((l) => l.locationId)?.locationId ?? "";
+      if (!headerLocationId) {
+        const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+          `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
+        );
+        const first = data.data[0];
+        if (!first) {
+          toast.error("Kho đã chọn chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+          setSaving(false);
+          return false;
+        }
+        headerLocationId = first.id;
+      }
+
       await apiClient.post("/inventory/goods-issues", {
-        locationId,
-        reason: reason || (purpose === "SALE" ? "Bán hàng" : "Khác"),
+        locationId: headerLocationId,
+        providerId: customerId || undefined,
+        purpose,
+        reasonId:
+          purpose === "OTHER" || purpose === "DISPOSAL" ? reasonId : undefined,
+        targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
         notes: notes || undefined,
         lines: lines.map((l) => ({
           itemId: l.itemId,
           quantity: Number(l.quantity),
+          unitPrice: Number(l.unitPrice) || 0,
           notes: l.notes || undefined,
         })),
       });
       setDirty(false);
+      toast.success("Đã tạo phiếu xuất kho.");
       await onSaved();
+      return true;
     } catch (err) {
-      setError(getUserFacingApiErrorMessage(err));
+      toast.error(getUserFacingApiErrorMessage(err));
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [locationId, lines, reason, notes, purpose, onSaved]);
+  }, [storageId, customerId, lines, notes, purpose, reasonId, targetBranchId, onSaved]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -752,9 +1085,12 @@ function GoodsIssueFormDialog({
   };
 
   const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
+    // UnsavedChangesDialog closes itself via onOpenChange. We only decide
+    // whether to close the parent form: yes on a successful save/discard,
+    // no when save failed (validation toast already shown).
     if (choice === "save") {
-      await handleSave();
-      onClose();
+      const ok = await handleSave();
+      if (ok) onClose();
     } else if (choice === "discard") {
       onClose();
     }
@@ -764,23 +1100,6 @@ function GoodsIssueFormDialog({
     { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
     { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
     { id: "sep1", type: "separator" },
-    {
-      id: "new",
-      label: "Thêm mới",
-      icon: Plus,
-      onClick: () => {
-        setCustomerId("");
-        setCustomerQuery("");
-        setLocationId("");
-        setLocationQuery("");
-        setReason("");
-        setReceiver("");
-        setNotes("");
-        setLines([emptyLine()]);
-        setDirty(false);
-        setError(null);
-      },
-    },
     {
       id: "edit",
       label: "Sửa",
@@ -821,10 +1140,15 @@ function GoodsIssueFormDialog({
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 160,
+      width: 220,
       placeholder: "Tìm mã hoặc tên",
       renderEditor: (row, idx) => (
-        <SearchListingInput
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn hàng hóa"
+          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
           onValueChange={(val) => {
@@ -834,10 +1158,18 @@ function GoodsIssueFormDialog({
             markDirty();
           }}
           onSelect={(item) => {
+            const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
               prev.map((l, i) =>
                 i === idx
-                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  ? {
+                      ...l,
+                      itemId: item.id,
+                      itemLabel: item.code,
+                      unit: item.unit,
+                      // Auto-fill only if user hasn't already typed a price.
+                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                    }
                   : l,
               ),
             );
@@ -847,6 +1179,14 @@ function GoodsIssueFormDialog({
           itemKey={(item) => item.id}
           renderItem={(item) => item.name}
           renderMeta={(item) => `${item.code} · ${item.unit}`}
+          columns={[
+            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
+            { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
+            { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
+          ]}
+          disabled={isView}
+          onCreateNew={isView ? undefined : () => setQuickItemLineIdx(idx)}
+          className="h-full"
         />
       ),
     },
@@ -857,8 +1197,61 @@ function GoodsIssueFormDialog({
       type: "readonly",
       getValue: (row) => row.itemLabel,
     },
-    { key: "warehouse", label: "Kho", width: 140, type: "readonly", getValue: () => "" },
-    { key: "position", label: "Vị trí", width: 100, type: "readonly", getValue: () => "" },
+    {
+      key: "warehouse",
+      label: "Kho",
+      width: 140,
+      type: "readonly",
+      getValue: () => storageQuery,
+    },
+    {
+      key: "position",
+      label: "Vị trí",
+      width: 160,
+      placeholder: storageId ? "Chọn vị trí" : "Chọn kho trước",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn vị trí"
+          searchModalPlaceholder="Nhập mã hoặc tên vị trí"
+          dropdownMinWidth={360}
+          placeholder={storageId ? "Chọn vị trí" : "Chọn kho trước"}
+          value={row.locationLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, locationLabel: val, locationId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(loc) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, locationId: loc.id, locationLabel: loc.code }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchLocationsForStorage}
+          itemKey={(loc) => loc.id}
+          renderItem={(loc) => loc.name}
+          renderMeta={(loc) => loc.code}
+          columns={[
+            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
+            { key: "name", label: "Tên vị trí", render: (l) => l.name },
+          ]}
+          disabled={isView || !storageId}
+          onCreateNew={
+            isView || !storageId ? undefined : () => setQuickLocationLineIdx(idx)
+          }
+          className="h-full"
+        />
+      ),
+    },
     {
       key: "unit",
       label: "Đơn vị tính",
@@ -911,72 +1304,149 @@ function GoodsIssueFormDialog({
         }
         toolbarItems={dialogToolbar}
         purpose={
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
             <span className="text-muted-foreground">Mục đích xuất kho</span>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={purpose === "OTHER"}
-                onChange={() => {
-                  setPurpose("OTHER");
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-              Khác
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={purpose === "SALE"}
-                onChange={() => {
-                  setPurpose("SALE");
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-              Bán hàng
-            </label>
+            <select
+              className="h-9 min-w-[260px] rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+              value={purpose}
+              onChange={(e) =>
+                handlePurposeChange(e.target.value as GoodsIssuePurposeUI)
+              }
+              disabled={isView}
+            >
+              {MANUAL_PURPOSES.map((p) => (
+                <option key={p} value={p}>
+                  {PURPOSE_LABELS[p]}
+                </option>
+              ))}
+            </select>
+
+            {reasonBucket ? (
+              <div className="min-w-[320px] flex-1">
+                <LookupField
+                  enableSearchModal
+                  searchModalTitle="Chọn lý do xuất kho"
+                  searchModalPlaceholder="Nhập mã hoặc tên lý do"
+                  placeholder="Nhập để tìm kiếm"
+                  value={reasonLabel}
+                  onValueChange={(v) => {
+                    setReasonLabel(v);
+                    setReasonId("");
+                    markDirty();
+                  }}
+                  onSelect={(r) => {
+                    setReasonId(r.id);
+                    setReasonLabel(r.name);
+                    markDirty();
+                  }}
+                  search={searchReasons}
+                  itemKey={(r) => r.id}
+                  renderItem={(r) => r.name}
+                  renderMeta={(r) => r.code}
+                  columns={[
+                    { key: "name", label: "Lý do", render: (r) => r.name },
+                    {
+                      key: "code",
+                      label: "Mã",
+                      className: "w-[140px] font-mono text-xs",
+                      render: (r) => r.code,
+                    },
+                  ]}
+                  disabled={isView}
+                  onCreateNew={
+                    isView ? undefined : () => setQuickReasonBucket(reasonBucket)
+                  }
+                />
+              </div>
+            ) : null}
+
+            {purpose === "TRANSFER_OUT" ? (
+              <div className="min-w-[320px] flex-1">
+                <LookupField
+                  enableSearchModal
+                  searchModalTitle="Chọn cửa hàng đích"
+                  searchModalPlaceholder="Nhập tên cửa hàng"
+                  placeholder="Chọn cửa hàng đích"
+                  value={targetBranchLabel}
+                  onValueChange={(v) => {
+                    setTargetBranchLabel(v);
+                    setTargetBranchId("");
+                  }}
+                  onSelect={(b) => {
+                    setTargetBranchId(b.id);
+                    setTargetBranchLabel(b.name);
+                    const autoNotes = `Xuất kho hàng hóa điều chuyển đến cửa hàng ${b.name}`;
+                    setNotes(autoNotes);
+                    notesAutoFilledRef.current = true;
+                    markDirty();
+                  }}
+                  search={searchBranches}
+                  itemKey={(b) => b.id}
+                  renderItem={(b) => b.name}
+                  renderMeta={(b) => b.address ?? ""}
+                  columns={[
+                    { key: "name", label: "Tên cửa hàng", render: (b) => b.name },
+                    { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                  ]}
+                  disabled={isView}
+                />
+              </div>
+            ) : null}
           </div>
         }
         generalInfo={
           <>
             <FieldRow label="Đối tượng">
-              <SearchListingInput
-                placeholder="Tìm đối tượng"
-                value={customerQuery}
-                onValueChange={(v) => {
-                  setCustomerQuery(v);
-                  setCustomerId("");
-                  markDirty();
-                }}
-                onSelect={(c) => {
-                  setCustomerId(c.id);
-                  setCustomerQuery(`${c.code} · ${c.name}`);
-                  markDirty();
-                }}
-                search={searchCustomers}
-                itemKey={(c) => c.id}
-                renderItem={(c) => c.name}
-                renderMeta={(c) => c.code}
-                disabled={isView}
-              />
+              <div className="flex items-stretch gap-2">
+                <LookupField
+                  enableSearchModal
+                  searchModalTitle="Chọn đối tượng"
+                  searchModalPlaceholder="Nhập mã hoặc tên khách hàng"
+                  className="w-[180px]"
+                  dropdownMinWidth={500}
+                  value={customerCode}
+                  onValueChange={(v) => {
+                    setCustomerCode(v);
+                    setCustomerId("");
+                    setCustomerName("");
+                    markDirty();
+                  }}
+                  onSelect={(c) => {
+                    setCustomerId(c.id);
+                    setCustomerCode(c.code);
+                    setCustomerName(c.name);
+                    markDirty();
+                  }}
+                  search={searchCustomers}
+                  itemKey={(c) => c.id}
+                  renderItem={(c) => c.name}
+                  renderMeta={(c) => c.code}
+                  columns={[
+                    {
+                      key: "code",
+                      label: "Mã",
+                      className: "w-[160px] font-mono",
+                      render: (p) => p.code,
+                    },
+                    { key: "name", label: "Tên", render: (p) => p.name },
+                  ]}
+                  disabled={isView}
+                  onCreateNew={isView ? undefined : () => setQuickCustomerOpen(true)}
+                />
+                <Input
+                  className="flex-1"
+                  placeholder="Tên đối tượng"
+                  value={customerName}
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
             </FieldRow>
-            <FieldRow label="Người nhận">
+            <FieldRow label="Người giao">
               <Input
-                value={receiver}
+                value={deliveryPerson}
                 onChange={(e) => {
-                  setReceiver(e.target.value);
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-            </FieldRow>
-            <FieldRow label="Lý do">
-              <Input
-                value={reason}
-                onChange={(e) => {
-                  setReason(e.target.value);
+                  setDeliveryPerson(e.target.value);
                   markDirty();
                 }}
                 disabled={isView}
@@ -987,6 +1457,7 @@ function GoodsIssueFormDialog({
                 value={notes}
                 onChange={(e) => {
                   setNotes(e.target.value);
+                  notesAutoFilledRef.current = false;
                   markDirty();
                 }}
                 disabled={isView}
@@ -1005,7 +1476,15 @@ function GoodsIssueFormDialog({
         documentInfo={
           <>
             <FieldRow label="Số phiếu xuất">
-              <Input value={initial?.documentNumber ?? ""} readOnly />
+              <Input
+                value={initial?.documentNumber ?? previewDocumentNumber ?? ""}
+                readOnly
+                title={
+                  initial?.documentNumber
+                    ? undefined
+                    : "Số dự kiến — hệ thống sẽ chốt khi lưu"
+                }
+              />
             </FieldRow>
             <FieldRow label="Ngày xuất">
               <Input
@@ -1030,23 +1509,32 @@ function GoodsIssueFormDialog({
               />
             </FieldRow>
             <FieldRow label="Kho">
-              <SearchListingInput
+              <LookupField
+                enableSearchModal
+                searchModalTitle="Chọn kho"
+                searchModalPlaceholder="Nhập tên kho"
                 placeholder="Chọn kho"
-                value={locationQuery}
+                value={storageQuery}
                 onValueChange={(v) => {
-                  setLocationQuery(v);
-                  setLocationId("");
+                  setStorageQuery(v);
+                  setStorageId("");
                   markDirty();
                 }}
-                onSelect={(loc) => {
-                  setLocationId(loc.id);
-                  setLocationQuery(`${loc.code} · ${loc.name}`);
+                onSelect={(s) => {
+                  setStorageId(s.id);
+                  setStorageQuery(s.name);
+                  // Reset per-line bin selection — bins from a different
+                  // warehouse cannot move into the newly chosen warehouse.
+                  setLines((prev) =>
+                    prev.map((l) => ({ ...l, locationId: "", locationLabel: "" })),
+                  );
                   markDirty();
                 }}
-                search={searchLocations}
-                itemKey={(loc) => loc.id}
-                renderItem={(loc) => loc.name}
-                renderMeta={(loc) => loc.code}
+                search={searchStorages}
+                itemKey={(s) => s.id}
+                renderItem={(s) => s.name}
+                renderMeta={() => ""}
+                columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
                 disabled={isView}
               />
             </FieldRow>
@@ -1119,23 +1607,69 @@ function GoodsIssueFormDialog({
         }
       />
 
-      {error && (
-        <AppModal
-          open
-          onOpenChange={() => setError(null)}
-          title="Lỗi"
-          defaultWidth={420}
-          defaultHeight={220}
-        >
-          <p className="text-sm text-destructive">{error}</p>
-        </AppModal>
-      )}
-
       <UnsavedChangesDialog
         open={unsavedOpen}
         onOpenChange={setUnsavedOpen}
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
+      />
+
+      <QuickCreateProviderDialog
+        open={quickCustomerOpen}
+        onClose={() => setQuickCustomerOpen(false)}
+        onCreated={(p: QuickProvider) => {
+          setCustomerId(p.id);
+          setCustomerCode(p.code);
+          setCustomerName(p.name);
+          markDirty();
+        }}
+      />
+
+      <QuickCreateLocationDialog
+        open={quickLocationLineIdx !== null}
+        onClose={() => setQuickLocationLineIdx(null)}
+        onCreated={(loc: QuickLocation) => {
+          const idx = quickLocationLineIdx;
+          if (idx === null) return;
+          setLines((prev) =>
+            prev.map((l, i) =>
+              i === idx ? { ...l, locationId: loc.id, locationLabel: loc.code } : l,
+            ),
+          );
+          setQuickLocationLineIdx(null);
+          markDirty();
+        }}
+        storages={storageCache}
+      />
+
+      <QuickCreateItemDialog
+        open={quickItemLineIdx !== null}
+        onClose={() => setQuickItemLineIdx(null)}
+        onCreated={(item: QuickItem) => {
+          const idx = quickItemLineIdx;
+          if (idx === null) return;
+          setLines((prev) =>
+            prev.map((l, i) =>
+              i === idx
+                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                : l,
+            ),
+          );
+          setQuickItemLineIdx(null);
+          markDirty();
+        }}
+      />
+
+      <QuickCreateIssueReasonDialog
+        open={quickReasonBucket !== null}
+        purpose={quickReasonBucket ?? "OTHER"}
+        onClose={() => setQuickReasonBucket(null)}
+        onCreated={(r: QuickIssueReason) => {
+          setReasonId(r.id);
+          setReasonLabel(r.name);
+          setQuickReasonBucket(null);
+          markDirty();
+        }}
       />
     </>
   );

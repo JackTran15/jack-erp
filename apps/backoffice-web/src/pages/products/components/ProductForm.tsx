@@ -1,12 +1,24 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatClientError } from "@erp/api-client";
 import { Button, Input, Textarea } from "@erp/ui";
 import { productsApi, type Product } from "../../../api/products";
+import { apiClient } from "../../../lib/api-axios";
 
 interface ProductFormProps {
   product?: Product;
   onSaved: (product: Product) => void;
   onCancel?: () => void;
+}
+
+interface ProviderOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface ProviderListResponse {
+  data: ProviderOption[];
+  total: number;
 }
 
 export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
@@ -18,7 +30,25 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<ProviderListResponse>(
+          "/inventory/providers?page=1&pageSize=200&activeOnly=true",
+        );
+        if (!cancelled) setProviders(data.data);
+      } catch {
+        // best-effort; dropdown will fall back to manual entry
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isEdit = Boolean(product);
 
@@ -86,12 +116,23 @@ export function ProductForm({ product, onSaved, onCancel }: ProductFormProps) {
         <label htmlFor="pf-provider" className="text-sm font-medium">
           Nhà cung cấp mặc định
         </label>
-        <Input
+        <select
           id="pf-provider"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
           value={defaultProviderId}
           onChange={(e) => setDefaultProviderId(e.target.value)}
-          placeholder="ID nhà cung cấp (tuỳ chọn)"
-        />
+        >
+          <option value="">— Không chọn —</option>
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.code} — {p.name}
+            </option>
+          ))}
+          {defaultProviderId &&
+            !providers.some((p) => p.id === defaultProviderId) && (
+              <option value={defaultProviderId}>{defaultProviderId}</option>
+            )}
+        </select>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

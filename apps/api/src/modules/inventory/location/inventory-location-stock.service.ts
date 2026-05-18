@@ -23,6 +23,7 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import { ProductStorageLocationService } from '../product/product-storage-location.service';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemEntity } from './item.entity';
 import { ItemProviderEntity } from './item-provider.entity';
@@ -43,7 +44,84 @@ export class InventoryLocationStockService {
     private readonly barcodeRepo: Repository<ItemBarcodeEntity>,
     @InjectRepository(ItemProviderEntity)
     private readonly itemProviderRepo: Repository<ItemProviderEntity>,
+    @InjectRepository(ItemEntity)
+    private readonly itemRepo: Repository<ItemEntity>,
+    private readonly pslService: ProductStorageLocationService,
   ) {}
+
+  /**
+   * Bind an existing item to a location (intended placement).
+   * Creates a stock_balance row at quantity 0 if not already present so the
+   * item shows up in the location's stock list. Also assigns the product↔location
+   * PSL mapping via the shared service (validates one-location-per-product-per-storage).
+   *
+   * No stock movement is recorded — actual stock arrives via goods receipts.
+   */
+  async addItemToLocation(
+    locationId: string,
+    itemId: string,
+    actor: ActorContext,
+  ): Promise<{ ok: true }> {
+    const location = await this.resolveLocation(locationId, actor);
+
+    const item = await this.itemRepo.findOne({
+      where: { id: itemId, organizationId: actor.organizationId },
+    });
+    if (!item) {
+      throw new NotFoundException(`Hàng hóa ${itemId} không tồn tại`);
+    }
+
+    // Validate / auto-create product-storage-location binding (product-level).
+    await this.pslService.validateAndAssignByLocation(itemId, locationId, actor);
+
+    // Upsert stock_balance row so the item appears in the location's stock list.
+    const existing = await this.stockBalanceRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        itemId,
+        locationId,
+      },
+    });
+    if (!existing) {
+      await this.stockBalanceRepo.insert({
+        organizationId: actor.organizationId,
+        branchId: location.branch.id || actor.branchId,
+        itemId,
+        locationId,
+        quantity: 0,
+        createdBy: actor.userId,
+      });
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * Remove an item from a location. Only allowed when current balance is 0 to
+   * avoid orphan stock. (Caller may force-zero via stock adjustment first.)
+   */
+  async removeItemFromLocation(
+    locationId: string,
+    itemId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    await this.resolveLocation(locationId, actor);
+
+    const balance = await this.stockBalanceRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        itemId,
+        locationId,
+      },
+    });
+    if (!balance) return;
+    if (Number(balance.quantity) !== 0) {
+      throw new ForbiddenException(
+        'Không thể bỏ hàng hóa khi tồn kho khác 0. Hãy điều chỉnh tồn về 0 trước.',
+      );
+    }
+    await this.stockBalanceRepo.delete(balance.id);
+  }
 
   async getStockByLocation(
     locationId: string,

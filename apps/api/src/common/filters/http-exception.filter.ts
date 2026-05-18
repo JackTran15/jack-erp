@@ -48,10 +48,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
       };
     }
 
-    this.logger.error(
-      `[${requestId}] ${request.method} ${request.url} -> ${status}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    const logLine = `[${requestId}] ${request.method} ${request.url} -> ${status}`;
+
+    if (status >= 500) {
+      // Server-side bugs: keep the stack trace.
+      this.logger.error(
+        logLine,
+        exception instanceof Error ? exception.stack : undefined,
+      );
+    } else if (status === HttpStatus.NOT_FOUND) {
+      // 404s are expected churn (favicon probes, scanners, stale links).
+      // `verbose` is hidden at the default Nest log level, so set
+      // `LOG_LEVELS=verbose` to see them when triaging routing issues.
+      this.logger.verbose(logLine);
+    } else {
+      // Other 4xx (validation, auth, conflict, …): one-line warn, no stack.
+      this.logger.warn(logLine);
+    }
 
     response.status(status).json(body);
   }
