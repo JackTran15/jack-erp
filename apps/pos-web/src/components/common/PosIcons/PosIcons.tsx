@@ -503,6 +503,15 @@ export function TagIcon(props: IconProps) {
   );
 }
 
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14.5 4.5l5 5L8 21H3v-5L14.5 4.5z" />
+      <path d="M13 6l5 5" />
+    </svg>
+  );
+}
+
 export function ProhibitedGlyphIcon(props: IconProps) {
   return (
     <svg className="bg-white rounded-full text-red-500" {...base(props)}>
