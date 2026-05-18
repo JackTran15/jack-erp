@@ -1,3 +1,13 @@
+import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import {
+  posFormFieldClass,
+  posFormHeight,
+  posFormPadX,
+  posFormRadius,
+  posFormUnderlineShadow,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
+import { cn } from "@erp/ui";
 import {
   useCallback,
   useState,
@@ -7,14 +17,49 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { cn } from "@erp/ui";
 
-/** Same set as `PosNumberInput`: `boxed` | `underline` | `ghost`. */
+export type PosQuantityInputSize = PosFormSize;
 export type PosQuantityVariant = "boxed" | "underline" | "ghost";
 
+const quantityVariant: Record<
+  PosQuantityVariant,
+  (size: PosQuantityInputSize, showSteppers: boolean) => string
+> = {
+  boxed: (size, showSteppers) =>
+    cn(
+      "relative flex w-full min-w-0 items-stretch gap-0 border border-gray-200 bg-white text-sm transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20",
+      posFormHeight[size],
+      posFormRadius[size],
+      showSteppers && "pr-0.5",
+    ),
+  underline: (size) =>
+    cn(
+      "relative flex w-full min-w-0 items-center gap-0 border-b border-transparent bg-transparent text-sm transition-[box-shadow] duration-150 ease-out",
+      posFormHeight[size],
+      posFormUnderlineShadow(),
+    ),
+  ghost: () =>
+    "relative flex w-full min-w-0 items-center gap-0.5 bg-transparent text-sm",
+};
+
+const quantityInner = "flex min-w-0 flex-1 items-center gap-1";
+
+const quantityInput = cn(
+  posFormFieldClass,
+  "w-full text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+);
+
+const stepperBtnBase =
+  "flex w-5 shrink-0 items-center justify-center text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-35";
+
+const stepperBtnHeight: Record<PosQuantityInputSize, string> = {
+  sm: "h-3.5",
+  md: "h-4",
+  lg: "h-[18px]",
+  xl: "h-5",
+};
+
 export interface PosQuantityInputProps {
-  /** Shown in the field (may be negative for return-credit rows). */
   displayValue: number;
   onChangeRaw: (raw: string) => void;
   onBumpDown?: () => void;
@@ -23,16 +68,13 @@ export interface PosQuantityInputProps {
   bumpUpDisabled?: boolean;
   min?: number;
   max?: number;
-  /** e.g. product name for accessible stepper labels. */
   itemLabel?: string;
   ariaLabel?: string;
   disabled?: boolean;
-  /** Default `boxed`. */
   variant?: PosQuantityVariant;
+  size?: PosQuantityInputSize;
   className?: string;
-  /** Rendered before the numeric field (e.g. prefix icon). */
   leading?: ReactNode;
-  /** Rendered after the numeric field, before steppers when shown. */
   trailing?: ReactNode;
   /** Forward to the native `<input>` so callers can focus/select imperatively. */
   inputRef?: Ref<HTMLInputElement>;
@@ -40,13 +82,6 @@ export interface PosQuantityInputProps {
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 }
 
-const stepperBtn =
-  "flex h-3.5 w-5 shrink-0 items-center justify-center text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-35";
-
-/**
- * Quantity field with native numeric entry and optional stacked steppers.
- * Variants mirror `PosNumberInput` for layout consistency on invoice rows.
- */
 export function PosQuantityInput({
   displayValue,
   onChangeRaw,
@@ -60,14 +95,15 @@ export function PosQuantityInput({
   ariaLabel,
   disabled,
   variant = "boxed",
+  size = "md",
   className,
   leading,
   trailing,
   inputRef,
   onKeyDown,
 }: PosQuantityInputProps) {
+  const stepperBtn = cn(stepperBtnBase, stepperBtnHeight[size]);
   const showSteppers = Boolean(onBumpDown && onBumpUp);
-  const hasAffixes = leading != null || trailing != null;
   const [underlineReveal, setUnderlineReveal] = useState(false);
 
   const handleUnderlineBlurCapture = useCallback(
@@ -79,51 +115,8 @@ export function PosQuantityInput({
     [],
   );
 
-  const rootVariant = cn(
-    "flex w-full min-w-0 items-stretch gap-0 text-sm",
-    variant === "boxed" &&
-      (showSteppers
-        ? "rounded-md border border-gray-200 bg-white pr-0.5 transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"
-        : "rounded-md border border-gray-200 bg-white transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"),
-    variant === "underline" &&
-      cn(
-        "relative items-center border-b border-transparent bg-transparent shadow-[inset_0_-1px_0_0_#E2E8F0] transition-[box-shadow] duration-150 ease-out focus-within:shadow-[inset_0_-2px_0_0_#6366F1]",
-      ),
-    variant === "ghost" && "items-center gap-0.5 bg-transparent",
-  );
-
-  const innerVariant = cn(
-    "flex min-w-0 flex-1 items-center",
-    hasAffixes && "gap-1",
-    variant === "boxed" && "px-1",
-    variant === "underline" && cn("px-1", showSteppers && "pr-6"),
-    variant === "ghost" && "px-0",
-    variant === "boxed" && showSteppers && "border-r border-gray-100",
-    variant === "ghost" && "shadow-none focus-within:shadow-none",
-  );
-
-  const inputVariant = cn(
-    "min-w-0 w-full bg-transparent text-right text-sm text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-    variant === "boxed" && "h-7 py-0.5",
-    variant === "underline" && "h-8 py-0.5 text-[#0F172A]",
-    variant === "ghost" && "h-7 border-0 px-0 py-0.5",
-  );
-
   const underlineSteppersVisible =
     variant === "underline" && showSteppers && underlineReveal;
-
-  const stepperColumnVariant = cn(
-    "flex shrink-0 flex-col justify-center border-0",
-    variant === "boxed" && "py-0.5",
-    variant === "underline" &&
-      cn(
-        "absolute right-0 top-1/2 z-[1] -translate-y-1/2 py-0.5 transition-opacity duration-150",
-        underlineSteppersVisible
-          ? "opacity-100"
-          : "pointer-events-none opacity-0",
-      ),
-    variant === "ghost" && "py-0",
-  );
 
   const rootHandlers =
     variant === "underline" && showSteppers
@@ -139,33 +132,50 @@ export function PosQuantityInput({
       : undefined;
 
   return (
-    <div className={cn(rootVariant, className)} {...rootHandlers}>
-      <div className={innerVariant}>
+    <div
+      className={cn(quantityVariant[variant](size, showSteppers), className)}
+      {...rootHandlers}
+    >
+      <div
+        className={cn(
+          quantityInner,
+          variant === "boxed" && "border-r border-gray-100",
+          variant !== "ghost" && posFormPadX[size],
+          variant === "underline" && showSteppers && "pr-6",
+        )}
+      >
         {leading != null ? (
           <span className="flex shrink-0 items-center">{leading}</span>
         ) : null}
-        <div className="min-w-0 flex-1 px-0.5">
-          <input
-            ref={inputRef}
-            type="number"
-            inputMode="numeric"
-            disabled={disabled}
-            min={min}
-            max={max}
-            value={displayValue}
-            onChange={(e) => onChangeRaw(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={onKeyDown}
-            aria-label={ariaLabel}
-            className={inputVariant}
-          />
-        </div>
+        <input
+          type="number"
+          inputMode="numeric"
+          disabled={disabled}
+          min={min}
+          max={max}
+          value={displayValue}
+          onChange={(e) => onChangeRaw(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={ariaLabel}
+          className={quantityInput}
+        />
         {trailing != null ? (
           <span className="flex shrink-0 items-center">{trailing}</span>
         ) : null}
       </div>
       {showSteppers ? (
-        <div className={stepperColumnVariant}>
+        <div
+          className={cn(
+            "flex shrink-0 flex-col justify-center border-0",
+            variant === "boxed" && "py-0.5",
+            variant === "underline" &&
+              "absolute right-0 top-1/2 z-[1] -translate-y-1/2 py-0.5 transition-opacity duration-150",
+            variant === "underline" &&
+              (underlineSteppersVisible
+                ? "opacity-100"
+                : "pointer-events-none opacity-0"),
+          )}
+        >
           <button
             type="button"
             disabled={disabled || bumpUpDisabled}

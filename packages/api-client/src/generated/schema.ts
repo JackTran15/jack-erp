@@ -11,28 +11,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
+        /** Liveness probe */
+        get: operations["HealthController_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/db": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        /** Database connectivity check */
+        get: operations["HealthController_checkDb"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CrudController_listEntities"];
         put?: never;
         post?: never;
         delete?: never;
@@ -48,118 +61,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Entity metadata */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
+        get: operations["CrudController_getEntityConfig"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/entities/{entityKey}/records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    page?: number;
-                    pageSize?: number;
-                    sortBy?: string;
-                    sortOrder?: "asc" | "desc";
-                    search?: string;
-                    filters?: string;
-                };
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Paginated records */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Created */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -173,76 +77,5427 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        get: operations["CrudController_getRecord"];
+        put?: never;
+        post?: never;
+        delete: operations["CrudController_deleteRecord"];
+        options?: never;
+        head?: never;
+        patch: operations["CrudController_updateRecord"];
+        trace?: never;
+    };
+    "/admin/entities/{entityKey}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CrudController_listRecords"];
+        put?: never;
+        post: operations["CrudController_createRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AuthController_getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationController_list"];
+        put?: never;
+        post: operations["OrganizationController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/registration-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Must be before @Get(':id') so "registration-requests" is not parsed as a UUID. */
+        get: operations["OrganizationController_listOrgRegistrationRequests"];
+        put?: never;
+        post: operations["RegistrationController_submitOrgRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["OrganizationController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationController_update"];
+        trace?: never;
+    };
+    "/branches/registration-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Must be before @Get(':id') so "registration-requests" is not parsed as a UUID. */
+        get: operations["BranchController_listBranchRegistrationRequests"];
+        put?: never;
+        post: operations["RegistrationController_submitBranchRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/registration-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegistrationController_approveOrgRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/registration-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegistrationController_rejectOrgRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/registration-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegistrationController_approveBranchRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/registration-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegistrationController_rejectBranchRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CoaController_list"];
+        put?: never;
+        post: operations["CoaController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CoaController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CoaController_update"];
+        trace?: never;
+    };
+    "/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_list"];
+        put?: never;
+        post: operations["BranchController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/main": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_findMainBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/users/{userId}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_getUserBranches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["BranchController_update"];
+        trace?: never;
+    };
+    "/branches/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_suspend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/assign-user/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchController_assignUser"];
+        delete: operations["BranchController_unassignUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DocumentNumberingController_listRules"];
+        put?: never;
+        post: operations["DocumentNumberingController_createRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         get?: never;
         put?: never;
         post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Deleted */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Deleted */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        delete?: never;
         options?: never;
         head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Updated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
+        patch: operations["DocumentNumberingController_updateRule"];
+        trace?: never;
+    };
+    "/document-number-rules/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_activateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_deactivateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-numbers/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/salesmen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesHierarchyController_listSalesmen"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/salesmen/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesHierarchyController_assignSalesman"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/salesmen/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesHierarchyController_unassignSalesman"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/sales-managers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesHierarchyController_listSalesManagers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/sales-managers/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesHierarchyController_assignSalesManager"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branches/{id}/sales-managers/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesHierarchyController_unassignSalesManager"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dead-letter-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DeadLetterController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dead-letter-events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DeadLetterController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dead-letter-events/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DeadLetterController_replay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dead-letter-events/{id}/ignore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DeadLetterController_ignore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_list"];
+        put?: never;
+        post: operations["CustomerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_listGroups"];
+        put?: never;
+        post: operations["CustomerController_createGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getGroup"];
+        put?: never;
+        post?: never;
+        delete: operations["CustomerController_removeGroup"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomerController_updateGroup"];
+        trace?: never;
+    };
+    "/customers/membership-cards/{cardId}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getPointHistory"];
+        put?: never;
+        post: operations["CustomerController_adjustPoints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_findById"];
+        put?: never;
+        post?: never;
+        delete: operations["CustomerController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomerController_update"];
+        trace?: never;
+    };
+    "/customers/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerController_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/membership-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getCard"];
+        put?: never;
+        post: operations["CustomerController_issueCard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CustomerController_updateCard"];
+        trace?: never;
+    };
+    "/inventory/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listItems"];
+        put?: never;
+        post: operations["InventoryLocationController_createItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getItemById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_updateItem"];
+        trace?: never;
+    };
+    "/inventory/items/{id}/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listItemProviders"];
+        put?: never;
+        post: operations["InventoryLocationController_linkItemProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}/providers/{providerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["InventoryLocationController_unlinkItemProvider"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}/providers/{providerId}/set-primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_setItemProviderPrimary"];
+        trace?: never;
+    };
+    "/inventory/items/{id}/barcodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listItemBarcodes"];
+        put?: never;
+        post: operations["InventoryLocationController_createItemBarcode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}/barcodes/{barcodeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["InventoryLocationController_deleteItemBarcode"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/barcodes/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_lookupBarcode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listItemThresholds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/items/{id}/thresholds/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_setDefaultItemThreshold"];
+        trace?: never;
+    };
+    "/inventory/items/{id}/thresholds/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getItemThreshold"];
+        put?: never;
+        post?: never;
+        delete: operations["InventoryLocationController_deleteItemThreshold"];
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_upsertItemThreshold"];
+        trace?: never;
+    };
+    "/inventory/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listProviders"];
+        put?: never;
+        post: operations["InventoryLocationController_createProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getProviderById"];
+        put?: never;
+        post?: never;
+        delete: operations["InventoryLocationController_deleteProvider"];
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_updateProvider"];
+        trace?: never;
+    };
+    "/inventory/branch-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getBranchLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/storages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listStorages"];
+        put?: never;
+        post: operations["InventoryLocationController_createStorage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/storages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getStorageById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_updateStorage"];
+        trace?: never;
+    };
+    "/inventory/showrooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listShowrooms"];
+        put?: never;
+        post: operations["InventoryLocationController_createShowroom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/showrooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getShowroomById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_updateShowroom"];
+        trace?: never;
+    };
+    "/inventory/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listLocations"];
+        put?: never;
+        post: operations["InventoryLocationController_createLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_getLocationById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["InventoryLocationController_updateLocation"];
+        trace?: never;
+    };
+    "/inventory/branches/{branchId}/storage-managers/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InventoryLocationController_assignStorageManager"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/branches/{branchId}/storage-managers/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InventoryLocationController_unassignStorageManager"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/branches/{branchId}/storage-managers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryLocationController_listStorageManagers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/{locationId}/stock-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List items + stock tại 1 location (kể cả stock âm) */
+        get: operations["InventoryLocationStockController_listStockByLocation"];
+        put?: never;
+        /** Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement. */
+        post: operations["InventoryLocationStockController_addItemToLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/{locationId}/stock-items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0) */
+        delete: operations["InventoryLocationStockController_removeItemFromLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockLedgerController_listBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/balances/{itemId}/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockLedgerController_getBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockLedgerController_listLedgerEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductController_list"];
+        put?: never;
+        post: operations["ProductController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductController_findById"];
+        put?: never;
+        post?: never;
+        delete: operations["ProductController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductController_update"];
+        trace?: never;
+    };
+    "/products/{id}/generate-variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductController_generateVariants"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{id}/resolve-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductController_resolveVariant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ProductAttributeController_list"];
+        put?: never;
+        post: operations["ProductAttributeController_createDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductAttributeController_deleteDefinition"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductAttributeController_updateDefinition"];
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{attrDefId}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductAttributeController_createOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/attributes/{attrDefId}/options/{optionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ProductAttributeController_deleteOption"];
+        options?: never;
+        head?: never;
+        patch: operations["ProductAttributeController_updateOption"];
+        trace?: never;
+    };
+    "/journals/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JournalController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JournalController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["JournalController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["JournalController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PayablesController_list"];
+        put?: never;
+        post: operations["PayablesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payables/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PayablesController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payables/{id}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PayablesController_settle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payables/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PayablesController_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payables/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PayablesController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReceivablesController_list"];
+        put?: never;
+        post: operations["ReceivablesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReceivablesController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables/{id}/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReceivablesController_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables/{id}/write-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReceivablesController_writeOff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReceivablesController_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receivables/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReceivablesController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpensesController_list"];
+        put?: never;
+        post: operations["ExpensesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expenses/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpensesController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expenses/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpensesController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expenses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpensesController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_listAccounts"];
+        put?: never;
+        post: operations["CashController_createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_getAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_listMovements"];
+        put?: never;
+        post: operations["CashController_recordMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTransferController_list"];
+        put?: never;
+        post: operations["StockTransferController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTransferController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockAdjustmentController_list"];
+        put?: never;
+        post: operations["StockAdjustmentController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockAdjustmentController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockAdjustmentController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockAdjustmentController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockAdjustmentController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/adjustments/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockAdjustmentController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the ACTIVE session for a branch (404 if none) */
+        get: operations["TempWarehouseController_getActiveSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one session by id (including CLOSED) with its lines */
+        get: operations["TempWarehouseController_getSessionById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List lines in raw mode (default) or aggregated net view (hideOffsetting=true) */
+        get: operations["TempWarehouseController_listLines"];
+        put?: never;
+        /** Add a line; auto-opens an ACTIVE session if none exists */
+        post: operations["TempWarehouseController_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/lines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Soft-delete a line (status=DELETED); idempotent */
+        delete: operations["TempWarehouseController_deleteLine"];
+        options?: never;
+        head?: never;
+        /** Update a line by soft-deleting it and creating a new one (idempotent) */
+        patch: operations["TempWarehouseController_updateLine"];
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/sessions/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close a session with one of three modes: NET_OFFSET (auto-balance), CREATE_TRANSFERS (publish events to create stock transfers), or NONE */
+        post: operations["TempWarehouseController_closeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/sessions/{id}/transfer-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Materialize the listed ACTIVE lines into stock transfer(s) without closing the session. Idempotent on the (sessionId, direction, sorted lineIds) tuple. */
+        post: operations["TempWarehouseController_transferLines"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/temp-warehouse/carriers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active users assigned to the given branch — used by the FE carrier picker */
+        get: operations["TempWarehouseController_listCarriers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/items/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/items/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/opening-balances/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateOpeningBalances"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/opening-balances/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitOpeningBalances"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/adjustments/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateAdjustments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/adjustments/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitAdjustments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/branches/{branchId}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_openSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}/start-sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_startSales"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}/start-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_startClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getReconciliation"];
+        put?: never;
+        post: operations["PosController_submitReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}/reconciliation/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_approveVariance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sessions/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_finalizeClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sales/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sales/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getSale"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sales/{id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_processReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pos/sales/{id}/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosController_processExchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_findAll"];
+        put?: never;
+        post: operations["InvoiceController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_findDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/customers/{customerId}/debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_getCustomerDebts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/debts/{debtId}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_getDebtPayments"];
+        put?: never;
+        post: operations["InvoiceController_collectDebt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_findOne"];
+        put?: never;
+        post?: never;
+        delete: operations["InvoiceController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["InvoiceController_update"];
+        trace?: never;
+    };
+    "/invoices/{id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/debt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_markAsDebt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/discount-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_listDiscountCodes"];
+        put?: never;
+        post: operations["PromotionController_createDiscountCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/discount-codes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PromotionController_deactivateDiscountCode"];
+        options?: never;
+        head?: never;
+        patch: operations["PromotionController_updateDiscountCode"];
+        trace?: never;
+    };
+    "/promotions/discount-codes/{code}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionController_validateDiscountCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/vouchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_listVouchers"];
+        put?: never;
+        post: operations["PromotionController_createVoucher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/vouchers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PromotionController_deactivateVoucher"];
+        options?: never;
+        head?: never;
+        patch: operations["PromotionController_updateVoucher"];
+        trace?: never;
+    };
+    "/promotions/vouchers/{code}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionController_validateVoucher"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PromotionController_listPromotions"];
+        put?: never;
+        post: operations["PromotionController_createPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/programs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PromotionController_deactivatePromotion"];
+        options?: never;
+        head?: never;
+        patch: operations["PromotionController_updatePromotion"];
+        trace?: never;
+    };
+    "/promotions/invoices/{invoiceId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PromotionController_applyPromotion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/promotions/invoices/{invoiceId}/{promotionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PromotionController_removePromotion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/sales-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getSalesSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory-valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getInventoryValuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/receivables-aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getReceivablesAging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/payables-aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getPayablesAging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_getCashReconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/async": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReportingController_runAsyncReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/async/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ReportingController_checkJobStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrderController_list"];
+        put?: never;
+        post: operations["PurchaseOrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PurchaseOrderController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_receiveGoods"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/purchase-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PurchaseOrderController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_list"];
+        put?: never;
+        post: operations["GoodsIssueController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsIssueController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/goods-issues/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/issue-reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IssueReasonController_list"];
+        put?: never;
+        post: operations["IssueReasonController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/issue-reasons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IssueReasonController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["IssueReasonController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["IssueReasonController_update"];
+        trace?: never;
+    };
+    "/goods-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_list"];
+        put?: never;
+        post: operations["GoodsReceiptController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/goods-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GoodsReceiptController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["GoodsReceiptController_cancel"];
+        options?: never;
+        head?: never;
+        patch: operations["GoodsReceiptController_update"];
+        trace?: never;
+    };
+    "/goods-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsReceiptController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_list"];
+        put?: never;
+        post: operations["StockTakeController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["StockTakeController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["StockTakeController_updateLine"];
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_list"];
+        put?: never;
+        post: operations["TransferOrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["TransferOrderController_cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TransferOrderController_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TransferOrderController_markExecuted"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        CreateOrganizationDto: {
+            name: string;
+            /** Format: email */
+            contactEmail: string;
+            contactPhone?: string;
+        };
+        OrganizationEntity: {
+            name: string;
+            contactEmail: string;
+            contactPhone?: string;
+            mainBranchId?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED";
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateOrganizationDto: {
+            name?: string;
+            /** Format: email */
+            contactEmail?: string;
+            contactPhone?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "SUSPENDED";
+        };
+        SubmitOrgRegistrationDto: {
+            organizationName: string;
+            /** Format: email */
+            contactEmail: string;
+            contactPhone?: string;
+            ownerName: string;
+            /** Format: email */
+            ownerEmail: string;
+        };
+        RegistrationRequestEntity: {
+            /** @enum {string} */
+            type: "ORGANIZATION" | "BRANCH";
+            requestData: Record<string, never>;
+            /** @enum {string} */
+            status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "RESUBMITTED";
+            reviewedBy?: string;
+            /** Format: date-time */
+            reviewedAt?: string;
+            rejectionReason?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        SubmitBranchRegistrationDto: {
+            branchName: string;
+            address?: string;
+            phone?: string;
+            /** Format: email */
+            email?: string;
+            /** Format: uuid */
+            parentBranchId?: string;
+        };
+        RejectRegistrationDto: {
+            reason: string;
+        };
+        CreateAccountDto: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
+            /** Format: uuid */
+            parentAccountId?: string;
+        };
+        AccountEntity: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
+            parentAccountId?: string;
+            parentAccount?: components["schemas"]["AccountEntity"];
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateAccountDto: {
+            name?: string;
+            /** Format: uuid */
+            parentAccountId?: string;
+            isActive?: boolean;
+        };
+        CreateBranchDto: {
+            name: string;
+            address?: string;
+            phone?: string;
+            /** Format: email */
+            email?: string;
+            /** Format: uuid */
+            parentBranchId?: string;
+        };
+        BranchEntity: {
+            name: string;
+            address?: string;
+            phone?: string;
+            email?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+            isMainBranch: boolean;
+            parentBranchId?: string;
+            parentBranch?: components["schemas"]["BranchEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UserBranchAssignmentEntity: {
+            id: string;
+            userId: string;
+            branchId: string;
+            organizationId: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: string;
+        };
+        UpdateBranchDto: {
+            name?: string;
+            address?: string;
+            phone?: string;
+            /** Format: email */
+            email?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+        };
+        CreateDocumentNumberRuleDto: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            branchId?: string;
+            prefix: string;
+            suffix?: string;
+            includeDate?: boolean;
+            dateFormat?: string;
+            sequenceLength?: number;
+            /** @enum {string} */
+            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+        };
+        DocumentNumberRuleEntity: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            prefix: string;
+            suffix?: string;
+            includeDate: boolean;
+            dateFormat: string;
+            sequenceLength: number;
+            /** @enum {string} */
+            resetPolicy: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateDocumentNumberRuleDto: {
+            prefix?: string;
+            suffix?: string;
+            includeDate?: boolean;
+            dateFormat?: string;
+            sequenceLength?: number;
+            /** @enum {string} */
+            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+        };
+        GenerateDocumentNumberDto: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            branchId?: string;
+        };
+        SalesmanAssignmentEntity: {
+            id: string;
+            userId: string;
+            branchId: string;
+            organizationId: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: string;
+        };
+        AssignSalesPersonDto: {
+            /** Format: uuid */
+            userId: string;
+        };
+        UnassignSalesPersonDto: {
+            /** Format: uuid */
+            userId: string;
+        };
+        SalesManagerAssignmentEntity: {
+            id: string;
+            userId: string;
+            branchId: string;
+            organizationId: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: string;
+        };
+        DeadLetterEventEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            topic: string;
+            partition?: number;
+            offset?: string;
+            key?: string;
+            payload: Record<string, never>;
+            error?: string;
+            retryCount: number;
+            /** @enum {string} */
+            status: "PENDING" | "RESOLVED" | "IGNORED";
+            resolvedBy?: string;
+            /** Format: date-time */
+            resolvedAt?: string;
+            notes?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy?: string;
+        };
+        IgnoreDeadLetterDto: {
+            reason?: string;
+        };
+        CreateMembershipCardInlineDto: {
+            cardNumber: string;
+            /** @enum {string} */
+            tier?: "none" | "silver" | "gold" | "diamond";
+            issuedAt?: string;
+            expiresAt?: string;
+            lomasCardNumber?: string;
+            lomasTier?: string;
+        };
+        CreateCustomerDto: {
+            code: string;
+            name: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            address?: string;
+            birthDate?: string;
+            /** @enum {string} */
+            gender?: "male" | "female" | "unspecified";
+            nationalId?: string;
+            /** Format: uuid */
+            groupId?: string;
+            /** Format: uuid */
+            assignedStaffId?: string;
+            note?: string;
+            companyName?: string;
+            taxCode?: string;
+            membershipCard?: components["schemas"]["CreateMembershipCardInlineDto"];
+        };
+        CustomerEntity: {
+            name: string;
+            email?: string;
+            phone?: string;
+            address?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE" | "MERGED";
+            mergedIntoId?: string;
+            mergedInto?: components["schemas"]["CustomerEntity"];
+            code: string;
+            /** Format: date-time */
+            birthDate?: string;
+            /** @enum {string} */
+            gender?: "male" | "female" | "unspecified";
+            nationalId?: string;
+            groupId?: string;
+            assignedStaffId?: string;
+            note?: string;
+            companyName?: string;
+            taxCode?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateCustomerGroupDto: {
+            name: string;
+            description?: string;
+        };
+        CustomerGroupEntity: {
+            name: string;
+            description?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        AdjustPointsDto: {
+            /** @enum {string} */
+            type: "earn" | "redeem" | "adjust";
+            delta: number;
+            /** Format: uuid */
+            invoiceId?: string;
+            note?: string;
+        };
+        MembershipCardEntity: {
+            customerId: string;
+            cardNumber: string;
+            /** @enum {string} */
+            tier: "none" | "silver" | "gold" | "diamond";
+            points: number;
+            /** Format: date-time */
+            issuedAt: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            lomasCardNumber?: string;
+            lomasTier?: string;
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateCustomerDto: {
+            code?: string;
+            name?: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            address?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE" | "MERGED";
+            version?: number;
+        };
+        MergeCustomerDto: {
+            /** Format: uuid */
+            targetCustomerId: string;
+        };
+        IssueMembershipCardDto: {
+            /** @enum {string} */
+            tier?: "none" | "silver" | "gold" | "diamond";
+            issuedAt: string;
+            expiresAt?: string;
+            lomasCardNumber?: string;
+            lomasTier?: string;
+        };
+        CreateItemBarcodeInput: {
+            code: string;
+            notes?: string;
+        };
+        CreateItemProviderInput: {
+            /** Format: uuid */
+            providerId: string;
+            isPrimary?: boolean;
+        };
+        CreateItemUnitInput: {
+            unitName: string;
+            ratio?: number;
+            description?: string;
+            purchasePrice?: number;
+            sellPrice?: number;
+            isDefaultSell?: boolean;
+            isDefaultBuy?: boolean;
+        };
+        CreateItemThresholdInput: {
+            /** Format: uuid */
+            locationId?: string;
+            minQty?: number;
+            maxQty?: number;
+        };
+        CreateItemDto: {
+            code: string;
+            name: string;
+            description?: string;
+            unit: string;
+            /** Format: uuid */
+            categoryId?: string;
+            isActive?: boolean;
+            isPosVisible?: boolean;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            weightGram?: number;
+            lengthCm?: number;
+            widthCm?: number;
+            heightCm?: number;
+            manufactureYear?: number;
+            composition?: string;
+            /** Format: uuid */
+            productId?: string;
+            brand?: string;
+            itemType?: string;
+            packageWeightGram?: number;
+            packageLengthCm?: number;
+            packageWidthCm?: number;
+            packageHeightCm?: number;
+            isGoldSilver?: boolean;
+            oddSize?: string;
+            manageBarcodePerUnit?: boolean;
+            /** Format: uuid */
+            providerId?: string;
+            barcodes?: components["schemas"]["CreateItemBarcodeInput"][];
+            providers?: components["schemas"]["CreateItemProviderInput"][];
+            units?: components["schemas"]["CreateItemUnitInput"][];
+            threshold?: components["schemas"]["CreateItemThresholdInput"];
+            initialStock?: number;
+            initialStockUnitPrice?: number;
+            /** Format: uuid */
+            initialLocationId?: string;
+        };
+        ItemCategoryEntity: {
+            name: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ProviderEntity: {
+            code: string;
+            name: string;
+            email?: string;
+            phone?: string;
+            notes?: string;
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ProductEntity: {
+            name: string;
+            description?: string;
+            isActive: boolean;
+            defaultProviderId?: string;
+            defaultProvider?: components["schemas"]["ProviderEntity"];
+            autoMigrated: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ItemBarcodeEntity: {
+            itemId: string;
+            code: string;
+            notes?: string;
+            item?: components["schemas"]["ItemEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        StorageEntity: {
+            name: string;
+            isMainStorage: boolean;
+            branch?: components["schemas"]["BranchEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        LocationEntity: {
+            code: string;
+            name: string;
+            storageId: string;
+            /** @enum {string} */
+            type: "SHELF" | "RACK" | "BIN" | "ZONE";
+            isActive: boolean;
+            storage?: components["schemas"]["StorageEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ItemStockThresholdEntity: {
+            itemId: string;
+            locationId: string;
+            minQty: number | null;
+            maxQty: number | null;
+            item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ItemUnitEntity: {
+            itemId: string;
+            unitName: string;
+            ratio: number;
+            description?: string;
+            purchasePrice: number;
+            sellPrice: number;
+            isDefaultSell: boolean;
+            isDefaultBuy: boolean;
+            item?: components["schemas"]["ItemEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ItemEntity: {
+            code: string;
+            name: string;
+            description?: string;
+            unit: string;
+            categoryId?: string;
+            category?: components["schemas"]["ItemCategoryEntity"];
+            isActive: boolean;
+            isPosVisible: boolean;
+            purchasePrice: number;
+            sellingPrice: number;
+            weightGram?: number;
+            lengthCm?: number;
+            widthCm?: number;
+            heightCm?: number;
+            manufactureYear?: number;
+            composition?: string;
+            brand?: string;
+            itemType?: string;
+            packageWeightGram?: number;
+            packageLengthCm?: number;
+            packageWidthCm?: number;
+            packageHeightCm?: number;
+            isGoldSilver: boolean;
+            oddSize?: string;
+            manageBarcodePerUnit: boolean;
+            productId?: string;
+            product?: components["schemas"]["ProductEntity"];
+            variantLabel?: string;
+            providers?: components["schemas"]["ItemProviderEntity"][];
+            barcodes?: components["schemas"]["ItemBarcodeEntity"][];
+            thresholds?: components["schemas"]["ItemStockThresholdEntity"][];
+            units?: components["schemas"]["ItemUnitEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ItemProviderEntity: {
+            itemId: string;
+            providerId: string;
+            isPrimary: boolean;
+            item?: components["schemas"]["ItemEntity"];
+            provider?: components["schemas"]["ProviderEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateItemDto: {
+            name?: string;
+            description?: string;
+            unit?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            isActive?: boolean;
+            isPosVisible?: boolean;
+            purchasePrice?: number;
+            sellingPrice?: number;
+            weightGram?: number;
+            lengthCm?: number;
+            widthCm?: number;
+            heightCm?: number;
+            manufactureYear?: number;
+            composition?: string;
+            /** Format: uuid */
+            productId?: string;
+        };
+        LinkItemProviderDto: {
+            /** Format: uuid */
+            providerId: string;
+            isPrimary?: boolean;
+        };
+        CreateItemBarcodeDto: {
+            code: string;
+            notes?: string;
+        };
+        SetStockThresholdDto: {
+            minQty?: number | null;
+            maxQty?: number | null;
+        };
+        CreateProviderDto: {
+            code: string;
+            name: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            notes?: string;
+            isActive?: boolean;
+        };
+        UpdateProviderDto: {
+            code?: string;
+            name?: string;
+            /** Format: email */
+            email?: string;
+            phone?: string;
+            notes?: string;
+            isActive?: boolean;
+        };
+        CreateStorageDto: {
+            name: string;
+            /** Format: uuid */
+            branchId: string;
+            isMainStorage?: boolean;
+        };
+        UpdateStorageDto: {
+            name?: string;
+        };
+        CreateShowroomDto: {
+            name: string;
+            /** Format: uuid */
+            branchId: string;
+            /** Format: uuid */
+            storageId: string;
+            isMainShowroom?: boolean;
+        };
+        ShowroomEntity: {
+            name: string;
+            storageId: string;
+            isMainShowroom: boolean;
+            storage?: components["schemas"]["StorageEntity"];
+            branch?: components["schemas"]["BranchEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateShowroomDto: {
+            name?: string;
+        };
+        CreateLocationDto: {
+            code?: string;
+            name: string;
+            /** Format: uuid */
+            storageId: string;
+            /** Format: uuid */
+            branchId: string;
+            /** @enum {string} */
+            type?: "SHELF" | "RACK" | "BIN" | "ZONE";
+        };
+        UpdateLocationDto: {
+            name?: string;
+            /** @enum {string} */
+            type?: "SHELF" | "RACK" | "BIN" | "ZONE";
+            isActive?: boolean;
+        };
+        AssignStorageManagerDto: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            storageId: string;
+        };
+        StorageManagerAssignmentEntity: {
+            id: string;
+            userId: string;
+            branchId: string;
+            storageId: string;
+            organizationId: string;
+            /** Format: date-time */
+            assignedAt: string;
+            assignedBy: string;
+        };
+        UnassignStorageManagerDto: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            storageId: string;
+        };
+        StockByLocationProviderDto: {
+            /** Format: uuid */
+            providerId: string;
+            providerName: string;
+            isPrimary: boolean;
+        };
+        StockByLocationItemDto: {
+            /** Format: uuid */
+            itemId: string;
+            code: string;
+            name: string;
+            unit: string;
+            /** Format: uuid */
+            categoryId?: string | null;
+            categoryName?: string | null;
+            /** Format: uuid */
+            productId?: string | null;
+            variantLabel?: string | null;
+            isPosVisible: boolean;
+            isActive: boolean;
+            sellingPrice: number;
+            purchasePrice: number;
+            barcodes: string[];
+            providers: components["schemas"]["StockByLocationProviderDto"][];
+            quantity: number;
+            minQty?: number | null;
+            maxQty?: number | null;
+            belowMin: boolean;
+            /** Format: date-time */
+            lastMovementAt?: string | null;
+        };
+        StockByLocationStorageRefDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        StockByLocationBranchRefDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        StockByLocationLocationRefDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "SHELF" | "RACK" | "BIN" | "ZONE";
+            isActive: boolean;
+            storage: components["schemas"]["StockByLocationStorageRefDto"];
+            branch: components["schemas"]["StockByLocationBranchRefDto"];
+        };
+        StockByLocationMetaDto: {
+            location: components["schemas"]["StockByLocationLocationRefDto"];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        StockByLocationResponseDto: {
+            data: components["schemas"]["StockByLocationItemDto"][];
+            meta: components["schemas"]["StockByLocationMetaDto"];
+        };
+        AddItemToLocationDto: Record<string, never>;
+        StockBalanceEntity: {
+            itemId: string;
+            item?: components["schemas"]["ItemEntity"];
+            locationId: string;
+            quantity: number;
+            /** Format: date-time */
+            lastMovementAt?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateProductDto: {
+            name: string;
+            description?: string;
+            isActive?: boolean;
+            /** Format: uuid */
+            defaultProviderId?: string;
+        };
+        UpdateProductDto: {
+            name?: string;
+            description?: string;
+            isActive?: boolean;
+            /** Format: uuid */
+            defaultProviderId?: string;
+        };
+        GenerateVariantsDto: {
+            force?: boolean;
+        };
+        ResolveVariantDto: {
+            attributes: Record<string, never>;
+        };
+        ProductAttributeDefinitionEntity: {
+            productId: string;
+            product?: components["schemas"]["ProductEntity"];
+            name: string;
+            sortOrder: number;
+            options?: components["schemas"]["ProductAttributeOptionEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ProductAttributeOptionEntity: {
+            attributeDefinitionId: string;
+            attributeDefinition?: components["schemas"]["ProductAttributeDefinitionEntity"];
+            valueLabel: string;
+            sortOrder: number;
+            codeSuffix?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateAttributeDefinitionDto: {
+            name: string;
+            sortOrder?: number;
+        };
+        CreateAttributeOptionDto: {
+            valueLabel: string;
+            sortOrder?: number;
+            codeSuffix?: string;
+        };
+        PostJournalLineDto: {
+            /** Format: uuid */
+            accountId: string;
+            debitAmount: number;
+            creditAmount: number;
+            description?: string;
+            lineOrder: number;
+        };
+        PostJournalDto: {
+            /** @enum {string} */
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            /** Format: uuid */
+            sourceReferenceId?: string;
+            description?: string;
+            notes?: string;
+            lines: components["schemas"]["PostJournalLineDto"][];
+        };
+        JournalEntryEntity: {
+            documentNumber: string;
+            /** @enum {string} */
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            sourceReferenceId?: string;
+            description?: string;
+            notes?: string;
+            /** @enum {string} */
+            status: "POSTED" | "REVERSED";
+            /** Format: date-time */
+            postedAt: string;
+            postedBy: string;
+            reversedByJournalId?: string;
+            reversalOfJournalId?: string;
+            lines: components["schemas"]["JournalLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        JournalLineEntity: {
+            journalEntryId: string;
+            journalEntry: components["schemas"]["JournalEntryEntity"];
+            accountId: string;
+            debitAmount: number;
+            creditAmount: number;
+            description?: string;
+            lineOrder: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ReverseJournalDto: {
+            reason: string;
+        };
+        CreatePayableDto: {
+            vendorName: string;
+            amount: number;
+            currency?: string;
+            dueDate: string;
+            /** Format: uuid */
+            accountId: string;
+        };
+        PayableEntity: {
+            documentNumber?: string;
+            vendorName: string;
+            amount: number;
+            currency: string;
+            dueDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "PARTIALLY_SETTLED" | "SETTLED" | "VOIDED";
+            accountId: string;
+            settledAmount: number;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            settlements: components["schemas"]["PayableSettlementEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        PayableSettlementEntity: {
+            payableId: string;
+            payable: components["schemas"]["PayableEntity"];
+            amount: number;
+            settlementDate: string;
+            method: string;
+            reference?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        SettlePayableDto: {
+            amount: number;
+            method: string;
+            reference?: string;
+            settlementDate?: string;
+        };
+        CreateReceivableDto: {
+            /** Format: uuid */
+            customerId: string;
+            amount: number;
+            currency?: string;
+            dueDate: string;
+            /** Format: uuid */
+            accountId: string;
+        };
+        ReceivableEntity: {
+            documentNumber?: string;
+            customerId: string;
+            amount: number;
+            currency: string;
+            dueDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "PARTIALLY_SETTLED" | "SETTLED" | "VOIDED" | "WRITTEN_OFF";
+            accountId: string;
+            settledAmount: number;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            writeOffReason?: string;
+            settlements: components["schemas"]["ReceivableSettlementEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ReceivableSettlementEntity: {
+            receivableId: string;
+            receivable: components["schemas"]["ReceivableEntity"];
+            amount: number;
+            settlementDate: string;
+            method: string;
+            reference?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CollectReceivableDto: {
+            amount: number;
+            method: string;
+            reference?: string;
+            settlementDate?: string;
+        };
+        WriteOffReceivableDto: {
+            reason: string;
+        };
+        CreateExpenseDto: {
+            description: string;
+            amount: number;
+            /** Format: uuid */
+            accountId: string;
+            /** Format: uuid */
+            payableId?: string;
+        };
+        ExpenseEntity: {
+            description: string;
+            amount: number;
+            accountId: string;
+            payableId?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "POSTED";
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateCashAccountDto: {
+            name: string;
+            /** @enum {string} */
+            type: "REGISTER" | "SAFE" | "PETTY_CASH";
+            /** Format: uuid */
+            accountId: string;
+            balance?: number;
+        };
+        CashAccountEntity: {
+            name: string;
+            /** @enum {string} */
+            type: "REGISTER" | "SAFE" | "PETTY_CASH";
+            balance: number;
+            accountId: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        RecordCashMovementDto: {
+            /** Format: uuid */
+            cashAccountId: string;
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            amount: number;
+            /**
+             * Format: uuid
+             * @description Required when type=TRANSFER (destination account).
+             */
+            toAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Required for DEPOSIT/WITHDRAWAL/ADJUSTMENT — the GL account that offsets the cash leg.
+             */
+            contraAccountId?: string;
+            reference?: string;
+            notes?: string;
+        };
+        PosSessionEntity: {
+            terminalId?: string;
+            /** @enum {string} */
+            status: "OPEN" | "ACTIVE_SALES" | "CLOSING" | "CLOSED";
+            openedBy: string;
+            /** Format: date-time */
+            openedAt: string;
+            closedBy?: string;
+            /** Format: date-time */
+            closedAt?: string;
+            openingCashAmount: number;
+            cashAccountId?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CashMovementEntity: {
+            cashAccountId: string;
+            cashAccount: components["schemas"]["CashAccountEntity"];
+            toAccountId?: string;
+            toAccount?: components["schemas"]["CashAccountEntity"];
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            amount: number;
+            reference?: string;
+            notes?: string;
+            sessionId?: string;
+            session?: components["schemas"]["PosSessionEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateTransferDto: Record<string, never>;
+        StockTransferEntity: {
+            documentNumber?: string;
+            sourceLocationId: string;
+            destinationLocationId: string;
+            sourceBranchId: string;
+            destinationBranchId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            notes?: string;
+            lines: components["schemas"]["StockTransferLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        StockTransferLineEntity: {
+            id: string;
+            transferId: string;
+            itemId: string;
+            sourceLocationId?: string;
+            destinationLocationId?: string;
+            quantity: number;
+            notes?: string;
+            transfer?: components["schemas"]["StockTransferEntity"];
+        };
+        CreateAdjustmentDto: Record<string, never>;
+        StockAdjustmentEntity: {
+            documentNumber?: string;
+            locationId: string;
+            reasonCode: string;
+            reasonDescription?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "PENDING_APPROVAL" | "POSTED" | "CANCELLED";
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            notes?: string;
+            lines: components["schemas"]["StockAdjustmentLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        StockAdjustmentLineEntity: {
+            id: string;
+            adjustmentId: string;
+            itemId: string;
+            /** @description Signed: positive for increase, negative for decrease */
+            quantity: number;
+            notes?: string;
+            adjustment?: components["schemas"]["StockAdjustmentEntity"];
+        };
+        TempWarehouseSessionEntity: {
+            /** @enum {string} */
+            status: "ACTIVE" | "CLOSED";
+            /** @enum {string|null} */
+            closeMode?: "NET_OFFSET" | "CREATE_TRANSFERS" | "NONE" | null;
+            warehouseLocationId: string;
+            showroomLocationId: string;
+            openedBy: string;
+            /** Format: date-time */
+            openedAt: string;
+            closedBy?: string | null;
+            /** Format: date-time */
+            closedAt?: string | null;
+            /** @enum {string} */
+            transferProcessingStatus: "NONE" | "PENDING" | "COMPLETED" | "FAILED";
+            transferW2sId?: string | null;
+            transferS2wId?: string | null;
+            transferFailureReason?: string | null;
+            notes?: string | null;
+            /** Format: date-time */
+            deletedAt?: string | null;
+            lines?: components["schemas"]["TempWarehouseLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        TempWarehouseLineEntity: {
+            sessionId: string;
+            itemId: string;
+            /** @enum {string} */
+            direction: "warehouse_to_showroom" | "showroom_to_warehouse";
+            quantity: string;
+            carrierUserId?: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "DELETED" | "AUTO_BALANCED" | "TRANSFERRED";
+            supersededById?: string | null;
+            transferId?: string | null;
+            notes?: string | null;
+            session?: components["schemas"]["TempWarehouseSessionEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        AddTempWarehouseLineDto: {
+            /**
+             * Format: uuid
+             * @description Branch the session belongs to — required
+             */
+            branchId: string;
+            /** Format: uuid */
+            itemId: string;
+            /**
+             * @description Omit to auto-resolve direction from the items current stock balance at the branchs main warehouse vs main showroom location
+             * @enum {string}
+             */
+            direction?: "warehouse_to_showroom" | "showroom_to_warehouse";
+            /**
+             * Format: uuid
+             * @description Carrier user id (FK users)
+             */
+            carrierUserId?: string;
+            notes?: string;
+        };
+        UpdateTempWarehouseLineDto: {
+            /**
+             * Format: uuid
+             * @description Replacement item — leaves direction unchanged
+             */
+            itemId?: string;
+            /** Format: uuid */
+            carrierUserId?: string | null;
+            notes?: string | null;
+        };
+        CloseTempWarehouseSessionDto: {
+            /** @enum {string} */
+            mode: "NET_OFFSET" | "CREATE_TRANSFERS" | "NONE";
+        };
+        TransferTempWarehouseLinesDto: {
+            /** @description IDs of ACTIVE lines in the session to materialize into stock transfer(s). */
+            lineIds: string[];
+            /** @description Free-form note attached to the resulting stock transfer(s). */
+            notes?: string;
+        };
+        InventoryImportJobEntity: {
+            /** @enum {string} */
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS";
+            fileName: string;
+            fileChecksum: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            status: "PENDING" | "VALIDATING" | "VALIDATED" | "IMPORTING" | "COMMITTING" | "COMMITTED" | "COMPLETED" | "FAILED";
+            totalRows: number;
+            validRows: number;
+            errorRows: number;
+            rows?: components["schemas"]["InventoryImportJobRowEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        InventoryImportJobRowEntity: {
+            id: string;
+            jobId: string;
+            rowNumber: number;
+            rawData: Record<string, never>;
+            /** @enum {string} */
+            status: "VALID" | "ERROR" | "COMMITTED";
+            errorMessages?: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            job?: components["schemas"]["InventoryImportJobEntity"];
+        };
+        OpenSessionDto: {
+            /** Format: uuid */
+            terminalId?: string;
+            /** Format: uuid */
+            branchId: string;
+            /** Format: uuid */
+            cashAccountId: string;
+            openingCashAmount: number;
+        };
+        SubmitReconciliationDto: {
+            actualCash: number;
+            notes?: string;
+        };
+        SessionReconciliationEntity: {
+            sessionId: string;
+            expectedCash: number;
+            actualCash: number;
+            variance: number;
+            varianceApproved: boolean;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            notes?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CheckoutLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+            taxAmount: number;
+        };
+        CheckoutPaymentDto: {
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
+            amount: number;
+            reference?: string;
+        };
+        CheckoutDto: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: uuid */
+            customerId?: string;
+            lines: components["schemas"]["CheckoutLineDto"][];
+            payments: components["schemas"]["CheckoutPaymentDto"][];
+            /** Format: uuid */
+            cashAccountId: string;
+            /** Format: uuid */
+            revenueAccountId: string;
+        };
+        PaymentEntity: {
+            saleId: string;
+            sale: components["schemas"]["SaleEntity"];
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
+            amount: number;
+            reference?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        SaleEntity: {
+            documentNumber: string;
+            sessionId: string;
+            customerId?: string;
+            subtotal: number;
+            taxAmount: number;
+            totalAmount: number;
+            /** @enum {string} */
+            status: "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED";
+            /** Format: date-time */
+            saleDate: string;
+            lines: components["schemas"]["SaleLineEntity"][];
+            payments: components["schemas"]["PaymentEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        SaleLineEntity: {
+            saleId: string;
+            sale: components["schemas"]["SaleEntity"];
+            itemId: string;
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+            lineTotal: number;
+            taxAmount: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ReturnLineDto: {
+            /** Format: uuid */
+            originalSaleLineId: string;
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+        };
+        ProcessReturnDto: {
+            /** Format: uuid */
+            sessionId: string;
+            reason: string;
+            lines: components["schemas"]["ReturnLineDto"][];
+            /** Format: uuid */
+            cashAccountId: string;
+            /** Format: uuid */
+            revenueAccountId: string;
+        };
+        ReturnEntity: {
+            documentNumber: string;
+            originalSaleId: string;
+            sessionId: string;
+            subtotal: number;
+            taxAmount: number;
+            totalAmount: number;
+            reason: string;
+            /** Format: date-time */
+            returnDate: string;
+            lines: components["schemas"]["ReturnLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ReturnLineEntity: {
+            returnId: string;
+            returnDoc: components["schemas"]["ReturnEntity"];
+            originalSaleLineId: string;
+            itemId: string;
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+            lineTotal: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ExchangeReturnLineDto: {
+            /** Format: uuid */
+            originalSaleLineId: string;
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+        };
+        ExchangeNewLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+            taxAmount: number;
+        };
+        ExchangeSettlementDto: {
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
+            amount: number;
+            reference?: string;
+        };
+        ProcessExchangeDto: {
+            /** Format: uuid */
+            sessionId: string;
+            reason: string;
+            returnLines: components["schemas"]["ExchangeReturnLineDto"][];
+            newLines: components["schemas"]["ExchangeNewLineDto"][];
+            settlement?: components["schemas"]["ExchangeSettlementDto"];
+            /** Format: uuid */
+            cashAccountId: string;
+            /** Format: uuid */
+            revenueAccountId: string;
+        };
+        CreateInvoiceItemDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId?: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            lineDiscount?: number;
+            note?: string;
+            sortOrder?: number;
+        };
+        CreateInvoiceDto: {
+            sessionId: string;
+            /** Format: uuid */
+            customerId?: string;
+            draftLabel?: string;
+            note?: string;
+            items?: components["schemas"]["CreateInvoiceItemDto"][];
+        };
+        InvoiceEntity: {
+            code: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            /** @enum {string} */
+            status: "draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled";
+            subtotal: number;
+            discountAmount: number;
+            depositAmount: number;
+            amountDue: number;
+            totalPaid: number;
+            note?: string;
+            isDraft: boolean;
+            sessionId: string;
+            draftLabel?: string;
+            customerId?: string;
+            staffId: string;
+            priceListId?: string;
+            /** Format: date-time */
+            cancelledAt?: string;
+            cancelReason?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        InvoiceDebtEntity: {
+            referenceCode: string;
+            invoiceId: string;
+            customerId: string;
+            /** @enum {string} */
+            documentType: "credit_invoice" | "payment_receipt" | "adjustment";
+            originalAmount: number;
+            paidAmount: number;
+            remainingAmount: number;
+            issuedAt: string;
+            dueDate?: string;
+            /** Format: date-time */
+            settledAt?: string;
+            /** @enum {string} */
+            status: "open" | "paid" | "overdue";
+            note?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        DebtPaymentEntity: {
+            debtId: string;
+            amount: number;
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer";
+            staffId: string;
+            /** Format: date-time */
+            paidAt: string;
+            note?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CollectDebtPaymentDto: Record<string, never>;
+        UpdateInvoiceItemDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId?: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            lineDiscount?: number;
+            note?: string;
+            sortOrder?: number;
+        };
+        UpdateInvoiceDto: {
+            /** Format: uuid */
+            customerId?: string;
+            draftLabel?: string;
+            note?: string;
+            items?: components["schemas"]["UpdateInvoiceItemDto"][];
+        };
+        InvoicePaymentLineDto: {
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /** Format: uuid */
+            accountId: string;
+            reference?: string;
+        };
+        CheckoutInvoiceDto: {
+            /** @description Payment lines. Empty array = full debt (requires receivableAccountId + customerId on invoice). */
+            payments: components["schemas"]["InvoicePaymentLineDto"][];
+            /** Format: uuid */
+            revenueAccountId: string;
+            /**
+             * Format: uuid
+             * @description Required when totalPaid < amountDue — AR account to debit for the remainder.
+             */
+            receivableAccountId?: string;
+        };
+        CancelInvoiceDto: {
+            reason: string;
+        };
+        DiscountCodeEntity: {
+            code: string;
+            /** @enum {string} */
+            discountType: "percentage" | "fixed_amount";
+            discountValue: number;
+            minOrderValue: number;
+            maxUses?: number;
+            usedCount: number;
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validTo: string;
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateDiscountCodeDto: {
+            code: string;
+            /** @enum {string} */
+            discountType: "percentage" | "fixed_amount";
+            discountValue: number;
+            minOrderValue?: number;
+            maxUses?: number;
+            validFrom: string;
+            validTo: string;
+        };
+        VoucherEntity: {
+            code: string;
+            faceValue: number;
+            customerId?: string;
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validTo: string;
+            isUsed: boolean;
+            redeemedInvoiceId?: string;
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreateVoucherDto: {
+            code: string;
+            faceValue: number;
+            /** Format: uuid */
+            customerId?: string;
+            validFrom: string;
+            validTo: string;
+        };
+        PromotionEntity: {
+            name: string;
+            /** @enum {string} */
+            type: "order_discount" | "gift_product" | "buy_x_get_y" | "product_discount";
+            conditions: Record<string, never>;
+            benefits: Record<string, never>;
+            /** Format: date-time */
+            validFrom: string;
+            /** Format: date-time */
+            validTo: string;
+            applicableBranchIds: string[];
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CreatePromotionDto: {
+            name: string;
+            /** @enum {string} */
+            type: "order_discount" | "gift_product" | "buy_x_get_y" | "product_discount";
+            conditions: Record<string, never>;
+            benefits: Record<string, never>;
+            validFrom: string;
+            validTo: string;
+            applicableBranchIds?: string[];
+        };
+        ApplyPromotionDto: {
+            /** @enum {string} */
+            type: "discount_code" | "voucher" | "promotion";
+            code: string;
+        };
+        AsyncReportDto: {
+            /** @enum {string} */
+            type: "sales-summary" | "inventory-valuation" | "receivables-aging" | "payables-aging" | "cash-reconciliation";
+            /** Format: uuid */
+            branchId?: string;
+            startDate?: string;
+            endDate?: string;
+        };
+        CreatePurchaseOrderDto: Record<string, never>;
+        PurchaseOrderEntity: {
+            documentNumber?: string;
+            providerId: string;
+            locationId: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "RECEIVING" | "RECEIVED" | "CANCELLED";
+            expectedDate?: string;
+            notes?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            lines: components["schemas"]["PurchaseOrderLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        PurchaseOrderLineEntity: {
+            id: string;
+            purchaseOrderId: string;
+            itemId: string;
+            orderedQuantity: number;
+            receivedQuantity: number;
+            unitPrice: number;
+            notes?: string;
+            purchaseOrder?: components["schemas"]["PurchaseOrderEntity"];
+        };
+        ReceiveGoodsDto: Record<string, never>;
+        CreateGoodsIssueDto: Record<string, never>;
+        IssueReasonEntity: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            purpose: "OTHER" | "DISPOSAL";
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        GoodsIssueEntity: {
+            documentNumber?: string;
+            locationId: string;
+            location?: components["schemas"]["LocationEntity"];
+            providerId?: string;
+            provider?: components["schemas"]["ProviderEntity"];
+            reason: string;
+            reasonId?: string;
+            reasonRef?: components["schemas"]["IssueReasonEntity"];
+            targetBranchId?: string;
+            targetBranch?: components["schemas"]["BranchEntity"];
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
+            /** @enum {string} */
+            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL";
+            notes?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            lines: components["schemas"]["GoodsIssueLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        GoodsIssueLineEntity: {
+            id: string;
+            goodsIssueId: string;
+            itemId: string;
+            quantity: number;
+            unitPrice: string;
+            lineTotal: string;
+            notes?: string;
+            goodsIssue?: components["schemas"]["GoodsIssueEntity"];
+            item?: components["schemas"]["ItemEntity"];
+        };
+        CreateIssueReasonDto: {
+            /**
+             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
+             * @example HONG_BAO_QUAN
+             */
+            code?: string;
+            /**
+             * @description Tên lý do
+             * @example Hàng hỏng do bảo quản chưa tốt
+             */
+            name: string;
+            /**
+             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
+             * @enum {string}
+             */
+            purpose: "OTHER" | "DISPOSAL";
+            /** @default true */
+            isActive: boolean;
+        };
+        UpdateIssueReasonDto: {
+            /**
+             * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
+             * @example HONG_BAO_QUAN
+             */
+            code?: string;
+            /**
+             * @description Tên lý do
+             * @example Hàng hỏng do bảo quản chưa tốt
+             */
+            name?: string;
+            /**
+             * @description Nhóm lý do (OTHER hoặc DISPOSAL)
+             * @enum {string}
+             */
+            purpose?: "OTHER" | "DISPOSAL";
+            /** @default true */
+            isActive: boolean;
+        };
+        GoodsReceiptLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            binId?: string;
+            uomCode: string;
+            quantity: number;
+            unitPrice: number;
+            note?: string;
+        };
+        CashSettlementDto: {
+            method: Record<string, never>;
+            amount: number;
+            /** Format: uuid */
+            cashAccountId?: string;
+            description?: string;
+        };
+        CreateGoodsReceiptDto: {
+            /** @enum {string} */
+            purpose: "OTHER" | "TRANSFER_IN";
+            /** Format: uuid */
+            providerId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            /** Format: uuid */
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            /** @description Source branch for transfer-in. Stored separately from referenceId. */
+            sourceBranchId?: string;
+            receivedAt: string;
+            /** Format: uuid */
+            locationId: string;
+            attachmentIds?: string[];
+            lines: components["schemas"]["GoodsReceiptLineDto"][];
+            cashPayment?: components["schemas"]["CashSettlementDto"];
+            cashReceipt?: components["schemas"]["CashSettlementDto"];
+        };
+        GoodsReceiptEntity: {
+            documentNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
+            /** @enum {string} */
+            purpose: "OTHER" | "TRANSFER_IN";
+            providerId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
+            sourceBranchId?: string;
+            /** Format: date-time */
+            receivedAt: string;
+            locationId: string;
+            attachmentIds: string[];
+            cashPaymentId?: string;
+            cashReceiptId?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["GoodsReceiptLineEntity"][];
+            provider?: components["schemas"]["ProviderEntity"];
+            location?: components["schemas"]["LocationEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        GoodsReceiptLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            goodsReceiptId: string;
+            itemId: string;
+            locationId: string;
+            binId?: string;
+            uomCode: string;
+            quantity: string;
+            unitPrice: string;
+            lineTotal: string;
+            note?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            goodsReceipt: components["schemas"]["GoodsReceiptEntity"];
+            item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
+        };
+        UpdateGoodsReceiptDto: {
+            /** @enum {string} */
+            purpose?: "OTHER" | "TRANSFER_IN";
+            /** Format: uuid */
+            providerId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            /** Format: uuid */
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            sourceBranchId?: string;
+            receivedAt?: string;
+            /** Format: uuid */
+            locationId?: string;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["GoodsReceiptLineDto"][];
+            cashPayment?: components["schemas"]["CashSettlementDto"];
+            cashReceipt?: components["schemas"]["CashSettlementDto"];
+        };
+        CreateStockTakeDto: Record<string, never>;
+        StockTakeEntity: {
+            documentNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED";
+            storageId?: string;
+            locationId?: string;
+            /** Format: date-time */
+            snapshotAt: string;
+            notes?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["StockTakeLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        StockTakeLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            stockTakeId: string;
+            itemId: string;
+            locationId: string;
+            expectedQty: string;
+            countedQty?: string | null;
+            note?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            stockTake: components["schemas"]["StockTakeEntity"];
+            item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
+        };
+        UpdateLineCountDto: Record<string, never>;
+        CreateTransferOrderDto: Record<string, never>;
+        TransferOrderEntity: {
+            documentNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
+            sourceBranchId: string;
+            destinationBranchId: string;
+            sourceStorageId?: string;
+            destinationStorageId?: string;
+            requestedDate?: string;
+            notes?: string;
+            /** Format: date-time */
+            approvedAt?: string;
+            approvedBy?: string;
+            /** Format: date-time */
+            executedAt?: string;
+            executedBy?: string;
+            executedTransferId?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["TransferOrderLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        TransferOrderLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            transferOrderId: string;
+            itemId: string;
+            requestedQty: string;
+            note?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            transferOrder: components["schemas"]["TransferOrderEntity"];
+            item?: components["schemas"]["ItemEntity"];
+        };
+        MarkExecutedDto: Record<string, never>;
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -250,4 +5505,6122 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    HealthController_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    HealthController_checkDb: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CrudController_listEntities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    CrudController_getEntityConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entity CRUD configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_getRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Single record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_deleteRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CrudController_updateRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Record fields to update */
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_listRecords: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                /** @description JSON-encoded filter object */
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                entityKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    CrudController_createRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityKey: string;
+            };
+            cookie?: never;
+        };
+        /** @description Record fields */
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Created record */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    AuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AuthController_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    OrganizationController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrganizationController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationEntity"];
+                };
+            };
+        };
+    };
+    OrganizationController_listOrgRegistrationRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RegistrationController_submitOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitOrgRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    OrganizationController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationEntity"];
+                };
+            };
+        };
+    };
+    OrganizationController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationEntity"];
+                };
+            };
+        };
+    };
+    BranchController_listBranchRegistrationRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RegistrationController_submitBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitBranchRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_approveOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_rejectOrgRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_approveBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    RegistrationController_rejectBranchRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRegistrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    CoaController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoaController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAccountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEntity"];
+                };
+            };
+        };
+    };
+    CoaController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEntity"];
+                };
+            };
+        };
+    };
+    CoaController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAccountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEntity"];
+                };
+            };
+        };
+    };
+    BranchController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BranchController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBranchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_findMainBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_getUserBranches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBranchAssignmentEntity"][];
+                };
+            };
+        };
+    };
+    BranchController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBranchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_suspend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchEntity"];
+                };
+            };
+        };
+    };
+    BranchController_assignUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBranchAssignmentEntity"];
+                };
+            };
+        };
+    };
+    BranchController_unassignUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentNumberingController_listRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentNumberingController_createRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDocumentNumberRuleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_updateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDocumentNumberRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_activateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_deactivateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateDocumentNumberDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
+    SalesHierarchyController_listSalesmen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesmanAssignmentEntity"][];
+                };
+            };
+        };
+    };
+    SalesHierarchyController_assignSalesman: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignSalesPersonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesmanAssignmentEntity"];
+                };
+            };
+        };
+    };
+    SalesHierarchyController_unassignSalesman: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnassignSalesPersonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SalesHierarchyController_listSalesManagers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesManagerAssignmentEntity"][];
+                };
+            };
+        };
+    };
+    SalesHierarchyController_assignSalesManager: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignSalesPersonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesManagerAssignmentEntity"];
+                };
+            };
+        };
+    };
+    SalesHierarchyController_unassignSalesManager: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnassignSalesPersonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DeadLetterController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: "PENDING" | "RESOLVED" | "IGNORED";
+                topic?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DeadLetterController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLetterEventEntity"];
+                };
+            };
+        };
+    };
+    DeadLetterController_replay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLetterEventEntity"];
+                };
+            };
+        };
+    };
+    DeadLetterController_ignore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IgnoreDeadLetterDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLetterEventEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_listGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupEntity"][];
+                };
+            };
+        };
+    };
+    CustomerController_createGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerGroupDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_getGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_removeGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_updateGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroupEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_getPointHistory: {
+        parameters: {
+            query: {
+                page: number;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_adjustPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustPointsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCardEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CustomerController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_merge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeCustomerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_getCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCardEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_issueCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueMembershipCardDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCardEntity"];
+                };
+            };
+        };
+    };
+    CustomerController_updateCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipCardEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listItems: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_createItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateItemDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getItemById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_updateItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listItemProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemProviderEntity"][];
+                };
+            };
+        };
+    };
+    InventoryLocationController_linkItemProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkItemProviderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemProviderEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_unlinkItemProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_setItemProviderPrimary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemProviderEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listItemBarcodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemBarcodeEntity"][];
+                };
+            };
+        };
+    };
+    InventoryLocationController_createItemBarcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateItemBarcodeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemBarcodeEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_deleteItemBarcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                barcodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_lookupBarcode: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_listItemThresholds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InventoryLocationController_setDefaultItemThreshold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStockThresholdDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_getItemThreshold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemStockThresholdEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_deleteItemThreshold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_upsertItemThreshold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStockThresholdDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemStockThresholdEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_createProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProviderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getProviderById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_deleteProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_updateProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProviderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getBranchLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_listStorages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_createStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStorageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getStorageById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_updateStorage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStorageDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listShowrooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_createShowroom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShowroomDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowroomEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getShowroomById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowroomEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_updateShowroom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateShowroomDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowroomEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_listLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_createLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLocationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_getLocationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_updateLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_assignStorageManager: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignStorageManagerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageManagerAssignmentEntity"];
+                };
+            };
+        };
+    };
+    InventoryLocationController_unassignStorageManager: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnassignStorageManagerDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationController_listStorageManagers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_listStockByLocation: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                /** @description Sort field */
+                sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
+                sortOrder?: "asc" | "desc";
+                /** @description Partial match on item code & name */
+                search?: string;
+                /** @description Exact match on item_barcodes.code */
+                barcode?: string;
+                categoryId?: string;
+                providerId?: string;
+                isPosVisible?: boolean;
+                isActive?: boolean;
+                stockState?: "all" | "positive" | "zero" | "negative" | "below-min";
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLocationResponseDto"];
+                };
+            };
+            /** @description Thiếu permission inventory.read hoặc sai branch scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location không tồn tại hoặc không thuộc tổ chức */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_addItemToLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddItemToLocationDto"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm hàng hóa vào vị trí */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_removeItemFromLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockLedgerController_listBalances: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockLedgerController_getBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBalanceEntity"];
+                };
+            };
+        };
+    };
+    StockLedgerController_listLedgerEntries: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductEntity"];
+                };
+            };
+        };
+    };
+    ProductController_generateVariants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateVariantsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductController_resolveVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveVariantDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"][];
+                };
+            };
+        };
+    };
+    ProductAttributeController_createDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeDefinitionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_deleteDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductAttributeController_updateDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeDefinitionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeDefinitionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_createOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeOptionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeOptionEntity"];
+                };
+            };
+        };
+    };
+    ProductAttributeController_deleteOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+                optionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProductAttributeController_updateOption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+                attrDefId: string;
+                optionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttributeOptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductAttributeOptionEntity"];
+                };
+            };
+        };
+    };
+    JournalController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostJournalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    JournalController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseJournalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    JournalController_list: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                source?: string;
+                status?: string;
+                branchId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JournalController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    PayablesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PayablesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePayableDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableEntity"];
+                };
+            };
+        };
+    };
+    PayablesController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableEntity"];
+                };
+            };
+        };
+    };
+    PayablesController_settle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlePayableDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableEntity"];
+                };
+            };
+        };
+    };
+    PayablesController_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableEntity"];
+                };
+            };
+        };
+    };
+    PayablesController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReceivablesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReceivableDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_collect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectReceivableDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_writeOff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteOffReceivableDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ReceivablesController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivableEntity"];
+                };
+            };
+        };
+    };
+    ExpensesController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExpensesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExpenseDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseEntity"];
+                };
+            };
+        };
+    };
+    ExpensesController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseEntity"];
+                };
+            };
+        };
+    };
+    ExpensesController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseEntity"];
+                };
+            };
+        };
+    };
+    ExpensesController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseEntity"];
+                };
+            };
+        };
+    };
+    CashController_listAccounts: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                branchId?: string;
+                type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashController_createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashAccountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashAccountEntity"];
+                };
+            };
+        };
+    };
+    CashController_getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashAccountEntity"];
+                };
+            };
+        };
+    };
+    CashController_listMovements: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                cashAccountId?: string;
+                type?: string;
+                branchId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashController_recordMovement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCashMovementDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashMovementEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTransferController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockAdjustmentController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdjustmentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    StockAdjustmentController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAdjustmentEntity"];
+                };
+            };
+        };
+    };
+    TempWarehouseController_getActiveSession: {
+        parameters: {
+            query: {
+                branchId: string;
+            };
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TempWarehouseSessionEntity"];
+                };
+            };
+        };
+    };
+    TempWarehouseController_getSessionById: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TempWarehouseController_listLines: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                sessionId?: string;
+                /** @description When true, return 1 aggregated row per item with totals + net direction */
+                hideOffsetting?: boolean;
+                /** @description Filter by line status; use ALL to return every status. TRANSFERRED lines are always excluded — query stock_transfers via temp_warehouse_lines.transfer_id for that audit trail. */
+                status?: "ACTIVE" | "DELETED" | "AUTO_BALANCED" | "ALL";
+                direction?: "warehouse_to_showroom" | "showroom_to_warehouse";
+                page?: number;
+                pageSize?: number;
+                /** @description Hide items whose totalW2s equals totalS2w. Requires hideOffsetting=true; otherwise 400. */
+                hideBalanced?: boolean;
+            };
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TempWarehouseController_addLine: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTempWarehouseLineDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TempWarehouseController_deleteLine: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TempWarehouseLineEntity"];
+                };
+            };
+        };
+    };
+    TempWarehouseController_updateLine: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTempWarehouseLineDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TempWarehouseController_closeSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseTempWarehouseSessionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    TempWarehouseController_transferLines: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferTempWarehouseLinesDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TempWarehouseController_listCarriers: {
+        parameters: {
+            query: {
+                /** @description Branch to scope carriers to. Must be one of the actor branchIds. */
+                branchId: string;
+                /** @description Free-text search on firstName, lastName, email (ILIKE). */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: {
+                /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
+                "X-Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_validateItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_commitItems: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_validateOpeningBalances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_commitOpeningBalances: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_validateAdjustments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_commitAdjustments: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvImportController_listJobs: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryImportJobEntity"];
+                };
+            };
+        };
+    };
+    CsvExportController_exportItems: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportBalances: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportLedger: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PosController_getCatalog: {
+        parameters: {
+            query?: {
+                search?: string;
+                direction?: "warehouse" | "showroom";
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    PosController_openSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenSessionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSessionEntity"];
+                };
+            };
+        };
+    };
+    PosController_startSales: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSessionEntity"];
+                };
+            };
+        };
+    };
+    PosController_getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSessionEntity"];
+                };
+            };
+        };
+    };
+    PosController_startClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PosController_getReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PosController_submitReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitReconciliationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionReconciliationEntity"];
+                };
+            };
+        };
+    };
+    PosController_approveVariance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionReconciliationEntity"];
+                };
+            };
+        };
+    };
+    PosController_finalizeClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSessionEntity"];
+                };
+            };
+        };
+    };
+    PosController_checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleEntity"];
+                };
+            };
+        };
+    };
+    PosController_getSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleEntity"];
+                };
+            };
+        };
+    };
+    PosController_processReturn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessReturnDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnEntity"];
+                };
+            };
+        };
+    };
+    PosController_processExchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessExchangeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceController_findAll: {
+        parameters: {
+            query?: {
+                status?: "draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled";
+                dateFrom?: string;
+                dateTo?: string;
+                customerId?: string;
+                branchId?: string;
+                sessionId?: string;
+                isDraft?: boolean;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvoiceController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_findDrafts: {
+        parameters: {
+            query: {
+                session_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"][];
+                };
+            };
+        };
+    };
+    InvoiceController_getCustomerDebts: {
+        parameters: {
+            query?: {
+                status?: unknown;
+            };
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDebtEntity"][];
+                };
+            };
+        };
+    };
+    InvoiceController_getDebtPayments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebtPaymentEntity"][];
+                };
+            };
+        };
+    };
+    InvoiceController_collectDebt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                debtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectDebtPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDebtEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvoiceController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvoiceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_markAsDebt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_listDiscountCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeEntity"][];
+                };
+            };
+        };
+    };
+    PromotionController_createDiscountCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDiscountCodeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_deactivateDiscountCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_updateDiscountCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_validateDiscountCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_listVouchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"][];
+                };
+            };
+        };
+    };
+    PromotionController_createVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVoucherDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_deactivateVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_updateVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_validateVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoucherEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_listPromotions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionEntity"][];
+                };
+            };
+        };
+    };
+    PromotionController_createPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePromotionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_deactivatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_updatePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_applyPromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyPromotionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    PromotionController_removePromotion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+                promotionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReportingController_getDashboard: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReportingController_getSalesSummary: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReportingController_getInventoryValuation: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    ReportingController_getReceivablesAging: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReportingController_getPayablesAging: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    ReportingController_getCashReconciliation: {
+        parameters: {
+            query?: {
+                branchId?: string;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    ReportingController_runAsyncReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsyncReportDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReportingController_checkJobStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PurchaseOrderController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PurchaseOrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePurchaseOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_receiveGoods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveGoodsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    PurchaseOrderController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsIssueController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsIssueDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    GoodsIssueController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
+                };
+            };
+        };
+    };
+    IssueReasonController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IssueReasonController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIssueReasonDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
+                };
+            };
+        };
+    };
+    IssueReasonController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
+                };
+            };
+        };
+    };
+    IssueReasonController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IssueReasonController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIssueReasonDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueReasonEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGoodsReceiptDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStockTakeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_updateLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLineCountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeLineEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TransferOrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransferOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TransferOrderController_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_markExecuted: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkExecutedDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+}

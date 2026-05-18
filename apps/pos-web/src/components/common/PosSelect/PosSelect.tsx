@@ -10,6 +10,46 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import {
+  posFormFieldClass,
+  posFormHeight,
+  posFormPadX,
+  posFormRadius,
+  posFormRowClass,
+  posFormUnderlineShadow,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
+
+export type PosSelectSize = PosFormSize;
+
+/** @deprecated Use {@link PosSelectSize} */
+export type PosSelectBoxedSize = PosSelectSize;
+
+export type PosSelectVariant = "boxed" | "underline";
+
+const selectVariant: Record<
+  PosSelectVariant,
+  (size: PosSelectSize, open: boolean, invalid?: boolean) => string
+> = {
+  boxed: (size, open, invalid) =>
+    cn(
+      posFormRowClass,
+      "border bg-white text-gray-700 transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-[#5C6BC0]",
+      posFormHeight[size],
+      posFormRadius[size],
+      invalid ? "border-[#F87171]" : "border-gray-200",
+      open && !invalid && "ring-2 ring-[#5C6BC0]/30",
+    ),
+  underline: (size, open, invalid) =>
+    cn(
+      posFormRowClass,
+      "border-b border-transparent bg-transparent text-gray-900 transition-[box-shadow] duration-150 ease-out",
+      posFormHeight[size],
+      posFormUnderlineShadow(invalid, open),
+    ),
+};
+
+const selectTrigger = cn(posFormFieldClass, "truncate text-left");
 
 /**
  * The data-bound subset of {@link PosSelectProps}. Wrapper components can use
@@ -28,6 +68,8 @@ export interface PosSelectConfig<T> {
   /** Forwarded to the underlying trigger button — used by hotkeys/focus. */
   triggerRef?: Ref<HTMLButtonElement>;
   disabled?: boolean;
+  /** Boxed row height only; ignored for `underline`. */
+  size?: PosSelectSize;
 }
 
 export interface PosSelectProps<T> {
@@ -57,7 +99,7 @@ export interface PosSelectProps<T> {
   ariaLabel?: string;
   placeholder?: string;
   emptyText?: string;
-  variant?: "boxed" | "underline";
+  variant?: PosSelectVariant;
   position?: "top" | "bottom";
   showChevron?: boolean;
   invalid?: boolean;
@@ -69,6 +111,8 @@ export interface PosSelectProps<T> {
   triggerClassName?: string;
   /** Forwarded to the underlying trigger button — used by hotkeys/focus. */
   ref?: Ref<HTMLButtonElement>;
+  /** Boxed control height (`sm` … `xl`); default `md`. No effect on `underline`. */
+  size?: PosSelectSize;
 }
 
 /**
@@ -112,6 +156,7 @@ export function PosSelect<T>({
   menuClassName,
   triggerClassName,
   ref,
+  size = "md",
 }: PosSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -132,10 +177,14 @@ export function PosSelect<T>({
   };
 
   const selectedKey = value != null ? itemKey(value) : null;
+  const isEmptySelection = value == null;
   const selectedDisplay = useMemo<ReactNode>(() => {
-    if (value == null) return placeholder ?? "";
+    if (isEmptySelection) {
+      // Keep a line box when placeholder is omitted/empty so the trigger stays clickable.
+      return placeholder?.trim() ? placeholder : "\u00a0";
+    }
     return (renderSelected ?? renderItem)(value);
-  }, [value, placeholder, renderItem, renderSelected]);
+  }, [value, placeholder, renderItem, renderSelected, isEmptySelection]);
 
   const isDisabledAt = (idx: number) =>
     idx < 0 || idx >= items.length || (isItemDisabled?.(items[idx]) ?? false);
@@ -293,41 +342,21 @@ export function PosSelect<T>({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open]);
 
-  const wrapperClass =
-    variant === "underline"
-      ? cn(
-          "flex h-8 items-center gap-2 border-b border-transparent bg-transparent transition-[box-shadow] duration-150 ease-out",
-          invalid
-            ? "shadow-[inset_0_-2px_0_0_#F87171]"
-            : open
-              ? "shadow-[inset_0_-2px_0_0_#5B5BD6]"
-              : "shadow-[inset_0_-1px_0_0_#E5E7EB] focus-within:shadow-[inset_0_-2px_0_0_#5B5BD6]",
-        )
-      : cn(
-          "flex h-7 items-center gap-2 rounded border bg-white transition-[border-color,box-shadow] duration-150 ease-out",
-          invalid
-            ? "border-[#F87171]"
-            : "border-gray-200 focus-within:border-[#5C6BC0]",
-          open && !invalid && "ring-2 ring-[#5C6BC0]/30",
-        );
-
-  const triggerClass =
-    variant === "underline"
-      ? cn(
-          "min-w-0 flex-1 bg-transparent pb-2 pl-0 pt-1 text-left text-[14px] text-gray-900 transition-colors",
-          value == null && "text-[#9CA3AF]",
-        )
-      : cn("min-w-0 flex-1 bg-transparent px-2 text-left text-[13px]");
-
   return (
     <div
       ref={rootRef}
       className={cn(
-        wrapperClass,
-        disabled && "cursor-not-allowed opacity-60",
+        selectVariant[variant](size, open, invalid),
+        posFormPadX[size],
+        disabled && "cursor-not-allowed opacity-60 bg-gray-100",
         className,
       )}
     >
+      {prefix ? (
+        <span className="flex shrink-0 items-center text-gray-500">
+          {prefix}
+        </span>
+      ) : null}
       <button
         ref={setTriggerRef}
         id={id}
@@ -336,8 +365,9 @@ export function PosSelect<T>({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         className={cn(
-          triggerClass,
-          "focus:outline-none inline-flex items-center gap-1.5",
+          selectTrigger,
+          "self-stretch",
+          isEmptySelection && "text-gray-400",
           triggerClassName,
         )}
         aria-label={ariaLabel}
@@ -345,9 +375,7 @@ export function PosSelect<T>({
         aria-expanded={open}
         aria-invalid={invalid || undefined}
       >
-        {prefix}
-
-        <span className="block truncate">{selectedDisplay}</span>
+        {selectedDisplay}
       </button>
 
       {trailing}
@@ -359,7 +387,7 @@ export function PosSelect<T>({
           aria-hidden="true"
           onClick={toggleOpen}
           className={cn(
-            "shrink-0 pr-1 text-[#6B7280] transition-transform focus:outline-none",
+            "flex shrink-0 items-center text-gray-400 transition-transform focus:outline-none",
             open && "rotate-180",
           )}
         >
