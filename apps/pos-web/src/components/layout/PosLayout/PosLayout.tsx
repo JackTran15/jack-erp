@@ -1,5 +1,5 @@
 import { ComponentType, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import {
   BellIcon,
@@ -253,7 +253,7 @@ export function PosLayout() {
         onDelete={handleDeleteDraft}
       />
 
-      {/* <Outlet/> */}
+      <Outlet/>
     </div>
   );
 }
