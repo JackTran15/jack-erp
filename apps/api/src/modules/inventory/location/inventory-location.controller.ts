@@ -276,6 +276,15 @@ export class InventoryLocationController {
     await this.service.deactivateProvider(id, actor);
   }
 
+  // ─── Branch locations (warehouses + showrooms for X-Branch-Id) ────
+
+  @Get('branch-locations')
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  getBranchLocations(@Actor() actor: ActorContext) {
+    return this.service.getBranchLocations(actor);
+  }
+
   // ─── Storages (branch-scoped) ─────────────────────────────────────
 
   @Post('storages')

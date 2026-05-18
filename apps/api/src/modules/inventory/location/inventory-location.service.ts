@@ -348,6 +348,36 @@ export class InventoryLocationService {
     return this.storageRepo.save(storage);
   }
 
+  async getBranchLocations(
+    actor: ActorContext,
+  ): Promise<{ warehouses: StorageEntity[]; showrooms: ShowroomEntity[] }> {
+    if (!actor.branchId) {
+      throw new BadRequestException('branchId is required');
+    }
+
+    const [storages, showrooms] = await Promise.all([
+      this.storageRepo.find({
+        where: {
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+        },
+        order: { isMainStorage: 'DESC', name: 'ASC' },
+      }),
+      this.showroomRepo.find({
+        where: {
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+        },
+        order: { isMainShowroom: 'DESC', name: 'ASC' },
+      }),
+    ]);
+
+    const showroomStorageIds = new Set(showrooms.map((s) => s.storageId));
+    const warehouses = storages.filter((s) => !showroomStorageIds.has(s.id));
+
+    return { warehouses, showrooms };
+  }
+
   async listStorages(
     query: PaginationQuery & { branchId?: string },
     actor: ActorContext,

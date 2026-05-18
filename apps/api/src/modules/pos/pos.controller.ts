@@ -50,7 +50,12 @@ export class PosController {
     @Query() query: PosCatalogQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.catalogService.getCatalog(branchId, actor, query.search);
+    return this.catalogService.getCatalog(
+      branchId,
+      actor,
+      query.search,
+      query.direction,
+    );
   }
 
   @Post('sessions/open')
