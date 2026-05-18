@@ -549,6 +549,7 @@ function formatDocumentTypeLabel(documentType: DocumentType): string {
     [DocumentType.RECEIVABLE]: "Phải thu",
     [DocumentType.PURCHASE_ORDER]: "Phiếu đặt hàng",
     [DocumentType.GOODS_ISSUE]: "Phiếu xuất hàng",
+    [DocumentType.GOODS_RECEIPT]: "Phiếu nhập kho",
   };
   return labels[documentType];
 }
@@ -575,6 +576,7 @@ function defaultPrefix(documentType: DocumentType): string {
     [DocumentType.RECEIVABLE]: "REC",
     [DocumentType.PURCHASE_ORDER]: "PO",
     [DocumentType.GOODS_ISSUE]: "GI",
+    [DocumentType.GOODS_RECEIPT]: "NK",
   };
   return prefixMap[documentType];
 }

@@ -28,8 +28,11 @@ const IDS = {
   role: '40000000-0000-4000-8000-000000000001',
   storageMain: '50000000-0000-4000-8000-000000000001',
   storageReserve: '50000000-0000-4000-8000-000000000002',
+  storageShowroom: '50000000-0000-4000-8000-000000000003',
   locationMain: '60000000-0000-4000-8000-000000000001',
   locationReserve: '60000000-0000-4000-8000-000000000002',
+  locationShowroom: '60000000-0000-4000-8000-000000000003',
+  showroomMain: '55000000-0000-4000-8000-000000000001',
   providerDefault: '65000000-0000-4000-8000-000000000001',
   itemLaptop: '70000000-0000-4000-8000-000000000001',
   itemMonitor: '70000000-0000-4000-8000-000000000002',
@@ -168,7 +171,7 @@ async function seedInventoryData() {
         ($2, $5, NULL, '1121', 'Tiền gửi ngân hàng',  'ASSET',   true, $5, NOW(), NOW()),
         ($3, $5, NULL, '5111', 'Doanh thu bán hàng',  'REVENUE', true, $5, NOW(), NOW()),
         ($4, $5, NULL, '1311', 'Phải thu khách hàng', 'ASSET',   true, $5, NOW(), NOW())
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (organization_id, code) DO NOTHING
       `,
       [IDS.accountCash, IDS.accountBank, IDS.accountRevenue, IDS.accountReceivable, IDS.organization],
     );
@@ -242,7 +245,8 @@ async function seedInventoryData() {
       INSERT INTO storages (id, organization_id, branch_id, name, is_main_storage, created_by, created_at, updated_at)
       VALUES
         ($1, $2, $3, 'Main Warehouse', true, $4, NOW(), NOW()),
-        ($5, $2, $3, 'Reserve Warehouse', false, $4, NOW(), NOW())
+        ($5, $2, $3, 'Reserve Warehouse', false, $4, NOW(), NOW()),
+        ($6, $2, $3, 'Main Showroom Storage', false, $4, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -251,6 +255,7 @@ async function seedInventoryData() {
         IDS.branch,
         IDS.user,
         IDS.storageReserve,
+        IDS.storageShowroom,
       ],
     );
 
@@ -259,7 +264,8 @@ async function seedInventoryData() {
       INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type, is_active, created_by, created_at, updated_at)
       VALUES
         ($1, $2, $3, $4, 'A-01', 'Main Rack A1', 'RACK', true, $5, NOW(), NOW()),
-        ($6, $2, $3, $7, 'B-01', 'Reserve Rack B1', 'RACK', true, $5, NOW(), NOW())
+        ($6, $2, $3, $7, 'B-01', 'Reserve Rack B1', 'RACK', true, $5, NOW(), NOW()),
+        ($8, $2, $3, $9, 'SR-01', 'Main Showroom Floor', 'ZONE', true, $5, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -270,6 +276,23 @@ async function seedInventoryData() {
         IDS.user,
         IDS.locationReserve,
         IDS.storageReserve,
+        IDS.locationShowroom,
+        IDS.storageShowroom,
+      ],
+    );
+
+    await AppDataSource.query(
+      `
+      INSERT INTO showrooms (id, organization_id, branch_id, name, storage_id, is_main_showroom, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, 'Main Showroom', $4, true, $5, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        IDS.showroomMain,
+        IDS.organization,
+        IDS.branch,
+        IDS.storageShowroom,
+        IDS.user,
       ],
     );
 
@@ -280,6 +303,20 @@ async function seedInventoryData() {
       ON CONFLICT (id) DO NOTHING
       `,
       [IDS.providerDefault, IDS.organization, IDS.user],
+    );
+
+    // Seed default DISPOSAL reasons for the demo org.
+    await AppDataSource.query(
+      `
+      INSERT INTO issue_reasons (id, organization_id, code, name, purpose, is_active, created_by, created_at, updated_at)
+      VALUES
+        (uuid_generate_v4(), $1, 'HONG_BAO_QUAN', 'Hàng hỏng do bảo quản chưa tốt', 'DISPOSAL', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'HET_HAN', 'Hàng hỏng do hết hạn sử dụng', 'DISPOSAL', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'XUAT_MAU', 'Xuất hàng mẫu', 'OTHER', true, $2, NOW(), NOW()),
+        (uuid_generate_v4(), $1, 'XUAT_NOI_BO', 'Xuất sử dụng nội bộ', 'OTHER', true, $2, NOW(), NOW())
+      ON CONFLICT (organization_id, code) DO NOTHING
+      `,
+      [IDS.organization, IDS.user],
     );
 
     // Create "Hardware" category for the two demo items.

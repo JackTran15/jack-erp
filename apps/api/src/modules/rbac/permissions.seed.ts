@@ -38,6 +38,9 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.goods-issue.approve', description: 'Approve goods issues', module: 'inventory' },
   { key: 'inventory.goods-issue.post', description: 'Post goods issues to ledger', module: 'inventory' },
   { key: 'inventory.goods-issue.cancel', description: 'Cancel goods issues', module: 'inventory' },
+  { key: 'goods_receipt.read', description: 'View goods receipts (phiếu nhập kho)', module: 'inventory' },
+  { key: 'goods_receipt.write', description: 'Create/update/cancel goods receipts', module: 'inventory' },
+  { key: 'goods_receipt.post', description: 'Post goods receipts (commit stock-in)', module: 'inventory' },
   { key: 'inventory.transfer.read', description: 'View inventory transfers', module: 'inventory' },
   { key: 'inventory.transfer.create', description: 'Create inventory transfers', module: 'inventory' },
   { key: 'inventory.transfer.post', description: 'Post inventory transfers', module: 'inventory' },
@@ -47,6 +50,9 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'inventory.adjustment.submit', description: 'Submit inventory adjustments', module: 'inventory' },
   { key: 'inventory.adjustment.post', description: 'Post inventory adjustments', module: 'inventory' },
   { key: 'inventory.adjustment.cancel', description: 'Cancel inventory adjustments', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.read', description: 'View temp warehouse sessions and lines', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.write', description: 'Add, update and delete temp warehouse lines', module: 'inventory' },
+  { key: 'inventory.temp-warehouse.close', description: 'Close temp warehouse sessions', module: 'inventory' },
   { key: 'inventory.manage', description: 'Manage inventory operations (broad scope)', module: 'inventory' },
 
   // Product

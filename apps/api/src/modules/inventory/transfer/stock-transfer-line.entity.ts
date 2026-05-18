@@ -13,6 +13,22 @@ export class StockTransferLineEntity {
   @Column({ name: 'item_id', type: 'uuid', comment: 'The item being transferred' })
   itemId: string;
 
+  @Column({
+    name: 'source_location_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Per-line source location (defaults to header sourceLocationId on legacy rows)',
+  })
+  sourceLocationId?: string;
+
+  @Column({
+    name: 'destination_location_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Per-line destination location (defaults to header destinationLocationId on legacy rows)',
+  })
+  destinationLocationId?: string;
+
   @Column({ type: 'numeric', comment: 'Quantity to transfer (always positive)' })
   quantity: number;
 

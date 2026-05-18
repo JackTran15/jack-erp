@@ -2,6 +2,8 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource, TypeOrmModule } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { BranchModule } from '../../branch/branch.module';
+import { StockLedgerModule } from '../ledger/stock-ledger.module';
+import { ProductModule } from '../product/product.module';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
@@ -9,15 +11,19 @@ import { ProviderEntity } from './provider.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
+import { ItemUnitEntity } from './item-unit.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
 import { LocationEntity } from './location.entity';
 import { StorageManagerAssignmentEntity } from './storage-manager-assignment.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { InventoryLocationService } from './inventory-location.service';
 import { ItemProviderService } from './item-provider.service';
 import { ItemBarcodeService } from './item-barcode.service';
 import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { InventoryLocationController } from './inventory-location.controller';
+import { InventoryLocationStockController } from './inventory-location-stock.controller';
+import { InventoryLocationStockService } from './inventory-location-stock.service';
 import {
   InventoryItemCrudService,
   INVENTORY_ITEM_ENTITY_CONFIG,
@@ -48,16 +54,21 @@ import {
       ItemProviderEntity,
       ItemBarcodeEntity,
       ItemStockThresholdEntity,
+      ItemUnitEntity,
       StorageEntity,
       ShowroomEntity,
       LocationEntity,
       StorageManagerAssignmentEntity,
+      StockBalanceEntity,
     ]),
     BranchModule,
+    StockLedgerModule,
+    ProductModule,
   ],
-  controllers: [InventoryLocationController],
+  controllers: [InventoryLocationController, InventoryLocationStockController],
   providers: [
     InventoryLocationService,
+    InventoryLocationStockService,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
@@ -81,6 +92,7 @@ import {
   ],
   exports: [
     InventoryLocationService,
+    InventoryLocationStockService,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,

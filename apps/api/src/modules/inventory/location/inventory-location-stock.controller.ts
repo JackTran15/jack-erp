@@ -1,0 +1,93 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsUUID } from 'class-validator';
+import {
+  Actor,
+  ActorContext,
+} from '../../../common/decorators/actor-context.decorator';
+import { RequireBranchScope, RequirePermission } from '../../auth/decorators';
+import { AuditInterceptor } from '../../crud/audit.interceptor';
+import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
+import { PermissionGuard } from '../../rbac/permission.guard';
+import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
+import { StockByLocationResponseDto } from './dto/stock-by-location.response.dto';
+import { InventoryLocationStockService } from './inventory-location-stock.service';
+
+class AddItemToLocationDto {
+  @IsUUID()
+  itemId: string;
+}
+
+@ApiTags('inventory')
+@Controller('inventory/locations')
+@UseInterceptors(AuditInterceptor)
+@UseGuards(PermissionGuard, BranchScopeGuard)
+export class InventoryLocationStockController {
+  constructor(private readonly service: InventoryLocationStockService) {}
+
+  @Get(':locationId/stock-items')
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary: 'List items + stock tại 1 location (kể cả stock âm)',
+  })
+  @ApiResponse({ status: 200, type: StockByLocationResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'Location không tồn tại hoặc không thuộc tổ chức',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Thiếu permission inventory.read hoặc sai branch scope',
+  })
+  listStockByLocation(
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Query() query: StockByLocationQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getStockByLocation(locationId, query, actor);
+  }
+
+  @Post(':locationId/stock-items')
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement.',
+  })
+  @ApiResponse({ status: 201, description: 'Đã thêm hàng hóa vào vị trí' })
+  addItemToLocation(
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Body() dto: AddItemToLocationDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.addItemToLocation(locationId, dto.itemId, actor);
+  }
+
+  @Delete(':locationId/stock-items/:itemId')
+  @HttpCode(204)
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary: 'Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0)',
+  })
+  async removeItemFromLocation(
+    @Param('locationId', ParseUUIDPipe) locationId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Actor() actor: ActorContext,
+  ): Promise<void> {
+    await this.service.removeItemFromLocation(locationId, itemId, actor);
+  }
+}

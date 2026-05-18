@@ -26,7 +26,13 @@ export interface CreateTransferDto {
   sourceBranchId: string;
   destinationBranchId: string;
   notes?: string;
-  lines: { itemId: string; quantity: number; notes?: string }[];
+  lines: {
+    itemId: string;
+    quantity: number;
+    sourceLocationId?: string;
+    destinationLocationId?: string;
+    notes?: string;
+  }[];
 }
 
 export interface TransferQuery extends PaginationQuery {
@@ -90,6 +96,9 @@ export class StockTransferService {
         const line = new StockTransferLineEntity();
         line.itemId = l.itemId;
         line.quantity = l.quantity;
+        line.sourceLocationId = l.sourceLocationId ?? dto.sourceLocationId;
+        line.destinationLocationId =
+          l.destinationLocationId ?? dto.destinationLocationId;
         line.notes = l.notes;
         return line;
       }),
@@ -133,9 +142,11 @@ export class StockTransferService {
       const movements: RecordMovementParams[] = [];
 
       for (const line of transfer.lines) {
+        const sourceLoc = line.sourceLocationId ?? transfer.sourceLocationId;
+        const destLoc = line.destinationLocationId ?? transfer.destinationLocationId;
         movements.push({
           itemId: line.itemId,
-          locationId: transfer.sourceLocationId,
+          locationId: sourceLoc,
           branchId: transfer.sourceBranchId,
           organizationId: transfer.organizationId,
           movementType: StockMovementType.TRANSFER_OUT,
@@ -148,7 +159,7 @@ export class StockTransferService {
 
         movements.push({
           itemId: line.itemId,
-          locationId: transfer.destinationLocationId,
+          locationId: destLoc,
           branchId: transfer.destinationBranchId,
           organizationId: transfer.organizationId,
           movementType: StockMovementType.TRANSFER_IN,

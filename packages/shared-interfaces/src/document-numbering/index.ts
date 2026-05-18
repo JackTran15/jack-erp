@@ -9,6 +9,7 @@ export enum DocumentType {
   RECEIVABLE = 'RECEIVABLE',
   PURCHASE_ORDER = 'PURCHASE_ORDER',
   GOODS_ISSUE = 'GOODS_ISSUE',
+  GOODS_RECEIPT = 'GOODS_RECEIPT',
 }
 
 export interface DocumentNumberRule {

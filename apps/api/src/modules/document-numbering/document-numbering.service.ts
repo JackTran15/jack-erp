@@ -196,16 +196,20 @@ export class DocumentNumberingService {
     documentType: DocumentType,
     actor: ActorContext,
   ): Promise<DocumentNumberRuleEntity | null> {
+    // continuous numbering (e.g. "NK000001", "NK000002", ...) — no date segment, never reset
+    const useContinuous =
+      documentType === DocumentType.GOODS_RECEIPT ||
+      documentType === DocumentType.GOODS_ISSUE;
     const defaultRule = this.ruleRepo.create({
       organizationId: actor.organizationId,
       branchId: undefined,
       documentType,
       prefix: this.getDefaultPrefix(documentType),
       suffix: undefined,
-      includeDate: true,
+      includeDate: !useContinuous,
       dateFormat: 'YYYYMM',
-      sequenceLength: 5,
-      resetPolicy: ResetPolicy.MONTHLY,
+      sequenceLength: useContinuous ? 6 : 5,
+      resetPolicy: useContinuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY,
       isActive: true,
       createdBy: actor.userId,
     });
@@ -240,6 +244,7 @@ export class DocumentNumberingService {
       [DocumentType.RECEIVABLE]: 'REC',
       [DocumentType.PURCHASE_ORDER]: 'PO',
       [DocumentType.GOODS_ISSUE]: 'GI',
+      [DocumentType.GOODS_RECEIPT]: 'NK',
     };
 
     return prefixMap[documentType];
@@ -303,18 +308,23 @@ export class DocumentNumberingService {
     now: Date,
     sequence: number,
   ): string {
-    const parts: string[] = [rule.prefix];
+    const seq = sequence.toString().padStart(rule.sequenceLength, '0');
+    // Continuous rules (no date, no suffix) render as "<prefix><seq>" so users
+    // see "NK000001" instead of "NK-000001". Rules with a date or suffix keep
+    // the legacy hyphen-separated layout — readability wins when there are
+    // multiple segments to scan.
+    if (!rule.includeDate && !rule.suffix) {
+      return `${rule.prefix}${seq}`;
+    }
 
+    const parts: string[] = [rule.prefix];
     if (rule.includeDate) {
       parts.push(this.formatDate(rule.dateFormat, now));
     }
-
-    parts.push(sequence.toString().padStart(rule.sequenceLength, '0'));
-
+    parts.push(seq);
     if (rule.suffix) {
       parts.push(rule.suffix);
     }
-
     return parts.join('-');
   }
 

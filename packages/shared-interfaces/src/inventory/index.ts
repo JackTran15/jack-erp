@@ -33,7 +33,62 @@ export enum GoodsIssueStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum GoodsIssuePurpose {
+  OTHER = 'OTHER',
+  SALE = 'SALE',
+  TRANSFER_OUT = 'TRANSFER_OUT',
+  DISPOSAL = 'DISPOSAL',
+}
+
+export enum IssueReasonPurpose {
+  OTHER = 'OTHER',
+  DISPOSAL = 'DISPOSAL',
+}
+
+export enum StockTakeStatus {
+  DRAFT = 'DRAFT',
+  POSTED = 'POSTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TransferOrderStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  EXECUTED = 'EXECUTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum GoodsReceiptStatus {
+  DRAFT = 'DRAFT',
+  POSTED = 'POSTED',
+  CANCELLED = 'CANCELLED',
+  REVERSED = 'REVERSED',
+}
+
+export enum GoodsReceiptPurpose {
+  OTHER = 'OTHER',
+  TRANSFER_IN = 'TRANSFER_IN',
+}
+
+export enum GoodsReceiptReferenceType {
+  PURCHASE_ORDER = 'PURCHASE_ORDER',
+  STOCK_TRANSFER = 'STOCK_TRANSFER',
+}
+
 export type { Product } from './product';
+
+export {
+  StockStateFilter,
+} from './stock-by-location';
+export type {
+  StockByLocationProvider,
+  StockByLocationItem,
+  StockByLocationStorageRef,
+  StockByLocationBranchRef,
+  StockByLocationLocationRef,
+  StockByLocationMeta,
+  StockByLocationResponse,
+} from './stock-by-location';
 
 export enum ImportJobStatus {
   PENDING = 'PENDING',
@@ -51,6 +106,66 @@ export enum LocationType {
   RACK = 'RACK',
   BIN = 'BIN',
   ZONE = 'ZONE',
+}
+
+export enum TempWarehouseSessionStatus {
+  ACTIVE = 'ACTIVE',
+  CLOSED = 'CLOSED',
+}
+
+export enum TempWarehouseLineStatus {
+  ACTIVE = 'ACTIVE',
+  DELETED = 'DELETED',
+  AUTO_BALANCED = 'AUTO_BALANCED',
+  TRANSFERRED = 'TRANSFERRED',
+}
+
+export enum TempWarehouseTransferKind {
+  FULL = 'FULL',
+  PARTIAL = 'PARTIAL',
+}
+
+export enum TempWarehouseDirection {
+  WAREHOUSE_TO_SHOWROOM = 'warehouse_to_showroom',
+  SHOWROOM_TO_WAREHOUSE = 'showroom_to_warehouse',
+}
+
+export enum TempWarehouseCloseMode {
+  NET_OFFSET = 'NET_OFFSET',
+  CREATE_TRANSFERS = 'CREATE_TRANSFERS',
+  NONE = 'NONE',
+}
+
+export enum TempWarehouseTransferProcessingStatus {
+  NONE = 'NONE',
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
+export interface TempWarehouseTransferRequestedPayload {
+  sessionId: string;
+  organizationId: string;
+  branchId: string;
+  direction: TempWarehouseDirection;
+  sourceLocationId: string;
+  destinationLocationId: string;
+  sourceBranchId: string;
+  destinationBranchId: string;
+  lines: { tempWarehouseLineId: string; itemId: string; quantity: number }[];
+  actor: {
+    userId: string;
+    organizationId: string;
+    branchId?: string;
+    roles: string[];
+  };
+  requestedAt: string;
+  /**
+   * Undefined or FULL = published by closeSession(CREATE_TRANSFERS) — consumer updates session-level transferW2sId/S2WId.
+   * PARTIAL = published by transferLines — consumer flips the listed lines to TRANSFERRED and stores transferId per line; session-level fields untouched.
+   */
+  kind?: TempWarehouseTransferKind;
+  notes?: string;
 }
 
 export interface Provider {

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
   FormField,
   Input,
+  MoneyInput,
   Textarea,
 } from "@erp/ui";
 import {
@@ -38,7 +39,11 @@ import {
   type TabId,
   UNIT_PRESETS,
 } from "./item-create/constants";
-import { ConversionUnitsTable } from "./item-create/ConversionUnitsTable";
+import {
+  ConversionUnitsTable,
+  createBlankConversionUnitRow,
+  type ConversionUnitRow,
+} from "./item-create/ConversionUnitsTable";
 import { ProvidersPlaceholderTable } from "./item-create/ProvidersPlaceholderTable";
 import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
 import { InventoryItemCreateDialogs } from "./item-create/InventoryItemCreateDialogs";
@@ -89,10 +94,64 @@ export function InventoryItemCreateForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const previewsRef = useRef<string[]>([]);
 
+  const [unitRows, setUnitRows] = useState<ConversionUnitRow[]>([
+    createBlankConversionUnitRow(),
+  ]);
+
   const editableFieldsByKey = useMemo(
     () => new Map(editableFields.map((f) => [f.key, f])),
     [editableFields],
   );
+
+  // ─── Sync local "extras" + unitRows into the parent `values` payload ────
+  // The keys below MUST match the API DTO (CreateItemDto). CrudCreatePage
+  // forwards the whole `values` object for entityKey === "inventory-items".
+  useEffect(() => {
+    const toNumberOrUndef = (raw: string): number | undefined => {
+      if (raw === "" || raw === null || raw === undefined) return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const units = unitRows
+      .filter((r) => r.unitName.trim().length > 0)
+      .map((r) => ({
+        unitName: r.unitName.trim(),
+        ratio: toNumberOrUndef(r.ratio) ?? 1,
+        description: r.description.trim() || undefined,
+        purchasePrice: toNumberOrUndef(r.buyPrice) ?? 0,
+        sellPrice: toNumberOrUndef(r.sellPrice) ?? 0,
+        isDefaultSell: r.defaultSell,
+        isDefaultBuy: r.defaultBuy,
+      }));
+
+    const minQty = toNumberOrUndef(extras.minStock);
+    const maxQty = toNumberOrUndef(extras.maxStock);
+    const threshold =
+      minQty !== undefined || maxQty !== undefined
+        ? { minQty, maxQty }
+        : undefined;
+
+    setValues((prev) => ({
+      ...prev,
+      // Top-level primitives mapped to DTO keys
+      isPosVisible: extras.showOnPos,
+      manageBarcodePerUnit: extras.manageBarcodePerUnit,
+      isGoldSilver: extras.isGoldSilver,
+      oddSize: extras.oddSize || undefined,
+      packageWeightGram: toNumberOrUndef(extras.weightG),
+      packageLengthCm: toNumberOrUndef(extras.pkgLength),
+      packageWidthCm: toNumberOrUndef(extras.pkgWidth),
+      packageHeightCm: toNumberOrUndef(extras.pkgHeight),
+      // Nested
+      units: units.length > 0 ? units : undefined,
+      threshold,
+      initialStock: toNumberOrUndef(extras.initialStock),
+      initialStockUnitPrice: toNumberOrUndef(extras.initialStockUnitPrice),
+    }));
+    // We intentionally re-sync whenever extras or unitRows change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extras, unitRows]);
 
   const renderedDynamicKeys = useRef(new Set<string>());
 
@@ -192,12 +251,7 @@ export function InventoryItemCreateForm({
     const id = String(row.id ?? "");
     const name = String(row.name ?? "");
     const code = String(row.code ?? "");
-    setValues((prev) => ({
-      ...prev,
-      providerId: id,
-      providerName: name,
-      providerCode: code,
-    }));
+    setValues((prev) => ({ ...prev, providerId: id }));
     setProviderSummary({ name, code });
     setErrors((prev) => {
       const next = { ...prev };
@@ -208,12 +262,7 @@ export function InventoryItemCreateForm({
   };
 
   const clearProvider = () => {
-    setValues((prev) => ({
-      ...prev,
-      providerId: "",
-      providerName: "",
-      providerCode: "",
-    }));
+    setValues((prev) => ({ ...prev, providerId: "" }));
     setProviderSummary(null);
   };
 
@@ -420,8 +469,28 @@ export function InventoryItemCreateForm({
   /** Renders any editable field NOT already shown by an explicit slot (placeholder fields). */
   const renderRemainingFields = () => {
     const skip = renderedDynamicKeys.current;
+    // Keys whose value is synced from local `extras`/unitRows in another tab —
+    // skip rendering them as plain inputs in the basic tab's remainder grid.
+    const managedElsewhere = new Set([
+      "description",
+      "packageWeightGram",
+      "packageLengthCm",
+      "packageWidthCm",
+      "packageHeightCm",
+      "oddSize",
+      "isGoldSilver",
+      "manageBarcodePerUnit",
+      "isPosVisible",
+      // Has an explicit slot in the right column of the basic tab.
+      "providerId",
+    ]);
     return editableFields
-      .filter((f) => !skip.has(f.key) && f.key !== "isActive")
+      .filter(
+        (f) =>
+          !skip.has(f.key) &&
+          f.key !== "isActive" &&
+          !managedElsewhere.has(f.key),
+      )
       .map((field) => (
         <CrudFieldInput
           key={field.key}
@@ -485,12 +554,16 @@ export function InventoryItemCreateForm({
               />
             </FormField>
             <FormField label="Đơn giá nhập đầu kỳ" htmlFor="extra-initial-stock-price">
-              <Input
+              <MoneyInput
                 id="extra-initial-stock-price"
-                type="number"
-                value={extras.initialStockUnitPrice}
-                onChange={(e) => updateExtras("initialStockUnitPrice", e.target.value)}
-                inputMode="decimal"
+                value={
+                  extras.initialStockUnitPrice === "" || extras.initialStockUnitPrice == null
+                    ? ""
+                    : Number(extras.initialStockUnitPrice)
+                }
+                onChange={(v) =>
+                  updateExtras("initialStockUnitPrice", v === "" ? "" : String(v))
+                }
               />
             </FormField>
 
@@ -607,7 +680,7 @@ export function InventoryItemCreateForm({
 
         <div className="p-3">
           {activeSubTab === "conversion" ? (
-            <ConversionUnitsTable />
+            <ConversionUnitsTable rows={unitRows} setRows={setUnitRows} />
           ) : (
             <ProvidersPlaceholderTable />
           )}
@@ -757,8 +830,14 @@ export function InventoryItemCreateForm({
             id="extra-year-made"
             type="number"
             inputMode="numeric"
-            value={extras.yearMade}
-            onChange={(e) => updateExtras("yearMade", e.target.value)}
+            value={String(values.manufactureYear ?? "")}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setValues((prev) => ({
+                ...prev,
+                manufactureYear: raw === "" ? "" : Number(raw),
+              }));
+            }}
             placeholder="VD: 2024"
           />
         </FormField>
@@ -767,8 +846,10 @@ export function InventoryItemCreateForm({
           <Textarea
             id="extra-composition"
             rows={3}
-            value={extras.composition}
-            onChange={(e) => updateExtras("composition", e.target.value)}
+            value={String(values.composition ?? "")}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, composition: e.target.value }))
+            }
           />
         </FormField>
 
@@ -786,8 +867,10 @@ export function InventoryItemCreateForm({
           <Textarea
             id="extra-long-desc"
             rows={4}
-            value={extras.longDescription}
-            onChange={(e) => updateExtras("longDescription", e.target.value)}
+            value={String(values.description ?? "")}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, description: e.target.value }))
+            }
             placeholder="Mô tả chi tiết về mặt hàng…"
           />
         </FormField>

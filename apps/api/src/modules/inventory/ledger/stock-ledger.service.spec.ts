@@ -43,6 +43,7 @@ describe('StockLedgerService', () => {
     balanceRepo = {
       findOne: jest.fn(),
       findAndCount: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
 
     const mockManager = {
@@ -149,8 +150,41 @@ describe('StockLedgerService', () => {
 
   describe('getBalances', () => {
     it('should return filtered paginated results', async () => {
-      const balances = [{ id: 'b1', itemId: 'item-1', quantity: 50 }];
-      balanceRepo.findAndCount.mockResolvedValue([balances, 1]);
+      const rawRow = {
+        id: 'b1',
+        organizationId: 'org-1',
+        branchId: 'branch-1',
+        itemId: 'item-1',
+        locationId: 'loc-1',
+        quantity: '50',
+        lastMovementAt: null,
+        itemCode: 'SKU-001',
+        itemName: 'Widget',
+        itemUnit: 'PCS',
+        itemIsActive: true,
+        itemIsPosVisible: true,
+        categoryName: null,
+        locationCode: 'A-01',
+        locationName: 'Aisle 1',
+        storageId: 'stor-1',
+        storageName: 'Main WH',
+        minQty: null,
+        maxQty: null,
+      };
+
+      const mockQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([rawRow]),
+        getCount: jest.fn().mockResolvedValue(1),
+      };
+      balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(mockQb);
 
       const result = await service.getBalances({
         organizationId: 'org-1',
@@ -159,16 +193,19 @@ describe('StockLedgerService', () => {
         pageSize: 20,
       });
 
-      expect(result.data).toEqual(balances);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].itemId).toBe('item-1');
+      expect(result.data[0].quantity).toBe(50);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
-      expect(balanceRepo.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            organizationId: 'org-1',
-            itemId: 'item-1',
-          }),
-        }),
+      expect(balanceRepo.createQueryBuilder).toHaveBeenCalledWith('sb');
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'sb.organization_id = :organizationId',
+        { organizationId: 'org-1' },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'sb.item_id = :itemId',
+        { itemId: 'item-1' },
       );
     });
   });
