@@ -24,6 +24,11 @@ import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkou
 import { readPinnedItems, writePinnedItems } from "@erp/pos/lib/common/localstorage";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { clearPosSession } from "@erp/pos/lib/common/posAuth";
+import {
+  PosNotificationPopover,
+  type NotificationItem,
+} from "./PosNotificationPopover/PosNotificationPopover";
+import { PosSyncDialog } from "./PosSyncDialog/PosSyncDialog";
 
 
 export interface PosMenuItem {
@@ -51,10 +56,27 @@ export function PosLayout() {
   const navigate = useNavigate();
 
   const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
 
   const [pinnedItems, setPinnedItems] =
     useState<PosMenuItem[]>(readPinnedItems);
   const appMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const notificationsTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const notifications = useMemo<NotificationItem[]>(
+    () => [
+      {
+        id: "n1",
+        timestamp: "8:05 02/12/2024",
+        title: "MISA thông báo v/v khắc phục vấn đề gián đoạn dịch vụ",
+        description:
+          "MISA thông báo v/v khắc phục vấn đề gián đoạn dịch vụ",
+        read: false,
+      },
+    ],
+    [],
+  );
 
   const clearBranch = usePosBranchStore((s) => s.clearBranch);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
@@ -211,8 +233,21 @@ export function PosLayout() {
 
          <div className="ml-auto flex items-center gap-1">
             <PosLocationIndicator />
-            <PosIconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
-            <PosIconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
+            <PosIconButton
+              ref={notificationsTriggerRef}
+              ariaLabel="Thông báo"
+              icon={<BellIcon size={18} />}
+              active={notificationsOpen}
+              aria-expanded={notificationsOpen}
+              aria-haspopup="dialog"
+              onClick={() => setNotificationsOpen((v) => !v)}
+            />
+            <PosIconButton
+              ariaLabel="Đồng bộ"
+              icon={<RefreshIcon size={18} />}
+              active={syncDialogOpen}
+              onClick={() => setSyncDialogOpen(true)}
+            />
             <PosUserMenu
               name={cashierDisplayName ?? 'Phan Thanh Hà'}
               onLogout={handleLogout}
@@ -251,6 +286,18 @@ export function PosLayout() {
         drafts={draftInvoices}
         onConfirm={handleRestoreDraft}
         onDelete={handleDeleteDraft}
+      />
+
+      <PosNotificationPopover
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        triggerRef={notificationsTriggerRef}
+        notifications={notifications}
+      />
+
+      <PosSyncDialog
+        open={syncDialogOpen}
+        onClose={() => setSyncDialogOpen(false)}
       />
 
       <Outlet/>
