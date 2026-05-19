@@ -11,6 +11,7 @@ import { UserRoleEntity } from './user-role.entity';
 import { RoleEntity } from './role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { SessionStore } from '../redis/session.store';
+import { RbacService } from '../rbac/rbac.service';
 
 jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
@@ -39,6 +40,7 @@ describe('AuthService', () => {
   let roleRepo: jest.Mocked<Pick<Repository<RoleEntity>, 'createQueryBuilder'>>;
   let userBranchRepo: jest.Mocked<Pick<Repository<UserBranchAssignmentEntity>, 'find'>>;
   let sessionStore: jest.Mocked<Pick<SessionStore, 'createSession' | 'getSession' | 'revokeSession'>>;
+  let rbacService: jest.Mocked<Pick<RbacService, 'getUserPermissions'>>;
 
   beforeEach(async () => {
     userRepo = { findOne: jest.fn(), update: jest.fn() };
@@ -48,6 +50,12 @@ describe('AuthService', () => {
       createSession: jest.fn(),
       getSession: jest.fn(),
       revokeSession: jest.fn(),
+    };
+    rbacService = {
+      getUserPermissions: jest.fn().mockResolvedValue([
+        'iam.role.read',
+        'iam.user.read',
+      ]),
     };
 
     const mockQb = {
@@ -72,6 +80,7 @@ describe('AuthService', () => {
           },
         },
         { provide: SessionStore, useValue: sessionStore },
+        { provide: RbacService, useValue: rbacService },
         { provide: getRepositoryToken(UserEntity), useValue: userRepo },
         { provide: getRepositoryToken(UserRoleEntity), useValue: userRoleRepo },
         { provide: getRepositoryToken(RoleEntity), useValue: roleRepo },
@@ -124,6 +133,7 @@ describe('AuthService', () => {
           organizationId: 'org-1',
           roles: ['admin'],
           branchIds: ['branch-1'],
+          permissions: ['iam.role.read', 'iam.user.read'],
         }),
       });
       expect(sessionStore.createSession).toHaveBeenCalled();
@@ -252,6 +262,12 @@ describe('AuthService', () => {
         issuedAt: 1000,
         expiresAt: 999999,
       });
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
 
       const result = await service.getSession('jti-123');
 
@@ -260,7 +276,12 @@ describe('AuthService', () => {
         organizationId: 'org-1',
         roles: ['admin'],
         branchIds: ['branch-1'],
+        permissions: ['iam.role.read', 'iam.user.read'],
       });
+      expect(rbacService.getUserPermissions).toHaveBeenCalledWith(
+        'user-1',
+        'org-1',
+      );
     });
 
     it('returns null when session does not exist', async () => {

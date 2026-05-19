@@ -25,6 +25,8 @@ export interface SessionInfo {
   organizationId: string;
   roles: string[];
   branchIds: string[];
+  /** Resolved permission keys for the user (e.g. iam.role.read). */
+  permissions: string[];
 }
 
 export interface JwtPayload {
