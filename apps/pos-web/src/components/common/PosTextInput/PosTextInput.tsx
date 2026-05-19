@@ -18,22 +18,24 @@ type PosTextType = "text" | "tel" | "email" | "date" | "search";
 
 const textInputVariant: Record<
   PosTextInputVariant,
-  (size: PosTextInputSize, invalid?: boolean) => string
+  (size: PosTextInputSize, invalid?: boolean, disabled?: boolean) => string
 > = {
-  boxed: (size, invalid) =>
+  boxed: (size, invalid, disabled) =>
     cn(
       posFormRowClass,
       "border bg-white transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-[#5C6BC0]",
       posFormHeight[size],
       posFormRadius[size],
       invalid ? "border-[#F87171]" : "border-gray-200",
+      disabled && "bg-gray-50 opacity-70",
     ),
-  underline: (size, invalid) =>
+  underline: (size, invalid, disabled) =>
     cn(
       posFormRowClass,
       "border-b border-transparent bg-transparent transition-[box-shadow] duration-150 ease-out",
       posFormHeight[size],
       posFormUnderlineShadow(invalid),
+      disabled && "opacity-70",
     ),
   ghost: () => cn(posFormRowClass, "w-auto"),
 };
@@ -49,6 +51,7 @@ export interface PosTextInputProps {
   size?: PosTextInputSize;
   invalid?: boolean;
   readOnly?: boolean;
+  disabled?: boolean;
   trailing?: ReactNode;
   onBlur?: () => void;
   inputMode?: "text" | "tel" | "email" | "numeric" | "search";
@@ -71,6 +74,7 @@ export function PosTextInput({
   size = "md",
   invalid,
   readOnly,
+  disabled,
   trailing,
   onBlur,
   inputMode,
@@ -90,6 +94,7 @@ export function PosTextInput({
       onBlur={onBlur}
       placeholder={placeholder}
       readOnly={readOnly}
+      disabled={disabled}
       inputMode={inputMode}
       autoComplete={autoComplete}
       aria-label={ariaLabel}
@@ -99,6 +104,7 @@ export function PosTextInput({
         align === "right" && "text-right",
         variant === "ghost" && "border-0 px-0 py-2",
         readOnly && "cursor-default text-gray-700",
+        disabled && "cursor-not-allowed bg-transparent text-gray-700",
         inputClassName,
       )}
     />
@@ -109,7 +115,7 @@ export function PosTextInput({
   return (
     <div
       className={cn(
-        textInputVariant[variant](size, invalid),
+        textInputVariant[variant](size, invalid, disabled),
         variant !== "ghost" && posFormPadX[size],
         className,
       )}

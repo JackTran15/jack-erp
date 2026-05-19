@@ -37,14 +37,11 @@ export const CheckoutDialogs = ({
     selectedCustomer,
     createCustomerOpen,
     createDefaultQuery,
-    editCustomerOpen,
     customerDetailOpen,
     closeCreateDialog,
     handleCustomerCreated,
-    closeEditDialog,
     handleCustomerSubmitted,
     closeCustomerDetail,
-    handleEditFromDetail,
   } = useCheckoutCustomer();
 
   const cancelInvoiceOpen = usePosCheckoutUiStore((s) => s.cancelInvoiceOpen);
@@ -78,23 +75,6 @@ export const CheckoutDialogs = ({
         onCreated={handleCustomerCreated}
       />
 
-      <CustomerCreateDialog
-        open={editCustomerOpen}
-        onClose={closeEditDialog}
-        mode="edit"
-        customer={
-          selectedCustomer
-            ? {
-                id: selectedCustomer.id,
-                name: selectedCustomer.name,
-                phone: selectedCustomer.phone ?? undefined,
-                email: selectedCustomer.email ?? undefined,
-              }
-            : undefined
-        }
-        onSubmitted={handleCustomerSubmitted}
-      />
-
       {selectedCustomer ? (
         <CustomerDetailDialog
           open={customerDetailOpen}
@@ -102,7 +82,7 @@ export const CheckoutDialogs = ({
           customerId={selectedCustomer.id}
           fallbackName={formatCustomerDisplay(selectedCustomer)}
           onConfirm={closeCustomerDetail}
-          onEdit={handleEditFromDetail}
+          onCustomerUpdated={handleCustomerSubmitted}
         />
       ) : null}
 

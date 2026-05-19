@@ -36,8 +36,7 @@ export function CompanySection({ values, ids, onChange }: CompanySectionProps) {
             id={ids.company}
             variant="underline"
             value={values.companyName ?? ""}
-            onChange={(v) => onChange("companyName", v)}
-          />
+            onChange={(v) => onChange("companyName", v)}          />
         </PosFormItem>
 
         <PosFormItem
@@ -50,8 +49,7 @@ export function CompanySection({ values, ids, onChange }: CompanySectionProps) {
             id={ids.taxCode}
             variant="underline"
             value={values.taxCode ?? ""}
-            onChange={(v) => onChange("taxCode", v)}
-          />
+            onChange={(v) => onChange("taxCode", v)}          />
         </PosFormItem>
       </div>
     </>

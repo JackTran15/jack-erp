@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { Ref, RefObject } from "react";
 import type { CustomerGenderEnum, CustomerRow } from "@erp/pos/lib/common/customerApi";
 
 export type CustomerDialogMode = "create" | "edit";
@@ -84,4 +84,33 @@ export interface CustomerCreateDialogProps {
    * search KH, tạo thành công → focus ô nhập tiền).
    */
   returnFocusTo?: RefObject<HTMLElement | null>;
+}
+
+/**
+ * Props for the shell-less `CustomerForm`. The form renders 3 sections plus a
+ * sub-dialog for creating customer groups; the parent supplies the dialog
+ * shell and footer (the footer's primary button submits via `saveFormId`).
+ */
+export interface CustomerFormProps {
+  mode: CustomerDialogMode;
+  /**
+   * Stable form element id; the parent passes this to `PosDialog.Footer`'s
+   * `saveFormId` so the primary button fires the native submit handler.
+   */
+  formId: string;
+  customer?: CustomerFormValues;
+  defaultQuery?: string;
+  defaultCustomerCode?: string;
+
+  provinces?: CustomerSelectOption[];
+  districts?: CustomerSelectOption[];
+  wards?: CustomerSelectOption[];
+  cardTiers?: CustomerSelectOption[];
+  accountManagers?: CustomerSelectOption[];
+
+  onSubmitted?: (customer: CustomerRow, mode: CustomerDialogMode) => void;
+  onAddCustomerGroup?: () => void;
+  nameInputRef?: Ref<HTMLInputElement>;
+  /** Mirrors the in-flight mutation state so the parent footer can disable its button. */
+  onSubmittingChange?: (submitting: boolean) => void;
 }

@@ -43,12 +43,6 @@ export function useCheckoutCustomer() {
   const setCreateDefaultQuery = usePosCheckoutCustomerStore(
     (s) => s.setCreateDefaultQuery,
   );
-  const editCustomerOpen = usePosCheckoutCustomerStore(
-    (s) => s.editCustomerOpen,
-  );
-  const setEditCustomerOpen = usePosCheckoutCustomerStore(
-    (s) => s.setEditCustomerOpen,
-  );
   const customerDetailOpen = usePosCheckoutCustomerStore(
     (s) => s.customerDetailOpen,
   );
@@ -128,10 +122,6 @@ export function useCheckoutCustomer() {
     setCreateCustomerOpen(true);
   }, [customerQuery, setCreateDefaultQuery, setCreateCustomerOpen]);
 
-  const handleEditCustomer = useCallback(() => {
-    setEditCustomerOpen(true);
-  }, [setEditCustomerOpen]);
-
   const handleOpenCustomerDetail = useCallback(() => {
     setCustomerDetailOpen(true);
   }, [setCustomerDetailOpen]);
@@ -139,11 +129,6 @@ export function useCheckoutCustomer() {
   const closeCustomerDetail = useCallback(() => {
     setCustomerDetailOpen(false);
   }, [setCustomerDetailOpen]);
-
-  const handleEditFromDetail = useCallback(() => {
-    setCustomerDetailOpen(false);
-    setEditCustomerOpen(true);
-  }, [setCustomerDetailOpen, setEditCustomerOpen]);
 
   // Dialog lifecycle handlers
   const closeCreateDialog = useCallback(() => {
@@ -160,16 +145,11 @@ export function useCheckoutCustomer() {
     [pickCustomer, setCreateCustomerOpen],
   );
 
-  const closeEditDialog = useCallback(() => {
-    setEditCustomerOpen(false);
-  }, [setEditCustomerOpen]);
-
   const handleCustomerSubmitted = useCallback(
     (c: CustomerRow) => {
-      setEditCustomerOpen(false);
       pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
     },
-    [pickCustomer, setEditCustomerOpen],
+    [pickCustomer],
   );
 
   return {
@@ -183,8 +163,6 @@ export function useCheckoutCustomer() {
     setCreateCustomerOpen,
     createDefaultQuery,
     setCreateDefaultQuery,
-    editCustomerOpen,
-    setEditCustomerOpen,
     customerDetailOpen,
     setCustomerDetailOpen,
     customerSearchAdapter,
@@ -192,13 +170,10 @@ export function useCheckoutCustomer() {
     handleCustomerSubmitQuery,
     handleClearCustomer,
     handleAddCustomer,
-    handleEditCustomer,
     handleOpenCustomerDetail,
     closeCustomerDetail,
-    handleEditFromDetail,
     closeCreateDialog,
     handleCustomerCreated,
-    closeEditDialog,
     handleCustomerSubmitted,
   };
 }

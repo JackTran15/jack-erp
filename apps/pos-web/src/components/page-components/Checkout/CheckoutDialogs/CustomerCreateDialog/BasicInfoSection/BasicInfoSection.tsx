@@ -74,8 +74,7 @@ export function BasicInfoSection({
             onChange={(v) => onChange("code", v)}
             variant="underline"
             invalid={showCodeError}
-            readOnly
-          />
+            readOnly          />
         </PosFormItem>
 
         <PosFormItem
@@ -95,8 +94,7 @@ export function BasicInfoSection({
             variant="underline"
             placeholder="Tên khách hàng"
             invalid={showNameError}
-            autoComplete="name"
-          />
+            autoComplete="name"          />
         </PosFormItem>
 
         <PosFormItem
@@ -113,8 +111,7 @@ export function BasicInfoSection({
             variant="underline"
             value={values.phone ?? ""}
             onChange={(v) => onChange("phone", v)}
-            placeholder="Số điện thoại"
-          />
+            placeholder="Số điện thoại"          />
         </PosFormItem>
 
         <PosFormItem
@@ -129,8 +126,7 @@ export function BasicInfoSection({
             autoComplete="email"
             variant="underline"
             value={values.email ?? ""}
-            onChange={(v) => onChange("email", v)}
-          />
+            onChange={(v) => onChange("email", v)}          />
         </PosFormItem>
 
         <PosFormItem
@@ -144,8 +140,7 @@ export function BasicInfoSection({
             variant="underline"
             value={values.cccd ?? ""}
             onChange={(v) => onChange("cccd", v)}
-            placeholder="Số căn cước công dân"
-          />
+            placeholder="Số căn cước công dân"          />
         </PosFormItem>
 
         <PosFormItem
@@ -160,8 +155,7 @@ export function BasicInfoSection({
             variant="underline"
             value={values.birthday ?? ""}
             onChange={(v) => onChange("birthday", v)}
-            trailing={<CalendarIcon size={18} className="text-gray-500" />}
-          />
+            trailing={<CalendarIcon size={18} className="text-gray-500" />}          />
         </PosFormItem>
 
         <PosFormItem
@@ -174,8 +168,7 @@ export function BasicInfoSection({
             name="gender"
             value={values.gender ?? CustomerGenderEnum.UNSPECIFIED}
             onChange={(v) => onChange("gender", v)}
-            options={GENDER_OPTIONS}
-          />
+            options={GENDER_OPTIONS}          />
         </PosFormItem>
 
         <PosFormItem

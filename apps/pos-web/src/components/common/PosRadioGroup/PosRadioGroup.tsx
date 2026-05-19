@@ -31,6 +31,8 @@ export interface PosRadioGroupProps<TValue extends string> {
   ariaLabel?: string;
   className?: string;
   optionClassName?: string;
+  /** Disables every option in the group. Overrides per-option `disabled` when true. */
+  disabled?: boolean;
 }
 
 export function PosRadioGroup<TValue extends string>({
@@ -43,6 +45,7 @@ export function PosRadioGroup<TValue extends string>({
   ariaLabel,
   className,
   optionClassName,
+  disabled: groupDisabled,
 }: PosRadioGroupProps<TValue>) {
   return (
     <div
@@ -58,13 +61,14 @@ export function PosRadioGroup<TValue extends string>({
     >
       {options.map((opt) => {
         const selected = opt.value === value;
+        const isDisabled = groupDisabled || opt.disabled;
         return (
           <label
             key={opt.value}
             className={cn(
               "inline-flex items-center gap-2 text-gray-900",
               radioGroupLabel[size],
-              opt.disabled
+              isDisabled
                 ? "cursor-not-allowed text-gray-400"
                 : "cursor-pointer",
               optionClassName,
@@ -75,7 +79,7 @@ export function PosRadioGroup<TValue extends string>({
               name={name}
               value={opt.value}
               checked={selected}
-              disabled={opt.disabled}
+              disabled={isDisabled}
               onChange={() => onChange(opt.value)}
               className="sr-only"
             />
