@@ -13,3 +13,4 @@ export { CreateInvoiceDto, CreateInvoiceItemDto } from './create-invoice.dto';
 export { UpdateInvoiceDto } from './update-invoice.dto';
 export { CheckoutInvoiceDto } from './checkout-invoice.dto';
 export { InvoiceQueryDto } from './invoice-query.dto';
+export { DraftInvoiceResponseDto } from './draft-invoice.response.dto';
