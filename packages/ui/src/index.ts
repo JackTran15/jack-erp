@@ -46,7 +46,11 @@ export {
 } from "./components/card";
 
 export { SearchInput, type SearchInputProps } from "./components/search-input";
-export { FormField, type FormFieldProps } from "./components/form-field";
+export {
+  FormField,
+  type FormFieldLayout,
+  type FormFieldProps,
+} from "./components/form-field";
 export { LargeTextInput, type LargeTextInputProps } from "./components/large-text-input";
 export { DateTimeField, type DateTimeFieldProps } from "./components/date-time-field";
 export { TagsInput, type TagsInputProps } from "./components/tags-input";
