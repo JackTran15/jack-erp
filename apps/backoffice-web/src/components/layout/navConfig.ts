@@ -265,6 +265,7 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/setup", label: "Thiết lập chung", },
           { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
+          { to: "/role-management", label: "Quản lý vai trò" },
         ],
       },
     ],
