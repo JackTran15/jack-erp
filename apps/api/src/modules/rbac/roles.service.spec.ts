@@ -95,25 +95,18 @@ describe('RolesService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('allows description updates on system roles', async () => {
-      const role = {
+    it('refuses description updates on system roles', async () => {
+      roleRepo.findOne.mockResolvedValue({
         id: 'r-1',
-        name: 'Admin',
+        name: 'Quản trị hệ thống',
         isSystem: true,
-        description: null as string | null,
+        description: null,
         organizationId: 'org-1',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      roleRepo.findOne
-        .mockResolvedValueOnce(role) // initial fetch
-        .mockResolvedValueOnce(role); // findById after save
-      rolePermissionRepo.find.mockResolvedValue([]);
+      });
 
-      await service.update('r-1', { description: 'updated' }, actor);
-
-      expect(role.description).toBe('updated');
-      expect(roleRepo.save).toHaveBeenCalledWith(role);
+      await expect(
+        service.update('r-1', { description: 'updated' }, actor),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -175,6 +168,18 @@ describe('RolesService', () => {
       await service.setPermissions('r-1', ['pos.sale.create'], actor);
 
       expect(rbac.invalidateOrgPermissions).toHaveBeenCalledWith('org-1');
+    });
+
+    it('refuses to change permissions on a system role', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: true,
+        organizationId: 'org-1',
+      });
+
+      await expect(
+        service.setPermissions('r-1', ['pos.sale.create'], actor),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects unknown permission keys', async () => {

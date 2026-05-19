@@ -174,3 +174,10 @@ export const IAM_PERMISSION_KEYS = {
 
 export type IamPermissionKey =
   (typeof IAM_PERMISSION_KEYS)[keyof typeof IAM_PERMISSION_KEYS];
+
+export {
+  PERMISSION_LABELS_VI,
+  PERMISSION_MODULE_LABELS_VI,
+  permissionLabelVi,
+  permissionModuleLabelVi,
+} from './permission-labels-vi';

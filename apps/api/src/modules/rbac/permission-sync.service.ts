@@ -15,22 +15,40 @@ export class PermissionSyncService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     const existing = await this.permissionRepo.find();
-    const existingKeys = new Set(existing.map((p) => p.key));
+    const byKey = new Map(existing.map((p) => [p.key, p]));
 
-    const missing = PERMISSION_SEEDS.filter((s) => !existingKeys.has(s.key));
-    if (missing.length === 0) return;
+    let inserted = 0;
+    let updated = 0;
 
-    const entities = missing.map((s) =>
-      this.permissionRepo.create({
-        key: s.key,
-        description: s.description,
-        module: s.module,
-      }),
-    );
+    for (const seed of PERMISSION_SEEDS) {
+      const row = byKey.get(seed.key);
+      if (!row) {
+        await this.permissionRepo.save(
+          this.permissionRepo.create({
+            key: seed.key,
+            description: seed.description,
+            module: seed.module,
+          }),
+        );
+        inserted += 1;
+        continue;
+      }
 
-    await this.permissionRepo.save(entities);
-    this.logger.log(
-      `Synced ${missing.length} new permission(s): ${missing.map((m) => m.key).join(', ')}`,
-    );
+      if (
+        row.description !== seed.description ||
+        row.module !== seed.module
+      ) {
+        row.description = seed.description;
+        row.module = seed.module;
+        await this.permissionRepo.save(row);
+        updated += 1;
+      }
+    }
+
+    if (inserted > 0 || updated > 0) {
+      this.logger.log(
+        `Permission catalogue sync: ${inserted} inserted, ${updated} updated`,
+      );
+    }
   }
 }
