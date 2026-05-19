@@ -5,6 +5,7 @@ export * from './customer';
 export * from './inventory';
 export * from './accounting';
 export * from './pos';
+export * from './iam';
 import { DocumentType } from './document-numbering';
 export { DocumentType };
 export type { DocumentNumberRule, DocumentNumberCounter } from './document-numbering';

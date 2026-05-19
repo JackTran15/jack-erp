@@ -95,6 +95,36 @@ Rules:
 - `POST /organizations/registration-requests/:id/approve`
 - `POST /organizations/registration-requests/:id/reject`
 
+## Identity & Access Management Endpoints
+
+All paths below are auth-required, organization-scoped, and protected by `iam.*` permissions. Full request/response shapes are exported from `@erp/shared-interfaces` (see `iam/`). A walkthrough with concrete TypeScript examples lives in `docs/iam-integration.md`.
+
+Users:
+
+- `GET /admin/users`                              (`iam.user.read`) — paginated, filterable by `search`, `isActive`
+- `GET /admin/users/:id`                          (`iam.user.read`) — returns `UserDetail` incl. `roleIds[]`, `branchIds[]`
+- `POST /admin/users`                             (`iam.user.write`) — admin sets temporary password
+- `PATCH /admin/users/:id`                        (`iam.user.write`) — update profile + `isActive` toggle
+- `POST /admin/users/:id/reset-password`          (`iam.user.write`) — set a new temporary password
+- `DELETE /admin/users/:id`                       (`iam.user.delete`) — soft delete (`isActive=false`)
+- `GET  /admin/users/:id/roles`                   (`iam.user.read`)
+- `POST /admin/users/:id/roles`                   (`iam.user.roles.write`) — replaces the full role set
+- `GET  /admin/users/:id/branches`                (`iam.user.read`)
+- `POST /admin/users/:id/branches`                (`iam.user.branches.write`) — replaces the full branch set
+
+Roles:
+
+- `GET /admin/roles`                              (`iam.role.read`)
+- `GET /admin/roles/:id`                          (`iam.role.read`) — incl. `permissionKeys[]`
+- `POST /admin/roles`                             (`iam.role.write`)
+- `PATCH /admin/roles/:id`                        (`iam.role.write`) — blocks rename of `isSystem` roles
+- `DELETE /admin/roles/:id`                       (`iam.role.delete`) — blocks `isSystem` roles
+- `PUT /admin/roles/:id/permissions`              (`iam.role.permissions.write`) — replaces the full permission set
+
+Permissions catalogue:
+
+- `GET /admin/permissions`                        (`iam.permission.read`) — flat list + grouped-by-module
+
 ## Generic CRUD Admin Endpoints
 
 - `GET /admin/entities`

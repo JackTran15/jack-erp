@@ -121,4 +121,16 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   { key: 'crud.entity.create', description: 'Create CRUD entity records', module: 'crud' },
   { key: 'crud.entity.update', description: 'Update CRUD entity records', module: 'crud' },
   { key: 'crud.entity.delete', description: 'Delete CRUD entity records', module: 'crud' },
+
+  // Identity & Access Management
+  { key: 'iam.user.read', description: 'View user accounts in the organization', module: 'iam' },
+  { key: 'iam.user.write', description: 'Create or update user accounts and reset their passwords', module: 'iam' },
+  { key: 'iam.user.delete', description: 'Deactivate user accounts (soft delete)', module: 'iam' },
+  { key: 'iam.role.read', description: 'View roles in the organization', module: 'iam' },
+  { key: 'iam.role.write', description: 'Create or update roles', module: 'iam' },
+  { key: 'iam.role.delete', description: 'Delete non-system roles', module: 'iam' },
+  { key: 'iam.role.permissions.write', description: 'Grant or revoke permissions on roles', module: 'iam' },
+  { key: 'iam.user.roles.write', description: 'Assign or unassign roles to users', module: 'iam' },
+  { key: 'iam.user.branches.write', description: 'Assign or unassign branches to users', module: 'iam' },
+  { key: 'iam.permission.read', description: 'List available permission keys', module: 'iam' },
 ];

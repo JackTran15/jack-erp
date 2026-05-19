@@ -16,11 +16,11 @@ export enum ReceivableStatus {
 }
 
 export enum AccountType {
-  ASSET = 'ASSET',
-  LIABILITY = 'LIABILITY',
-  EQUITY = 'EQUITY',
-  REVENUE = 'REVENUE',
-  EXPENSE = 'EXPENSE',
+  ASSET = 'ASSET', // Current Assets, Non-Current Assets
+  LIABILITY = 'LIABILITY', // Current Liabilities, Non-Current Liabilities
+  EQUITY = 'EQUITY', // Shareholder's Equity
+  REVENUE = 'REVENUE', // Revenue
+  EXPENSE = 'EXPENSE', // Cost of Goods Sold, Expenses
 }
 
 export enum JournalStatus {
