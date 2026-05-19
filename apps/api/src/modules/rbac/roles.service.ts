@@ -130,6 +130,11 @@ export class RolesService {
       role.name = trimmedName;
     }
     if (dto.description !== undefined) {
+      if (role.isSystem) {
+        throw new BadRequestException(
+          'System roles cannot be updated',
+        );
+      }
       role.description = dto.description?.trim() ?? null;
     }
 
@@ -185,6 +190,11 @@ export class RolesService {
     });
     if (!role) {
       throw new NotFoundException(`Role ${id} not found`);
+    }
+    if (role.isSystem) {
+      throw new BadRequestException(
+        'System role permissions cannot be changed',
+      );
     }
 
     const permissionIds = permissionKeys.length
