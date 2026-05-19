@@ -14,6 +14,7 @@ interface PosCheckoutCustomerState {
   createCustomerOpen: boolean;
   createDefaultQuery: string;
   editCustomerOpen: boolean;
+  customerDetailOpen: boolean;
 
   setSelectedCustomer: (value: Updater<CustomerRow | null>) => void;
   setCustomerQuery: (value: Updater<string>) => void;
@@ -21,6 +22,7 @@ interface PosCheckoutCustomerState {
   setCreateCustomerOpen: (value: Updater<boolean>) => void;
   setCreateDefaultQuery: (value: Updater<string>) => void;
   setEditCustomerOpen: (value: Updater<boolean>) => void;
+  setCustomerDetailOpen: (value: Updater<boolean>) => void;
 
   pickCustomer: (customer: CustomerRow) => void;
   clearCustomer: () => void;
@@ -36,6 +38,7 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
     createCustomerOpen: false,
     createDefaultQuery: "",
     editCustomerOpen: false,
+    customerDetailOpen: false,
 
     setSelectedCustomer: (value) =>
       set((state) => ({
@@ -58,6 +61,10 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
     setEditCustomerOpen: (value) =>
       set((state) => ({
         editCustomerOpen: apply(state.editCustomerOpen, value),
+      })),
+    setCustomerDetailOpen: (value) =>
+      set((state) => ({
+        customerDetailOpen: apply(state.customerDetailOpen, value),
       })),
 
     pickCustomer: (customer) =>
@@ -82,6 +89,7 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
         createCustomerOpen: false,
         createDefaultQuery: "",
         editCustomerOpen: false,
+        customerDetailOpen: false,
       }),
   }),
 );

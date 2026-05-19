@@ -49,6 +49,12 @@ export function useCheckoutCustomer() {
   const setEditCustomerOpen = usePosCheckoutCustomerStore(
     (s) => s.setEditCustomerOpen,
   );
+  const customerDetailOpen = usePosCheckoutCustomerStore(
+    (s) => s.customerDetailOpen,
+  );
+  const setCustomerDetailOpen = usePosCheckoutCustomerStore(
+    (s) => s.setCustomerDetailOpen,
+  );
   const pickCustomerAction = usePosCheckoutCustomerStore(
     (s) => s.pickCustomer,
   );
@@ -126,6 +132,19 @@ export function useCheckoutCustomer() {
     setEditCustomerOpen(true);
   }, [setEditCustomerOpen]);
 
+  const handleOpenCustomerDetail = useCallback(() => {
+    setCustomerDetailOpen(true);
+  }, [setCustomerDetailOpen]);
+
+  const closeCustomerDetail = useCallback(() => {
+    setCustomerDetailOpen(false);
+  }, [setCustomerDetailOpen]);
+
+  const handleEditFromDetail = useCallback(() => {
+    setCustomerDetailOpen(false);
+    setEditCustomerOpen(true);
+  }, [setCustomerDetailOpen, setEditCustomerOpen]);
+
   // Dialog lifecycle handlers
   const closeCreateDialog = useCallback(() => {
     setCreateCustomerOpen(false);
@@ -166,12 +185,17 @@ export function useCheckoutCustomer() {
     setCreateDefaultQuery,
     editCustomerOpen,
     setEditCustomerOpen,
+    customerDetailOpen,
+    setCustomerDetailOpen,
     customerSearchAdapter,
     pickCustomer,
     handleCustomerSubmitQuery,
     handleClearCustomer,
     handleAddCustomer,
     handleEditCustomer,
+    handleOpenCustomerDetail,
+    closeCustomerDetail,
+    handleEditFromDetail,
     closeCreateDialog,
     handleCustomerCreated,
     closeEditDialog,

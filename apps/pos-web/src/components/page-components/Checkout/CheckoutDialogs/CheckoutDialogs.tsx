@@ -3,10 +3,12 @@ import { useMemo, type RefObject } from "react";
 import { PosErrorDialog } from "@erp/pos/components/common/PosErrorDialog/PosErrorDialog";
 import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CancelInvoiceConfirmDialog/CancelInvoiceConfirmDialog";
 import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerCreateDialog";
+import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailDialog";
 import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";
 import { useCheckoutCancelFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cancel-flow";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutOversellFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-oversell-flow";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
 import {
   computeOversellLines,
   usePosCheckoutSessionStore,
@@ -36,10 +38,13 @@ export const CheckoutDialogs = ({
     createCustomerOpen,
     createDefaultQuery,
     editCustomerOpen,
+    customerDetailOpen,
     closeCreateDialog,
     handleCustomerCreated,
     closeEditDialog,
     handleCustomerSubmitted,
+    closeCustomerDetail,
+    handleEditFromDetail,
   } = useCheckoutCustomer();
 
   const cancelInvoiceOpen = usePosCheckoutUiStore((s) => s.cancelInvoiceOpen);
@@ -89,6 +94,17 @@ export const CheckoutDialogs = ({
         }
         onSubmitted={handleCustomerSubmitted}
       />
+
+      {selectedCustomer ? (
+        <CustomerDetailDialog
+          open={customerDetailOpen}
+          onClose={closeCustomerDetail}
+          customerId={selectedCustomer.id}
+          fallbackName={formatCustomerDisplay(selectedCustomer)}
+          onConfirm={closeCustomerDetail}
+          onEdit={handleEditFromDetail}
+        />
+      ) : null}
 
       <CancelInvoiceConfirmDialog
         open={cancelInvoiceOpen}
