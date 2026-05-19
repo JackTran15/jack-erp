@@ -3,9 +3,13 @@
  * storages, locations, sample items, and stock balances.
  *
  * Credentials (sign in at backoffice /login):
- *   Email:            inventory.admin@erp.local
- *   Password:         DEV_ADMIN_PLAIN_PASSWORD (constant below; bcrypt-hashed before insert)
  *   Organization ID:  10000000-0000-4000-8000-000000000001
+ *   Password:         DEV_ADMIN_PLAIN_PASSWORD (constant below; bcrypt-hashed before insert)
+ *
+ *   Email:            inventory.admin@erp.local
+ *   Role:             Quản trị hệ thống (system, full access — read-only on UI)
+ *
+ *   Other seeded roles (CRUD on UI): Quản lý tổng, Quản lý chi nhánh, Nhân viên
  *
  * Run: pnpm --filter @erp/api seed:inventory   (alias: seed:dev-admin)
  *
@@ -15,6 +19,13 @@
 import * as bcrypt from 'bcryptjs';
 import { AppDataSource } from '../data-source';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
+import {
+  BRANCH_MANAGER_PERMISSION_KEYS,
+  GENERAL_MANAGER_PERMISSION_KEYS,
+  SEED_ROLE_NAMES,
+  STAFF_PERMISSION_KEYS,
+  SYSTEM_ADMIN_PERMISSION_KEYS,
+} from './org-role-permissions';
 
 /** Plaintext dev login password — must match what you type in the backoffice login form. */
 const DEV_ADMIN_PLAIN_PASSWORD = 'password123';
@@ -25,7 +36,12 @@ const IDS = {
   organization: '10000000-0000-4000-8000-000000000001',
   branch: '20000000-0000-4000-8000-000000000001',
   user: '30000000-0000-4000-8000-000000000001',
-  role: '40000000-0000-4000-8000-000000000001',
+  roleSystemAdmin: '40000000-0000-4000-8000-000000000001',
+  roleGeneralManager: '40000000-0000-4000-8000-000000000003',
+  roleBranchManager: '40000000-0000-4000-8000-000000000004',
+  roleStaff: '40000000-0000-4000-8000-000000000005',
+  /** Legacy second admin role from earlier seeds — removed after merge. */
+  legacyAdminRole: '40000000-0000-4000-8000-000000000002',
   storageMain: '50000000-0000-4000-8000-000000000001',
   storageReserve: '50000000-0000-4000-8000-000000000002',
   storageShowroom: '50000000-0000-4000-8000-000000000003',
@@ -69,6 +85,77 @@ const IDS = {
   itemShoe43Den: 'A3000000-0000-4000-8000-000000000006',
 };
 
+async function upsertPermissions(): Promise<void> {
+  for (const permission of PERMISSION_SEEDS) {
+    await AppDataSource.query(
+      `
+      INSERT INTO permissions (id, key, description, module)
+      VALUES (gen_random_uuid(), $1, $2, $3)
+      ON CONFLICT (key) DO UPDATE SET
+        description = EXCLUDED.description,
+        module = EXCLUDED.module
+      `,
+      [permission.key, permission.description, permission.module],
+    );
+  }
+}
+
+async function assignPermissionsToRole(
+  roleId: string,
+  permissionKeys: string[],
+): Promise<void> {
+  await upsertPermissions();
+  await AppDataSource.query(
+    `DELETE FROM role_permissions WHERE role_id = $1`,
+    [roleId],
+  );
+  for (const key of permissionKeys) {
+    await AppDataSource.query(
+      `
+      INSERT INTO role_permissions (id, role_id, permission_id)
+      SELECT gen_random_uuid(), $1, p.id
+      FROM permissions p
+      WHERE p.key = $2
+      ON CONFLICT (role_id, permission_id) DO NOTHING
+      `,
+      [roleId, key],
+    );
+  }
+}
+
+async function upsertSeedRole(
+  id: string,
+  organizationId: string,
+  name: string,
+  description: string,
+  isSystem: boolean,
+): Promise<void> {
+  await AppDataSource.query(
+    `
+    UPDATE roles
+    SET name = 'role-legacy-' || substr(replace(id::text, '-', ''), 1, 8),
+        updated_at = NOW()
+    WHERE organization_id = $1
+      AND name = $2
+      AND id <> $3::uuid
+    `,
+    [organizationId, name, id],
+  );
+
+  await AppDataSource.query(
+    `
+    INSERT INTO roles (id, organization_id, name, description, is_system, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      description = EXCLUDED.description,
+      is_system = EXCLUDED.is_system,
+      updated_at = NOW()
+    `,
+    [id, organizationId, name, description, isSystem],
+  );
+}
+
 async function seedInventoryData() {
   await AppDataSource.initialize();
 
@@ -96,14 +183,67 @@ async function seedInventoryData() {
       [IDS.user, IDS.organization, devAdminPasswordHash],
     );
 
+    // Rename legacy `admin` role id to Quản trị hệ thống (system, immutable on UI).
     await AppDataSource.query(
       `
-      INSERT INTO roles (id, organization_id, name, description, is_system, created_at, updated_at)
-      VALUES ($1, $2, 'inventory-admin', 'Inventory management seed role', true, NOW(), NOW())
-      ON CONFLICT (id) DO NOTHING
+      UPDATE roles
+      SET name = 'admin-legacy-' || substr(replace(id::text, '-', ''), 1, 8),
+          updated_at = NOW()
+      WHERE organization_id = $1
+        AND name IN ('admin', $2)
+        AND id <> $3::uuid
       `,
-      [IDS.role, IDS.organization],
+      [
+        IDS.organization,
+        SEED_ROLE_NAMES.SYSTEM_ADMIN,
+        IDS.roleSystemAdmin,
+      ],
     );
+
+    await upsertSeedRole(
+      IDS.roleSystemAdmin,
+      IDS.organization,
+      SEED_ROLE_NAMES.SYSTEM_ADMIN,
+      'User Root — toàn quyền hệ thống (không chỉnh trên UI)',
+      true,
+    );
+    await assignPermissionsToRole(
+      IDS.roleSystemAdmin,
+      SYSTEM_ADMIN_PERMISSION_KEYS,
+    );
+
+    await upsertSeedRole(
+      IDS.roleGeneralManager,
+      IDS.organization,
+      SEED_ROLE_NAMES.GENERAL_MANAGER,
+      'Toàn quyền vận hành + báo cáo tổng hợp và từng chi nhánh',
+      false,
+    );
+    await assignPermissionsToRole(
+      IDS.roleGeneralManager,
+      GENERAL_MANAGER_PERMISSION_KEYS,
+    );
+
+    await upsertSeedRole(
+      IDS.roleBranchManager,
+      IDS.organization,
+      SEED_ROLE_NAMES.BRANCH_MANAGER,
+      'Toàn quyền vận hành trong phạm vi chi nhánh + báo cáo chi nhánh',
+      false,
+    );
+    await assignPermissionsToRole(
+      IDS.roleBranchManager,
+      BRANCH_MANAGER_PERMISSION_KEYS,
+    );
+
+    await upsertSeedRole(
+      IDS.roleStaff,
+      IDS.organization,
+      SEED_ROLE_NAMES.STAFF,
+      'Đơn hàng, kho tạm, hóa đơn, ca làm việc, yêu cầu điều chuyển',
+      false,
+    );
+    await assignPermissionsToRole(IDS.roleStaff, STAFF_PERMISSION_KEYS);
 
     await AppDataSource.query(
       `
@@ -111,30 +251,56 @@ async function seedInventoryData() {
       VALUES (gen_random_uuid(), $1, $2, $3, NOW())
       ON CONFLICT (user_id, role_id, organization_id) DO NOTHING
       `,
-      [IDS.user, IDS.role, IDS.organization],
+      [IDS.user, IDS.roleSystemAdmin, IDS.organization],
     );
 
-    for (const permission of PERMISSION_SEEDS) {
-      await AppDataSource.query(
-        `
-        INSERT INTO permissions (id, key, description, module)
-        VALUES (gen_random_uuid(), $1, $2, $3)
-        ON CONFLICT (key) DO NOTHING
-        `,
-        [permission.key, permission.description, permission.module],
-      );
-
-      await AppDataSource.query(
-        `
-        INSERT INTO role_permissions (id, role_id, permission_id)
-        SELECT gen_random_uuid(), $1, p.id
-        FROM permissions p
-        WHERE p.key = $2
-        ON CONFLICT (role_id, permission_id) DO NOTHING
-        `,
-        [IDS.role, permission.key],
-      );
-    }
+    // Drop duplicate dev admin user / legacy admin role from earlier seeds.
+    await AppDataSource.query(
+      `
+      DELETE FROM user_branch_assignments
+      WHERE user_id IN (
+        SELECT id FROM users
+        WHERE organization_id = $1 AND email = 'admin@erp.local'
+      )
+      `,
+      [IDS.organization],
+    );
+    await AppDataSource.query(
+      `
+      DELETE FROM user_roles
+      WHERE user_id IN (
+        SELECT id FROM users
+        WHERE organization_id = $1 AND email = 'admin@erp.local'
+      )
+      `,
+      [IDS.organization],
+    );
+    await AppDataSource.query(
+      `
+      DELETE FROM users
+      WHERE organization_id = $1 AND email = 'admin@erp.local'
+      `,
+      [IDS.organization],
+    );
+    await AppDataSource.query(
+      `
+      DELETE FROM role_permissions WHERE role_id = $1
+      `,
+      [IDS.legacyAdminRole],
+    );
+    await AppDataSource.query(
+      `
+      DELETE FROM user_roles WHERE role_id = $1
+      `,
+      [IDS.legacyAdminRole],
+    );
+    await AppDataSource.query(
+      `
+      DELETE FROM roles
+      WHERE id = $1 AND organization_id = $2
+      `,
+      [IDS.legacyAdminRole, IDS.organization],
+    );
 
     await AppDataSource.query(
       `
@@ -546,7 +712,9 @@ async function seedInventoryData() {
     );
 
     // eslint-disable-next-line no-console
-    console.log('Inventory seed completed successfully (includes product catalog).');
+    console.log(
+      'Inventory seed completed (inventory.admin@erp.local → Quản trị hệ thống + 3 vai trò mẫu).',
+    );
   } finally {
     await AppDataSource.destroy();
   }
