@@ -8,15 +8,9 @@ import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-chec
 
 interface CustomerSectionProps {
   customerInputRef: RefObject<HTMLInputElement | null>;
-  /** Action group (QR / Add / Voucher) — kế hợp UI state ở PaymentSummaryPanel. */
   actions?: CustomerActionItem[];
 }
 
-/**
- * Header section của payment panel: sub-topbar (datetime+saleMode) + customer
- * search/selected card + field error. Đọc selectedCustomer + customerFieldError
- * từ customer hook.
- */
 export function CustomerSection({
   customerInputRef,
   actions,

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import {
   isInDateRange,
@@ -7,6 +6,9 @@ import {
 } from "@erp/pos/lib/common/dateRangeFilter";
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
+import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-invoices";
+import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
+import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/FilterBar/FilterBar";
 import { InvoiceDetailPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceDetailPanel/InvoiceDetailPanel";
 import { InvoiceListPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceListPanel/InvoiceListPanel";
@@ -14,7 +16,11 @@ import { InvoiceListPanel } from "@erp/pos/components/page-components/Checkout/C
 export interface DraftInvoicesDialogProps {
   open: boolean;
   onClose: () => void;
-  drafts: DraftInvoice[];
+  /**
+   * POS session id dùng để filter draft trên BE. Truyền `activeSessionId` từ
+   * `usePosCheckoutSessionStore`.
+   */
+  sessionId: string;
   /** Pre-selected draft id when the modal mounts. */
   initialSelectedId?: string | null;
 
@@ -44,14 +50,12 @@ export interface DraftInvoicesDialogProps {
  *   • Left  — master list of saved drafts with inline delete.
  *   • Right — receipt-style detail panel with line items + total + zigzag edge.
  *
- * Self-contained — selection / search / date filter live inside; collaboration
- * points (`onConfirm`, `onDelete`, optional controlled props) keep the dialog
- * reusable from any host that holds the draft store.
+ * Self-fetching qua `GET /invoices/drafts?session_id=...` — chỉ fetch khi `open`.
  */
 export function DraftInvoicesDialog({
   open,
   onClose,
-  drafts,
+  sessionId,
   initialSelectedId = null,
   onConfirm,
   onDelete,
@@ -60,6 +64,12 @@ export function DraftInvoicesDialog({
   dateFilter,
   onDateFilterChange,
 }: DraftInvoicesDialogProps) {
+  const draftsQuery = useDraftInvoicesQuery({ sessionId, enabled: open });
+  const drafts = useMemo<DraftInvoice[]>(
+    () => (draftsQuery.data ?? []).map((row) => mapInvoiceRowToDraftInvoice(row)),
+    [draftsQuery.data],
+  );
+
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSelectedId,
   );
@@ -118,6 +128,9 @@ export function DraftInvoicesDialog({
     onClose();
   };
 
+  const isLoading = draftsQuery.isLoading && drafts.length === 0;
+  const isError = draftsQuery.isError;
+
   return (
     <PosDialog
       open={open}
@@ -127,7 +140,6 @@ export function DraftInvoicesDialog({
     >
       <PosDialog.Header title="Hóa đơn chưa thanh toán" />
       <PosDialog.Body className="flex flex-col gap-4">
-        {/* 4.3 Filter bar */}
         <FilterBar
           search={searchState.value}
           onSearchChange={searchState.setValue}
@@ -135,16 +147,25 @@ export function DraftInvoicesDialog({
           onFilterChange={filterState.setValue}
         />
 
-        {/* 4.5+ Two-pane body */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
-          <InvoiceListPanel
-            drafts={filteredDrafts}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onDelete={onDelete}
-          />
-          <InvoiceDetailPanel draft={selectedDraft} />
-        </div>
+        {isLoading ? (
+          <p className="flex-1 px-4 py-12 text-center text-[14px] italic text-[#9CA0AB]">
+            Đang tải hóa đơn lưu tạm…
+          </p>
+        ) : isError ? (
+          <p className="flex-1 px-4 py-12 text-center text-[14px] italic text-red-600">
+            Không tải được danh sách hóa đơn lưu tạm.
+          </p>
+        ) : (
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
+            <InvoiceListPanel
+              drafts={filteredDrafts}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onDelete={onDelete}
+            />
+            <InvoiceDetailPanel draft={selectedDraft} />
+          </div>
+        )}
       </PosDialog.Body>
       <PosDialog.Footer
         onSave={handleConfirm}

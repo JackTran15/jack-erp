@@ -1,4 +1,5 @@
 import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { ApiPaymentMethod } from "@erp/pos/dtos/invoice.dto";
 
 // ============================================================================
 // Customer (purchase history, debt, detail tabs)
@@ -143,6 +144,22 @@ export const PAYMENT_METHODS: readonly PaymentMethodOption[] = [
   { value: PaymentMethodEnum.CARD, label: "Thẻ" },
   { value: PaymentMethodEnum.TRANSFER, label: "Chuyển khoản" },
 ];
+
+// ============================================================================
+// Invoice API — payment method ↔ BE enum
+// ============================================================================
+// `revenueAccountId`, `receivableAccountId` và per-line `accountId` được
+// resolve runtime qua `useRevenueAccountsQuery` / `useReceivableAccountsQuery`
+// / `usePaymentAccountsQuery` (xem `hooks/react-query/use-accounts.ts`).
+
+export const PAYMENT_METHOD_TO_API_METHOD: Record<
+  PaymentMethod,
+  ApiPaymentMethod
+> = {
+  [PaymentMethodEnum.CASH]: "cash",
+  [PaymentMethodEnum.CARD]: "card",
+  [PaymentMethodEnum.TRANSFER]: "bank_transfer",
+};
 
 // ============================================================================
 // Promo menu

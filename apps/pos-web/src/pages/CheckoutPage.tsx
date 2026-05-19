@@ -9,11 +9,6 @@ import { useCheckoutHotkeys } from "@erp/pos/hooks/page-hooks/checkout/use-check
 import { useEnsureSessionHydrated } from "@erp/pos/hooks/page-hooks/checkout/use-ensure-session-hydrated";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
-/**
- * Composer thuần: gọi orchestrator hooks (hydrate, session-watcher, catalog
- * loader, hotkeys) rồi render 4 component với refs forwardRef cho focus
- * management. Mọi state/handler do component con tự consume stores+hooks.
- */
 export function CheckoutPage() {
   const branchId = usePosBranchStore((s) => s.branchId)!;
   const focus = useCheckoutFocusManager();

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ArrowLeftIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { KeyboardHint } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/PaymentCTAButtons/KeyboardHint/KeyboardHint";
 import { useCheckoutCancelFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cancel-flow";
@@ -18,21 +17,19 @@ export function PaymentCTAButtons() {
   const isReturnExchange = usePosCheckoutSessionStore(
     selectIsReturnExchangeInvoice,
   );
-  const { saveDraft } = useCheckoutDraft();
-  const { finalizeCheckoutAndPrint } = useCheckoutFinalize();
+  const { saveDraft, isSaving } = useCheckoutDraft();
+  const { finalizeCheckoutAndPrint, isFinalizing } = useCheckoutFinalize();
   const { requestCancelInvoice } = useCheckoutCancelFlow();
   const { collectDisabled } = useCheckoutCollectState();
 
-  const [busy, setBusy] = useState(false);
+  const busy = isSaving || isFinalizing;
 
-  const handleCollect = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await finalizeCheckoutAndPrint();
-    } finally {
-      setBusy(false);
-    }
+  const handleSaveDraft = () => {
+    void saveDraft();
+  };
+
+  const handleCollect = () => {
+    void finalizeCheckoutAndPrint();
   };
 
   return (
@@ -41,7 +38,7 @@ export function PaymentCTAButtons() {
         <button
           type="button"
           onClick={requestCancelInvoice}
-          disabled={collectDisabled}
+          disabled={collectDisabled || busy}
           aria-label="Huỷ bỏ hoá đơn"
           className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-600 text-white transition-colors hover:bg-orange-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-600/40 disabled:cursor-not-allowed disabled:bg-orange-300/70 disabled:hover:bg-orange-300/70"
         >
@@ -50,8 +47,9 @@ export function PaymentCTAButtons() {
       ) : (
         <button
           type="button"
-          onClick={saveDraft}
-          className="inline-flex basis-[35%] flex-col items-center justify-center rounded-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          onClick={handleSaveDraft}
+          disabled={isSaving}
+          className="inline-flex basis-[35%] flex-col items-center justify-center rounded-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span>Lưu tạm</span>
           <KeyboardHint className="text-[11px] text-white/80">(F10)</KeyboardHint>

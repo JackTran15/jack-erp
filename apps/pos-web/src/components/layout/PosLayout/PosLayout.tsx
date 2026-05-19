@@ -13,6 +13,10 @@ import { PosPinnedButton } from "./PosPinnedButton/PosPinnedButton";
 import { PosLogo } from "./PosLogo/PosLogo";
 import { PosUserMenu } from "./PosUserMenu/PosUserMenu";
 import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
+import {
+  useDeleteInvoiceMutation,
+  useDraftInvoicesQuery,
+} from "@erp/pos/hooks/react-query/use-invoices";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { InvoiceTabBar } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTabBar/InvoiceTabBar";
@@ -88,7 +92,6 @@ export function PosLayout() {
   );
   const addSession = usePosCheckoutSessionStore((s) => s.addSession);
   const removeSession = usePosCheckoutSessionStore((s) => s.removeSession);
-  const draftInvoices = usePosCheckoutSessionStore((s) => s.draftInvoices);
   const cashierDisplayName = usePosCheckoutSessionStore(
     (s) => s.cashierDisplayName,
   );
@@ -101,7 +104,13 @@ export function PosLayout() {
   const openDraftInNewSession = usePosCheckoutSessionStore(
     (s) => s.openDraftInNewSession,
   );
-  const removeDraft = usePosCheckoutSessionStore((s) => s.removeDraft);
+
+  const draftsQuery = useDraftInvoicesQuery({
+    sessionId: activeSessionId,
+    enabled: Boolean(activeSessionId),
+  });
+  const draftsCount = draftsQuery.data?.length ?? 0;
+  const deleteInvoiceMutation = useDeleteInvoiceMutation();
 
   const announcement = usePosCheckoutUiStore((s) => s.announcement);
   const announce = usePosCheckoutUiStore((s) => s.setAnnouncement);
@@ -119,10 +128,8 @@ export function PosLayout() {
 
   const tabsWithBadges = useMemo<InvoiceTabItem[]>(
     () =>
-      tabs.map((t) =>
-        t.isDraft ? { ...t, badgeCount: draftInvoices.length } : t,
-      ),
-    [tabs, draftInvoices.length],
+      tabs.map((t) => (t.isDraft ? { ...t, badgeCount: draftsCount } : t)),
+    [tabs, draftsCount],
   );
 
   const handleSelectTab = (id: string) => {
@@ -150,8 +157,11 @@ export function PosLayout() {
   };
 
   const handleDeleteDraft = (id: string) => {
-    removeDraft(id);
-    announce("Đã xóa hóa đơn lưu tạm.");
+    deleteInvoiceMutation.mutate(id, {
+      onSuccess: () => {
+        announce("Đã xóa hóa đơn lưu tạm.");
+      },
+    });
   };
 
   const activeItemId = useMemo(
@@ -289,7 +299,7 @@ export function PosLayout() {
       <DraftInvoicesDialog
         open={draftsDialogOpen}
         onClose={() => setDraftsDialogOpen(false)}
-        drafts={draftInvoices}
+        sessionId={activeSessionId}
         onConfirm={handleRestoreDraft}
         onDelete={handleDeleteDraft}
       />

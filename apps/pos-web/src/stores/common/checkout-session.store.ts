@@ -70,7 +70,9 @@ interface PosCheckoutSessionState {
   version: number;
   sessions: InvoiceSession[];
   activeSessionId: string;
+  /** @deprecated server-side via `/invoices/drafts` — kept for localStorage migration compat, cleanup in follow-up. */
   draftInvoices: DraftInvoice[];
+  /** @deprecated server `code` is now source of truth — see `useDraftInvoicesQuery`. */
   draftSeq: number;
   cashierDisplayName: string | null;
   draftsDialogOpen: boolean;

@@ -30,11 +30,6 @@ export interface PaymentSummaryPanelProps {
   addCustomerButtonRef: RefObject<HTMLButtonElement | null>;
 }
 
-/**
- * Right-hand sticky panel containing the entire payment / customer summary.
- * Concrete cho CustomerRow — đọc state/handlers từ stores+hooks. Props chỉ
- * còn 3 refs phục vụ focus management (F4 / F12 / return-focus sau dialog).
- */
 export function PaymentSummaryPanel({
   customerSearchRef,
   paymentAmountRef,

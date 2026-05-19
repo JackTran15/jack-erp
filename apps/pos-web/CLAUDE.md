@@ -18,7 +18,8 @@ src/
 │       └── Customer/
 ├── pages/                   # File route, đặt tên *Page.tsx
 ├── hooks/
-│   ├── common/
+│   ├── common/             # hook dùng chung, KHÔNG dính React Query
+│   ├── react-query/        # toàn bộ hook wrap useQuery / useMutation / useInfiniteQuery / useSubscription
 │   └── page-hooks/
 │       ├── home/
 │       ├── product/
@@ -31,12 +32,22 @@ src/
 │       ├── product/
 │       ├── order/
 │       └── customer/
+├── services/               # 1 file = 1 module dữ liệu, gọi API qua http
+│   ├── account.service.ts
+│   └── invoice.service.ts
+├── dtos/                   # DTO request / response / payload đi cùng API
+│   ├── account.dto.ts
+│   └── invoice.dto.ts
+├── interfaces/             # Interface dùng chung cho cả dự án
+│   ├── paginated.interface.ts
+│   └── pos-session.interface.ts
 └── constants/
     ├── common.constant.ts
     ├── home.constant.ts
     ├── product.constant.ts
     ├── order.constant.ts
-    └── customer.constant.ts
+    ├── customer.constant.ts
+    └── react-query-key.constant.ts   # tập trung toàn bộ React Query key
 ```
 
 ---
@@ -52,10 +63,16 @@ src/
 | File store | `<name>.store.ts` | `cart.store.ts` |
 | File constant | `<name>.constant.ts` | `order.constant.ts` |
 | File page | `<Name>Page.tsx` | `OrderPage.tsx` |
+| File service | `<module>.service.ts` | `account.service.ts` |
+| Service (trong code) | camelCase, suffix `Service` | `accountService` |
+| File DTO | `<module>.dto.ts` | `account.dto.ts` |
+| File interface | `<name>.interface.ts` | `paginated.interface.ts` |
+| DTO / interface (trong code) | PascalCase | `CreateInvoiceBody`, `Paginated` |
 | Component (trong code) | PascalCase | `export const ProductList` |
 | Hook (trong code) | camelCase, prefix `use` | `useCartItems` |
 | Store (trong code) | camelCase, prefix `use`, suffix `Store` | `useCartStore` |
 | Constant value | UPPER_SNAKE_CASE | `MAX_CART_ITEMS` |
+| React Query key group | UPPER_SNAKE_CASE, suffix `_KEYS`, object `as const` | `ACCOUNT_KEYS.LIST` |
 
 ⚠️ Lưu ý folder `page-components/Home/`, `page-components/Product/`... dùng **PascalCase** vì là folder gom component theo trang. Folder `page-hooks/home/`, `page-stores/order/`... dùng **kebab-case** vì không chứa component.
 
@@ -190,17 +207,60 @@ OrderSummary/
 ## 6. Hooks
 
 ```
-hooks/common/use-debounce.ts                  ← dùng nhiều trang
-hooks/page-hooks/order/use-order-total.ts     ← chỉ trang Order
+hooks/common/use-debounce.ts                  ← utility, KHÔNG dính React Query, dùng nhiều trang
+hooks/react-query/use-accounts.ts             ← wrap useQuery / useMutation, gom theo entity
+hooks/page-hooks/order/use-order-total.ts     ← logic UI / state chỉ dùng trong 1 trang
 ```
 
-Quy tắc:
+Quy tắc chung:
 - 1 file = 1 hook
 - Tên file kebab-case, tên hook camelCase prefix `use`
 - Named export
 
+### Cây quyết định đặt hook
+
+Khi tạo hook mới, trả lời theo thứ tự:
+
+**Câu 1: Hook này wrap React Query (`useQuery` / `useMutation` / `useInfiniteQuery` / `useSubscription`)?**
+- Có → `src/hooks/react-query/use-<name>.ts`
+  - Đặt theo entity dữ liệu: `use-accounts.ts`, `use-invoices.ts`, `use-customer-groups.ts`...
+  - queryKey **bắt buộc** lấy từ `src/constants/react-query-key.constant.ts`, không hard-code chuỗi tại chỗ.
+  - queryFn / mutationFn **bắt buộc** gọi service trong `src/services/<module>.service.ts`. Không tự gọi `http.get/post/...` bên trong hook.
+
+**Câu 2: Hook không dính React Query và dùng ở 2+ trang?**
+- Có → `src/hooks/common/use-<name>.ts`
+- Ví dụ: `use-debounce.ts`, `use-hotkeys.ts`.
+
+**Câu 3: Hook chỉ phục vụ 1 trang (state UI, focus manager, hotkey trang...)?**
+- Có → `src/hooks/page-hooks/<trang>/use-<name>.ts`
+
+### Cấm tuyệt đối
+
+- ❌ Để hook React Query trong `common/` hoặc `page-hooks/`.
+- ❌ Hard-code queryKey string trực tiếp ở hook hoặc component (phải đi qua `react-query-key.constant.ts`).
+- ❌ Gọi `http.get / http.post / fetch / axios` trực tiếp trong hook React Query (phải đi qua service trong `src/services/`).
+- ❌ Đặt hook utility (debounce, hotkey...) vào `react-query/`.
+
+### Skeleton hook React Query
+
 ```ts
-// use-cart-items.ts
+// src/hooks/react-query/use-accounts.ts
+import { useQuery } from '@tanstack/react-query';
+import { accountService } from '@/services/account.service';
+import { ACCOUNT_KEYS } from '@/constants/react-query-key.constant';
+
+export const usePaymentAccounts = () => {
+  return useQuery({
+    queryKey: ACCOUNT_KEYS.PAYMENT_LIST,
+    queryFn: () => accountService.listPaymentAccounts(),
+  });
+};
+```
+
+### Skeleton hook utility / page-hook
+
+```ts
+// src/hooks/common/use-cart-items.ts
 import { useMemo } from 'react';
 
 export const useCartItems = () => {
@@ -264,6 +324,38 @@ export const ORDER_STATUS = {
 export type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
 ```
 
+### 8.1 React Query keys
+
+Toàn bộ key React Query (query, mutation, subscription) **bắt buộc** tập trung tại `src/constants/react-query-key.constant.ts`. Mục tiêu: dễ quản lý, tránh trùng key, invalidate by prefix theo convention TanStack Query của monorepo (xem CLAUDE.md gốc — queryKey arrays start with the resource name).
+
+Quy tắc:
+- Group theo module dữ liệu, mỗi group là 1 object `<ENTITY>_KEYS as const`.
+- Key trong group viết UPPER_SNAKE_CASE.
+- Key có tham số → khai báo dạng function trả tuple `as const`, để TypeScript giữ literal type.
+- **Tên trong tuple phải bắt đầu bằng tên resource** (để `queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.ALL })` invalidate được mọi key con của resource đó).
+
+```ts
+// src/constants/react-query-key.constant.ts
+export const ACCOUNT_KEYS = {
+  ALL: ['accounts'] as const,
+  PAYMENT_LIST: ['accounts', 'payment-list'] as const,
+  LIST: (filters: Record<string, unknown>) =>
+    ['accounts', 'list', filters] as const,
+  DETAIL: (id: string) => ['accounts', 'detail', id] as const,
+} as const;
+
+export const INVOICE_KEYS = {
+  ALL: ['invoices'] as const,
+  DRAFTS: ['invoices', 'drafts'] as const,
+  DETAIL: (id: string) => ['invoices', 'detail', id] as const,
+} as const;
+```
+
+Cấm tuyệt đối:
+- ❌ Viết queryKey inline tại hook hoặc component (vd `useQuery({ queryKey: ['accounts', id], ... })`).
+- ❌ Đặt key React Query ở bất kỳ file constant nào khác.
+- ❌ Trộn lẫn 2 module trong cùng 1 group key.
+
 ---
 
 ## 9. Pages
@@ -307,11 +399,142 @@ export const OrderPage = () => {
 
 ---
 
-## 10. Checklist trước khi tạo file
+## 10. Services
+
+`src/services/` là **chỗ duy nhất** chứa hàm gọi API của pos-web. Tổ chức theo module dữ liệu: `account.service.ts`, `invoice.service.ts`, `customer.service.ts`...
+
+Quy tắc:
+- 1 file = 1 module dữ liệu. Tên file `<module>.service.ts` (kebab-case).
+- Mỗi file export **1 object** `<module>Service` chứa tất cả method của module đó; không export rời từng hàm.
+- Method chỉ làm 2 việc: dựng request (params/body) và trả response đã typed. **Không** chứa logic UI, **không** đụng store, **không** gọi React Query.
+- Dùng `http` từ `@/lib/common/http` để gọi backend.
+- Type request/response của API (`AccountRow`, `CreateInvoiceBody`...) **bắt buộc** khai báo trong `src/dtos/<module>.dto.ts` (xem mục 11). Interface dùng chung như `Paginated<T>` đặt trong `src/interfaces/<name>.interface.ts` (xem mục 12). Service file **chỉ import**, không tự định nghĩa type request/response.
+- Named export, không default; **KHÔNG** tạo `index.ts`.
+
+### Skeleton
+
+```ts
+// src/services/account.service.ts
+import { http } from '@/lib/common/http';
+import type {
+  AccountRow,
+  ListAccountsParams,
+} from '@/dtos/account.dto';
+import type { Paginated } from '@/interfaces/paginated.interface';
+
+export const accountService = {
+  listPaymentAccounts: async (): Promise<Paginated<AccountRow>> => {
+    const params: ListAccountsParams = {
+      page: 1,
+      pageSize: 200,
+      filters: { type: 'ASSET', isActive: true },
+    };
+    const qs = new URLSearchParams();
+    if (params.page !== undefined) qs.set('page', String(params.page));
+    if (params.pageSize !== undefined) qs.set('pageSize', String(params.pageSize));
+    if (params.filters) qs.set('filters', JSON.stringify(params.filters));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return http.get<Paginated<AccountRow>>(`/accounts${suffix}`);
+  },
+};
+```
+
+### Cấm tuyệt đối
+
+- ❌ Gọi API trực tiếp trong component, page, store hoặc hook utility. Hook React Query trong `src/hooks/react-query/` là chỗ **duy nhất** được phép tiêu thụ service.
+- ❌ Tạo file API kiểu `src/lib/common/<x>Api.ts` mới. Convention cũ — code mới đi qua `src/services/`.
+- ❌ Trộn 2 module dữ liệu vào cùng 1 file service.
+
+Code cũ còn nằm ở `src/lib/common/*Api.ts` hoặc gọi API trong `page-hooks/` → **báo cho tôi biết, không tự ý refactor** trừ khi tôi yêu cầu.
+
+---
+
+## 11. DTOs
+
+`src/dtos/` chứa **toàn bộ** type/interface đi kèm API của pos-web (request body, response row, payload, enum API). Tổ chức theo module dữ liệu — 1 file = 1 module.
+
+Quy tắc:
+- Tên file kebab-case, **suffix BẮT BUỘC `.dto.ts`**: `account.dto.ts`, `invoice.dto.ts`, `customer-group.dto.ts`...
+- Mỗi type/interface PascalCase, named export. Quy ước tên:
+  - `<Action>Body` cho request body (vd `CreateInvoiceBody`, `CheckoutInvoiceBody`).
+  - `<Resource>Row` cho response row (vd `InvoiceRow`, `AccountRow`).
+  - `<Resource>Status` cho enum/literal API (vd `InvoiceStatus`, `ApiPaymentMethod`).
+- KHÔNG default export, KHÔNG `index.ts`.
+
+### Skeleton
+
+```ts
+// src/dtos/invoice.dto.ts
+export type ApiPaymentMethod = 'cash' | 'bank_transfer' | 'card';
+
+export interface CreateInvoiceItemBody {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface CreateInvoiceBody {
+  sessionId: string;
+  customerId?: string;
+  items?: CreateInvoiceItemBody[];
+}
+
+export interface InvoiceRow {
+  id: string;
+  code: string;
+  status: 'draft' | 'paid' | 'debt' | 'partial_debt' | 'cancelled';
+  amountDue: number;
+  // ...
+}
+```
+
+### Cấm tuyệt đối
+
+- ❌ Khai báo type request/response của API ngoài `src/dtos/` (đặc biệt: KHÔNG inline trong `*.service.ts`, hook, hoặc component).
+- ❌ Đặt interface dùng chung (`Paginated<T>`, `ApiError`...) trong `dtos/` — chúng thuộc `interfaces/`.
+- ❌ Trộn 2 module dữ liệu vào cùng 1 file DTO.
+- ❌ Bỏ suffix `.dto.ts` (vd `account.ts` là sai).
+
+---
+
+## 12. Interfaces
+
+`src/interfaces/` chứa interface / type **dùng chung** cho nhiều module — không gắn với 1 API cụ thể, không phải props component.
+
+Quy tắc:
+- Tên file kebab-case, **suffix BẮT BUỘC `.interface.ts`**: `paginated.interface.ts`, `pos-session.interface.ts`, `api-error.interface.ts`...
+- 1 file = 1 interface chính (hoặc 1 nhóm type/interface gắn bó chặt, vd `Paginated<T>` + `PageMeta` cùng file).
+- PascalCase, named export. KHÔNG default, KHÔNG `index.ts`.
+
+### Skeleton
+
+```ts
+// src/interfaces/paginated.interface.ts
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+### Cấm tuyệt đối
+
+- ❌ Đặt type request/response đi kèm 1 API cụ thể vào `interfaces/` — chúng thuộc `dtos/`.
+- ❌ Đặt props component vào `interfaces/` (props sống cạnh component, named `<Component>Props`).
+- ❌ Bỏ suffix `.interface.ts`.
+
+Code cũ đang khai báo type request/response inline trong `services/*.service.ts` → **báo cho tôi biết, không tự ý refactor** trừ khi tôi yêu cầu.
+
+---
+
+## 13. Checklist trước khi tạo file
 
 Trước khi tạo file mới, Claude PHẢI verify:
 
-- [ ] Đã chạy cây quyết định ở mục 3?
+- [ ] Đã chạy cây quyết định ở mục 3 (component) / mục 6 (hook)?
 - [ ] Folder component dùng PascalCase, các folder khác kebab-case?
 - [ ] Component trong `common/` hoặc `layout/` có prefix `Pos`?
 - [ ] Component trong `page-components/` KHÔNG có prefix `Pos`?
@@ -320,5 +543,13 @@ Trước khi tạo file mới, Claude PHẢI verify:
 - [ ] **KHÔNG tạo file `index.ts`?**
 - [ ] Import dùng `@/` và trỏ đến file đầy đủ?
 - [ ] Page không chứa business logic, đã tách ra hook/store?
+- [ ] Hook React Query nằm trong `src/hooks/react-query/`, KHÔNG nằm trong `common/` hay `page-hooks/`?
+- [ ] queryKey lấy từ `react-query-key.constant.ts`, KHÔNG hard-code chuỗi tại chỗ?
+- [ ] Hàm gọi API nằm trong `src/services/<module>.service.ts`, KHÔNG nằm trong hook / component / `lib/common/*Api.ts` mới?
+- [ ] Component / page / store / hook utility KHÔNG gọi `http` trực tiếp?
+- [ ] File DTO đặt trong `src/dtos/`, đuôi `.dto.ts`?
+- [ ] File interface dùng chung đặt trong `src/interfaces/`, đuôi `.interface.ts`?
+- [ ] Type request/response API có nằm trong `src/dtos/`, KHÔNG khai báo inline trong service / hook / component?
+- [ ] Interface dùng chung (`Paginated<T>`...) có nằm trong `src/interfaces/`, KHÔNG nằm trong `dtos/`?
 
 Nếu phát hiện code cũ vi phạm rule, **báo cho tôi biết, không tự ý refactor** trừ khi tôi yêu cầu.
