@@ -43,6 +43,7 @@ import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 import { ProductsPage } from "./pages/products/ProductsPage";
 import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
+import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -174,6 +175,10 @@ export function App() {
                 <Route
                   path="/settings/document-numbering"
                   element={<DocumentNumberingPage />}
+                />
+                <Route
+                  path="/role-management"
+                  element={<RoleManagementPage />}
                 />
                 <Route path="/setup" element={<TenantSetupPage />} />
                 <Route path="/error/:code" element={<HttpErrorPage />} />
