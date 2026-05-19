@@ -42,6 +42,7 @@ import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 import { ProductsPage } from "./pages/products/ProductsPage";
 import { ProductDetailPage } from "./pages/products/ProductDetailPage";
+import { EmployeesPage } from "./pages/employees/EmployeesPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,6 +73,7 @@ export function App() {
             <Route element={<RequireAuth />}>
               <Route element={<BackofficeLayout />}>
                 <Route path="/" element={<DashboardPage />} />
+                <Route path="/admin/employees" element={<EmployeesPage />} />
                 <Route path="/admin/:entityKey/new" element={<CrudCreatePage />} />
                 <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
                 <Route path="/admin/:entityKey/:id" element={<CrudDetailPage />} />
