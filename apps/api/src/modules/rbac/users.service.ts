@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import {
   PaginatedResponse,
   UserSummary,
+  UserListItem,
   UserDetail,
   EmployeeProfileView,
   EmploymentStatus,
@@ -66,12 +67,26 @@ export class UsersService {
   async list(
     query: UserListParams,
     actor: ActorContext,
-  ): Promise<PaginatedResponse<UserSummary>> {
+  ): Promise<PaginatedResponse<UserListItem>> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
     };
     if (typeof query.isActive === 'boolean') {
       where.isActive = query.isActive;
+    }
+
+    // Resolve users whose employee code matches the search term so the OR clause
+    // below can match on code in addition to email/firstName/lastName.
+    let codeMatchedUserIds: string[] = [];
+    if (query.search) {
+      const matches = await this.profileRepo.find({
+        where: {
+          organizationId: actor.organizationId,
+          code: ILike(`%${query.search}%`),
+        },
+        select: { id: true, userId: true },
+      });
+      codeMatchedUserIds = matches.map((m) => m.userId);
     }
 
     const baseFind = {
@@ -80,6 +95,9 @@ export class UsersService {
             { ...where, email: ILike(`%${query.search}%`) },
             { ...where, firstName: ILike(`%${query.search}%`) },
             { ...where, lastName: ILike(`%${query.search}%`) },
+            ...(codeMatchedUserIds.length
+              ? [{ ...where, id: In(codeMatchedUserIds) }]
+              : []),
           ]
         : where,
       skip: (query.page - 1) * query.pageSize,
@@ -89,8 +107,20 @@ export class UsersService {
 
     const [rows, total] = await this.userRepo.findAndCount(baseFind);
 
+    // Batch-load profiles for the page in a single query (avoids N+1).
+    const profiles = rows.length
+      ? await this.profileRepo.find({
+          where: {
+            userId: In(rows.map((u) => u.id)),
+            organizationId: actor.organizationId,
+          },
+          relations: ['jobPosition'],
+        })
+      : [];
+    const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
+
     return {
-      data: rows.map((u) => this.toView(u)),
+      data: rows.map((u) => this.toListItem(u, profileByUser.get(u.id))),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -617,6 +647,27 @@ export class UsersService {
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
+    };
+  }
+
+  private toListItem(
+    u: UserEntity,
+    p: EmployeeProfileEntity | undefined,
+  ): UserListItem {
+    return {
+      ...this.toView(u),
+      code: p?.code ?? null,
+      profile: p
+        ? {
+            code: p.code,
+            jobPosition: p.jobPosition
+              ? { id: p.jobPosition.id, name: p.jobPosition.name }
+              : null,
+            photoUrl: p.photoUrl ?? null,
+            mobile: p.mobile ?? null,
+            employmentStatus: p.employmentStatus,
+          }
+        : null,
     };
   }
 }
