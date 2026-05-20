@@ -4,11 +4,17 @@ import { setAccessToken, clearAccessToken } from "./access-token";
 const REFRESH = "refresh_token";
 const ORG = "organization_id";
 const BRANCH = "active_branch_id";
+const PERMISSIONS = "user_permissions";
+
+function persistPermissions(permissions: string[]): void {
+  localStorage.setItem(PERMISSIONS, JSON.stringify(permissions));
+}
 
 export function persistSession(login: LoginResponse): void {
   setAccessToken(login.accessToken);
   localStorage.setItem(REFRESH, login.refreshToken);
   localStorage.setItem(ORG, login.session.organizationId);
+  persistPermissions(login.session.permissions ?? []);
   const firstBranch = login.session.branchIds[0];
   if (firstBranch) {
     localStorage.setItem(BRANCH, firstBranch);
@@ -16,6 +22,10 @@ export function persistSession(login: LoginResponse): void {
     localStorage.removeItem(BRANCH);
   }
   localStorage.removeItem("access_token");
+}
+
+export function persistSessionInfo(session: LoginResponse["session"]): void {
+  persistPermissions(session.permissions ?? []);
 }
 
 export function persistRefreshResponse(res: RefreshResponse): void {
@@ -29,6 +39,7 @@ export function clearSession(): void {
   localStorage.removeItem(REFRESH);
   localStorage.removeItem(ORG);
   localStorage.removeItem(BRANCH);
+  localStorage.removeItem(PERMISSIONS);
   localStorage.removeItem("access_token");
 }
 

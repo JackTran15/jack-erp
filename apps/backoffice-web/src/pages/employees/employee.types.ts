@@ -1,3 +1,5 @@
+import type { RoleSummary } from "@erp/shared-interfaces";
+
 export enum GenderEnum {
   MALE = "MALE",
   FEMALE = "FEMALE",
@@ -41,11 +43,11 @@ export interface EmployeeAccess {
   schedule: AccessScheduleDay[];
 }
 
-export interface EmployeeRole {
-  id: string;
-  name: string;
-  description: string;
-}
+/** Role row in employee UI (from IAM RoleSummary). */
+export type EmployeeRolePick = Pick<
+  RoleSummary,
+  "id" | "name" | "description"
+>;
 
 export interface AddressBlock {
   address: string;
@@ -80,35 +82,10 @@ export interface EmployeeProfile {
   originalDocumentsNote: string;
 }
 
-export interface Employee {
-  id: string;
-  code: string;
-  fullName: string;
-  gender: GenderEnum;
-  birthDate?: string;
-  phone: string;
-  email?: string;
-  employmentStatus: EmploymentStatusEnum;
-  allowSoftwareAccess: boolean;
-  roles: EmployeeRole[];
-  contact: ContactSummary;
-  emergencyContact: EmergencyContactSummary;
-  profile: EmployeeProfile;
-  access: EmployeeAccess;
-  basicExtra?: {
-    idCardNumber?: string;
-    idCardIssuePlace?: string;
-    idCardIssueDate?: string;
-    maritalStatus?: MaritalStatusEnum;
-    photoDataUrl?: string;
-  };
-  contactDetail?: {
-    homePhone: string;
-    permanentAddress: AddressBlock;
-    currentAddress: AddressBlock;
-  };
-}
-
+/**
+ * Form state for the employee modal.
+ * IAM fields map to CreateUserRequest / UpdateUserRequest; HR tabs are UI-only (readonly).
+ */
 export interface EmployeeFormDraft {
   basic: {
     code: string;
@@ -128,6 +105,7 @@ export interface EmployeeFormDraft {
     gender: GenderEnum;
   };
   roleIds: string[];
+  branchIds?: string[];
   contact: {
     homePhone: string;
     permanentAddress: AddressBlock;

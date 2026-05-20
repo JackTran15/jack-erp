@@ -1,6 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
-import { DocumentListShell, PageToolbar, type ToolbarItem } from "@erp/ui";
-import { Pencil, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  IAM_PERMISSION_KEYS,
+  type RoleSummary,
+  type UserDetail,
+} from "@erp/shared-interfaces";
+import {
+  Badge,
+  DocumentListShell,
+  PageToolbar,
+  type ToolbarItem,
+} from "@erp/ui";
+import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   BaseDataTable,
@@ -14,17 +25,25 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../components/table/pagination.dto";
-import type { Employee } from "../employees/employee.types";
-import { RoleDetailPanel } from "./components/RoleDetailPanel";
-import { RoleEditModal } from "./components/RoleEditModal";
-import { RoleEmployeePickerModal } from "./components/RoleEmployeePickerModal";
+import { hasPermission } from "../../lib/permissions";
 import {
-  buildInitialRoleEmployees,
-  buildInitialRoles,
-  draftToRole,
-  roleToDraft,
-} from "./role-management.mock";
-import type { RoleFormDraft, RoleRecord } from "./role-management.types";
+  emptyRoleDraft,
+  getIamErrorMessage,
+  joinFullName,
+  roleToFormDraft,
+  useAllUserDetails,
+  useCreateRole,
+  useDeleteRole,
+  useRole,
+  useRoles,
+  useSetRolePermissions,
+  useSyncRoleUsers,
+  useUpdateRole,
+} from "../../hooks/iam";
+import { RoleDetailPanel } from "./components/RoleDetailPanel";
+import { RoleEditModal, type RoleEditMode } from "./components/RoleEditModal";
+import { RoleEmployeePickerModal } from "./components/RoleEmployeePickerModal";
+import type { RoleFormDraft } from "../../lib/iam";
 
 const FILTER_KEYS = ["name", "description"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -39,39 +58,49 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   );
 }
 
-function employeeHasRole(employee: Employee, roleId: string): boolean {
-  return employee.roles.some((r) => r.id === roleId);
-}
-
-function roleSnapshot(role: RoleRecord): Pick<Employee["roles"][number], "id" | "name" | "description"> {
-  return { id: role.id, name: role.name, description: role.description };
-}
-
 export function RoleManagementPage() {
-  const [roles, setRoles] = useState<RoleRecord[]>(() => buildInitialRoles());
-  const [employees, setEmployees] = useState<Employee[]>(() =>
-    buildInitialRoleEmployees(),
-  );
+  const qc = useQueryClient();
+  const canRead = hasPermission(IAM_PERMISSION_KEYS.ROLE_READ);
+  const canWrite = hasPermission(IAM_PERMISSION_KEYS.ROLE_WRITE);
+  const canDelete = hasPermission(IAM_PERMISSION_KEYS.ROLE_DELETE);
+  const canAssignUsers = hasPermission(IAM_PERMISSION_KEYS.USER_ROLES_WRITE);
+
+  const { data: roles = [], isLoading, isError, error, refetch } = useRoles();
+  const { data: allUserDetails = [], isLoading: usersLoading } =
+    useAllUserDetails(canRead && canAssignUsers);
+
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
-  const [editDraft, setEditDraft] = useState<RoleFormDraft>({
-    name: "",
-    description: "",
-    permissionIds: [],
-  });
+  const [editMode, setEditMode] = useState<RoleEditMode>("edit");
+  const [editDraft, setEditDraft] = useState<RoleFormDraft>(emptyRoleDraft());
+  const [editRoleId, setEditRoleId] = useState<string | null>(null);
+  const [originalPermissionKeys, setOriginalPermissionKeys] = useState<
+    string[]
+  >([]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<Employee | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<UserDetail | null>(null);
+  const [confirmDeleteRole, setConfirmDeleteRole] = useState(false);
+
+  const { data: editRoleDetail } = useRole(
+    editOpen && editMode === "edit" ? (editRoleId ?? undefined) : undefined,
+  );
+
+  const createRole = useCreateRole();
+  const updateRole = useUpdateRole(editRoleId ?? "");
+  const setPermissions = useSetRolePermissions(editRoleId ?? "");
+  const deleteRole = useDeleteRole();
+  const syncRoleUsers = useSyncRoleUsers();
 
   const filteredRoles = useMemo(() => {
     return roles.filter((row) => {
       const checks = [
         applyColumnFilter(toComparableText(row.name), columnFilters.name),
         applyColumnFilter(
-          toComparableText(row.description),
+          toComparableText(row.description ?? ""),
           columnFilters.description,
         ),
       ];
@@ -84,137 +113,197 @@ export function RoleManagementPage() {
     [roles, selectedRoleId],
   );
 
-  const roleEmployees = useMemo(() => {
-    if (!selectedRoleId) return [];
-    return employees.filter((e) => employeeHasRole(e, selectedRoleId));
-  }, [employees, selectedRoleId]);
+  const editingIsSystem =
+    editRoleDetail?.isSystem ?? selectedRole?.isSystem ?? false;
 
-  const assignedEmployeeIds = useMemo(
-    () => roleEmployees.map((e) => e.id),
-    [roleEmployees],
+  const roleUsers = useMemo((): UserDetail[] => {
+    if (!selectedRoleId) return [];
+    return allUserDetails.filter((u) => u.roleIds.includes(selectedRoleId));
+  }, [allUserDetails, selectedRoleId]);
+
+  const assignedUserIds = useMemo(
+    () => roleUsers.map((u) => u.id),
+    [roleUsers],
   );
+
+  const openCreate = useCallback(() => {
+    setEditMode("create");
+    setEditRoleId(null);
+    setEditDraft(emptyRoleDraft());
+    setOriginalPermissionKeys([]);
+    setEditOpen(true);
+  }, []);
 
   const openEdit = useCallback(() => {
     if (!selectedRole) {
       toast.error("Vui lòng chọn một vai trò để sửa.");
       return;
     }
-    setEditDraft(roleToDraft(selectedRole));
+    setEditMode("edit");
+    setEditRoleId(selectedRole.id);
+    setEditDraft(roleToFormDraft(selectedRole));
+    setOriginalPermissionKeys([]);
     setEditOpen(true);
   }, [selectedRole]);
 
-  const handleReload = useCallback(() => {
-    setRoles(buildInitialRoles());
-    setEmployees(buildInitialRoleEmployees());
-    setColumnFilters(emptyColumnFilters());
-    setSelectedRoleId(null);
-    toast.success("Đã nạp lại dữ liệu");
-  }, []);
+  useEffect(() => {
+    if (editRoleDetail && editMode === "edit" && editOpen) {
+      setEditDraft(roleToFormDraft(editRoleDetail));
+      setOriginalPermissionKeys([...editRoleDetail.permissionKeys]);
+    }
+  }, [editRoleDetail, editMode, editOpen]);
 
-  const handleSaveRole = useCallback(() => {
-    if (!selectedRole) return;
+  const handleReload = useCallback(() => {
+    void refetch();
+    void qc.invalidateQueries({ queryKey: ["iam", "users"] });
+    setColumnFilters(emptyColumnFilters());
+    toast.success("Đã nạp lại dữ liệu");
+  }, [qc, refetch]);
+
+  const permissionsChanged = useCallback(
+    (draft: RoleFormDraft) => {
+      const a = [...draft.permissionKeys].sort().join(",");
+      const b = [...originalPermissionKeys].sort().join(",");
+      return a !== b;
+    },
+    [originalPermissionKeys],
+  );
+
+  const handleSaveRole = useCallback(async () => {
     if (!editDraft.name.trim()) {
       toast.error("Tên vai trò không được để trống.");
       return;
     }
-    const updated = draftToRole(editDraft, selectedRole.id);
-    setRoles((prev) =>
-      prev.map((r) => (r.id === updated.id ? updated : r)),
-    );
-    setEmployees((prev) =>
-      prev.map((emp) => {
-        if (!employeeHasRole(emp, updated.id)) return emp;
-        return {
-          ...emp,
-          roles: emp.roles.map((r) =>
-            r.id === updated.id ? roleSnapshot(updated) : r,
-          ),
-        };
-      }),
-    );
-    setEditOpen(false);
-    toast.success("Đã cập nhật vai trò.");
-  }, [editDraft, selectedRole]);
 
-  const syncEmployeesForRole = useCallback(
-    (role: RoleRecord, employeeIds: string[]) => {
-      const snap = roleSnapshot(role);
-      setEmployees((prev) =>
-        prev.map((emp) => {
-          const shouldHave = employeeIds.includes(emp.id);
-          const has = employeeHasRole(emp, role.id);
-          if (shouldHave && !has) {
-            return { ...emp, roles: [...emp.roles, snap] };
-          }
-          if (!shouldHave && has) {
-            return {
-              ...emp,
-              roles: emp.roles.filter((r) => r.id !== role.id),
-            };
-          }
-          if (shouldHave && has) {
-            return {
-              ...emp,
-              roles: emp.roles.map((r) =>
-                r.id === role.id ? snap : r,
-              ),
-            };
-          }
-          return emp;
-        }),
-      );
-    },
-    [],
-  );
+    try {
+      if (editMode === "create") {
+        await createRole.mutateAsync(editDraft);
+        toast.success("Đã tạo vai trò mới.");
+      } else if (editRoleId) {
+        if (editingIsSystem) {
+          toast.error("Vai trò hệ thống không thể chỉnh sửa.");
+          return;
+        }
+        await updateRole.mutateAsync({
+          draft: editDraft,
+          isSystem: false,
+        });
+        if (permissionsChanged(editDraft)) {
+          await setPermissions.mutateAsync(editDraft);
+        }
+        toast.success("Đã cập nhật vai trò.");
+      }
+      setEditOpen(false);
+      void refetch();
+    } catch (err) {
+      toast.error(getIamErrorMessage(err, "Không lưu được vai trò."));
+    }
+  }, [
+    createRole,
+    editDraft,
+    editMode,
+    editRoleId,
+    permissionsChanged,
+    refetch,
+    editingIsSystem,
+    setPermissions,
+    updateRole,
+  ]);
+
+  const handleDeleteRole = useCallback(async () => {
+    if (!selectedRole || selectedRole.isSystem) return;
+    try {
+      await deleteRole.mutateAsync(selectedRole.id);
+      setSelectedRoleId(null);
+      setConfirmDeleteRole(false);
+      toast.success("Đã xóa vai trò.");
+    } catch (err) {
+      toast.error(getIamErrorMessage(err, "Không xóa được vai trò."));
+    }
+  }, [deleteRole, selectedRole]);
 
   const handlePickerConfirm = useCallback(
-    (employeeIds: string[]) => {
-      if (!selectedRole) return;
-      syncEmployeesForRole(selectedRole, employeeIds);
-      toast.success("Đã cập nhật danh sách người dùng.");
+    async (userIds: string[]) => {
+      if (!selectedRoleId) return;
+      try {
+        const usersPayload = allUserDetails.map((u) => ({
+          id: u.id,
+          roleIds: u.roleIds,
+        }));
+        const count = await syncRoleUsers.mutateAsync({
+          allUsers: usersPayload,
+          roleId: selectedRoleId,
+          desiredUserIds: userIds,
+        });
+        toast.success(
+          count > 0 ? `Đã cập nhật ${count} người dùng.` : "Không có thay đổi.",
+        );
+      } catch (err) {
+        toast.error(
+          getIamErrorMessage(err, "Không cập nhật được danh sách người dùng."),
+        );
+      }
     },
-    [selectedRole, syncEmployeesForRole],
+    [allUserDetails, selectedRoleId, syncRoleUsers],
   );
 
-  const handleRemoveEmployee = useCallback(() => {
-    if (!confirmRemove || !selectedRole) return;
-    setEmployees((prev) =>
-      prev.map((emp) =>
-        emp.id === confirmRemove.id
-          ? {
-              ...emp,
-              roles: emp.roles.filter((r) => r.id !== selectedRole.id),
-            }
-          : emp,
-      ),
-    );
+  const handleRemoveUser = useCallback(async () => {
+    if (!confirmRemove || !selectedRoleId) return;
+    const nextIds = assignedUserIds.filter((id) => id !== confirmRemove.id);
+    await handlePickerConfirm(nextIds);
     setConfirmRemove(null);
-    toast.success("Đã gỡ nhân viên khỏi vai trò.");
-  }, [confirmRemove, selectedRole]);
+  }, [assignedUserIds, confirmRemove, handlePickerConfirm, selectedRoleId]);
+
+  const saving =
+    createRole.isPending || updateRole.isPending || setPermissions.isPending;
 
   const toolbarItems: ToolbarItem[] = [
     {
+      id: "add",
+      label: "Thêm mới",
+      icon: Plus,
+      onClick: openCreate,
+      disabled: !canWrite,
+    },
+    {
       id: "edit",
-      label: "Sửa",
+      label: selectedRole?.isSystem ? "Xem" : "Sửa",
       icon: Pencil,
       onClick: openEdit,
-      disabled: !selectedRole,
+      disabled: !selectedRole || !canWrite,
+    },
+    {
+      id: "delete",
+      label: "Xóa",
+      icon: Trash2,
+      variant: "danger",
+      onClick: () => setConfirmDeleteRole(true),
+      disabled: !selectedRole || !canDelete || selectedRole?.isSystem === true,
     },
     { id: "sep", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: handleReload },
   ];
 
-  const columns: TableColumn<RoleRecord>[] = [
+  const columns: TableColumn<RoleSummary>[] = [
     {
       key: "name",
       label: "Tên vai trò",
       width: 280,
-      render: (row) => row.name,
+      render: (row) => (
+        <span className="flex items-center gap-2">
+          {row.name}
+          {row.isSystem && (
+            <Badge variant="outline" className="text-xs font-normal">
+              Hệ thống
+            </Badge>
+          )}
+        </span>
+      ),
     },
     {
       key: "description",
       label: "Diễn giải",
-      render: (row) => row.description,
+      render: (row) => row.description ?? "—",
     },
   ];
 
@@ -235,6 +324,15 @@ export function RoleManagementPage() {
     [columnFilters],
   );
 
+  if (!canRead) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Bạn không có quyền xem quản lý vai trò ({IAM_PERMISSION_KEYS.ROLE_READ}
+        ).
+      </div>
+    );
+  }
+
   return (
     <>
       <DocumentListShell
@@ -249,16 +347,23 @@ export function RoleManagementPage() {
         detailPanel={
           <RoleDetailPanel
             role={selectedRole}
-            employees={roleEmployees}
+            users={roleUsers}
+            usersLoading={usersLoading}
+            canAssign={canAssignUsers}
             onChoose={() => setPickerOpen(true)}
-            onRemoveEmployee={(emp) => setConfirmRemove(emp)}
+            onRemoveUser={(user) => setConfirmRemove(user)}
           />
         }
       >
+        {isError && (
+          <p className="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+            {getIamErrorMessage(error, "Không tải được danh sách vai trò.")}
+          </p>
+        )}
         <BaseDataTable
           columns={columns}
           rows={filteredRoles}
-          loading={false}
+          loading={isLoading}
           emptyLabel="Chưa có vai trò."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedRoleId(row.id)}
@@ -271,9 +376,7 @@ export function RoleManagementPage() {
                 aria-label={`Chọn vai trò ${row.name}`}
                 checked={selectedRoleId === row.id}
                 onChange={() =>
-                  setSelectedRoleId(
-                    selectedRoleId === row.id ? null : row.id,
-                  )
+                  setSelectedRoleId(selectedRoleId === row.id ? null : row.id)
                 }
                 onClick={(e) => e.stopPropagation()}
               />
@@ -285,31 +388,46 @@ export function RoleManagementPage() {
 
       <RoleEditModal
         open={editOpen}
+        mode={editMode}
         draft={editDraft}
+        isSystem={editMode === "edit" && editingIsSystem}
+        saving={saving}
         onDraftChange={setEditDraft}
         onClose={() => setEditOpen(false)}
-        onSave={handleSaveRole}
+        onSave={() => void handleSaveRole()}
       />
 
       {selectedRole && (
         <RoleEmployeePickerModal
           open={pickerOpen}
           roleName={selectedRole.name}
-          employees={employees}
-          assignedEmployeeIds={assignedEmployeeIds}
+          users={allUserDetails}
+          assignedUserIds={assignedUserIds}
+          loading={usersLoading}
           onOpenChange={setPickerOpen}
-          onConfirm={handlePickerConfirm}
+          onConfirm={(ids) => void handlePickerConfirm(ids)}
         />
       )}
 
       {confirmRemove && selectedRole && (
         <ConfirmActionModal
-          title="Gỡ nhân viên khỏi vai trò"
-          message={`Xác nhận gỡ "${confirmRemove.fullName}" (${confirmRemove.code}) khỏi vai trò "${selectedRole.name}"?`}
+          title="Gỡ người dùng khỏi vai trò"
+          message={`Xác nhận gỡ "${joinFullName(confirmRemove.firstName, confirmRemove.lastName)}" (${confirmRemove.email}) khỏi vai trò "${selectedRole.name}"?`}
           confirmLabel="Gỡ"
           cancelLabel="Quay lại"
           onCancel={() => setConfirmRemove(null)}
-          onConfirm={handleRemoveEmployee}
+          onConfirm={() => void handleRemoveUser()}
+        />
+      )}
+
+      {confirmDeleteRole && selectedRole && (
+        <ConfirmActionModal
+          title="Xóa vai trò"
+          message={`Xác nhận xóa vai trò "${selectedRole.name}"?`}
+          confirmLabel="Xóa"
+          cancelLabel="Quay lại"
+          onCancel={() => setConfirmDeleteRole(false)}
+          onConfirm={() => void handleDeleteRole()}
         />
       )}
     </>

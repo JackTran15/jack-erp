@@ -4,11 +4,11 @@ export function validateEmployeeDraft(
   draft: EmployeeFormDraft,
   isEdit: boolean,
 ): string | null {
-  if (!draft.basic.code.trim()) {
-    return "Vui lòng nhập mã nhân viên.";
+  if (!draft.basic.email.trim()) {
+    return "Vui lòng nhập email đăng nhập.";
   }
   if (!draft.basic.fullName.trim()) {
-    return "Vui lòng nhập tên nhân viên.";
+    return "Vui lòng nhập họ và tên.";
   }
   if (draft.basic.allowSoftwareAccess && !isEdit) {
     if (draft.basic.password.length < 8) {
