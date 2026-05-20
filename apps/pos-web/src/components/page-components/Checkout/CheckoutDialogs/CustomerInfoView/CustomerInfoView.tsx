@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
+import { cn } from "@erp/ui";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
 import { CustomerGenderEnum } from "@erp/pos/types/customer.type";
 import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
@@ -24,7 +24,7 @@ function genderLabel(g: CustomerGenderEnum | null | undefined): string {
 
 /**
  * Read-only mirror of `CustomerCreateDialog`'s form: same 3 grouped sections,
- * same horizontal `PosFormItem` rows, but the value slot renders plain text
+ * same horizontal label rows, but the value slot renders plain text
  * instead of an input. Used by the `CustomerDetailDialog` "Thông tin" tab.
  */
 export function CustomerInfoView({ data }: CustomerInfoViewProps) {
@@ -75,15 +75,13 @@ interface RowProps {
 
 function Row({ label, value, className }: RowProps) {
   return (
-    <PosFormItem
-      label={label}
-      layout="horizontal"
-      labelClassName={FORM_ITEM_LABEL_CLASS}
-      className={className}
-    >
-      <div className="flex min-h-9 items-center text-sm text-gray-900  font-bold">
-        {value}
+    <div className={cn("flex min-w-0 items-center gap-2 text-sm", className)}>
+      <label className={FORM_ITEM_LABEL_CLASS}>{label}</label>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-9 items-center text-sm text-gray-900 font-bold">
+          {value}
+        </div>
       </div>
-    </PosFormItem>
+    </div>
   );
 }

@@ -79,7 +79,7 @@ export const posSearchPopoverEntry: CatalogEntry = {
     { name: "emptyAction", type: "{ label: string; onClick: (q: string) => void }", required: false, description: "Nút hành động khi không có kết quả." },
   ],
   usageNotes: [
-    "Khác PosSelectSearch: search là async (Promise) và component KHÔNG vẽ viền — bạn tự cấp qua containerClassName + prefix/suffix.",
+    "Search là async (Promise) và component KHÔNG vẽ viền — bạn tự cấp qua containerClassName + prefix/suffix.",
     "Phù hợp tìm kiếm gọi API (sản phẩm, khách hàng) với debounce sẵn.",
     "Dùng emptyAction để gợi ý 'Tạo mới' khi không thấy kết quả.",
   ],

@@ -1,4 +1,3 @@
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
@@ -47,113 +46,90 @@ export function MembershipSection({
       <PosSectionBanner>Thông tin thẻ thành viên</PosSectionBanner>
 
       <div className="grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2">
-        <PosFormItem
+        <PosTextInput
+          id={ids.cardCode}
           label="Mã thẻ thành viên"
-          htmlFor={ids.cardCode}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.cardCode}
-            variant="underline"
-            value={values.cardCode ?? ""}
-            onChange={(v) => onChange("cardCode", v)}
-            trailing={
+          variant="underline"
+          value={values.cardCode ?? ""}
+          onChange={(v) => onChange("cardCode", v)}
+          trailing={
+            <button
+              type="button"
+              aria-label="Quét mã thẻ thành viên"
+              className="rounded p-0.5 text-gray-500 hover:text-gray-700"
+            >
+              <ScanFrameIcon size={20} />
+            </button>
+          }
+        />
+
+        <PosSelect
+          id={ids.cardTier}
+          label="Hạng thẻ"
+          fieldLayout="horizontal"
+          labelClassName={FORM_ITEM_LABEL_CLASS}
+          variant="underline"
+          value={cardTiers.find((o) => o.value === values.cardTier) ?? null}
+          onChange={(item) => onChange("cardTier", item.value)}
+          items={cardTiers}
+          itemKey={(o) => o.value}
+          renderItem={(o) => o.label}
+        />
+
+        <PosSelect
+          id={ids.group}
+          label="Nhóm khách hàng"
+          fieldLayout="horizontal"
+          labelClassName={FORM_ITEM_LABEL_CLASS}
+          variant="underline"
+          value={
+            customerGroups.find((o) => o.value === values.customerGroup) ?? null
+          }
+          onChange={(item) => onChange("customerGroup", item.value)}
+          items={customerGroups}
+          itemKey={(o) => o.value}
+          renderItem={(o) => o.label}
+          trailing={
+            onAddCustomerGroup ? (
               <button
                 type="button"
-                aria-label="Quét mã thẻ thành viên"
-                className="rounded p-0.5 text-gray-500 hover:text-gray-700"
+                aria-label="Thêm nhóm khách hàng mới"
+                onClick={onAddCustomerGroup}
+                className="rounded p-0.5 text-[#22C55E] hover:scale-110"
               >
-                <ScanFrameIcon size={20} />
+                <PlusCircleSolidIcon size={18} />
               </button>
-            }
-          />
-        </PosFormItem>
+            ) : undefined
+          }
+        />
 
-        <PosFormItem
-          label="Hạng thẻ"
-          htmlFor={ids.cardTier}
-          layout="horizontal"
-          labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosSelect
-            id={ids.cardTier}
-            variant="underline"
-            value={
-              cardTiers.find((o) => o.value === values.cardTier) ?? null
-            }
-            onChange={(item) => onChange("cardTier", item.value)}
-            items={cardTiers}
-            itemKey={(o) => o.value}
-            renderItem={(o) => o.label}
-          />
-        </PosFormItem>
-
-        <PosFormItem
-          label="Nhóm khách hàng"
-          htmlFor={ids.group}
-          layout="horizontal"
-          labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosSelect
-            id={ids.group}
-            variant="underline"
-            value={
-              customerGroups.find((o) => o.value === values.customerGroup) ??
-              null
-            }
-            onChange={(item) => onChange("customerGroup", item.value)}
-            items={customerGroups}
-            itemKey={(o) => o.value}
-            renderItem={(o) => o.label}
-            trailing={
-              onAddCustomerGroup ? (
-                <button
-                  type="button"
-                  aria-label="Thêm nhóm khách hàng mới"
-                  onClick={onAddCustomerGroup}
-                  className="rounded p-0.5 text-[#22C55E] hover:scale-110"
-                >
-                  <PlusCircleSolidIcon size={18} />
-                </button>
-              ) : undefined
-            }
-          />
-        </PosFormItem>
-
-        <PosFormItem
+        <PosSelect
+          id={ids.manager}
           label="Nhân viên phụ trách"
-          htmlFor={ids.manager}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosSelect
-            id={ids.manager}
-            variant="underline"
-            value={
-              accountManagers.find((o) => o.value === values.accountManager) ??
-              null
-            }
-            onChange={(item) => onChange("accountManager", item.value)}
-            items={accountManagers}
-            itemKey={(o) => o.value}
-            renderItem={(o) => o.label}
-          />
-        </PosFormItem>
+          variant="underline"
+          value={
+            accountManagers.find((o) => o.value === values.accountManager) ??
+            null
+          }
+          onChange={(item) => onChange("accountManager", item.value)}
+          items={accountManagers}
+          itemKey={(o) => o.value}
+          renderItem={(o) => o.label}
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.note}
           label="Ghi chú"
-          htmlFor={ids.note}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.note}
-            variant="underline"
-            value={values.note ?? ""}
-            onChange={(v) => onChange("note", v)}
-          />
-        </PosFormItem>
+          variant="underline"
+          value={values.note ?? ""}
+          onChange={(v) => onChange("note", v)}
+        />
       </div>
     </>
   );

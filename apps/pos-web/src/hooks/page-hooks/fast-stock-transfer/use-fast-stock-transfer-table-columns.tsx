@@ -3,7 +3,10 @@ import {
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
-import { PosSelectSearch } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
+import {
+  PosSearchPopover,
+  type SearchSuggestion,
+} from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
@@ -20,9 +23,84 @@ import {
   locationLabelForLine,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { TempWarehousePublicUser } from "@erp/shared-interfaces";
+
+interface TransporterEditCellProps {
+  value: TempWarehousePublicUser | null;
+  onSelect: (carrier: TempWarehousePublicUser) => void;
+  search: (
+    query: string,
+  ) => Promise<SearchSuggestion<TempWarehousePublicUser>[]>;
+}
+
+/** Inline carrier picker for the editing row — owns its own input string. */
+function TransporterEditCell({
+  value,
+  onSelect,
+  search,
+}: TransporterEditCellProps) {
+  const [query, setQuery] = useState(value ? formatCarrierName(value) : "");
+  useEffect(() => {
+    setQuery(value ? formatCarrierName(value) : "");
+  }, [value]);
+  return (
+    <PosSearchPopover
+      value={query}
+      onValueChange={setQuery}
+      search={search}
+      onSelect={(c) => {
+        onSelect(c);
+        setQuery(formatCarrierName(c));
+      }}
+      itemKey={(c) => c.id}
+      renderItem={(c) => formatCarrierName(c)}
+      placeholder="Chọn"
+      ariaLabel="Người vận chuyển"
+      variant="underline"
+      minChars={0}
+      containerClassName="w-full min-w-[140px]"
+    />
+  );
+}
+
+interface SkuEditCellProps {
+  value: PosCatalogLine | null;
+  onSelect: (product: PosCatalogLine) => void;
+  search: (query: string) => Promise<SearchSuggestion<PosCatalogLine>[]>;
+}
+
+/** Inline SKU picker for the editing row — owns its own input string. */
+function SkuEditCell({ value, onSelect, search }: SkuEditCellProps) {
+  const [query, setQuery] = useState(value ? value.code : "");
+  useEffect(() => {
+    setQuery(value ? value.code : "");
+  }, [value]);
+  return (
+    <PosSearchPopover
+      value={query}
+      onValueChange={setQuery}
+      search={search}
+      onSelect={(p) => {
+        onSelect(p);
+        setQuery(p.code);
+      }}
+      itemKey={(p) => p.itemId}
+      renderItem={(p) => <span className="font-medium">{p.name}</span>}
+      renderMeta={(p) =>
+        `${p.code} · Tồn: ${formatOnHand(p.quantityOnHand, p.unit)}`
+      }
+      placeholder="SKU"
+      ariaLabel="Mã SKU"
+      variant="underline"
+      minChars={0}
+      containerClassName="w-full min-w-[160px]"
+    />
+  );
+}
 
 export function useFastStockTransferTableColumns() {
   const data = useFastStockTransferData();
@@ -48,19 +126,10 @@ export function useFastStockTransferTableColumns() {
         title: "Người vận chuyển",
         render: (row) =>
           editingRowId === row.id && editableDraft ? (
-            <PosSelectSearch
-              className="w-full min-w-[140px]"
+            <TransporterEditCell
               value={editableDraft.carrier}
-              onChange={actions.handleEditDraftCarrier}
+              onSelect={actions.handleEditDraftCarrier}
               search={data.searchFastStockCarriers}
-              onQueryChange={data.handleCarrierQueryChange}
-              itemKey={(c) => c.id}
-              renderItem={(c) => formatCarrierName(c)}
-              renderSelected={(c) => formatCarrierName(c)}
-              placeholder="Chọn"
-              ariaLabel="Người vận chuyển"
-              menuClassName="min-w-[220px]"
-              variant="underline"
             />
           ) : (
             formatCarrierName(row.carrier)
@@ -79,22 +148,10 @@ export function useFastStockTransferTableColumns() {
         title: "Mã SKU",
         render: (row) =>
           editingRowId === row.id && editableDraft ? (
-            <PosSelectSearch
-              className="w-full min-w-[160px]"
+            <SkuEditCell
               value={editableDraft.product}
-              onChange={actions.handleEditDraftProduct}
+              onSelect={actions.handleEditDraftProduct}
               search={data.searchCatalogProducts}
-              onQueryChange={data.handleCatalogQueryChange}
-              itemKey={(p) => p.itemId}
-              renderItem={(p) => <span className="font-medium">{p.name}</span>}
-              renderMeta={(p) =>
-                `${p.code} · Tồn: ${formatOnHand(p.quantityOnHand, p.unit)}`
-              }
-              renderSelected={(p) => p.code}
-              placeholder="SKU"
-              ariaLabel="Mã SKU"
-              menuClassName="min-w-[280px]"
-              variant="underline"
             />
           ) : (
             lineSku(row)

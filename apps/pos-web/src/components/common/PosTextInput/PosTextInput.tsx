@@ -61,6 +61,23 @@ export interface PosTextInputProps {
   inputClassName?: string;
   /** Forwarded to the native `<input>` so callers can focus/select imperatively. */
   inputRef?: Ref<HTMLInputElement>;
+  /**
+   * When provided, the input renders inside a label + control + inline-error row
+   * (replacing the former `PosFormItem` wrapper). Omit `label` for a bare input.
+   */
+  label?: ReactNode;
+  /** Shows a red asterisk after the label. Only used when `label` is set. */
+  required?: boolean;
+  /** Inline error message rendered below the control. Only used when `label` is set. */
+  error?: ReactNode;
+  /** Label/control arrangement when `label` is set. */
+  fieldLayout?: "vertical" | "horizontal";
+  /** Class for the `<label>` (e.g. fixed-width column in horizontal forms). */
+  labelClassName?: string;
+  /** Class for the outer field-row wrapper. */
+  fieldClassName?: string;
+  /** Class for the control area (control + error). */
+  contentClassName?: string;
 }
 
 export function PosTextInput({
@@ -83,6 +100,13 @@ export function PosTextInput({
   className,
   inputClassName,
   inputRef,
+  label,
+  required,
+  error,
+  fieldLayout = "vertical",
+  labelClassName,
+  fieldClassName,
+  contentClassName,
 }: PosTextInputProps) {
   const input = (
     <input
@@ -110,18 +134,52 @@ export function PosTextInput({
     />
   );
 
-  if (variant === "ghost" && !trailing) return input;
+  const control =
+    variant === "ghost" && !trailing ? (
+      input
+    ) : (
+      <div
+        className={cn(
+          textInputVariant[variant](size, invalid, disabled),
+          variant !== "ghost" && posFormPadX[size],
+          className,
+        )}
+      >
+        {input}
+        {trailing}
+      </div>
+    );
+
+  if (label === undefined) return control;
 
   return (
     <div
       className={cn(
-        textInputVariant[variant](size, invalid, disabled),
-        variant !== "ghost" && posFormPadX[size],
-        className,
+        "min-w-0 text-sm",
+        fieldLayout === "vertical" && "flex flex-col gap-1",
+        fieldLayout === "horizontal" && "flex items-center gap-2",
+        fieldClassName,
       )}
     >
-      {input}
-      {trailing}
+      <label
+        htmlFor={id}
+        className={cn(fieldLayout === "horizontal" && "shrink-0", labelClassName)}
+      >
+        {label}
+        {required ? <span className="ml-0.5 text-[#E53E3E]">*</span> : null}
+      </label>
+      <div className={cn("min-w-0 flex-1", contentClassName)}>
+        {control}
+        {error ? (
+          <p
+            className="mt-1 text-xs text-[#E53E3E]"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

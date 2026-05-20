@@ -1,4 +1,4 @@
-import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
+import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
 import { formatCarrierName } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import type { TempWarehousePublicUser } from "@erp/shared-interfaces";
@@ -33,10 +33,10 @@ export function useFastStockTransferCarriers(
   const requestIdRef = useRef(0);
 
   const loadCarriers = useCallback(
-    async (search?: string) => {
+    async (search?: string): Promise<TempWarehousePublicUser[]> => {
       if (!branchId) {
         setCarrierRows([]);
-        return;
+        return [];
       }
       const reqId = ++requestIdRef.current;
       setCarriersLoading(true);
@@ -46,11 +46,11 @@ export function useFastStockTransferCarriers(
           search,
           pagination: { page: 1, pageSize: CARRIERS_PAGE_SIZE },
         });
-        if (reqId !== requestIdRef.current) return;
-        setCarrierRows(result.data);
+        if (reqId === requestIdRef.current) setCarrierRows(result.data);
+        return result.data;
       } catch {
-        if (reqId !== requestIdRef.current) return;
-        setCarrierRows([]);
+        if (reqId === requestIdRef.current) setCarrierRows([]);
+        return [];
       } finally {
         if (reqId === requestIdRef.current) setCarriersLoading(false);
       }
@@ -85,19 +85,22 @@ export function useFastStockTransferCarriers(
   );
 
   const searchFastStockCarriers = useCallback(
-    (
+    async (
       query: string,
-    ): ReadonlyArray<PosSelectSearchSuggestion<TempWarehousePublicUser>> => {
-      const q = query.trim().toLowerCase();
+    ): Promise<SearchSuggestion<TempWarehousePublicUser>[]> => {
+      const trimmed = query.trim();
+      const rows = await loadCarriers(trimmed || undefined);
+      const merged = mergeCarriers(rows, pinnedCarriers);
+      const q = trimmed.toLowerCase();
       const source = q
-        ? carriersForSearch.filter((c) => {
+        ? merged.filter((c) => {
             const label = formatCarrierName(c).toLowerCase();
             return label.includes(q) || c.email.toLowerCase().includes(q);
           })
-        : carriersForSearch;
+        : merged;
       return source.map((item) => ({ item }));
     },
-    [carriersForSearch],
+    [loadCarriers, pinnedCarriers],
   );
 
   const resolveCarrierById = useCallback(

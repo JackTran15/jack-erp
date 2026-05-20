@@ -33,7 +33,7 @@ export const posRadioEntry: CatalogEntry = {
   category: "input",
   importPath: "@erp/pos/components/common/PosRadio/PosRadio",
   description:
-    "Chỉ báo radio (chấm tròn) thuần hiển thị. Không tự quản lý trạng thái — thường dùng bên trong PosRadioGroup hoặc nút tự dựng.",
+    "Chỉ báo radio (chấm tròn) thuần hiển thị. Không tự quản lý trạng thái — bọc trong <label>/<button> để xử lý chọn.",
   props: [
     { name: "selected", type: "boolean", required: true, description: "Đang được chọn hay không." },
     { name: "size", type: '"sm" | "md" | "lg" | "xl"', required: false, defaultValue: '"sm"', description: "Kích thước vòng tròn." },
@@ -41,7 +41,7 @@ export const posRadioEntry: CatalogEntry = {
   ],
   usageNotes: [
     "Đây là phần hiển thị thuần — bao ngoài bằng <label>/<button> để xử lý chọn.",
-    "Nếu cần nhóm radio hoàn chỉnh, dùng PosRadioGroup.",
+    'Gói nhiều PosRadio trong một <div role="radiogroup"> để tạo nhóm.',
   ],
   code: `<button onClick={() => setValue("a")} className="inline-flex items-center gap-2">
   <PosRadio selected={value === "a"} />

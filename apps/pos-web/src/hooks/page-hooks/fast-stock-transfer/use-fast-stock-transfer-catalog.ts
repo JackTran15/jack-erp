@@ -1,4 +1,4 @@
-import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
+import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { catalogService } from "@erp/pos/services/catalog.service";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
@@ -18,20 +18,25 @@ export function useFastStockTransferCatalog(
   const requestIdRef = useRef(0);
 
   const loadCatalog = useCallback(
-    async (search?: string) => {
+    async (search?: string): Promise<PosCatalogLine[]> => {
       if (!branchId) {
         setCatalogLines([]);
-        return;
+        return [];
       }
       const reqId = ++requestIdRef.current;
       setCatalogLoading(true);
       try {
-        const rows = await catalogService.fetch(branchId, search, catalogDirection);
-        if (reqId !== requestIdRef.current) return;
-        setCatalogLines(rows.slice(0, CATALOG_LIMIT));
+        const rows = await catalogService.fetch(
+          branchId,
+          search,
+          catalogDirection,
+        );
+        const limited = rows.slice(0, CATALOG_LIMIT);
+        if (reqId === requestIdRef.current) setCatalogLines(limited);
+        return limited;
       } catch {
-        if (reqId !== requestIdRef.current) return;
-        setCatalogLines([]);
+        if (reqId === requestIdRef.current) setCatalogLines([]);
+        return [];
       } finally {
         if (reqId === requestIdRef.current) setCatalogLoading(false);
       }
@@ -61,17 +66,16 @@ export function useFastStockTransferCatalog(
   );
 
   const searchCatalogProducts = useCallback(
-    (
-      query: string,
-    ): ReadonlyArray<PosSelectSearchSuggestion<PosCatalogLine>> => {
+    async (query: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
       const normalized = query.trim();
+      const rows = await loadCatalog(normalized || undefined);
       const source =
         normalized.length > 0
-          ? catalogLines.filter((p) => matchesCatalogQuery(p, normalized))
-          : catalogLines;
+          ? rows.filter((p) => matchesCatalogQuery(p, normalized))
+          : rows;
       return source.slice(0, CATALOG_LIMIT).map((item) => ({ item }));
     },
-    [catalogLines],
+    [loadCatalog],
   );
 
   const findCatalogProduct = useCallback(
@@ -88,7 +92,9 @@ export function useFastStockTransferCatalog(
       searchCatalogProducts,
       handleCatalogQueryChange,
       findCatalogProduct,
-      reloadCatalog: () => loadCatalog(),
+      reloadCatalog: async () => {
+        await loadCatalog();
+      },
     }),
     [
       catalogLines,

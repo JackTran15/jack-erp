@@ -3,7 +3,6 @@ import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNum
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 
 interface DepositDialogProps {
   open: boolean;
@@ -30,36 +29,30 @@ export function DepositDialog({
     <PosDialog open={open} onClose={onClose} width={560}>
       <PosDialog.Header title="Đặt cọc" />
       <PosDialog.Body className="space-y-4">
-        <PosFormItem
+        <PosNumberInput
           label="Số tiền đặt cọc"
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName="w-1/2"
-        >
-          <PosNumberInput
-            value={amount}
-            onChange={(next) => onAmountChange(Math.max(0, next))}
-            inputMode="numeric"
-            variant="underline"
-            ariaLabel="Số tiền đặt cọc"
-          />
-        </PosFormItem>
+          value={amount}
+          onChange={(next) => onAmountChange(Math.max(0, next))}
+          inputMode="numeric"
+          variant="underline"
+          ariaLabel="Số tiền đặt cọc"
+        />
 
-        <PosFormItem
+        <PosSelect
           label="Hình thức thanh toán"
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName="w-1/2"
-        >
-          <PosSelect
-            value={methods.find((item) => item.value === method) ?? null}
-            onChange={(item) => onMethodChange(item.value)}
-            items={methods}
-            itemKey={(item) => item.value}
-            renderItem={(item) => item.label}
-            ariaLabel="Hình thức thanh toán đặt cọc"
-            variant="underline"
-            className="w-full"
-          />
-        </PosFormItem>
+          value={methods.find((item) => item.value === method) ?? null}
+          onChange={(item) => onMethodChange(item.value)}
+          items={methods}
+          itemKey={(item) => item.value}
+          renderItem={(item) => item.label}
+          ariaLabel="Hình thức thanh toán đặt cọc"
+          variant="underline"
+          className="w-full"
+        />
       </PosDialog.Body>
       <PosDialog.Footer
         onSave={onConfirm}

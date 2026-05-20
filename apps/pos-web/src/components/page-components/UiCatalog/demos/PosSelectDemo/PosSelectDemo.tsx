@@ -64,7 +64,7 @@ export const posSelectEntry: CatalogEntry = {
     { name: "className / menuClassName / triggerClassName", type: "string", required: false, description: "Class cho wrapper / menu / trigger." },
   ],
   usageNotes: [
-    "Dùng cho danh sách tĩnh; cần gõ-để-lọc thì dùng PosSelectSearch (cùng shape generic).",
+    "Dùng cho danh sách tĩnh; cần gõ-để-lọc (async) thì dùng PosSearchPopover.",
     "Menu được portal ra document.body — tránh đặt trong container overflow-hidden.",
     "position=\"top\" hữu ích khi select nằm ở footer (vd chọn số dòng/trang).",
   ],

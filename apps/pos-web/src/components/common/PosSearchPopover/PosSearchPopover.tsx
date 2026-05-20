@@ -9,11 +9,49 @@ import {
   type Ref,
 } from "react";
 import { cn } from "@erp/ui";
+import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import {
+  posFormFieldClass,
+  posFormHeight,
+  posFormPadX,
+  posFormRadius,
+  posFormRowClass,
+  posFormUnderlineShadow,
+  type PosFormSize,
+} from "@erp/pos/components/common/posFormDimensions";
 
 export interface SearchSuggestion<T> {
   item: T;
   disabled?: boolean;
 }
+
+export type PosSearchPopoverVariant = "boxed" | "underline";
+
+/**
+ * Preset chrome (border/height) for `variant` mode — mirrors the look the former
+ * `PosSelectSearch` rendered, so picker call sites stay concise. Consumers that
+ * leave `variant` unset keep full control via `containerClassName`/`prefix`.
+ */
+const searchPopoverVariant: Record<
+  PosSearchPopoverVariant,
+  (size: PosFormSize, open: boolean) => string
+> = {
+  boxed: (size, open) =>
+    cn(
+      posFormRowClass,
+      "border border-gray-200 bg-white text-gray-700 transition-[border-color,box-shadow] duration-150 ease-out hover:border-gray-300 focus-within:border-[#5C6BC0]",
+      posFormHeight[size],
+      posFormRadius[size],
+      open && "ring-2 ring-[#5C6BC0]/30",
+    ),
+  underline: (size, open) =>
+    cn(
+      posFormRowClass,
+      "border-b border-transparent bg-transparent transition-[box-shadow] duration-150 ease-out",
+      posFormUnderlineShadow(false, open),
+      posFormHeight[size],
+    ),
+};
 
 export interface PosSearchPopoverProps<T> {
   value: string;
@@ -35,6 +73,19 @@ export interface PosSearchPopoverProps<T> {
   inputType?: string;
   ariaLabel?: string;
   disabled?: boolean;
+
+  /**
+   * Preset chrome. When set, the component draws its own border/height (+ a
+   * trailing chevron) so picker call sites don't supply `containerClassName`.
+   * Leave unset to keep full control via `containerClassName`/`prefix`/`suffix`.
+   */
+  variant?: PosSearchPopoverVariant;
+  /** Control height for the preset chrome (default `"md"`). */
+  size?: PosFormSize;
+  /** Leading icon rendered inside the preset chrome, before the input. */
+  leadingIcon?: ReactNode;
+  /** Shortcut hint prefixed into the placeholder, e.g. `"Alt + N"`. */
+  shortcut?: string;
 
   minChars?: number;
   debounceMs?: number;
@@ -72,6 +123,10 @@ export function PosSearchPopover<T>({
   inputType = "search",
   ariaLabel,
   disabled,
+  variant,
+  size = "md",
+  leadingIcon,
+  shortcut,
   minChars = 2,
   debounceMs = 300,
   maxSuggestions = 8,
@@ -204,16 +259,56 @@ export function PosSearchPopover<T>({
   const showDropdown = open && trimmed.length >= minChars;
   const hasSuggestions = suggestions.length > 0;
 
+  // Preset chrome (variant) vs fully consumer-driven layout (default).
+  const preset = variant !== undefined;
+  const resolvedContainerClass = preset
+    ? cn(
+        searchPopoverVariant[variant](size, open),
+        posFormPadX[size],
+        disabled && "cursor-not-allowed opacity-60",
+        containerClassName,
+      )
+    : containerClassName;
+  const resolvedInputClass = preset
+    ? cn(
+        posFormFieldClass,
+        "placeholder:italic placeholder:text-gray-400",
+        inputClassName,
+      )
+    : inputClassName;
+  const resolvedPrefix = preset
+    ? leadingIcon
+      ? (
+          <span className="flex shrink-0 items-center text-gray-500">
+            {leadingIcon}
+          </span>
+        )
+      : prefix
+    : prefix;
+  const resolvedSuffix = preset
+    ? (suffix ?? (
+        <span className="flex shrink-0 items-center text-gray-400">
+          <ChevronDownIcon
+            size={14}
+            className={cn("transition-transform", open && "rotate-180")}
+          />
+        </span>
+      ))
+    : suffix;
+  const resolvedPlaceholder = shortcut
+    ? `(${shortcut}) ${placeholder ?? ""}`
+    : placeholder;
+
   return (
     <div ref={wrapRef} className="relative">
-      <div className={containerClassName}>
-        {prefix}
+      <div className={resolvedContainerClass}>
+        {resolvedPrefix}
         <input
           ref={setRefs}
           id={inputId}
           type={inputType}
           autoComplete="off"
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           aria-label={ariaLabel}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
@@ -232,9 +327,9 @@ export function PosSearchPopover<T>({
           aria-activedescendant={
             highlightIdx >= 0 ? `${listboxId}-${highlightIdx}` : undefined
           }
-          className={inputClassName}
+          className={resolvedInputClass}
         />
-        {suffix}
+        {resolvedSuffix}
       </div>
 
       {showDropdown ? (

@@ -1,6 +1,5 @@
 import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
 import { useCreateCustomerGroup } from "@erp/pos/hooks/react-query/use-query-customer-group";
@@ -121,62 +120,49 @@ export function CustomerGroupCreateDialog({
             </div>
           ) : null}
 
-          <PosFormItem
+          <PosTextInput
+            id={nameId}
             label="Tên nhóm"
-            htmlFor={nameId}
-            layout="horizontal"
             required
+            fieldLayout="horizontal"
             labelClassName={LABEL_CLASS}
             error={showNameError ? nameError : undefined}
-          >
-            <PosTextInput
-              id={nameId}
-              variant="underline"
-              value={values.name}
-              onChange={(v) => setField("name", v)}
-              onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-              invalid={showNameError}
-              autoComplete="off"
-            />
-          </PosFormItem>
+            variant="underline"
+            value={values.name}
+            onChange={(v) => setField("name", v)}
+            onBlur={() => setTouched((t) => ({ ...t, name: true }))}
+            invalid={showNameError}
+            autoComplete="off"
+          />
 
-          <PosFormItem
+          <PosSelect
+            id={parentId}
             label="Thuộc nhóm"
-            htmlFor={parentId}
-            layout="horizontal"
+            fieldLayout="horizontal"
             labelClassName={LABEL_CLASS}
-          >
-            <PosSelect
-              id={parentId}
-              variant="underline"
-              value={
-                parentGroups.find((o) => o.value === values.parentGroupId) ??
-                null
-              }
-              onChange={(item) => setField("parentGroupId", item.value)}
-              items={parentGroups}
-              itemKey={(o) => o.value}
-              renderItem={(o) => o.label}
-              placeholder=""
-              ariaLabel="Thuộc nhóm"
-            />
-          </PosFormItem>
+            variant="underline"
+            value={
+              parentGroups.find((o) => o.value === values.parentGroupId) ?? null
+            }
+            onChange={(item) => setField("parentGroupId", item.value)}
+            items={parentGroups}
+            itemKey={(o) => o.value}
+            renderItem={(o) => o.label}
+            placeholder=""
+            ariaLabel="Thuộc nhóm"
+          />
 
-          <PosFormItem
+          <PosTextInput
+            id={descriptionId}
             label="Diễn giải"
-            htmlFor={descriptionId}
-            layout="horizontal"
+            fieldLayout="horizontal"
             labelClassName={LABEL_CLASS}
-          >
-            <PosTextInput
-              id={descriptionId}
-              variant="underline"
-              value={values.description}
-              onChange={(v) => setField("description", v)}
-              placeholder="Nhập nội dung..."
-              autoComplete="off"
-            />
-          </PosFormItem>
+            variant="underline"
+            value={values.description}
+            onChange={(v) => setField("description", v)}
+            placeholder="Nhập nội dung..."
+            autoComplete="off"
+          />
         </form>
       </PosDialog.Body>
       <PosDialog.Footer

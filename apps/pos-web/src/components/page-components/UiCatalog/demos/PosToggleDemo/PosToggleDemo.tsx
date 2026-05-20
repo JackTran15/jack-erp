@@ -29,7 +29,7 @@ export const posToggleEntry: CatalogEntry = {
   ],
   usageNotes: [
     "ariaLabel là bắt buộc vì công tắc không có nhãn đi kèm.",
-    "Cần kèm nhãn hiển thị thì dùng PosToggleField.",
+    "Cần nhãn đi kèm thì bọc PosToggle trong <label> cùng phần text.",
   ],
   code: `const [on, setOn] = useState(false);
 

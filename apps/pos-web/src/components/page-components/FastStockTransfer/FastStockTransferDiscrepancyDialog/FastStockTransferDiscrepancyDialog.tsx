@@ -3,8 +3,7 @@ import {
   PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
-import { PosRadioGroup } from "@erp/pos/components/common/PosRadioGroup/PosRadioGroup";
+import { PosRadio } from "@erp/pos/components/common/PosRadio/PosRadio";
 import {
   nettedDiscrepancyReason,
   nettedProductLabel,
@@ -91,19 +90,27 @@ export function FastStockTransferDiscrepancyDialog({
             fillHeight
           />
         </div>
-        <PosFormItem
-          label="Xử lý chênh lệch"
-          layout="horizontal"
-          labelClassName="w-1/5"
-        >
-          <PosRadioGroup<TempWarehouseCloseMode>
-            name="discrepancy-close-mode"
-            value={closeMode}
-            onChange={setCloseMode}
-            options={CLOSE_MODE_OPTIONS}
-            ariaLabel="Xử lý chênh lệch"
-          />
-        </PosFormItem>
+        <div className="flex min-w-0 items-center gap-2 text-sm">
+          <label className="w-1/5 shrink-0">Xử lý chênh lệch</label>
+          <div className="min-w-0 flex-1">
+            <div
+              role="radiogroup"
+              aria-label="Xử lý chênh lệch"
+              className="flex h-7 items-center gap-6"
+            >
+              {CLOSE_MODE_OPTIONS.map((opt) => (
+                <PosRadio
+                  key={opt.value}
+                  name="discrepancy-close-mode"
+                  value={opt.value}
+                  label={opt.label}
+                  selected={closeMode === opt.value}
+                  onChange={() => setCloseMode(opt.value)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       </PosDialog.Body>
       <PosDialog.Footer
         onCancel={onClose}

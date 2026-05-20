@@ -1,11 +1,11 @@
-import type { RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import {
   TagIcon,
   UserPlusIcon,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { PosSelectSearch } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
+import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { ProductSearchInput } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/POSToolbar/ProductSearchInput/ProductSearchInput";
-import { PosToggleField } from "@erp/pos/components/common/PosToggleField/PosToggleField";
+import { PosToggle } from "@erp/pos/components/common/PosToggle/PosToggle";
 import { PosQuantityInput } from "@erp/pos/components/common/PosQuantityInput/PosQuantityInput";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutMeta } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-meta";
@@ -33,6 +33,21 @@ export function POSToolbar({
 }: POSToolbarProps) {
   const { toolbar, setToolbar, catalogLoading } = useCheckoutCatalog();
   const meta = useCheckoutMeta();
+
+  // PosSearchPopover owns a string value; mirror each picker's selected label.
+  const [salespersonQuery, setSalespersonQuery] = useState(
+    meta.selectedSalesperson?.name ?? "",
+  );
+  useEffect(() => {
+    setSalespersonQuery(meta.selectedSalesperson?.name ?? "");
+  }, [meta.selectedSalesperson]);
+
+  const [priceBookQuery, setPriceBookQuery] = useState(
+    meta.selectedPriceBook?.name ?? "",
+  );
+  useEffect(() => {
+    setPriceBookQuery(meta.selectedPriceBook?.name ?? "");
+  }, [meta.selectedPriceBook]);
 
   return (
     <div className="flex h-[52px] items-center gap-2 border-b border-gray-200 bg-white px-3">
@@ -67,40 +82,51 @@ export function POSToolbar({
           variant="boxed"
         />
       </div>
-      <PosToggleField
-        label="Tách dòng"
-        checked={toolbar.splitLine}
-        onChange={(next) =>
-          setToolbar((s) => ({ ...s, splitLine: next }))
-        }
-      />
-      <PosSelectSearch
-        ref={salespersonRef}
-        value={meta.selectedSalesperson}
-        onChange={meta.setSelectedSalesperson}
+      <label className="inline-flex items-center gap-2 text-[13px] text-gray-700">
+        <span>Tách dòng</span>
+        <PosToggle
+          checked={toolbar.splitLine}
+          onChange={(next) => setToolbar((s) => ({ ...s, splitLine: next }))}
+          ariaLabel="Tách dòng"
+        />
+      </label>
+      <PosSearchPopover
+        inputRef={salespersonRef}
+        value={salespersonQuery}
+        onValueChange={setSalespersonQuery}
         search={meta.salespersonSearch}
+        onSelect={(s) => {
+          meta.setSelectedSalesperson(s);
+          setSalespersonQuery(s.name);
+        }}
         itemKey={(s) => s.id}
         renderItem={(s) => s.name}
-        renderSelected={(s) => s.name}
         placeholder="NV bán hàng"
         shortcut="Alt + N"
-        leadingIcon={<UserPlusIcon size={16} className="text-gray-500" />}
         ariaLabel="Chọn nhân viên bán hàng"
-        className="min-w-[180px]"
+        variant="boxed"
+        leadingIcon={<UserPlusIcon size={16} className="text-gray-500" />}
+        minChars={0}
+        containerClassName="min-w-[180px]"
       />
-      <PosSelectSearch
-        ref={priceBookRef}
-        value={meta.selectedPriceBook}
-        onChange={meta.setSelectedPriceBook}
+      <PosSearchPopover
+        inputRef={priceBookRef}
+        value={priceBookQuery}
+        onValueChange={setPriceBookQuery}
         search={meta.priceBookSearch}
+        onSelect={(p) => {
+          meta.setSelectedPriceBook(p);
+          setPriceBookQuery(p.name);
+        }}
         itemKey={(p) => p.id}
         renderItem={(p) => p.name}
-        renderSelected={(p) => p.name}
-        leadingIcon={<TagIcon size={16} className="text-gray-500" />}
         placeholder="Chọn bảng giá"
         shortcut="Alt + B"
         ariaLabel="Chọn bảng giá"
-        className="min-w-[180px]"
+        variant="boxed"
+        leadingIcon={<TagIcon size={16} className="text-gray-500" />}
+        minChars={0}
+        containerClassName="min-w-[180px]"
       />
     </div>
   );

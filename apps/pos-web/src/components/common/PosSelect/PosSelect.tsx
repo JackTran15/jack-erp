@@ -54,7 +54,7 @@ const selectTrigger = cn(posFormFieldClass, "truncate text-left");
 /**
  * The data-bound subset of {@link PosSelectProps}. Wrapper components can use
  * this to accept a caller's typed data + handlers while owning presentation
- * (variant, placeholder, icons, sizing). Mirrors `PosSelectSearchConfig<T>`.
+ * (variant, placeholder, icons, sizing).
  */
 export interface PosSelectConfig<T> {
   value?: T | null;
@@ -113,14 +113,30 @@ export interface PosSelectProps<T> {
   ref?: Ref<HTMLButtonElement>;
   /** Boxed control height (`sm` … `xl`); default `md`. No effect on `underline`. */
   size?: PosSelectSize;
+
+  /**
+   * When provided, the select renders inside a label + control + inline-error
+   * row. Omit `label` for a bare select.
+   */
+  label?: ReactNode;
+  /** Shows a red asterisk after the label. Only used when `label` is set. */
+  required?: boolean;
+  /** Inline error message rendered below the control. Only used when `label` is set. */
+  error?: ReactNode;
+  /** Label/control arrangement when `label` is set. */
+  fieldLayout?: "vertical" | "horizontal";
+  /** Class for the `<label>` (e.g. fixed-width column in horizontal forms). */
+  labelClassName?: string;
+  /** Class for the outer field-row wrapper. */
+  fieldClassName?: string;
+  /** Class for the control area (control + error). */
+  contentClassName?: string;
 }
 
 /**
  * Generic single-select dropdown for static option lists. Pair with
- * {@link PosSelectSearch} when the picker needs type-to-filter — the two
- * components share the same generic shape (`items`/`value`/`onChange` +
- * `itemKey`/`renderItem`/`renderSelected`/`renderMeta`) so consumers can swap
- * one for the other with minimal API churn.
+ * {@link PosSearchPopover} when the picker needs type-to-filter against an
+ * async data source.
  *
  * Behavior:
  *  - Trigger is a button. Click toggles the floating menu (portal'd to body).
@@ -157,6 +173,13 @@ export function PosSelect<T>({
   triggerClassName,
   ref,
   size = "md",
+  label,
+  required,
+  error,
+  fieldLayout = "vertical",
+  labelClassName,
+  fieldClassName,
+  contentClassName,
 }: PosSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -342,7 +365,7 @@ export function PosSelect<T>({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open]);
 
-  return (
+  const control = (
     <div
       ref={rootRef}
       className={cn(
@@ -474,6 +497,39 @@ export function PosSelect<T>({
             document.body,
           )
         : null}
+    </div>
+  );
+
+  if (label === undefined) return control;
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 text-sm",
+        fieldLayout === "vertical" && "flex flex-col gap-1",
+        fieldLayout === "horizontal" && "flex items-center gap-2",
+        fieldClassName,
+      )}
+    >
+      <label
+        htmlFor={id}
+        className={cn(fieldLayout === "horizontal" && "shrink-0", labelClassName)}
+      >
+        {label}
+        {required ? <span className="ml-0.5 text-[#E53E3E]">*</span> : null}
+      </label>
+      <div className={cn("min-w-0 flex-1", contentClassName)}>
+        {control}
+        {error ? (
+          <p
+            className="mt-1 text-xs text-[#E53E3E]"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

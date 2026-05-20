@@ -1,6 +1,5 @@
-import type { RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { BoxIcon, SearchIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { PosSelectSearch } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
 import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
@@ -22,6 +21,14 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
     useCheckoutCatalog();
   const meta = useCheckoutMeta();
   const { addProductByItem } = useCheckoutCartActions();
+
+  // PosSearchPopover owns a string value; mirror the selected group's name.
+  const [groupQuery, setGroupQuery] = useState(
+    meta.selectedProductGroup?.name ?? "",
+  );
+  useEffect(() => {
+    setGroupQuery(meta.selectedProductGroup?.name ?? "");
+  }, [meta.selectedProductGroup]);
 
   return (
     <div className="flex h-12 items-center gap-3 border-b border-gray-200 bg-white px-3">
@@ -50,18 +57,22 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
         />
       </div>
 
-      <PosSelectSearch
-        value={meta.selectedProductGroup}
-        onChange={(g) => setCatalogGroup(g.id)}
+      <PosSearchPopover
+        value={groupQuery}
+        onValueChange={setGroupQuery}
         search={meta.productGroupSearch}
+        onSelect={(g) => {
+          setCatalogGroup(g.id);
+          setGroupQuery(g.name);
+        }}
         itemKey={(g) => g.id}
         renderItem={(g) => g.name}
-        renderSelected={(g) => g.name}
         placeholder="Lọc theo nhóm hàng hóa"
-        leadingIcon={<BoxIcon size={16} className="text-gray-500" />}
         ariaLabel="Lọc theo nhóm hàng hóa"
-        className="min-w-[220px]"
-        position="top"
+        variant="boxed"
+        leadingIcon={<BoxIcon size={16} className="text-gray-500" />}
+        minChars={0}
+        containerClassName="min-w-[220px]"
       />
     </div>
   );

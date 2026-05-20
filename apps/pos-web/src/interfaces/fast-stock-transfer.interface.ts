@@ -1,4 +1,4 @@
-import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
+import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
 import type {
@@ -76,14 +76,14 @@ export interface FastStockTransferData {
   locationsLoading: boolean;
   searchCatalogProducts: (
     query: string,
-  ) => ReadonlyArray<PosSelectSearchSuggestion<PosCatalogLine>>;
+  ) => Promise<SearchSuggestion<PosCatalogLine>[]>;
   handleCatalogQueryChange: (query: string) => void;
   catalogLoading: boolean;
   catalogLines: ReadonlyArray<PosCatalogLine>;
   catalogDirection: PosCatalogDirection;
   searchFastStockCarriers: (
     query: string,
-  ) => ReadonlyArray<PosSelectSearchSuggestion<TempWarehousePublicUser>>;
+  ) => Promise<SearchSuggestion<TempWarehousePublicUser>[]>;
   handleCarrierQueryChange: (query: string) => void;
   findCatalogProduct: (itemId: string) => PosCatalogLine | null;
   resolveCarrierById: (userId: string) => TempWarehousePublicUser | null;
