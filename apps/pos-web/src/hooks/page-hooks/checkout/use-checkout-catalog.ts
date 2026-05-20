@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 

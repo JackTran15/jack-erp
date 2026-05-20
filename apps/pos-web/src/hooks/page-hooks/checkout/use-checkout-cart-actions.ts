@@ -2,9 +2,9 @@ import { useCallback } from "react";
 
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
-import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 import { locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";

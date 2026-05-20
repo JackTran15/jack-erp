@@ -1,9 +1,11 @@
 import type {
   PromotionItem,
-  PromotionKind,
   PromotionStatusInfo,
+} from "@erp/pos/interfaces/promotion.interface";
+import type {
+  PromotionKind,
   PromotionStatusTone,
-} from "./promotion.types";
+} from "@erp/pos/constants/checkout.constant";
 import {
   PromotionKindEnum,
   PromotionStatusEnum,

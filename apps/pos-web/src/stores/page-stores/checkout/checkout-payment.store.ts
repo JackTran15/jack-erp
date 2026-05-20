@@ -5,7 +5,7 @@ import {
   type PaymentLine,
 } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
-import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CashSuggestion } from "@erp/pos/interfaces/checkout.interface";
 
 type Updater<T> = T | ((prev: T) => T);
 

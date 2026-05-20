@@ -2,8 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { CustomerDetailTabKeyEnum } from "@erp/pos/constants/checkout.constant";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
-import { useCustomer } from "@erp/pos/hooks/common/use-customer";
-import { useCustomerGroups } from "@erp/pos/hooks/page-hooks/checkout/use-customer-groups";
+import { useCustomer } from "@erp/pos/hooks/react-query/use-query-customer";
+import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
@@ -11,9 +11,10 @@ import { InfoTab } from "@erp/pos/components/page-components/Checkout/CheckoutDi
 import { mapCustomerToDetailData } from "@erp/pos/lib/page-libs/checkout/mapCustomerDetail";
 import { OverviewTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/OverviewTab/OverviewTab";
 import { PurchaseHistoryTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/PurchaseHistoryTab";
-import type { CustomerDetailData, CustomerDetailTabKey } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
-import type { CustomerFormValues } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
+import type { CustomerDetailTabKey } from "@erp/pos/constants/checkout.constant";
+import type { CustomerFormValues } from "@erp/pos/interfaces/customer-dialog.interface";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
 export interface CustomerDetailDialogProps {
   open: boolean;

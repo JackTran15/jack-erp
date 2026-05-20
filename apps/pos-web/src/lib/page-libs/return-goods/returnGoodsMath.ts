@@ -1,4 +1,4 @@
-import type { ReturnInvoiceRow, ReturnableItem } from "./return-goods.types";
+import type { ReturnInvoiceRow, ReturnableItem } from "@erp/pos/interfaces/return-goods.interface";
 
 /** Clamps a user-entered return quantity to `[0, max]`, rounding non-integers down. */
 export function clampReturnQty(value: number, max: number): number {

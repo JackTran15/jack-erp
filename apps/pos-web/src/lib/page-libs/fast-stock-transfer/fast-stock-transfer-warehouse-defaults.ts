@@ -1,13 +1,9 @@
 import type {
+  InventoryLocationPickerOption,
   InventoryShowroomOption,
   InventoryStorageOption,
-} from "@erp/pos/lib/page-libs/fast-stock-transfer/inventory-location-api";
+} from "@erp/pos/interfaces/inventory-location.interface";
 import { TempWarehouseDirection } from "@erp/shared-interfaces";
-
-export interface InventoryLocationPickerOption {
-  id: string;
-  name: string;
-}
 
 export function toStoragePickerOptions(
   storages: ReadonlyArray<InventoryStorageOption>,

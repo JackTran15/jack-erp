@@ -10,7 +10,7 @@ import {
   FilterOperatorTypeEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { DebtEntry } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { DebtEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface DebtTabProps {
   rows: DebtEntry[];

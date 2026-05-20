@@ -6,15 +6,15 @@ import {
   usePaymentAccountsQuery,
   useReceivableAccountsQuery,
   useRevenueAccountsQuery,
-} from "@erp/pos/hooks/react-query/use-accounts";
+} from "@erp/pos/hooks/react-query/use-query-account";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import {
   useCheckoutInvoiceMutation,
   useCreateInvoiceMutation,
-} from "@erp/pos/hooks/react-query/use-invoices";
-import type { AccountRow } from "@erp/pos/dtos/account.dto";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+} from "@erp/pos/hooks/react-query/use-query-invoice";
+import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import {
   getOversellSaleLines,
@@ -24,9 +24,9 @@ import { validateCheckout } from "@erp/pos/lib/page-libs/checkout/checkoutValida
 import {
   buildCheckoutInvoiceApiPayload,
   buildCreateInvoicePayload,
-  type ResolveCheckoutPayloadError,
 } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
-import type { InvoicePayload } from "@erp/pos/lib/page-libs/checkout/printing/types";
+import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
+import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
 import {

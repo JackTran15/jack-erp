@@ -8,7 +8,7 @@ import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-componen
 import { useCheckoutCancelFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cancel-flow";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutOversellFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-oversell-flow";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import {
   computeOversellLines,
   usePosCheckoutSessionStore,

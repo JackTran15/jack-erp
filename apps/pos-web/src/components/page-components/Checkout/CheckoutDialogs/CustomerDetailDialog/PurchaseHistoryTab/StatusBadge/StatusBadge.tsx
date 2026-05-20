@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { PurchaseHistoryStatusEnum } from "@erp/pos/constants/checkout.constant";
-import type { PurchaseHistoryStatus } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { PurchaseHistoryStatus } from "@erp/pos/constants/checkout.constant";
 
 export interface StatusBadgeProps {
   status: PurchaseHistoryStatus;

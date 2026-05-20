@@ -6,7 +6,7 @@ import {
   PlusIcon,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { InvoiceTab } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTab/InvoiceTab";
-import type { InvoiceTabItem } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { InvoiceTabItem } from "@erp/pos/interfaces/checkout.interface";
 
 export interface InvoiceTabBarProps {
   tabs: ReadonlyArray<InvoiceTabItem>;

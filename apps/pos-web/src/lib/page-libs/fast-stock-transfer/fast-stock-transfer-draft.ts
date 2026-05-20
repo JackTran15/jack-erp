@@ -1,4 +1,4 @@
-import type { FastStockTransferToolbarDraft } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferToolbarDraft } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 
 export function isFastStockTransferDraftCompleteForAdd(
   draft: FastStockTransferToolbarDraft,

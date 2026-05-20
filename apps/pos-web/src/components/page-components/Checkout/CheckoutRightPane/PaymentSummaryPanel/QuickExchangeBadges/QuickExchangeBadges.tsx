@@ -6,7 +6,7 @@ import {
   selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { CheckoutVariantEnum } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 /**
  * Read-only summary: đổi trả / mua thêm labels + qty badges (wraps naturally,

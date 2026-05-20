@@ -5,7 +5,7 @@ import {
   type CustomerActionItem,
 } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 
 export interface SelectedCustomerCardProps {
   /** Actions group (Voucher / quà tặng nếu đã chọn khách). */

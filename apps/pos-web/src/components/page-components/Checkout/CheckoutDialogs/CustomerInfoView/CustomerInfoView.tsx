@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
-import { CustomerGenderEnum } from "@erp/pos/lib/common/customerApi";
-import type { CustomerDetailData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import { CustomerGenderEnum } from "@erp/pos/types/customer.type";
+import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 

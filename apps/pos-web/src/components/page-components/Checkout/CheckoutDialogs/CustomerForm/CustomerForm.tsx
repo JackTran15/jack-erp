@@ -6,18 +6,17 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type Ref,
 } from "react";
 import {
   useCreateCustomer,
   useCustomer,
   useUpdateCustomer,
-} from "@erp/pos/hooks/common/use-customer";
-import { useCustomerGroups } from "@erp/pos/hooks/page-hooks/checkout/use-customer-groups";
-import {
-  generateCustomerCode,
-  type CustomerDetail,
-  type CustomerGroupRow,
-} from "@erp/pos/lib/common/customerApi";
+} from "@erp/pos/hooks/react-query/use-query-customer";
+import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
+import { generateCustomerCode } from "@erp/pos/lib/common/customerUtils";
+import type { CustomerDetail } from "@erp/pos/interfaces/customer.interface";
+import type { CustomerGroupRow } from "@erp/pos/interfaces/customer-group.interface";
 import { CustomerGroupCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerGroupCreateDialog/CustomerGroupCreateDialog";
 import {
   buildCreateBody,
@@ -30,12 +29,41 @@ import {
 import { BasicInfoSection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/BasicInfoSection/BasicInfoSection";
 import { MembershipSection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/MembershipSection/MembershipSection";
 import { CompanySection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CompanySection/CompanySection";
+import type { CustomerDialogMode } from "@erp/pos/types/customer.type";
 import type {
-  CustomerDialogMode,
-  CustomerFormProps,
   CustomerFormValues,
   CustomerSelectOption,
-} from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
+} from "@erp/pos/interfaces/customer-dialog.interface";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+
+/**
+ * Props for the shell-less `CustomerForm`. The form renders 3 sections plus a
+ * sub-dialog for creating customer groups; the parent supplies the dialog
+ * shell and footer (the footer's primary button submits via `saveFormId`).
+ */
+export interface CustomerFormProps {
+  mode: CustomerDialogMode;
+  /**
+   * Stable form element id; the parent passes this to `PosDialog.Footer`'s
+   * `saveFormId` so the primary button fires the native submit handler.
+   */
+  formId: string;
+  customer?: CustomerFormValues;
+  defaultQuery?: string;
+  defaultCustomerCode?: string;
+
+  provinces?: CustomerSelectOption[];
+  districts?: CustomerSelectOption[];
+  wards?: CustomerSelectOption[];
+  cardTiers?: CustomerSelectOption[];
+  accountManagers?: CustomerSelectOption[];
+
+  onSubmitted?: (customer: CustomerRow, mode: CustomerDialogMode) => void;
+  onAddCustomerGroup?: () => void;
+  nameInputRef?: Ref<HTMLInputElement>;
+  /** Mirrors the in-flight mutation state so the parent footer can disable its button. */
+  onSubmittingChange?: (submitting: boolean) => void;
+}
 
 /** Map BE customer record into the form's flat `CustomerFormValues` shape. */
 function detailToFormValues(c: CustomerDetail): Partial<CustomerFormValues> {

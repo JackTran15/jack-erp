@@ -2,8 +2,8 @@ import { useCallback } from "react";
 
 import type { PromoMenuOption } from "@erp/pos/constants/checkout.constant";
 import { promoOptionLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
-import type { VoucherFormResult } from "@erp/pos/lib/page-libs/checkout/voucher.types";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
+import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutPromotionResult {

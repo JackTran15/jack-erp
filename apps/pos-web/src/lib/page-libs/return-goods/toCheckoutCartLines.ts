@@ -1,5 +1,5 @@
-import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import type { ReturnInvoiceRow } from "./return-goods.types";
+import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
+import type { ReturnInvoiceRow } from "@erp/pos/interfaces/return-goods.interface";
 
 /**
  * Build checkout lines for invoice-return checkout (`CheckoutVariant.InvoiceReturn`) from the

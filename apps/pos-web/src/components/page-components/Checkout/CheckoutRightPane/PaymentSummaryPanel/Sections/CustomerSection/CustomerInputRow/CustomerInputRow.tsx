@@ -6,10 +6,8 @@ import {
   type CustomerActionItem,
 } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
-import {
-  formatCustomerDisplay,
-  type CustomerRow,
-} from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
 export interface CustomerInputRowProps {
   inputRef: RefObject<HTMLInputElement | null>;

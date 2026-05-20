@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
 type Updater<T> = T | ((prev: T) => T);
 

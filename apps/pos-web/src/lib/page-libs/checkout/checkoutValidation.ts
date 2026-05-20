@@ -1,5 +1,5 @@
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
-import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
 
 export const CHECKOUT_ERROR_CODES = {
   EMPTY_CART: "EMPTY_CART",

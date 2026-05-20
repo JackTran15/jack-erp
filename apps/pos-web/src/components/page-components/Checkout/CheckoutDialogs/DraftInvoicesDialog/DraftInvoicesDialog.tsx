@@ -6,9 +6,9 @@ import {
 } from "@erp/pos/lib/common/dateRangeFilter";
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
-import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-invoices";
+import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
-import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/FilterBar/FilterBar";
 import { InvoiceDetailPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceDetailPanel/InvoiceDetailPanel";
 import { InvoiceListPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceListPanel/InvoiceListPanel";

@@ -3,7 +3,7 @@ import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem"
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { useFastStockTransferActions } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-actions";
 import { useFastStockTransferData } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-data";
-import type { InventoryLocationPickerOption } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-warehouse-defaults";
+import type { InventoryLocationPickerOption } from "@erp/pos/interfaces/inventory-location.interface";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
 
 export function WarehouseFilterRow() {

@@ -1,5 +1,5 @@
 import { CustomerInfoView } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerInfoView/CustomerInfoView";
-import type { CustomerDetailData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface InfoTabProps {
   data: CustomerDetailData;

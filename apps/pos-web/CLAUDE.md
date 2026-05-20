@@ -19,7 +19,7 @@ src/
 ├── pages/                   # File route, đặt tên *Page.tsx
 ├── hooks/
 │   ├── common/             # hook dùng chung, KHÔNG dính React Query
-│   ├── react-query/        # toàn bộ hook wrap useQuery / useMutation / useInfiniteQuery / useSubscription
+│   ├── react-query/        # hook wrap useQuery/useMutation (1 file/domain, đặt tên use-query-<domain>.ts)
 │   └── page-hooks/
 │       ├── home/
 │       ├── product/
@@ -35,12 +35,15 @@ src/
 ├── services/               # 1 file = 1 module dữ liệu, gọi API qua http
 │   ├── account.service.ts
 │   └── invoice.service.ts
-├── dtos/                   # DTO request / response / payload đi cùng API
+├── dtos/                   # Payload/arg/return của function, request/response body, params (transient)
 │   ├── account.dto.ts
 │   └── invoice.dto.ts
-├── interfaces/             # Interface dùng chung cho cả dự án
-│   ├── paginated.interface.ts
-│   └── pos-session.interface.ts
+├── interfaces/             # Entity (dữ liệu domain: InvoiceRow, CustomerRow…) + interface dùng chung
+│   ├── invoice.interface.ts
+│   └── paginated.interface.ts
+├── types/                  # type-alias / union không phải entity/dto (1 file = 1 domain, đuôi .type.ts)
+│   ├── invoice.type.ts
+│   └── customer.type.ts
 └── constants/
     ├── common.constant.ts
     ├── home.constant.ts
@@ -59,15 +62,17 @@ src/
 | Folder chứa component | **PascalCase** | `ProductList/`, `OrderItem/` |
 | Folder khác (hooks, stores, page-components con) | **kebab-case** | `page-hooks/`, `order/`, `customer/` |
 | File component | `<Name>.tsx` | `ProductList.tsx` |
-| File hook | `use-<name>.ts` | `use-cart-items.ts` |
+| File hook (react-query) | `use-query-<domain>.ts` | `use-query-account.ts` |
+| File hook (common/page) | `use-<name>.ts` | `use-cart-items.ts` |
 | File store | `<name>.store.ts` | `cart.store.ts` |
 | File constant | `<name>.constant.ts` | `order.constant.ts` |
 | File page | `<Name>Page.tsx` | `OrderPage.tsx` |
 | File service | `<module>.service.ts` | `account.service.ts` |
 | Service (trong code) | camelCase, suffix `Service` | `accountService` |
 | File DTO | `<module>.dto.ts` | `account.dto.ts` |
-| File interface | `<name>.interface.ts` | `paginated.interface.ts` |
-| DTO / interface (trong code) | PascalCase | `CreateInvoiceBody`, `Paginated` |
+| File interface | `<domain>.interface.ts` | `invoice.interface.ts` |
+| File type | `<domain>.type.ts` | `invoice.type.ts` |
+| DTO / interface / type (trong code) | PascalCase | `CreateInvoiceBody`, `InvoiceRow`, `InvoiceStatus` |
 | Component (trong code) | PascalCase | `export const ProductList` |
 | Hook (trong code) | camelCase, prefix `use` | `useCartItems` |
 | Store (trong code) | camelCase, prefix `use`, suffix `Store` | `useCartStore` |
@@ -208,7 +213,7 @@ OrderSummary/
 
 ```
 hooks/common/use-debounce.ts                  ← utility, KHÔNG dính React Query, dùng nhiều trang
-hooks/react-query/use-accounts.ts             ← wrap useQuery / useMutation, gom theo entity
+hooks/react-query/use-query-account.ts        ← wrap useQuery / useMutation, gom theo domain
 hooks/page-hooks/order/use-order-total.ts     ← logic UI / state chỉ dùng trong 1 trang
 ```
 
@@ -222,8 +227,8 @@ Quy tắc chung:
 Khi tạo hook mới, trả lời theo thứ tự:
 
 **Câu 1: Hook này wrap React Query (`useQuery` / `useMutation` / `useInfiniteQuery` / `useSubscription`)?**
-- Có → `src/hooks/react-query/use-<name>.ts`
-  - Đặt theo entity dữ liệu: `use-accounts.ts`, `use-invoices.ts`, `use-customer-groups.ts`...
+- Có → `src/hooks/react-query/use-query-<domain>.ts`
+  - Đặt theo domain dữ liệu, **bắt buộc prefix `use-query-`**: `use-query-account.ts`, `use-query-invoice.ts`, `use-query-customer-group.ts`...
   - queryKey **bắt buộc** lấy từ `src/constants/react-query-key.constant.ts`, không hard-code chuỗi tại chỗ.
   - queryFn / mutationFn **bắt buộc** gọi service trong `src/services/<module>.service.ts`. Không tự gọi `http.get/post/...` bên trong hook.
 
@@ -244,10 +249,10 @@ Khi tạo hook mới, trả lời theo thứ tự:
 ### Skeleton hook React Query
 
 ```ts
-// src/hooks/react-query/use-accounts.ts
+// src/hooks/react-query/use-query-account.ts
 import { useQuery } from '@tanstack/react-query';
-import { accountService } from '@/services/account.service';
-import { ACCOUNT_KEYS } from '@/constants/react-query-key.constant';
+import { accountService } from '@erp/pos/services/account.service';
+import { ACCOUNT_KEYS } from '@erp/pos/constants/react-query-key.constant';
 
 export const usePaymentAccounts = () => {
   return useQuery({
@@ -407,20 +412,18 @@ Quy tắc:
 - 1 file = 1 module dữ liệu. Tên file `<module>.service.ts` (kebab-case).
 - Mỗi file export **1 object** `<module>Service` chứa tất cả method của module đó; không export rời từng hàm.
 - Method chỉ làm 2 việc: dựng request (params/body) và trả response đã typed. **Không** chứa logic UI, **không** đụng store, **không** gọi React Query.
-- Dùng `http` từ `@/lib/common/http` để gọi backend.
-- Type request/response của API (`AccountRow`, `CreateInvoiceBody`...) **bắt buộc** khai báo trong `src/dtos/<module>.dto.ts` (xem mục 11). Interface dùng chung như `Paginated<T>` đặt trong `src/interfaces/<name>.interface.ts` (xem mục 12). Service file **chỉ import**, không tự định nghĩa type request/response.
+- Dùng `http` từ `@erp/pos/lib/common/http` để gọi backend.
+- Entity (`AccountRow`, `InvoiceRow`...) khai báo trong `src/interfaces/<domain>.interface.ts` (mục 12); payload/params (`CreateInvoiceBody`, `ListAccountsParams`...) trong `src/dtos/<module>.dto.ts` (mục 11); union/enum domain trong `src/types/<domain>.type.ts` (mục 12.1). Service file **chỉ import**, không tự định nghĩa type.
 - Named export, không default; **KHÔNG** tạo `index.ts`.
 
 ### Skeleton
 
 ```ts
 // src/services/account.service.ts
-import { http } from '@/lib/common/http';
-import type {
-  AccountRow,
-  ListAccountsParams,
-} from '@/dtos/account.dto';
-import type { Paginated } from '@/interfaces/paginated.interface';
+import { http } from '@erp/pos/lib/common/http';
+import type { AccountRow } from '@erp/pos/interfaces/account.interface';
+import type { ListAccountsParams } from '@erp/pos/dtos/account.dto';
+import type { Paginated } from '@erp/pos/interfaces/paginated.interface';
 
 export const accountService = {
   listPaymentAccounts: async (): Promise<Paginated<AccountRow>> => {
@@ -451,21 +454,20 @@ Code cũ còn nằm ở `src/lib/common/*Api.ts` hoặc gọi API trong `page-ho
 
 ## 11. DTOs
 
-`src/dtos/` chứa **toàn bộ** type/interface đi kèm API của pos-web (request body, response row, payload, enum API). Tổ chức theo module dữ liệu — 1 file = 1 module.
+`src/dtos/` chứa các shape **transient/transport**: payload / tham số / kiểu trả về của function, request body, query params. Tổ chức theo module dữ liệu — 1 file = 1 module. **Entity** (dữ liệu chuẩn của 1 đối tượng domain như `InvoiceRow`, `AccountRow`, `CustomerRow`) KHÔNG thuộc đây mà thuộc `interfaces/` (xem mục 12).
 
 Quy tắc:
 - Tên file kebab-case, **suffix BẮT BUỘC `.dto.ts`**: `account.dto.ts`, `invoice.dto.ts`, `customer-group.dto.ts`...
 - Mỗi type/interface PascalCase, named export. Quy ước tên:
   - `<Action>Body` cho request body (vd `CreateInvoiceBody`, `CheckoutInvoiceBody`).
-  - `<Resource>Row` cho response row (vd `InvoiceRow`, `AccountRow`).
-  - `<Resource>Status` cho enum/literal API (vd `InvoiceStatus`, `ApiPaymentMethod`).
+  - `<Action>Params` cho query params (vd `ListAccountsParams`).
 - KHÔNG default export, KHÔNG `index.ts`.
 
 ### Skeleton
 
 ```ts
 // src/dtos/invoice.dto.ts
-export type ApiPaymentMethod = 'cash' | 'bank_transfer' | 'card';
+import type { ApiPaymentMethod } from '@erp/pos/types/invoice.type';
 
 export interface CreateInvoiceItemBody {
   itemId: string;
@@ -481,18 +483,17 @@ export interface CreateInvoiceBody {
   items?: CreateInvoiceItemBody[];
 }
 
-export interface InvoiceRow {
-  id: string;
-  code: string;
-  status: 'draft' | 'paid' | 'debt' | 'partial_debt' | 'cancelled';
-  amountDue: number;
-  // ...
+export interface InvoicePaymentLineBody {
+  paymentMethod: ApiPaymentMethod;
+  amount: number;
+  accountId: string;
 }
 ```
 
 ### Cấm tuyệt đối
 
-- ❌ Khai báo type request/response của API ngoài `src/dtos/` (đặc biệt: KHÔNG inline trong `*.service.ts`, hook, hoặc component).
+- ❌ Khai báo shape payload/params API ngoài `src/dtos/` (đặc biệt: KHÔNG inline trong `*.service.ts`, hook, hoặc component).
+- ❌ Đặt entity (dữ liệu domain như `InvoiceRow`, `CustomerRow`) vào `dtos/` — chúng thuộc `interfaces/`.
 - ❌ Đặt interface dùng chung (`Paginated<T>`, `ApiError`...) trong `dtos/` — chúng thuộc `interfaces/`.
 - ❌ Trộn 2 module dữ liệu vào cùng 1 file DTO.
 - ❌ Bỏ suffix `.dto.ts` (vd `account.ts` là sai).
@@ -501,16 +502,27 @@ export interface InvoiceRow {
 
 ## 12. Interfaces
 
-`src/interfaces/` chứa interface / type **dùng chung** cho nhiều module — không gắn với 1 API cụ thể, không phải props component.
+`src/interfaces/` chứa **entity** — dữ liệu chuẩn của 1 đối tượng domain (`InvoiceRow`, `AccountRow`, `CustomerRow`, `CartLine`...) — và interface **dùng chung** cho nhiều module (`Paginated<T>`, `ApiError`...). Interface đóng vai trò như entity. Không phải props component.
 
 Quy tắc:
-- Tên file kebab-case, **suffix BẮT BUỘC `.interface.ts`**: `paginated.interface.ts`, `pos-session.interface.ts`, `api-error.interface.ts`...
-- 1 file = 1 interface chính (hoặc 1 nhóm type/interface gắn bó chặt, vd `Paginated<T>` + `PageMeta` cùng file).
+- Tên file kebab-case, **suffix BẮT BUỘC `.interface.ts`**: `invoice.interface.ts`, `customer.interface.ts`, `paginated.interface.ts`...
+- 1 file = 1 domain (gom các entity/interface gắn bó của domain đó, vd `Paginated<T>` + `PageMeta`).
 - PascalCase, named export. KHÔNG default, KHÔNG `index.ts`.
 
 ### Skeleton
 
 ```ts
+// src/interfaces/invoice.interface.ts
+import type { InvoiceStatus } from '@erp/pos/types/invoice.type';
+
+export interface InvoiceRow {
+  id: string;
+  code: string;
+  status: InvoiceStatus;
+  amountDue: number;
+  // ...
+}
+
 // src/interfaces/paginated.interface.ts
 export interface Paginated<T> {
   data: T[];
@@ -522,11 +534,29 @@ export interface Paginated<T> {
 
 ### Cấm tuyệt đối
 
-- ❌ Đặt type request/response đi kèm 1 API cụ thể vào `interfaces/` — chúng thuộc `dtos/`.
+- ❌ Đặt shape payload/params đi kèm 1 lời gọi API (request body, query params) vào `interfaces/` — chúng thuộc `dtos/`.
 - ❌ Đặt props component vào `interfaces/` (props sống cạnh component, named `<Component>Props`).
 - ❌ Bỏ suffix `.interface.ts`.
 
-Code cũ đang khai báo type request/response inline trong `services/*.service.ts` → **báo cho tôi biết, không tự ý refactor** trừ khi tôi yêu cầu.
+---
+
+## 12.1. Types
+
+`src/types/` chứa khai báo bằng keyword `type` (union / alias) **không phải** entity cũng **không phải** payload/dto — vd `InvoiceStatus`, `PosCatalogDirection`, `CustomerDialogMode`, hoặc enum domain (`CheckoutVariantEnum`).
+
+Quy tắc:
+- Tên file kebab-case, **suffix BẮT BUỘC `.type.ts`**, 1 file = 1 domain: `invoice.type.ts`, `customer.type.ts`...
+- PascalCase, named export. KHÔNG default, KHÔNG `index.ts`.
+- Nếu một `type` thực chất đóng vai trò entity → chuyển sang `interfaces/`; nếu là payload/params → chuyển sang `dtos/`.
+
+```ts
+// src/types/invoice.type.ts
+export type ApiPaymentMethod = 'cash' | 'bank_transfer' | 'card';
+export type InvoiceStatus =
+  | 'draft' | 'pending' | 'paid' | 'debt' | 'partial_debt' | 'cancelled';
+```
+
+> Interface/type chỉ dùng để định nghĩa **props của component UI** thì sống cạnh component đó (named `<Component>Props`), KHÔNG đưa vào `interfaces/` hay `types/`.
 
 ---
 

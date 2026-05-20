@@ -2,7 +2,7 @@ import { useCallback, type FormEvent } from "react";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
-import type { DiscountPointData } from "@erp/pos/lib/page-libs/checkout/discountPoint.types";
+import type { DiscountPointData } from "@erp/pos/interfaces/discount-point.interface";
 import { MembershipPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/MembershipPanel";
 import { VoucherSearchPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/VoucherSearchPanel/VoucherSearchPanel";
 

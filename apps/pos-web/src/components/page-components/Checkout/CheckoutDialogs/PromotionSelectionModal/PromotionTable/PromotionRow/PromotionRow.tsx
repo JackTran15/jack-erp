@@ -1,5 +1,5 @@
 import { cn } from "@erp/ui";
-import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import {
   kindLabel,
   resolvePromotionStatus,

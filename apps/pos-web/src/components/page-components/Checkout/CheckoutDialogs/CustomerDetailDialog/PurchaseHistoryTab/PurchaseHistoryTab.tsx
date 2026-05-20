@@ -14,7 +14,7 @@ import {
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/StatusBadge/StatusBadge";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
-import type { PurchaseHistoryEntry } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface PurchaseHistoryTabProps {
   rows: PurchaseHistoryEntry[];

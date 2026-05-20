@@ -7,7 +7,7 @@ import {
   lineTotal,
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { cn, formatVnd } from "@erp/ui";
-import type { CartLine } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
 import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemWarningCell/InvoiceLineItemWarningCell";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";

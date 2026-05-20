@@ -1,8 +1,8 @@
+import type { FastStockTransferTableRow } from "@erp/pos/types/fast-stock-transfer.type";
 import type {
   FastStockTransferFilters,
-  FastStockTransferTableRow,
   FastStockTransferToolbarDraft,
-} from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+} from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import type {
   AddTempWarehouseLineBody,
   UpdateTempWarehouseLineBody,

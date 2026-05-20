@@ -1,7 +1,7 @@
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 

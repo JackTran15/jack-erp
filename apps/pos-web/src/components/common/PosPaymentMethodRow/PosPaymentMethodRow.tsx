@@ -3,8 +3,8 @@ import { cn } from "@erp/ui";
 import { CloseIcon, PlusCircleIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { AccountRow } from "@erp/pos/dtos/account.dto";
-import type { PaymentMethod } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 
 /**
  * One payment-method line: the user can split a sale across N methods, each

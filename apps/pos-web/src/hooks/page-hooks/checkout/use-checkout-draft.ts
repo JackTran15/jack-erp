@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 
-import { useCreateInvoiceMutation } from "@erp/pos/hooks/react-query/use-invoices";
+import { useCreateInvoiceMutation } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { buildCreateInvoicePayload } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import {

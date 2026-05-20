@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { PriceBook } from "@erp/pos/hooks/page-hooks/checkout/use-price-books";
 import type { Salesperson } from "@erp/pos/hooks/page-hooks/checkout/use-salespersons";
 

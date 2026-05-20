@@ -16,21 +16,21 @@ import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
 import {
   useDeleteInvoiceMutation,
   useDraftInvoicesQuery,
-} from "@erp/pos/hooks/react-query/use-invoices";
+} from "@erp/pos/hooks/react-query/use-query-invoice";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { InvoiceTabBar } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTabBar/InvoiceTabBar";
 import type {
   DraftInvoice,
   InvoiceTabItem,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+} from "@erp/pos/interfaces/checkout.interface";
 import { DraftInvoicesDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/DraftInvoicesDialog";
 import {
   readPinnedItems,
   writePinnedItems,
 } from "@erp/pos/lib/common/localstorage";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
-import { clearPosSession } from "@erp/pos/lib/common/posAuth";
+import { authService } from "@erp/pos/services/auth.service";
 import {
   PosNotificationPopover,
   type NotificationItem,
@@ -210,7 +210,7 @@ export function PosLayout() {
   };
 
   const handleLogout = () => {
-    clearPosSession();
+    authService.clearSession();
     clearBranch();
     navigate("/dang-nhap", { replace: true });
   };

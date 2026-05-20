@@ -1,3 +1,5 @@
+import type { ApiPaymentMethod } from "@erp/pos/types/invoice.type";
+
 /**
  * Một item trên payload tạo invoice. Mirror `CreateInvoiceItemDto` ở backend
  * (`apps/api/src/modules/pos/dto/create-invoice.dto.ts`).
@@ -24,9 +26,6 @@ export interface CreateInvoiceBody {
   items?: CreateInvoiceItemBody[];
 }
 
-/** Phương thức thanh toán API hỗ trợ — khác với UI enum (TRANSFER ↔ bank_transfer). */
-export type ApiPaymentMethod = "cash" | "bank_transfer" | "card";
-
 export interface InvoicePaymentLineBody {
   paymentMethod: ApiPaymentMethod;
   amount: number;
@@ -42,52 +41,4 @@ export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
   revenueAccountId: string;
   receivableAccountId?: string;
-}
-
-export type InvoiceStatus =
-  | "draft"
-  | "pending"
-  | "paid"
-  | "debt"
-  | "partial_debt"
-  | "cancelled";
-
-export interface InvoiceItemRow {
-  id: string;
-  itemId: string;
-  locationId?: string;
-  itemCode: string;
-  itemName: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-  lineDiscount: number;
-  lineTotal: number;
-  note?: string;
-  sortOrder?: number;
-}
-
-/**
- * Bản ghi invoice trả về từ `POST /invoices`, `GET /invoices/:id`, `GET /invoices/drafts`
- * và `POST /invoices/:id/checkout`. `items` chỉ có ở endpoint chi tiết.
- */
-export interface InvoiceRow {
-  id: string;
-  code: string;
-  status: InvoiceStatus;
-  isDraft: boolean;
-  draftLabel?: string;
-  sessionId: string;
-  customerId?: string;
-  staffId: string;
-  subtotal: number;
-  discountAmount: number;
-  depositAmount: number;
-  amountDue: number;
-  totalPaid: number;
-  note?: string;
-  issuedAt?: string;
-  createdAt: string;
-  updatedAt?: string;
-  items?: InvoiceItemRow[];
 }

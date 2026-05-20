@@ -1,9 +1,9 @@
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { CatalogLocation } from "@erp/pos/types/fast-stock-transfer.type";
 import type {
-  CatalogLocation,
   FastStockTransferFilters,
   FastStockTransferToolbarDraft,
-} from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+} from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import {
   TempWarehouseDirection,
   type TempWarehouseLine,

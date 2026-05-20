@@ -10,7 +10,7 @@ import { QrPaymentButton } from "@erp/pos/components/page-components/Checkout/Ch
 import { LabelTagButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/LabelTagButton/LabelTagButton";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
-import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-accounts";
+import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 interface PaymentSectionProps {

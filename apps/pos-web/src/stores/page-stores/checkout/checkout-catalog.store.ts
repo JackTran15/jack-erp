@@ -1,9 +1,7 @@
 import { create } from "zustand";
 
-import {
-  fetchPosCatalog,
-  type PosCatalogLine,
-} from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import { catalogService } from "@erp/pos/services/catalog.service";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -74,7 +72,7 @@ export const usePosCheckoutCatalogStore = create<PosCheckoutCatalogState>()(
     loadCatalog: async (branchId) => {
       set({ catalogError: "", catalogLoading: true });
       try {
-        const rows = await fetchPosCatalog(branchId);
+        const rows = await catalogService.fetch(branchId);
         set({ catalog: rows, catalogLoading: false });
       } catch (e) {
         set({

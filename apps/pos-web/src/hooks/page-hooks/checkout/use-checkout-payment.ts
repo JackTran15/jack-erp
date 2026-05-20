@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import {
   type PaymentLine,
 } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CashSuggestion } from "@erp/pos/interfaces/checkout.interface";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
@@ -12,7 +12,7 @@ import {
   derivePaymentDisplay,
   settlementAbsFromGrand,
 } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";

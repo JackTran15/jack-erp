@@ -1,5 +1,5 @@
-import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import type { ApiPaymentMethod } from "@erp/pos/dtos/invoice.dto";
+import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface";
+import type { ApiPaymentMethod } from "@erp/pos/types/invoice.type";
 
 // ============================================================================
 // Customer (purchase history, debt, detail tabs)
@@ -150,7 +150,7 @@ export const PAYMENT_METHODS: readonly PaymentMethodOption[] = [
 // ============================================================================
 // `revenueAccountId`, `receivableAccountId` và per-line `accountId` được
 // resolve runtime qua `useRevenueAccountsQuery` / `useReceivableAccountsQuery`
-// / `usePaymentAccountsQuery` (xem `hooks/react-query/use-accounts.ts`).
+// / `usePaymentAccountsQuery` (xem `hooks/react-query/use-query-account.ts`).
 
 export const PAYMENT_METHOD_TO_API_METHOD: Record<
   PaymentMethod,

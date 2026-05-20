@@ -8,7 +8,7 @@ import { POSToolbar } from "@erp/pos/components/page-components/Checkout/Checkou
 import { ProductCatalogGrid } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCatalogGrid";
 import { ProductCatalogHeader } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogHeader/ProductCatalogHeader";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
-import { CheckoutVariantEnum } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   selectCheckoutVariant,
   usePosCheckoutSessionStore,

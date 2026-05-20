@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  type CartLine,
-  CheckoutVariantEnum,
-  coerceCheckoutVariant,
-  type DraftInvoice,
-  type DraftInvoicePayment,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type {
+  CartLine,
+  DraftInvoice,
+  DraftInvoicePayment,
+} from "@erp/pos/interfaces/checkout.interface";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
+import { coerceCheckoutVariant } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 import { getOversellSaleLines } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 

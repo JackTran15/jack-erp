@@ -1,5 +1,5 @@
 import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
-import { listCarriers } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-api";
+import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
 import { formatCarrierName } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import type { TempWarehousePublicUser } from "@erp/shared-interfaces";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,7 +41,7 @@ export function useFastStockTransferCarriers(
       const reqId = ++requestIdRef.current;
       setCarriersLoading(true);
       try {
-        const result = await listCarriers({
+        const result = await tempWarehouseService.listCarriers({
           branchId,
           search,
           pagination: { page: 1, pageSize: CARRIERS_PAGE_SIZE },

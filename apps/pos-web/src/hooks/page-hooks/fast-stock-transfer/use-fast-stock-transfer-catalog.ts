@@ -1,10 +1,8 @@
 import type { PosSelectSearchSuggestion } from "@erp/pos/components/common/PosSelectSearch/PosSelectSearch";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import {
-  fetchPosCatalog,
-  type PosCatalogDirection,
-  type PosCatalogLine,
-} from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import { catalogService } from "@erp/pos/services/catalog.service";
+import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const CATALOG_LIMIT = 40;
@@ -28,7 +26,7 @@ export function useFastStockTransferCatalog(
       const reqId = ++requestIdRef.current;
       setCatalogLoading(true);
       try {
-        const rows = await fetchPosCatalog(branchId, search, catalogDirection);
+        const rows = await catalogService.fetch(branchId, search, catalogDirection);
         if (reqId !== requestIdRef.current) return;
         setCatalogLines(rows.slice(0, CATALOG_LIMIT));
       } catch {

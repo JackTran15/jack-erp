@@ -3,11 +3,11 @@ import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
-import { useCreateCustomerGroup } from "@erp/pos/hooks/page-hooks/checkout/use-customer-groups";
-import { type CustomerGroupRow } from "@erp/pos/lib/common/customerApi";
+import { useCreateCustomerGroup } from "@erp/pos/hooks/react-query/use-query-customer-group";
+import { type CustomerGroupRow } from "@erp/pos/interfaces/customer-group.interface";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { userFacingError } from "@erp/pos/lib/page-libs/checkout/customerFormUtils";
-import type { CustomerSelectOption } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
+import type { CustomerSelectOption } from "@erp/pos/interfaces/customer-dialog.interface";
 
 const LABEL_CLASS = "w-[110px] shrink-0 text-sm text-gray-700";
 

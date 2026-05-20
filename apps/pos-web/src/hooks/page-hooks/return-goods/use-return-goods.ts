@@ -12,11 +12,11 @@ import {
   clampReturnQty,
   sumSelectedReturnTotal,
 } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
+import type { ReturnInvoiceFilters } from "@erp/pos/dtos/return-goods.dto";
 import type {
-  ReturnInvoiceFilters,
   ReturnInvoiceRow,
   ReturnableItem,
-} from "@erp/pos/lib/page-libs/return-goods/return-goods.types";
+} from "@erp/pos/interfaces/return-goods.interface";
 
 interface UseReturnGoodsResult {
   /** Date-range pill at top-left of the page. */

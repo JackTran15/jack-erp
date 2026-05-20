@@ -1,5 +1,5 @@
 import { cn, formatVnd } from "@erp/ui";
-import type { MemberCardData } from "@erp/pos/lib/page-libs/checkout/discountPoint.types";
+import type { MemberCardData } from "@erp/pos/interfaces/discount-point.interface";
 import { MemberCardTeal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/MemberCardTeal/MemberCardTeal";
 import { StatBlock } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/StatBlock/StatBlock";
 import { UsePointsRow } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/UsePointsRow/UsePointsRow";

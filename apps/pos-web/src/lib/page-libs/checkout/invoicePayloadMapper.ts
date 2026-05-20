@@ -1,19 +1,20 @@
 import { PAYMENT_METHOD_TO_API_METHOD } from "@erp/pos/constants/checkout.constant";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import type { AccountRow } from "@erp/pos/dtos/account.dto";
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import type {
   CheckoutInvoiceBody,
   CreateInvoiceBody,
   CreateInvoiceItemBody,
   InvoicePaymentLineBody,
-  InvoiceRow,
 } from "@erp/pos/dtos/invoice.dto";
+import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
+import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type {
   CartLine,
   DraftInvoice,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+} from "@erp/pos/interfaces/checkout.interface";
 
 interface BuildCreateInvoicePayloadInput {
   sessionId: string;
@@ -67,11 +68,6 @@ interface BuildCheckoutInvoiceApiPayloadInput {
    */
   accountById: Map<string, AccountRow>;
 }
-
-export type ResolveCheckoutPayloadError =
-  | { code: "missing_revenue_account" }
-  | { code: "missing_receivable_account" }
-  | { code: "missing_cash_account"; cashAccountId: string | null };
 
 /**
  * Build payload cho `POST /invoices/:id/checkout`. Trả về `{ ok: true, body }`

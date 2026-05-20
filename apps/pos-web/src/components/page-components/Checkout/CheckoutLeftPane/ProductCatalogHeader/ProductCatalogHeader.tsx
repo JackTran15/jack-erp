@@ -5,7 +5,7 @@ import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/Po
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutMeta } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-meta";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 
 export interface ProductCatalogHeaderProps {
   /** Forwarded to the underlying input — used by the Shift+F3 hotkey. */

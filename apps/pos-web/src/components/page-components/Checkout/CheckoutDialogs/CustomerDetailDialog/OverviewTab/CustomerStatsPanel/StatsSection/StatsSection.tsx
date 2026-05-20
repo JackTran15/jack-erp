@@ -1,4 +1,4 @@
-import type { CustomerStatsData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { CustomerStatsData } from "@erp/pos/interfaces/customer-detail.interface";
 
 interface StatPair {
   label: string;

@@ -10,7 +10,7 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { formatOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import type { FastStockTransferTableRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferTableRow } from "@erp/pos/types/fast-stock-transfer.type";
 import {
   formatCarrierName,
   lineProductName,
