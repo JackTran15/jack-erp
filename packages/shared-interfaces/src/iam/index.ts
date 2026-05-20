@@ -4,7 +4,7 @@
  * Endpoint catalogue (all auth-required, organization-scoped):
  *
  *   USERS
- *   GET    /admin/users                              ?page&pageSize&search&isActive  → PaginatedResponse<UserSummary>
+ *   GET    /admin/users                              ?page&pageSize&search&isActive  → PaginatedResponse<UserListItem>
  *   GET    /admin/users/:id                                                          → UserDetail
  *   POST   /admin/users                              body: CreateUserRequest         → UserDetail
  *   PATCH  /admin/users/:id                          body: UpdateUserRequest         → UserDetail
@@ -47,6 +47,22 @@ export interface UserDetail extends UserSummary {
   branchIds: string[];
   /** HR profile (1:1). Null when the user has no employee profile yet. */
   profile?: EmployeeProfileView | null;
+}
+
+/** Compact employee profile fields surfaced on the user list rows. */
+export interface EmployeeProfileSummary {
+  code: string;
+  /** Inline job position (id + name); null when unset. */
+  jobPosition: JobPositionRef | null;
+  photoUrl: string | null;
+  mobile: string | null;
+  employmentStatus: EmploymentStatus;
+}
+
+/** A row in the GET /admin/users list: user summary + employee code/profile (null when the user has no profile). */
+export interface UserListItem extends UserSummary {
+  code: string | null;
+  profile: EmployeeProfileSummary | null;
 }
 
 export interface CreateUserRequest {

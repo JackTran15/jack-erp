@@ -13,6 +13,7 @@ import { RoleEntity } from '../auth/role.entity';
 import { UserRoleEntity } from '../auth/user-role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { BranchEntity } from '../branch/branch.entity';
+import { EmployeeProfileEntity } from './employee/employee-profile.entity';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -49,6 +50,7 @@ describe('UsersService', () => {
   let userRoleRepo: ReturnType<typeof makeMockRepo>;
   let userBranchRepo: ReturnType<typeof makeMockRepo>;
   let branchRepo: ReturnType<typeof makeMockRepo>;
+  let profileRepo: ReturnType<typeof makeMockRepo>;
   let rbac: jest.Mocked<
     Pick<RbacService, 'invalidateUserPermissions' | 'invalidateOrgPermissions'>
   >;
@@ -60,6 +62,7 @@ describe('UsersService', () => {
     userRoleRepo = makeMockRepo();
     userBranchRepo = makeMockRepo();
     branchRepo = makeMockRepo();
+    profileRepo = makeMockRepo();
     manager = makeMockManager();
     rbac = {
       invalidateUserPermissions: jest.fn().mockResolvedValue(undefined),
@@ -81,12 +84,96 @@ describe('UsersService', () => {
           useValue: userBranchRepo,
         },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
+        {
+          provide: getRepositoryToken(EmployeeProfileEntity),
+          useValue: profileRepo,
+        },
         { provide: RbacService, useValue: rbac },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
     service = module.get(UsersService);
+  });
+
+  describe('list', () => {
+    const makeUser = (over: Record<string, unknown> = {}) => ({
+      id: 'u-1',
+      email: 'a@example.com',
+      firstName: 'A',
+      lastName: 'B',
+      isActive: true,
+      lastLoginAt: null,
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+      ...over,
+    });
+
+    it('includes code + lightweight profile when a profile exists, null otherwise', async () => {
+      const userWith = makeUser({ id: 'u-1' });
+      const userWithout = makeUser({ id: 'u-2', email: 'b@example.com' });
+      userRepo.findAndCount.mockResolvedValue([[userWith, userWithout], 2]);
+      profileRepo.find.mockResolvedValue([
+        {
+          userId: 'u-1',
+          code: 'NV000001',
+          jobPosition: { id: 'jp-1', name: 'Sales' },
+          photoUrl: 'http://cdn/p1.png',
+          mobile: '0900000001',
+          employmentStatus: 'OFFICIAL',
+        },
+      ]);
+
+      const result = await service.list(
+        { page: 1, pageSize: 20 },
+        actor,
+      );
+
+      expect(result.total).toBe(2);
+      expect(result.data[0]).toMatchObject({
+        id: 'u-1',
+        code: 'NV000001',
+        profile: {
+          code: 'NV000001',
+          jobPosition: { id: 'jp-1', name: 'Sales' },
+          photoUrl: 'http://cdn/p1.png',
+          mobile: '0900000001',
+          employmentStatus: 'OFFICIAL',
+        },
+      });
+      expect(result.data[1]).toMatchObject({
+        id: 'u-2',
+        code: null,
+        profile: null,
+      });
+    });
+
+    it('adds an id In(...) clause when the search term matches employee codes', async () => {
+      profileRepo.find
+        .mockResolvedValueOnce([{ id: 'p-1', userId: 'u-1' }]) // code-match lookup
+        .mockResolvedValueOnce([]); // batch profile load for the page
+      userRepo.findAndCount.mockResolvedValue([[makeUser()], 1]);
+
+      await service.list({ page: 1, pageSize: 20, search: 'NV0001' }, actor);
+
+      const findArg = userRepo.findAndCount.mock.calls[0][0];
+      expect(Array.isArray(findArg.where)).toBe(true);
+      // email + firstName + lastName + id-in-code-matches
+      expect(findArg.where).toHaveLength(4);
+      expect(findArg.where[3]).toHaveProperty('id');
+    });
+
+    it('omits the code clause when the search term matches no employee codes', async () => {
+      profileRepo.find
+        .mockResolvedValueOnce([]) // no code matches
+        .mockResolvedValueOnce([]); // batch profile load
+      userRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.list({ page: 1, pageSize: 20, search: 'nope' }, actor);
+
+      const findArg = userRepo.findAndCount.mock.calls[0][0];
+      expect(findArg.where).toHaveLength(3);
+    });
   });
 
   describe('create', () => {

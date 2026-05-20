@@ -15,7 +15,7 @@ import {
 import {
   PaginationQuery,
   PaginatedResponse,
-  UserSummary,
+  UserListItem,
   UserDetail,
   UserRolesResponse,
   UserBranchesResponse,
@@ -41,7 +41,7 @@ export class UsersController {
     @Query()
     query: PaginationQuery & { search?: string; isActive?: string },
     @Actor() actor: ActorContext,
-  ): Promise<PaginatedResponse<UserSummary>> {
+  ): Promise<PaginatedResponse<UserListItem>> {
     const isActive =
       query.isActive === 'true'
         ? true
