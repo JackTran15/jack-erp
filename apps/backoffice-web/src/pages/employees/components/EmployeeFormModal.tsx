@@ -1,16 +1,22 @@
-import { useMemo, useState, type ReactNode } from "react";
+import type { UserDetail } from "@erp/shared-interfaces";
+import { DocumentType } from "@erp/shared-interfaces";
 import { AppModal, Button, cn } from "@erp/ui";
-import { CircleHelp, Plus, Save, X } from "lucide-react";
+import { CircleHelp, Loader2, Plus, RefreshCw, Save, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { EmployeeFormDraft } from "../employee.types";
+import { useGenerateDocumentNumber } from "../../../hooks/document-numbering";
+import { getIamErrorMessage } from "../../../hooks/iam";
+import { getUserFacingApiErrorMessage } from "../../../lib/user-facing-api-error";
+import type { EmployeeFormDraft, EmployeeFormMode } from "../employee.types";
 import { validateEmployeeDraft } from "../employee.validation";
+import { EmployeeAccessTimeTab } from "./EmployeeAccessTimeTab";
 import { EmployeeBasicInfoTab } from "./EmployeeBasicInfoTab";
-import { EmployeeRolesFormTab } from "./EmployeeRolesFormTab";
 import { EmployeeContactFormTab } from "./EmployeeContactFormTab";
 import { EmployeeProfileFormTab } from "./EmployeeProfileFormTab";
-import { EmployeeAccessTimeTab } from "./EmployeeAccessTimeTab";
+import { EmployeeRolesFormTab } from "./EmployeeRolesFormTab";
+import { useEmployeeFormDraft } from "./useEmployeeFormDraft";
 
-export type EmployeeFormMode = "create" | "edit";
+export type { EmployeeFormMode } from "../employee.types";
 
 export enum EmployeeFormTabEnum {
   BASIC = "basic",
@@ -28,40 +34,116 @@ export const EMPLOYEE_FORM_TAB_LABELS: Record<EmployeeFormTabEnum, string> = {
   [EmployeeFormTabEnum.ACCESS]: "Thời gian truy cập",
 };
 
+export interface EmployeeFormSaveContext {
+  loadedUser?: UserDetail;
+}
+
 interface EmployeeFormModalProps {
   open: boolean;
   mode: EmployeeFormMode;
-  draft: EmployeeFormDraft;
-  onDraftChange: (draft: EmployeeFormDraft) => void;
+  userId?: string;
+  initialDraft?: EmployeeFormDraft;
   onClose: () => void;
-  onSave: (draft: EmployeeFormDraft) => void;
+  onSave: (draft: EmployeeFormDraft, context: EmployeeFormSaveContext) => void;
+}
+
+function EmployeeFormLoadingOverlay() {
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center bg-gray-900/20"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="Đang tải dữ liệu nhân viên"
+    >
+      <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-white px-8 py-5 shadow-lg">
+        <Loader2
+          className="h-9 w-9 animate-spin text-primary"
+          strokeWidth={2}
+        />
+        <span
+          className="text-xl font-medium tracking-[0.35em] text-muted-foreground"
+          aria-hidden
+        >
+          ···
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function EmployeeFormModal({
   open,
   mode,
-  draft,
-  onDraftChange,
+  userId,
+  initialDraft,
   onClose,
   onSave,
 }: EmployeeFormModalProps) {
   const [activeTab, setActiveTab] = useState<EmployeeFormTabEnum>(
     EmployeeFormTabEnum.BASIC,
   );
+  const [changePassword, setChangePassword] = useState(false);
   const isEdit = mode === "edit";
+
+  const {
+    draft,
+    setDraft,
+    loadedUser,
+    isLoadingDetail,
+    isError,
+    error,
+    refetch,
+  } = useEmployeeFormDraft({ open, mode, userId, initialDraft });
+
+  useEffect(() => {
+    if (!open || mode !== "edit") {
+      setChangePassword(false);
+    }
+  }, [open, mode]);
+  const { mutateAsync: generateDocumentNumber, isPending: isGeneratingCode } =
+    useGenerateDocumentNumber();
+
+  useEffect(() => {
+    if (!open || mode !== "create") return;
+
+    let cancelled = false;
+    void generateDocumentNumber({ documentType: DocumentType.EMPLOYEE })
+      .then((code) => {
+        if (cancelled) return;
+        setDraft((current) => ({
+          ...current,
+          basic: { ...current.basic, code },
+        }));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(
+          getUserFacingApiErrorMessage(err) ||
+            "Không sinh được mã. Vui lòng nhập thủ công.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, generateDocumentNumber, setDraft]);
 
   const tabs = useMemo<EmployeeFormTabEnum[]>(
     () => Object.values(EmployeeFormTabEnum),
     [],
   );
 
+  const formReady = !isEdit || Boolean(loadedUser);
+
   const handleSave = () => {
-    const error = validateEmployeeDraft(draft, isEdit);
+    const error = validateEmployeeDraft(draft, isEdit, {
+      changePassword: isEdit && changePassword,
+    });
     if (error) {
       toast.error(error);
       return;
     }
-    onSave(draft);
+    onSave(draft, { loadedUser });
   };
 
   const title = isEdit ? "Sửa nhân viên" : "Thêm mới Nhân viên";
@@ -71,24 +153,72 @@ export function EmployeeFormModal({
       [EmployeeFormTabEnum.BASIC]: (
         <EmployeeBasicInfoTab
           draft={draft}
-          onChange={onDraftChange}
+          onChange={setDraft}
           isEdit={isEdit}
+          isGeneratingCode={isGeneratingCode}
+          changePassword={changePassword}
+          onChangePassword={setChangePassword}
         />
       ),
       [EmployeeFormTabEnum.ROLES]: (
-        <EmployeeRolesFormTab draft={draft} onChange={onDraftChange} />
+        <EmployeeRolesFormTab draft={draft} onChange={setDraft} />
       ),
       [EmployeeFormTabEnum.CONTACT]: (
-        <EmployeeContactFormTab draft={draft} onChange={onDraftChange} />
+        <EmployeeContactFormTab draft={draft} onChange={setDraft} />
       ),
       [EmployeeFormTabEnum.PROFILE]: (
-        <EmployeeProfileFormTab draft={draft} onChange={onDraftChange} />
+        <EmployeeProfileFormTab draft={draft} onChange={setDraft} />
       ),
       [EmployeeFormTabEnum.ACCESS]: (
-        <EmployeeAccessTimeTab draft={draft} onChange={onDraftChange} />
+        <EmployeeAccessTimeTab draft={draft} onChange={setDraft} />
       ),
     }),
-    [draft, onDraftChange, isEdit],
+    [draft, isEdit, isGeneratingCode, changePassword],
+  );
+
+  const body = isError ? (
+    <div className="space-y-3 p-4 flex flex-col items-center justify-center h-full">
+      <p className="text-sm text-destructive">
+        {getIamErrorMessage(error, "Không tải được thông tin nhân viên.")}
+      </p>
+      <Button type="button" variant="outline" onClick={() => void refetch()}>
+        <RefreshCw className="mr-1 h-4 w-4" />
+        Thử lại
+      </Button>
+    </div>
+  ) : (
+    <div
+      className={cn(
+        "relative flex min-h-[28rem] flex-col",
+        isLoadingDetail && "pointer-events-none select-none",
+      )}
+    >
+      <nav
+        aria-label="Tab biểu mẫu nhân viên"
+        className="flex shrink-0 gap-4 overflow-x-auto border-b text-sm"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            tabIndex={isLoadingDetail ? -1 : undefined}
+            className={cn(
+              "whitespace-nowrap border-b-2 py-2 font-medium transition-colors",
+              activeTab === tab
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setActiveTab(tab)}
+          >
+            {EMPLOYEE_FORM_TAB_LABELS[tab]}
+          </button>
+        ))}
+      </nav>
+      <div className="min-h-0 flex-1 overflow-y-auto py-0">
+        {formTabPanels[activeTab]}
+      </div>
+      {isLoadingDetail && <EmployeeFormLoadingOverlay />}
+    </div>
   );
 
   return (
@@ -111,7 +241,7 @@ export function EmployeeFormModal({
             Trợ giúp
           </button>
           <div className="flex items-center gap-2">
-            <Button type="button" onClick={handleSave}>
+            <Button type="button" onClick={handleSave} disabled={!formReady}>
               <Save className="mr-1 h-4 w-4" />
               Lưu
             </Button>
@@ -119,6 +249,7 @@ export function EmployeeFormModal({
               type="button"
               variant="outline"
               onClick={handleSave}
+              disabled={!formReady}
             >
               <Plus className="mr-1 h-4 w-4" />
               Lưu và thêm mới
@@ -131,27 +262,7 @@ export function EmployeeFormModal({
         </div>
       }
     >
-      <nav
-        aria-label="Tab biểu mẫu nhân viên"
-        className="flex gap-4 overflow-x-auto border-b px-4 text-sm"
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={cn(
-              "whitespace-nowrap border-b-2 py-2 font-medium transition-colors",
-              activeTab === tab
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => setActiveTab(tab)}
-          >
-            {EMPLOYEE_FORM_TAB_LABELS[tab]}
-          </button>
-        ))}
-      </nav>
-      <div className="flex-1 overflow-y-auto">{formTabPanels[activeTab]}</div>
+      {body}
     </AppModal>
   );
 }

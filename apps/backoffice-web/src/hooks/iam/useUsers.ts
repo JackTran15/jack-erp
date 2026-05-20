@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-import type { PaginatedResponse, UserDetail, UserSummary } from "@erp/shared-interfaces";
+import { UseQueryResult, useQuery } from "@tanstack/react-query";
+import type {
+  PaginatedResponse,
+  UserDetail,
+  UserSummary,
+} from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 
 export interface UserListFilters {
@@ -65,10 +69,12 @@ export function useAllUsers(enabled = true) {
   });
 }
 
-export function useUser(userId: string | undefined) {
+export function useUser(
+  userId: string | undefined,
+): UseQueryResult<UserDetail, Error> {
   return useQuery({
-    queryKey: ["iam", "user", userId],
-    queryFn: async () =>
+    queryKey: ["iam", "user", userId] as const,
+    queryFn: async (): Promise<UserDetail> =>
       requireErpData(
         await erpApi.GET<UserDetail>("/admin/users/{id}", {
           params: { path: { id: userId! } },

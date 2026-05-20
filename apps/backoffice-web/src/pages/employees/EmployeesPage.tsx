@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   IAM_PERMISSION_KEYS,
   type UserDetail,
@@ -37,15 +37,12 @@ import {
   useUsers,
   userDisplayCode,
 } from "../../hooks/iam";
-import type { EmployeeFormDraft } from "./employee.types";
-import {
-  createEmptyDraft,
-  userDetailToEmployeeDraft,
-} from "./employee.mappers";
+import type { EmployeeFormDraft, EmployeeFormMode } from "./employee.types";
+import { userDetailToEmployeeDraft } from "./employee.mappers";
 import { EmployeeDetailPanel } from "./components/EmployeeDetailPanel";
 import {
   EmployeeFormModal,
-  type EmployeeFormMode,
+  type EmployeeFormSaveContext,
 } from "./components/EmployeeFormModal";
 
 const FILTER_KEYS = ["code", "fullName", "email", "status"] as const;
@@ -103,9 +100,9 @@ export function EmployeesPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<EmployeeFormMode>("create");
-  const [formDraft, setFormDraft] = useState<EmployeeFormDraft>(() =>
-    createEmptyDraft(),
-  );
+  const [formInitialDraft, setFormInitialDraft] = useState<
+    EmployeeFormDraft | undefined
+  >();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<{
     id: string;
@@ -121,9 +118,6 @@ export function EmployeesPage() {
     useUsers(listFilters);
   const { data: roles = [] } = useRoles();
   const { data: userDetail } = useUser(selectedId ?? undefined);
-  const { data: editUserDetail } = useUser(
-    formOpen && formMode === "edit" ? (editingId ?? undefined) : undefined,
-  );
 
   const createUser = useCreateUser();
   const updateUser = useUpdateUser(editingId ?? "");
@@ -156,7 +150,7 @@ export function EmployeesPage() {
   const openCreate = useCallback(() => {
     setFormMode("create");
     setEditingId(null);
-    setFormDraft(createEmptyDraft());
+    setFormInitialDraft(undefined);
     setFormOpen(true);
   }, []);
 
@@ -167,11 +161,9 @@ export function EmployeesPage() {
     }
     setFormMode("edit");
     setEditingId(selectedId);
-    if (userDetail) {
-      setFormDraft(userDetailToEmployeeDraft(userDetail));
-    }
+    setFormInitialDraft(undefined);
     setFormOpen(true);
-  }, [selectedId, userDetail]);
+  }, [selectedId]);
 
   const openDuplicate = useCallback(() => {
     if (!userDetail) {
@@ -179,20 +171,16 @@ export function EmployeesPage() {
       return;
     }
     const draft = userDetailToEmployeeDraft(userDetail);
+    draft.basic.code = "";
     draft.basic.email = "";
+    draft.basic.changePassword = false;
     draft.basic.password = "";
     draft.basic.confirmPassword = "";
     setFormMode("create");
     setEditingId(null);
-    setFormDraft(draft);
+    setFormInitialDraft(draft);
     setFormOpen(true);
   }, [userDetail]);
-
-  useEffect(() => {
-    if (editUserDetail && formOpen && formMode === "edit") {
-      setFormDraft(userDetailToEmployeeDraft(editUserDetail));
-    }
-  }, [editUserDetail, formMode, formOpen]);
 
   const handleReload = useCallback(() => {
     void refetch();
@@ -223,18 +211,19 @@ export function EmployeesPage() {
   );
 
   const handleSave = useCallback(
-    async (draft: EmployeeFormDraft) => {
+    async (draft: EmployeeFormDraft, context: EmployeeFormSaveContext) => {
       try {
         if (formMode === "create") {
           const created = await createUser.mutateAsync(draft);
           setSelectedId(created.id);
           toast.success("Đã thêm người dùng mới.");
         } else if (editingId) {
-          const previous = editUserDetail
+          const snapshot = context.loadedUser;
+          const previous = snapshot
             ? {
-                roleIds: editUserDetail.roleIds,
-                branchIds: editUserDetail.branchIds,
-                isActive: editUserDetail.isActive,
+                roleIds: snapshot.roleIds,
+                branchIds: snapshot.branchIds,
+                isActive: snapshot.isActive,
               }
             : undefined;
           const payload = draftToUserUpdatePayload(draft, previous);
@@ -244,12 +233,13 @@ export function EmployeesPage() {
 
         setFormOpen(false);
         setEditingId(null);
+        setFormInitialDraft(undefined);
         void refetch();
       } catch (err) {
         toast.error(getIamErrorMessage(err, "Không lưu được người dùng."));
       }
     },
-    [createUser, editUserDetail, editingId, formMode, refetch, updateUser],
+    [createUser, editingId, formMode, refetch, updateUser],
   );
 
   const handleDeactivate = useCallback(async () => {
@@ -285,7 +275,7 @@ export function EmployeesPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      onClick: openEdit,
+      onClick: () => void openEdit(),
       disabled: !selectedId || !canWrite,
     },
     { id: "sep1", type: "separator" },
@@ -432,13 +422,14 @@ export function EmployeesPage() {
       <EmployeeFormModal
         open={formOpen}
         mode={formMode}
-        draft={formDraft}
-        onDraftChange={setFormDraft}
+        userId={editingId ?? undefined}
+        initialDraft={formInitialDraft}
         onClose={() => {
           setFormOpen(false);
           setEditingId(null);
+          setFormInitialDraft(undefined);
         }}
-        onSave={(draft) => void handleSave(draft)}
+        onSave={(draft, context) => void handleSave(draft, context)}
       />
 
       {confirmDeactivate && (

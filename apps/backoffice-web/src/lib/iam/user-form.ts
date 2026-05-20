@@ -10,7 +10,6 @@ import type {
   AddressBlock,
   EmployeeFormDraft,
 } from "../../pages/employees/employee.types";
-import { isActiveFromEmploymentStatus } from "../../pages/employees/employee-status";
 import { splitFullName } from "./display";
 
 /** PATCH profile + optional role/branch/password side effects (see useUpdateUser). */
@@ -90,10 +89,10 @@ export function draftToCreateUserRequest(
     email: draft.basic.email.trim(),
     firstName,
     lastName,
+    isActive: draft.basic.allowSoftwareAccess,
     temporaryPassword: draft.basic.password,
     roleIds: draft.roleIds.length > 0 ? draft.roleIds : undefined,
-    branchIds:
-      (draft.branchIds?.length ?? 0) > 0 ? draft.branchIds : undefined,
+    branchIds: (draft.branchIds?.length ?? 0) > 0 ? draft.branchIds : undefined,
     profile: draftToEmployeeProfilePayload(draft),
   };
 }
@@ -105,8 +104,8 @@ export function draftToUserUpdatePayload(
   const { firstName, lastName } = splitFullName(draft.basic.fullName);
   const payload: UserUpdatePayload = { firstName, lastName };
 
-  const isActive = isActiveFromEmploymentStatus(draft.basic.employmentStatus);
-  if (previous?.isActive !== isActive) {
+  const isActive = draft.basic.allowSoftwareAccess;
+  if (previous === undefined || previous.isActive !== isActive) {
     payload.isActive = isActive;
   }
 
@@ -127,8 +126,8 @@ export function draftToUserUpdatePayload(
     payload.branchIds = branchIds;
   }
 
-  if (draft.basic.password.trim()) {
-    payload.newTemporaryPassword = draft.basic.password;
+  if (draft.basic.changePassword && draft.basic.password.trim()) {
+    payload.newTemporaryPassword = draft.basic.password.trim();
   }
 
   // Always upsert the HR profile so the contact / profile / access tabs persist.

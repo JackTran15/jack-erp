@@ -9,7 +9,13 @@ import {
 
 // Re-export the IAM/HR enums under the names the employee UI components already use,
 // so the form draft stays in sync with the API contract (CreateUserRequest.profile).
-export { GenderEnum, EmploymentStatusEnum, MaritalStatusEnum, AccessModeEnum, WeekdayEnum };
+export {
+  GenderEnum,
+  EmploymentStatusEnum,
+  MaritalStatusEnum,
+  AccessModeEnum,
+  WeekdayEnum,
+};
 
 export interface AccessScheduleDay {
   weekday: WeekdayEnum;
@@ -24,10 +30,7 @@ export interface EmployeeAccess {
 }
 
 /** Role row in employee UI (from IAM RoleSummary). */
-export type EmployeeRolePick = Pick<
-  RoleSummary,
-  "id" | "name" | "description"
->;
+export type EmployeeRolePick = Pick<RoleSummary, "id" | "name" | "description">;
 
 export interface AddressBlock {
   address: string;
@@ -62,6 +65,8 @@ export interface EmployeeProfile {
   originalDocumentsNote: string;
 }
 
+export type EmployeeFormMode = "create" | "edit";
+
 /**
  * Form state for the employee modal.
  * IAM fields map to CreateUserRequest / UpdateUserRequest; HR tabs are UI-only (readonly).
@@ -73,6 +78,8 @@ export interface EmployeeFormDraft {
     mobile: string;
     fullName: string;
     allowSoftwareAccess: boolean;
+    /** Only used when editing: show the password change form. */
+    changePassword: boolean;
     password: string;
     confirmPassword: string;
     idCardNumber: string;
