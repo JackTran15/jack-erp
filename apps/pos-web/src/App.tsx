@@ -10,6 +10,7 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
+import { UiCatalogPage } from "./pages/UiCatalogPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ export function App() {
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/dang-nhap" element={<PosLoginPage />} />
+            <Route path="/ui" element={<UiCatalogPage />} />
             <Route element={<PosRequireAuth />}>
               <Route path="/chon-chi-nhanh" element={<BranchSelectPage />} />
               <Route element={<PosRequireBranch />}>
