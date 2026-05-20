@@ -7510,7 +7510,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/InvoiceEntity"
+                    "$ref": "#/components/schemas/DraftInvoiceResponseDto"
                   }
                 }
               }
@@ -15749,6 +15749,209 @@
           }
         },
         "required": [
+          "code",
+          "status",
+          "subtotal",
+          "discountAmount",
+          "depositAmount",
+          "amountDue",
+          "totalPaid",
+          "isDraft",
+          "sessionId",
+          "staffId",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "InvoiceItemEntity": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "unitPriceDefault": {
+            "type": "number"
+          },
+          "costPrice": {
+            "type": "number"
+          },
+          "lineDiscount": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "quantity",
+          "unitPrice",
+          "unitPriceDefault",
+          "costPrice",
+          "lineDiscount",
+          "lineTotal",
+          "sortOrder",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "DraftInvoiceResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Line items belonging to this draft, ordered by sortOrder.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItemEntity"
+            }
+          },
+          "code": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "pending",
+              "paid",
+              "debt",
+              "partial_debt",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "depositAmount": {
+            "type": "number"
+          },
+          "amountDue": {
+            "type": "number"
+          },
+          "totalPaid": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "isDraft": {
+            "type": "boolean"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "draftLabel": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "staffId": {
+            "type": "string"
+          },
+          "priceListId": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cancelReason": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "items",
           "code",
           "status",
           "subtotal",

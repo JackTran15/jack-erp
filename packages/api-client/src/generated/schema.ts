@@ -4929,6 +4929,68 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        InvoiceItemEntity: {
+            invoiceId: string;
+            itemId: string;
+            locationId?: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            unitPriceDefault: number;
+            costPrice: number;
+            lineDiscount: number;
+            lineTotal: number;
+            note?: string;
+            sortOrder: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        DraftInvoiceResponseDto: {
+            /** @description Line items belonging to this draft, ordered by sortOrder. */
+            items: components["schemas"]["InvoiceItemEntity"][];
+            code: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            /** @enum {string} */
+            status: "draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled";
+            subtotal: number;
+            discountAmount: number;
+            depositAmount: number;
+            amountDue: number;
+            totalPaid: number;
+            note?: string;
+            isDraft: boolean;
+            sessionId: string;
+            draftLabel?: string;
+            customerId?: string;
+            staffId: string;
+            priceListId?: string;
+            /** Format: date-time */
+            cancelledAt?: string;
+            cancelReason?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
         InvoiceDebtEntity: {
             referenceCode: string;
             invoiceId: string;
@@ -10114,7 +10176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvoiceEntity"][];
+                    "application/json": components["schemas"]["DraftInvoiceResponseDto"][];
                 };
             };
         };
