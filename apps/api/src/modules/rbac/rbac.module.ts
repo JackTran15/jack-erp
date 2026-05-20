@@ -7,6 +7,11 @@ import { RolePermissionEntity } from '../auth/role-permission.entity';
 import { PermissionEntity } from '../auth/permission.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { BranchEntity } from '../branch/branch.entity';
+import { JobPositionEntity } from '../hr/job-position/job-position.entity';
+import { EmployeeProfileEntity } from './employee/employee-profile.entity';
+import { EmployeeAddressEntity } from './employee/employee-address.entity';
+import { EmployeeEmergencyContactEntity } from './employee/employee-emergency-contact.entity';
+import { EmployeeAccessScheduleEntity } from './employee/employee-access-schedule.entity';
 import { RbacService } from './rbac.service';
 import { PermissionGuard } from './permission.guard';
 import { BranchScopeGuard } from './branch-scope.guard';
@@ -28,6 +33,11 @@ import { PermissionsController } from './permissions.controller';
       PermissionEntity,
       UserBranchAssignmentEntity,
       BranchEntity,
+      JobPositionEntity,
+      EmployeeProfileEntity,
+      EmployeeAddressEntity,
+      EmployeeEmergencyContactEntity,
+      EmployeeAccessScheduleEntity,
     ]),
   ],
   controllers: [UsersController, RolesController, PermissionsController],

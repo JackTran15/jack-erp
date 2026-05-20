@@ -6,12 +6,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, ILike } from 'typeorm';
+import { DataSource, EntityManager, In, Repository, ILike } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import {
   PaginatedResponse,
   UserSummary,
   UserDetail,
+  EmployeeProfileView,
+  EmploymentStatus,
+  EmployeeAccessMode,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { UserEntity } from '../auth/user.entity';
@@ -19,9 +22,15 @@ import { RoleEntity } from '../auth/role.entity';
 import { UserRoleEntity } from '../auth/user-role.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
 import { BranchEntity } from '../branch/branch.entity';
+import { JobPositionEntity } from '../hr/job-position/job-position.entity';
+import { EmployeeProfileEntity } from './employee/employee-profile.entity';
+import { EmployeeAddressEntity } from './employee/employee-address.entity';
+import { EmployeeEmergencyContactEntity } from './employee/employee-emergency-contact.entity';
+import { EmployeeAccessScheduleEntity } from './employee/employee-access-schedule.entity';
 import { RbacService } from './rbac.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { EmployeeProfileDto } from './dto/employee-profile.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const BCRYPT_COST = 10;
@@ -48,6 +57,8 @@ export class UsersService {
     private readonly userBranchRepo: Repository<UserBranchAssignmentEntity>,
     @InjectRepository(BranchEntity)
     private readonly branchRepo: Repository<BranchEntity>,
+    @InjectRepository(EmployeeProfileEntity)
+    private readonly profileRepo: Repository<EmployeeProfileEntity>,
     private readonly rbacService: RbacService,
     private readonly dataSource: DataSource,
   ) {}
@@ -93,18 +104,23 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User ${id} not found`);
     }
-    const [roles, branches] = await Promise.all([
+    const [roles, branches, profile] = await Promise.all([
       this.userRoleRepo.find({
         where: { userId: id, organizationId: actor.organizationId },
       }),
       this.userBranchRepo.find({
         where: { userId: id, organizationId: actor.organizationId },
       }),
+      this.profileRepo.findOne({
+        where: { userId: id, organizationId: actor.organizationId },
+        relations: ['jobPosition', 'addresses', 'emergencyContact', 'accessSchedule'],
+      }),
     ]);
     return {
       ...this.toView(user),
       roleIds: roles.map((r) => r.roleId),
       branchIds: branches.map((b) => b.branchId),
+      profile: profile ? this.toProfileView(profile) : null,
     };
   }
 
@@ -167,6 +183,10 @@ export class UsersService {
         await manager.save(UserBranchAssignmentEntity, branchRows);
       }
 
+      if (dto.profile) {
+        await this.upsertProfile(manager, savedUser.id, dto.profile, actor);
+      }
+
       return savedUser;
     });
 
@@ -194,11 +214,17 @@ export class UsersService {
       throw new NotFoundException(`User ${id} not found`);
     }
 
-    if (dto.firstName !== undefined) user.firstName = dto.firstName.trim();
-    if (dto.lastName !== undefined) user.lastName = dto.lastName.trim();
-    if (dto.isActive !== undefined) user.isActive = dto.isActive;
+    await this.dataSource.transaction(async (manager) => {
+      if (dto.firstName !== undefined) user.firstName = dto.firstName.trim();
+      if (dto.lastName !== undefined) user.lastName = dto.lastName.trim();
+      if (dto.isActive !== undefined) user.isActive = dto.isActive;
 
-    await this.userRepo.save(user);
+      await manager.save(UserEntity, user);
+
+      if (dto.profile) {
+        await this.upsertProfile(manager, id, dto.profile, actor);
+      }
+    });
 
     if (dto.isActive === false) {
       await this.rbacService.invalidateUserPermissions(
@@ -378,6 +404,207 @@ export class UsersService {
         `Branches not found in this organization: ${missing.join(', ')}`,
       );
     }
+  }
+
+  /**
+   * Inserts or updates the employee HR profile for a user inside an open transaction.
+   * Provided child collections (addresses / accessSchedule / emergencyContact) fully
+   * replace the existing rows; collections left undefined are untouched.
+   */
+  private async upsertProfile(
+    manager: EntityManager,
+    userId: string,
+    dto: EmployeeProfileDto,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (dto.jobPositionId) {
+      const jobPosition = await manager.findOne(JobPositionEntity, {
+        where: { id: dto.jobPositionId, organizationId: actor.organizationId },
+      });
+      if (!jobPosition) {
+        throw new BadRequestException(
+          `Job position ${dto.jobPositionId} not found in this organization`,
+        );
+      }
+    }
+
+    const codeOwner = await manager.findOne(EmployeeProfileEntity, {
+      where: { code: dto.code, organizationId: actor.organizationId },
+    });
+    if (codeOwner && codeOwner.userId !== userId) {
+      throw new ConflictException(
+        `Employee code ${dto.code} already exists in this organization`,
+      );
+    }
+
+    const fields = {
+      code: dto.code,
+      mobile: dto.mobile ?? null,
+      homePhone: dto.homePhone ?? null,
+      idCardNumber: dto.idCardNumber ?? null,
+      idCardIssuePlace: dto.idCardIssuePlace ?? null,
+      idCardIssueDate: this.toDateOnly(dto.idCardIssueDate),
+      birthDate: this.toDateOnly(dto.birthDate),
+      gender: dto.gender ?? null,
+      maritalStatus: dto.maritalStatus ?? null,
+      employmentStatus: dto.employmentStatus ?? EmploymentStatus.OFFICIAL,
+      photoUrl: dto.photoUrl ?? null,
+      jobPositionId: dto.jobPositionId ?? null,
+      probationDate: this.toDateOnly(dto.probationDate),
+      officialDate: this.toDateOnly(dto.officialDate),
+      salary: dto.salary ?? 0,
+      deposit: dto.deposit ?? 0,
+      originalDocumentsNote: dto.originalDocumentsNote ?? null,
+      accessMode: dto.accessMode ?? EmployeeAccessMode.FREE,
+    };
+
+    const existing = await manager.findOne(EmployeeProfileEntity, {
+      where: { userId, organizationId: actor.organizationId },
+    });
+
+    let profile: EmployeeProfileEntity;
+    if (existing) {
+      manager.merge(EmployeeProfileEntity, existing, fields as Partial<EmployeeProfileEntity>);
+      profile = await manager.save(EmployeeProfileEntity, existing);
+    } else {
+      profile = await manager.save(
+        EmployeeProfileEntity,
+        manager.create(EmployeeProfileEntity, {
+          ...fields,
+          userId,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+        }),
+      );
+    }
+
+    const profileId = profile.id;
+    const audit = {
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
+    };
+
+    if (dto.addresses !== undefined) {
+      await manager.delete(EmployeeAddressEntity, { employeeProfileId: profileId });
+      if (dto.addresses.length) {
+        const rows = dto.addresses.map((a) =>
+          manager.create(EmployeeAddressEntity, {
+            employeeProfileId: profileId,
+            type: a.type,
+            address: a.address ?? null,
+            country: a.country ?? null,
+            province: a.province ?? null,
+            district: a.district ?? null,
+            ward: a.ward ?? null,
+            ...audit,
+          }),
+        );
+        await manager.save(EmployeeAddressEntity, rows);
+      }
+    }
+
+    if (dto.emergencyContact !== undefined) {
+      await manager.delete(EmployeeEmergencyContactEntity, {
+        employeeProfileId: profileId,
+      });
+      const e = dto.emergencyContact;
+      const hasData =
+        e.fullName || e.relationship || e.mobile || e.homePhone || e.email || e.address;
+      if (hasData) {
+        await manager.save(
+          EmployeeEmergencyContactEntity,
+          manager.create(EmployeeEmergencyContactEntity, {
+            employeeProfileId: profileId,
+            fullName: e.fullName ?? null,
+            relationship: e.relationship ?? null,
+            mobile: e.mobile ?? null,
+            homePhone: e.homePhone ?? null,
+            email: e.email ?? null,
+            address: e.address ?? null,
+            ...audit,
+          }),
+        );
+      }
+    }
+
+    if (dto.accessSchedule !== undefined) {
+      await manager.delete(EmployeeAccessScheduleEntity, {
+        employeeProfileId: profileId,
+      });
+      if (dto.accessSchedule.length) {
+        const rows = dto.accessSchedule.map((s) =>
+          manager.create(EmployeeAccessScheduleEntity, {
+            employeeProfileId: profileId,
+            weekday: s.weekday,
+            enabled: s.enabled,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            ...audit,
+          }),
+        );
+        await manager.save(EmployeeAccessScheduleEntity, rows);
+      }
+    }
+  }
+
+  /** Normalizes an ISO date/datetime string to a plain `YYYY-MM-DD` for `date` columns. */
+  private toDateOnly(value?: string | null): string | null {
+    if (!value) return null;
+    return value.slice(0, 10);
+  }
+
+  private toProfileView(p: EmployeeProfileEntity): EmployeeProfileView {
+    const trimTime = (t: string): string =>
+      typeof t === 'string' && t.length >= 5 ? t.slice(0, 5) : t;
+    return {
+      code: p.code,
+      mobile: p.mobile ?? null,
+      homePhone: p.homePhone ?? null,
+      idCardNumber: p.idCardNumber ?? null,
+      idCardIssuePlace: p.idCardIssuePlace ?? null,
+      idCardIssueDate: p.idCardIssueDate ?? null,
+      birthDate: p.birthDate ?? null,
+      gender: p.gender ?? null,
+      maritalStatus: p.maritalStatus ?? null,
+      employmentStatus: p.employmentStatus,
+      photoUrl: p.photoUrl ?? null,
+      jobPositionId: p.jobPositionId ?? null,
+      jobPosition: p.jobPosition
+        ? { id: p.jobPosition.id, name: p.jobPosition.name }
+        : null,
+      probationDate: p.probationDate ?? null,
+      officialDate: p.officialDate ?? null,
+      salary: Number(p.salary ?? 0),
+      deposit: Number(p.deposit ?? 0),
+      originalDocumentsNote: p.originalDocumentsNote ?? null,
+      accessMode: p.accessMode,
+      addresses: (p.addresses ?? []).map((a) => ({
+        type: a.type,
+        address: a.address ?? null,
+        country: a.country ?? null,
+        province: a.province ?? null,
+        district: a.district ?? null,
+        ward: a.ward ?? null,
+      })),
+      emergencyContact: p.emergencyContact
+        ? {
+            fullName: p.emergencyContact.fullName ?? null,
+            relationship: p.emergencyContact.relationship ?? null,
+            mobile: p.emergencyContact.mobile ?? null,
+            homePhone: p.emergencyContact.homePhone ?? null,
+            email: p.emergencyContact.email ?? null,
+            address: p.emergencyContact.address ?? null,
+          }
+        : null,
+      accessSchedule: (p.accessSchedule ?? []).map((s) => ({
+        weekday: s.weekday,
+        enabled: s.enabled,
+        startTime: trimTime(s.startTime),
+        endTime: trimTime(s.endTime),
+      })),
+    };
   }
 
   private toView(u: UserEntity): UserSummary {

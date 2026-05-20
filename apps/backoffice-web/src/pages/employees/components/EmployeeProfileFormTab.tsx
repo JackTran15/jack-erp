@@ -6,7 +6,7 @@ import {
   FormFieldProps,
 } from "@erp/ui";
 import type { EmployeeFormDraft } from "../employee.types";
-const JOB_POSITIONS: { id: string; name: string }[] = [];
+import { useCrudRecords } from "../../../components/crud/useCrudApi";
 
 interface EmployeeProfileFormTabProps {
   draft: EmployeeFormDraft;
@@ -21,6 +21,23 @@ export function EmployeeProfileFormTab({
     layout: "horizontal",
     labelWidth: "9.5rem",
   };
+
+  const { data: jobPositionsFetch } = useCrudRecords(
+    "job-positions",
+    {
+      page: 1,
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "asc",
+      search: "",
+      filters: { isActive: "true" },
+    },
+    true,
+  );
+  const jobPositions = (jobPositionsFetch?.data ?? []) as {
+    id: string;
+    name: string;
+  }[];
 
   const setProfile = (patch: Partial<EmployeeFormDraft["profile"]>) => {
     onChange({ ...draft, profile: { ...draft.profile, ...patch } });
@@ -37,7 +54,7 @@ export function EmployeeProfileFormTab({
           }
         >
           <option value="">— Chọn vị trí —</option>
-          {JOB_POSITIONS.map((p) => (
+          {jobPositions.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>

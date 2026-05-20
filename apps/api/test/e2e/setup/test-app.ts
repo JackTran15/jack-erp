@@ -123,6 +123,8 @@ export async function seedBaseData(
     'accounting.coa.create', 'accounting.coa.read',
     'accounting.expenses.create', 'accounting.expenses.read',
     'reporting.dashboard.branch.read', 'reporting.dashboard.consolidated.read',
+    'iam.user.read', 'iam.user.write', 'iam.user.delete',
+    'iam.user.roles.write', 'iam.user.branches.write',
   ];
 
   // Seed an active document numbering rule for every DocumentType so that

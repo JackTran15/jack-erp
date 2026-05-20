@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-07T13:06:51.030Z",
-  "totalEntities": 55,
+  "generatedAt": "2026-05-20T10:06:16.028Z",
+  "totalEntities": 87,
   "entities": [
     {
       "className": "AccountEntity",
@@ -159,6 +159,15 @@
           "isPrimaryKey": false
         },
         {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "default": "CashAccountType.REGISTER",
+          "comment": "REGISTER=két quầy POS, SAFE=két chính chi nhánh, PETTY_CASH=quỹ lẻ",
+          "isPrimaryKey": false
+        },
+        {
           "property": "balance",
           "dbColumn": "balance",
           "type": "numeric",
@@ -195,7 +204,15 @@
           "dbColumn": "cash_account_id",
           "type": "uuid",
           "nullable": false,
-          "comment": "The cash account affected",
+          "comment": "The cash account affected (source for TRANSFER)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "toAccountId",
+          "dbColumn": "to_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Destination cash account when type=TRANSFER",
           "isPrimaryKey": false
         },
         {
@@ -229,6 +246,14 @@
           "nullable": true,
           "comment": "Free-text notes",
           "isPrimaryKey": false
+        },
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "POS session that recorded this movement, if any",
+          "isPrimaryKey": false
         }
       ],
       "relations": [
@@ -236,11 +261,23 @@
           "property": "cashAccount",
           "kind": "ManyToOne",
           "target": "CashAccountEntity"
+        },
+        {
+          "property": "toAccount",
+          "kind": "ManyToOne",
+          "target": "CashAccountEntity"
+        },
+        {
+          "property": "session",
+          "kind": "ManyToOne",
+          "target": "PosSessionEntity"
         }
       ],
       "indexes": [
         "'idx_cash_movement_account', ['cashAccountId']",
-        "'idx_cash_movement_org_branch', ['organizationId', 'branchId']"
+        "'idx_cash_movement_org_branch', ['organizationId', 'branchId']",
+        "'idx_cash_movement_to_account', ['toAccountId']",
+        "'idx_cash_movement_session', ['sessionId']"
       ],
       "uniques": []
     },
@@ -299,6 +336,78 @@
           "nullable": true,
           "comment": "FK to customers — points to surviving customer after a merge",
           "isPrimaryKey": false
+        },
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Customer code; required and unique per org e.g. KH000017",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "birthDate",
+          "dbColumn": "birth_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Date of birth",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "gender",
+          "dbColumn": "gender",
+          "type": "enum",
+          "nullable": true,
+          "comment": "Customer gender",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "nationalId",
+          "dbColumn": "national_id",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "CCCD / national ID number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "groupId",
+          "dbColumn": "group_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to customer_groups",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "assignedStaffId",
+          "dbColumn": "assigned_staff_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to users — assigned salesperson",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "comment": "Internal notes",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "companyName",
+          "dbColumn": "company_name",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Company or business name for B2B customers",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "taxCode",
+          "dbColumn": "tax_code",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Business tax identification number (MST)",
+          "isPrimaryKey": false
         }
       ],
       "relations": [
@@ -311,7 +420,314 @@
       "indexes": [
         "'uq_customer_org_email', ['organizationId', 'email'], {\n  unique: true,\n  where: '\"email\" IS NOT NULL',\n}",
         "'idx_customer_org_status', ['organizationId', 'status']",
-        "'uq_customer_org_phone', ['organizationId', 'phone'], {\n  unique: true,\n  where: '\"phone\" IS NOT NULL',\n}"
+        "'uq_customer_org_phone', ['organizationId', 'phone'], {\n  unique: true,\n  where: '\"phone\" IS NOT NULL',\n}",
+        "'uq_customer_org_code', ['organizationId', 'code'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "CustomerGroupEntity",
+      "tableName": "customer_groups",
+      "filePath": "apps/api/src/modules/customer/customer-group.entity.ts",
+      "extendsBase": true,
+      "comment": "Lookup table for grouping customers (e.g. VIP, Wholesale).",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Group name unique per org",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'uq_customer_group_org_name', ['organizationId', 'name'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "DeadLetterEventEntity",
+      "tableName": "dead_letter_events",
+      "filePath": "apps/api/src/modules/events/entities/dead-letter-event.entity.ts",
+      "extendsBase": false,
+      "comment": "Records Kafka messages that exhausted DLQ retries. Admin can replay or ignore.",
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "topic",
+          "dbColumn": "topic",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "partition",
+          "dbColumn": "partition",
+          "type": "integer",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "offset",
+          "dbColumn": "offset",
+          "type": "bigint",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "key",
+          "dbColumn": "key",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "payload",
+          "dbColumn": "payload",
+          "type": "jsonb",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "error",
+          "dbColumn": "error",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "retryCount",
+          "dbColumn": "retry_count",
+          "type": "integer",
+          "nullable": false,
+          "default": "3",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "DeadLetterStatus.PENDING",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "resolvedBy",
+          "dbColumn": "resolved_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "resolvedAt",
+          "dbColumn": "resolved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdBy",
+          "dbColumn": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'idx_dle_status_topic', ['status', 'topic']",
+        "'idx_dle_org_created', ['organizationId', 'createdAt']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "DebtPaymentEntity",
+      "tableName": "debt_payments",
+      "filePath": "apps/api/src/modules/pos/entities/debt-payment.entity.ts",
+      "extendsBase": true,
+      "comment": "Records a single repayment instalment made against an outstanding invoice debt.",
+      "columns": [
+        {
+          "property": "debtId",
+          "dbColumn": "debt_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The invoice debt this payment is applied to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Amount paid in this instalment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "paymentMethod",
+          "dbColumn": "payment_method",
+          "type": "enum",
+          "nullable": false,
+          "comment": "How the repayment was received",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "staffId",
+          "dbColumn": "staff_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Staff member who collected or recorded this payment",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "paidAt",
+          "dbColumn": "paid_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "comment": "Exact timestamp the repayment was received",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text note about this payment instalment",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['debtId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "DiscountCodeEntity",
+      "tableName": "discount_codes",
+      "filePath": "apps/api/src/modules/promotion/discount-code.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "discountType",
+          "dbColumn": "discount_type",
+          "type": "enum",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "discountValue",
+          "dbColumn": "discount_value",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "minOrderValue",
+          "dbColumn": "min_order_value",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "maxUses",
+          "dbColumn": "max_uses",
+          "type": "int",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "usedCount",
+          "dbColumn": "used_count",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validFrom",
+          "dbColumn": "valid_from",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validTo",
+          "dbColumn": "valid_to",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'uq_discount_code_org', ['organizationId', 'code'], { unique: true }"
       ],
       "uniques": []
     },
@@ -481,6 +897,419 @@
       ]
     },
     {
+      "className": "EmployeeAccessScheduleEntity",
+      "tableName": "employee_access_schedules",
+      "filePath": "apps/api/src/modules/rbac/employee/employee-access-schedule.entity.ts",
+      "extendsBase": true,
+      "comment": "Per-weekday software access time window for an employee (used when access_mode = SCHEDULED).",
+      "columns": [
+        {
+          "property": "employeeProfileId",
+          "dbColumn": "employee_profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to employee_profiles",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "weekday",
+          "dbColumn": "weekday",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Day of week this window applies to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "enabled",
+          "dbColumn": "enabled",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Whether access is allowed on this day",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "startTime",
+          "dbColumn": "start_time",
+          "type": "time",
+          "nullable": false,
+          "default": "'00:00'",
+          "comment": "Window start (HH:mm)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "endTime",
+          "dbColumn": "end_time",
+          "type": "time",
+          "nullable": false,
+          "default": "'23:59'",
+          "comment": "Window end (HH:mm)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "employeeProfile",
+          "kind": "ManyToOne",
+          "target": "EmployeeProfileEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_employee_access_profile_weekday', ['employeeProfileId', 'weekday'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "EmployeeAddressEntity",
+      "tableName": "employee_addresses",
+      "filePath": "apps/api/src/modules/rbac/employee/employee-address.entity.ts",
+      "extendsBase": true,
+      "comment": "Permanent or current residence address for an employee profile.",
+      "columns": [
+        {
+          "property": "employeeProfileId",
+          "dbColumn": "employee_profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to employee_profiles",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "PERMANENT (hộ khẩu) or CURRENT (chỗ ở hiện tại)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "address",
+          "dbColumn": "address",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Street address line",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "country",
+          "dbColumn": "country",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Country",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "province",
+          "dbColumn": "province",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Province / city",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "district",
+          "dbColumn": "district",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "District",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "ward",
+          "dbColumn": "ward",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Ward",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "employeeProfile",
+          "kind": "ManyToOne",
+          "target": "EmployeeProfileEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_employee_address_profile_type', ['employeeProfileId', 'type'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "EmployeeEmergencyContactEntity",
+      "tableName": "employee_emergency_contacts",
+      "filePath": "apps/api/src/modules/rbac/employee/employee-emergency-contact.entity.ts",
+      "extendsBase": true,
+      "comment": "Emergency contact for an employee profile (1:1).",
+      "columns": [
+        {
+          "property": "employeeProfileId",
+          "dbColumn": "employee_profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to employee_profiles",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "fullName",
+          "dbColumn": "full_name",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Contact full name",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "relationship",
+          "dbColumn": "relationship",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Relationship to the employee",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "mobile",
+          "dbColumn": "mobile",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Mobile phone",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "homePhone",
+          "dbColumn": "home_phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Home phone",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "email",
+          "dbColumn": "email",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Email address",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "address",
+          "dbColumn": "address",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Address",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "employeeProfile",
+          "kind": "OneToOne",
+          "target": "EmployeeProfileEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_employee_emergency_profile', ['employeeProfileId'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "EmployeeProfileEntity",
+      "tableName": "employee_profiles",
+      "filePath": "apps/api/src/modules/rbac/employee/employee-profile.entity.ts",
+      "extendsBase": true,
+      "comment": "HR profile data for a user/employee. One-to-one with `users`; `users` stays auth-only.",
+      "columns": [
+        {
+          "property": "userId",
+          "dbColumn": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "FK to users — the authenticated identity this profile belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Employee code, unique per organization (e.g. NV000002)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "mobile",
+          "dbColumn": "mobile",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Mobile phone number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "homePhone",
+          "dbColumn": "home_phone",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Landline / home phone",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "idCardNumber",
+          "dbColumn": "id_card_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "National ID / CMND number",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "idCardIssuePlace",
+          "dbColumn": "id_card_issue_place",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Place where the ID card was issued",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "idCardIssueDate",
+          "dbColumn": "id_card_issue_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Date the ID card was issued",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "birthDate",
+          "dbColumn": "birth_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Date of birth",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "gender",
+          "dbColumn": "gender",
+          "type": "enum",
+          "nullable": true,
+          "comment": "Gender",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "maritalStatus",
+          "dbColumn": "marital_status",
+          "type": "enum",
+          "nullable": true,
+          "comment": "Marital status",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "employmentStatus",
+          "dbColumn": "employment_status",
+          "type": "enum",
+          "nullable": false,
+          "default": "EmploymentStatus.OFFICIAL",
+          "comment": "HR employment status; independent from users.is_active (login flag)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "photoUrl",
+          "dbColumn": "photo_url",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "URL of the employee photo",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "jobPositionId",
+          "dbColumn": "job_position_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to job_positions",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "probationDate",
+          "dbColumn": "probation_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Probation start date",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "officialDate",
+          "dbColumn": "official_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Official employment start date",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "salary",
+          "dbColumn": "salary",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Monthly salary",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "deposit",
+          "dbColumn": "deposit",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Deposit held",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "originalDocumentsNote",
+          "dbColumn": "original_documents_note",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Notes on original documents on file",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accessMode",
+          "dbColumn": "access_mode",
+          "type": "enum",
+          "nullable": false,
+          "default": "EmployeeAccessMode.FREE",
+          "comment": "Software access mode: free anytime or restricted to scheduled time slots",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "user",
+          "kind": "OneToOne",
+          "target": "UserEntity"
+        },
+        {
+          "property": "jobPosition",
+          "kind": "ManyToOne",
+          "target": "JobPositionEntity"
+        },
+        {
+          "property": "addresses",
+          "kind": "OneToMany",
+          "target": "EmployeeAddressEntity"
+        },
+        {
+          "property": "emergencyContact",
+          "kind": "OneToOne",
+          "target": "EmployeeEmergencyContactEntity"
+        },
+        {
+          "property": "accessSchedule",
+          "kind": "OneToMany",
+          "target": "EmployeeAccessScheduleEntity"
+        }
+      ],
+      "indexes": [
+        "'uq_employee_profile_user', ['userId'], { unique: true }",
+        "'uq_employee_profile_org_code', ['organizationId', 'code'], { unique: true }",
+        "'idx_employee_profile_org_job', ['organizationId', 'jobPositionId']"
+      ],
+      "uniques": []
+    },
+    {
       "className": "ExpenseEntity",
       "tableName": "expenses",
       "filePath": "apps/api/src/modules/accounting/expenses/expense.entity.ts",
@@ -593,11 +1422,35 @@
           "isPrimaryKey": false
         },
         {
+          "property": "providerId",
+          "dbColumn": "provider_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to providers — the \"Đối tượng\" counterparty (NCC/đối tác)",
+          "isPrimaryKey": false
+        },
+        {
           "property": "reason",
           "dbColumn": "reason",
           "type": "varchar",
           "nullable": false,
-          "comment": "Reason for issuance (e.g. bán hàng, nội bộ, mẫu)",
+          "comment": "Denormalized reason text (auto-filled from reasonRef.name or targetBranch.name)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reasonId",
+          "dbColumn": "reason_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to issue_reasons — required for purpose=OTHER|DISPOSAL",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "targetBranchId",
+          "dbColumn": "target_branch_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "FK to branches — required for purpose=TRANSFER_OUT",
           "isPrimaryKey": false
         },
         {
@@ -606,6 +1459,15 @@
           "type": "enum",
           "nullable": false,
           "default": "GoodsIssueStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "purpose",
+          "dbColumn": "purpose",
+          "type": "enum",
+          "nullable": false,
+          "default": "GoodsIssuePurpose.OTHER",
+          "comment": "Mục đích xuất kho: OTHER | SALE | TRANSFER_OUT | DISPOSAL",
           "isPrimaryKey": false
         },
         {
@@ -646,6 +1508,26 @@
         }
       ],
       "relations": [
+        {
+          "property": "location",
+          "kind": "ManyToOne",
+          "target": "LocationEntity"
+        },
+        {
+          "property": "provider",
+          "kind": "ManyToOne",
+          "target": "ProviderEntity"
+        },
+        {
+          "property": "reasonRef",
+          "kind": "ManyToOne",
+          "target": "IssueReasonEntity"
+        },
+        {
+          "property": "targetBranch",
+          "kind": "ManyToOne",
+          "target": "BranchEntity"
+        },
         {
           "property": "lines",
           "kind": "OneToMany",
@@ -696,6 +1578,22 @@
           "isPrimaryKey": false
         },
         {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineTotal",
+          "dbColumn": "line_total",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
           "property": "notes",
           "dbColumn": "notes",
           "type": "varchar",
@@ -709,6 +1607,298 @@
           "property": "goodsIssue",
           "kind": "ManyToOne",
           "target": "GoodsIssueEntity"
+        },
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
+    },
+    {
+      "className": "GoodsReceiptEntity",
+      "tableName": "goods_receipts",
+      "filePath": "apps/api/src/modules/inventory/goods-receipt/goods-receipt.entity.ts",
+      "extendsBase": true,
+      "comment": "Phiếu nhập kho — goods receipt. State: DRAFT → POSTED → (REVERSED) | CANCELLED.",
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Auto-generated on post (PNK-YY-####)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "GoodsReceiptStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "purpose",
+          "dbColumn": "purpose",
+          "type": "enum",
+          "nullable": false,
+          "default": "GoodsReceiptPurpose.OTHER",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "providerId",
+          "dbColumn": "provider_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "deliveredBy",
+          "dbColumn": "delivered_by",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reason",
+          "dbColumn": "reason",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "referenceId",
+          "dbColumn": "reference_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "referenceType",
+          "dbColumn": "reference_type",
+          "type": "enum",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceBranchId",
+          "dbColumn": "source_branch_id",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "receivedAt",
+          "dbColumn": "received_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "attachmentIds",
+          "dbColumn": "attachment_ids",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "() => \"'[]'::jsonb\"",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "cashPaymentId",
+          "dbColumn": "cash_payment_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "cashReceiptId",
+          "dbColumn": "cash_receipt_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "GoodsReceiptLineEntity"
+        },
+        {
+          "property": "provider",
+          "kind": "ManyToOne",
+          "target": "ProviderEntity"
+        },
+        {
+          "property": "location",
+          "kind": "ManyToOne",
+          "target": "LocationEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "GoodsReceiptLineEntity",
+      "tableName": "goods_receipt_lines",
+      "filePath": "apps/api/src/modules/inventory/goods-receipt/goods-receipt-line.entity.ts",
+      "extendsBase": false,
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "goodsReceiptId",
+          "dbColumn": "goods_receipt_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "binId",
+          "dbColumn": "bin_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "uomCode",
+          "dbColumn": "uom_code",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineTotal",
+          "dbColumn": "line_total",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdBy",
+          "dbColumn": "created_by",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "goodsReceipt",
+          "kind": "ManyToOne",
+          "target": "GoodsReceiptEntity"
+        },
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        },
+        {
+          "property": "location",
+          "kind": "ManyToOne",
+          "target": "LocationEntity"
         }
       ],
       "indexes": [],
@@ -886,6 +2076,558 @@
       "uniques": []
     },
     {
+      "className": "InvoiceDebtEntity",
+      "tableName": "invoice_debts",
+      "filePath": "apps/api/src/modules/pos/entities/invoice-debt.entity.ts",
+      "extendsBase": true,
+      "comment": "Tracks an outstanding debt created from a credit (debt-payment-method) invoice.",
+      "columns": [
+        {
+          "property": "referenceCode",
+          "dbColumn": "reference_code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable reference code for the debt record",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "invoiceId",
+          "dbColumn": "invoice_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "The invoice that generated this debt (1-to-1)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Customer who owes the debt",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "documentType",
+          "dbColumn": "document_type",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Category of the source document that created or adjusted this debt",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "originalAmount",
+          "dbColumn": "original_amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Full invoice amount that was placed on credit",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "paidAmount",
+          "dbColumn": "paid_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Cumulative amount received against this debt so far",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "remainingAmount",
+          "dbColumn": "remaining_amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Balance still owed (originalAmount − paidAmount)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "issuedAt",
+          "dbColumn": "issued_at",
+          "type": "date",
+          "nullable": false,
+          "comment": "Calendar date the debt was created",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "dueDate",
+          "dbColumn": "due_date",
+          "type": "date",
+          "nullable": true,
+          "comment": "Optional payment deadline",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "settledAt",
+          "dbColumn": "settled_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "Timestamp when the debt was fully settled; null while open",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "DebtStatus.OPEN",
+          "comment": "Current collection status of the debt",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text note attached to the debt record",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'customerId', 'status']",
+        "'uq_invoice_debt_invoice', ['invoiceId'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "InvoiceEntity",
+      "tableName": "invoices",
+      "filePath": "apps/api/src/modules/pos/entities/invoice.entity.ts",
+      "extendsBase": true,
+      "comment": "POS invoice — supports drafts, full payment, and debt (credit) scenarios.",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Auto-generated invoice code, unique per organisation",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "issuedAt",
+          "dbColumn": "issued_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "comment": "Timestamp the invoice was issued; null while in draft state",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "InvoiceStatus.DRAFT",
+          "comment": "Current lifecycle status of the invoice",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "subtotal",
+          "dbColumn": "subtotal",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Sum of all line totals before discount",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "discountAmount",
+          "dbColumn": "discount_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total discount applied to the invoice",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "depositAmount",
+          "dbColumn": "deposit_amount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Deposit collected upfront (e.g. on layaway)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amountDue",
+          "dbColumn": "amount_due",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Final amount the customer owes (subtotal - discountAmount)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "totalPaid",
+          "dbColumn": "total_paid",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Total amount collected across all payment lines",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text note attached to the invoice",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isDraft",
+          "dbColumn": "is_draft",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "True while the invoice has not been finalised / committed",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "POS session that originated this invoice",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "draftLabel",
+          "dbColumn": "draft_label",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "User-visible label for in-progress draft (e.g. \"Table 3\")",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Customer linked to this invoice; null for anonymous sales",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "staffId",
+          "dbColumn": "staff_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Staff member who created / owns the invoice",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "priceListId",
+          "dbColumn": "price_list_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Price list applied at invoice creation (future feature)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "cancelledAt",
+          "dbColumn": "cancelled_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "cancelReason",
+          "dbColumn": "cancel_reason",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'branchId', 'issuedAt']",
+        "['organizationId', 'customerId']",
+        "['organizationId', 'sessionId', 'isDraft']",
+        "'uq_invoice_org_code', ['organizationId', 'code'], { unique: true }"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "InvoiceItemEntity",
+      "tableName": "invoice_items",
+      "filePath": "apps/api/src/modules/pos/entities/invoice-item.entity.ts",
+      "extendsBase": true,
+      "comment": "Single line item on a POS invoice. Snapshot columns preserve pricing at the time of sale.",
+      "columns": [
+        {
+          "property": "invoiceId",
+          "dbColumn": "invoice_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Parent invoice this line belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Live reference to the catalogue item (for reporting)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Inventory location the stock was drawn from at sale time",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemCode",
+          "dbColumn": "item_code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Snapshot of the item code at sale time",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemName",
+          "dbColumn": "item_name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Snapshot of the item name at sale time",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unit",
+          "dbColumn": "unit",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Snapshot of the unit of measure at sale time (e.g. \"pcs\", \"kg\")",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Number of units sold",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPrice",
+          "dbColumn": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Snapshot of the selling price per unit at sale time",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitPriceDefault",
+          "dbColumn": "unit_price_default",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Default catalogue selling price at sale time (server-populated, not from client)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "costPrice",
+          "dbColumn": "cost_price",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Cost price (COGS) at sale time (server-populated, not from client)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineDiscount",
+          "dbColumn": "line_discount",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "comment": "Discount applied to this line only",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lineTotal",
+          "dbColumn": "line_total",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Final line amount (quantity × unitPrice − lineDiscount)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text note for this line item",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sortOrder",
+          "dbColumn": "sort_order",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "comment": "Display ordering of lines within the invoice",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['invoiceId']",
+        "['itemId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "InvoicePaymentEntity",
+      "tableName": "invoice_payments",
+      "filePath": "apps/api/src/modules/pos/entities/invoice-payment.entity.ts",
+      "extendsBase": true,
+      "comment": "One payment line tendered against a POS invoice. Multiple records per invoice support split tender.",
+      "columns": [
+        {
+          "property": "invoiceId",
+          "dbColumn": "invoice_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Invoice this payment line belongs to",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "paymentMethod",
+          "dbColumn": "payment_method",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Payment method used for this line",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "amount",
+          "dbColumn": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "comment": "Amount tendered via this method",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "accountId",
+          "dbColumn": "account_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "GL account to debit for this payment line",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reference",
+          "dbColumn": "reference",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "External reference: card auth code, bank transfer ref, etc.",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['invoiceId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "InvoicePromotionEntity",
+      "tableName": "invoice_promotions",
+      "filePath": "apps/api/src/modules/promotion/invoice-promotion.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "invoiceId",
+          "dbColumn": "invoice_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "promotionType",
+          "dbColumn": "promotion_type",
+          "type": "enum",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "refId",
+          "dbColumn": "ref_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "discountAmount",
+          "dbColumn": "discount_amount",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['invoiceId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "IssueReasonEntity",
+      "tableName": "issue_reasons",
+      "filePath": "apps/api/src/modules/inventory/issue-reason/issue-reason.entity.ts",
+      "extendsBase": true,
+      "comment": "Lý do xuất kho cho các phiếu xuất kho với purpose=OTHER hoặc DISPOSAL.",
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Mã lý do duy nhất trong organization",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Tên hiển thị của lý do",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "purpose",
+          "dbColumn": "purpose",
+          "type": "enum",
+          "nullable": false,
+          "comment": "Lý do thuộc nhóm OTHER (xuất khác) hay DISPOSAL (hủy hàng)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'purpose']"
+      ],
+      "uniques": [
+        "['organizationId', 'code']"
+      ]
+    },
+    {
       "className": "ItemAttributeValueEntity",
       "tableName": "item_attribute_values",
       "filePath": "apps/api/src/modules/inventory/product/item-attribute-value.entity.ts",
@@ -937,6 +2679,49 @@
       "indexes": [],
       "uniques": [
         "['itemId', 'attributeDefinitionId']"
+      ]
+    },
+    {
+      "className": "ItemBarcodeEntity",
+      "tableName": "item_barcodes",
+      "filePath": "apps/api/src/modules/inventory/location/item-barcode.entity.ts",
+      "extendsBase": true,
+      "comment": "Additional barcode(s) attached to an item (manufacturer EAN, internal codes). Unique per organization.",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Barcode string, alphanumeric + - _ .",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "comment": "Free-text note (e.g. supplier-side code label)",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": [
+        "['organizationId', 'code']"
       ]
     },
     {
@@ -1001,11 +2786,11 @@
           "isPrimaryKey": false
         },
         {
-          "property": "category",
-          "dbColumn": "category",
-          "type": "varchar",
+          "property": "categoryId",
+          "dbColumn": "category_id",
+          "type": "uuid",
           "nullable": true,
-          "comment": "Grouping label for filtering and reporting (e.g. Electronics, Furniture)",
+          "comment": "FK to inventory_item_categories",
           "isPrimaryKey": false
         },
         {
@@ -1015,6 +2800,15 @@
           "nullable": false,
           "default": "true",
           "comment": "When false, item cannot be used in new transactions",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isPosVisible",
+          "dbColumn": "is_pos_visible",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "When false, item is hidden from POS catalog",
           "isPrimaryKey": false
         },
         {
@@ -1036,11 +2830,118 @@
           "isPrimaryKey": false
         },
         {
-          "property": "providerId",
-          "dbColumn": "provider_id",
-          "type": "uuid",
+          "property": "weightGram",
+          "dbColumn": "weight_gram",
+          "type": "decimal",
+          "nullable": true,
+          "comment": "Net weight in grams",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lengthCm",
+          "dbColumn": "length_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "widthCm",
+          "dbColumn": "width_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "heightCm",
+          "dbColumn": "height_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "manufactureYear",
+          "dbColumn": "manufacture_year",
+          "type": "smallint",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "composition",
+          "dbColumn": "composition",
+          "type": "text",
+          "nullable": true,
+          "comment": "Material composition / fabric / ingredients",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "brand",
+          "dbColumn": "brand",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Brand name (e.g. Samsung, Nike)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemType",
+          "dbColumn": "item_type",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Free-text grouping label (Nhóm hàng)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "packageWeightGram",
+          "dbColumn": "package_weight_gram",
+          "type": "decimal",
+          "nullable": true,
+          "comment": "Package gross weight in grams",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "packageLengthCm",
+          "dbColumn": "package_length_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "packageWidthCm",
+          "dbColumn": "package_width_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "packageHeightCm",
+          "dbColumn": "package_height_cm",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isGoldSilver",
+          "dbColumn": "is_gold_silver",
+          "type": "varchar",
           "nullable": false,
-          "comment": "FK to inventory_providers — the supplier for this item",
+          "default": "false",
+          "comment": "Mặt hàng vàng/bạc — special pricing rules apply",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "oddSize",
+          "dbColumn": "odd_size",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Đầy size — free-text size descriptor",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "manageBarcodePerUnit",
+          "dbColumn": "manage_barcode_per_unit",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "When true, separate barcodes are kept per conversion unit",
           "isPrimaryKey": false
         },
         {
@@ -1062,20 +2963,275 @@
       ],
       "relations": [
         {
-          "property": "provider",
+          "property": "category",
           "kind": "ManyToOne",
-          "target": "ProviderEntity"
+          "target": "ItemCategoryEntity"
         },
         {
           "property": "product",
           "kind": "ManyToOne",
           "target": "ProductEntity"
+        },
+        {
+          "property": "providers",
+          "kind": "OneToMany",
+          "target": "ItemProviderEntity"
+        },
+        {
+          "property": "barcodes",
+          "kind": "OneToMany",
+          "target": "ItemBarcodeEntity"
+        },
+        {
+          "property": "thresholds",
+          "kind": "OneToMany",
+          "target": "ItemStockThresholdEntity"
+        },
+        {
+          "property": "units",
+          "kind": "OneToMany",
+          "target": "ItemUnitEntity"
         }
       ],
       "indexes": [],
       "uniques": [
         "['organizationId', 'code']"
       ]
+    },
+    {
+      "className": "ItemProviderEntity",
+      "tableName": "item_providers",
+      "filePath": "apps/api/src/modules/inventory/location/item-provider.entity.ts",
+      "extendsBase": true,
+      "comment": "Join row linking an item to one of its providers (suppliers). Exactly one row per item may be marked is_primary.",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "providerId",
+          "dbColumn": "provider_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isPrimary",
+          "dbColumn": "is_primary",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "comment": "Primary supplier — used as default for PO suggestions",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        },
+        {
+          "property": "provider",
+          "kind": "ManyToOne",
+          "target": "ProviderEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'itemId']"
+      ],
+      "uniques": [
+        "['itemId', 'providerId']"
+      ]
+    },
+    {
+      "className": "ItemStockThresholdEntity",
+      "tableName": "item_stock_thresholds",
+      "filePath": "apps/api/src/modules/inventory/location/item-stock-threshold.entity.ts",
+      "extendsBase": true,
+      "comment": "Min/max stock threshold per (item, location). Null values mean \"no threshold configured\".",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "minQty",
+          "dbColumn": "min_qty",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "maxQty",
+          "dbColumn": "max_qty",
+          "type": "decimal",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        },
+        {
+          "property": "location",
+          "kind": "ManyToOne",
+          "target": "LocationEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'locationId']"
+      ],
+      "uniques": [
+        "['itemId', 'locationId']"
+      ]
+    },
+    {
+      "className": "ItemUnitEntity",
+      "tableName": "item_units",
+      "filePath": "apps/api/src/modules/inventory/location/item-unit.entity.ts",
+      "extendsBase": true,
+      "comment": "Unit-of-measure variant for an item (e.g. \"Hộp\" with ratio 12 for \"Cái\").",
+      "columns": [
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "unitName",
+          "dbColumn": "unit_name",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "ratio",
+          "dbColumn": "ratio",
+          "type": "decimal",
+          "nullable": false,
+          "default": "1",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "purchasePrice",
+          "dbColumn": "purchase_price",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sellPrice",
+          "dbColumn": "sell_price",
+          "type": "decimal",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isDefaultSell",
+          "dbColumn": "is_default_sell",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isDefaultBuy",
+          "dbColumn": "is_default_buy",
+          "type": "varchar",
+          "nullable": false,
+          "default": "false",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'itemId']"
+      ],
+      "uniques": [
+        "['itemId', 'unitName']"
+      ]
+    },
+    {
+      "className": "JobPositionEntity",
+      "tableName": "job_positions",
+      "filePath": "apps/api/src/modules/hr/job-position/job-position.entity.ts",
+      "extendsBase": true,
+      "comment": "Job position / title an employee can hold (e.g. Cashier, Store Manager). Reference data, org-scoped.",
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "Human-readable position name; unique per organization",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional short code",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "description",
+          "dbColumn": "description",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "Optional description",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "varchar",
+          "nullable": false,
+          "default": "true",
+          "comment": "Inactive positions are hidden from assignment dropdowns",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'uq_job_position_org_name', ['organizationId', 'name'], { unique: true }"
+      ],
+      "uniques": []
     },
     {
       "className": "JournalEntryEntity",
@@ -1314,6 +3470,87 @@
       "uniques": [
         "['storageId', 'code']"
       ]
+    },
+    {
+      "className": "MembershipCardEntity",
+      "tableName": "membership_cards",
+      "filePath": "apps/api/src/modules/customer/membership-card.entity.ts",
+      "extendsBase": true,
+      "comment": "Loyalty/membership card linked 1-to-1 with a customer.",
+      "columns": [
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "cardNumber",
+          "dbColumn": "card_number",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "tier",
+          "dbColumn": "tier",
+          "type": "enum",
+          "nullable": false,
+          "default": "MembershipTier.NONE",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "points",
+          "dbColumn": "points",
+          "type": "int",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "issuedAt",
+          "dbColumn": "issued_at",
+          "type": "date",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "expiresAt",
+          "dbColumn": "expires_at",
+          "type": "date",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lomasCardNumber",
+          "dbColumn": "lomas_card_number",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "lomasTier",
+          "dbColumn": "lomas_tier",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'uq_membership_card_customer', ['customerId'], { unique: true }",
+        "'uq_membership_card_number', ['organizationId', 'cardNumber'], { unique: true }"
+      ],
+      "uniques": []
     },
     {
       "className": "OrganizationEntity",
@@ -1632,6 +3869,55 @@
       "uniques": []
     },
     {
+      "className": "PointHistoryEntity",
+      "tableName": "point_history",
+      "filePath": "apps/api/src/modules/customer/point-history.entity.ts",
+      "extendsBase": true,
+      "comment": "Immutable ledger of all point transactions against a membership card.",
+      "columns": [
+        {
+          "property": "cardId",
+          "dbColumn": "card_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "invoiceId",
+          "dbColumn": "invoice_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "delta",
+          "dbColumn": "delta",
+          "type": "int",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['cardId']"
+      ],
+      "uniques": []
+    },
+    {
       "className": "PosSessionEntity",
       "tableName": "pos_sessions",
       "filePath": "apps/api/src/modules/pos/entities/pos-session.entity.ts",
@@ -1695,6 +3981,14 @@
           "default": "0",
           "comment": "Cash amount in the register at session start (float/seed money)",
           "isPrimaryKey": false
+        },
+        {
+          "property": "cashAccountId",
+          "dbColumn": "cash_account_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Cash register/drawer used in this session (required for sessions created after EPIC-009)",
+          "isPrimaryKey": false
         }
       ],
       "relations": [],
@@ -1702,6 +3996,38 @@
         "['organizationId', 'branchId', 'status']",
         "['organizationId', 'openedBy', 'createdAt']"
       ],
+      "uniques": []
+    },
+    {
+      "className": "ProcessedEventEntity",
+      "tableName": "processed_events",
+      "filePath": "apps/api/src/modules/events/entities/processed-event.entity.ts",
+      "extendsBase": false,
+      "columns": [
+        {
+          "property": "topic",
+          "dbColumn": "topic",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "processedAt",
+          "dbColumn": "processed_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [],
       "uniques": []
     },
     {
@@ -1914,6 +4240,77 @@
       "uniques": [
         "['productId', 'storageId']"
       ]
+    },
+    {
+      "className": "PromotionEntity",
+      "tableName": "promotions",
+      "filePath": "apps/api/src/modules/promotion/promotion.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "name",
+          "dbColumn": "name",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "type",
+          "dbColumn": "type",
+          "type": "enum",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "conditions",
+          "dbColumn": "conditions",
+          "type": "jsonb",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "benefits",
+          "dbColumn": "benefits",
+          "type": "jsonb",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validFrom",
+          "dbColumn": "valid_from",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validTo",
+          "dbColumn": "valid_to",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "applicableBranchIds",
+          "dbColumn": "applicable_branch_ids",
+          "type": "text",
+          "nullable": false,
+          "default": "'{}'",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "['organizationId', 'isActive']"
+      ],
+      "uniques": []
     },
     {
       "className": "ProviderEntity",
@@ -3364,6 +5761,194 @@
       "uniques": []
     },
     {
+      "className": "StockTakeEntity",
+      "tableName": "stock_takes",
+      "filePath": "apps/api/src/modules/inventory/stock-take/stock-take.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "StockTakeStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "storageId",
+          "dbColumn": "storage_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "snapshotAt",
+          "dbColumn": "snapshot_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedAt",
+          "dbColumn": "posted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "postedBy",
+          "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "StockTakeLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "StockTakeLineEntity",
+      "tableName": "stock_take_lines",
+      "filePath": "apps/api/src/modules/inventory/stock-take/stock-take-line.entity.ts",
+      "extendsBase": false,
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "stockTakeId",
+          "dbColumn": "stock_take_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "locationId",
+          "dbColumn": "location_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "expectedQty",
+          "dbColumn": "expected_qty",
+          "type": "numeric",
+          "nullable": false,
+          "default": "0",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "countedQty",
+          "dbColumn": "counted_qty",
+          "type": "numeric",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdBy",
+          "dbColumn": "created_by",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "stockTake",
+          "kind": "ManyToOne",
+          "target": "StockTakeEntity"
+        },
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        },
+        {
+          "property": "location",
+          "kind": "ManyToOne",
+          "target": "LocationEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
+    },
+    {
       "className": "StockTransferEntity",
       "tableName": "stock_transfers",
       "filePath": "apps/api/src/modules/inventory/transfer/stock-transfer.entity.ts",
@@ -3503,6 +6088,22 @@
           "isPrimaryKey": false
         },
         {
+          "property": "sourceLocationId",
+          "dbColumn": "source_location_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Per-line source location (defaults to header sourceLocationId on legacy rows)",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "destinationLocationId",
+          "dbColumn": "destination_location_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Per-line destination location (defaults to header destinationLocationId on legacy rows)",
+          "isPrimaryKey": false
+        },
+        {
           "property": "quantity",
           "dbColumn": "quantity",
           "type": "numeric",
@@ -3634,6 +6235,415 @@
       "uniques": [
         "['userId', 'storageId']"
       ]
+    },
+    {
+      "className": "TempWarehouseLineEntity",
+      "tableName": "temp_warehouse_lines",
+      "filePath": "apps/api/src/modules/inventory/temp-warehouse/temp-warehouse-line.entity.ts",
+      "extendsBase": true,
+      "comment": "A single record of one item moving between the main warehouse and the main showroom.\nUpdates are done by soft-deleting (status=DELETED) and creating a new line — superseded_by_id links the two.",
+      "columns": [
+        {
+          "property": "sessionId",
+          "dbColumn": "session_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "direction",
+          "dbColumn": "direction",
+          "type": "varchar",
+          "nullable": false,
+          "comment": "warehouse_to_showroom | showroom_to_warehouse",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "quantity",
+          "dbColumn": "quantity",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "carrierUserId",
+          "dbColumn": "carrier_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "varchar",
+          "nullable": false,
+          "default": "TempWarehouseLineStatus.ACTIVE",
+          "comment": "ACTIVE | DELETED | AUTO_BALANCED | TRANSFERRED",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "supersededById",
+          "dbColumn": "superseded_by_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferId",
+          "dbColumn": "transfer_id",
+          "type": "uuid",
+          "nullable": true,
+          "comment": "Set when this line was consumed by a partial stock transfer; null while the line is ACTIVE in the working set.",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "session",
+          "kind": "ManyToOne",
+          "target": "TempWarehouseSessionEntity"
+        }
+      ],
+      "indexes": [
+        "['sessionId', 'status']",
+        "['sessionId', 'itemId']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "TempWarehouseSessionEntity",
+      "tableName": "temp_warehouse_sessions",
+      "filePath": "apps/api/src/modules/inventory/temp-warehouse/temp-warehouse-session.entity.ts",
+      "extendsBase": true,
+      "comment": "Header row aggregating stock movements between main warehouse and main showroom of a branch within one shift.\nEach branch may have at most one ACTIVE session — enforced by a partial unique index in DB.",
+      "columns": [
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "varchar",
+          "nullable": false,
+          "default": "TempWarehouseSessionStatus.ACTIVE",
+          "comment": "ACTIVE | CLOSED",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "closeMode",
+          "dbColumn": "close_mode",
+          "type": "varchar",
+          "nullable": true,
+          "comment": "NET_OFFSET | CREATE_TRANSFERS | NONE — NULL while session is ACTIVE",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "warehouseLocationId",
+          "dbColumn": "warehouse_location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Resolved at session open — main storage location of the branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "showroomLocationId",
+          "dbColumn": "showroom_location_id",
+          "type": "uuid",
+          "nullable": false,
+          "comment": "Resolved at session open — main showroom location of the branch",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "openedBy",
+          "dbColumn": "opened_by",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "openedAt",
+          "dbColumn": "opened_at",
+          "type": "timestamp",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "closedBy",
+          "dbColumn": "closed_by",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "closedAt",
+          "dbColumn": "closed_at",
+          "type": "timestamp",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferProcessingStatus",
+          "dbColumn": "transfer_processing_status",
+          "type": "varchar",
+          "nullable": false,
+          "default": "TempWarehouseTransferProcessingStatus.NONE",
+          "comment": "NONE | PENDING | COMPLETED | FAILED — only != NONE when closeMode=CREATE_TRANSFERS",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferW2sId",
+          "dbColumn": "transfer_w2s_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferS2wId",
+          "dbColumn": "transfer_s2w_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferFailureReason",
+          "dbColumn": "transfer_failure_reason",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "TempWarehouseLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "TransferOrderEntity",
+      "tableName": "transfer_orders",
+      "filePath": "apps/api/src/modules/inventory/transfer-order/transfer-order.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "documentNumber",
+          "dbColumn": "document_number",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "status",
+          "dbColumn": "status",
+          "type": "enum",
+          "nullable": false,
+          "default": "TransferOrderStatus.DRAFT",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceBranchId",
+          "dbColumn": "source_branch_id",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "destinationBranchId",
+          "dbColumn": "destination_branch_id",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "sourceStorageId",
+          "dbColumn": "source_storage_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "destinationStorageId",
+          "dbColumn": "destination_storage_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "requestedDate",
+          "dbColumn": "requested_date",
+          "type": "date",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "notes",
+          "dbColumn": "notes",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedAt",
+          "dbColumn": "approved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "approvedBy",
+          "dbColumn": "approved_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "executedAt",
+          "dbColumn": "executed_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "executedBy",
+          "dbColumn": "executed_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "executedTransferId",
+          "dbColumn": "executed_transfer_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "lines",
+          "kind": "OneToMany",
+          "target": "TransferOrderLineEntity"
+        }
+      ],
+      "indexes": [
+        "['organizationId', 'status']"
+      ],
+      "uniques": []
+    },
+    {
+      "className": "TransferOrderLineEntity",
+      "tableName": "transfer_order_lines",
+      "filePath": "apps/api/src/modules/inventory/transfer-order/transfer-order-line.entity.ts",
+      "extendsBase": false,
+      "columns": [
+        {
+          "property": "id",
+          "dbColumn": "id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": true
+        },
+        {
+          "property": "organizationId",
+          "dbColumn": "organization_id",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "branchId",
+          "dbColumn": "branch_id",
+          "type": "varchar",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "transferOrderId",
+          "dbColumn": "transfer_order_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "itemId",
+          "dbColumn": "item_id",
+          "type": "uuid",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "requestedQty",
+          "dbColumn": "requested_qty",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "note",
+          "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdAt",
+          "dbColumn": "created_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "updatedAt",
+          "dbColumn": "updated_at",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "createdBy",
+          "dbColumn": "created_by",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [
+        {
+          "property": "transferOrder",
+          "kind": "ManyToOne",
+          "target": "TransferOrderEntity"
+        },
+        {
+          "property": "item",
+          "kind": "ManyToOne",
+          "target": "ItemEntity"
+        }
+      ],
+      "indexes": [],
+      "uniques": []
     },
     {
       "className": "UserBranchAssignmentEntity",
@@ -3840,6 +6850,77 @@
       "uniques": [
         "['userId', 'roleId', 'organizationId']"
       ]
+    },
+    {
+      "className": "VoucherEntity",
+      "tableName": "vouchers",
+      "filePath": "apps/api/src/modules/promotion/voucher.entity.ts",
+      "extendsBase": true,
+      "columns": [
+        {
+          "property": "code",
+          "dbColumn": "code",
+          "type": "varchar",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "faceValue",
+          "dbColumn": "face_value",
+          "type": "numeric",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "customerId",
+          "dbColumn": "customer_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validFrom",
+          "dbColumn": "valid_from",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "validTo",
+          "dbColumn": "valid_to",
+          "type": "timestamptz",
+          "nullable": false,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isUsed",
+          "dbColumn": "is_used",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "isPrimaryKey": false
+        },
+        {
+          "property": "redeemedInvoiceId",
+          "dbColumn": "redeemed_invoice_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "isActive",
+          "dbColumn": "is_active",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "isPrimaryKey": false
+        }
+      ],
+      "relations": [],
+      "indexes": [
+        "'uq_voucher_org_code', ['organizationId', 'code'], { unique: true }"
+      ],
+      "uniques": []
     }
   ]
 }

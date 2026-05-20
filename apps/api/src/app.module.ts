@@ -33,6 +33,7 @@ import { StockTakeModule } from './modules/inventory/stock-take/stock-take.modul
 import { TransferOrderModule } from './modules/inventory/transfer-order/transfer-order.module';
 import { ProductModule } from './modules/inventory/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
+import { JobPositionModule } from './modules/hr/job-position/job-position.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { PromotionModule } from './modules/promotion/promotion.module';
     TransferOrderModule,
     ProductModule,
     PromotionModule,
+    JobPositionModule,
   ],
 })
 export class AppModule {}

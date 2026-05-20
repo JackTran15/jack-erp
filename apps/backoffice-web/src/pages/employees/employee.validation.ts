@@ -4,6 +4,9 @@ export function validateEmployeeDraft(
   draft: EmployeeFormDraft,
   isEdit: boolean,
 ): string | null {
+  if (!draft.basic.code.trim()) {
+    return "Vui lòng nhập mã nhân viên.";
+  }
   if (!draft.basic.email.trim()) {
     return "Vui lòng nhập email đăng nhập.";
   }

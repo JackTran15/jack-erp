@@ -6,7 +6,10 @@ import {
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { EmployeeProfileDto } from './employee-profile.dto';
 
 export class CreateUserDto {
   @IsEmail()
@@ -40,4 +43,10 @@ export class CreateUserDto {
   @IsArray()
   @IsUUID('all', { each: true })
   branchIds?: string[];
+
+  /** Optional HR profile persisted alongside the user account. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EmployeeProfileDto)
+  profile?: EmployeeProfileDto;
 }

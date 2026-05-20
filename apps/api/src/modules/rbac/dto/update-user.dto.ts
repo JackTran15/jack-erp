@@ -1,4 +1,13 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { EmployeeProfileDto } from './employee-profile.dto';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -16,4 +25,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** HR profile to upsert. Provided child collections fully replace the existing set. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EmployeeProfileDto)
+  profile?: EmployeeProfileDto;
 }
