@@ -9,6 +9,7 @@ import { EmployeeRolesFormTab } from "./EmployeeRolesFormTab";
 import { EmployeeContactFormTab } from "./EmployeeContactFormTab";
 import { EmployeeProfileFormTab } from "./EmployeeProfileFormTab";
 import { EmployeeAccessTimeTab } from "./EmployeeAccessTimeTab";
+import { HrReadonlyBanner } from "./HrReadonlyBanner";
 
 export type EmployeeFormMode = "create" | "edit";
 
@@ -19,6 +20,12 @@ export enum EmployeeFormTabEnum {
   PROFILE = "profile",
   ACCESS = "access",
 }
+
+const HR_READONLY_TABS = new Set([
+  EmployeeFormTabEnum.CONTACT,
+  EmployeeFormTabEnum.PROFILE,
+  EmployeeFormTabEnum.ACCESS,
+]);
 
 export const EMPLOYEE_FORM_TAB_LABELS: Record<EmployeeFormTabEnum, string> = {
   [EmployeeFormTabEnum.BASIC]: "Thông tin cơ bản",
@@ -34,7 +41,7 @@ interface EmployeeFormModalProps {
   draft: EmployeeFormDraft;
   onDraftChange: (draft: EmployeeFormDraft) => void;
   onClose: () => void;
-  onSave: (draft: EmployeeFormDraft, options: { keepOpen: boolean }) => void;
+  onSave: (draft: EmployeeFormDraft) => void;
 }
 
 export function EmployeeFormModal({
@@ -55,16 +62,13 @@ export function EmployeeFormModal({
     [],
   );
 
-  const handleSave = (keepOpen: boolean) => {
+  const handleSave = () => {
     const error = validateEmployeeDraft(draft, isEdit);
     if (error) {
       toast.error(error);
       return;
     }
-    onSave(draft, { keepOpen });
-    if (keepOpen) {
-      setActiveTab(EmployeeFormTabEnum.BASIC);
-    }
+    onSave(draft);
   };
 
   const title = isEdit ? "Sửa nhân viên" : "Thêm mới Nhân viên";
@@ -114,14 +118,14 @@ export function EmployeeFormModal({
             Trợ giúp
           </button>
           <div className="flex items-center gap-2">
-            <Button type="button" onClick={() => handleSave(false)}>
+            <Button type="button" onClick={handleSave}>
               <Save className="mr-1 h-4 w-4" />
               Lưu
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleSave(true)}
+              onClick={handleSave}
             >
               <Plus className="mr-1 h-4 w-4" />
               Lưu và thêm mới
@@ -154,7 +158,15 @@ export function EmployeeFormModal({
           </button>
         ))}
       </nav>
-      <div className="flex-1 overflow-y-auto">{formTabPanels[activeTab]}</div>
+      <div className="flex-1 overflow-y-auto">
+        {HR_READONLY_TABS.has(activeTab) && <HrReadonlyBanner />}
+        <fieldset
+          disabled={HR_READONLY_TABS.has(activeTab)}
+          className={HR_READONLY_TABS.has(activeTab) ? "opacity-60" : undefined}
+        >
+          {formTabPanels[activeTab]}
+        </fieldset>
+      </div>
     </AppModal>
   );
 }

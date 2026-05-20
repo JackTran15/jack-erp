@@ -1,58 +1,61 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppModal, Button } from "@erp/ui";
+import type { UserDetail } from "@erp/shared-interfaces";
 import { X } from "lucide-react";
 import {
   BaseDataTable,
   type TableColumn,
 } from "../../../components/table/BaseDataTable";
-import type { Employee } from "../../employees/employee.types";
+import { joinFullName, userDisplayCode } from "../../../lib/iam";
 
 interface RoleEmployeePickerModalProps {
   open: boolean;
   roleName: string;
-  employees: Employee[];
-  assignedEmployeeIds: string[];
+  users: UserDetail[];
+  assignedUserIds: string[];
+  loading?: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (employeeIds: string[]) => void;
+  onConfirm: (userIds: string[]) => void;
 }
 
 export function RoleEmployeePickerModal({
   open,
   roleName,
-  employees,
-  assignedEmployeeIds,
+  users,
+  assignedUserIds,
+  loading = false,
   onOpenChange,
   onConfirm,
 }: RoleEmployeePickerModalProps) {
-  const [pendingIds, setPendingIds] = useState<string[]>(assignedEmployeeIds);
+  const [pendingIds, setPendingIds] = useState<string[]>(assignedUserIds);
 
   useEffect(() => {
     if (open) {
-      setPendingIds(assignedEmployeeIds);
+      setPendingIds(assignedUserIds);
     }
-  }, [open, assignedEmployeeIds]);
+  }, [open, assignedUserIds]);
 
-  const toggleEmployee = (employeeId: string, checked: boolean) => {
+  const toggleUser = (userId: string, checked: boolean) => {
     setPendingIds((prev) => {
       const next = checked
-        ? [...prev, employeeId]
-        : prev.filter((id) => id !== employeeId);
+        ? [...prev, userId]
+        : prev.filter((id) => id !== userId);
       return [...new Set(next)];
     });
   };
 
-  const columns: TableColumn<Employee>[] = useMemo(
+  const columns: TableColumn<UserDetail>[] = useMemo(
     () => [
       {
         key: "code",
-        label: "Mã nhân viên",
+        label: "Mã / email",
         width: 160,
-        render: (row) => row.code,
+        render: (row) => userDisplayCode(row),
       },
       {
         key: "fullName",
-        label: "Tên nhân viên",
-        render: (row) => row.fullName,
+        label: "Tên người dùng",
+        render: (row) => joinFullName(row.firstName, row.lastName),
       },
     ],
     [],
@@ -67,7 +70,7 @@ export function RoleEmployeePickerModal({
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title={`Chọn nhân viên vai trò: ${roleName}`}
+      title={`Chọn người dùng vai trò: ${roleName}`}
       defaultWidth={800}
       defaultHeight={500}
       showFooter={true}
@@ -89,9 +92,9 @@ export function RoleEmployeePickerModal({
     >
       <BaseDataTable
         columns={columns}
-        rows={employees}
-        loading={false}
-        emptyLabel="Chưa có nhân viên."
+        rows={users}
+        loading={loading}
+        emptyLabel="Chưa có người dùng."
         getRowKey={(row) => row.id}
         leadingColumn={{
           width: 40,
@@ -100,9 +103,9 @@ export function RoleEmployeePickerModal({
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-input"
-              aria-label={`Chọn ${row.fullName}`}
+              aria-label={`Chọn ${joinFullName(row.firstName, row.lastName)}`}
               checked={pendingIds.includes(row.id)}
-              onChange={(e) => toggleEmployee(row.id, e.target.checked)}
+              onChange={(e) => toggleUser(row.id, e.target.checked)}
               onClick={(e) => e.stopPropagation()}
             />
           ),

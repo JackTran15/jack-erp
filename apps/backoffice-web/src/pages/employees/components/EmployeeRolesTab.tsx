@@ -1,12 +1,16 @@
-import type { Employee } from "../employee.types";
+import type { EmployeeRolePick } from "../employee.types";
 
 interface EmployeeRolesTabProps {
-  employee: Employee;
+  roles: EmployeeRolePick[];
 }
 
-export function EmployeeRolesTab({ employee }: EmployeeRolesTabProps) {
-  if (employee.roles.length === 0) {
-    return <p className="text-sm text-muted-foreground">Nhân viên chưa được gán vai trò.</p>;
+export function EmployeeRolesTab({ roles }: EmployeeRolesTabProps) {
+  if (roles.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nhân viên chưa được gán vai trò.
+      </p>
+    );
   }
 
   return (
@@ -18,10 +22,12 @@ export function EmployeeRolesTab({ employee }: EmployeeRolesTabProps) {
         </tr>
       </thead>
       <tbody>
-        {employee.roles.map((role) => (
+        {roles.map((role) => (
           <tr key={role.id} className="border-b">
             <td className="border-r px-2 py-1">{role.name}</td>
-            <td className="px-2 py-1 text-muted-foreground">{role.description}</td>
+            <td className="px-2 py-1 text-muted-foreground">
+              {role.description ?? "—"}
+            </td>
           </tr>
         ))}
       </tbody>

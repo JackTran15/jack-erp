@@ -1,25 +1,12 @@
-export interface RoleRecord {
-  id: string;
-  name: string;
-  description: string;
-  permissionIds: string[];
-}
+import type { Permission, PermissionGroup } from "@erp/shared-interfaces";
 
-export interface RoleFormDraft {
-  name: string;
-  description: string;
-  permissionIds: string[];
-}
+export type { RoleDetail, RoleSummary } from "@erp/shared-interfaces";
 
-export interface PermissionItem {
-  id: string;
-  key: string;
+export type LabeledPermission = Permission & { label: string };
+
+/** Permission group with Vietnamese labels for the role editor UI. */
+export type PermissionModuleView = {
+  module: PermissionGroup["module"];
   label: string;
-  moduleId: string;
-}
-
-export interface PermissionModule {
-  id: string;
-  label: string;
-  permissions: PermissionItem[];
-}
+  permissions: LabeledPermission[];
+};
