@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -7,9 +8,9 @@ import {
   MaxLength,
   MinLength,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { EmployeeProfileDto } from './employee-profile.dto';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { EmployeeProfileDto } from "./employee-profile.dto";
 
 export class CreateUserDto {
   @IsEmail()
@@ -32,16 +33,21 @@ export class CreateUserDto {
   @MaxLength(72)
   temporaryPassword: string;
 
+  /** Whether the user can sign in. Defaults to true when omitted. */
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
   /** Optional initial roles to assign on creation. */
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   roleIds?: string[];
 
   /** Optional initial branch assignments. */
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   branchIds?: string[];
 
   /** Optional HR profile persisted alongside the user account. */

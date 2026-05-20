@@ -13,6 +13,9 @@ interface EmployeeBasicInfoTabProps {
   draft: EmployeeFormDraft;
   onChange: (draft: EmployeeFormDraft) => void;
   isEdit: boolean;
+  isGeneratingCode?: boolean;
+  changePassword?: boolean;
+  onChangePassword?: (value: boolean) => void;
 }
 
 const EMPLOYMENT_OPTIONS = Object.values(EmploymentStatusEnum);
@@ -90,11 +93,23 @@ export function EmployeeBasicInfoTab({
   draft,
   onChange,
   isEdit,
+  isGeneratingCode = false,
+  changePassword = false,
+  onChangePassword,
 }: EmployeeBasicInfoTabProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { basic } = draft;
+
+  const handleChangePasswordToggle = (checked: boolean) => {
+    onChange(
+      setBasic(draft, {
+        changePassword: checked,
+        ...(checked ? {} : { password: "", confirmPassword: "" }),
+      }),
+    );
+  };
 
   const handlePhoto = (file: File | undefined) => {
     if (!file) return;
@@ -114,7 +129,10 @@ export function EmployeeBasicInfoTab({
           <FormField label="Mã nhân viên" required {...fieldProps}>
             <Input
               value={basic.code}
-              placeholder="VD: NV000002"
+              placeholder={
+                isGeneratingCode ? "Đang sinh mã..." : "VD: NV000002"
+              }
+              disabled={isGeneratingCode}
               onChange={(e) =>
                 onChange(setBasic(draft, { code: e.target.value }))
               }
@@ -206,6 +224,30 @@ export function EmployeeBasicInfoTab({
         </FormField>
       </div>
 
+      {isEdit && onChangePassword && (
+        <FormField label="" layout="horizontal" labelWidth={FORM_LABEL_WIDTH}>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input"
+              checked={changePassword}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                onChangePassword(checked);
+                if (!checked) {
+                  onChange(
+                    setBasic(draft, { password: "", confirmPassword: "" }),
+                  );
+                  setShowPassword(false);
+                  setShowConfirm(false);
+                }
+              }}
+            />
+            Đổi mật khẩu
+          </label>
+        </FormField>
+      )}
+
       <FormField label="" layout="horizontal" labelWidth={FORM_LABEL_WIDTH}>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -223,9 +265,10 @@ export function EmployeeBasicInfoTab({
       </FormField>
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-        {basic.allowSoftwareAccess && (
+        {((!isEdit && basic.allowSoftwareAccess) ||
+          (isEdit && changePassword)) && (
           <>
-            <FormField label="Mật khẩu" required={!isEdit} {...fieldProps}>
+            <FormField label="Mật khẩu" required {...fieldProps}>
               <PasswordInput
                 value={basic.password}
                 show={showPassword}
@@ -236,7 +279,7 @@ export function EmployeeBasicInfoTab({
                 }
               />
             </FormField>
-            <FormField label="Xác nhận MK" required={!isEdit} {...fieldProps}>
+            <FormField label="Xác nhận MK" required {...fieldProps}>
               <PasswordInput
                 value={basic.confirmPassword}
                 show={showConfirm}

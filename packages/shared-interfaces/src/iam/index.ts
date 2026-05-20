@@ -40,6 +40,7 @@ export interface UserSummary {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+  code: string | null;
 }
 
 export interface UserDetail extends UserSummary {
@@ -69,6 +70,8 @@ export interface CreateUserRequest {
   email: string;
   firstName: string;
   lastName: string;
+  /** Whether the account can sign in. Defaults to true on the server when omitted. */
+  isActive?: boolean;
   /** Temporary password set by the administrator; user is expected to change it after first login. Min 8 chars. */
   temporaryPassword: string;
   /** Optional initial roles to assign on creation. */
@@ -105,41 +108,41 @@ export interface UserListQuery {
 // ---------------------------------------------------------------------------
 
 export enum EmployeeGender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
+  MALE = "MALE",
+  FEMALE = "FEMALE",
 }
 
 export enum MaritalStatus {
-  SINGLE = 'SINGLE',
-  MARRIED = 'MARRIED',
+  SINGLE = "SINGLE",
+  MARRIED = "MARRIED",
 }
 
 export enum EmploymentStatus {
-  OFFICIAL = 'OFFICIAL',
-  PROBATION = 'PROBATION',
-  RESIGNED = 'RESIGNED',
+  OFFICIAL = "OFFICIAL",
+  PROBATION = "PROBATION",
+  RESIGNED = "RESIGNED",
 }
 
 export enum EmployeeAccessMode {
-  FREE = 'FREE',
-  SCHEDULED = 'SCHEDULED',
+  FREE = "FREE",
+  SCHEDULED = "SCHEDULED",
 }
 
 export enum Weekday {
-  MONDAY = 'MONDAY',
-  TUESDAY = 'TUESDAY',
-  WEDNESDAY = 'WEDNESDAY',
-  THURSDAY = 'THURSDAY',
-  FRIDAY = 'FRIDAY',
-  SATURDAY = 'SATURDAY',
-  SUNDAY = 'SUNDAY',
+  MONDAY = "MONDAY",
+  TUESDAY = "TUESDAY",
+  WEDNESDAY = "WEDNESDAY",
+  THURSDAY = "THURSDAY",
+  FRIDAY = "FRIDAY",
+  SATURDAY = "SATURDAY",
+  SUNDAY = "SUNDAY",
 }
 
 export enum EmployeeAddressType {
   /** Permanent residence (hộ khẩu thường trú). */
-  PERMANENT = 'PERMANENT',
+  PERMANENT = "PERMANENT",
   /** Current residence (chỗ ở hiện tại). */
-  CURRENT = 'CURRENT',
+  CURRENT = "CURRENT",
 }
 
 export interface EmployeeAddressPayload {
@@ -334,16 +337,16 @@ export interface PermissionsCatalogue {
 // ---------------------------------------------------------------------------
 
 export const IAM_PERMISSION_KEYS = {
-  USER_READ: 'iam.user.read',
-  USER_WRITE: 'iam.user.write',
-  USER_DELETE: 'iam.user.delete',
-  ROLE_READ: 'iam.role.read',
-  ROLE_WRITE: 'iam.role.write',
-  ROLE_DELETE: 'iam.role.delete',
-  ROLE_PERMISSIONS_WRITE: 'iam.role.permissions.write',
-  USER_ROLES_WRITE: 'iam.user.roles.write',
-  USER_BRANCHES_WRITE: 'iam.user.branches.write',
-  PERMISSION_READ: 'iam.permission.read',
+  USER_READ: "iam.user.read",
+  USER_WRITE: "iam.user.write",
+  USER_DELETE: "iam.user.delete",
+  ROLE_READ: "iam.role.read",
+  ROLE_WRITE: "iam.role.write",
+  ROLE_DELETE: "iam.role.delete",
+  ROLE_PERMISSIONS_WRITE: "iam.role.permissions.write",
+  USER_ROLES_WRITE: "iam.user.roles.write",
+  USER_BRANCHES_WRITE: "iam.user.branches.write",
+  PERMISSION_READ: "iam.permission.read",
 } as const;
 
 export type IamPermissionKey =
@@ -354,4 +357,4 @@ export {
   PERMISSION_MODULE_LABELS_VI,
   permissionLabelVi,
   permissionModuleLabelVi,
-} from './permission-labels-vi';
+} from "./permission-labels-vi";

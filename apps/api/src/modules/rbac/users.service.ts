@@ -4,10 +4,10 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository, ILike } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, EntityManager, In, Repository, ILike } from "typeorm";
+import * as bcrypt from "bcryptjs";
 import {
   PaginatedResponse,
   UserSummary,
@@ -16,23 +16,23 @@ import {
   EmployeeProfileView,
   EmploymentStatus,
   EmployeeAccessMode,
-} from '@erp/shared-interfaces';
-import { ActorContext } from '../../common/decorators/actor-context.decorator';
-import { UserEntity } from '../auth/user.entity';
-import { RoleEntity } from '../auth/role.entity';
-import { UserRoleEntity } from '../auth/user-role.entity';
-import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
-import { BranchEntity } from '../branch/branch.entity';
-import { JobPositionEntity } from '../hr/job-position/job-position.entity';
-import { EmployeeProfileEntity } from './employee/employee-profile.entity';
-import { EmployeeAddressEntity } from './employee/employee-address.entity';
-import { EmployeeEmergencyContactEntity } from './employee/employee-emergency-contact.entity';
-import { EmployeeAccessScheduleEntity } from './employee/employee-access-schedule.entity';
-import { RbacService } from './rbac.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { EmployeeProfileDto } from './dto/employee-profile.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../common/decorators/actor-context.decorator";
+import { UserEntity } from "../auth/user.entity";
+import { RoleEntity } from "../auth/role.entity";
+import { UserRoleEntity } from "../auth/user-role.entity";
+import { UserBranchAssignmentEntity } from "../branch/user-branch-assignment.entity";
+import { BranchEntity } from "../branch/branch.entity";
+import { JobPositionEntity } from "../hr/job-position/job-position.entity";
+import { EmployeeProfileEntity } from "./employee/employee-profile.entity";
+import { EmployeeAddressEntity } from "./employee/employee-address.entity";
+import { EmployeeEmergencyContactEntity } from "./employee/employee-emergency-contact.entity";
+import { EmployeeAccessScheduleEntity } from "./employee/employee-access-schedule.entity";
+import { RbacService } from "./rbac.service";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
+import { EmployeeProfileDto } from "./dto/employee-profile.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 const BCRYPT_COST = 10;
 
@@ -71,7 +71,7 @@ export class UsersService {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
     };
-    if (typeof query.isActive === 'boolean') {
+    if (typeof query.isActive === "boolean") {
       where.isActive = query.isActive;
     }
 
@@ -102,7 +102,7 @@ export class UsersService {
         : where,
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
-      order: { createdAt: 'DESC' as const },
+      order: { createdAt: "DESC" as const },
     };
 
     const [rows, total] = await this.userRepo.findAndCount(baseFind);
@@ -114,7 +114,7 @@ export class UsersService {
             userId: In(rows.map((u) => u.id)),
             organizationId: actor.organizationId,
           },
-          relations: ['jobPosition'],
+          relations: ["jobPosition"],
         })
       : [];
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
@@ -143,21 +143,23 @@ export class UsersService {
       }),
       this.profileRepo.findOne({
         where: { userId: id, organizationId: actor.organizationId },
-        relations: ['jobPosition', 'addresses', 'emergencyContact', 'accessSchedule'],
+        relations: [
+          "jobPosition",
+          "addresses",
+          "emergencyContact",
+          "accessSchedule",
+        ],
       }),
     ]);
     return {
-      ...this.toView(user),
+      ...this.toView(user, profile),
       roleIds: roles.map((r) => r.roleId),
       branchIds: branches.map((b) => b.branchId),
       profile: profile ? this.toProfileView(profile) : null,
     };
   }
 
-  async create(
-    dto: CreateUserDto,
-    actor: ActorContext,
-  ): Promise<UserDetail> {
+  async create(dto: CreateUserDto, actor: ActorContext): Promise<UserDetail> {
     const normalizedEmail = dto.email.trim().toLowerCase();
 
     const existing = await this.userRepo.findOne({
@@ -185,7 +187,7 @@ export class UsersService {
         passwordHash,
         firstName: dto.firstName.trim(),
         lastName: dto.lastName.trim(),
-        isActive: true,
+        isActive: dto.isActive ?? true,
         lastLoginAt: null,
       });
       const savedUser = await manager.save(UserEntity, user);
@@ -298,16 +300,13 @@ export class UsersService {
       throw new NotFoundException(`User ${id} not found`);
     }
     if (id === actor.userId) {
-      throw new BadRequestException('You cannot deactivate your own account');
+      throw new BadRequestException("You cannot deactivate your own account");
     }
     if (!user.isActive) return;
 
     user.isActive = false;
     await this.userRepo.save(user);
-    await this.rbacService.invalidateUserPermissions(
-      id,
-      actor.organizationId,
-    );
+    await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
   }
 
   async getRoleIds(id: string, actor: ActorContext): Promise<string[]> {
@@ -345,10 +344,7 @@ export class UsersService {
       }
     });
 
-    await this.rbacService.invalidateUserPermissions(
-      id,
-      actor.organizationId,
-    );
+    await this.rbacService.invalidateUserPermissions(id, actor.organizationId);
 
     return roleIds;
   }
@@ -415,7 +411,7 @@ export class UsersService {
       const foundIds = new Set(found.map((r) => r.id));
       const missing = roleIds.filter((rid) => !foundIds.has(rid));
       throw new BadRequestException(
-        `Roles not found in this organization: ${missing.join(', ')}`,
+        `Roles not found in this organization: ${missing.join(", ")}`,
       );
     }
   }
@@ -431,7 +427,7 @@ export class UsersService {
       const foundIds = new Set(found.map((b) => b.id));
       const missing = branchIds.filter((bid) => !foundIds.has(bid));
       throw new BadRequestException(
-        `Branches not found in this organization: ${missing.join(', ')}`,
+        `Branches not found in this organization: ${missing.join(", ")}`,
       );
     }
   }
@@ -494,7 +490,11 @@ export class UsersService {
 
     let profile: EmployeeProfileEntity;
     if (existing) {
-      manager.merge(EmployeeProfileEntity, existing, fields as Partial<EmployeeProfileEntity>);
+      manager.merge(
+        EmployeeProfileEntity,
+        existing,
+        fields as Partial<EmployeeProfileEntity>,
+      );
       profile = await manager.save(EmployeeProfileEntity, existing);
     } else {
       profile = await manager.save(
@@ -517,7 +517,9 @@ export class UsersService {
     };
 
     if (dto.addresses !== undefined) {
-      await manager.delete(EmployeeAddressEntity, { employeeProfileId: profileId });
+      await manager.delete(EmployeeAddressEntity, {
+        employeeProfileId: profileId,
+      });
       if (dto.addresses.length) {
         const rows = dto.addresses.map((a) =>
           manager.create(EmployeeAddressEntity, {
@@ -541,7 +543,12 @@ export class UsersService {
       });
       const e = dto.emergencyContact;
       const hasData =
-        e.fullName || e.relationship || e.mobile || e.homePhone || e.email || e.address;
+        e.fullName ||
+        e.relationship ||
+        e.mobile ||
+        e.homePhone ||
+        e.email ||
+        e.address;
       if (hasData) {
         await manager.save(
           EmployeeEmergencyContactEntity,
@@ -587,7 +594,7 @@ export class UsersService {
 
   private toProfileView(p: EmployeeProfileEntity): EmployeeProfileView {
     const trimTime = (t: string): string =>
-      typeof t === 'string' && t.length >= 5 ? t.slice(0, 5) : t;
+      typeof t === "string" && t.length >= 5 ? t.slice(0, 5) : t;
     return {
       code: p.code,
       mobile: p.mobile ?? null,
@@ -637,7 +644,10 @@ export class UsersService {
     };
   }
 
-  private toView(u: UserEntity): UserSummary {
+  private toView(
+    u: UserEntity,
+    p: EmployeeProfileEntity | undefined | null,
+  ): UserSummary {
     return {
       id: u.id,
       email: u.email,
@@ -647,6 +657,7 @@ export class UsersService {
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
+      code: p?.code ?? null,
     };
   }
 
@@ -655,7 +666,7 @@ export class UsersService {
     p: EmployeeProfileEntity | undefined,
   ): UserListItem {
     return {
-      ...this.toView(u),
+      ...this.toView(u, p),
       code: p?.code ?? null,
       profile: p
         ? {

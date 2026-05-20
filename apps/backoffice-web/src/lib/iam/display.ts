@@ -19,11 +19,8 @@ export function splitFullName(fullName: string): {
   };
 }
 
-export function userDisplayCode(
-  user: Pick<UserSummary, "id" | "email">,
-): string {
-  const local = user.email.split("@")[0];
-  return local || user.id.slice(0, 8);
+export function userDisplayCode(user: UserSummary): string {
+  return user?.code ?? "N/A";
 }
 
 export function formatIamDate(value?: string | null): string {
