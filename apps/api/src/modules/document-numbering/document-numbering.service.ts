@@ -19,6 +19,48 @@ import {
   UpdateDocumentNumberRuleDto,
 } from './dto';
 
+/**
+ * Default numbering config per document type, used to auto-create a rule when
+ * none is configured. `continuous` types render as "<prefix><6-digit-seq>" with
+ * no date and never reset (e.g. NV000001); the legacy accounting/POS types keep
+ * the date-based monthly layout (e.g. INV-202605-00001). Prefixes match the
+ * organization's standard document-code table.
+ */
+const DEFAULT_DOC_NUMBER_CONFIG: Record<
+  DocumentType,
+  { prefix: string; continuous: boolean }
+> = {
+  // Legacy accounting / POS types — date-based, monthly reset, 5-digit
+  [DocumentType.INVOICE]: { prefix: 'INV', continuous: false },
+  [DocumentType.SALE]: { prefix: 'SAL', continuous: false },
+  [DocumentType.RETURN]: { prefix: 'RTN', continuous: false },
+  [DocumentType.ADJUSTMENT]: { prefix: 'ADJ', continuous: false },
+  [DocumentType.JOURNAL]: { prefix: 'JNL', continuous: false },
+  [DocumentType.PAYABLE]: { prefix: 'PAY', continuous: false },
+  [DocumentType.RECEIVABLE]: { prefix: 'REC', continuous: false },
+  // Standard code types — continuous, 6-digit, never reset
+  [DocumentType.QUOTATION]: { prefix: 'PBH', continuous: true },
+  [DocumentType.PURCHASE_ORDER]: { prefix: 'PDH', continuous: true },
+  [DocumentType.GOODS_RECEIPT]: { prefix: 'NK', continuous: true },
+  [DocumentType.GOODS_ISSUE]: { prefix: 'XK', continuous: true },
+  [DocumentType.TRANSFER]: { prefix: 'CK', continuous: true },
+  [DocumentType.TRANSFER_ORDER]: { prefix: 'LDC', continuous: true },
+  [DocumentType.STOCK_COUNT]: { prefix: 'KK', continuous: true },
+  [DocumentType.CASH_RECEIPT]: { prefix: 'PT', continuous: true },
+  [DocumentType.CASH_PAYMENT]: { prefix: 'PC', continuous: true },
+  [DocumentType.CASH_COUNT]: { prefix: 'KKQ', continuous: true },
+  [DocumentType.BANK_RECEIPT]: { prefix: 'NTTK', continuous: true },
+  [DocumentType.BANK_PAYMENT]: { prefix: 'UNC', continuous: true },
+  [DocumentType.EXPENSE]: { prefix: 'CP', continuous: true },
+  [DocumentType.RECONCILIATION]: { prefix: 'DS', continuous: true },
+  [DocumentType.DEBT_OFFSET]: { prefix: 'BTCN', continuous: true },
+  [DocumentType.CUSTOMER]: { prefix: 'KH', continuous: true },
+  [DocumentType.EMPLOYEE]: { prefix: 'NV', continuous: true },
+  [DocumentType.SUPPLIER]: { prefix: 'NCC', continuous: true },
+  [DocumentType.DELIVERY_PARTNER]: { prefix: 'DTGH', continuous: true },
+  [DocumentType.STOCK_TAKE]: { prefix: 'KK', continuous: true },
+};
+
 @Injectable()
 export class DocumentNumberingService {
   private readonly logger = new Logger(DocumentNumberingService.name);
@@ -197,10 +239,7 @@ export class DocumentNumberingService {
     actor: ActorContext,
   ): Promise<DocumentNumberRuleEntity | null> {
     // continuous numbering (e.g. "NK000001", "NK000002", ...) — no date segment, never reset
-    const useContinuous =
-      documentType === DocumentType.GOODS_RECEIPT ||
-      documentType === DocumentType.GOODS_ISSUE ||
-      documentType === DocumentType.STOCK_TAKE;
+    const useContinuous = DEFAULT_DOC_NUMBER_CONFIG[documentType].continuous;
     const defaultRule = this.ruleRepo.create({
       organizationId: actor.organizationId,
       branchId: undefined,
@@ -234,22 +273,7 @@ export class DocumentNumberingService {
   }
 
   private getDefaultPrefix(documentType: DocumentType): string {
-    const prefixMap: Record<DocumentType, string> = {
-      [DocumentType.INVOICE]: 'INV',
-      [DocumentType.SALE]: 'SAL',
-      [DocumentType.RETURN]: 'RTN',
-      [DocumentType.TRANSFER]: 'TRF',
-      [DocumentType.ADJUSTMENT]: 'ADJ',
-      [DocumentType.JOURNAL]: 'JNL',
-      [DocumentType.PAYABLE]: 'PAY',
-      [DocumentType.RECEIVABLE]: 'REC',
-      [DocumentType.PURCHASE_ORDER]: 'PO',
-      [DocumentType.GOODS_ISSUE]: 'GI',
-      [DocumentType.GOODS_RECEIPT]: 'NK',
-      [DocumentType.STOCK_TAKE]: 'KK',
-    };
-
-    return prefixMap[documentType];
+    return DEFAULT_DOC_NUMBER_CONFIG[documentType].prefix;
   }
 
   private computeResetKey(policy: ResetPolicy, now: Date): string {

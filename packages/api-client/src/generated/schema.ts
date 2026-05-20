@@ -3672,7 +3672,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -3684,7 +3684,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -3716,7 +3716,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             branchId?: string;
         };
         SalesmanAssignmentEntity: {
