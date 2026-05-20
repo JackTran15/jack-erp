@@ -507,7 +507,7 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
           </Button>
         </div>
 
-        {/* Quét mã vạch (visual only) — separate row, right-aligned, matches Misa */}
+        {/* Quét mã vạch (visual only) — separate row, right-aligned */}
         <div className="flex justify-end px-4 pb-2">
           <label className="flex cursor-not-allowed items-center gap-1.5 text-sm text-muted-foreground opacity-50">
             <input type="checkbox" disabled />

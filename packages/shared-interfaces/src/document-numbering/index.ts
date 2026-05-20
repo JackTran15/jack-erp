@@ -10,6 +10,7 @@ export enum DocumentType {
   PURCHASE_ORDER = 'PURCHASE_ORDER',
   GOODS_ISSUE = 'GOODS_ISSUE',
   GOODS_RECEIPT = 'GOODS_RECEIPT',
+  STOCK_TAKE = 'STOCK_TAKE',
 }
 
 export interface DocumentNumberRule {

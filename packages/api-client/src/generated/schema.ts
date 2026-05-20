@@ -1178,6 +1178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/stock-items/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction. */
+        post: operations["InventoryLocationStockController_assignBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/{locationId}/stock-items/{itemId}": {
         parameters: {
             query?: never;
@@ -1235,6 +1252,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["StockLedgerController_listLedgerEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockSummaryController_getSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/summary/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockSummaryController_getFilterOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1733,6 +1782,22 @@ export interface paths {
         get: operations["StockTransferController_list"];
         put?: never;
         post: operations["StockTransferController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock/transfers/intra-warehouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferController_createIntraWarehouseTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3073,6 +3138,22 @@ export interface paths {
         delete: operations["StockTakeController_cancel"];
         options?: never;
         head?: never;
+        patch: operations["StockTakeController_updateHeader"];
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -3086,13 +3167,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["StockTakeController_removeLine"];
         options?: never;
         head?: never;
         patch: operations["StockTakeController_updateLine"];
         trace?: never;
     };
-    "/inventory/stock-takes/{id}/post": {
+    "/inventory/stock-takes/{id}/process": {
         parameters: {
             query?: never;
             header?: never;
@@ -3101,7 +3182,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["StockTakeController_post"];
+        post: operations["StockTakeController_process"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3337,7 +3418,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -3349,7 +3430,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -3381,7 +3462,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
             branchId?: string;
         };
         SalesmanAssignmentEntity: {
@@ -4033,6 +4114,13 @@ export interface components {
             meta: components["schemas"]["StockByLocationMetaDto"];
         };
         AddItemToLocationDto: Record<string, never>;
+        BatchAssignItemRowDto: {
+            itemId: string;
+            locationId: string;
+        };
+        BatchAssignItemsDto: {
+            rows: components["schemas"]["BatchAssignItemRowDto"][];
+        };
         StockBalanceEntity: {
             itemId: string;
             item?: components["schemas"]["ItemEntity"];
@@ -4471,6 +4559,31 @@ export interface components {
             quantity: number;
             notes?: string;
             transfer?: components["schemas"]["StockTransferEntity"];
+        };
+        IntraWarehouseTransferLineDto: {
+            /**
+             * Format: uuid
+             * @description UUID of the inventory item
+             */
+            itemId: string;
+            /** @description Quantity to transfer (must be > 0) */
+            quantity: number;
+            /** @description Optional notes for this line */
+            notes?: string;
+        };
+        CreateIntraWarehouseTransferDto: {
+            /**
+             * Format: uuid
+             * @description UUID of the source location
+             */
+            sourceLocationId: string;
+            /**
+             * Format: uuid
+             * @description UUID of the destination location (must be in same storage as source)
+             */
+            destinationLocationId: string;
+            /** @description Lines to transfer */
+            lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
         };
         CreateAdjustmentDto: Record<string, never>;
         StockAdjustmentEntity: {
@@ -5399,19 +5512,52 @@ export interface components {
             cashPayment?: components["schemas"]["CashSettlementDto"];
             cashReceipt?: components["schemas"]["CashSettlementDto"];
         };
-        CreateStockTakeDto: Record<string, never>;
+        CreateStockTakeLineDto: {
+            itemId: string;
+            locationId?: string;
+            countedQty?: Record<string, never> | null;
+            reason?: string;
+        };
+        CreateStockTakeDto: {
+            storageId?: string;
+            locationId?: string;
+            /** @description Kiểm kê đến ngày (YYYY-MM-DD) */
+            plannedDate?: string;
+            /** @description Mục đích kiểm kê */
+            purpose?: string;
+            notes?: string;
+            /** @description Kết luận sau kiểm kê */
+            conclusion?: string;
+            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
+            countedAt?: string;
+            lines?: components["schemas"]["CreateStockTakeLineDto"][];
+        };
         StockTakeEntity: {
             documentNumber?: string;
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED";
             storageId?: string;
             locationId?: string;
+            /** @description Mục đích — free-text purpose written by user on the form (matches MISA "Mục đích"). */
+            purpose?: string;
+            /** @description Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time). */
+            plannedDate?: string;
+            /**
+             * Format: date-time
+             * @description Ngày + giờ kiểm kê thực tế — defaults to now() on create.
+             */
+            countedAt?: string;
+            /** @description Kết luận — conclusion text shown at the bottom of the form. */
+            conclusion?: string;
             /** Format: date-time */
             snapshotAt: string;
             notes?: string;
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
+            /** @description IDs of the goods-receipt/goods-issue documents auto-generated by process(). */
+            generatedReceiptId?: string;
+            generatedIssueId?: string;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["StockTakeLineEntity"][];
@@ -5437,6 +5583,8 @@ export interface components {
             expectedQty: string;
             countedQty?: string | null;
             note?: string;
+            /** @description Nguyên nhân — reason text for the variance on this line. */
+            reason?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -5446,7 +5594,24 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
             location?: components["schemas"]["LocationEntity"];
         };
-        UpdateLineCountDto: Record<string, never>;
+        UpdateStockTakeHeaderDto: {
+            purpose?: string;
+            notes?: string;
+            /** @description Kết luận sau kiểm kê */
+            conclusion?: string;
+            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
+            countedAt?: string;
+        };
+        AddStockTakeLineDto: {
+            itemId: string;
+            locationId?: string;
+        };
+        UpdateLineCountDto: {
+            countedQty?: Record<string, never> | null;
+            note?: string;
+            /** @description Nguyên nhân chênh lệch */
+            reason?: string;
+        };
         CreateTransferOrderDto: Record<string, never>;
         TransferOrderEntity: {
             documentNumber?: string;
@@ -7970,6 +8135,28 @@ export interface operations {
             };
         };
     };
+    InventoryLocationStockController_assignBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAssignItemsDto"];
+            };
+        };
+        responses: {
+            /** @description Kết quả: { created, skipped } */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     InventoryLocationStockController_removeItemFromLocation: {
         parameters: {
             query?: never;
@@ -7999,6 +8186,22 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                locationCode?: string;
+                locationCodeMode?: string;
+                locationName?: string;
+                locationNameMode?: string;
+                itemCode?: string;
+                itemCodeMode?: string;
+                itemName?: string;
+                itemNameMode?: string;
+                categoryName?: string;
+                categoryNameMode?: string;
+                unit?: string;
+                unitMode?: string;
+                storageName?: string;
+                storageNameMode?: string;
+                quantity?: number;
+                quantityOp?: string;
             };
             header?: never;
             path?: never;
@@ -8057,6 +8260,66 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    StockSummaryController_getSummary: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                /** @description ILIKE on item.code or item.name */
+                search?: string;
+                branchId?: string;
+                storageId?: string;
+                categoryId?: string;
+                /** @description ILIKE on item.brand */
+                brand?: string;
+                /** @description Exact match on item.unit */
+                unit?: string;
+                /** @description Filter by item.is_active (Trạng thái kinh doanh). */
+                isActive?: boolean;
+                /** @description Filter by item.is_pos_visible (Trạng thái giao dịch). */
+                isPosVisible?: boolean;
+                /** @description Post-aggregate filter on SUM(quantity): IN_STOCK > 0, OUT_OF_STOCK = 0, NEGATIVE < 0, ALL = no filter. */
+                stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
+                /** @description Filter rows with last_movement_at >= movementFrom (YYYY-MM-DD). */
+                movementFrom?: string;
+                /** @description Filter rows with last_movement_at <= movementTo end-of-day (YYYY-MM-DD). */
+                movementTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockSummaryController_getFilterOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9031,6 +9294,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateTransferDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_createIntraWarehouseTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIntraWarehouseTransferDto"];
             };
         };
         responses: {
@@ -11365,6 +11651,11 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
+                status?: "DRAFT" | "POSTED" | "CANCELLED";
+                /** @description Lọc createdAt >= (YYYY-MM-DD) */
+                fromDate?: string;
+                /** @description Lọc createdAt <= (YYYY-MM-DD) */
+                toDate?: string;
             };
             header?: never;
             path?: never;
@@ -11443,6 +11734,76 @@ export interface operations {
             };
         };
     };
+    StockTakeController_updateHeader: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStockTakeHeaderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_addLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddStockTakeLineDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeLineEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_removeLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     StockTakeController_updateLine: {
         parameters: {
             query?: never;
@@ -11469,7 +11830,7 @@ export interface operations {
             };
         };
     };
-    StockTakeController_post: {
+    StockTakeController_process: {
         parameters: {
             query?: never;
             header?: never;

@@ -5,6 +5,8 @@ import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { StockLedgerService } from './stock-ledger.service';
 import { StockLedgerController } from './stock-ledger.controller';
+import { StockSummaryService } from './stock-summary.service';
+import { StockSummaryController } from './stock-summary.controller';
 import {
   InventoryStockBalanceCrudService,
   INVENTORY_STOCK_BALANCE_ENTITY_CONFIG,
@@ -20,9 +22,10 @@ import { StockReturnConsumer } from '../consumers/stock-return.consumer';
     TypeOrmModule.forFeature([StockLedgerEntryEntity, StockBalanceEntity]),
     ProductModule,
   ],
-  controllers: [StockLedgerController],
+  controllers: [StockLedgerController, StockSummaryController],
   providers: [
     StockLedgerService,
+    StockSummaryService,
     InventoryStockBalanceCrudService,
     {
       provide: INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,

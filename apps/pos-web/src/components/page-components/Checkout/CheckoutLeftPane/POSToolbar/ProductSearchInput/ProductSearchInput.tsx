@@ -29,7 +29,7 @@ export interface ProductSearchInputProps {
  *
  * Đọc query từ catalog store, gọi cart-actions hook để thêm sản phẩm.
  * Lắng nghe `productSearchFocusSeq` từ ui store để auto-focus khi user
- * commit qty (MISA flow Bước 3).
+ * commit qty.
  */
 export function ProductSearchInput({
   inputRef,

@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AppModal,
-  Button,
   DocumentListShell,
-  FormField,
-  Input,
   PageToolbar,
-  Textarea,
+  PeriodFilter,
+  resolvePeriodRange,
+  type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { CheckCircle, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -21,61 +19,48 @@ import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-
-type StockTakeStatus = "DRAFT" | "POSTED" | "CANCELLED";
-
-const STATUS_LABEL: Record<StockTakeStatus, string> = {
-  DRAFT: "Đang đếm",
-  POSTED: "Đã duyệt",
-  CANCELLED: "Đã huỷ",
-};
-
-interface StockTakeLine {
-  id: string;
-  itemId: string;
-  locationId: string;
-  expectedQty: string | number;
-  countedQty: string | number | null;
-  note?: string | null;
-  item?: { id: string; code: string; name: string; unit: string };
-  location?: { id: string; code: string; name: string };
-}
-
-interface StockTake {
-  id: string;
-  documentNumber?: string;
-  status: StockTakeStatus;
-  storageId?: string | null;
-  locationId?: string | null;
-  snapshotAt: string;
-  notes?: string;
-  postedAt?: string | null;
-  createdAt: string;
-  lines: StockTakeLine[];
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-interface StorageOption {
-  id: string;
-  name: string;
-  branchId: string;
-}
+import {
+  CreateStockTakeDialog,
+  type StockTakeDraft,
+} from "./CreateStockTakeDialog";
+import { StockTakeDetailPanel } from "./StockTakeDetailPanel";
+import { StockTakeFormDialog } from "./StockTakeFormDialog";
+import {
+  STATUS_LABEL,
+  type PaginatedResponse,
+  type StockTake,
+  type StorageOption,
+} from "./stock-takes.types";
 
 export function StockTakesPage() {
   const [records, setRecords] = useState<PaginatedResponse<StockTake> | null>(null);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [period, setPeriod] = useState<PeriodValue>(() => {
+    const range = resolvePeriodRange("this_month");
+    return { preset: "this_month", ...range };
+  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [viewing, setViewing] = useState<StockTake | null>(null);
+  /** New-mode draft from CreateStockTakeDialog. While set, FormDialog opens in "new" mode. */
+  const [newDraft, setNewDraft] = useState<StockTakeDraft | null>(null);
+  /** Loaded stock-take being viewed/edited. */
+  const [editing, setEditing] = useState<StockTake | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<StockTake | null>(null);
+  const [confirmProcess, setConfirmProcess] = useState<StockTake | null>(null);
+  const [storages, setStorages] = useState<StorageOption[]>([]);
+
+  const loadStorages = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<StorageOption>>(
+        "/inventory/storages?page=1&pageSize=200",
+      );
+      setStorages(data.data);
+    } catch {
+      // best-effort
+    }
+  }, []);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -83,6 +68,8 @@ export function StockTakesPage() {
       const params = new URLSearchParams({
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
+        fromDate: period.from,
+        toDate: period.to,
       });
       const { data } = await apiClient.get<PaginatedResponse<StockTake>>(
         `/inventory/stock-takes?${params}`,
@@ -94,24 +81,66 @@ export function StockTakesPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination]);
+  }, [pagination.page, pagination.pageSize, period.from, period.to]);
+
+  useEffect(() => {
+    void loadStorages();
+  }, [loadStorages]);
 
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
+
+  const storageNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of storages) m.set(s.id, s.name);
+    return m;
+  }, [storages]);
 
   const selected = useMemo(
     () => records?.data.find((r) => r.id === selectedId) ?? null,
     [records, selectedId],
   );
 
-  const handleCancel = async (st: StockTake) => {
+  /**
+   * Preview the next "Số phiếu KK" based on the highest numeric suffix in the
+   * current page. Display-only — the server is still the source of truth and
+   * assigns the real number atomically when the form is saved.
+   */
+  const nextDocumentNumber = useMemo(() => {
+    const rows = records?.data ?? [];
+    let max = 0;
+    for (const row of rows) {
+      const m = row.documentNumber?.match(/(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    return `KK${String(max + 1).padStart(6, "0")}`;
+  }, [records]);
+
+  /** Fetch a single stock-take (with full lines) when opening for view/edit. */
+  const openForEdit = useCallback(async (id: string) => {
+    try {
+      const { data } = await apiClient.get<StockTake>(
+        `/inventory/stock-takes/${id}`,
+      );
+      setEditing(data);
+      setSelectedId(id); // sync bottom panel to the row we just opened
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
+  }, []);
+
+  const handleProcess = async (st: StockTake) => {
     setActionLoading(st.id);
     try {
-      await apiClient.delete(`/inventory/stock-takes/${st.id}`);
-      toast.success("Đã huỷ phiếu kiểm kê.");
-      setConfirmCancel(null);
-      if (selectedId === st.id) setSelectedId(null);
+      await apiClient.post(`/inventory/stock-takes/${st.id}/process`);
+      toast.success(
+        "Đã xử lý phiếu kiểm kê — phiếu nhập/xuất chênh lệch đã được sinh.",
+      );
+      setConfirmProcess(null);
       await loadRecords();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -120,69 +149,118 @@ export function StockTakesPage() {
     }
   };
 
+  const handleCancel = async (st: StockTake) => {
+    setActionLoading(st.id);
+    try {
+      await apiClient.delete(`/inventory/stock-takes/${st.id}`);
+      toast.success("Đã huỷ phiếu kiểm kê.");
+      setConfirmCancel(null);
+      if (selectedId === st.id) setSelectedId(null);
+      if (editing?.id === st.id) setEditing(null);
+      await loadRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ─── Toolbar ─────────────────────────────────────────────────────────────
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
-      label: "Tạo phiếu kiểm kê",
+      label: "Thêm mới",
       icon: Plus,
       onClick: () => setCreateOpen(true),
     },
     {
       id: "view",
-      label: "Đếm / Xem",
+      label: "Xem",
       icon: Eye,
       disabled: !selected,
-      onClick: () => selected && setViewing(selected),
+      onClick: () => selected && void openForEdit(selected.id),
     },
     {
-      id: "cancel",
-      label: "Huỷ",
+      id: "edit",
+      label: "Sửa",
+      icon: Pencil,
+      disabled: !selected || selected.status !== "DRAFT",
+      onClick: () => selected && void openForEdit(selected.id),
+    },
+    {
+      id: "process",
+      label: "Xử lý",
+      icon: Settings2,
+      // Tạm disable — flow xử lý chưa khớp MISA; sẽ xem xét lại sau.
+      disabled: true,
+      onClick: () => {},
+    },
+    {
+      id: "delete",
+      label: "Xoá",
       icon: Trash2,
       variant: "danger",
       disabled: !selected || selected.status !== "DRAFT",
       onClick: () => selected && setConfirmCancel(selected),
     },
     { id: "sep", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => void loadRecords(),
+    },
   ];
 
+  // ─── Columns ─────────────────────────────────────────────────────────────
   const columns: TableColumn<StockTake>[] = [
     {
       key: "createdAt",
-      label: "Ngày tạo",
+      label: "Ngày",
       width: 130,
-      render: (r) => new Date(r.createdAt).toLocaleString("vi-VN"),
+      render: (r) => new Date(r.createdAt).toLocaleDateString("vi-VN"),
+    },
+    {
+      key: "documentNumber",
+      label: "Số phiếu KK",
+      width: 160,
+      render: (r) => (
+        <button
+          type="button"
+          className="font-mono text-primary hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            void openForEdit(r.id);
+          }}
+        >
+          {r.documentNumber ?? `#${r.id.slice(0, 8)}`}
+        </button>
+      ),
+    },
+    {
+      key: "storage",
+      label: "Kho kiểm kê",
+      width: 220,
+      render: (r) =>
+        r.storageId
+          ? storageNameById.get(r.storageId) ?? r.storageId.slice(0, 8)
+          : "—",
+    },
+    {
+      key: "purpose",
+      label: "Diễn giải",
+      render: (r) => r.purpose ?? r.conclusion ?? r.notes ?? "",
     },
     {
       key: "status",
       label: "Trạng thái",
-      width: 130,
+      width: 140,
       render: (r) => STATUS_LABEL[r.status],
     },
-    {
-      key: "lineCount",
-      label: "Số dòng",
-      width: 100,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (r) => r.lines?.length ?? 0,
-    },
-    {
-      key: "scope",
-      label: "Phạm vi",
-      render: (r) =>
-        r.locationId
-          ? `Vị trí: ${r.locationId.slice(0, 8)}`
-          : r.storageId
-            ? `Kho: ${r.storageId.slice(0, 8)}`
-            : "—",
-    },
-    {
-      key: "notes",
-      label: "Ghi chú",
-      render: (r) => r.notes ?? "",
-    },
   ];
+
+  /** What the bottom panel shows: prefer the currently-open form over the list selection. */
+  const panelStockTake = editing ?? selected;
 
   return (
     <>
@@ -190,6 +268,13 @@ export function StockTakesPage() {
         title="Kiểm kê kho"
         tabs={<InventoryTabBar activeId="stock-take" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        filters={
+          <PeriodFilter
+            value={period}
+            onChange={setPeriod}
+            onApply={() => void loadRecords()}
+          />
+        }
         pagination={
           <PaginationControls
             page={pagination.page}
@@ -202,12 +287,13 @@ export function StockTakesPage() {
             onRefresh={() => void loadRecords()}
           />
         }
+        detailPanel={<StockTakeDetailPanel stockTake={panelStockTake} />}
       >
         <BaseDataTable
           columns={columns}
           rows={records?.data ?? []}
           loading={loading}
-          emptyLabel="Chưa có phiếu kiểm kê."
+          emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id)}
           leadingColumn={{
@@ -228,28 +314,53 @@ export function StockTakesPage() {
         />
       </DocumentListShell>
 
-      {createOpen && (
+      {createOpen ? (
         <CreateStockTakeDialog
           onClose={() => setCreateOpen(false)}
-          onCreated={async (st) => {
+          onPicked={(draft) => {
             setCreateOpen(false);
-            await loadRecords();
-            setViewing(st);
+            setNewDraft(draft); // opens form in "new" mode — NO API call yet
           }}
         />
-      )}
+      ) : null}
 
-      {viewing && (
-        <StockTakeCountDialog
-          stockTake={viewing}
+      {newDraft ? (
+        <StockTakeFormDialog
+          initialDraft={newDraft}
+          storageName={newDraft.storageName}
+          previewDocumentNumber={nextDocumentNumber}
           onClose={() => {
-            setViewing(null);
+            setNewDraft(null);
             void loadRecords();
           }}
+          onSaved={async () => {
+            await loadRecords();
+          }}
         />
-      )}
+      ) : editing ? (
+        <StockTakeFormDialog
+          initialStockTake={editing}
+          storageName={
+            editing.storageId
+              ? storageNameById.get(editing.storageId) ?? undefined
+              : undefined
+          }
+          onClose={() => {
+            setEditing(null);
+            void loadRecords();
+          }}
+          onSaved={async () => {
+            await loadRecords();
+          }}
+          onRequestDelete={
+            editing.status === "DRAFT"
+              ? () => setConfirmCancel(editing)
+              : undefined
+          }
+        />
+      ) : null}
 
-      {confirmCancel && (
+      {confirmCancel ? (
         <ConfirmActionModal
           title="Huỷ phiếu kiểm kê"
           message="Xác nhận huỷ phiếu kiểm kê này? Các giá trị đã đếm sẽ bị bỏ."
@@ -259,278 +370,19 @@ export function StockTakesPage() {
           onCancel={() => setConfirmCancel(null)}
           onConfirm={() => void handleCancel(confirmCancel)}
         />
-      )}
+      ) : null}
+
+      {confirmProcess ? (
+        <ConfirmActionModal
+          title="Xử lý phiếu kiểm kê"
+          message={`Phiếu ${confirmProcess.documentNumber ?? confirmProcess.id.slice(0, 8)} sẽ được duyệt, phần mềm tự sinh phiếu nhập/xuất kho cho hàng chênh lệch và cập nhật tồn ngay. Tiếp tục?`}
+          confirmLabel="Xử lý"
+          cancelLabel="Quay lại"
+          loading={actionLoading === confirmProcess.id}
+          onCancel={() => setConfirmProcess(null)}
+          onConfirm={() => void handleProcess(confirmProcess)}
+        />
+      ) : null}
     </>
-  );
-}
-
-// ─── Create dialog ──────────────────────────────────────────────────────────
-
-function CreateStockTakeDialog({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (st: StockTake) => void;
-}) {
-  const [storages, setStorages] = useState<StorageOption[]>([]);
-  const [storageId, setStorageId] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data } = await apiClient.get<PaginatedResponse<StorageOption>>(
-          "/inventory/storages?page=1&pageSize=200",
-        );
-        if (!cancelled) setStorages(data.data);
-      } catch {
-        // best-effort
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleSave = async () => {
-    if (!storageId) {
-      toast.error("Vui lòng chọn kho.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const { data } = await apiClient.post<StockTake>("/inventory/stock-takes", {
-        storageId,
-        notes: notes || undefined,
-      });
-      toast.success(`Đã khởi tạo phiếu kiểm kê với ${data.lines.length} dòng.`);
-      onCreated(data);
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <AppModal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title="Tạo phiếu kiểm kê"
-      onSave={() => void handleSave()}
-      onCancel={onClose}
-      saveLabel={saving ? "Đang khởi tạo…" : "Khởi tạo"}
-      saveDisabled={saving}
-      className="max-w-[480px]"
-    >
-      <div className="flex flex-col gap-3">
-        <FormField label="Kho cần kiểm kê *">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={storageId}
-            onChange={(e) => setStorageId(e.target.value)}
-          >
-            <option value="">— Chọn kho —</option>
-            {storages.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Ghi chú">
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-          />
-        </FormField>
-        <p className="text-xs text-muted-foreground">
-          Hệ thống sẽ tạo snapshot tồn kho hiện tại của các vị trí trong kho đã
-          chọn. Bạn có thể nhập số đếm thực tế ở bước kế tiếp.
-        </p>
-      </div>
-    </AppModal>
-  );
-}
-
-// ─── Count dialog ───────────────────────────────────────────────────────────
-
-function StockTakeCountDialog({
-  stockTake,
-  onClose,
-}: {
-  stockTake: StockTake;
-  onClose: () => void;
-}) {
-  const [lines, setLines] = useState(stockTake.lines);
-  const [posting, setPosting] = useState(false);
-  const [dirtyLines, setDirtyLines] = useState<Set<string>>(new Set());
-
-  const isLocked = stockTake.status !== "DRAFT";
-
-  const handleUpdateCount = async (lineId: string, value: string) => {
-    const parsed = value === "" ? null : Number(value);
-    setLines((prev) =>
-      prev.map((l) =>
-        l.id === lineId ? { ...l, countedQty: parsed as never } : l,
-      ),
-    );
-    setDirtyLines((prev) => new Set(prev).add(lineId));
-  };
-
-  const handleSaveLine = async (line: StockTakeLine) => {
-    try {
-      await apiClient.patch(
-        `/inventory/stock-takes/${stockTake.id}/lines/${line.id}`,
-        { countedQty: line.countedQty == null ? null : Number(line.countedQty) },
-      );
-      setDirtyLines((prev) => {
-        const next = new Set(prev);
-        next.delete(line.id);
-        return next;
-      });
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    }
-  };
-
-  const handlePost = async () => {
-    // Save any unsaved lines first
-    setPosting(true);
-    try {
-      for (const lineId of Array.from(dirtyLines)) {
-        const line = lines.find((l) => l.id === lineId);
-        if (line) await handleSaveLine(line);
-      }
-      await apiClient.post(`/inventory/stock-takes/${stockTake.id}/post`);
-      toast.success("Đã duyệt phiếu kiểm kê — đã tạo điều chỉnh tồn kho.");
-      onClose();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const variances = useMemo(
-    () =>
-      lines
-        .filter((l) => l.countedQty != null)
-        .map((l) => ({
-          id: l.id,
-          variance: Number(l.countedQty) - Number(l.expectedQty),
-        }))
-        .filter((x) => x.variance !== 0),
-    [lines],
-  );
-
-  return (
-    <AppModal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title={`Kiểm kê ${stockTake.documentNumber ?? stockTake.id.slice(0, 8)}`}
-      defaultWidth={1000}
-      defaultHeight={680}
-      footer={
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Số dòng: <strong>{lines.length}</strong>
-            <span className="mx-3">·</span>
-            Đã đếm: <strong>{lines.filter((l) => l.countedQty != null).length}</strong>
-            <span className="mx-3">·</span>
-            Lệch: <strong className="text-amber-700">{variances.length}</strong>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isLocked && (
-              <Button
-                type="button"
-                onClick={() => void handlePost()}
-                disabled={posting || lines.every((l) => l.countedQty == null)}
-              >
-                <CheckCircle className="mr-1.5 h-4 w-4" />
-                {posting ? "Đang duyệt…" : "Duyệt phiếu"}
-              </Button>
-            )}
-            <Button type="button" variant="outline" onClick={onClose}>
-              Đóng
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <div className="flex h-full flex-col gap-3">
-        <div className="overflow-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-muted/40">
-              <tr>
-                <th className="border-b border-r px-3 py-2 text-left">Mã SKU</th>
-                <th className="border-b border-r px-3 py-2 text-left">Tên hàng hóa</th>
-                <th className="border-b border-r px-3 py-2 text-left">Vị trí</th>
-                <th className="border-b border-r px-3 py-2 text-right">Tồn dự kiến</th>
-                <th className="border-b border-r px-3 py-2 text-right w-[140px]">Số đếm</th>
-                <th className="border-b px-3 py-2 text-right">Lệch</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l) => {
-                const counted = l.countedQty == null ? null : Number(l.countedQty);
-                const expected = Number(l.expectedQty);
-                const variance = counted == null ? null : counted - expected;
-                return (
-                  <tr key={l.id} className="border-b">
-                    <td className="border-r px-3 py-1.5 font-mono text-xs">
-                      {l.item?.code ?? l.itemId.slice(0, 8)}
-                    </td>
-                    <td className="border-r px-3 py-1.5">{l.item?.name ?? "—"}</td>
-                    <td className="border-r px-3 py-1.5">
-                      {l.location?.code ?? l.locationId.slice(0, 8)}
-                    </td>
-                    <td className="border-r px-3 py-1.5 text-right tabular-nums">
-                      {expected.toLocaleString("vi-VN")}
-                    </td>
-                    <td className="border-r px-2 py-1">
-                      <Input
-                        type="number"
-                        min={0}
-                        className="h-8 text-right"
-                        value={l.countedQty == null ? "" : String(l.countedQty)}
-                        onChange={(e) => void handleUpdateCount(l.id, e.target.value)}
-                        onBlur={() => {
-                          if (dirtyLines.has(l.id)) void handleSaveLine(l);
-                        }}
-                        disabled={isLocked}
-                      />
-                    </td>
-                    <td
-                      className={`px-3 py-1.5 text-right tabular-nums ${
-                        variance == null
-                          ? "text-muted-foreground"
-                          : variance === 0
-                            ? "text-emerald-600"
-                            : "text-destructive font-medium"
-                      }`}
-                    >
-                      {variance == null
-                        ? "—"
-                        : variance > 0
-                          ? `+${variance.toLocaleString("vi-VN")}`
-                          : variance.toLocaleString("vi-VN")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </AppModal>
   );
 }
