@@ -424,7 +424,7 @@ export function PosSelect<T>({
               ref={menuRef}
               role="listbox"
               className={cn(
-                "fixed pointer-events-auto z-[100] max-h-72 overflow-auto rounded-2xl border border-gray-200 bg-white shadow-lg transition-opacity delay-50 duration-75",
+                "fixed pointer-events-auto z-[100] max-h-72 overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg transition-opacity delay-50 duration-75",
                 menuClassName,
               )}
               style={{
@@ -445,7 +445,7 @@ export function PosSelect<T>({
               }}
             >
               {items.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-400">
+                <div className="px-3 py-2 text-[13px] text-gray-500">
                   {emptyText}
                 </div>
               ) : (
@@ -473,14 +473,14 @@ export function PosSelect<T>({
                         if (!itemDisabled) commit(item);
                       }}
                       className={cn(
-                        "block w-full px-4 py-2 text-left text-sm text-gray-900 transition-colors",
+                        "block w-full px-3 py-2 text-left text-[13px] text-gray-900 transition-colors",
                         itemDisabled
                           ? "cursor-not-allowed text-gray-400"
                           : isSelected
-                            ? "bg-indigo-100 text-[#4F46E5]"
+                            ? "cursor-pointer bg-indigo-100 text-[#4F46E5]"
                             : isHighlighted
-                              ? "bg-indigo-50"
-                              : "hover:bg-indigo-50",
+                              ? "cursor-pointer bg-indigo-50"
+                              : "cursor-pointer hover:bg-indigo-50",
                       )}
                     >
                       <div>{renderItem(item)}</div>
