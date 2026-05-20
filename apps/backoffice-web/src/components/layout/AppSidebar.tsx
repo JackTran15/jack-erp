@@ -15,6 +15,7 @@ import {
 } from "@erp/ui";
 import {
   navConfig,
+  visibleNavConfig,
   activeModuleFor,
   isFlyoutEnabled,
   type NavChild,
@@ -29,7 +30,9 @@ import { MegaMenuPanel } from "./MegaMenuPanel";
 export function AppSidebar() {
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebar } = useLayout();
-  const activeModule = activeModuleFor(location.pathname, navConfig) ?? navConfig[0];
+  const filteredNav = visibleNavConfig();
+  const activeModule =
+    activeModuleFor(location.pathname, filteredNav) ?? filteredNav[0];
 
   const asideRef = useRef<HTMLElement>(null);
   const megaMenuPanelRef = useRef<HTMLDivElement>(null);
@@ -44,7 +47,7 @@ export function AppSidebar() {
 
   const openFlyoutModule =
     openFlyoutModuleId &&
-    navConfig.find((m) => m.id === openFlyoutModuleId && isFlyoutEnabled(m));
+    filteredNav.find((m) => m.id === openFlyoutModuleId && isFlyoutEnabled(m));
 
   useEffect(() => {
     if (!openFlyoutModuleId || !openFlyoutModule) return;
@@ -88,7 +91,7 @@ export function AppSidebar() {
       >
         <ScrollArea className="flex-1 py-2">
           <nav aria-label="Điều hướng chính">
-            {navConfig.map((module) => (
+            {filteredNav.map((module) => (
               <ModuleRow
                 key={module.id}
                 module={module}

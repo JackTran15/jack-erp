@@ -6,7 +6,7 @@ import {
   FormFieldProps,
 } from "@erp/ui";
 import type { EmployeeFormDraft } from "../employee.types";
-import { MOCK_JOB_POSITIONS } from "../employees.mock";
+const JOB_POSITIONS: { id: string; name: string }[] = [];
 
 interface EmployeeProfileFormTabProps {
   draft: EmployeeFormDraft;
@@ -37,7 +37,7 @@ export function EmployeeProfileFormTab({
           }
         >
           <option value="">— Chọn vị trí —</option>
-          {MOCK_JOB_POSITIONS.map((p) => (
+          {JOB_POSITIONS.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>

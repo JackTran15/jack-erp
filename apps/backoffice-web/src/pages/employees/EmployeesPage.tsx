@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  IAM_PERMISSION_KEYS,
+  type UserDetail,
+  type UserSummary,
+} from "@erp/shared-interfaces";
 import { DocumentListShell, PageToolbar, type ToolbarItem } from "@erp/ui";
 import { Copy, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +12,6 @@ import {
   type TableColumn,
 } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
-
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import {
   applyColumnFilter,
@@ -18,18 +22,25 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import type { Employee, EmployeeFormDraft } from "./employee.types";
-import { INITIAL_EMPLOYEES } from "./employees.mock";
+import { hasPermission } from "../../lib/permissions";
+import {
+  draftToUserUpdatePayload,
+  formatAccountStatus,
+  formatIamDateTime,
+  getIamErrorMessage,
+  joinFullName,
+  useCreateUser,
+  useDeactivateUser,
+  useRoles,
+  useUpdateUser,
+  useUser,
+  useUsers,
+  userDisplayCode,
+} from "../../hooks/iam";
+import type { EmployeeFormDraft } from "./employee.types";
 import {
   createEmptyDraft,
-  draftToEmployee,
-  employeeToDraft,
-  EMPLOYMENT_FILTER_OPTIONS,
-  formatEmployeeDate,
-  formatEmploymentStatus,
-  formatGender,
-  GENDER_FILTER_OPTIONS,
-  suggestNextEmployeeCode,
+  userDetailToEmployeeDraft,
 } from "./employee.mappers";
 import { EmployeeDetailPanel } from "./components/EmployeeDetailPanel";
 import {
@@ -37,16 +48,14 @@ import {
   type EmployeeFormMode,
 } from "./components/EmployeeFormModal";
 
-const FILTER_KEYS = [
-  "code",
-  "fullName",
-  "gender",
-  "birthDate",
-  "phone",
-  "employmentStatus",
-] as const;
-
+const FILTER_KEYS = ["code", "fullName", "email", "status"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "Tất cả" },
+  { value: "true", label: "Đang hoạt động" },
+  { value: "false", label: "Ngừng hoạt động" },
+];
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
@@ -58,20 +67,34 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   );
 }
 
-function matchesSelectFilter(rowValue: string, filterValue: string): boolean {
-  if (!filterValue) return true;
-  return rowValue === filterValue;
-}
+function resolveUserListQuery(
+  columnFilters: Record<FilterKey, ColumnFilter>,
+  pagination: PaginationStateDto,
+) {
+  const search =
+    columnFilters.email.value.trim() ||
+    columnFilters.fullName.value.trim() ||
+    columnFilters.code.value.trim() ||
+    undefined;
 
-function matchesDateFilter(rowValue: string, filterValue: string): boolean {
-  if (!filterValue) return true;
-  return rowValue.startsWith(filterValue);
+  let isActive: boolean | undefined;
+  const status = columnFilters.status.value;
+  if (status === "true") isActive = true;
+  if (status === "false") isActive = false;
+
+  return {
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    search,
+    isActive,
+  };
 }
 
 export function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>(() => [
-    ...INITIAL_EMPLOYEES,
-  ]);
+  const canRead = hasPermission(IAM_PERMISSION_KEYS.USER_READ);
+  const canWrite = hasPermission(IAM_PERMISSION_KEYS.USER_WRITE);
+  const canDelete = hasPermission(IAM_PERMISSION_KEYS.USER_DELETE);
+
   const [pagination, setPagination] =
     useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [columnFilters, setColumnFilters] =
@@ -81,214 +104,267 @@ export function EmployeesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<EmployeeFormMode>("create");
   const [formDraft, setFormDraft] = useState<EmployeeFormDraft>(() =>
-    createEmptyDraft(suggestNextEmployeeCode(INITIAL_EMPLOYEES)),
+    createEmptyDraft(),
   );
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<Employee | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
-  const filteredRows = useMemo(() => {
-    return employees.filter((row) => {
-      const checks: boolean[] = [
-        applyColumnFilter(toComparableText(row.code), columnFilters.code),
+  const listFilters = useMemo(
+    () => resolveUserListQuery(columnFilters, pagination),
+    [columnFilters, pagination],
+  );
+
+  const { data: listData, isLoading, isError, error, refetch } =
+    useUsers(listFilters);
+  const { data: roles = [] } = useRoles();
+  const { data: userDetail } = useUser(selectedId ?? undefined);
+  const { data: editUserDetail } = useUser(
+    formOpen && formMode === "edit" ? (editingId ?? undefined) : undefined,
+  );
+
+  const createUser = useCreateUser();
+  const updateUser = useUpdateUser(editingId ?? "");
+  const deactivateUser = useDeactivateUser();
+
+  const listRows = useMemo(() => {
+    const rows = listData?.data ?? [];
+    return rows.filter((row) => {
+      const checks = [
         applyColumnFilter(
-          toComparableText(row.fullName),
+          toComparableText(userDisplayCode(row)),
+          columnFilters.code,
+        ),
+        applyColumnFilter(
+          toComparableText(joinFullName(row.firstName, row.lastName)),
           columnFilters.fullName,
         ),
-        matchesSelectFilter(row.gender, columnFilters.gender.value),
-        matchesDateFilter(row.birthDate ?? "", columnFilters.birthDate.value),
-        applyColumnFilter(toComparableText(row.phone), columnFilters.phone),
-        matchesSelectFilter(
-          row.employmentStatus,
-          columnFilters.employmentStatus.value,
-        ),
+        applyColumnFilter(toComparableText(row.email), columnFilters.email),
       ];
       return checks.every(Boolean);
     });
-  }, [employees, columnFilters]);
+  }, [columnFilters, listData?.data]);
 
-  useEffect(() => {
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  }, [columnFilters]);
-
-  const total = filteredRows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
-  const page = Math.min(pagination.page, totalPages);
-
-  const pagedRows = useMemo(() => {
-    const start = (page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, page, pagination.pageSize]);
-
-  const selectedEmployee = useMemo(
-    () => employees.find((e) => e.id === selectedId) ?? null,
-    [employees, selectedId],
-  );
+  const selectedUser = useMemo((): UserDetail | UserSummary | null => {
+    if (!selectedId) return null;
+    if (userDetail?.id === selectedId) return userDetail;
+    return listRows.find((u) => u.id === selectedId) ?? null;
+  }, [listRows, selectedId, userDetail]);
 
   const openCreate = useCallback(() => {
     setFormMode("create");
     setEditingId(null);
-    setFormDraft(createEmptyDraft(suggestNextEmployeeCode(employees)));
+    setFormDraft(createEmptyDraft());
     setFormOpen(true);
-  }, [employees]);
+  }, []);
 
   const openEdit = useCallback(() => {
-    if (!selectedEmployee) {
+    if (!selectedId) {
       toast.error("Vui lòng chọn một nhân viên để sửa.");
       return;
     }
     setFormMode("edit");
-    setEditingId(selectedEmployee.id);
-    setFormDraft(employeeToDraft(selectedEmployee));
+    setEditingId(selectedId);
+    if (userDetail) {
+      setFormDraft(userDetailToEmployeeDraft(userDetail));
+    }
     setFormOpen(true);
-  }, [selectedEmployee]);
+  }, [selectedId, userDetail]);
 
   const openDuplicate = useCallback(() => {
-    if (!selectedEmployee) {
+    if (!userDetail) {
       toast.error("Vui lòng chọn một nhân viên để nhân bản.");
       return;
     }
-    const draft = employeeToDraft(selectedEmployee);
-    draft.basic.code = `${selectedEmployee.code}-copy`;
+    const draft = userDetailToEmployeeDraft(userDetail);
+    draft.basic.email = "";
+    draft.basic.password = "";
+    draft.basic.confirmPassword = "";
     setFormMode("create");
     setEditingId(null);
     setFormDraft(draft);
     setFormOpen(true);
-  }, [selectedEmployee]);
+  }, [userDetail]);
+
+  useEffect(() => {
+    if (editUserDetail && formOpen && formMode === "edit") {
+      setFormDraft(userDetailToEmployeeDraft(editUserDetail));
+    }
+  }, [editUserDetail, formMode, formOpen]);
 
   const handleReload = useCallback(() => {
-    setColumnFilters(emptyColumnFilters());
+    void refetch();
     setPagination((p) => ({ ...p, page: 1 }));
+    setColumnFilters(emptyColumnFilters());
     toast.success("Đã nạp lại dữ liệu");
-  }, []);
+  }, [refetch]);
 
-  const handleSave = useCallback(
-    (draft: EmployeeFormDraft, options: { keepOpen: boolean }) => {
-      const saved = draftToEmployee(draft, editingId ?? undefined);
-      setEmployees((prev) => {
-        const idx = prev.findIndex((e) => e.id === saved.id);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = saved;
-          return next;
-        }
-        return [...prev, saved];
-      });
-      setSelectedId(saved.id);
-      toast.success(
-        editingId ? "Đã cập nhật nhân viên." : "Đã thêm nhân viên mới.",
-      );
-
-      if (options.keepOpen) {
-        setFormMode("create");
-        setEditingId(null);
-        setFormDraft(
-          createEmptyDraft(suggestNextEmployeeCode([...employees, saved])),
-        );
-      } else {
-        setFormOpen(false);
-        setEditingId(null);
-      }
+  const handleColumnFilterValueChange = useCallback(
+    (key: string, value: string) => {
+      setColumnFilters((prev) => ({
+        ...prev,
+        [key as FilterKey]: { ...prev[key as FilterKey], value },
+      }));
+      setPagination((p) => ({ ...p, page: 1 }));
     },
-    [editingId, employees],
+    [],
   );
 
-  const handleDelete = useCallback(() => {
-    if (!confirmDelete) return;
-    setEmployees((prev) => prev.filter((e) => e.id !== confirmDelete.id));
-    setSelectedId((id) => (id === confirmDelete.id ? null : id));
-    setConfirmDelete(null);
-    toast.success("Đã xóa nhân viên.");
-  }, [confirmDelete]);
+  const handleColumnFilterModeChange = useCallback(
+    (key: string, mode: ColumnFilterMode) => {
+      setColumnFilters((prev) => ({
+        ...prev,
+        [key as FilterKey]: { ...prev[key as FilterKey], mode },
+      }));
+    },
+    [],
+  );
+
+  const handleSave = useCallback(
+    async (draft: EmployeeFormDraft) => {
+      try {
+        if (formMode === "create") {
+          const created = await createUser.mutateAsync(draft);
+          setSelectedId(created.id);
+          toast.success("Đã thêm người dùng mới.");
+        } else if (editingId) {
+          const previous = editUserDetail
+            ? {
+                roleIds: editUserDetail.roleIds,
+                branchIds: editUserDetail.branchIds,
+                isActive: editUserDetail.isActive,
+              }
+            : undefined;
+          const payload = draftToUserUpdatePayload(draft, previous);
+          await updateUser.mutateAsync(payload);
+          toast.success("Đã cập nhật người dùng.");
+        }
+
+        setFormOpen(false);
+        setEditingId(null);
+        void refetch();
+      } catch (err) {
+        toast.error(getIamErrorMessage(err, "Không lưu được người dùng."));
+      }
+    },
+    [createUser, editUserDetail, editingId, formMode, refetch, updateUser],
+  );
+
+  const handleDeactivate = useCallback(async () => {
+    if (!confirmDeactivate) return;
+    try {
+      await deactivateUser.mutateAsync(confirmDeactivate.id);
+      setSelectedId((id) =>
+        id === confirmDeactivate.id ? null : id,
+      );
+      setConfirmDeactivate(null);
+      toast.success("Đã ngừng hoạt động tài khoản.");
+    } catch (err) {
+      toast.error(getIamErrorMessage(err, "Không ngừng hoạt động được tài khoản."));
+    }
+  }, [confirmDeactivate, deactivateUser]);
 
   const toolbarItems: ToolbarItem[] = [
-    { id: "add", label: "Thêm mới", icon: Plus, onClick: openCreate },
+    {
+      id: "add",
+      label: "Thêm mới",
+      icon: Plus,
+      onClick: openCreate,
+      disabled: !canWrite,
+    },
     {
       id: "clone",
       label: "Nhân bản",
       icon: Copy,
       onClick: openDuplicate,
-      disabled: !selectedEmployee,
+      disabled: !selectedId || !canWrite,
     },
     {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
       onClick: openEdit,
-      disabled: !selectedEmployee,
+      disabled: !selectedId || !canWrite,
     },
     { id: "sep1", type: "separator" },
     {
       id: "delete",
-      label: "Xóa",
+      label: "Ngừng HĐ",
       icon: Trash2,
       variant: "danger",
-      onClick: () => selectedEmployee && setConfirmDelete(selectedEmployee),
-      disabled: !selectedEmployee,
+      onClick: () =>
+        selectedUser &&
+        setConfirmDeactivate({
+          id: selectedUser.id,
+          label: `${joinFullName(selectedUser.firstName, selectedUser.lastName)} (${selectedUser.email})`,
+        }),
+      disabled: !selectedUser || !canDelete,
     },
     { id: "sep2", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: handleReload },
   ];
 
-  const columns: TableColumn<Employee>[] = [
+  const columns: TableColumn<UserSummary>[] = [
     {
       key: "code",
-      label: "Mã nhân viên",
-      width: 140,
-      render: (row) => row.code,
+      label: "Mã / email",
+      width: 160,
+      render: (row) => userDisplayCode(row),
     },
     {
       key: "fullName",
-      label: "Tên nhân viên",
+      label: "Họ và tên",
       width: 200,
-      render: (row) => row.fullName,
+      render: (row) => joinFullName(row.firstName, row.lastName),
     },
     {
-      key: "gender",
-      label: "Giới tính",
-      width: 120,
-      filterKind: "select",
-      filterOptions: GENDER_FILTER_OPTIONS,
-      render: (row) => formatGender(row.gender),
+      key: "email",
+      label: "Email",
+      width: 220,
+      render: (row) => row.email,
     },
     {
-      key: "birthDate",
-      label: "Ngày sinh",
-      width: 130,
-      filterKind: "date",
-      render: (row) => formatEmployeeDate(row.birthDate),
-    },
-    {
-      key: "phone",
-      label: "Số điện thoại",
+      key: "status",
+      label: "Trạng thái",
       width: 140,
-      render: (row) => row.phone,
+      filterKind: "select",
+      filterOptions: STATUS_FILTER_OPTIONS,
+      render: (row) => formatAccountStatus(row.isActive),
     },
     {
-      key: "employmentStatus",
-      label: "Trạng thái làm việc",
-      width: 160,
-      filterKind: "select",
-      filterOptions: EMPLOYMENT_FILTER_OPTIONS,
-      render: (row) => formatEmploymentStatus(row.employmentStatus),
+      key: "lastLoginAt",
+      label: "Đăng nhập gần nhất",
+      width: 180,
+      filterKind: "none",
+      render: (row) => formatIamDateTime(row.lastLoginAt),
     },
   ];
 
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as FilterKey]: { ...prev[key as FilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
-        setColumnFilters((prev) => ({
-          ...prev,
-          [key as FilterKey]: { ...prev[key as FilterKey], value },
-        })),
+      onModeChange: handleColumnFilterModeChange,
+      onValueChange: handleColumnFilterValueChange,
     }),
-    [columnFilters],
+    [
+      columnFilters,
+      handleColumnFilterModeChange,
+      handleColumnFilterValueChange,
+    ],
   );
+
+  const total = listData?.total ?? 0;
+
+  if (!canRead) {
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        Bạn không có quyền xem danh sách nhân viên (
+        {IAM_PERMISSION_KEYS.USER_READ}).
+      </div>
+    );
+  }
 
   return (
     <>
@@ -303,7 +379,7 @@ export function EmployeesPage() {
         }
         pagination={
           <PaginationControls
-            page={page}
+            page={pagination.page}
             pageSize={pagination.pageSize}
             total={total}
             onPageChange={(p) =>
@@ -318,22 +394,30 @@ export function EmployeesPage() {
             }
           />
         }
-        detailPanel={<EmployeeDetailPanel employee={selectedEmployee} />}
+        detailPanel={
+          <EmployeeDetailPanel user={selectedUser} roles={roles} />
+        }
       >
+        {isError && (
+          <p className="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+            {getIamErrorMessage(error, "Không tải được danh sách nhân viên.")}
+          </p>
+        )}
         <BaseDataTable
           columns={columns}
-          rows={pagedRows}
-          loading={false}
+          rows={listRows}
+          loading={isLoading}
           emptyLabel="Chưa có nhân viên."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          columnFilterControl={columnFilterControl}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,
             cell: (row) => (
               <input
                 type="checkbox"
-                aria-label={`Chọn nhân viên ${row.fullName}`}
+                aria-label={`Chọn nhân viên ${joinFullName(row.firstName, row.lastName)}`}
                 checked={selectedId === row.id}
                 onChange={() =>
                   setSelectedId(selectedId === row.id ? null : row.id)
@@ -342,7 +426,6 @@ export function EmployeesPage() {
               />
             ),
           }}
-          columnFilterControl={columnFilterControl}
         />
       </DocumentListShell>
 
@@ -355,17 +438,17 @@ export function EmployeesPage() {
           setFormOpen(false);
           setEditingId(null);
         }}
-        onSave={handleSave}
+        onSave={(draft) => void handleSave(draft)}
       />
 
-      {confirmDelete && (
+      {confirmDeactivate && (
         <ConfirmActionModal
-          title="Xóa nhân viên"
-          message={`Xác nhận xóa nhân viên "${confirmDelete.fullName}" (${confirmDelete.code})?`}
-          confirmLabel="Xóa"
+          title="Ngừng hoạt động tài khoản"
+          message={`Xác nhận ngừng hoạt động tài khoản "${confirmDeactivate.label}"? Người dùng sẽ không đăng nhập được.`}
+          confirmLabel="Ngừng hoạt động"
           cancelLabel="Quay lại"
-          onCancel={() => setConfirmDelete(null)}
-          onConfirm={handleDelete}
+          onCancel={() => setConfirmDeactivate(null)}
+          onConfirm={() => void handleDeactivate()}
         />
       )}
     </>

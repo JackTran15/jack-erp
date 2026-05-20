@@ -1,20 +1,23 @@
 import { cn } from "@erp/ui";
-import type { Employee } from "../../employees/employee.types";
-import type { RoleRecord } from "../role-management.types";
+import type { RoleSummary, UserDetail } from "@erp/shared-interfaces";
 import { RoleUsersTab } from "./RoleUsersTab";
 
 interface RoleDetailPanelProps {
-  role: RoleRecord | null;
-  employees: Employee[];
+  role: RoleSummary | null;
+  users: UserDetail[];
+  usersLoading?: boolean;
+  canAssign?: boolean;
   onChoose: () => void;
-  onRemoveEmployee: (employee: Employee) => void;
+  onRemoveUser: (user: UserDetail) => void;
 }
 
 export function RoleDetailPanel({
   role,
-  employees,
+  users,
+  usersLoading = false,
+  canAssign = true,
   onChoose,
-  onRemoveEmployee,
+  onRemoveUser,
 }: RoleDetailPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col px-4 pt-3">
@@ -38,9 +41,11 @@ export function RoleDetailPanel({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <RoleUsersTab
-            employees={employees}
+            users={users}
+            loading={usersLoading}
+            canAssign={canAssign}
             onChoose={onChoose}
-            onRemove={onRemoveEmployee}
+            onRemove={onRemoveUser}
           />
         </div>
       )}

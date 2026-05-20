@@ -1,9 +1,6 @@
-import { useMemo, useState } from "react";
-import { Button, Input } from "@erp/ui";
-import { MoreHorizontal } from "lucide-react";
+import { FormField, cn } from "@erp/ui";
 import type { EmployeeFormDraft } from "../employee.types";
-import { MOCK_ROLES } from "../employees.mock";
-import { EmployeeRolePickerModal } from "./EmployeeRolePickerModal";
+import { useBranches, useRoles } from "../../../hooks/iam";
 
 interface EmployeeRolesFormTabProps {
   draft: EmployeeFormDraft;
@@ -14,25 +11,8 @@ export function EmployeeRolesFormTab({
   draft,
   onChange,
 }: EmployeeRolesFormTabProps) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const quickRoles = MOCK_ROLES.filter((r) => r.quickPick);
-
-  const selectedPickerLabels = useMemo(
-    () =>
-      MOCK_ROLES.filter((r) => draft.roleIds.includes(r.id) && r.category)
-        .map((r) => r.name)
-        .join(", "),
-    [draft.roleIds],
-  );
-
-  const pickerSelectedIds = useMemo(
-    () =>
-      draft.roleIds.filter((id) => {
-        const role = MOCK_ROLES.find((r) => r.id === id);
-        return Boolean(role?.category);
-      }),
-    [draft.roleIds],
-  );
+  const { data: roles = [], isLoading: rolesLoading } = useRoles();
+  const { data: branches = [], isLoading: branchesLoading } = useBranches();
 
   const toggleRole = (roleId: string, checked: boolean) => {
     const next = checked
@@ -41,65 +21,83 @@ export function EmployeeRolesFormTab({
     onChange({ ...draft, roleIds: [...new Set(next)] });
   };
 
-  const handlePickerConfirm = (pickerIds: string[]) => {
-    const quickPickIds = draft.roleIds.filter((id) =>
-      MOCK_ROLES.some((r) => r.id === id && r.quickPick),
-    );
-    onChange({
-      ...draft,
-      roleIds: [...new Set([...quickPickIds, ...pickerIds])],
-    });
+  const toggleBranch = (branchId: string, checked: boolean) => {
+    const current = draft.branchIds ?? [];
+    const next = checked
+      ? [...current, branchId]
+      : current.filter((id) => id !== branchId);
+    onChange({ ...draft, branchIds: [...new Set(next)] });
   };
 
-  const hasManageRole = useMemo(
-    () =>
-      ["role-admin", "role-chain"].some((roleId) =>
-        draft.roleIds.includes(roleId),
-      ),
-    [draft.roleIds],
-  );
-
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex gap-6">
-        {quickRoles.map((role) => (
-          <label key={role.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.roleIds.includes(role.id)}
-              onChange={(e) => toggleRole(role.id, e.target.checked)}
-            />
-            Vai trò {role.name}
-          </label>
-        ))}
-      </div>
+    <div className="space-y-6 p-4">
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">
+          VAI TRÒ HỆ THỐNG
+        </h3>
+        {rolesLoading ? (
+          <p className="text-sm text-muted-foreground">Đang tải vai trò…</p>
+        ) : roles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Chưa có vai trò.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {roles.map((role) => (
+              <label
+                key={role.id}
+                className={cn(
+                  "flex cursor-pointer items-start gap-2 rounded-md border p-3 text-sm",
+                  draft.roleIds.includes(role.id) && "border-primary bg-primary/5",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+                  checked={draft.roleIds.includes(role.id)}
+                  onChange={(e) => toggleRole(role.id, e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">{role.name}</span>
+                  {role.description && (
+                    <span className="mt-0.5 block text-muted-foreground">
+                      {role.description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </section>
 
-      {!hasManageRole && (
-        <div className="flex gap-1">
-          <Input
-            readOnly
-            placeholder="Chọn 1 hoặc nhiều vai trò"
-            value={selectedPickerLabels}
-            className="flex-1"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Chọn vai trò"
-            onClick={() => setPickerOpen(true)}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      <EmployeeRolePickerModal
-        open={pickerOpen}
-        selectedRoleIds={pickerSelectedIds}
-        onOpenChange={setPickerOpen}
-        onConfirm={handlePickerConfirm}
-      />
+      <section className="space-y-3">
+        <FormField label="Chi nhánh được truy cập">
+          {branchesLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Đang tải chi nhánh…
+            </p>
+          ) : branches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Chưa có chi nhánh.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {branches.map((branch) => (
+                <label
+                  key={branch.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={(draft.branchIds ?? []).includes(branch.id)}
+                    onChange={(e) =>
+                      toggleBranch(branch.id, e.target.checked)
+                    }
+                  />
+                  {branch.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </FormField>
+      </section>
     </div>
   );
 }
