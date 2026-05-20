@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { CustomerDetailTabKeyEnum } from "@erp/pos/constants/checkout.constant";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { useCustomer } from "@erp/pos/hooks/common/use-customer";
 import { useCustomerGroups } from "@erp/pos/hooks/page-hooks/checkout/use-customer-groups";
-import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerCreateDialog";
+import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
 import { InfoTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/InfoTab/InfoTab";
@@ -34,9 +34,9 @@ export interface CustomerDetailDialogProps {
   onChangeCard?: () => void;
   onRefreshPoints?: () => void;
   /**
-   * Fires after the user saves edits from the nested `CustomerCreateDialog`
-   * launched from the "Thông tin" tab. The parent typically forwards this to
-   * `pickCustomer` so the selected-customer chip refreshes with the new name.
+   * Fires after the user saves edits via the in-place `CustomerForm` on the
+   * "Thông tin" tab. The parent typically forwards this to `pickCustomer` so
+   * the selected-customer chip refreshes with the new name.
    */
   onCustomerUpdated?: (customer: CustomerRow) => void;
 }
@@ -44,6 +44,10 @@ export interface CustomerDetailDialogProps {
 interface FooterConfig {
   primaryLabel?: string;
   onPrimary?: () => void;
+  primaryDisabled?: boolean;
+  cancelLabel?: string;
+  /** Overrides the dialog-close default for the cancel button. */
+  onCancel?: () => void;
 }
 
 /**
@@ -55,9 +59,10 @@ interface FooterConfig {
  * Callers only need to supply `customerId` and optional fallback / callbacks.
  *
  * The "Thông tin" tab shows the record as plain text (mirroring the
- * `CustomerCreateDialog` layout). Its footer CTA "Sửa" opens a nested
- * `CustomerCreateDialog` in edit mode; on save the customer cache is
- * invalidated by `useUpdateCustomer`, so this dialog's preview refreshes.
+ * `CustomerCreateDialog` layout). Its footer CTA "Sửa" swaps the tab body
+ * for the shared `CustomerForm` (mode=edit) inline — no nested dialog.
+ * On save the customer cache is invalidated by `useUpdateCustomer`, so this
+ * dialog's preview refreshes automatically.
  */
 export function CustomerDetailDialog({
   open,
@@ -72,13 +77,21 @@ export function CustomerDetailDialog({
   onCustomerUpdated,
 }: CustomerDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<CustomerDetailTabKey>(initialTab);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [infoSubmitting, setInfoSubmitting] = useState(false);
+  const infoFormId = useId();
 
   const handleOpenReset = useCallback(() => {
     setActiveTab(initialTab);
-    setEditDialogOpen(false);
+    setIsEditingInfo(false);
+    setInfoSubmitting(false);
   }, [initialTab]);
   useDialogReset(open, handleOpenReset);
+
+  // Switching tabs always returns to view — don't carry edit state across tabs.
+  useEffect(() => {
+    setIsEditingInfo(false);
+  }, [activeTab]);
 
   // Skip the fetch while the dialog is closed so we don't spam the API as the
   // checkout page re-renders. TanStack Query dedups across consumers anyway.
@@ -109,68 +122,90 @@ export function CustomerDetailDialog({
     [customerId, data.code, data.name, data.phone, data.email],
   );
 
-  const handleEditSubmitted = useCallback(
+  const handleInfoSubmitted = useCallback(
     (c: CustomerRow) => {
-      setEditDialogOpen(false);
+      setIsEditingInfo(false);
       onCustomerUpdated?.(c);
     },
     [onCustomerUpdated],
   );
 
+  /**
+   * Submit the embedded edit form programmatically. We avoid wiring the
+   * footer button as native `type="submit"` because morphing it from "Sửa"
+   * (type=button) to "Lưu" (type=submit) on the same DOM element in the
+   * same commit can auto-fire the freshly-mounted form's submit handler
+   * under React 18 + Radix Dialog.
+   */
+  const handleSubmitInfo = useCallback(() => {
+    const form = document.getElementById(infoFormId);
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  }, [infoFormId]);
+
   const footer = footerForTab(activeTab, {
     onConfirm,
     onCollectDebt,
-    onStartEdit: () => setEditDialogOpen(true),
+    isEditingInfo,
+    infoSubmitting,
+    onStartEditInfo: () => setIsEditingInfo(true),
+    onCancelEditInfo: () => setIsEditingInfo(false),
+    onSubmitInfo: handleSubmitInfo,
   });
 
   return (
-    <>
-      <PosDialog open={open} onClose={onClose} width={1020}>
-        <PosDialog.Header title={`Khách hàng: ${data.name}`} />
-        <PosDialog.Body className="pt-1">
-          <CustomerDetailTabs activeTab={activeTab} onChange={setActiveTab} />
+    <PosDialog open={open} onClose={onClose} width={1020}>
+      <PosDialog.Header title={`Khách hàng: ${data.name}`} />
+      <PosDialog.Body className="pt-1">
+        <CustomerDetailTabs activeTab={activeTab} onChange={setActiveTab} />
 
-          <div className="flex-1 overflow-y-auto py-5">
-            {activeTab === CustomerDetailTabKeyEnum.OVERVIEW ? (
-              <OverviewTab
-                data={data}
-                onChangeCard={onChangeCard}
-                onRefreshPoints={onRefreshPoints}
+        <div className="flex-1 overflow-y-auto py-5">
+          {activeTab === CustomerDetailTabKeyEnum.OVERVIEW ? (
+            <OverviewTab
+              data={data}
+              onChangeCard={onChangeCard}
+              onRefreshPoints={onRefreshPoints}
+            />
+          ) : null}
+          {activeTab === CustomerDetailTabKeyEnum.INFO ? (
+            isEditingInfo ? (
+              <CustomerForm
+                mode="edit"
+                formId={infoFormId}
+                customer={editSeed}
+                onSubmitted={handleInfoSubmitted}
+                onSubmittingChange={setInfoSubmitting}
               />
-            ) : null}
-            {activeTab === CustomerDetailTabKeyEnum.INFO ? (
+            ) : (
               <InfoTab data={data} />
-            ) : null}
-            {activeTab === CustomerDetailTabKeyEnum.HISTORY ? (
-              <PurchaseHistoryTab rows={data.purchaseHistory ?? []} />
-            ) : null}
-            {activeTab === CustomerDetailTabKeyEnum.DEBT ? (
-              <DebtTab rows={data.debts ?? []} />
-            ) : null}
-          </div>
-        </PosDialog.Body>
-        <PosDialog.Footer
-          onSave={footer.onPrimary}
-          saveLabel={footer.primaryLabel}
-          onCancel={onClose}
-        />
-      </PosDialog>
-
-      <CustomerCreateDialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        mode="edit"
-        customer={editSeed}
-        onSubmitted={handleEditSubmitted}
+            )
+          ) : null}
+          {activeTab === CustomerDetailTabKeyEnum.HISTORY ? (
+            <PurchaseHistoryTab rows={data.purchaseHistory ?? []} />
+          ) : null}
+          {activeTab === CustomerDetailTabKeyEnum.DEBT ? (
+            <DebtTab rows={data.debts ?? []} />
+          ) : null}
+        </div>
+      </PosDialog.Body>
+      <PosDialog.Footer
+        onSave={footer.onPrimary}
+        saveLabel={footer.primaryLabel}
+        saveDisabled={footer.primaryDisabled}
+        cancelLabel={footer.cancelLabel}
+        onCancel={footer.onCancel ?? onClose}
       />
-    </>
+    </PosDialog>
   );
 }
 
 interface FooterCtx {
   onConfirm?: () => void;
   onCollectDebt?: () => void;
-  onStartEdit: () => void;
+  isEditingInfo: boolean;
+  infoSubmitting: boolean;
+  onStartEditInfo: () => void;
+  onCancelEditInfo: () => void;
+  onSubmitInfo: () => void;
 }
 
 function footerForTab(
@@ -183,7 +218,16 @@ function footerForTab(
         ? { primaryLabel: "Xác nhận", onPrimary: ctx.onConfirm }
         : {};
     case CustomerDetailTabKeyEnum.INFO:
-      return { primaryLabel: "Sửa", onPrimary: ctx.onStartEdit };
+      if (ctx.isEditingInfo) {
+        return {
+          primaryLabel: ctx.infoSubmitting ? "Đang lưu…" : "Lưu",
+          primaryDisabled: ctx.infoSubmitting,
+          onPrimary: ctx.onSubmitInfo,
+          cancelLabel: "Hủy",
+          onCancel: ctx.onCancelEditInfo,
+        };
+      }
+      return { primaryLabel: "Sửa", onPrimary: ctx.onStartEditInfo };
     case CustomerDetailTabKeyEnum.DEBT:
       return ctx.onCollectDebt
         ? { primaryLabel: "Thu nợ", onPrimary: ctx.onCollectDebt }
