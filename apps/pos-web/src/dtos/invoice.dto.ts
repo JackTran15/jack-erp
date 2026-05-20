@@ -1,4 +1,4 @@
-import type { ApiPaymentMethod } from "@erp/pos/types/invoice.type";
+import type { ApiPaymentMethod, InvoiceStatus } from "@erp/pos/types/invoice.type";
 
 /**
  * Một item trên payload tạo invoice. Mirror `CreateInvoiceItemDto` ở backend
@@ -41,4 +41,18 @@ export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
   revenueAccountId: string;
   receivableAccountId?: string;
+}
+
+/** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */
+export interface ListInvoicesParams {
+  customerId?: string;
+  status?: InvoiceStatus;
+  isDraft?: boolean;
+  branchId?: string;
+  /** ISO date — `issued_at ≥`. */
+  dateFrom?: string;
+  /** ISO date — `issued_at ≤`. */
+  dateTo?: string;
+  page?: number;
+  limit?: number;
 }

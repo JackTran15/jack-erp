@@ -18,6 +18,8 @@ import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.i
 
 export interface PurchaseHistoryTabProps {
   rows: PurchaseHistoryEntry[];
+  /** Hiển thị "Đang tải…" thay cho empty-state trong lúc fetch lịch sử. */
+  isLoading?: boolean;
 }
 
 const STATUS_FILTER_TO_STATUS: Record<
@@ -34,7 +36,10 @@ const STATUS_FILTER_TO_STATUS: Record<
  * pagination + grand-total footer. Filters are visual placeholders for now;
  * wire `onFilterChange` once a real query layer exists.
  */
-export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
+export function PurchaseHistoryTab({
+  rows,
+  isLoading,
+}: PurchaseHistoryTabProps) {
   const [statusFilter, setStatusFilter] =
     useState<PurchaseHistoryStatusFilterEnum>(
       PurchaseHistoryStatusFilterEnum.ALL,
@@ -161,7 +166,7 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
           columns={columns}
           dataSource={filtered}
           rowKey={(row) => row.id}
-          emptyText="Chưa có hóa đơn nào."
+          emptyText={isLoading ? "Đang tải…" : "Chưa có hóa đơn nào."}
           summaryRow={
             filtered.length > 0 ? (
               <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">

@@ -22,6 +22,8 @@ export const INVOICE_KEYS = {
 export const CUSTOMER_KEYS = {
   ALL: ["customers"] as const,
   DETAIL: (id: string) => ["customers", id] as const,
+  PURCHASE_HISTORY: (customerId: string) =>
+    ["customers", "purchase-history", customerId] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {
