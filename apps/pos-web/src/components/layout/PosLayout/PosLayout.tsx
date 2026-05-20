@@ -1,18 +1,10 @@
-import { cn } from "@erp/ui";
-import {
-  ComponentType,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { ComponentType, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import {
   BellIcon,
   GridIcon,
   IconProps,
-  PlusIcon,
   RefreshIcon,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosMenuPopover } from "./PosMenuPopover/PosMenuPopover";
@@ -23,7 +15,7 @@ import { PosUserMenu } from "./PosUserMenu/PosUserMenu";
 import { APP_MENU_ITEMS } from "@erp/pos/constants/pos-menu.constant";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
-import { InvoiceTab } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTab/InvoiceTab";
+import { InvoiceTabBar } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTabBar/InvoiceTabBar";
 import type {
   DraftInvoice,
   InvoiceTabItem,
@@ -34,6 +26,12 @@ import {
   writePinnedItems,
 } from "@erp/pos/lib/common/localstorage";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
+import { clearPosSession } from "@erp/pos/lib/common/posAuth";
+import {
+  PosNotificationPopover,
+  type NotificationItem,
+} from "./PosNotificationPopover/PosNotificationPopover";
+import { PosSyncDialog } from "./PosSyncDialog/PosSyncDialog";
 
 export interface PosMenuItem {
   id: string;
@@ -60,12 +58,29 @@ export function PosLayout() {
   const navigate = useNavigate();
 
   const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
 
   const [pinnedItems, setPinnedItems] =
     useState<PosMenuItem[]>(readPinnedItems);
   const appMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const notificationsTriggerRef = useRef<HTMLButtonElement>(null);
 
-  const branchName = usePosBranchStore((s) => s.branchName);
+  const notifications = useMemo<NotificationItem[]>(
+    () => [
+      {
+        id: "n1",
+        timestamp: "8:05 02/12/2024",
+        title: "MISA thông báo v/v khắc phục vấn đề gián đoạn dịch vụ",
+        description:
+          "MISA thông báo v/v khắc phục vấn đề gián đoạn dịch vụ",
+        read: false,
+      },
+    ],
+    [],
+  );
+
+  const clearBranch = usePosBranchStore((s) => s.clearBranch);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const setActiveSessionId = usePosCheckoutSessionStore(
@@ -184,6 +199,12 @@ export function PosLayout() {
     navigate(item.route);
   };
 
+  const handleLogout = () => {
+    clearPosSession();
+    clearBranch();
+    navigate("/dang-nhap", { replace: true });
+  };
+
   return (
     <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
       <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 h-12 gap-3 bg-white px-3">
@@ -207,35 +228,36 @@ export function PosLayout() {
         </div>
 
         {showInvoiceTabs && (
-          <nav
-            aria-label="Hóa đơn"
-            className="flex items-end gap-0.5 self-end pl-2"
-          >
-            {tabsWithBadges.map((tab) => (
-              <InvoiceTab
-                key={tab.id}
-                label={tab.label}
-                isActive={tab.id === activeSessionId}
-                isDraft={tab.isDraft}
-                badgeCount={tab.badgeCount}
-                onSelect={() => handleSelectTab(tab.id)}
-                onClose={() => handleCloseTab(tab.id)}
-              />
-            ))}
-            <PosIconButton
-              ariaLabel="Thêm hóa đơn"
-              icon={<PlusIcon size={16} />}
-              onClick={handleAddTab}
-              className="mb-1"
-            />
-          </nav>
+          <InvoiceTabBar
+            tabs={tabsWithBadges}
+            activeId={activeSessionId}
+            onSelect={handleSelectTab}
+            onClose={handleCloseTab}
+            onAdd={handleAddTab}
+          />
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          <PosLocationIndicator location={branchName ?? "Main brain"} />
-          <PosIconButton ariaLabel="Thông báo" icon={<BellIcon size={18} />} />
-          <PosIconButton ariaLabel="Đồng bộ" icon={<RefreshIcon size={18} />} />
-          <PosUserMenu name={cashierDisplayName ?? "Phan Thanh Hà"} />
+          <PosLocationIndicator />
+          <PosIconButton
+            ref={notificationsTriggerRef}
+            ariaLabel="Thông báo"
+            icon={<BellIcon size={18} />}
+            active={notificationsOpen}
+            aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
+            onClick={() => setNotificationsOpen((v) => !v)}
+          />
+          <PosIconButton
+            ariaLabel="Đồng bộ"
+            icon={<RefreshIcon size={18} />}
+            active={syncDialogOpen}
+            onClick={() => setSyncDialogOpen(true)}
+          />
+          <PosUserMenu
+            name={cashierDisplayName ?? "Phan Thanh Hà"}
+            onLogout={handleLogout}
+          />
           <PosIconButton
             ref={appMenuTriggerRef}
             ariaLabel="Menu ứng dụng"
@@ -270,6 +292,18 @@ export function PosLayout() {
         drafts={draftInvoices}
         onConfirm={handleRestoreDraft}
         onDelete={handleDeleteDraft}
+      />
+
+      <PosNotificationPopover
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        triggerRef={notificationsTriggerRef}
+        notifications={notifications}
+      />
+
+      <PosSyncDialog
+        open={syncDialogOpen}
+        onClose={() => setSyncDialogOpen(false)}
       />
 
       <Outlet />

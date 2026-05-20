@@ -10,6 +10,7 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { LocationEntity } from '../../inventory/location/location.entity';
 import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
@@ -24,6 +25,8 @@ export class InvoiceService {
     private readonly invoiceRepo: Repository<InvoiceEntity>,
     @InjectRepository(InvoiceItemEntity)
     private readonly itemRepo: Repository<InvoiceItemEntity>,
+    @InjectRepository(LocationEntity)
+    private readonly locationRepo: Repository<LocationEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -178,7 +181,7 @@ export class InvoiceService {
   async findOneWithItems(
     id: string,
     actor: ActorContext,
-  ): Promise<InvoiceEntity & { items: InvoiceItemEntity[] }> {
+  ): Promise<InvoiceEntity & { items: Array<InvoiceItemEntity & { location: LocationEntity | null }> }> {
     const invoice = await this.findOne(id, actor);
 
     const items = await this.itemRepo.find({
@@ -186,7 +189,9 @@ export class InvoiceService {
       order: { sortOrder: 'ASC' },
     });
 
-    return Object.assign(invoice, { items });
+    const itemsWithLocation = await this.attachLocations(items, actor);
+
+    return Object.assign(invoice, { items: itemsWithLocation });
   }
 
   async update(
@@ -295,8 +300,14 @@ export class InvoiceService {
   async findDrafts(
     sessionId: string,
     actor: ActorContext,
-  ): Promise<InvoiceEntity[]> {
-    return this.invoiceRepo.find({
+  ): Promise<
+    Array<
+      InvoiceEntity & {
+        items: Array<InvoiceItemEntity & { location: LocationEntity | null }>;
+      }
+    >
+  > {
+    const drafts = await this.invoiceRepo.find({
       where: {
         organizationId: actor.organizationId,
         sessionId,
@@ -304,5 +315,52 @@ export class InvoiceService {
       },
       order: { createdAt: 'DESC' },
     });
+
+    if (drafts.length === 0) return [];
+
+    const items = await this.itemRepo.find({
+      where: { invoiceId: In(drafts.map((d) => d.id)) },
+      order: { sortOrder: 'ASC' },
+    });
+
+    const itemsWithLocation = await this.attachLocations(items, actor);
+
+    const itemsByInvoice = new Map<
+      string,
+      Array<InvoiceItemEntity & { location: LocationEntity | null }>
+    >();
+    for (const item of itemsWithLocation) {
+      const bucket = itemsByInvoice.get(item.invoiceId) ?? [];
+      bucket.push(item);
+      itemsByInvoice.set(item.invoiceId, bucket);
+    }
+
+    return drafts.map((draft) =>
+      Object.assign(draft, { items: itemsByInvoice.get(draft.id) ?? [] }),
+    );
+  }
+
+  private async attachLocations(
+    items: InvoiceItemEntity[],
+    actor: ActorContext,
+  ): Promise<Array<InvoiceItemEntity & { location: LocationEntity | null }>> {
+    const locationIds = [
+      ...new Set(items.map((i) => i.locationId).filter((id): id is string => !!id)),
+    ];
+
+    const locationMap = new Map<string, LocationEntity>();
+    if (locationIds.length > 0) {
+      const locations = await this.locationRepo.findBy({
+        id: In(locationIds),
+        organizationId: actor.organizationId,
+      });
+      for (const loc of locations) locationMap.set(loc.id, loc);
+    }
+
+    return items.map((item) =>
+      Object.assign(item, {
+        location: item.locationId ? locationMap.get(item.locationId) ?? null : null,
+      }),
+    );
   }
 }

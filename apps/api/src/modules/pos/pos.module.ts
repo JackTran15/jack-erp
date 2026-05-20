@@ -23,6 +23,7 @@ import {
 } from './entities';
 import { CashAccountEntity } from '../accounting/cash/cash-account.entity';
 import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
+import { LocationEntity } from '../inventory/location/location.entity';
 import {
   PosSessionService,
   CheckoutService,
@@ -55,6 +56,7 @@ import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publis
       DebtPaymentEntity,
       CashAccountEntity,
       CashMovementEntity,
+      LocationEntity,
     ]),
     DocumentNumberingModule,
     StockLedgerModule,

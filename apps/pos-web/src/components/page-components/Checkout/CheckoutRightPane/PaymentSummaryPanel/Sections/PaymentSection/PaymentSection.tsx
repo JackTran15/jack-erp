@@ -8,8 +8,10 @@ import { KeepChangeRow } from "@erp/pos/components/page-components/Checkout/Chec
 import { PosPaymentMethodList } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { PaymentSummaryBlock } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/PaymentSummaryBlock/PaymentSummaryBlock";
 import { QrPaymentButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/QrPaymentButton/QrPaymentButton";
+import { LabelTagButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/LabelTagButton/LabelTagButton";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
+import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
@@ -39,6 +41,7 @@ export function PaymentSection({
     note,
     setNote,
   } = useCheckoutPayment();
+  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
 
   const amountDue = Math.max(0, total - deposit);
   const isRefundFlow = total < 0;
@@ -125,8 +128,9 @@ export function PaymentSection({
           rows={2}
         />
       </div>
-      <div className="px-4 py-3">
+      <div className="flex flex-col gap-2 px-4 py-3">
         <QrPaymentButton />
+        {preorder ? <LabelTagButton /> : null}
       </div>
     </>
   );
