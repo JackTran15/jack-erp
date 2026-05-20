@@ -9,6 +9,8 @@ export interface ToolbarAction {
   icon?: ComponentType<{ className?: string }>;
   onClick: () => void;
   disabled?: boolean;
+  /** Hover hint shown via native title attribute. Useful for disabled buttons. */
+  tooltip?: string;
   /** "danger" renders the button in destructive color */
   variant?: "default" | "danger";
 }
@@ -109,6 +111,7 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       type="button"
       onClick={action.onClick}
       disabled={action.disabled}
+      title={action.tooltip}
       className={cn(
         "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

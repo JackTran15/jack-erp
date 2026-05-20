@@ -3674,6 +3674,31 @@
         ]
       }
     },
+    "/inventory/locations/stock-items/batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_assignBatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAssignItemsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kết quả: { created, skipped }"
+          }
+        },
+        "summary": "Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items/{itemId}": {
       "delete": {
         "operationId": "InventoryLocationStockController_removeItemFromLocation",
@@ -3762,6 +3787,134 @@
           },
           {
             "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationCodeMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCodeMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quantity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "quantityOp",
             "required": false,
             "in": "query",
             "schema": {
@@ -3887,6 +4040,177 @@
         },
         "tags": [
           "StockLedger"
+        ]
+      }
+    },
+    "/inventory/stock/summary": {
+      "get": {
+        "operationId": "StockSummaryController_getSummary",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE on item.code or item.name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE on item.brand",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unit",
+            "required": false,
+            "in": "query",
+            "description": "Exact match on item.unit",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item.is_active (Trạng thái kinh doanh).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isPosVisible",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item.is_pos_visible (Trạng thái giao dịch).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stockState",
+            "required": false,
+            "in": "query",
+            "description": "Post-aggregate filter on SUM(quantity): IN_STOCK > 0, OUT_OF_STOCK = 0, NEGATIVE < 0, ALL = no filter.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "IN_STOCK",
+                "OUT_OF_STOCK",
+                "NEGATIVE"
+              ]
+            }
+          },
+          {
+            "name": "movementFrom",
+            "required": false,
+            "in": "query",
+            "description": "Filter rows with last_movement_at >= movementFrom (YYYY-MM-DD).",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "movementTo",
+            "required": false,
+            "in": "query",
+            "description": "Filter rows with last_movement_at <= movementTo end-of-day (YYYY-MM-DD).",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/stock/summary/filter-options": {
+      "get": {
+        "operationId": "StockSummaryController_getFilterOptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory"
         ]
       }
     },
@@ -5596,6 +5920,37 @@
         "responses": {
           "200": {
             "description": ""
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/intra-warehouse": {
+      "post": {
+        "operationId": "StockTransferController_createIntraWarehouseTransfer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -9596,6 +9951,37 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Lọc createdAt >= (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Lọc createdAt <= (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9637,6 +10023,44 @@
           "StockTake"
         ]
       },
+      "patch": {
+        "operationId": "StockTakeController_updateHeader",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStockTakeHeaderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
       "delete": {
         "operationId": "StockTakeController_cancel",
         "parameters": [
@@ -9659,7 +10083,76 @@
         ]
       }
     },
+    "/inventory/stock-takes/{id}/lines": {
+      "post": {
+        "operationId": "StockTakeController_addLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddStockTakeLineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeLineEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
     "/inventory/stock-takes/{id}/lines/{lineId}": {
+      "delete": {
+        "operationId": "StockTakeController_removeLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
       "patch": {
         "operationId": "StockTakeController_updateLine",
         "parameters": [
@@ -9707,9 +10200,9 @@
         ]
       }
     },
-    "/inventory/stock-takes/{id}/post": {
+    "/inventory/stock-takes/{id}/process": {
       "post": {
-        "operationId": "StockTakeController_post",
+        "operationId": "StockTakeController_process",
         "parameters": [
           {
             "name": "id",
@@ -10528,7 +11021,8 @@
               "RECEIVABLE",
               "PURCHASE_ORDER",
               "GOODS_ISSUE",
-              "GOODS_RECEIPT"
+              "GOODS_RECEIPT",
+              "STOCK_TAKE"
             ]
           },
           "branchId": {
@@ -10585,7 +11079,8 @@
               "RECEIVABLE",
               "PURCHASE_ORDER",
               "GOODS_ISSUE",
-              "GOODS_RECEIPT"
+              "GOODS_RECEIPT",
+              "STOCK_TAKE"
             ],
             "type": "string"
           },
@@ -10706,7 +11201,8 @@
               "RECEIVABLE",
               "PURCHASE_ORDER",
               "GOODS_ISSUE",
-              "GOODS_RECEIPT"
+              "GOODS_RECEIPT",
+              "STOCK_TAKE"
             ]
           },
           "branchId": {
@@ -12864,6 +13360,35 @@
         "type": "object",
         "properties": {}
       },
+      "BatchAssignItemRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId"
+        ]
+      },
+      "BatchAssignItemsDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchAssignItemRowDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -14274,6 +14799,57 @@
           "transferId",
           "itemId",
           "quantity"
+        ]
+      },
+      "IntraWarehouseTransferLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the inventory item"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Quantity to transfer (must be > 0)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes for this line"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateIntraWarehouseTransferDto": {
+        "type": "object",
+        "properties": {
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the source location"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the destination location (must be in same storage as source)"
+          },
+          "lines": {
+            "minItems": 1,
+            "description": "Lines to transfer",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntraWarehouseTransferLineDto"
+            }
+          }
+        },
+        "required": [
+          "sourceLocationId",
+          "destinationLocationId",
+          "lines"
         ]
       },
       "CreateAdjustmentDto": {
@@ -17455,9 +18031,62 @@
           }
         }
       },
+      "CreateStockTakeLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "countedQty": {
+            "type": "object",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
       "CreateStockTakeDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "plannedDate": {
+            "type": "string",
+            "description": "Kiểm kê đến ngày (YYYY-MM-DD)"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Mục đích kiểm kê"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận sau kiểm kê"
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateStockTakeLineDto"
+            }
+          }
+        }
       },
       "StockTakeEntity": {
         "type": "object",
@@ -17479,6 +18108,23 @@
           "locationId": {
             "type": "string"
           },
+          "purpose": {
+            "type": "string",
+            "description": "Mục đích — free-text purpose written by user on the form."
+          },
+          "plannedDate": {
+            "type": "string",
+            "description": "Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time)."
+          },
+          "countedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế — defaults to now() on create."
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận — conclusion text shown at the bottom of the form."
+          },
           "snapshotAt": {
             "format": "date-time",
             "type": "string"
@@ -17491,6 +18137,13 @@
             "type": "string"
           },
           "postedBy": {
+            "type": "string"
+          },
+          "generatedReceiptId": {
+            "type": "string",
+            "description": "IDs of the goods-receipt/goods-issue documents auto-generated by process()."
+          },
+          "generatedIssueId": {
             "type": "string"
           },
           "deletedAt": {
@@ -17569,6 +18222,10 @@
           "note": {
             "type": "string"
           },
+          "reason": {
+            "type": "string",
+            "description": "Nguyên nhân — reason text for the variance on this line."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -17603,9 +18260,54 @@
           "stockTake"
         ]
       },
+      "UpdateStockTakeHeaderDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận sau kiểm kê"
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
+          }
+        }
+      },
+      "AddStockTakeLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
       "UpdateLineCountDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "countedQty": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Nguyên nhân chênh lệch"
+          }
+        }
       },
       "CreateTransferOrderDto": {
         "type": "object",

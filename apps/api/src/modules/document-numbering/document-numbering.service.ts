@@ -199,7 +199,8 @@ export class DocumentNumberingService {
     // continuous numbering (e.g. "NK000001", "NK000002", ...) — no date segment, never reset
     const useContinuous =
       documentType === DocumentType.GOODS_RECEIPT ||
-      documentType === DocumentType.GOODS_ISSUE;
+      documentType === DocumentType.GOODS_ISSUE ||
+      documentType === DocumentType.STOCK_TAKE;
     const defaultRule = this.ruleRepo.create({
       organizationId: actor.organizationId,
       branchId: undefined,
@@ -245,6 +246,7 @@ export class DocumentNumberingService {
       [DocumentType.PURCHASE_ORDER]: 'PO',
       [DocumentType.GOODS_ISSUE]: 'GI',
       [DocumentType.GOODS_RECEIPT]: 'NK',
+      [DocumentType.STOCK_TAKE]: 'KK',
     };
 
     return prefixMap[documentType];

@@ -208,6 +208,114 @@ describe('StockLedgerService', () => {
         { itemId: 'item-1' },
       );
     });
+
+    describe('per-column filters', () => {
+      function createQbSpy() {
+        const qb: any = {
+          innerJoin: jest.fn().mockReturnThis(),
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          select: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          offset: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getRawMany: jest.fn().mockResolvedValue([]),
+          getCount: jest.fn().mockResolvedValue(0),
+        };
+        return qb;
+      }
+
+      it('test 1: locationCode equals filter applies exact match SQL', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          locationCode: '999.01',
+          locationCodeMode: 'equals',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('loc.code = :locationCode'),
+          expect.objectContaining({ locationCode: '999.01' }),
+        );
+      });
+
+      it('test 2: itemName contains filter applies ILIKE with wildcards (default mode)', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          itemName: 'AK078',
+          itemNameMode: 'contains',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('item.name ILIKE :itemName'),
+          expect.objectContaining({ itemName: '%AK078%' }),
+        );
+      });
+
+      it('test 3: quantity lte filter applies <= SQL', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          quantity: 0,
+          quantityOp: 'lte',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('sb.quantity <= :quantity'),
+          expect.objectContaining({ quantity: 0 }),
+        );
+      });
+
+      it('test 4: itemName notContains filter applies NOT ILIKE with wildcards', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          itemName: 'AK078',
+          itemNameMode: 'notContains',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('item.name NOT ILIKE :itemName'),
+          expect.objectContaining({ itemName: '%AK078%' }),
+        );
+      });
+
+      it('test 5: cross-org scoping is still applied when per-column filters are present', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          itemName: 'Widget',
+          itemNameMode: 'contains',
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.where).toHaveBeenCalledWith(
+          'sb.organization_id = :organizationId',
+          { organizationId: 'org-1' },
+        );
+      });
+    });
   });
 
   describe('reconstructBalance', () => {

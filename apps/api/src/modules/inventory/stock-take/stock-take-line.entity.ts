@@ -40,6 +40,10 @@ export class StockTakeLineEntity {
   @Column({ type: 'text', nullable: true })
   note?: string;
 
+  /** Nguyên nhân — reason text for the variance on this line. */
+  @Column({ type: 'text', nullable: true })
+  reason?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

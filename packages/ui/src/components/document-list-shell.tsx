@@ -6,6 +6,8 @@ export interface DocumentListShellProps {
   title: React.ReactNode;
   /** Horizontal sub-page navigation. Render a <PageTabBar /> here. */
   tabs?: React.ReactNode;
+  /** Right-aligned actions in the title row (e.g. branch selector). */
+  headerActions?: React.ReactNode;
   /** Action toolbar (Thêm mới, Sửa, Xóa, ...). Render a <PageToolbar /> here. */
   toolbar?: React.ReactNode;
   /** Period filter row (preset dropdown + từ-ngày/đến-ngày + Lấy dữ liệu). */
@@ -38,6 +40,7 @@ const MIN_TABLE_AREA_PX = 120;
 export function DocumentListShell({
   title,
   tabs,
+  headerActions,
   toolbar,
   filters,
   children,
@@ -106,6 +109,11 @@ export function DocumentListShell({
       <div className="flex shrink-0 items-center gap-6 border-b px-4 py-2">
         <h1 className="text-base font-semibold">{title}</h1>
         {tabs ? <div className="min-w-0 flex-1">{tabs}</div> : null}
+        {headerActions ? (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {headerActions}
+          </div>
+        ) : null}
       </div>
       {toolbar ? <div className="shrink-0 border-b">{toolbar}</div> : null}
       {filters ? (
