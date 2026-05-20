@@ -16,6 +16,7 @@ import { RequirePermission, RequireBranchScope } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { InvoiceService } from '../services/invoice.service';
 import { CheckoutInvoiceService } from '../services/checkout-invoice.service';
 import { CancelInvoiceService } from '../services/cancel-invoice.service';
@@ -25,6 +26,7 @@ import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { CancelInvoiceDto } from '../dto/cancel-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
+import { DraftInvoiceResponseDto } from '../dto/draft-invoice.response.dto';
 import { DebtStatus } from '../entities/invoice-debt.entity';
 import { DebtPaymentMethod } from '../entities/debt-payment.entity';
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
@@ -77,6 +79,7 @@ export class InvoiceController {
 
   @Get('drafts')
   @RequirePermission('pos.invoice.read')
+  @ApiOkResponse({ type: [DraftInvoiceResponseDto] })
   findDrafts(
     @Query('session_id') sessionId: string,
     @Actor() actor: ActorContext,
