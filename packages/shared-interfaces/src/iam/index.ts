@@ -45,6 +45,8 @@ export interface UserSummary {
 export interface UserDetail extends UserSummary {
   roleIds: string[];
   branchIds: string[];
+  /** HR profile (1:1). Null when the user has no employee profile yet. */
+  profile?: EmployeeProfileView | null;
 }
 
 export interface CreateUserRequest {
@@ -57,12 +59,16 @@ export interface CreateUserRequest {
   roleIds?: string[];
   /** Optional initial branch assignments. */
   branchIds?: string[];
+  /** Optional HR profile persisted alongside the user account. */
+  profile?: EmployeeProfilePayload;
 }
 
 export interface UpdateUserRequest {
   firstName?: string;
   lastName?: string;
   isActive?: boolean;
+  /** HR profile to upsert. Child collections (addresses/schedule) fully replace the existing set. */
+  profile?: EmployeeProfilePayload;
 }
 
 export interface ResetUserPasswordRequest {
@@ -76,6 +82,158 @@ export interface UserListQuery {
   search?: string;
   /** Pass as `"true"` / `"false"` on the wire. */
   isActive?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Employee HR profile (1:1 with a user; surfaced through the /admin/users API)
+// ---------------------------------------------------------------------------
+
+export enum EmployeeGender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+}
+
+export enum MaritalStatus {
+  SINGLE = 'SINGLE',
+  MARRIED = 'MARRIED',
+}
+
+export enum EmploymentStatus {
+  OFFICIAL = 'OFFICIAL',
+  PROBATION = 'PROBATION',
+  RESIGNED = 'RESIGNED',
+}
+
+export enum EmployeeAccessMode {
+  FREE = 'FREE',
+  SCHEDULED = 'SCHEDULED',
+}
+
+export enum Weekday {
+  MONDAY = 'MONDAY',
+  TUESDAY = 'TUESDAY',
+  WEDNESDAY = 'WEDNESDAY',
+  THURSDAY = 'THURSDAY',
+  FRIDAY = 'FRIDAY',
+  SATURDAY = 'SATURDAY',
+  SUNDAY = 'SUNDAY',
+}
+
+export enum EmployeeAddressType {
+  /** Permanent residence (hộ khẩu thường trú). */
+  PERMANENT = 'PERMANENT',
+  /** Current residence (chỗ ở hiện tại). */
+  CURRENT = 'CURRENT',
+}
+
+export interface EmployeeAddressPayload {
+  type: EmployeeAddressType;
+  address?: string;
+  country?: string;
+  province?: string;
+  district?: string;
+  ward?: string;
+}
+
+export interface EmployeeEmergencyContactPayload {
+  fullName?: string;
+  relationship?: string;
+  mobile?: string;
+  homePhone?: string;
+  email?: string;
+  address?: string;
+}
+
+export interface EmployeeAccessScheduleDayPayload {
+  weekday: Weekday;
+  enabled: boolean;
+  /** "HH:mm" local time. */
+  startTime: string;
+  /** "HH:mm" local time. */
+  endTime: string;
+}
+
+/** Reference to a job position, returned inline on the employee profile. */
+export interface JobPositionRef {
+  id: string;
+  name: string;
+}
+
+export interface EmployeeProfilePayload {
+  /** Employee code, unique per organization (e.g. NV000002). */
+  code: string;
+  mobile?: string;
+  homePhone?: string;
+  idCardNumber?: string;
+  idCardIssuePlace?: string;
+  /** ISO date (YYYY-MM-DD). */
+  idCardIssueDate?: string;
+  birthDate?: string;
+  gender?: EmployeeGender;
+  maritalStatus?: MaritalStatus;
+  employmentStatus?: EmploymentStatus;
+  photoUrl?: string;
+  jobPositionId?: string;
+  probationDate?: string;
+  officialDate?: string;
+  salary?: number;
+  deposit?: number;
+  originalDocumentsNote?: string;
+  accessMode?: EmployeeAccessMode;
+  addresses?: EmployeeAddressPayload[];
+  emergencyContact?: EmployeeEmergencyContactPayload;
+  accessSchedule?: EmployeeAccessScheduleDayPayload[];
+}
+
+export interface EmployeeAddressView {
+  type: EmployeeAddressType;
+  address: string | null;
+  country: string | null;
+  province: string | null;
+  district: string | null;
+  ward: string | null;
+}
+
+export interface EmployeeEmergencyContactView {
+  fullName: string | null;
+  relationship: string | null;
+  mobile: string | null;
+  homePhone: string | null;
+  email: string | null;
+  address: string | null;
+}
+
+export interface EmployeeAccessScheduleDayView {
+  weekday: Weekday;
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+export interface EmployeeProfileView {
+  code: string;
+  mobile: string | null;
+  homePhone: string | null;
+  idCardNumber: string | null;
+  idCardIssuePlace: string | null;
+  idCardIssueDate: string | null;
+  birthDate: string | null;
+  gender: EmployeeGender | null;
+  maritalStatus: MaritalStatus | null;
+  employmentStatus: EmploymentStatus;
+  photoUrl: string | null;
+  jobPositionId: string | null;
+  /** Inline job position (id + name); null when unset. */
+  jobPosition: JobPositionRef | null;
+  probationDate: string | null;
+  officialDate: string | null;
+  salary: number;
+  deposit: number;
+  originalDocumentsNote: string | null;
+  accessMode: EmployeeAccessMode;
+  addresses: EmployeeAddressView[];
+  emergencyContact: EmployeeEmergencyContactView | null;
+  accessSchedule: EmployeeAccessScheduleDayView[];
 }
 
 // ---------------------------------------------------------------------------

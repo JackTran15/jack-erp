@@ -1,35 +1,15 @@
 import type { RoleSummary } from "@erp/shared-interfaces";
+import {
+  EmployeeGender as GenderEnum,
+  EmploymentStatus as EmploymentStatusEnum,
+  MaritalStatus as MaritalStatusEnum,
+  EmployeeAccessMode as AccessModeEnum,
+  Weekday as WeekdayEnum,
+} from "@erp/shared-interfaces";
 
-export enum GenderEnum {
-  MALE = "MALE",
-  FEMALE = "FEMALE",
-}
-
-export enum EmploymentStatusEnum {
-  OFFICIAL = "OFFICIAL",
-  PROBATION = "PROBATION",
-  RESIGNED = "RESIGNED",
-}
-
-export enum MaritalStatusEnum {
-  SINGLE = "SINGLE",
-  MARRIED = "MARRIED",
-}
-
-export enum AccessModeEnum {
-  FREE = "FREE",
-  SCHEDULED = "SCHEDULED",
-}
-
-export enum WeekdayEnum {
-  MONDAY = "MONDAY",
-  TUESDAY = "TUESDAY",
-  WEDNESDAY = "WEDNESDAY",
-  THURSDAY = "THURSDAY",
-  FRIDAY = "FRIDAY",
-  SATURDAY = "SATURDAY",
-  SUNDAY = "SUNDAY",
-}
+// Re-export the IAM/HR enums under the names the employee UI components already use,
+// so the form draft stays in sync with the API contract (CreateUserRequest.profile).
+export { GenderEnum, EmploymentStatusEnum, MaritalStatusEnum, AccessModeEnum, WeekdayEnum };
 
 export interface AccessScheduleDay {
   weekday: WeekdayEnum;

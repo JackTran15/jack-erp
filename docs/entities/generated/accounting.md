@@ -49,6 +49,7 @@ Total entities: **10**
 | Property | DB Column | Type | Constraints | Description |
 |----------|-----------|------|-------------|-------------|
 | `name` | `name` | `varchar` | NN | Display name (e.g. Register 1, Petty Cash) |
+| `type` | `type` | `enum` | NN, default: CashAccountType.REGISTER | REGISTER=két quầy POS, SAFE=két chính chi nhánh, PETTY_CASH=quỹ lẻ |
 | `balance` | `balance` | `numeric` | NN, default: 0 | Current cash balance; updated in real-time with each movement |
 | `accountId` | `account_id` | `uuid` | NN | Corresponding general ledger account in the COA |
 
@@ -64,19 +65,25 @@ Total entities: **10**
 ### Indexes
 - `'idx_cash_movement_account', ['cashAccountId']`
 - `'idx_cash_movement_org_branch', ['organizationId', 'branchId']`
+- `'idx_cash_movement_to_account', ['toAccountId']`
+- `'idx_cash_movement_session', ['sessionId']`
 
 ### Columns
 
 | Property | DB Column | Type | Constraints | Description |
 |----------|-----------|------|-------------|-------------|
-| `cashAccountId` | `cash_account_id` | `uuid` | NN | The cash account affected |
+| `cashAccountId` | `cash_account_id` | `uuid` | NN | The cash account affected (source for TRANSFER) |
+| `toAccountId` | `to_account_id` | `uuid` | - | Destination cash account when type=TRANSFER |
 | `type` | `type` | `enum` | NN | Nature of the cash movement (DEPOSIT, WITHDRAWAL, TRANSFER, ADJUSTMENT) |
 | `amount` | `amount` | `numeric` | NN | Movement amount (always positive; direction determined by type) |
 | `reference` | `reference` | `varchar` | - | External reference (receipt number, bank slip, etc.) |
 | `notes` | `notes` | `text` | - | Free-text notes |
+| `sessionId` | `session_id` | `uuid` | - | POS session that recorded this movement, if any |
 
 ### Relations
 - `ManyToOne` `cashAccount` → `CashAccountEntity`
+- `ManyToOne` `toAccount` → `CashAccountEntity`
+- `ManyToOne` `session` → `PosSessionEntity`
 
 ---
 

@@ -111,12 +111,13 @@ export function EmployeeBasicInfoTab({
     <div className="space-y-3 p-4">
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         <div className="space-y-3">
-          <FormField label="Mã / email đăng nhập" {...fieldProps}>
+          <FormField label="Mã nhân viên" required {...fieldProps}>
             <Input
               value={basic.code}
-              readOnly
-              placeholder="Tự sinh từ email"
-              className="bg-muted/40"
+              placeholder="VD: NV000002"
+              onChange={(e) =>
+                onChange(setBasic(draft, { code: e.target.value }))
+              }
             />
           </FormField>
           <FormField label="Email đăng nhập" required {...fieldProps}>
@@ -133,9 +134,7 @@ export function EmployeeBasicInfoTab({
           <FormField label="ĐT di động" {...fieldProps}>
             <Input
               value={basic.mobile}
-              readOnly
-              placeholder="Sắp có — HR"
-              className="bg-muted/40"
+              placeholder="VD: 0900000000"
               onChange={(e) =>
                 onChange(setBasic(draft, { mobile: e.target.value }))
               }

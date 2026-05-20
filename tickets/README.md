@@ -171,3 +171,35 @@ flowchart LR
   T67 --> T69
 ```
 
+## EPIC-20052026 Quản lý Nhân viên & Hồ sơ nhân sự (Employee HR Profile)
+
+- [EPIC-20052026 Employee HR Profile](./epics/EPIC-20052026-employee-hr-management.md)
+- Mở rộng DB + API backend để lưu/đọc dữ liệu HR mà FE (`pages/employees/`, modal 5 tab) đã thu thập sẵn; gỡ readonly 3 tab HR.
+
+| Ticket | Mô tả |
+|---|---|
+| TKT-EMP-01 | Migration: 5 bảng (`job_positions`, `employee_profiles`, `employee_addresses`, `employee_emergency_contacts`, `employee_access_schedules`) + enums + index/unique |
+| TKT-EMP-02 | shared-interfaces: enums HR + `EmployeeProfilePayload`/`EmployeeProfileView`; mở rộng `CreateUserRequest`/`UpdateUserRequest`/`UserDetail` |
+| TKT-EMP-03 | Entities + `job_positions` đăng ký `EntityRegistryService` + permissions seed `hr.job_position.*` |
+| TKT-EMP-04 | DTO `EmployeeProfileDto` + mở rộng `UsersService.create/update/findById` (transaction, validate, inline jobPosition) + unit test |
+| TKT-EMP-05 | `pnpm openapi:generate` + commit api-client snapshot |
+| TKT-EMP-06 | FE wiring `user-form.ts` + `employee.mappers.ts`; enable field code/mobile |
+| TKT-EMP-07 | FE gỡ readonly 3 tab HR + dropdown vị trí công việc + detail panel |
+| TKT-EMP-08 | E2E employee flow + docs |
+
+### Ticket dependency graph (EPIC-20052026)
+
+```mermaid
+flowchart LR
+  E1["TKT-EMP-01 Migration"] --> E3["TKT-EMP-03 Entities + jobPos CRUD"]
+  E2["TKT-EMP-02 shared-interfaces"] --> E4["TKT-EMP-04 Service + DTO"]
+  E1 --> E4
+  E3 --> E4
+  E4 --> E5["TKT-EMP-05 openapi:generate"]
+  E5 --> E6["TKT-EMP-06 FE mappers"]
+  E3 --> E7["TKT-EMP-07 FE tabs + dropdown"]
+  E6 --> E7
+  E4 --> E8["TKT-EMP-08 E2E + docs"]
+  E7 --> E8
+```
+

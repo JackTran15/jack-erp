@@ -417,6 +417,514 @@
         ]
       }
     },
+    "/admin/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "operationId": "UsersController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/admin/users/{id}/reset-password": {
+      "post": {
+        "operationId": "UsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/admin/users/{id}/roles": {
+      "get": {
+        "operationId": "UsersController_getUserRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_setUserRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserRolesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replaces the entire role set for the user.",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/admin/users/{id}/branches": {
+      "get": {
+        "operationId": "UsersController_getUserBranches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_setUserBranches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserBranchesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replaces the entire branch assignment set for the user.",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/admin/roles": {
+      "get": {
+        "operationId": "RolesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      },
+      "post": {
+        "operationId": "RolesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/admin/roles/{id}": {
+      "get": {
+        "operationId": "RolesController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      },
+      "patch": {
+        "operationId": "RolesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      },
+      "delete": {
+        "operationId": "RolesController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/admin/roles/{id}/permissions": {
+      "put": {
+        "operationId": "RolesController_setPermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRolePermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replaces the entire permission set for the role.",
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/admin/permissions": {
+      "get": {
+        "operationId": "PermissionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Returns the catalogue of permission keys, both as a flat list and grouped by module.",
+        "tags": [
+          "Permissions"
+        ]
+      }
+    },
     "/organizations": {
       "post": {
         "operationId": "OrganizationController_create",
@@ -10487,6 +10995,398 @@
       }
     },
     "schemas": {
+      "EmployeeAddressDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "PERMANENT",
+              "CURRENT"
+            ],
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "province": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "district": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "ward": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "EmployeeEmergencyContactDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "relationship": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "mobile": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "homePhone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "EmployeeAccessScheduleDayDto": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "enum": [
+              "MONDAY",
+              "TUESDAY",
+              "WEDNESDAY",
+              "THURSDAY",
+              "FRIDAY",
+              "SATURDAY",
+              "SUNDAY"
+            ],
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "startTime": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "17:30"
+          }
+        },
+        "required": [
+          "weekday",
+          "enabled",
+          "startTime",
+          "endTime"
+        ]
+      },
+      "EmployeeProfileDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Employee code, unique per organization (e.g. NV000002)"
+          },
+          "mobile": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "homePhone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "idCardNumber": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "idCardIssuePlace": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "idCardIssueDate": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD"
+          },
+          "birthDate": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD"
+          },
+          "gender": {
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ],
+            "type": "string"
+          },
+          "maritalStatus": {
+            "enum": [
+              "SINGLE",
+              "MARRIED"
+            ],
+            "type": "string"
+          },
+          "employmentStatus": {
+            "enum": [
+              "OFFICIAL",
+              "PROBATION",
+              "RESIGNED"
+            ],
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "jobPositionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "probationDate": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD"
+          },
+          "officialDate": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD"
+          },
+          "salary": {
+            "type": "number",
+            "minimum": 0
+          },
+          "deposit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "originalDocumentsNote": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "accessMode": {
+            "enum": [
+              "FREE",
+              "SCHEDULED"
+            ],
+            "type": "string"
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeeAddressDto"
+            }
+          },
+          "emergencyContact": {
+            "$ref": "#/components/schemas/EmployeeEmergencyContactDto"
+          },
+          "accessSchedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeeAccessScheduleDayDto"
+            }
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "description": "Temporary password set by the administrator; user is expected to change it on first login.",
+            "minLength": 8,
+            "maxLength": 72
+          },
+          "roleIds": {
+            "description": "Optional initial roles to assign on creation.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "branchIds": {
+            "description": "Optional initial branch assignments.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "profile": {
+            "description": "Optional HR profile persisted alongside the user account.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeProfileDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "temporaryPassword"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "profile": {
+            "description": "HR profile to upsert. Provided child collections fully replace the existing set.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeProfileDto"
+              }
+            ]
+          }
+        }
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "newTemporaryPassword": {
+            "type": "string",
+            "description": "New temporary password the administrator wants to set for the user.",
+            "minLength": 8,
+            "maxLength": 72
+          }
+        },
+        "required": [
+          "newTemporaryPassword"
+        ]
+      },
+      "SetUserRolesDto": {
+        "type": "object",
+        "properties": {
+          "roleIds": {
+            "description": "Replaces the entire role set for the user with this list.",
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "roleIds"
+        ]
+      },
+      "SetUserBranchesDto": {
+        "type": "object",
+        "properties": {
+          "branchIds": {
+            "description": "Replaces the entire branch assignment set for the user with this list.",
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "branchIds"
+        ]
+      },
+      "CreateRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "permissionKeys": {
+            "description": "Permission keys to attach when the role is created. May be empty.",
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "SetRolePermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissionKeys": {
+            "description": "Replaces the entire permission set for the role with this list.",
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "permissionKeys"
+        ]
+      },
       "CreateOrganizationDto": {
         "type": "object",
         "properties": {

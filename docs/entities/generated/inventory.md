@@ -2,7 +2,7 @@
 
 Generated from `docs/entities/entity-manifest.json`.
 
-Total entities: **24**
+Total entities: **37**
 
 ---
 
@@ -22,8 +22,12 @@ Total entities: **24**
 |----------|-----------|------|-------------|-------------|
 | `documentNumber` | `document_number` | `varchar` | - | Auto-generated on posting |
 | `locationId` | `location_id` | `uuid` | NN | Source storage location |
-| `reason` | `reason` | `varchar` | NN | Reason for issuance (e.g. bán hàng, nội bộ, mẫu) |
+| `providerId` | `provider_id` | `uuid` | - | FK to providers — the "Đối tượng" counterparty (NCC/đối tác) |
+| `reason` | `reason` | `varchar` | NN | Denormalized reason text (auto-filled from reasonRef.name or targetBranch.name) |
+| `reasonId` | `reason_id` | `uuid` | - | FK to issue_reasons — required for purpose=OTHER\|DISPOSAL |
+| `targetBranchId` | `target_branch_id` | `uuid` | - | FK to branches — required for purpose=TRANSFER_OUT |
 | `status` | `status` | `enum` | NN, default: GoodsIssueStatus.DRAFT | - |
+| `purpose` | `purpose` | `enum` | NN, default: GoodsIssuePurpose.OTHER | Mục đích xuất kho: OTHER \| SALE \| TRANSFER_OUT \| DISPOSAL |
 | `notes` | `notes` | `varchar` | - | Free-text notes |
 | `approvedBy` | `approved_by` | `uuid` | - | - |
 | `approvedAt` | `approved_at` | `timestamptz` | - | - |
@@ -31,6 +35,10 @@ Total entities: **24**
 | `postedAt` | `posted_at` | `timestamptz` | - | - |
 
 ### Relations
+- `ManyToOne` `location` → `LocationEntity`
+- `ManyToOne` `provider` → `ProviderEntity`
+- `ManyToOne` `reasonRef` → `IssueReasonEntity`
+- `ManyToOne` `targetBranch` → `BranchEntity`
 - `OneToMany` `lines` → `GoodsIssueLineEntity`
 
 ---
@@ -50,10 +58,85 @@ Total entities: **24**
 | `goodsIssueId` | `goods_issue_id` | `uuid` | NN | Parent goods issue document |
 | `itemId` | `item_id` | `uuid` | NN | Item being issued from stock |
 | `quantity` | `quantity` | `numeric` | NN | Quantity to issue (always positive) |
+| `unitPrice` | `unit_price` | `numeric` | NN, default: 0 | - |
+| `lineTotal` | `line_total` | `numeric` | NN, default: 0 | - |
 | `notes` | `notes` | `varchar` | - | Per-line notes |
 
 ### Relations
 - `ManyToOne` `goodsIssue` → `GoodsIssueEntity`
+- `ManyToOne` `item` → `ItemEntity`
+
+---
+
+## GoodsReceiptEntity
+
+- **Table:** `goods_receipts`
+- **Source:** `apps/api/src/modules/inventory/goods-receipt/goods-receipt.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Phiếu nhập kho — goods receipt. State: DRAFT → POSTED → (REVERSED) | CANCELLED.
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `documentNumber` | `document_number` | `varchar` | - | Auto-generated on post (PNK-YY-####) |
+| `status` | `status` | `enum` | NN, default: GoodsReceiptStatus.DRAFT | - |
+| `purpose` | `purpose` | `enum` | NN, default: GoodsReceiptPurpose.OTHER | - |
+| `providerId` | `provider_id` | `uuid` | - | - |
+| `deliveredBy` | `delivered_by` | `varchar` | - | - |
+| `reason` | `reason` | `varchar` | - | - |
+| `description` | `description` | `varchar` | - | - |
+| `referenceId` | `reference_id` | `uuid` | - | - |
+| `referenceType` | `reference_type` | `enum` | - | - |
+| `sourceBranchId` | `source_branch_id` | `varchar` | - | - |
+| `receivedAt` | `received_at` | `timestamptz` | NN | - |
+| `locationId` | `location_id` | `uuid` | NN | - |
+| `attachmentIds` | `attachment_ids` | `jsonb` | NN, default: () => "'[]'::jsonb" | - |
+| `cashPaymentId` | `cash_payment_id` | `uuid` | - | - |
+| `cashReceiptId` | `cash_receipt_id` | `uuid` | - | - |
+| `postedAt` | `posted_at` | `timestamptz` | - | - |
+| `postedBy` | `posted_by` | `uuid` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `GoodsReceiptLineEntity`
+- `ManyToOne` `provider` → `ProviderEntity`
+- `ManyToOne` `location` → `LocationEntity`
+
+---
+
+## GoodsReceiptLineEntity
+
+- **Table:** `goods_receipt_lines`
+- **Source:** `apps/api/src/modules/inventory/goods-receipt/goods-receipt-line.entity.ts`
+- **Extends BaseEntity:** No
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `id` | `id` | `uuid` | PK, NN | - |
+| `organizationId` | `organization_id` | `varchar` | NN | - |
+| `branchId` | `branch_id` | `varchar` | - | - |
+| `goodsReceiptId` | `goods_receipt_id` | `uuid` | NN | - |
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `locationId` | `location_id` | `uuid` | NN | - |
+| `binId` | `bin_id` | `uuid` | - | - |
+| `uomCode` | `uom_code` | `varchar` | NN | - |
+| `quantity` | `quantity` | `numeric` | NN | - |
+| `unitPrice` | `unit_price` | `numeric` | NN, default: 0 | - |
+| `lineTotal` | `line_total` | `numeric` | NN, default: 0 | - |
+| `note` | `note` | `varchar` | - | - |
+| `createdAt` | `created_at` | `varchar` | NN | - |
+| `updatedAt` | `updated_at` | `varchar` | NN | - |
+| `createdBy` | `created_by` | `varchar` | NN | - |
+
+### Relations
+- `ManyToOne` `goodsReceipt` → `GoodsReceiptEntity`
+- `ManyToOne` `item` → `ItemEntity`
+- `ManyToOne` `location` → `LocationEntity`
 
 ---
 
@@ -116,6 +199,30 @@ Total entities: **24**
 
 ---
 
+## IssueReasonEntity
+
+- **Table:** `issue_reasons`
+- **Source:** `apps/api/src/modules/inventory/issue-reason/issue-reason.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Lý do xuất kho cho các phiếu xuất kho với purpose=OTHER hoặc DISPOSAL.
+
+### Unique Constraints
+- `['organizationId', 'code']`
+
+### Indexes
+- `['organizationId', 'purpose']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `code` | `code` | `varchar` | NN | Mã lý do duy nhất trong organization |
+| `name` | `name` | `varchar` | NN | Tên hiển thị của lý do |
+| `purpose` | `purpose` | `enum` | NN | Lý do thuộc nhóm OTHER (xuất khác) hay DISPOSAL (hủy hàng) |
+| `isActive` | `is_active` | `varchar` | NN, default: true | - |
+
+---
+
 ## ItemAttributeValueEntity
 
 - **Table:** `item_attribute_values`
@@ -138,6 +245,29 @@ Total entities: **24**
 - `ManyToOne` `item` → `ItemEntity`
 - `ManyToOne` `attributeDefinition` → `ProductAttributeDefinitionEntity`
 - `ManyToOne` `option` → `ProductAttributeOptionEntity`
+
+---
+
+## ItemBarcodeEntity
+
+- **Table:** `item_barcodes`
+- **Source:** `apps/api/src/modules/inventory/location/item-barcode.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Additional barcode(s) attached to an item (manufacturer EAN, internal codes). Unique per organization.
+
+### Unique Constraints
+- `['organizationId', 'code']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `code` | `code` | `varchar` | NN | Barcode string, alphanumeric + - _ . |
+| `notes` | `notes` | `text` | - | Free-text note (e.g. supplier-side code label) |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
 
 ---
 
@@ -177,17 +307,122 @@ Total entities: **24**
 | `name` | `name` | `varchar` | NN | Human-readable product name |
 | `description` | `description` | `varchar` | - | Detailed description or specifications |
 | `unit` | `unit` | `varchar` | NN | Unit of measure (e.g. pcs, kg, box) |
-| `category` | `category` | `varchar` | - | Grouping label for filtering and reporting (e.g. Electronics, Furniture) |
+| `categoryId` | `category_id` | `uuid` | - | FK to inventory_item_categories |
 | `isActive` | `is_active` | `varchar` | NN, default: true | When false, item cannot be used in new transactions |
+| `isPosVisible` | `is_pos_visible` | `varchar` | NN, default: true | When false, item is hidden from POS catalog |
 | `purchasePrice` | `purchase_price` | `decimal` | NN, default: 0 | Default purchase (cost) price per unit |
 | `sellingPrice` | `selling_price` | `decimal` | NN, default: 0 | Default selling price per unit |
-| `providerId` | `provider_id` | `uuid` | NN | FK to inventory_providers — the supplier for this item |
+| `weightGram` | `weight_gram` | `decimal` | - | Net weight in grams |
+| `lengthCm` | `length_cm` | `decimal` | - | - |
+| `widthCm` | `width_cm` | `decimal` | - | - |
+| `heightCm` | `height_cm` | `decimal` | - | - |
+| `manufactureYear` | `manufacture_year` | `smallint` | - | - |
+| `composition` | `composition` | `text` | - | Material composition / fabric / ingredients |
+| `brand` | `brand` | `varchar` | - | Brand name (e.g. Samsung, Nike) |
+| `itemType` | `item_type` | `varchar` | - | Free-text grouping label (Nhóm hàng) |
+| `packageWeightGram` | `package_weight_gram` | `decimal` | - | Package gross weight in grams |
+| `packageLengthCm` | `package_length_cm` | `decimal` | - | - |
+| `packageWidthCm` | `package_width_cm` | `decimal` | - | - |
+| `packageHeightCm` | `package_height_cm` | `decimal` | - | - |
+| `isGoldSilver` | `is_gold_silver` | `varchar` | NN, default: false | Mặt hàng vàng/bạc — special pricing rules apply |
+| `oddSize` | `odd_size` | `varchar` | - | Đầy size — free-text size descriptor |
+| `manageBarcodePerUnit` | `manage_barcode_per_unit` | `varchar` | NN, default: false | When true, separate barcodes are kept per conversion unit |
 | `productId` | `product_id` | `uuid` | - | FK to products — null for legacy items without a parent product |
 | `variantLabel` | `variant_label` | `varchar` | - | Denormalized display label for variant attributes (e.g. "39 · Nâu") |
 
 ### Relations
-- `ManyToOne` `provider` → `ProviderEntity`
+- `ManyToOne` `category` → `ItemCategoryEntity`
 - `ManyToOne` `product` → `ProductEntity`
+- `OneToMany` `providers` → `ItemProviderEntity`
+- `OneToMany` `barcodes` → `ItemBarcodeEntity`
+- `OneToMany` `thresholds` → `ItemStockThresholdEntity`
+- `OneToMany` `units` → `ItemUnitEntity`
+
+---
+
+## ItemProviderEntity
+
+- **Table:** `item_providers`
+- **Source:** `apps/api/src/modules/inventory/location/item-provider.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Join row linking an item to one of its providers (suppliers). Exactly one row per item may be marked is_primary.
+
+### Unique Constraints
+- `['itemId', 'providerId']`
+
+### Indexes
+- `['organizationId', 'itemId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `providerId` | `provider_id` | `uuid` | NN | - |
+| `isPrimary` | `is_primary` | `varchar` | NN, default: false | Primary supplier — used as default for PO suggestions |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
+- `ManyToOne` `provider` → `ProviderEntity`
+
+---
+
+## ItemStockThresholdEntity
+
+- **Table:** `item_stock_thresholds`
+- **Source:** `apps/api/src/modules/inventory/location/item-stock-threshold.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Min/max stock threshold per (item, location). Null values mean "no threshold configured".
+
+### Unique Constraints
+- `['itemId', 'locationId']`
+
+### Indexes
+- `['organizationId', 'locationId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `locationId` | `location_id` | `uuid` | NN | - |
+| `minQty` | `min_qty` | `decimal` | - | - |
+| `maxQty` | `max_qty` | `decimal` | - | - |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
+- `ManyToOne` `location` → `LocationEntity`
+
+---
+
+## ItemUnitEntity
+
+- **Table:** `item_units`
+- **Source:** `apps/api/src/modules/inventory/location/item-unit.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Unit-of-measure variant for an item (e.g. "Hộp" with ratio 12 for "Cái").
+
+### Unique Constraints
+- `['itemId', 'unitName']`
+
+### Indexes
+- `['organizationId', 'itemId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `unitName` | `unit_name` | `varchar` | NN | - |
+| `ratio` | `ratio` | `decimal` | NN, default: 1 | - |
+| `description` | `description` | `varchar` | - | - |
+| `purchasePrice` | `purchase_price` | `decimal` | NN, default: 0 | - |
+| `sellPrice` | `sell_price` | `decimal` | NN, default: 0 | - |
+| `isDefaultSell` | `is_default_sell` | `varchar` | NN, default: false | - |
+| `isDefaultBuy` | `is_default_buy` | `varchar` | NN, default: false | - |
+
+### Relations
+- `ManyToOne` `item` → `ItemEntity`
 
 ---
 
@@ -520,6 +755,63 @@ Constraint: one product can only be stored in one location per storage (warehous
 
 ---
 
+## StockTakeEntity
+
+- **Table:** `stock_takes`
+- **Source:** `apps/api/src/modules/inventory/stock-take/stock-take.entity.ts`
+- **Extends BaseEntity:** Yes
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `documentNumber` | `document_number` | `varchar` | - | - |
+| `status` | `status` | `enum` | NN, default: StockTakeStatus.DRAFT | - |
+| `storageId` | `storage_id` | `uuid` | - | - |
+| `locationId` | `location_id` | `uuid` | - | - |
+| `snapshotAt` | `snapshot_at` | `timestamptz` | NN | - |
+| `notes` | `notes` | `text` | - | - |
+| `postedAt` | `posted_at` | `timestamptz` | - | - |
+| `postedBy` | `posted_by` | `uuid` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `StockTakeLineEntity`
+
+---
+
+## StockTakeLineEntity
+
+- **Table:** `stock_take_lines`
+- **Source:** `apps/api/src/modules/inventory/stock-take/stock-take-line.entity.ts`
+- **Extends BaseEntity:** No
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `id` | `id` | `uuid` | PK, NN | - |
+| `organizationId` | `organization_id` | `varchar` | NN | - |
+| `branchId` | `branch_id` | `varchar` | - | - |
+| `stockTakeId` | `stock_take_id` | `uuid` | NN | - |
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `locationId` | `location_id` | `uuid` | NN | - |
+| `expectedQty` | `expected_qty` | `numeric` | NN, default: 0 | - |
+| `countedQty` | `counted_qty` | `numeric` | - | - |
+| `note` | `note` | `text` | - | - |
+| `createdAt` | `created_at` | `varchar` | NN | - |
+| `updatedAt` | `updated_at` | `varchar` | NN | - |
+| `createdBy` | `created_by` | `varchar` | NN | - |
+
+### Relations
+- `ManyToOne` `stockTake` → `StockTakeEntity`
+- `ManyToOne` `item` → `ItemEntity`
+- `ManyToOne` `location` → `LocationEntity`
+
+---
+
 ## StockTransferEntity
 
 - **Table:** `stock_transfers`
@@ -565,6 +857,8 @@ Constraint: one product can only be stored in one location per storage (warehous
 | `id` | `id` | `uuid` | PK, NN | - |
 | `transferId` | `transfer_id` | `uuid` | NN | Parent transfer document |
 | `itemId` | `item_id` | `uuid` | NN | The item being transferred |
+| `sourceLocationId` | `source_location_id` | `uuid` | - | Per-line source location (defaults to header sourceLocationId on legacy rows) |
+| `destinationLocationId` | `destination_location_id` | `uuid` | - | Per-line destination location (defaults to header destinationLocationId on legacy rows) |
 | `quantity` | `quantity` | `numeric` | NN | Quantity to transfer (always positive) |
 | `notes` | `notes` | `varchar` | - | Per-line notes |
 
@@ -616,5 +910,129 @@ Constraint: one product can only be stored in one location per storage (warehous
 | `organizationId` | `organization_id` | `uuid` | NN | Organization scope |
 | `assignedAt` | `assigned_at` | `varchar` | NN | When the assignment was created |
 | `assignedBy` | `assigned_by` | `uuid` | NN | Who made the assignment |
+
+---
+
+## TempWarehouseLineEntity
+
+- **Table:** `temp_warehouse_lines`
+- **Source:** `apps/api/src/modules/inventory/temp-warehouse/temp-warehouse-line.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** A single record of one item moving between the main warehouse and the main showroom.
+Updates are done by soft-deleting (status=DELETED) and creating a new line — superseded_by_id links the two.
+
+### Indexes
+- `['sessionId', 'status']`
+- `['sessionId', 'itemId']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `sessionId` | `session_id` | `uuid` | NN | - |
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `direction` | `direction` | `varchar` | NN | warehouse_to_showroom \| showroom_to_warehouse |
+| `quantity` | `quantity` | `numeric` | NN | - |
+| `carrierUserId` | `carrier_user_id` | `uuid` | - | - |
+| `status` | `status` | `varchar` | NN, default: TempWarehouseLineStatus.ACTIVE | ACTIVE \| DELETED \| AUTO_BALANCED \| TRANSFERRED |
+| `supersededById` | `superseded_by_id` | `uuid` | - | - |
+| `transferId` | `transfer_id` | `uuid` | - | Set when this line was consumed by a partial stock transfer; null while the line is ACTIVE in the working set. |
+| `notes` | `notes` | `text` | - | - |
+
+### Relations
+- `ManyToOne` `session` → `TempWarehouseSessionEntity`
+
+---
+
+## TempWarehouseSessionEntity
+
+- **Table:** `temp_warehouse_sessions`
+- **Source:** `apps/api/src/modules/inventory/temp-warehouse/temp-warehouse-session.entity.ts`
+- **Extends BaseEntity:** Yes
+- **Description:** Header row aggregating stock movements between main warehouse and main showroom of a branch within one shift.
+Each branch may have at most one ACTIVE session — enforced by a partial unique index in DB.
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `status` | `status` | `varchar` | NN, default: TempWarehouseSessionStatus.ACTIVE | ACTIVE \| CLOSED |
+| `closeMode` | `close_mode` | `varchar` | - | NET_OFFSET \| CREATE_TRANSFERS \| NONE — NULL while session is ACTIVE |
+| `warehouseLocationId` | `warehouse_location_id` | `uuid` | NN | Resolved at session open — main storage location of the branch |
+| `showroomLocationId` | `showroom_location_id` | `uuid` | NN | Resolved at session open — main showroom location of the branch |
+| `openedBy` | `opened_by` | `varchar` | NN | - |
+| `openedAt` | `opened_at` | `timestamp` | NN | - |
+| `closedBy` | `closed_by` | `varchar` | - | - |
+| `closedAt` | `closed_at` | `timestamp` | - | - |
+| `transferProcessingStatus` | `transfer_processing_status` | `varchar` | NN, default: TempWarehouseTransferProcessingStatus.NONE | NONE \| PENDING \| COMPLETED \| FAILED — only != NONE when closeMode=CREATE_TRANSFERS |
+| `transferW2sId` | `transfer_w2s_id` | `uuid` | - | - |
+| `transferS2wId` | `transfer_s2w_id` | `uuid` | - | - |
+| `transferFailureReason` | `transfer_failure_reason` | `text` | - | - |
+| `notes` | `notes` | `text` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `TempWarehouseLineEntity`
+
+---
+
+## TransferOrderEntity
+
+- **Table:** `transfer_orders`
+- **Source:** `apps/api/src/modules/inventory/transfer-order/transfer-order.entity.ts`
+- **Extends BaseEntity:** Yes
+
+### Indexes
+- `['organizationId', 'status']`
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `documentNumber` | `document_number` | `varchar` | - | - |
+| `status` | `status` | `enum` | NN, default: TransferOrderStatus.DRAFT | - |
+| `sourceBranchId` | `source_branch_id` | `varchar` | NN | - |
+| `destinationBranchId` | `destination_branch_id` | `varchar` | NN | - |
+| `sourceStorageId` | `source_storage_id` | `uuid` | - | - |
+| `destinationStorageId` | `destination_storage_id` | `uuid` | - | - |
+| `requestedDate` | `requested_date` | `date` | - | - |
+| `notes` | `notes` | `text` | - | - |
+| `approvedAt` | `approved_at` | `timestamptz` | - | - |
+| `approvedBy` | `approved_by` | `uuid` | - | - |
+| `executedAt` | `executed_at` | `timestamptz` | - | - |
+| `executedBy` | `executed_by` | `uuid` | - | - |
+| `executedTransferId` | `executed_transfer_id` | `uuid` | - | - |
+
+### Relations
+- `OneToMany` `lines` → `TransferOrderLineEntity`
+
+---
+
+## TransferOrderLineEntity
+
+- **Table:** `transfer_order_lines`
+- **Source:** `apps/api/src/modules/inventory/transfer-order/transfer-order-line.entity.ts`
+- **Extends BaseEntity:** No
+
+### Columns
+
+| Property | DB Column | Type | Constraints | Description |
+|----------|-----------|------|-------------|-------------|
+| `id` | `id` | `uuid` | PK, NN | - |
+| `organizationId` | `organization_id` | `varchar` | NN | - |
+| `branchId` | `branch_id` | `varchar` | - | - |
+| `transferOrderId` | `transfer_order_id` | `uuid` | NN | - |
+| `itemId` | `item_id` | `uuid` | NN | - |
+| `requestedQty` | `requested_qty` | `numeric` | NN | - |
+| `note` | `note` | `text` | - | - |
+| `createdAt` | `created_at` | `varchar` | NN | - |
+| `updatedAt` | `updated_at` | `varchar` | NN | - |
+| `createdBy` | `created_by` | `varchar` | NN | - |
+
+### Relations
+- `ManyToOne` `transferOrder` → `TransferOrderEntity`
+- `ManyToOne` `item` → `ItemEntity`
 
 ---

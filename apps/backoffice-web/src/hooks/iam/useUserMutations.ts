@@ -26,14 +26,15 @@ export function useUpdateUser(userId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: UserUpdatePayload) => {
-      const { roleIds, branchIds, newTemporaryPassword, ...profile } = payload;
+      // Remaining fields (firstName/lastName/isActive + nested HR `profile`) go in the PATCH body.
+      const { roleIds, branchIds, newTemporaryPassword, ...userPatch } = payload;
 
       let detail: UserDetail | undefined;
-      if (Object.keys(profile).length > 0) {
+      if (Object.keys(userPatch).length > 0) {
         detail = await requireErpData(
           await erpApi.PATCH<UserDetail>("/admin/users/{id}", {
             params: { path: { id: userId } },
-            body: profile,
+            body: userPatch,
           }),
         );
       }
