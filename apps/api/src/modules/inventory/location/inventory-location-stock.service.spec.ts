@@ -12,6 +12,7 @@ import { ItemEntity } from './item.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
+import { DataSource } from 'typeorm';
 
 const locationEntity = {
   id: 'loc-1',
@@ -82,17 +83,21 @@ function makeQuery(
 }
 
 describe('InventoryLocationStockService', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: InventoryLocationStockService;
-  let stockBalanceRepo: {
-    find: jest.Mock;
-    findAndCount: jest.Mock;
-  };
-  let locationRepo: { findOne: jest.Mock };
-  let thresholdRepo: { find: jest.Mock };
-  let barcodeRepo: { find: jest.Mock };
-  let itemProviderRepo: { find: jest.Mock };
-  let itemRepo: { findOne: jest.Mock };
-  let pslService: { validateAndAssignByLocation: jest.Mock };
+  let stockBalanceRepo: any;
+  let locationRepo: any;
+  let thresholdRepo: any;
+  let barcodeRepo: any;
+  let itemProviderRepo: any;
+  let itemRepo: any;
+  let pslService: any;
+  /** EntityManager mock used by assignBatch / addItemToLocation tests. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let managerFindOne: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let managerInsert: any;
+  let dataSourceMock: any;
 
   function setup(opts: {
     location?: typeof locationEntity | null;
@@ -138,6 +143,17 @@ describe('InventoryLocationStockService', () => {
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
     };
 
+    managerFindOne = jest.fn();
+    managerInsert = jest.fn().mockResolvedValue(undefined);
+    const manager = { findOne: managerFindOne, insert: managerInsert };
+    dataSourceMock = {
+      transaction: jest
+        .fn()
+        .mockImplementation((cb: (m: typeof manager) => Promise<unknown>) =>
+          cb(manager),
+        ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InventoryLocationStockService,
@@ -165,6 +181,10 @@ describe('InventoryLocationStockService', () => {
         {
           provide: ProductStorageLocationService,
           useValue: pslService,
+        },
+        {
+          provide: DataSource,
+          useValue: dataSourceMock,
         },
       ],
     }).compile();

@@ -88,19 +88,6 @@ export type {
   StockByLocationResponse,
 } from "./stock-by-location";
 
-export {
-  StockStateFilter,
-} from './stock-by-location';
-export type {
-  StockByLocationProvider,
-  StockByLocationItem,
-  StockByLocationStorageRef,
-  StockByLocationBranchRef,
-  StockByLocationLocationRef,
-  StockByLocationMeta,
-  StockByLocationResponse,
-} from './stock-by-location';
-
 export enum ImportJobStatus {
   PENDING = "PENDING",
   VALIDATING = "VALIDATING",

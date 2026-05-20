@@ -11,8 +11,13 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ArrayMinSize,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   Actor,
   ActorContext,
@@ -28,6 +33,24 @@ import { InventoryLocationStockService } from './inventory-location-stock.servic
 class AddItemToLocationDto {
   @IsUUID()
   itemId: string;
+}
+
+class BatchAssignItemRowDto {
+  @ApiProperty()
+  @IsUUID()
+  itemId!: string;
+
+  @ApiProperty()
+  @IsUUID()
+  locationId!: string;
+}
+
+export class BatchAssignItemsDto {
+  @ApiProperty({ type: [BatchAssignItemRowDto] })
+  @ValidateNested({ each: true })
+  @Type(() => BatchAssignItemRowDto)
+  @ArrayMinSize(1)
+  rows!: BatchAssignItemRowDto[];
 }
 
 @ApiTags('inventory')
@@ -74,6 +97,21 @@ export class InventoryLocationStockController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.addItemToLocation(locationId, dto.itemId, actor);
+  }
+
+  @Post('stock-items/batch')
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.',
+  })
+  @ApiResponse({ status: 201, description: 'Kết quả: { created, skipped }' })
+  assignBatch(
+    @Body() dto: BatchAssignItemsDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.assignBatch(dto, actor);
   }
 
   @Delete(':locationId/stock-items/:itemId')

@@ -3674,6 +3674,31 @@
         ]
       }
     },
+    "/inventory/locations/stock-items/batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_assignBatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAssignItemsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kết quả: { created, skipped }"
+          }
+        },
+        "summary": "Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items/{itemId}": {
       "delete": {
         "operationId": "InventoryLocationStockController_removeItemFromLocation",
@@ -3762,6 +3787,134 @@
           },
           {
             "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationCodeMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locationNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCodeMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageName",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "quantity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "quantityOp",
             "required": false,
             "in": "query",
             "schema": {
@@ -5596,6 +5749,37 @@
         "responses": {
           "200": {
             "description": ""
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/intra-warehouse": {
+      "post": {
+        "operationId": "StockTransferController_createIntraWarehouseTransfer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -12864,6 +13048,35 @@
         "type": "object",
         "properties": {}
       },
+      "BatchAssignItemRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId"
+        ]
+      },
+      "BatchAssignItemsDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchAssignItemRowDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -14274,6 +14487,57 @@
           "transferId",
           "itemId",
           "quantity"
+        ]
+      },
+      "IntraWarehouseTransferLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the inventory item"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Quantity to transfer (must be > 0)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes for this line"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateIntraWarehouseTransferDto": {
+        "type": "object",
+        "properties": {
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the source location"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the destination location (must be in same storage as source)"
+          },
+          "lines": {
+            "minItems": 1,
+            "description": "Lines to transfer",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntraWarehouseTransferLineDto"
+            }
+          }
+        },
+        "required": [
+          "sourceLocationId",
+          "destinationLocationId",
+          "lines"
         ]
       },
       "CreateAdjustmentDto": {
