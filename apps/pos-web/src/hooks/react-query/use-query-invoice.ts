@@ -83,6 +83,21 @@ export function useDeleteInvoiceMutation(): UseMutationResult<
   });
 }
 
+/**
+ * Chi tiết một hóa đơn — `GET /invoices/:id` (kèm `items[]` + thông tin thanh
+ * toán). Truyền `undefined` để tắt query khi chưa cần.
+ */
+export function useInvoiceDetailQuery(
+  id: string | undefined,
+): UseQueryResult<InvoiceRow, Error> {
+  return useQuery<InvoiceRow, Error>({
+    queryKey: INVOICE_KEYS.DETAIL(id ?? ""),
+    queryFn: () => invoiceService.getById(id as string),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
+}
+
 interface UseDraftInvoicesQueryInput {
   sessionId: string;
   enabled?: boolean;

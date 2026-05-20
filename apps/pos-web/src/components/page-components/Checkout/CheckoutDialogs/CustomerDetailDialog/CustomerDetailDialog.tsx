@@ -201,6 +201,8 @@ export function CustomerDetailDialog({
             <PurchaseHistoryTab
               rows={purchaseHistory}
               isLoading={isHistoryLoading}
+              customerName={data.name}
+              customerPhone={data.phone}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.DEBT ? (

@@ -1,5 +1,8 @@
 import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface";
-import type { ApiPaymentMethod } from "@erp/pos/types/invoice.type";
+import type {
+  ApiPaymentMethod,
+  InvoicePaymentMethod,
+} from "@erp/pos/types/invoice.type";
 
 // ============================================================================
 // Customer (purchase history, debt, detail tabs)
@@ -160,6 +163,15 @@ export const PAYMENT_METHOD_TO_API_METHOD: Record<
   [PaymentMethodEnum.CARD]: "card",
   [PaymentMethodEnum.TRANSFER]: "bank_transfer",
 };
+
+/** Nhãn tiếng Việt cho `invoice.paymentMethod` (dùng ở biên lai chi tiết). */
+export const INVOICE_PAYMENT_METHOD_LABEL: Record<InvoicePaymentMethod, string> =
+  {
+    cash: "Tiền mặt",
+    bank_transfer: "Chuyển khoản",
+    card: "Thẻ",
+    debt: "Ghi nợ",
+  };
 
 // ============================================================================
 // Promo menu

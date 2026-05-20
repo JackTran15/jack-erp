@@ -17,6 +17,7 @@ export const INVOICE_KEYS = {
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
   DRAFTS: (sessionId: string) =>
     ["invoices", "drafts", sessionId] as const,
+  DETAIL: (id: string) => ["invoices", "detail", id] as const,
 } as const;
 
 export const CUSTOMER_KEYS = {

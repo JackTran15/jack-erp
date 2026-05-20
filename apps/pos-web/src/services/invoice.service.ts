@@ -11,6 +11,9 @@ export const invoiceService = {
   create: (body: CreateInvoiceBody): Promise<InvoiceRow> =>
     http.post<InvoiceRow>("/invoices", body),
 
+  getById: (id: string): Promise<InvoiceRow> =>
+    http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`),
+
   list: (params: ListInvoicesParams = {}): Promise<Paginated<InvoiceRow>> => {
     const qs = new URLSearchParams();
     if (params.customerId) qs.set("customerId", params.customerId);

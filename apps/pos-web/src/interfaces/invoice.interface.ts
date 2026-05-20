@@ -1,4 +1,7 @@
-import type { InvoiceStatus } from "@erp/pos/types/invoice.type";
+import type {
+  InvoicePaymentMethod,
+  InvoiceStatus,
+} from "@erp/pos/types/invoice.type";
 
 export interface InvoiceItemRow {
   id: string;
@@ -38,4 +41,8 @@ export interface InvoiceRow {
   createdAt: string;
   updatedAt?: string;
   items?: InvoiceItemRow[];
+  // Chỉ có ở `GET /invoices/:id` (sau checkout) — phục vụ biên lai chi tiết.
+  paymentMethod?: InvoicePaymentMethod | null;
+  cashTendered?: number | null;
+  changeAmount?: number | null;
 }

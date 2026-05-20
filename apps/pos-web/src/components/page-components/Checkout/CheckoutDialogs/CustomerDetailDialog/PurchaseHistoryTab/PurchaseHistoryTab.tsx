@@ -13,6 +13,7 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/StatusBadge/StatusBadge";
+import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
@@ -20,6 +21,9 @@ export interface PurchaseHistoryTabProps {
   rows: PurchaseHistoryEntry[];
   /** Hiển thị "Đang tải…" thay cho empty-state trong lúc fetch lịch sử. */
   isLoading?: boolean;
+  /** Tên + SĐT khách (hiển thị trong biên lai chi tiết). */
+  customerName?: string;
+  customerPhone?: string | null;
 }
 
 const STATUS_FILTER_TO_STATUS: Record<
@@ -39,11 +43,16 @@ const STATUS_FILTER_TO_STATUS: Record<
 export function PurchaseHistoryTab({
   rows,
   isLoading,
+  customerName,
+  customerPhone,
 }: PurchaseHistoryTabProps) {
   const [statusFilter, setStatusFilter] =
     useState<PurchaseHistoryStatusFilterEnum>(
       PurchaseHistoryStatusFilterEnum.ALL,
     );
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
+    null,
+  );
   const selectedStatus = STATUS_FILTER_TO_STATUS[statusFilter];
 
   const statusOptions = useMemo(
@@ -87,9 +96,13 @@ export function PurchaseHistoryTab({
         key: "invoiceNumber",
         title: "Số hóa đơn",
         render: (row) => (
-          <span className="font-medium text-[#5C6BC0]">
+          <button
+            type="button"
+            onClick={() => setSelectedInvoiceId(row.id)}
+            className="font-medium text-[#5C6BC0] hover:underline focus:outline-none focus-visible:underline"
+          >
             {row.invoiceNumber}
-          </span>
+          </button>
         ),
         filterRender: (
           <PosDataTableFilterCell
@@ -160,32 +173,42 @@ export function PurchaseHistoryTab({
   );
 
   return (
-    <div className="flex flex-col">
-      <div className="max-h-[360px] overflow-auto border border-gray-200">
-        <PosDataTable
-          columns={columns}
-          dataSource={filtered}
-          rowKey={(row) => row.id}
-          emptyText={isLoading ? "Đang tải…" : "Chưa có hóa đơn nào."}
-          summaryRow={
-            filtered.length > 0 ? (
-              <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
-                <td colSpan={4} className="px-3">
-                  Tổng hóa đơn: {filtered.length}
-                </td>
-                <td className="px-3 text-right">{formatVnd(grandTotal)}</td>
-                <td />
-              </tr>
-            ) : null
-          }
+    <>
+      <div className="flex flex-col">
+        <div className="max-h-[360px] overflow-auto border border-gray-200">
+          <PosDataTable
+            columns={columns}
+            dataSource={filtered}
+            rowKey={(row) => row.id}
+            emptyText={isLoading ? "Đang tải…" : "Chưa có hóa đơn nào."}
+            summaryRow={
+              filtered.length > 0 ? (
+                <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
+                  <td colSpan={4} className="px-3">
+                    Tổng hóa đơn: {filtered.length}
+                  </td>
+                  <td className="px-3 text-right">{formatVnd(grandTotal)}</td>
+                  <td />
+                </tr>
+              ) : null
+            }
+          />
+        </div>
+        <PosPaginationBar
+          page={1}
+          totalPages={1}
+          pageSize={100}
+          total={filtered.length}
         />
       </div>
-      <PosPaginationBar
-        page={1}
-        totalPages={1}
-        pageSize={100}
-        total={filtered.length}
+
+      <InvoiceReceiptDialog
+        open={selectedInvoiceId !== null}
+        invoiceId={selectedInvoiceId}
+        onClose={() => setSelectedInvoiceId(null)}
+        customerName={customerName}
+        customerPhone={customerPhone}
       />
-    </div>
+    </>
   );
 }
