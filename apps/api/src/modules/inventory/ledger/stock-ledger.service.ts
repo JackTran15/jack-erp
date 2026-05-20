@@ -18,6 +18,10 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import {
+  type StringFilterMode,
+  type NumericFilterOp,
+} from './balance-filter.constants';
 
 export interface RecordMovementParams {
   itemId: string;
@@ -52,6 +56,25 @@ export interface BalanceQuery extends PaginationQuery {
   /** Only return rows where quantity < minQty (threshold). */
   belowMin?: boolean;
   organizationId: string;
+
+  // Per-column string filters (server-side)
+  locationCode?: string;
+  locationCodeMode?: StringFilterMode;
+  locationName?: string;
+  locationNameMode?: StringFilterMode;
+  itemCode?: string;
+  itemCodeMode?: StringFilterMode;
+  itemName?: string;
+  itemNameMode?: StringFilterMode;
+  categoryName?: string;
+  categoryNameMode?: StringFilterMode;
+  unit?: string;
+  unitMode?: StringFilterMode;
+  storageName?: string;
+  storageNameMode?: StringFilterMode;
+  // Numeric filter for quantity
+  quantity?: number;
+  quantityOp?: NumericFilterOp;
 }
 
 export interface StockBalanceSummaryRow {
@@ -261,6 +284,60 @@ export class StockLedgerService {
     if (query.belowMin) {
       qb.andWhere('th.min_qty IS NOT NULL AND sb.quantity < th.min_qty');
     }
+
+    // Inline closures over `qb` keep the queryBuilder mutation local and avoid
+    // passing it as a parameter. If `getBalances` grows further, consider extracting
+    // to a util file with an explicit `qb` parameter.
+    const applyString = (
+      column: string,
+      value: string | undefined,
+      mode: StringFilterMode = 'contains',
+      paramKey: string,
+    ) => {
+      if (!value || !value.trim()) return;
+      const v = value.trim();
+      switch (mode) {
+        case 'contains':
+          qb.andWhere(`${column} ILIKE :${paramKey}`, { [paramKey]: `%${v}%` });
+          break;
+        case 'equals':
+          qb.andWhere(`${column} = :${paramKey}`, { [paramKey]: v });
+          break;
+        case 'startsWith':
+          qb.andWhere(`${column} ILIKE :${paramKey}`, { [paramKey]: `${v}%` });
+          break;
+        case 'endsWith':
+          qb.andWhere(`${column} ILIKE :${paramKey}`, { [paramKey]: `%${v}` });
+          break;
+        case 'notContains':
+          qb.andWhere(`${column} NOT ILIKE :${paramKey}`, { [paramKey]: `%${v}%` });
+          break;
+        default: {
+          const _exhaustive: never = mode;
+          throw new Error(`Unknown StringFilterMode: ${String(_exhaustive)}`);
+        }
+      }
+    };
+
+    const applyNumeric = (
+      column: string,
+      value: number | undefined,
+      op: NumericFilterOp = 'eq',
+      paramKey: string,
+    ) => {
+      if (value === undefined || value === null || Number.isNaN(value)) return;
+      const opSql: Record<NumericFilterOp, string> = { eq: '=', lte: '<=', gte: '>=', lt: '<', gt: '>' };
+      qb.andWhere(`${column} ${opSql[op]} :${paramKey}`, { [paramKey]: value });
+    };
+
+    applyString('loc.code', query.locationCode, query.locationCodeMode, 'locationCode');
+    applyString('loc.name', query.locationName, query.locationNameMode, 'locationName');
+    applyString('item.code', query.itemCode, query.itemCodeMode, 'itemCode');
+    applyString('item.name', query.itemName, query.itemNameMode, 'itemName');
+    applyString('cat.name', query.categoryName, query.categoryNameMode, 'categoryName');
+    applyString('item.unit', query.unit, query.unitMode, 'unit');
+    applyString('storage.name', query.storageName, query.storageNameMode, 'storageName');
+    applyNumeric('sb.quantity', query.quantity, query.quantityOp, 'quantity');
 
     qb.select([
       'sb.id AS id',

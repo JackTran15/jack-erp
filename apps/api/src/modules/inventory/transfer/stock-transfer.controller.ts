@@ -28,6 +28,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { StockTransferService } from './stock-transfer.service';
+import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 class TransferLineDto {
   @IsUUID()
@@ -93,6 +94,16 @@ export class StockTransferController {
   @RequirePermission('inventory.transfer.create')
   create(@Body() dto: CreateTransferDto, @Actor() actor: ActorContext) {
     return this.service.create(dto, actor);
+  }
+
+  @Post('intra-warehouse')
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  createIntraWarehouseTransfer(
+    @Body() dto: CreateIntraWarehouseTransferDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.createIntraWarehouseTransferAndPost(dto, actor);
   }
 
   @Get()

@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
+  DataSource,
+  EntityManager,
   Equal,
   FindOptionsOrder,
   FindOptionsWhere,
@@ -30,6 +32,7 @@ import { ItemProviderEntity } from './item-provider.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
+import { BatchAssignItemsDto } from './inventory-location-stock.controller';
 
 @Injectable()
 export class InventoryLocationStockService {
@@ -44,9 +47,8 @@ export class InventoryLocationStockService {
     private readonly barcodeRepo: Repository<ItemBarcodeEntity>,
     @InjectRepository(ItemProviderEntity)
     private readonly itemProviderRepo: Repository<ItemProviderEntity>,
-    @InjectRepository(ItemEntity)
-    private readonly itemRepo: Repository<ItemEntity>,
     private readonly pslService: ProductStorageLocationService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -62,38 +64,95 @@ export class InventoryLocationStockService {
     itemId: string,
     actor: ActorContext,
   ): Promise<{ ok: true }> {
-    const location = await this.resolveLocation(locationId, actor);
+    await this.dataSource.transaction((manager) =>
+      this.addItemToLocationInternal(manager, locationId, itemId, actor),
+    );
+    return { ok: true };
+  }
 
-    const item = await this.itemRepo.findOne({
+  /**
+   * Batch-assign multiple (item, location) pairs in a single transaction.
+   * Idempotent: rows where the stock_balance already exists are skipped.
+   */
+  async assignBatch(
+    dto: BatchAssignItemsDto,
+    actor: ActorContext,
+  ): Promise<{ created: number; skipped: number }> {
+    let created = 0;
+    let skipped = 0;
+    await this.dataSource.transaction(async (manager) => {
+      for (const row of dto.rows) {
+        const result = await this.addItemToLocationInternal(
+          manager,
+          row.locationId,
+          row.itemId,
+          actor,
+        );
+        if (result.created) created++;
+        else skipped++;
+      }
+    });
+    return { created, skipped };
+  }
+
+  /**
+   * Core logic shared by addItemToLocation and assignBatch.
+   * Runs within the provided EntityManager so callers control the transaction.
+   * Returns { created: true } when a new stock_balance row was inserted,
+   * { created: false } when it already existed (idempotent skip).
+   */
+  private async addItemToLocationInternal(
+    manager: EntityManager,
+    locationId: string,
+    itemId: string,
+    actor: ActorContext,
+  ): Promise<{ created: boolean }> {
+    const location = await manager.findOne(LocationEntity, {
+      where: { id: locationId, organizationId: actor.organizationId },
+      relations: { storage: { branch: true } },
+    });
+    if (!location || !location.storage) {
+      throw new NotFoundException('Vị trí không tồn tại');
+    }
+    const locationBranchId = location.branchId ?? location.storage.branchId;
+    if (actor.branchId && locationBranchId !== actor.branchId) {
+      throw new NotFoundException('Vị trí không tồn tại');
+    }
+
+    const item = await manager.findOne(ItemEntity, {
       where: { id: itemId, organizationId: actor.organizationId },
     });
     if (!item) {
-      throw new NotFoundException(`Hàng hóa ${itemId} không tồn tại`);
+      throw new NotFoundException('Hàng hoá không tồn tại');
     }
 
     // Validate / auto-create product-storage-location binding (product-level).
+    // pslService uses its own repos — runs outside the transaction boundary
+    // which is acceptable here (PSL is a config mapping, not a balance row).
     await this.pslService.validateAndAssignByLocation(itemId, locationId, actor);
 
     // Upsert stock_balance row so the item appears in the location's stock list.
-    const existing = await this.stockBalanceRepo.findOne({
+    const existing = await manager.findOne(StockBalanceEntity, {
       where: {
         organizationId: actor.organizationId,
         itemId,
         locationId,
       },
     });
-    if (!existing) {
-      await this.stockBalanceRepo.insert({
-        organizationId: actor.organizationId,
-        branchId: location.branch.id || actor.branchId,
-        itemId,
-        locationId,
-        quantity: 0,
-        createdBy: actor.userId,
-      });
+    if (existing) {
+      return { created: false };
     }
 
-    return { ok: true };
+    const branchId = locationBranchId || actor.branchId;
+    await manager.insert(StockBalanceEntity, {
+      organizationId: actor.organizationId,
+      branchId,
+      itemId,
+      locationId,
+      quantity: 0,
+      createdBy: actor.userId,
+    });
+    return { created: true };
   }
 
   /**

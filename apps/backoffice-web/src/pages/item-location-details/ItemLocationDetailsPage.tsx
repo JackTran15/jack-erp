@@ -1,334 +1,186 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  DocumentListShell,
-  Input,
-  PageToolbar,
-  type ToolbarItem,
-} from "@erp/ui";
-import { RefreshCw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiClient } from "../../lib/api-axios";
-import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
-import { LookupField } from "../../components/forms/LookupField";
+import { DocumentListShell, PageToolbar } from "@erp/ui";
+import { buildItemLocationToolbarItems } from "./ItemLocationDetailsToolbar";
+import { BaseDataTable } from "../../components/table/BaseDataTable";
+import { PaginationControls } from "../../components/table/PaginationControls";
+import type { ColumnFilter, ColumnFilterMode } from "../../components/table/pagination.dto";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
-
-interface ItemSearchResult {
-  id: string;
-  code: string;
-  name: string;
-  unit: string;
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-interface BalanceRow {
-  id: string;
-  itemId: string;
-  locationId: string;
-  quantity: number;
-  lastMovementAt?: string | null;
-  item: {
-    id: string;
-    code: string;
-    name: string;
-    unit: string;
-    categoryName: string | null;
-  };
-  location: {
-    id: string;
-    code: string;
-    name: string;
-    storageId: string;
-    storageName: string;
-  };
-  threshold: { minQty: number | null; maxQty: number | null };
-  belowMin: boolean;
-}
-
-interface LedgerEntry {
-  id: string;
-  itemId: string;
-  locationId: string;
-  movementType: string;
-  quantity: number;
-  referenceType: string;
-  referenceId: string;
-  notes?: string;
-  createdAt: string;
-}
-
-const MOVEMENT_LABEL: Record<string, string> = {
-  PURCHASE_RECEIPT: "Nhập kho",
-  SALE_ISSUE: "Bán hàng",
-  RETURN_IN: "Trả về kho",
-  EXCHANGE_IN: "Đổi vào",
-  EXCHANGE_OUT: "Đổi ra",
-  TRANSFER_IN: "Chuyển vào",
-  TRANSFER_OUT: "Chuyển đi",
-  ADJUSTMENT_INCREASE: "Điều chỉnh +",
-  ADJUSTMENT_DECREASE: "Điều chỉnh -",
-  GOODS_ISSUE: "Xuất kho",
-};
+import {
+  listStockBalances,
+  type StockBalanceRow,
+} from "../../api/stock-balances";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { buildItemLocationColumns } from "./ItemLocationDetailsColumns";
+import { buildQuery } from "./ItemLocationDetailsQuery";
+import { ArrangeLocationDialog } from "./ArrangeLocationDialog";
+import { TransferLocationDialog } from "./TransferLocationDialog";
 
 export function ItemLocationDetailsPage() {
-  const [itemId, setItemId] = useState("");
-  const [itemLabel, setItemLabel] = useState("");
-  const [pickedItem, setPickedItem] = useState<ItemSearchResult | null>(null);
-  const [balances, setBalances] = useState<BalanceRow[]>([]);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "10" });
-    if (query.trim()) params.set("search", query.trim());
-    const { data } = await apiClient.get<PaginatedResponse<ItemSearchResult>>(
-      `/inventory/items?${params}`,
-    );
-    return data.data;
-  }, []);
-
-  const load = useCallback(async () => {
-    if (!itemId) {
-      setBalances([]);
-      setLedger([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [{ data: bal }, { data: led }] = await Promise.all([
-        apiClient.get<PaginatedResponse<BalanceRow>>(
-          `/inventory/stock/balances?page=1&pageSize=100&itemId=${itemId}`,
-        ),
-        apiClient.get<PaginatedResponse<LedgerEntry>>(
-          `/inventory/stock/ledger?page=1&pageSize=20&itemId=${itemId}`,
-        ),
-      ]);
-      setBalances(bal.data);
-      setLedger(led.data);
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-      setBalances([]);
-      setLedger([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [itemId]);
+  const qc = useQueryClient();
+  const [filters, setFilters] = useState<Record<string, ColumnFilter>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [arrangeOpen, setArrangeOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPage(1);
+  }, [filters]);
 
-  const totalQty = useMemo(
-    () => balances.reduce((s, b) => s + Number(b.quantity || 0), 0),
-    [balances],
+  const queryParams = useMemo(
+    () => buildQuery(page, pageSize, filters),
+    [page, pageSize, filters],
   );
 
-  const balanceColumns: TableColumn<BalanceRow>[] = [
-    {
-      key: "storage",
-      label: "Kho",
-      width: 200,
-      render: (r) => r.location.storageName,
-    },
-    {
-      key: "location",
-      label: "Vị trí",
-      width: 160,
-      render: (r) => (
-        <span>
-          {r.location.code}
-          {r.location.name !== r.location.code ? (
-            <span className="ml-1 text-xs text-muted-foreground">({r.location.name})</span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: "quantity",
-      label: "Tồn",
-      width: 100,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (r) => (
-        <span className={r.belowMin ? "text-destructive font-medium" : undefined}>
-          {Number(r.quantity).toLocaleString("vi-VN")}
-        </span>
-      ),
-    },
-    {
-      key: "minQty",
-      label: "Min",
-      width: 80,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums text-muted-foreground",
-      render: (r) =>
-        r.threshold.minQty == null
-          ? "—"
-          : Number(r.threshold.minQty).toLocaleString("vi-VN"),
-    },
-    {
-      key: "maxQty",
-      label: "Max",
-      width: 80,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums text-muted-foreground",
-      render: (r) =>
-        r.threshold.maxQty == null
-          ? "—"
-          : Number(r.threshold.maxQty).toLocaleString("vi-VN"),
-    },
-    {
-      key: "lastMovement",
-      label: "Biến động gần nhất",
-      width: 160,
-      className: "text-muted-foreground",
-      render: (r) =>
-        r.lastMovementAt
-          ? new Date(r.lastMovementAt).toLocaleString("vi-VN")
-          : "—",
-    },
-  ];
+  const { data, isFetching, isError, error } = useQuery({
+    queryKey: ["stock-balances", queryParams],
+    queryFn: () => listStockBalances(queryParams),
+  });
 
-  const ledgerColumns: TableColumn<LedgerEntry>[] = [
-    {
-      key: "createdAt",
-      label: "Thời gian",
-      width: 160,
-      render: (r) => new Date(r.createdAt).toLocaleString("vi-VN"),
-    },
-    {
-      key: "movementType",
-      label: "Loại biến động",
-      width: 160,
-      render: (r) => MOVEMENT_LABEL[r.movementType] ?? r.movementType,
-    },
-    {
-      key: "quantity",
-      label: "Số lượng",
-      width: 100,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (r) => (
-        <span className={Number(r.quantity) < 0 ? "text-destructive" : "text-emerald-600"}>
-          {Number(r.quantity) > 0 ? "+" : ""}
-          {Number(r.quantity).toLocaleString("vi-VN")}
-        </span>
-      ),
-    },
-    {
-      key: "reference",
-      label: "Chứng từ",
-      render: (r) => (
-        <span className="text-xs">
-          {r.referenceType}{" "}
-          <span className="text-muted-foreground">#{r.referenceId.slice(0, 8)}</span>
-        </span>
-      ),
-    },
-    {
-      key: "notes",
-      label: "Ghi chú",
-      render: (r) => r.notes ?? "",
-    },
-  ];
+  useEffect(() => {
+    if (isError && error) {
+      toast.error(getUserFacingApiErrorMessage(error));
+    }
+  }, [isError, error]);
 
-  const toolbarItems: ToolbarItem[] = [
-    {
-      id: "reload",
-      label: "Nạp",
-      icon: RefreshCw,
-      onClick: () => void load(),
-      disabled: loading || !itemId,
-    },
-  ];
+  const rows = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const hasSelection = selectedIds.size > 0;
+
+  const onModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
+    setFilters((prev) => ({
+      ...prev,
+      [fieldKey]: { mode, value: prev[fieldKey]?.value ?? "" },
+    }));
+  };
+  const onValueChange = (fieldKey: string, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [fieldKey]: { mode: prev[fieldKey]?.mode ?? "contains", value },
+    }));
+  };
+
+  const toggleRow = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allOnPageSelected =
+    rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+  const someOnPageSelected =
+    !allOnPageSelected && rows.some((r) => selectedIds.has(r.id));
+
+  const togglePage = () =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        for (const r of rows) next.delete(r.id);
+      } else {
+        for (const r of rows) next.add(r.id);
+      }
+      return next;
+    });
+
+  const rowIndexMap = useMemo(
+    () => new Map(rows.map((r, i) => [r.id, (page - 1) * pageSize + i + 1])),
+    [rows, page, pageSize],
+  );
+
+  const columns = useMemo(
+    () => buildItemLocationColumns(rowIndexMap),
+    [rowIndexMap],
+  );
+
+  const leadingColumn = {
+    width: 36,
+    header: (
+      <input
+        type="checkbox"
+        aria-label="Chọn tất cả dòng trên trang"
+        checked={allOnPageSelected}
+        ref={(el) => {
+          if (el) el.indeterminate = someOnPageSelected;
+        }}
+        onChange={togglePage}
+      />
+    ),
+    filterHeader: null,
+    cell: (_r: StockBalanceRow, _index: number) => (
+      <input
+        type="checkbox"
+        aria-label={`Chọn dòng ${_r.item.code}`}
+        checked={selectedIds.has(_r.id)}
+        onChange={() => toggleRow(_r.id)}
+      />
+    ),
+    cellClassName: "text-center",
+    headerClassName: "text-center",
+  };
+
+  const reload = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["stock-balances"] }),
+    [qc],
+  );
+
+  const toolbarItems = useMemo(
+    () =>
+      buildItemLocationToolbarItems({
+        isFetching,
+        hasSelection,
+        onReload: reload,
+        onOpenArrange: () => setArrangeOpen(true),
+        onOpenTransfer: () => setTransferOpen(true),
+      }),
+    [isFetching, hasSelection, reload],
+  );
 
   return (
-    <DocumentListShell
-      title="Chi tiết vị trí hàng hóa"
-      tabs={<InventoryTabBar activeId="item-location-details" />}
-      toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
-      filters={
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-[420px]">
-            <LookupField
-              placeholder="Chọn hàng hóa…"
-              value={itemLabel}
-              onValueChange={(v) => {
-                setItemLabel(v);
-                if (!v) {
-                  setItemId("");
-                  setPickedItem(null);
-                }
-              }}
-              onSelect={(it) => {
-                setItemId(it.id);
-                setItemLabel(`${it.code} · ${it.name}`);
-                setPickedItem(it);
-              }}
-              search={searchItems}
-              itemKey={(it) => it.id}
-              renderItem={(it) => it.name}
-              renderMeta={(it) => `${it.code} · ${it.unit}`}
-              columns={[
-                { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
-                { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
-                { key: "unit", label: "ĐVT", className: "w-[60px]", render: (it) => it.unit },
-              ]}
-            />
-          </div>
-          {pickedItem ? (
-            <div className="text-sm text-muted-foreground">
-              ĐVT: <strong className="text-foreground">{pickedItem.unit}</strong>
-              <span className="mx-3">·</span>
-              Tổng tồn ở mọi vị trí:{" "}
-              <strong className="text-foreground tabular-nums">
-                {totalQty.toLocaleString("vi-VN")}
-              </strong>
-            </div>
-          ) : null}
-        </div>
-      }
-    >
-      {!itemId ? (
-        <div className="flex flex-1 items-center justify-center py-20 text-sm text-muted-foreground">
-          Chọn 1 hàng hóa ở trên để xem tồn theo từng vị trí.
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6 p-4">
-          <section>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Tồn theo vị trí
-            </h3>
-            <BaseDataTable
-              columns={balanceColumns}
-              rows={balances}
-              loading={loading}
-              emptyLabel="Hàng hóa này chưa có tồn ở vị trí nào."
-              getRowKey={(r) => r.id}
-            />
-          </section>
-
-          <section>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Biến động gần đây (20 dòng mới nhất)
-            </h3>
-            <BaseDataTable
-              columns={ledgerColumns}
-              rows={ledger}
-              loading={loading}
-              emptyLabel="Chưa có biến động."
-              getRowKey={(r) => r.id}
-            />
-          </section>
-        </div>
-      )}
-    </DocumentListShell>
+    <>
+      <DocumentListShell
+        title="Chi tiết vị trí hàng hóa"
+        tabs={<InventoryTabBar activeId="item-location-details" />}
+        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        pagination={
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={(n) => {
+              setPageSize(n);
+              setPage(1);
+            }}
+            pageSizeOptions={[20, 50, 100, 200]}
+            onRefresh={reload}
+          />
+        }
+      >
+        <BaseDataTable
+          columns={columns}
+          rows={rows}
+          loading={isFetching}
+          emptyLabel="Không có dữ liệu phù hợp với bộ lọc."
+          getRowKey={(r) => r.id}
+          leadingColumn={leadingColumn}
+          columnFilterControl={{ filters, onModeChange, onValueChange }}
+        />
+      </DocumentListShell>
+      <ArrangeLocationDialog
+        open={arrangeOpen}
+        onOpenChange={setArrangeOpen}
+        onSaved={reload}
+      />
+      <TransferLocationDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        onSaved={reload}
+      />
+    </>
   );
 }

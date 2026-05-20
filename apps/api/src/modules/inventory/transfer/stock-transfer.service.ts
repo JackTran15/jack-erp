@@ -19,6 +19,8 @@ import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
+import { LocationEntity } from '../location/location.entity';
+import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 export interface CreateTransferDto {
   sourceLocationId: string;
@@ -55,6 +57,8 @@ export class StockTransferService {
   constructor(
     @InjectRepository(StockTransferEntity)
     private readonly transferRepo: Repository<StockTransferEntity>,
+    @InjectRepository(LocationEntity)
+    private readonly locationRepo: Repository<LocationEntity>,
     private readonly dataSource: DataSource,
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
@@ -224,6 +228,66 @@ export class StockTransferService {
     });
 
     return { data, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  /**
+   * Validates same-storage constraint, then creates → approves → posts
+   * an intra-warehouse transfer in one shot.
+   */
+  async createIntraWarehouseTransferAndPost(
+    dto: CreateIntraWarehouseTransferDto,
+    actor: ActorContext,
+  ): Promise<StockTransferEntity> {
+    // 1. Source and destination must differ
+    if (dto.sourceLocationId === dto.destinationLocationId) {
+      throw new BadRequestException('Vị trí nguồn và đích phải khác nhau');
+    }
+
+    // 2. Both locations must exist in the actor's org
+    const [source, dest] = await Promise.all([
+      this.locationRepo.findOne({
+        where: { id: dto.sourceLocationId, organizationId: actor.organizationId },
+      }),
+      this.locationRepo.findOne({
+        where: { id: dto.destinationLocationId, organizationId: actor.organizationId },
+      }),
+    ]);
+
+    if (!source) throw new NotFoundException('Vị trí nguồn không tồn tại');
+    if (!dest) throw new NotFoundException('Vị trí đích không tồn tại');
+
+    // 3. Both locations must belong to the same storage
+    if (source.storageId !== dest.storageId) {
+      throw new BadRequestException(
+        'Chuyển vị trí trong cùng kho: 2 vị trí phải cùng một kho.',
+      );
+    }
+
+    if (!actor.branchId) {
+      throw new BadRequestException(
+        'Vui lòng chọn chi nhánh trước khi chuyển vị trí',
+      );
+    }
+
+    // 4. Build the CreateTransferDto
+    const createDto: CreateTransferDto = {
+      sourceBranchId: actor.branchId,
+      destinationBranchId: actor.branchId,
+      sourceLocationId: dto.sourceLocationId,
+      destinationLocationId: dto.destinationLocationId,
+      lines: dto.lines.map((l) => ({
+        itemId: l.itemId,
+        quantity: l.quantity,
+        notes: l.notes,
+      })),
+    };
+
+    // 5. Run create → approve → post sequentially
+    // Each step has its own save/transaction internally; we run them in sequence
+    // so that a failure in any step stops the flow.
+    const draft = await this.create(createDto, actor);
+    await this.approve(draft.id, actor);
+    return this.post(draft.id, actor);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────
