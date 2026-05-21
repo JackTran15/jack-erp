@@ -35,6 +35,11 @@ export interface InvoiceSession {
   activeCheckoutPane: CheckoutPane;
   selectedLinePurchaseId: string | null;
   selectedLineReturnId: string | null;
+  /**
+   * Khi tab được mở từ một draft đã lưu (restore), đây là id của draft đó.
+   * Lưu/thanh toán lại sẽ ghi đè (PATCH/checkout) chính draft này thay vì tạo mới.
+   */
+  sourceInvoiceId?: string;
 }
 
 function createSaleSession(id: string, label: string): InvoiceSession {
@@ -52,6 +57,12 @@ function createSaleSession(id: string, label: string): InvoiceSession {
 
 interface PosCheckoutSessionState {
   version: number;
+  /**
+   * POS session id cố định cho terminal — dùng làm `session_id` khi tạo/liệt kê
+   * draft (`/invoices/drafts`). Tách khỏi id tab (`activeSessionId`) để danh sách
+   * HĐ lưu tạm + badge ổn định, không đổi khi chuyển tab / restore.
+   */
+  posSessionId: string;
   sessions: InvoiceSession[];
   activeSessionId: string;
   cashierDisplayName: string | null;
@@ -104,6 +115,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
   persist(
     (set, get) => ({
       version: STORE_VERSION,
+      posSessionId: crypto.randomUUID(),
       sessions: [createSaleSession(initialId, "Hóa đơn 1")],
       activeSessionId: initialId,
       cashierDisplayName: null,
@@ -261,10 +273,13 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       resetActiveSessionAfterCheckout: () => {
         const id = get().activeSessionId;
         set({
-          sessions: get().sessions.map((s) =>
+          sessions: get().sessions.map((s, idx) =>
             s.id === id
               ? {
                   ...s,
+                  // Tab từng gắn với 1 draft (restore) → trả tên về mặc định.
+                  label: s.sourceInvoiceId ? `Hóa đơn ${idx + 1}` : s.label,
+                  sourceInvoiceId: undefined,
                   checkoutVariant: CheckoutVariantEnum.SALE,
                   purchaseCart: [],
                   returnCart: [],
@@ -280,8 +295,8 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       openDraftInNewSession: (draft) => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
-        const nextIdx = sessions.length + 1;
-        const label = `Hóa đơn ${nextIdx}`;
+        // Tab restore mang tên = số hóa đơn của draft, và gắn với draft đó.
+        const label = draft.invoiceNumber;
         const variant = coerceCheckoutVariant(draft.checkoutVariant);
 
         let newSession: InvoiceSession;
@@ -300,6 +315,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
+            sourceInvoiceId: draft.id,
           };
         } else {
           newSession = {
@@ -314,6 +330,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
+            sourceInvoiceId: draft.id,
           };
         }
 
@@ -336,6 +353,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       version: STORE_VERSION,
       partialize: (s) => ({
         version: s.version,
+        posSessionId: s.posSessionId,
         sessions: s.sessions,
         activeSessionId: s.activeSessionId,
         cashierDisplayName: s.cashierDisplayName,
@@ -366,6 +384,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   ),
                   selectedLinePurchaseId: raw.selectedLinePurchaseId ?? null,
                   selectedLineReturnId: raw.selectedLineReturnId ?? null,
+                  sourceInvoiceId: raw.sourceInvoiceId,
                 };
               })
             : current.sessions;
@@ -374,6 +393,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         return {
           ...(current as PosCheckoutSessionState),
           version: typeof p.version === "number" ? p.version : STORE_VERSION,
+          posSessionId: p.posSessionId ?? current.posSessionId,
           sessions,
           activeSessionId: activeOk ? p.activeSessionId! : sessions[0]!.id,
           cashierDisplayName:

@@ -26,6 +26,17 @@ export interface CreateInvoiceBody {
   items?: CreateInvoiceItemBody[];
 }
 
+/**
+ * Body cho `PATCH /invoices/:id` — cập nhật draft (chỉ khi `isDraft=true`).
+ * Gửi `items` sẽ **thay thế hoàn toàn** danh sách item hiện tại.
+ */
+export interface UpdateInvoiceBody {
+  customerId?: string;
+  draftLabel?: string;
+  note?: string;
+  items?: CreateInvoiceItemBody[];
+}
+
 export interface InvoicePaymentLineBody {
   paymentMethod: ApiPaymentMethod;
   amount: number;

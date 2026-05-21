@@ -87,6 +87,7 @@ export function PosLayout() {
   const clearBranch = usePosBranchStore((s) => s.clearBranch);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
+  const posSessionId = usePosCheckoutSessionStore((s) => s.posSessionId);
   const setActiveSessionId = usePosCheckoutSessionStore(
     (s) => s.setActiveSessionId,
   );
@@ -106,8 +107,8 @@ export function PosLayout() {
   );
 
   const draftsQuery = useDraftInvoicesQuery({
-    sessionId: activeSessionId,
-    enabled: Boolean(activeSessionId),
+    sessionId: posSessionId,
+    enabled: Boolean(posSessionId),
   });
   const draftsCount = draftsQuery.data?.length ?? 0;
   const deleteInvoiceMutation = useDeleteInvoiceMutation();
@@ -299,7 +300,7 @@ export function PosLayout() {
       <DraftInvoicesDialog
         open={draftsDialogOpen}
         onClose={() => setDraftsDialogOpen(false)}
-        sessionId={activeSessionId}
+        sessionId={posSessionId}
         onConfirm={handleRestoreDraft}
         onDelete={handleDeleteDraft}
       />

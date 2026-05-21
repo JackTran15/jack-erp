@@ -8,6 +8,7 @@ import type {
   CreateInvoiceBody,
   CreateInvoiceItemBody,
   InvoicePaymentLineBody,
+  UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
@@ -29,10 +30,8 @@ interface BuildCreateInvoicePayloadInput {
  *   - sortOrder = index (giữ thứ tự cart hiện hữu).
  *   - lineDiscount = 0 (chiết khấu dòng chưa wire vào UI).
  */
-export function buildCreateInvoicePayload(
-  input: BuildCreateInvoicePayloadInput,
-): CreateInvoiceBody {
-  const items: CreateInvoiceItemBody[] = input.cart.map((line, index) => ({
+function mapCartToInvoiceItems(cart: CartLine[]): CreateInvoiceItemBody[] {
+  return cart.map((line, index) => ({
     itemId: line.itemId,
     locationId: line.locationId || undefined,
     itemCode: line.code,
@@ -43,13 +42,39 @@ export function buildCreateInvoicePayload(
     lineDiscount: 0,
     sortOrder: index,
   }));
+}
 
+export function buildCreateInvoicePayload(
+  input: BuildCreateInvoicePayloadInput,
+): CreateInvoiceBody {
   return {
     sessionId: input.sessionId,
     customerId: input.customer?.id,
     draftLabel: input.draftLabel,
     note: input.note,
-    items,
+    items: mapCartToInvoiceItems(input.cart),
+  };
+}
+
+interface BuildUpdateInvoicePayloadInput {
+  cart: CartLine[];
+  customer: CustomerRow | null;
+  note?: string;
+  draftLabel?: string;
+}
+
+/**
+ * Build payload cho `PATCH /invoices/:id`. Dùng khi lưu/thanh toán lại một draft
+ * đã restore — `items` thay thế toàn bộ danh sách item hiện tại của draft.
+ */
+export function buildUpdateInvoicePayload(
+  input: BuildUpdateInvoicePayloadInput,
+): UpdateInvoiceBody {
+  return {
+    customerId: input.customer?.id,
+    draftLabel: input.draftLabel,
+    note: input.note,
+    items: mapCartToInvoiceItems(input.cart),
   };
 }
 

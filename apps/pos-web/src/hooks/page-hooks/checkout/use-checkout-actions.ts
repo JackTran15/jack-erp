@@ -11,6 +11,7 @@ import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoic
 import {
   useCheckoutInvoiceMutation,
   useCreateInvoiceMutation,
+  useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import type { AccountRow } from "@erp/pos/interfaces/account.interface";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
@@ -24,6 +25,7 @@ import { validateCheckout } from "@erp/pos/lib/page-libs/checkout/checkoutValida
 import {
   buildCheckoutInvoiceApiPayload,
   buildCreateInvoicePayload,
+  buildUpdateInvoicePayload,
 } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
@@ -34,6 +36,7 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import {
   computeReceiptLines,
+  selectActiveSession,
   selectGrandTotal,
   selectHasAnyCartLines,
   selectPurchaseCart,
@@ -80,6 +83,7 @@ function describeResolveError(error: ResolveCheckoutPayloadError): string {
 export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const invoicePrinter = useInvoicePrinter();
   const createMutation = useCreateInvoiceMutation();
+  const updateMutation = useUpdateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
 
   const paymentAccountsQuery = usePaymentAccountsQuery();
@@ -195,17 +199,35 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       });
 
       const note = p.note || undefined;
-      const createPayload = buildCreateInvoicePayload({
-        sessionId: sessionState.activeSessionId,
-        cart: purchaseCart,
-        customer: selectedCustomer,
-        note,
-      });
+      // Tab mở từ một draft đã lưu → PATCH chính draft đó rồi checkout, để hóa
+      // đơn đó rời khỏi danh sách lưu tạm. Tab thường → tạo mới rồi checkout.
+      const sourceInvoiceId = selectActiveSession(sessionState)?.sourceInvoiceId;
 
       try {
-        const created = await createMutation.mutateAsync(createPayload);
+        let invoiceId: string;
+        if (sourceInvoiceId) {
+          const updated = await updateMutation.mutateAsync({
+            id: sourceInvoiceId,
+            body: buildUpdateInvoicePayload({
+              cart: purchaseCart,
+              customer: selectedCustomer,
+              note,
+            }),
+          });
+          invoiceId = updated.id;
+        } else {
+          const created = await createMutation.mutateAsync(
+            buildCreateInvoicePayload({
+              sessionId: sessionState.posSessionId,
+              cart: purchaseCart,
+              customer: selectedCustomer,
+              note,
+            }),
+          );
+          invoiceId = created.id;
+        }
         await checkoutMutation.mutateAsync({
-          id: created.id,
+          id: invoiceId,
           body: checkoutResolve.body,
         });
       } catch (err) {
@@ -232,6 +254,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       receivableAccountId,
       accountById,
       createMutation,
+      updateMutation,
       checkoutMutation,
       printReceiptIfNeeded,
     ],
@@ -261,7 +284,10 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
 
   return {
     finalizeCheckoutAndPrint,
-    isFinalizing: createMutation.isPending || checkoutMutation.isPending,
+    isFinalizing:
+      createMutation.isPending ||
+      updateMutation.isPending ||
+      checkoutMutation.isPending,
     requestCancelInvoice,
     confirmCancelInvoice,
     confirmOversell,

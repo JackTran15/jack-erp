@@ -18,8 +18,8 @@ export interface DraftInvoicesDialogProps {
   open: boolean;
   onClose: () => void;
   /**
-   * POS session id dùng để filter draft trên BE. Truyền `activeSessionId` từ
-   * `usePosCheckoutSessionStore`.
+   * POS session id cố định của terminal dùng để filter draft trên BE. Truyền
+   * `posSessionId` từ `usePosCheckoutSessionStore` (ổn định, không đổi theo tab).
    */
   sessionId: string;
   /** Pre-selected draft id when the modal mounts. */

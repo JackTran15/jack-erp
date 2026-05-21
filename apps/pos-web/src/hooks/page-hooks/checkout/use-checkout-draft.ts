@@ -1,10 +1,17 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 
-import { useCreateInvoiceMutation } from "@erp/pos/hooks/react-query/use-query-invoice";
-import { buildCreateInvoicePayload } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
+import {
+  useCreateInvoiceMutation,
+  useUpdateInvoiceMutation,
+} from "@erp/pos/hooks/react-query/use-query-invoice";
+import {
+  buildCreateInvoicePayload,
+  buildUpdateInvoicePayload,
+} from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import {
+  selectActiveSession,
   selectHasAnyCartLines,
   selectPurchaseCart,
   usePosCheckoutSessionStore,
@@ -24,6 +31,7 @@ export interface UseCheckoutDraftResult {
  */
 export const useCheckoutDraft = (): UseCheckoutDraftResult => {
   const createMutation = useCreateInvoiceMutation();
+  const updateMutation = useUpdateInvoiceMutation();
 
   const saveDraft = useCallback(async () => {
     const sessionState = usePosCheckoutSessionStore.getState();
@@ -33,20 +41,32 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
     const selectedCustomer =
       usePosCheckoutCustomerStore.getState().selectedCustomer;
     const note = usePosCheckoutPaymentStore.getState().note || undefined;
-
-    const payload = buildCreateInvoicePayload({
-      sessionId: sessionState.activeSessionId,
-      cart: purchaseCart,
-      customer: selectedCustomer,
-      note,
-    });
+    // Tab mở từ một draft đã lưu → PATCH chính draft đó thay vì tạo bản mới.
+    const sourceInvoiceId = selectActiveSession(sessionState)?.sourceInvoiceId;
 
     try {
-      const created = await createMutation.mutateAsync(payload);
-      usePosCheckoutUiStore
-        .getState()
-        .setAnnouncement(`Đã lưu tạm hóa đơn ${created.code}.`);
-      toast.success(`Đã lưu tạm hóa đơn ${created.code}`);
+      const saved = sourceInvoiceId
+        ? await updateMutation.mutateAsync({
+            id: sourceInvoiceId,
+            body: buildUpdateInvoicePayload({
+              cart: purchaseCart,
+              customer: selectedCustomer,
+              note,
+            }),
+          })
+        : await createMutation.mutateAsync(
+            buildCreateInvoicePayload({
+              sessionId: sessionState.posSessionId,
+              cart: purchaseCart,
+              customer: selectedCustomer,
+              note,
+            }),
+          );
+      const message = sourceInvoiceId
+        ? `Đã cập nhật hóa đơn lưu tạm ${saved.code}`
+        : `Đã lưu tạm hóa đơn ${saved.code}`;
+      usePosCheckoutUiStore.getState().setAnnouncement(`${message}.`);
+      toast.success(message);
       sessionState.resetActiveSessionAfterCheckout();
       resetCheckoutDraftState();
     } catch (err) {
@@ -54,7 +74,10 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
         err instanceof Error ? err.message : "Không lưu được hóa đơn lưu tạm",
       );
     }
-  }, [createMutation]);
+  }, [createMutation, updateMutation]);
 
-  return { saveDraft, isSaving: createMutation.isPending };
+  return {
+    saveDraft,
+    isSaving: createMutation.isPending || updateMutation.isPending,
+  };
 };

@@ -3,6 +3,7 @@ import type {
   CheckoutInvoiceBody,
   CreateInvoiceBody,
   ListInvoicesParams,
+  UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
@@ -13,6 +14,9 @@ export const invoiceService = {
 
   getById: (id: string): Promise<InvoiceRow> =>
     http.get<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`),
+
+  update: (id: string, body: UpdateInvoiceBody): Promise<InvoiceRow> =>
+    http.patch<InvoiceRow>(`/invoices/${encodeURIComponent(id)}`, body),
 
   list: (params: ListInvoicesParams = {}): Promise<Paginated<InvoiceRow>> => {
     const qs = new URLSearchParams();

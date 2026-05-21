@@ -11,6 +11,7 @@ import { invoiceService } from "@erp/pos/services/invoice.service";
 import type {
   CheckoutInvoiceBody,
   CreateInvoiceBody,
+  UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 
@@ -22,6 +23,29 @@ export function useCreateInvoiceMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<InvoiceRow, Error, CreateInvoiceBody>({
     mutationFn: (body) => invoiceService.create(body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DRAFTS_PREFIX });
+    },
+  });
+}
+
+interface UpdateInvoiceVars {
+  id: string;
+  body: UpdateInvoiceBody;
+}
+
+/**
+ * `PATCH /invoices/:id` — cập nhật draft (thay items/customer/note). Dùng khi
+ * tab được restore từ một draft: lưu/thanh toán lại sẽ ghi đè chính draft đó.
+ */
+export function useUpdateInvoiceMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  UpdateInvoiceVars
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, UpdateInvoiceVars>({
+    mutationFn: ({ id, body }) => invoiceService.update(id, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DRAFTS_PREFIX });
     },
