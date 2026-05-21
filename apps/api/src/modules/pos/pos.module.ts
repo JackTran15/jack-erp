@@ -38,6 +38,7 @@ import { InvoiceDebtService } from './services/invoice-debt.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
+import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publis
     CancelInvoiceService,
     InvoiceDebtService,
     InvoiceCancelledPublisher,
+    DebtPaymentVoucherLinkConsumer,
   ],
   exports: [
     PosSessionService,

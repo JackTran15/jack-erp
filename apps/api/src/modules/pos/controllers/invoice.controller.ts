@@ -29,7 +29,7 @@ import { InvoiceQueryDto } from '../dto/invoice-query.dto';
 import { DraftInvoiceResponseDto } from '../dto/draft-invoice.response.dto';
 import { DebtStatus } from '../entities/invoice-debt.entity';
 import { DebtPaymentMethod } from '../entities/debt-payment.entity';
-import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
 
 class CollectDebtPaymentDto {
   @IsNumber()
@@ -45,6 +45,11 @@ class CollectDebtPaymentDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** Cash account that receives the payment — required when paymentMethod=cash. */
+  @ValidateIf((o) => o.paymentMethod === DebtPaymentMethod.CASH)
+  @IsUUID()
+  cashAccountId?: string;
 }
 
 @Controller('invoices')

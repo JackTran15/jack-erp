@@ -65,11 +65,12 @@ export class CashController {
 
   @Post('movements')
   @RequirePermission('accounting.cash.create')
-  recordMovement(
+  async recordMovement(
     @Body() dto: RecordCashMovementDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.cashService.recordMovement(dto, actor);
+    const { movement } = await this.cashService.recordMovement(dto, actor);
+    return movement;
   }
 
   @Get('movements')

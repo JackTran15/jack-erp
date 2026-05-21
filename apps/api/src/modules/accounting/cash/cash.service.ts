@@ -5,7 +5,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, DataSource, SelectQueryBuilder } from 'typeorm';
+import {
+  In,
+  Repository,
+  DataSource,
+  SelectQueryBuilder,
+  EntityManager,
+} from 'typeorm';
 import { JournalSource, SessionStatus } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { JournalService } from '../journal/journal.service';
@@ -27,6 +33,16 @@ export interface CashMovementListQuery {
   cashAccountId?: string;
   type?: CashMovementType;
   branchId?: string;
+}
+
+/**
+ * Result of recording a cash movement: the persisted movement plus the id of the
+ * journal entry posted alongside it. Callers (cash vouchers, outbox) push the
+ * `journalEntryId` into events / voucher documents that link the existing JE.
+ */
+export interface RecordMovementResult {
+  movement: CashMovementEntity;
+  journalEntryId: string;
 }
 
 @Injectable()
@@ -75,11 +91,35 @@ export class CashService {
     return saved;
   }
 
+  /**
+   * Record a cash movement (+ balanced journal entry) and update the cash account
+   * balance.
+   *
+   * When `manager` is provided, all DB writes (movement + balance + JE) run inside
+   * the caller's transaction so the movement, journal entry and any caller-side
+   * writes (voucher document, outbox row) commit atomically. When omitted, a
+   * dedicated transaction is opened (legacy behavior).
+   *
+   * Returns the persisted movement plus the posted `journalEntryId`.
+   */
   async recordMovement(
     dto: RecordCashMovementDto,
     actor: ActorContext,
-  ): Promise<CashMovementEntity> {
-    const source = await this.accountRepo.findOne({
+    manager?: EntityManager,
+  ): Promise<RecordMovementResult> {
+    return manager
+      ? this.recordMovementInTx(dto, actor, manager)
+      : this.dataSource.transaction((m) =>
+          this.recordMovementInTx(dto, actor, m),
+        );
+  }
+
+  private async recordMovementInTx(
+    dto: RecordCashMovementDto,
+    actor: ActorContext,
+    manager: EntityManager,
+  ): Promise<RecordMovementResult> {
+    const source = await manager.findOne(CashAccountEntity, {
       where: { id: dto.cashAccountId, organizationId: actor.organizationId },
     });
     if (!source) {
@@ -87,17 +127,18 @@ export class CashService {
     }
 
     if (dto.type === CashMovementType.TRANSFER) {
-      return this.recordTransfer(dto, source, actor);
+      return this.recordTransferInTx(dto, source, actor, manager);
     }
 
-    return this.recordSingleAccountMovement(dto, source, actor);
+    return this.recordSingleAccountMovementInTx(dto, source, actor, manager);
   }
 
-  private async recordTransfer(
+  private async recordTransferInTx(
     dto: RecordCashMovementDto,
     source: CashAccountEntity,
     actor: ActorContext,
-  ): Promise<CashMovementEntity> {
+    manager: EntityManager,
+  ): Promise<RecordMovementResult> {
     if (!dto.toAccountId) {
       throw new BadRequestException('toAccountId is required for TRANSFER');
     }
@@ -105,11 +146,13 @@ export class CashService {
       throw new BadRequestException('Source and destination must differ');
     }
 
-    const dest = await this.accountRepo.findOne({
+    const dest = await manager.findOne(CashAccountEntity, {
       where: { id: dto.toAccountId, organizationId: actor.organizationId },
     });
     if (!dest) {
-      throw new NotFoundException(`Destination cash account ${dto.toAccountId} not found`);
+      throw new NotFoundException(
+        `Destination cash account ${dto.toAccountId} not found`,
+      );
     }
 
     if (source.branchId !== dest.branchId) {
@@ -126,64 +169,65 @@ export class CashService {
     }
 
     const sessionId =
-      (await this.findActiveSessionFor(source.id, actor.organizationId))?.id ?? undefined;
+      (await this.findActiveSessionFor(source.id, actor.organizationId))?.id ??
+      undefined;
 
-    return this.dataSource.transaction(async (manager) => {
-      source.balance = Number(source.balance) - amount;
-      dest.balance = Number(dest.balance) + amount;
-      await manager.save([source, dest]);
+    source.balance = Number(source.balance) - amount;
+    dest.balance = Number(dest.balance) + amount;
+    await manager.save([source, dest]);
 
-      const movement = manager.create(CashMovementEntity, {
-        cashAccountId: source.id,
-        toAccountId: dest.id,
-        type: CashMovementType.TRANSFER,
-        amount,
-        reference: dto.reference,
-        notes: dto.notes,
-        sessionId,
-        organizationId: actor.organizationId,
-        branchId: source.branchId,
-        createdBy: actor.userId,
-      });
-      const savedMovement = await manager.save(movement);
-
-      await this.journalService.post(
-        {
-          source: JournalSource.CASH_MOVEMENT,
-          sourceReferenceId: savedMovement.id,
-          description: `Transfer ${amount}: ${source.name} → ${dest.name}`,
-          lines: [
-            {
-              accountId: dest.accountId,
-              debitAmount: amount,
-              creditAmount: 0,
-              description: `Cash account: ${dest.name}`,
-              lineOrder: 1,
-            },
-            {
-              accountId: source.accountId,
-              debitAmount: 0,
-              creditAmount: amount,
-              description: `Cash account: ${source.name}`,
-              lineOrder: 2,
-            },
-          ],
-        },
-        actor,
-      );
-
-      this.logger.log(
-        `Recorded TRANSFER ${amount} from ${source.name} → ${dest.name} (id=${savedMovement.id})`,
-      );
-      return savedMovement;
+    const movement = manager.create(CashMovementEntity, {
+      cashAccountId: source.id,
+      toAccountId: dest.id,
+      type: CashMovementType.TRANSFER,
+      amount,
+      reference: dto.reference,
+      notes: dto.notes,
+      sessionId,
+      organizationId: actor.organizationId,
+      branchId: source.branchId,
+      createdBy: actor.userId,
     });
+    const savedMovement = await manager.save(movement);
+
+    const journalEntry = await this.journalService.post(
+      {
+        source: JournalSource.CASH_MOVEMENT,
+        sourceReferenceId: savedMovement.id,
+        description: `Transfer ${amount}: ${source.name} → ${dest.name}`,
+        lines: [
+          {
+            accountId: dest.accountId,
+            debitAmount: amount,
+            creditAmount: 0,
+            description: `Cash account: ${dest.name}`,
+            lineOrder: 1,
+          },
+          {
+            accountId: source.accountId,
+            debitAmount: 0,
+            creditAmount: amount,
+            description: `Cash account: ${source.name}`,
+            lineOrder: 2,
+          },
+        ],
+      },
+      actor,
+      manager,
+    );
+
+    this.logger.log(
+      `Recorded TRANSFER ${amount} from ${source.name} → ${dest.name} (id=${savedMovement.id})`,
+    );
+    return { movement: savedMovement, journalEntryId: journalEntry.id };
   }
 
-  private async recordSingleAccountMovement(
+  private async recordSingleAccountMovementInTx(
     dto: RecordCashMovementDto,
     cashAccount: CashAccountEntity,
     actor: ActorContext,
-  ): Promise<CashMovementEntity> {
+    manager: EntityManager,
+  ): Promise<RecordMovementResult> {
     if (!dto.contraAccountId) {
       throw new BadRequestException(
         `contraAccountId is required for ${dto.type}`,
@@ -212,42 +256,42 @@ export class CashService {
     );
 
     const sessionId =
-      (await this.findActiveSessionFor(cashAccount.id, actor.organizationId))?.id ?? undefined;
+      (await this.findActiveSessionFor(cashAccount.id, actor.organizationId))
+        ?.id ?? undefined;
 
-    return this.dataSource.transaction(async (manager) => {
-      const movement = manager.create(CashMovementEntity, {
-        cashAccountId: dto.cashAccountId,
-        type: dto.type,
-        amount: dto.amount,
-        reference: dto.reference,
-        notes: dto.notes,
-        sessionId,
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-      });
-
-      const savedMovement = await manager.save(movement);
-
-      cashAccount.balance = newBalance;
-      await manager.save(cashAccount);
-
-      await this.journalService.post(
-        {
-          source: JournalSource.CASH_MOVEMENT,
-          sourceReferenceId: savedMovement.id,
-          description: `Cash ${dto.type.toLowerCase()}: ${dto.amount} — ${cashAccount.name}`,
-          lines,
-        },
-        actor,
-      );
-
-      this.logger.log(
-        `Recorded ${dto.type} of ${dto.amount} on cash account ${cashAccount.name} (id=${cashAccount.id})`,
-      );
-
-      return savedMovement;
+    const movement = manager.create(CashMovementEntity, {
+      cashAccountId: dto.cashAccountId,
+      type: dto.type,
+      amount: dto.amount,
+      reference: dto.reference,
+      notes: dto.notes,
+      sessionId,
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
     });
+
+    const savedMovement = await manager.save(movement);
+
+    cashAccount.balance = newBalance;
+    await manager.save(cashAccount);
+
+    const journalEntry = await this.journalService.post(
+      {
+        source: JournalSource.CASH_MOVEMENT,
+        sourceReferenceId: savedMovement.id,
+        description: `Cash ${dto.type.toLowerCase()}: ${dto.amount} — ${cashAccount.name}`,
+        lines,
+      },
+      actor,
+      manager,
+    );
+
+    this.logger.log(
+      `Recorded ${dto.type} of ${dto.amount} on cash account ${cashAccount.name} (id=${cashAccount.id})`,
+    );
+
+    return { movement: savedMovement, journalEntryId: journalEntry.id };
   }
 
   private buildJournalLines(

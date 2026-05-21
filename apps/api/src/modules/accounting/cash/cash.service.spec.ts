@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { CashService } from './cash.service';
 import { CashAccountEntity, CashAccountType } from './cash-account.entity';
 import { CashMovementEntity, CashMovementType } from './cash-movement.entity';
@@ -30,6 +30,11 @@ describe('CashService', () => {
   let sessionRepo: { findOne: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let journalService: { post: jest.Mock };
+  let mockManager: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    create: jest.Mock;
+  };
 
   beforeEach(async () => {
     accountRepo = {
@@ -40,8 +45,17 @@ describe('CashService', () => {
     };
     movementRepo = { createQueryBuilder: jest.fn() };
     sessionRepo = { findOne: jest.fn().mockResolvedValue(null) };
-    dataSource = { transaction: jest.fn() };
-    journalService = { post: jest.fn().mockResolvedValue({}) };
+    // recordMovement now runs all DB writes inside a transaction (or the caller's
+    // manager). The mock manager is the single source of findOne/save/create.
+    mockManager = {
+      findOne: jest.fn(),
+      save: jest.fn((entity) => Promise.resolve(entity)),
+      create: jest.fn((_entity, data) => ({ id: 'mv-1', ...data })),
+    };
+    dataSource = {
+      transaction: jest.fn((cb) => cb(mockManager as unknown as EntityManager)),
+    };
+    journalService = { post: jest.fn().mockResolvedValue({ id: 'je-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -116,20 +130,10 @@ describe('CashService', () => {
       type: CashAccountType.SAFE,
     };
 
-    const setupTransaction = (saveImpl?: jest.Mock) => {
-      const mockManager = {
-        save: saveImpl ?? jest.fn((entity) => Promise.resolve(entity)),
-        create: jest.fn((_entity, data) => ({ id: 'mv-1', ...data })),
-      };
-      dataSource.transaction.mockImplementation((cb) => cb(mockManager));
-      return mockManager;
-    };
-
-    it('updates both balances and creates movement with toAccountId', async () => {
-      accountRepo.findOne
+    it('updates both balances and returns movement + journalEntryId', async () => {
+      mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount })
         .mockResolvedValueOnce({ ...destAccount });
-      setupTransaction();
 
       const result = await service.recordMovement(
         {
@@ -141,16 +145,14 @@ describe('CashService', () => {
         actor,
       );
 
-      expect(result.cashAccountId).toBe('src-1');
-      expect(result.toAccountId).toBe('dst-1');
-      expect(result.type).toBe(CashMovementType.TRANSFER);
-      // Source balance reduced; destination balance increased
-      const saveCallArgs = dataSource.transaction.mock.calls[0][0];
-      expect(typeof saveCallArgs).toBe('function');
+      expect(result.movement.cashAccountId).toBe('src-1');
+      expect(result.movement.toAccountId).toBe('dst-1');
+      expect(result.movement.type).toBe(CashMovementType.TRANSFER);
+      expect(result.journalEntryId).toBe('je-1');
     });
 
     it('rejects TRANSFER without toAccountId', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...sourceAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...sourceAccount });
 
       await expect(
         service.recordMovement(
@@ -161,7 +163,7 @@ describe('CashService', () => {
     });
 
     it('rejects TRANSFER when source equals destination', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...sourceAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...sourceAccount });
 
       await expect(
         service.recordMovement(
@@ -177,7 +179,7 @@ describe('CashService', () => {
     });
 
     it('rejects cross-branch TRANSFER', async () => {
-      accountRepo.findOne
+      mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount })
         .mockResolvedValueOnce({ ...destAccount, branchId: 'branch-2' });
 
@@ -195,7 +197,7 @@ describe('CashService', () => {
     });
 
     it('rejects TRANSFER when source has insufficient balance', async () => {
-      accountRepo.findOne
+      mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount, balance: 50 })
         .mockResolvedValueOnce({ ...destAccount });
 
@@ -213,7 +215,7 @@ describe('CashService', () => {
     });
 
     it('rejects TRANSFER when destination not found', async () => {
-      accountRepo.findOne
+      mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount })
         .mockResolvedValueOnce(null);
 
@@ -231,10 +233,9 @@ describe('CashService', () => {
     });
 
     it('posts journal entry with DR destination + CR source', async () => {
-      accountRepo.findOne
+      mockManager.findOne
         .mockResolvedValueOnce({ ...sourceAccount })
         .mockResolvedValueOnce({ ...destAccount });
-      setupTransaction();
 
       await service.recordMovement(
         {
@@ -254,6 +255,7 @@ describe('CashService', () => {
           ],
         }),
         actor,
+        mockManager,
       );
     });
   });
@@ -269,17 +271,8 @@ describe('CashService', () => {
       type: CashAccountType.REGISTER,
     };
 
-    const setupTransaction = () => {
-      const mockManager = {
-        save: jest.fn((entity) => Promise.resolve(entity)),
-        create: jest.fn((_entity, data) => ({ id: 'mv-1', ...data })),
-      };
-      dataSource.transaction.mockImplementation((cb) => cb(mockManager));
-      return mockManager;
-    };
-
     it('rejects DEPOSIT without contraAccountId', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
 
       await expect(
         service.recordMovement(
@@ -290,7 +283,7 @@ describe('CashService', () => {
     });
 
     it('rejects when contraAccountId equals cashAccount.accountId', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
 
       await expect(
         service.recordMovement(
@@ -306,8 +299,7 @@ describe('CashService', () => {
     });
 
     it('DEPOSIT posts DR cash + CR contra', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
-      setupTransaction();
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
 
       await service.recordMovement(
         {
@@ -327,12 +319,12 @@ describe('CashService', () => {
           ],
         }),
         actor,
+        mockManager,
       );
     });
 
     it('WITHDRAWAL posts DR contra + CR cash', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
-      setupTransaction();
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
 
       await service.recordMovement(
         {
@@ -352,12 +344,12 @@ describe('CashService', () => {
           ],
         }),
         actor,
+        mockManager,
       );
     });
 
     it('ADJUSTMENT posts DR cash + CR contra (treated as positive)', async () => {
-      accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
-      setupTransaction();
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
 
       await service.recordMovement(
         {
@@ -377,7 +369,24 @@ describe('CashService', () => {
           ],
         }),
         actor,
+        mockManager,
       );
+    });
+
+    it('rejects WITHDRAWAL that would drive the balance below zero', async () => {
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount, balance: 30 });
+
+      await expect(
+        service.recordMovement(
+          {
+            cashAccountId: 'cash-1',
+            type: CashMovementType.WITHDRAWAL,
+            amount: 100,
+            contraAccountId: 'gl-expense',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(/Insufficient cash balance/);
     });
 
     it('journal lines are balanced (debits = credits) for every type', async () => {
@@ -388,8 +397,7 @@ describe('CashService', () => {
       ];
 
       for (const type of types) {
-        accountRepo.findOne.mockResolvedValueOnce({ ...cashAccount });
-        setupTransaction();
+        mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
         journalService.post.mockClear();
 
         await service.recordMovement(
@@ -410,6 +418,64 @@ describe('CashService', () => {
     });
   });
 
+  describe('recordMovement (TX composition — TKT-CV-00)', () => {
+    const cashAccount = {
+      id: 'cash-1',
+      name: 'Quầy 1',
+      accountId: 'gl-cash',
+      balance: 500,
+      branchId: 'branch-1',
+      organizationId: 'org-1',
+      type: CashAccountType.REGISTER,
+    };
+
+    it('runs inside the caller manager without opening a new transaction', async () => {
+      const callerManager = {
+        findOne: jest.fn().mockResolvedValueOnce({ ...cashAccount }),
+        save: jest.fn((entity) => Promise.resolve(entity)),
+        create: jest.fn((_entity, data) => ({ id: 'mv-9', ...data })),
+      };
+
+      const result = await service.recordMovement(
+        {
+          cashAccountId: 'cash-1',
+          type: CashMovementType.DEPOSIT,
+          amount: 100,
+          contraAccountId: 'gl-revenue',
+        },
+        actor,
+        callerManager as unknown as EntityManager,
+      );
+
+      // No nested transaction opened — caller owns the unit of work.
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      // JE posted within the same caller manager.
+      expect(journalService.post).toHaveBeenCalledWith(
+        expect.any(Object),
+        actor,
+        callerManager,
+      );
+      expect(result.movement.id).toBe('mv-9');
+      expect(result.journalEntryId).toBe('je-1');
+    });
+
+    it('opens its own transaction when no manager is passed (backward compatible)', async () => {
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
+
+      await service.recordMovement(
+        {
+          cashAccountId: 'cash-1',
+          type: CashMovementType.DEPOSIT,
+          amount: 100,
+          contraAccountId: 'gl-revenue',
+        },
+        actor,
+      );
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('sessionId auto-fill — TKT-057', () => {
     const cashAccount = {
       id: 'cash-1',
@@ -421,19 +487,9 @@ describe('CashService', () => {
       type: CashAccountType.REGISTER,
     };
 
-    const setupTransaction = () => {
-      const mockManager = {
-        save: jest.fn((entity) => Promise.resolve(entity)),
-        create: jest.fn((_entity, data) => ({ id: 'mv-1', ...data })),
-      };
-      dataSource.transaction.mockImplementation((cb) => cb(mockManager));
-      return mockManager;
-    };
-
     it('auto-fills sessionId when active session exists for the cash_account', async () => {
-      accountRepo.findOne.mockResolvedValue({ ...cashAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
       sessionRepo.findOne.mockResolvedValue({ id: 'session-1', status: 'OPEN' });
-      const mgr = setupTransaction();
 
       await service.recordMovement(
         {
@@ -445,14 +501,13 @@ describe('CashService', () => {
         actor,
       );
 
-      const created = mgr.create.mock.calls[0][1];
+      const created = mockManager.create.mock.calls[0][1];
       expect(created.sessionId).toBe('session-1');
     });
 
     it('leaves sessionId undefined when no active session', async () => {
-      accountRepo.findOne.mockResolvedValue({ ...cashAccount });
+      mockManager.findOne.mockResolvedValueOnce({ ...cashAccount });
       sessionRepo.findOne.mockResolvedValue(null);
-      const mgr = setupTransaction();
 
       await service.recordMovement(
         {
@@ -464,7 +519,7 @@ describe('CashService', () => {
         actor,
       );
 
-      const created = mgr.create.mock.calls[0][1];
+      const created = mockManager.create.mock.calls[0][1];
       expect(created.sessionId).toBeUndefined();
     });
   });

@@ -7,6 +7,12 @@ export enum ExpenseStatus {
   POSTED = 'POSTED',
 }
 
+export enum ExpensePaymentMethod {
+  CASH = 'CASH',
+  BANK = 'BANK',
+  PAYABLE = 'PAYABLE',
+}
+
 /** Operational expense record. Workflow: DRAFT → APPROVED → POSTED. Posting auto-creates a journal entry. */
 @Entity('expenses')
 @Index('idx_expense_org_status', ['organizationId', 'status'])
@@ -49,4 +55,23 @@ export class ExpenseEntity extends BaseEntity {
 
   @Column({ name: 'posted_by', type: 'uuid', nullable: true, comment: 'User who posted' })
   postedBy?: string;
+
+  @Column({
+    name: 'payment_method',
+    type: 'enum',
+    enum: ExpensePaymentMethod,
+    enumName: 'expense_payment_method_enum',
+    nullable: true,
+    comment: 'CASH posts a cash movement + auto Phiếu chi; BANK/PAYABLE post a JE only',
+  })
+  paymentMethod?: ExpensePaymentMethod;
+
+  @Column({ name: 'cash_account_id', type: 'uuid', nullable: true, comment: 'Required when paymentMethod=CASH (két chi)' })
+  cashAccountId?: string;
+
+  @Column({ name: 'cash_payment_id', type: 'uuid', nullable: true, comment: 'Auto-created Phiếu chi (set by link-back consumer)' })
+  cashPaymentId?: string;
+
+  @Column({ name: 'journal_entry_id', type: 'uuid', nullable: true, comment: 'Journal entry created on post' })
+  journalEntryId?: string;
 }

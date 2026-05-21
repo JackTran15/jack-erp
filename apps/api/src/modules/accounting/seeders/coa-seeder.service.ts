@@ -31,11 +31,13 @@ export const DEFAULT_COA: DefaultAccount[] = [
   // REVENUE
   { code: '511', name: 'Doanh thu bán hàng', type: AccountType.REVENUE },
   { code: '521', name: 'Các khoản giảm trừ doanh thu', type: AccountType.REVENUE },
+  { code: '711', name: 'Thu nhập khác', type: AccountType.REVENUE },
 
   // EXPENSE
   { code: '632', name: 'Giá vốn hàng bán', type: AccountType.EXPENSE },
   { code: '641', name: 'Chi phí bán hàng', type: AccountType.EXPENSE },
   { code: '642', name: 'Chi phí quản lý doanh nghiệp', type: AccountType.EXPENSE },
+  { code: '811', name: 'Chi phí khác', type: AccountType.EXPENSE },
 
   // SUMMARY
   { code: '911', name: 'Xác định kết quả kinh doanh', type: AccountType.EQUITY },
@@ -54,8 +56,11 @@ export class CoaSeederService {
     const existing = await this.accountRepo.count({ where: { organizationId } });
     if (existing > 0) {
       this.logger.log(
-        `Org ${organizationId} already has ${existing} COA accounts, skipping seed`,
+        `Org ${organizationId} already has ${existing} COA accounts, skipping full seed`,
       );
+      // Idempotently top up accounts added after the org was first seeded
+      // (e.g. TK 711/811 needed by cash-count variance vouchers).
+      await this.ensureMissingAccounts(organizationId, actorId);
       return 0;
     }
 
@@ -101,5 +106,36 @@ export class CoaSeederService {
       `Seeded ${DEFAULT_COA.length} default COA accounts for organization ${organizationId}`,
     );
     return DEFAULT_COA.length;
+  }
+
+  /** Insert any DEFAULT_COA root accounts the org is missing (idempotent top-up). */
+  private async ensureMissingAccounts(
+    organizationId: string,
+    actorId: string,
+  ): Promise<void> {
+    const codes = DEFAULT_COA.filter((a) => !a.parent).map((a) => a.code);
+    const present = await this.accountRepo.find({
+      where: { organizationId },
+      select: ['code'],
+    });
+    const presentCodes = new Set(present.map((a) => a.code));
+
+    for (const code of codes) {
+      if (presentCodes.has(code)) continue;
+      const def = DEFAULT_COA.find((a) => a.code === code)!;
+      await this.accountRepo.save(
+        this.accountRepo.create({
+          organizationId,
+          code: def.code,
+          name: def.name,
+          type: def.type,
+          isActive: true,
+          createdBy: actorId,
+        }),
+      );
+      this.logger.log(
+        `Added missing COA account ${def.code} (${def.name}) for org ${organizationId}`,
+      );
+    }
   }
 }

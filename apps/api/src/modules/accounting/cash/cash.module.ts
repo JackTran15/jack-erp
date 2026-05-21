@@ -7,7 +7,6 @@ import { CashService } from './cash.service';
 import { CashController } from './cash.controller';
 import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publisher';
-import { CashFromPaymentConsumer } from '../consumers/cash-from-payment.consumer';
 
 @Module({
   imports: [
@@ -15,7 +14,9 @@ import { CashFromPaymentConsumer } from '../consumers/cash-from-payment.consumer
     JournalModule,
   ],
   controllers: [CashController],
-  providers: [CashService, CashFromPaymentPublisher, CashFromPaymentConsumer],
+  providers: [CashService, CashFromPaymentPublisher],
+  // CashFromPaymentConsumer relocated to cash-vouchers/cash-voucher-consumers/
+  // pos-cash-sale.consumer.ts (now creates the Phiếu thu voucher too).
   exports: [CashService, CashFromPaymentPublisher],
 })
 export class CashModule {}

@@ -18,6 +18,10 @@ const TOPIC_SPECS: TopicSpec[] = [
   { topic: ERP_TOPICS.JOURNAL_POST_SALE, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.LOYALTY_POINTS_AWARD, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CASH_MOVEMENT_FROM_PAYMENT, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.CASH_VOUCHER_NEEDED_DEBT_PAYMENT, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.CASH_VOUCHER_NEEDED_GOODS_RECEIPT, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.CASH_VOUCHER_NEEDED_EXPENSE, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.CASH_VOUCHER_CREATED, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CUSTOMER_MERGED, numPartitions: 1, replicationFactor: 1 },
   { topic: ERP_TOPICS.TEMP_WAREHOUSE_TRANSFER_REQUESTED, numPartitions: 3, replicationFactor: 1 },
 ];

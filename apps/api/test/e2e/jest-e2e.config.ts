@@ -17,6 +17,9 @@ const config: Config = {
   globalTeardown: '<rootDir>/setup/global-teardown.ts',
   setupFilesAfterEnv: ['<rootDir>/setup/jest-setup.ts'],
   testTimeout: 30_000,
+  // External clients (kafkajs consumers) can leave handles open after the run;
+  // force exit so a hanging teardown doesn't masquerade as a suite failure.
+  forceExit: true,
 };
 
 export default config;
