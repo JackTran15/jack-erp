@@ -50,6 +50,22 @@ export function createErpApiClient(axiosInstance: AxiosInstance) {
     }
   }
 
+  async function PUT<T = unknown>(
+    path: string,
+    options?: {
+      params?: { path?: Record<string, string> };
+      body?: unknown;
+    },
+  ): Promise<{ data: T | undefined; error: unknown }> {
+    const url = resolvePath(path, options?.params?.path);
+    try {
+      const res = await axiosInstance.put<T>(url, options?.body);
+      return { data: res.data, error: undefined };
+    } catch (err) {
+      return { data: undefined, error: extractErrorBody(err) };
+    }
+  }
+
   async function DELETE<T = unknown>(
     path: string,
     options?: { params?: { path?: Record<string, string> } },
@@ -63,7 +79,7 @@ export function createErpApiClient(axiosInstance: AxiosInstance) {
     }
   }
 
-  return { GET, POST, PATCH, DELETE };
+  return { GET, POST, PUT, PATCH, DELETE };
 }
 
 function resolvePath(

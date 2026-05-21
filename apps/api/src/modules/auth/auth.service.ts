@@ -10,6 +10,7 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionStore } from '../redis/session.store';
+import { RbacService } from '../rbac/rbac.service';
 import { UserEntity } from './user.entity';
 import { UserRoleEntity } from './user-role.entity';
 import { RoleEntity } from './role.entity';
@@ -33,6 +34,7 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly sessionStore: SessionStore,
+    private readonly rbacService: RbacService,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     @InjectRepository(UserRoleEntity)
@@ -67,16 +69,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const roles = await this.resolveUserRoles(user.id, orgId);
-    const branchIds = await this.resolveUserBranches(user.id, orgId);
+    const session = await this.buildSessionInfo(user.id, orgId);
+    const { roles, branchIds } = session;
     const jti = uuidv4();
-
-    const session: SessionInfo = {
-      userId: user.id,
-      organizationId: orgId,
-      roles,
-      branchIds,
-    };
 
     await this.sessionStore.createSession(
       jti,
@@ -181,12 +176,19 @@ export class AuthService {
   async getSession(jti: string): Promise<SessionInfo | null> {
     const session = await this.sessionStore.getSession(jti);
     if (!session) return null;
-    return {
-      userId: session.userId,
-      organizationId: session.organizationId,
-      roles: session.roles,
-      branchIds: session.branchIds,
-    };
+    return this.buildSessionInfo(session.userId, session.organizationId);
+  }
+
+  private async buildSessionInfo(
+    userId: string,
+    organizationId: string,
+  ): Promise<SessionInfo> {
+    const [roles, branchIds, permissions] = await Promise.all([
+      this.resolveUserRoles(userId, organizationId),
+      this.resolveUserBranches(userId, organizationId),
+      this.rbacService.getUserPermissions(userId, organizationId),
+    ]);
+    return { userId, organizationId, roles, branchIds, permissions };
   }
 
   verifyAccessToken(token: string): JwtPayload {

@@ -28,11 +28,14 @@ import {
   LayoutGrid
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { hasPermission } from "../../lib/permissions";
 
 export interface NavChild {
   to: string;
   label: string;
   end?: boolean;
+  /** When set, link is hidden unless the user has this permission key. */
+  permission?: string;
 }
 
 export interface NavSection {
@@ -59,6 +62,29 @@ export interface NavModule {
 
 export function isFlyoutEnabled(module: NavModule): boolean {
   return module.flyout?.enabled === true;
+}
+
+export function isNavChildVisible(child: NavChild): boolean {
+  if (!child.permission) return true;
+  return hasPermission(child.permission);
+}
+
+export function filterNavSections(sections: NavSection[]): NavSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      children: section.children.filter(isNavChildVisible),
+    }))
+    .filter((section) => section.children.length > 0);
+}
+
+export function visibleNavConfig(): NavModule[] {
+  return navConfig
+    .map((mod) => ({
+      ...mod,
+      sections: filterNavSections(mod.sections),
+    }))
+    .filter((mod) => mod.sections.some((s) => s.children.length > 0));
 }
 
 export const navConfig: NavModule[] = [
@@ -233,7 +259,11 @@ export const navConfig: NavModule[] = [
         id: "catalog-misc",
         label: "KHÁC",
         children: [
-          { to: "/admin/employees", label: "Nhân viên" },
+          {
+            to: "/admin/employees",
+            label: "Nhân viên",
+            permission: "iam.user.read",
+          },
           { to: "/admin/job-positions", label: "Vị trí công việc" },
           { to: "/admin/stores", label: "Cửa hàng" },
           { to: "/admin/cash-boxes", label: "Két đựng tiền" },
@@ -265,6 +295,11 @@ export const navConfig: NavModule[] = [
         children: [
           { to: "/setup", label: "Thiết lập chung", },
           { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
+          {
+            to: "/role-management",
+            label: "Quản lý vai trò",
+            permission: "iam.role.read",
+          },
         ],
       },
     ],

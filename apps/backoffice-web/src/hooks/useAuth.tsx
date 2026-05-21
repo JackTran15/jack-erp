@@ -6,10 +6,15 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { LoginResponse, RefreshResponse } from "@erp/shared-interfaces";
+import type {
+  LoginResponse,
+  RefreshResponse,
+  SessionInfo,
+} from "@erp/shared-interfaces";
 import { getAccessToken, setAccessToken } from "../lib/access-token";
 import {
   persistSession,
+  persistSessionInfo,
   persistRefreshResponse,
   clearSession,
   getRefreshToken,
@@ -43,6 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
       persistRefreshResponse(data);
+      const sessionRes = await erpApi.GET<SessionInfo>("/auth/session");
+      if (!sessionRes.error && sessionRes.data) {
+        persistSessionInfo(sessionRes.data);
+      }
       return true;
     },
     staleTime: Infinity,

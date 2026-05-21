@@ -166,6 +166,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UsersController_list"];
+        put?: never;
+        post: operations["UsersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UsersController_findById"];
+        put?: never;
+        post?: never;
+        delete: operations["UsersController_deactivate"];
+        options?: never;
+        head?: never;
+        patch: operations["UsersController_update"];
+        trace?: never;
+    };
+    "/admin/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UsersController_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UsersController_getUserRoles"];
+        put?: never;
+        /** Replaces the entire role set for the user. */
+        post: operations["UsersController_setUserRoles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{id}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UsersController_getUserBranches"];
+        put?: never;
+        /** Replaces the entire branch assignment set for the user. */
+        post: operations["UsersController_setUserBranches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RolesController_list"];
+        put?: never;
+        post: operations["RolesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RolesController_findById"];
+        put?: never;
+        post?: never;
+        delete: operations["RolesController_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["RolesController_update"];
+        trace?: never;
+    };
+    "/admin/roles/{id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replaces the entire permission set for the role. */
+        put: operations["RolesController_setPermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the catalogue of permission keys, both as a flat list and grouped by module. */
+        get: operations["PermissionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations": {
         parameters: {
             query?: never;
@@ -3257,6 +3405,112 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        EmployeeAddressDto: {
+            /** @enum {string} */
+            type: "PERMANENT" | "CURRENT";
+            address?: string;
+            country?: string;
+            province?: string;
+            district?: string;
+            ward?: string;
+        };
+        EmployeeEmergencyContactDto: {
+            fullName?: string;
+            relationship?: string;
+            mobile?: string;
+            homePhone?: string;
+            email?: string;
+            address?: string;
+        };
+        EmployeeAccessScheduleDayDto: {
+            /** @enum {string} */
+            weekday: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+            enabled: boolean;
+            /** @example 08:00 */
+            startTime: string;
+            /** @example 17:30 */
+            endTime: string;
+        };
+        EmployeeProfileDto: {
+            /** @description Employee code, unique per organization (e.g. NV000002) */
+            code: string;
+            mobile?: string;
+            homePhone?: string;
+            idCardNumber?: string;
+            idCardIssuePlace?: string;
+            /** @description ISO date YYYY-MM-DD */
+            idCardIssueDate?: string;
+            /** @description ISO date YYYY-MM-DD */
+            birthDate?: string;
+            /** @enum {string} */
+            gender?: "MALE" | "FEMALE";
+            /** @enum {string} */
+            maritalStatus?: "SINGLE" | "MARRIED";
+            /** @enum {string} */
+            employmentStatus?: "OFFICIAL" | "PROBATION" | "RESIGNED";
+            photoUrl?: string;
+            /** Format: uuid */
+            jobPositionId?: string;
+            /** @description ISO date YYYY-MM-DD */
+            probationDate?: string;
+            /** @description ISO date YYYY-MM-DD */
+            officialDate?: string;
+            salary?: number;
+            deposit?: number;
+            originalDocumentsNote?: string;
+            /** @enum {string} */
+            accessMode?: "FREE" | "SCHEDULED";
+            addresses?: components["schemas"]["EmployeeAddressDto"][];
+            emergencyContact?: components["schemas"]["EmployeeEmergencyContactDto"];
+            accessSchedule?: components["schemas"]["EmployeeAccessScheduleDayDto"][];
+        };
+        CreateUserDto: {
+            /** Format: email */
+            email: string;
+            firstName: string;
+            lastName: string;
+            /** @description Temporary password set by the administrator; user is expected to change it on first login. */
+            temporaryPassword: string;
+            /** @description Optional initial roles to assign on creation. */
+            roleIds?: string[];
+            /** @description Optional initial branch assignments. */
+            branchIds?: string[];
+            /** @description Optional HR profile persisted alongside the user account. */
+            profile?: components["schemas"]["EmployeeProfileDto"];
+        };
+        UpdateUserDto: {
+            firstName?: string;
+            lastName?: string;
+            isActive?: boolean;
+            /** @description HR profile to upsert. Provided child collections fully replace the existing set. */
+            profile?: components["schemas"]["EmployeeProfileDto"];
+        };
+        ResetPasswordDto: {
+            /** @description New temporary password the administrator wants to set for the user. */
+            newTemporaryPassword: string;
+        };
+        SetUserRolesDto: {
+            /** @description Replaces the entire role set for the user with this list. */
+            roleIds: string[];
+        };
+        SetUserBranchesDto: {
+            /** @description Replaces the entire branch assignment set for the user with this list. */
+            branchIds: string[];
+        };
+        CreateRoleDto: {
+            name: string;
+            description?: string;
+            /** @description Permission keys to attach when the role is created. May be empty. */
+            permissionKeys?: string[];
+        };
+        UpdateRoleDto: {
+            name?: string;
+            description?: string;
+        };
+        SetRolePermissionsDto: {
+            /** @description Replaces the entire permission set for the role with this list. */
+            permissionKeys: string[];
+        };
         CreateOrganizationDto: {
             name: string;
             /** Format: email */
@@ -3418,7 +3672,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -3430,7 +3684,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -3462,7 +3716,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
             branchId?: string;
         };
         SalesmanAssignmentEntity: {
@@ -6008,6 +6262,377 @@ export interface operations {
         };
     };
     AuthController_getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_getUserRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_setUserRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetUserRolesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_getUserBranches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    UsersController_setUserBranches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetUserBranchesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    RolesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    RolesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    RolesController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    RolesController_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RolesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    RolesController_setPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRolePermissionsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PermissionsController_list: {
         parameters: {
             query?: never;
             header?: never;
