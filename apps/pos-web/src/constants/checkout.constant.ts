@@ -1,4 +1,7 @@
-import type { PaymentMethodOption } from "@erp/pos/interfaces/checkout.interface";
+import type {
+  PaymentMethodOption,
+  SaleChannelOption,
+} from "@erp/pos/interfaces/checkout.interface";
 import type {
   ApiPaymentMethod,
   InvoicePaymentMethod,
@@ -146,6 +149,28 @@ export const PAYMENT_METHODS: readonly PaymentMethodOption[] = [
   { value: PaymentMethodEnum.CASH, label: "Tiền mặt" },
   { value: PaymentMethodEnum.CARD, label: "Thẻ" },
   { value: PaymentMethodEnum.TRANSFER, label: "Chuyển khoản" },
+];
+
+// ============================================================================
+// Sale channel (kênh bán hàng — popover "Tại cửa hàng")
+// ============================================================================
+
+export const DEFAULT_SALE_CHANNEL_ID = "at-store";
+
+/** Bộ màu bubble lấy từ design token mục 2.1 của TaiCuaHang.md. */
+export const SALE_CHANNELS: readonly SaleChannelOption[] = [
+  {
+    id: "at-store",
+    label: "Tại cửa hàng",
+    bubbleClassName: "bg-gradient-to-br from-[#7C7FE8] to-[#5A5DD8]",
+    isStore: true,
+  },
+  { id: "facebook", label: "Facebook", bubbleClassName: "bg-[#1877F2]", initial: "f" },
+  { id: "zalo", label: "Zalo", bubbleClassName: "bg-[#0084FF]", initial: "Z" },
+  { id: "instagram", label: "Instagram", bubbleClassName: "bg-[#E1306C]", initial: "I" },
+  { id: "tiki", label: "Tiki", bubbleClassName: "bg-[#1BA9E1]", initial: "T" },
+  { id: "lazada", label: "Lazada", bubbleClassName: "bg-[#0F1F8F]", initial: "L" },
+  { id: "shopee", label: "Shopee", bubbleClassName: "bg-[#EE4D2D]", initial: "S" },
 ];
 
 // ============================================================================

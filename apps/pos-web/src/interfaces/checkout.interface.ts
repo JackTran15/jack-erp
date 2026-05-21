@@ -42,6 +42,18 @@ export interface PaymentMethodOption {
   label: string;
 }
 
+/** One sales-channel row in the "Tại cửa hàng" selector popover. */
+export interface SaleChannelOption {
+  id: string;
+  label: string;
+  /** Tailwind class nền cho bubble tròn 40px, vd "bg-[#1877F2]". */
+  bubbleClassName: string;
+  /** Chữ cái hiển thị trong bubble; bỏ trống nếu dùng icon storefront. */
+  initial?: string;
+  /** true => render StoreIcon trong bubble (kênh "Tại cửa hàng"). */
+  isStore?: boolean;
+}
+
 export interface CashSuggestion {
   id: string;
   amount: number;
