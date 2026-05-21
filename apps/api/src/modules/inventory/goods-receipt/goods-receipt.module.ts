@@ -3,10 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { EventsModule } from '../../events/events.module';
+import { CashModule } from '../../accounting/cash/cash.module';
+import { JournalModule } from '../../accounting/journal/journal.module';
 import { GoodsReceiptEntity } from './goods-receipt.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { GoodsReceiptService } from './goods-receipt.service';
 import { GoodsReceiptController } from './goods-receipt.controller';
+import { GoodsReceiptVoucherLinkConsumer } from './consumers/goods-receipt-voucher-link.consumer';
 
 @Module({
   imports: [
@@ -14,9 +17,11 @@ import { GoodsReceiptController } from './goods-receipt.controller';
     StockLedgerModule,
     DocumentNumberingModule,
     EventsModule,
+    CashModule,
+    JournalModule,
   ],
   controllers: [GoodsReceiptController],
-  providers: [GoodsReceiptService],
+  providers: [GoodsReceiptService, GoodsReceiptVoucherLinkConsumer],
   exports: [GoodsReceiptService],
 })
 export class GoodsReceiptModule {}

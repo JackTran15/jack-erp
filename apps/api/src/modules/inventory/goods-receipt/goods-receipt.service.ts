@@ -13,10 +13,12 @@ import {
   DomainEventType,
   GoodsReceiptPurpose,
   GoodsReceiptStatus,
+  JournalSource,
   PaginatedResponse,
   PaginationQuery,
   StockMovementType,
 } from '@erp/shared-interfaces';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import {
   RecordMovementParams,
@@ -24,7 +26,15 @@ import {
 } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { EventPublisher } from '../../events/event-publisher.service';
-import { GoodsReceiptEntity } from './goods-receipt.entity';
+import { CashService } from '../../accounting/cash/cash.service';
+import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
+import { JournalService } from '../../accounting/journal/journal.service';
+import { OutboxService } from '../../events/outbox/outbox.service';
+import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
+import {
+  GoodsReceiptEntity,
+  GoodsReceiptPaymentMethod,
+} from './goods-receipt.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
@@ -49,6 +59,9 @@ export class GoodsReceiptService {
     private readonly stockLedger: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly eventPublisher: EventPublisher,
+    private readonly cashService: CashService,
+    private readonly journalService: JournalService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
@@ -77,6 +90,8 @@ export class GoodsReceiptService {
       sourceBranchId: dto.sourceBranchId,
       receivedAt: new Date(dto.receivedAt),
       locationId: dto.locationId,
+      paymentMethod: dto.paymentMethod,
+      cashAccountId: dto.cashAccountId,
       attachmentIds: dto.attachmentIds ?? [],
       lines: dto.lines.map((l) =>
         this.makeLine(l, actor.organizationId, actor.branchId, actor.userId),
@@ -215,12 +230,91 @@ export class GoodsReceiptService {
         ? StockMovementType.TRANSFER_IN
         : StockMovementType.PURCHASE_RECEIPT;
 
+    const total = receipt.lines.reduce(
+      (sum, l) => sum + Number(l.quantity) * Number(l.unitPrice),
+      0,
+    );
+    const isCash = receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH;
+    if (isCash && !receipt.cashAccountId) {
+      throw new BadRequestException(
+        'paymentMethod=CASH yêu cầu cashAccountId',
+      );
+    }
+
     await this.dataSource.transaction(async (manager) => {
+      let journalEntryId: string | undefined;
+      let cashMovementId: string | undefined;
+      let cashContraAccountId: string | undefined;
+
+      if (isCash) {
+        // CASH: DR inventory (TK 156) / CR cash via recordMovement — atomic with
+        // the stock posting; insufficient balance throws 400 and rolls back.
+        const inventoryAccountId = await this.resolveAccountId(
+          manager,
+          receipt.organizationId,
+          '156',
+        );
+        cashContraAccountId = inventoryAccountId;
+        const res = await this.cashService.recordMovement(
+          {
+            cashAccountId: receipt.cashAccountId!,
+            type: CashMovementType.WITHDRAWAL,
+            amount: total,
+            contraAccountId: inventoryAccountId,
+            reference: documentNumber,
+            notes: `Goods receipt ${documentNumber}`,
+          },
+          actor,
+          manager,
+        );
+        journalEntryId = res.journalEntryId;
+        cashMovementId = res.movement.id;
+      } else if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
+        // CREDIT: DR inventory (156) / CR payable (331), no cash movement.
+        const inventoryAccountId = await this.resolveAccountId(
+          manager,
+          receipt.organizationId,
+          '156',
+        );
+        const payableAccountId = await this.resolveAccountId(
+          manager,
+          receipt.organizationId,
+          '331',
+        );
+        const entry = await this.journalService.post(
+          {
+            source: JournalSource.MANUAL,
+            sourceReferenceId: receipt.id,
+            description: `Goods receipt ${documentNumber} (credit)`,
+            lines: [
+              {
+                accountId: inventoryAccountId,
+                debitAmount: total,
+                creditAmount: 0,
+                description: 'Inventory (debit)',
+                lineOrder: 1,
+              },
+              {
+                accountId: payableAccountId,
+                debitAmount: 0,
+                creditAmount: total,
+                description: 'Payable (credit)',
+                lineOrder: 2,
+              },
+            ],
+          },
+          actor,
+          manager,
+        );
+        journalEntryId = entry.id;
+      }
+
       await manager.update(GoodsReceiptEntity, receipt.id, {
         status: GoodsReceiptStatus.POSTED,
         documentNumber,
         postedAt: new Date(),
         postedBy: actor.userId,
+        ...(journalEntryId ? { journalEntryId } : {}),
       });
 
       const movements: RecordMovementParams[] = receipt.lines.map((line) => ({
@@ -236,6 +330,30 @@ export class GoodsReceiptService {
         actorContext: actor,
       }));
       await this.stockLedger.recordBatchMovements(movements);
+
+      if (isCash && cashMovementId && journalEntryId) {
+        await this.outboxService.enqueue(
+          manager,
+          ERP_TOPICS.CASH_VOUCHER_NEEDED_GOODS_RECEIPT,
+          buildCashVoucherNeededEvent({
+            sourceType: 'GOODS_RECEIPT',
+            sourceId: receipt.id,
+            sourceDocumentNumber: documentNumber,
+            amount: total,
+            cashAccountId: receipt.cashAccountId!,
+            contraAccountId: cashContraAccountId!,
+            cashMovementId,
+            journalEntryId,
+            partnerType: receipt.providerId ? 'SUPPLIER' : 'OTHER',
+            partnerId: receipt.providerId,
+            description: `Goods receipt ${documentNumber}`,
+            categoryCode: 'CHI_MUA_HANG',
+            organizationId: receipt.organizationId,
+            branchId,
+            actorId: actor.userId,
+          }),
+        );
+      }
     });
 
     await this.eventPublisher.publish('inventory.goods_receipt.posted', {
@@ -262,6 +380,24 @@ export class GoodsReceiptService {
 
     this.logger.log(`Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`);
     return this.findOrFail(id, actor.organizationId);
+  }
+
+  /** Resolve an account id by code within an org (for inventory/payable contra). */
+  private async resolveAccountId(
+    manager: import('typeorm').EntityManager,
+    organizationId: string,
+    code: string,
+  ): Promise<string> {
+    const rows = await manager.query(
+      `SELECT "id" FROM "accounts" WHERE "organization_id" = $1 AND "code" = $2 AND "is_active" = true LIMIT 1`,
+      [organizationId, code],
+    );
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException(
+        `Account ${code} is not configured in the chart of accounts`,
+      );
+    }
+    return rows[0].id;
   }
 
   // ─── Read ─────────────────────────────────────────────────────────────────

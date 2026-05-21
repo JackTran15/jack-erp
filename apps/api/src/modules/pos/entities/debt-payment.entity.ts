@@ -27,4 +27,10 @@ export class DebtPaymentEntity extends BaseEntity {
 
   @Column({ type: 'text', nullable: true, comment: 'Free-text note about this payment instalment' })
   note?: string;
+
+  @Column({ name: 'cash_receipt_id', type: 'uuid', nullable: true, comment: 'Auto-created Phiếu thu (set by link-back consumer)' })
+  cashReceiptId?: string;
+
+  @Column({ name: 'journal_entry_id', type: 'uuid', nullable: true, comment: 'Journal entry created when collected in cash' })
+  journalEntryId?: string;
 }

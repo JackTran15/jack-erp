@@ -203,3 +203,38 @@ variance     = actualCash - expectedCash
 | `cash_movements` thiếu `toAccountId`   | TRANSFER không biết két đích                                |
 | Bug journal trong `CashService`        | Debit và credit cùng 1 account → bút toán vô nghĩa          |
 | Journal fail silently                  | COA và document numbering chưa được seed cho org/branch mới |
+
+---
+
+## 6. Cash voucher document layer (EPIC-18052026)
+
+A document-level cash layer sits on top of `cash_accounts` / `cash_movements`:
+
+- **Phiếu thu** (`cash_receipts` + `cash_receipt_lines`) — header + lines, state `DRAFT → POSTED → REVERSED`. On post: `CashService.recordMovement(DEPOSIT, contra=…)` creates the movement + journal entry (DR cash / CR contra) and bumps the balance.
+- **Phiếu chi** (`cash_payments` + `cash_payment_lines`) — symmetric; post = `WITHDRAWAL` (DR contra / CR cash), insufficient balance → 400.
+- **Reverse** copies the lines verbatim (amount > 0) and posts the opposite movement (`WITHDRAWAL` for a reversed receipt, `DEPOSIT` for a reversed payment), which produces the DR↔CR-swapped reversing journal entry. The original is flagged `REVERSED` with `reversed_by_voucher_id`; the reversal carries `reverses_voucher_id`, `reference_type=REVERSAL`, `reversal_reason`.
+- **Sổ chi tiết tiền mặt** (`GET /cash-ledger`) — cursor-paginated; opening/closing/totals via scalar SQL `SUM` (no GROUP BY), running balance computed in RAM. Filter is `(cash_account_id = X OR to_account_id = X)` so a TRANSFER shows in both accounts' ledgers (signed by direction).
+- **Kiểm kê tiền mặt** (`cash_counts`) — `expected_amount` is snapshotted at POST under `SELECT FOR UPDATE`; `variance > 0` auto-posts a Phiếu thu (TK 711), `variance < 0` a Phiếu chi (TK 811), `variance = 0` posts with no voucher.
+
+`CashService.recordMovement()` / `JournalService.post()/reverse()` accept an optional `EntityManager` so the movement, journal entry, voucher document and outbox row commit in **one transaction** (TKT-CV-00). `recordMovement` returns `{ movement, journalEntryId }`.
+
+### TKT-CV-00 fixes the historical bugs
+
+The "bug journal trong CashService" and "cash_movements chưa ghi khi checkout" rows above are resolved: `recordMovement` posts a correct DR/CR pair, and POS cash sales now flow through `PosCashSaleConsumer` which records the movement + JE + Phiếu thu.
+
+## 7. Auto-create vouchers + Transactional Outbox (Phase 2)
+
+`paymentMethod=CASH` on a source document triggers an auto Phiếu thu/chi:
+
+| Source | Flow |
+| ------ | ---- |
+| POS cash sale | `CheckoutInvoiceSvc` publishes `erp.cash.movement.from.payment` → `PosCashSaleConsumer.createAndPostInternal()` (movement + JE + Phiếu thu, atomic in the consumer). |
+| Debt collection | `InvoiceDebtService.collectPayment(CASH)` → `recordMovement(DEPOSIT, contra=131)` in the source TX → enqueue `needed.debt_payment` → `DebtCollectionCashConsumer.createVoucherForMovement()` (links existing movement+JE). |
+| Goods receipt | `GoodsReceiptService.post(CASH)` → `recordMovement(WITHDRAWAL, contra=156)` → enqueue `needed.goods_receipt` → `GoodsReceiptCashConsumer`. |
+| Expense | `ExpensesService.post(CASH)` → `recordMovement(WITHDRAWAL, contra=expense.accountId)` → enqueue `needed.expense` → `ExpenseCashConsumer`. |
+
+Each voucher consumer publishes `cash.voucher.created`; link-back consumers in the source modules back-fill `debt_payments.cash_receipt_id` / `goods_receipts.cash_payment_id` / `expenses.cash_payment_id`.
+
+### Transactional Outbox (`modules/events/outbox/`)
+
+Closes the dual-write gap: instead of publishing after commit, source services `OutboxService.enqueue(manager, topic, event)` **inside** the business transaction. `OutboxRelayService` polls `published_at IS NULL AND next_attempt_at <= now()` with `FOR UPDATE SKIP LOCKED`, publishes to Kafka, marks `published_at`; failures back off exponentially. Invariant: **source committed ⟺ outbox row exists ⟺ event is published ⟺ voucher is created** — self-recovering after a crash. `event_id` is deterministic (`uuidv5` over `(sourceType, sourceId)`) so at-least-once delivery is idempotent via `processed_events` + the unique `(org, reference_type, reference_id)` index. Set `OUTBOX_RELAY_DISABLED=1` to disable the relay (used to simulate crash-recovery in tests).

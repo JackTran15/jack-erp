@@ -5,6 +5,7 @@ import { PayablesModule } from './payables/payables.module';
 import { ReceivablesModule } from './receivables/receivables.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { CashModule } from './cash/cash.module';
+import { CashVouchersModule } from './cash-vouchers/cash-vouchers.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CashModule } from './cash/cash.module';
     ReceivablesModule,
     ExpensesModule,
     CashModule,
+    CashVouchersModule,
   ],
   exports: [
     CoaModule,
@@ -22,6 +24,7 @@ import { CashModule } from './cash/cash.module';
     ReceivablesModule,
     ExpensesModule,
     CashModule,
+    CashVouchersModule,
   ],
 })
 export class AccountingModule {}

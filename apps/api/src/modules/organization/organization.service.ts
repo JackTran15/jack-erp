@@ -12,6 +12,7 @@ import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { OrganizationEntity, OrganizationStatus } from './organization.entity';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
+import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
 
 @Injectable()
 export class OrganizationService {
@@ -21,6 +22,7 @@ export class OrganizationService {
     @InjectRepository(OrganizationEntity)
     private readonly orgRepo: Repository<OrganizationEntity>,
     private readonly coaSeederService: CoaSeederService,
+    private readonly cashVoucherCategorySeederService: CashVoucherCategorySeederService,
   ) {}
 
   async create(
@@ -50,6 +52,17 @@ export class OrganizationService {
     } catch (err) {
       this.logger.error(
         `Failed to seed COA for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    try {
+      await this.cashVoucherCategorySeederService.seedForOrganization(
+        saved.id,
+        actor.userId,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to seed cash voucher categories for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
       );
     }
 

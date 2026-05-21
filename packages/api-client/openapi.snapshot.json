@@ -1434,6 +1434,1413 @@
         ]
       }
     },
+    "/cash-receipts": {
+      "post": {
+        "operationId": "CashReceiptsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      },
+      "get": {
+        "operationId": "CashReceiptsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OTHER",
+                "DEBT_COLLECTION",
+                "POS_SALE",
+                "OTHER_INCOME"
+              ]
+            }
+          },
+          {
+            "name": "cashAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE over document_number, payer_name, reason.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter by origin (maps to reference_type) — TKT-CV-22.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "POS_SALE",
+                "DEBT_COLLECTION",
+                "MANUAL"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-receipts/{id}": {
+      "get": {
+        "operationId": "CashReceiptsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      },
+      "patch": {
+        "operationId": "CashReceiptsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCashReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      },
+      "delete": {
+        "operationId": "CashReceiptsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-receipts/{id}/post": {
+      "post": {
+        "operationId": "CashReceiptsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashReceiptEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-receipts/{id}/reverse": {
+      "post": {
+        "operationId": "CashReceiptsController_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseCashReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashReceipts"
+        ]
+      }
+    },
+    "/cash-payments": {
+      "post": {
+        "operationId": "CashPaymentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      },
+      "get": {
+        "operationId": "CashPaymentsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "REVERSED"
+              ]
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OTHER",
+                "SUPPLIER_PAYMENT",
+                "PURCHASE",
+                "EXPENSE",
+                "SALARY",
+                "REFUND"
+              ]
+            }
+          },
+          {
+            "name": "cashAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "partnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "ILIKE over document_number, payee_name, reason.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter by origin (maps to reference_type) — TKT-CV-22.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GOODS_RECEIPT",
+                "EXPENSE",
+                "MANUAL"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-payments/{id}": {
+      "get": {
+        "operationId": "CashPaymentsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      },
+      "patch": {
+        "operationId": "CashPaymentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCashPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      },
+      "delete": {
+        "operationId": "CashPaymentsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-payments/{id}/post": {
+      "post": {
+        "operationId": "CashPaymentsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashPaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-payments/{id}/reverse": {
+      "post": {
+        "operationId": "CashPaymentsController_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseCashPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashPayments"
+        ]
+      }
+    },
+    "/cash-ledger": {
+      "get": {
+        "operationId": "CashLedgerController_getLedger",
+        "parameters": [
+          {
+            "name": "cashAccountId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page (`nextCursor`).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashLedger"
+        ]
+      }
+    },
+    "/cash-counts": {
+      "post": {
+        "operationId": "CashCountsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashCountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashCounts"
+        ]
+      },
+      "get": {
+        "operationId": "CashCountsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED"
+              ]
+            }
+          },
+          {
+            "name": "cashAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CashCounts"
+        ]
+      }
+    },
+    "/cash-counts/{id}": {
+      "get": {
+        "operationId": "CashCountsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashCounts"
+        ]
+      },
+      "patch": {
+        "operationId": "CashCountsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCashCountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashCounts"
+        ]
+      }
+    },
+    "/cash-counts/{id}/post": {
+      "post": {
+        "operationId": "CashCountsController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashCounts"
+        ]
+      }
+    },
+    "/cash/accounts": {
+      "post": {
+        "operationId": "CashController_createAccount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashAccountEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      },
+      "get": {
+        "operationId": "CashController_listAccounts",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      }
+    },
+    "/cash/accounts/{id}": {
+      "get": {
+        "operationId": "CashController_getAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashAccountEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      }
+    },
+    "/cash/movements": {
+      "post": {
+        "operationId": "CashController_recordMovement",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordCashMovementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashMovementEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      },
+      "get": {
+        "operationId": "CashController_listMovements",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cashAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      }
+    },
+    "/journals/post": {
+      "post": {
+        "operationId": "JournalController_post",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostJournalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Journal"
+        ]
+      }
+    },
+    "/journals/{id}/reverse": {
+      "post": {
+        "operationId": "JournalController_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReverseJournalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Journal"
+        ]
+      }
+    },
+    "/journals": {
+      "get": {
+        "operationId": "JournalController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Journal"
+        ]
+      }
+    },
+    "/journals/{id}": {
+      "get": {
+        "operationId": "JournalController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Journal"
+        ]
+      }
+    },
+    "/document-number-rules": {
+      "post": {
+        "operationId": "DocumentNumberingController_createRule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentNumberRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      },
+      "get": {
+        "operationId": "DocumentNumberingController_listRules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
+    "/document-number-rules/{id}": {
+      "patch": {
+        "operationId": "DocumentNumberingController_updateRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDocumentNumberRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
+    "/document-number-rules/{id}/activate": {
+      "post": {
+        "operationId": "DocumentNumberingController_activateRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
+    "/document-number-rules/{id}/deactivate": {
+      "post": {
+        "operationId": "DocumentNumberingController_deactivateRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
+    "/document-numbers/generate": {
+      "post": {
+        "operationId": "DocumentNumberingController_generate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDocumentNumberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DocumentNumbering"
+        ]
+      }
+    },
     "/branches": {
       "post": {
         "operationId": "BranchController_create",
@@ -1723,180 +3130,6 @@
         },
         "tags": [
           "Branch"
-        ]
-      }
-    },
-    "/document-number-rules": {
-      "post": {
-        "operationId": "DocumentNumberingController_createRule",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDocumentNumberRuleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
-        ]
-      },
-      "get": {
-        "operationId": "DocumentNumberingController_listRules",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
-        ]
-      }
-    },
-    "/document-number-rules/{id}": {
-      "patch": {
-        "operationId": "DocumentNumberingController_updateRule",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDocumentNumberRuleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
-        ]
-      }
-    },
-    "/document-number-rules/{id}/activate": {
-      "post": {
-        "operationId": "DocumentNumberingController_activateRule",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
-        ]
-      }
-    },
-    "/document-number-rules/{id}/deactivate": {
-      "post": {
-        "operationId": "DocumentNumberingController_deactivateRule",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentNumberRuleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
-        ]
-      }
-    },
-    "/document-numbers/generate": {
-      "post": {
-        "operationId": "DocumentNumberingController_generate",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerateDocumentNumberDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DocumentNumbering"
         ]
       }
     },
@@ -5275,178 +6508,6 @@
         ]
       }
     },
-    "/journals/post": {
-      "post": {
-        "operationId": "JournalController_post",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PostJournalDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalEntryEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Journal"
-        ]
-      }
-    },
-    "/journals/{id}/reverse": {
-      "post": {
-        "operationId": "JournalController_reverse",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReverseJournalDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalEntryEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Journal"
-        ]
-      }
-    },
-    "/journals": {
-      "get": {
-        "operationId": "JournalController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "source",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Journal"
-        ]
-      }
-    },
-    "/journals/{id}": {
-      "get": {
-        "operationId": "JournalController_findById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalEntryEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Journal"
-        ]
-      }
-    },
     "/payables": {
       "post": {
         "operationId": "PayablesController_create",
@@ -6140,196 +7201,6 @@
         },
         "tags": [
           "Expenses"
-        ]
-      }
-    },
-    "/cash/accounts": {
-      "post": {
-        "operationId": "CashController_createAccount",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCashAccountDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashAccountEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Cash"
-        ]
-      },
-      "get": {
-        "operationId": "CashController_listAccounts",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Cash"
-        ]
-      }
-    },
-    "/cash/accounts/{id}": {
-      "get": {
-        "operationId": "CashController_getAccount",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashAccountEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Cash"
-        ]
-      }
-    },
-    "/cash/movements": {
-      "post": {
-        "operationId": "CashController_recordMovement",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordCashMovementDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashMovementEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Cash"
-        ]
-      },
-      "get": {
-        "operationId": "CashController_listMovements",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cashAccountId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Cash"
         ]
       }
     },
@@ -11226,6 +12097,10 @@
             "minLength": 8,
             "maxLength": 72
           },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the user can sign in. Defaults to true when omitted."
+          },
           "roleIds": {
             "description": "Optional initial roles to assign on creation.",
             "type": "array",
@@ -11747,66 +12622,957 @@
           }
         }
       },
-      "CreateBranchDto": {
+      "CashReceiptLineDto": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "parentBranchId": {
+          "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "\"Diễn giải\"",
+            "maxLength": 500
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "\"Mục thu\" — references a cash_voucher_categories row.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "referenceNote": {
+            "type": "string",
+            "maxLength": 255
           }
         },
         "required": [
-          "name"
+          "description",
+          "amount"
         ]
       },
-      "BranchEntity": {
+      "CreateCashReceiptDto": {
         "type": "object",
         "properties": {
-          "name": {
+          "voucherDate": {
+            "type": "string",
+            "description": "\"Ngày thu\" (YYYY-MM-DD)."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "POS_SALE",
+              "OTHER_INCOME"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "description": "\"Người nộp\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do nộp\"",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "description": "Cashier (thủ quỹ).",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "description": "Contra GL account for the whole voucher (per-header, e.g. 511/131/711).",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Denormalized total — must equal sum(lines.amount).",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "voucherDate",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "lines"
+        ]
+      },
+      "CashReceiptEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
             "type": "string"
           },
-          "address": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "email": {
+          "voucherDate": {
             "type": "string"
           },
           "status": {
             "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
+              "DRAFT",
+              "POSTED",
+              "REVERSED"
             ],
             "type": "string"
           },
-          "isMainBranch": {
-            "type": "boolean"
-          },
-          "parentBranchId": {
+          "purpose": {
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "POS_SALE",
+              "OTHER_INCOME"
+            ],
             "type": "string"
           },
-          "parentBranch": {
-            "$ref": "#/components/schemas/BranchEntity"
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "partnerNameSnapshot": {
+            "type": "string"
+          },
+          "partnerAddressSnapshot": {
+            "type": "string"
+          },
+          "payerName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "staffId": {
+            "type": "string"
+          },
+          "referenceType": {
+            "enum": [
+              "INVOICE",
+              "INVOICE_DEBT",
+              "RECEIVABLE",
+              "MANUAL",
+              "REVERSAL"
+            ],
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cashMovementId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
+          "reversedByVoucherId": {
+            "type": "string"
+          },
+          "reversesVoucherId": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashReceiptLineEntity"
+            }
+          },
+          "reversesVoucher": {
+            "$ref": "#/components/schemas/CashReceiptEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "voucherDate",
+          "status",
+          "purpose",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "attachmentIds",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CashReceiptLineEntity": {
+        "type": "object",
+        "properties": {
+          "cashReceiptId": {
+            "type": "string"
+          },
+          "cashReceipt": {
+            "$ref": "#/components/schemas/CashReceiptEntity"
+          },
+          "lineOrder": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "referenceNote": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "cashReceiptId",
+          "cashReceipt",
+          "lineOrder",
+          "description",
+          "amount",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UpdateCashReceiptDto": {
+        "type": "object",
+        "properties": {
+          "voucherDate": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "DEBT_COLLECTION",
+              "POS_SALE",
+              "OTHER_INCOME"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashReceiptLineDto"
+            }
+          }
+        }
+      },
+      "ReverseCashReceiptDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for the reversal (đảo bút). Stored on the reversal voucher.",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CashPaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "\"Diễn giải\"",
+            "maxLength": 500
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "\"Mục chi\" — references a cash_voucher_categories row.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "referenceNote": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "description",
+          "amount"
+        ]
+      },
+      "CreateCashPaymentDto": {
+        "type": "object",
+        "properties": {
+          "voucherDate": {
+            "type": "string",
+            "description": "\"Ngày chi\" (YYYY-MM-DD)."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "SALARY",
+              "REFUND"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do chi\"",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "description": "Cashier (thủ quỹ).",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "description": "Contra GL account for the whole voucher (per-header, e.g. 331/811).",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Denormalized total — must equal sum(lines.amount).",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashPaymentLineDto"
+            }
+          }
+        },
+        "required": [
+          "voucherDate",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "lines"
+        ]
+      },
+      "CashPaymentEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "voucherDate": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "OTHER",
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "SALARY",
+              "REFUND"
+            ],
+            "type": "string"
+          },
+          "partnerType": {
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "partnerNameSnapshot": {
+            "type": "string"
+          },
+          "partnerAddressSnapshot": {
+            "type": "string"
+          },
+          "payeeName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "staffId": {
+            "type": "string"
+          },
+          "referenceType": {
+            "enum": [
+              "INVOICE_DEBT",
+              "GOODS_RECEIPT",
+              "EXPENSE",
+              "SALARY",
+              "REFUND",
+              "MANUAL",
+              "REVERSAL"
+            ],
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cashMovementId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
+          "reversedByVoucherId": {
+            "type": "string"
+          },
+          "reversesVoucherId": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashPaymentLineEntity"
+            }
+          },
+          "reversesVoucher": {
+            "$ref": "#/components/schemas/CashPaymentEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "voucherDate",
+          "status",
+          "purpose",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "attachmentIds",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CashPaymentLineEntity": {
+        "type": "object",
+        "properties": {
+          "cashPaymentId": {
+            "type": "string"
+          },
+          "cashPayment": {
+            "$ref": "#/components/schemas/CashPaymentEntity"
+          },
+          "lineOrder": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "referenceNote": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "cashPaymentId",
+          "cashPayment",
+          "lineOrder",
+          "description",
+          "amount",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UpdateCashPaymentDto": {
+        "type": "object",
+        "properties": {
+          "voucherDate": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "SUPPLIER_PAYMENT",
+              "PURCHASE",
+              "EXPENSE",
+              "SALARY",
+              "REFUND"
+            ]
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contraAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totalAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashPaymentLineDto"
+            }
+          }
+        }
+      },
+      "ReverseCashPaymentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for the reversal (đảo bút). Stored on the reversal voucher.",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "DenominationDto": {
+        "type": "object",
+        "properties": {
+          "denom": {
+            "type": "number",
+            "description": "Note/coin face value, e.g. 500000.",
+            "minimum": 1
+          },
+          "count": {
+            "type": "number",
+            "description": "Quantity of this denomination counted.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "denom",
+          "count"
+        ]
+      },
+      "CreateCashCountDto": {
+        "type": "object",
+        "properties": {
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "countedAt": {
+            "type": "string"
+          },
+          "actualAmount": {
+            "type": "number",
+            "description": "Counted physical cash (nhập tay).",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          },
+          "denominations": {
+            "description": "Optional breakdown — when present, sum(denom*count) must equal actualAmount.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DenominationDto"
+            }
+          }
+        },
+        "required": [
+          "cashAccountId",
+          "countedAt",
+          "actualAmount"
+        ]
+      },
+      "UpdateCashCountDto": {
+        "type": "object",
+        "properties": {
+          "countedAt": {
+            "type": "string"
+          },
+          "actualAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          },
+          "denominations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DenominationDto"
+            }
+          }
+        }
+      },
+      "CreateCashAccountDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "REGISTER",
+              "SAFE",
+              "PETTY_CASH"
+            ]
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "balance": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "accountId"
+        ]
+      },
+      "CashAccountEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "REGISTER",
+              "SAFE",
+              "PETTY_CASH"
+            ],
+            "type": "string"
+          },
+          "balance": {
+            "type": "number"
+          },
+          "accountId": {
+            "type": "string"
           },
           "id": {
             "type": "string"
@@ -11834,8 +13600,9 @@
         },
         "required": [
           "name",
-          "status",
-          "isMainBranch",
+          "type",
+          "balance",
+          "accountId",
           "id",
           "organizationId",
           "createdAt",
@@ -11843,67 +13610,433 @@
           "createdBy"
         ]
       },
-      "UserBranchAssignmentEntity": {
+      "RecordCashMovementDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "userId": {
-            "type": "string"
+          "type": {
+            "type": "string",
+            "enum": [
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "TRANSFER",
+              "ADJUSTMENT"
+            ]
           },
-          "branchId": {
-            "type": "string"
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
           },
-          "organizationId": {
-            "type": "string"
+          "toAccountId": {
+            "type": "string",
+            "description": "Required when type=TRANSFER (destination account).",
+            "format": "uuid"
           },
-          "assignedAt": {
-            "format": "date-time",
-            "type": "string"
+          "contraAccountId": {
+            "type": "string",
+            "description": "Required for DEPOSIT/WITHDRAWAL/ADJUSTMENT — the GL account that offsets the cash leg.",
+            "format": "uuid"
           },
-          "assignedBy": {
-            "type": "string"
+          "reference": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
           }
         },
         "required": [
-          "id",
-          "userId",
-          "branchId",
-          "organizationId",
-          "assignedAt",
-          "assignedBy"
+          "cashAccountId",
+          "type",
+          "amount"
         ]
       },
-      "UpdateBranchDto": {
+      "PosSessionEntity": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
+          "terminalId": {
+            "type": "string"
           },
-          "address": {
+          "status": {
+            "enum": [
+              "OPEN",
+              "ACTIVE_SALES",
+              "CLOSING",
+              "CLOSED"
+            ],
+            "type": "string"
+          },
+          "openedBy": {
+            "type": "string"
+          },
+          "openedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "closedBy": {
+            "type": "string"
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "openingCashAmount": {
+            "type": "number"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "status",
+          "openedBy",
+          "openedAt",
+          "openingCashAmount",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CashMovementEntity": {
+        "type": "object",
+        "properties": {
+          "cashAccountId": {
+            "type": "string"
+          },
+          "cashAccount": {
+            "$ref": "#/components/schemas/CashAccountEntity"
+          },
+          "toAccountId": {
+            "type": "string"
+          },
+          "toAccount": {
+            "$ref": "#/components/schemas/CashAccountEntity"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "DEPOSIT",
+              "WITHDRAWAL",
+              "TRANSFER",
+              "ADJUSTMENT"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/PosSessionEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "cashAccountId",
+          "cashAccount",
+          "type",
+          "amount",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "PostJournalLineDto": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "debitAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "creditAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": {
             "type": "string",
             "maxLength": 500
           },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "status": {
+          "lineOrder": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "accountId",
+          "debitAmount",
+          "creditAmount",
+          "lineOrder"
+        ]
+      },
+      "PostJournalDto": {
+        "type": "object",
+        "properties": {
+          "source": {
             "type": "string",
             "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
+              "SALE",
+              "RETURN",
+              "EXCHANGE",
+              "EXPENSE",
+              "CASH_MOVEMENT",
+              "MANUAL",
+              "TRANSFER"
             ]
+          },
+          "sourceReferenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lines": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostJournalLineDto"
+            }
           }
-        }
+        },
+        "required": [
+          "source",
+          "lines"
+        ]
+      },
+      "JournalEntryEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "SALE",
+              "RETURN",
+              "EXCHANGE",
+              "EXPENSE",
+              "CASH_MOVEMENT",
+              "MANUAL",
+              "TRANSFER"
+            ],
+            "type": "string"
+          },
+          "sourceReferenceId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "reversedByJournalId": {
+            "type": "string"
+          },
+          "reversalOfJournalId": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLineEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "documentNumber",
+          "source",
+          "status",
+          "postedAt",
+          "postedBy",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "JournalLineEntity": {
+        "type": "object",
+        "properties": {
+          "journalEntryId": {
+            "type": "string"
+          },
+          "journalEntry": {
+            "$ref": "#/components/schemas/JournalEntryEntity"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "debitAmount": {
+            "type": "number"
+          },
+          "creditAmount": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "lineOrder": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "journalEntryId",
+          "journalEntry",
+          "accountId",
+          "debitAmount",
+          "creditAmount",
+          "lineOrder",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "ReverseJournalDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
       },
       "CreateDocumentNumberRuleDto": {
         "type": "object",
@@ -12132,6 +14265,7 @@
               "PURCHASE_ORDER",
               "GOODS_ISSUE",
               "GOODS_RECEIPT",
+              "STOCK_TAKE",
               "EMPLOYEE",
               "QUOTATION",
               "TRANSFER_ORDER",
@@ -12146,8 +14280,7 @@
               "DEBT_OFFSET",
               "CUSTOMER",
               "SUPPLIER",
-              "DELIVERY_PARTNER",
-              "STOCK_TAKE"
+              "DELIVERY_PARTNER"
             ]
           },
           "branchId": {
@@ -12157,6 +14290,164 @@
         "required": [
           "documentType"
         ]
+      },
+      "CreateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "parentBranchId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "BranchEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "isMainBranch": {
+            "type": "boolean"
+          },
+          "parentBranchId": {
+            "type": "string"
+          },
+          "parentBranch": {
+            "$ref": "#/components/schemas/BranchEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "isMainBranch",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UserBranchAssignmentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "branchId",
+          "organizationId",
+          "assignedAt",
+          "assignedBy"
+        ]
+      },
+      "UpdateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ]
+          }
+        }
       },
       "SalesmanAssignmentEntity": {
         "type": "object",
@@ -14592,243 +16883,6 @@
           "valueLabel"
         ]
       },
-      "PostJournalLineDto": {
-        "type": "object",
-        "properties": {
-          "accountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "debitAmount": {
-            "type": "number",
-            "minimum": 0
-          },
-          "creditAmount": {
-            "type": "number",
-            "minimum": 0
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "lineOrder": {
-            "type": "number",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "accountId",
-          "debitAmount",
-          "creditAmount",
-          "lineOrder"
-        ]
-      },
-      "PostJournalDto": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "type": "string",
-            "enum": [
-              "SALE",
-              "RETURN",
-              "EXCHANGE",
-              "EXPENSE",
-              "CASH_MOVEMENT",
-              "MANUAL",
-              "TRANSFER"
-            ]
-          },
-          "sourceReferenceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "notes": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "lines": {
-            "minItems": 2,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PostJournalLineDto"
-            }
-          }
-        },
-        "required": [
-          "source",
-          "lines"
-        ]
-      },
-      "JournalEntryEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "source": {
-            "enum": [
-              "SALE",
-              "RETURN",
-              "EXCHANGE",
-              "EXPENSE",
-              "CASH_MOVEMENT",
-              "MANUAL",
-              "TRANSFER"
-            ],
-            "type": "string"
-          },
-          "sourceReferenceId": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "POSTED",
-              "REVERSED"
-            ],
-            "type": "string"
-          },
-          "postedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "postedBy": {
-            "type": "string"
-          },
-          "reversedByJournalId": {
-            "type": "string"
-          },
-          "reversalOfJournalId": {
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JournalLineEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "documentNumber",
-          "source",
-          "status",
-          "postedAt",
-          "postedBy",
-          "lines",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "JournalLineEntity": {
-        "type": "object",
-        "properties": {
-          "journalEntryId": {
-            "type": "string"
-          },
-          "journalEntry": {
-            "$ref": "#/components/schemas/JournalEntryEntity"
-          },
-          "accountId": {
-            "type": "string"
-          },
-          "debitAmount": {
-            "type": "number"
-          },
-          "creditAmount": {
-            "type": "number"
-          },
-          "description": {
-            "type": "string"
-          },
-          "lineOrder": {
-            "type": "number"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "journalEntryId",
-          "journalEntry",
-          "accountId",
-          "debitAmount",
-          "creditAmount",
-          "lineOrder",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "ReverseJournalDto": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "reason"
-        ]
-      },
       "CreatePayableDto": {
         "type": "object",
         "properties": {
@@ -15261,6 +17315,20 @@
           "payableId": {
             "type": "string",
             "format": "uuid"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Settlement method. CASH posts a cash movement + auto Phiếu chi on post.",
+            "enum": [
+              "CASH",
+              "BANK",
+              "PAYABLE"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Cash account to pay from — required when paymentMethod=CASH.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -15306,6 +17374,23 @@
           "postedBy": {
             "type": "string"
           },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK",
+              "PAYABLE"
+            ],
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "cashPaymentId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -15335,283 +17420,6 @@
           "amount",
           "accountId",
           "status",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "CreateCashAccountDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "REGISTER",
-              "SAFE",
-              "PETTY_CASH"
-            ]
-          },
-          "accountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "balance": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "name",
-          "type",
-          "accountId"
-        ]
-      },
-      "CashAccountEntity": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "enum": [
-              "REGISTER",
-              "SAFE",
-              "PETTY_CASH"
-            ],
-            "type": "string"
-          },
-          "balance": {
-            "type": "number"
-          },
-          "accountId": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "name",
-          "type",
-          "balance",
-          "accountId",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "RecordCashMovementDto": {
-        "type": "object",
-        "properties": {
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "DEPOSIT",
-              "WITHDRAWAL",
-              "TRANSFER",
-              "ADJUSTMENT"
-            ]
-          },
-          "amount": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "toAccountId": {
-            "type": "string",
-            "description": "Required when type=TRANSFER (destination account).",
-            "format": "uuid"
-          },
-          "contraAccountId": {
-            "type": "string",
-            "description": "Required for DEPOSIT/WITHDRAWAL/ADJUSTMENT — the GL account that offsets the cash leg.",
-            "format": "uuid"
-          },
-          "reference": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "notes": {
-            "type": "string",
-            "maxLength": 2000
-          }
-        },
-        "required": [
-          "cashAccountId",
-          "type",
-          "amount"
-        ]
-      },
-      "PosSessionEntity": {
-        "type": "object",
-        "properties": {
-          "terminalId": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "OPEN",
-              "ACTIVE_SALES",
-              "CLOSING",
-              "CLOSED"
-            ],
-            "type": "string"
-          },
-          "openedBy": {
-            "type": "string"
-          },
-          "openedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "closedBy": {
-            "type": "string"
-          },
-          "closedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "openingCashAmount": {
-            "type": "number"
-          },
-          "cashAccountId": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "status",
-          "openedBy",
-          "openedAt",
-          "openingCashAmount",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "CashMovementEntity": {
-        "type": "object",
-        "properties": {
-          "cashAccountId": {
-            "type": "string"
-          },
-          "cashAccount": {
-            "$ref": "#/components/schemas/CashAccountEntity"
-          },
-          "toAccountId": {
-            "type": "string"
-          },
-          "toAccount": {
-            "$ref": "#/components/schemas/CashAccountEntity"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "DEPOSIT",
-              "WITHDRAWAL",
-              "TRANSFER",
-              "ADJUSTMENT"
-            ]
-          },
-          "amount": {
-            "type": "number"
-          },
-          "reference": {
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "sessionId": {
-            "type": "string"
-          },
-          "session": {
-            "$ref": "#/components/schemas/PosSessionEntity"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "cashAccountId",
-          "cashAccount",
-          "type",
-          "amount",
           "id",
           "organizationId",
           "createdAt",
@@ -17287,9 +19095,19 @@
           "createdBy"
         ]
       },
-      "InvoiceItemEntity": {
+      "DraftInvoiceItemDto": {
         "type": "object",
         "properties": {
+          "location": {
+            "nullable": true,
+            "description": "Resolved storage location for this line (null if locationId is unset or stale).",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LocationEntity"
+              }
+            ]
+          },
           "invoiceId": {
             "type": "string"
           },
@@ -17357,6 +19175,7 @@
           }
         },
         "required": [
+          "location",
           "invoiceId",
           "itemId",
           "itemCode",
@@ -17383,7 +19202,7 @@
             "description": "Line items belonging to this draft, ordered by sortOrder.",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/InvoiceItemEntity"
+              "$ref": "#/components/schemas/DraftInvoiceItemDto"
             }
           },
           "code": {
@@ -17605,6 +19424,12 @@
             "type": "string"
           },
           "note": {
+            "type": "string"
+          },
+          "cashReceiptId": {
+            "type": "string"
+          },
+          "journalEntryId": {
             "type": "string"
           },
           "id": {
@@ -18690,6 +20515,19 @@
               "$ref": "#/components/schemas/GoodsReceiptLineDto"
             }
           },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Cash account to pay from — required when paymentMethod=CASH.",
+            "format": "uuid"
+          },
           "cashPayment": {
             "$ref": "#/components/schemas/CashSettlementDto"
           },
@@ -18764,6 +20602,19 @@
             "items": {
               "type": "string"
             }
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "journalEntryId": {
+            "type": "string"
           },
           "cashPaymentId": {
             "type": "string"
