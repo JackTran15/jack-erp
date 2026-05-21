@@ -83,6 +83,8 @@ export interface AppModalProps {
    */
   footer?: React.ReactNode;
   className?: string;
+  /** Class cho vùng nội dung (mặc định `overflow-auto`). Dùng `overflow-hidden` khi scroll nội bộ. */
+  bodyClassName?: string;
   defaultWidth?: number;
   defaultHeight?: number;
   minWidth?: number;
@@ -103,6 +105,7 @@ function AppModal({
   showFooter = true,
   footer,
   className,
+  bodyClassName,
   defaultWidth = 520,
   defaultHeight = 440,
   minWidth = DEFAULT_MIN_W,
@@ -427,7 +430,9 @@ function AppModal({
                 <div className="shrink-0 text-sm text-muted-foreground">{description}</div>
               </DialogDescription>
             ) : null}
-            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+            <div className={cn("min-h-0 flex-1 overflow-auto", bodyClassName)}>
+              {children}
+            </div>
           </div>
 
           {showFooter ? (

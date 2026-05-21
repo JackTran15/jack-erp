@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "./hooks/useAuth";
 import { RequireAuth } from "./components/auth/RequireAuth";
@@ -21,6 +21,10 @@ import { SalesReportPage } from "./pages/reports/SalesReportPage";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
+import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
+import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/TreasuryCashReceiptsPage";
+import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
+import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
 import { StockSummaryReportPage } from "./pages/reports/storage/StockSummaryReportPage";
 import { StockDocumentDetailsReportPage } from "./pages/reports/storage/StockDocumentDetailsReportPage";
 import { StockQuantityDetailsReportPage } from "./pages/reports/storage/StockQuantityDetailsReportPage";
@@ -140,6 +144,17 @@ export function App() {
                 <Route path="/reports/inventory" element={<InventoryReportPage />} />
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
+                <Route
+                  path="/treasury/cash/receipts-expenses"
+                  element={<TreasuryCashReceiptsPage />}
+                />
+                <Route path="/treasury/cash/count" element={<TreasuryCashCountPage />} />
+                <Route path="/treasury/cash/ledger" element={<LedgerCashPage />} />
+                <Route path="/treasury/wip/:slug" element={<TreasuryWipPage />} />
+                <Route
+                  path="/ledger-cash"
+                  element={<Navigate to="/treasury/cash/ledger" replace />}
+                />
                 <Route
                   path="/reports/storage/stock-summary"
                   element={<StockSummaryReportPage />}
