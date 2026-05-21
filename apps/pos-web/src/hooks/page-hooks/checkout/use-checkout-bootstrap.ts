@@ -2,7 +2,11 @@ import { useEffect, useRef } from "react";
 
 import { createPaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
-import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
+import { settlementAbsFromGrand } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
+import {
+  selectGrandTotal,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
@@ -48,6 +52,14 @@ export function useCheckoutBootstrap(): void {
           createPaymentLine(row.method, row.amount),
         ),
       );
+    } else {
+      // `resetCheckoutDraftState()` đưa số tiền về 0; settlementAbs không đổi sau
+      // reset nên effect auto-fill ở PaymentSection không re-fire. Seed lại tại
+      // đây = số tiền cần thanh toán của session vừa chuyển/restore (deposit = 0).
+      const grandTotal = selectGrandTotal(usePosCheckoutSessionStore.getState());
+      usePosCheckoutPaymentStore
+        .getState()
+        .setFirstLineAmountAuto(settlementAbsFromGrand(grandTotal));
     }
 
     // Restore khách của draft (nếu có) — chạy SAU resetCheckoutDraftState().

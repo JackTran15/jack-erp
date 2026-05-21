@@ -25,6 +25,7 @@ export function PaymentSection({
   const {
     deposit,
     grandTotal: total,
+    settlementAbs,
     paymentLines,
     handleChangePaymentLines,
     changeAmount,
@@ -36,9 +37,17 @@ export function PaymentSection({
     setNote,
   } = useCheckoutPayment();
   const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
+  const setFirstLineAmountAuto = usePosCheckoutPaymentStore(
+    (s) => s.setFirstLineAmountAuto,
+  );
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
-  console.log('accounts:: ',)
+
+  // Mặc định số tiền dòng thanh toán đầu = số tiền cần thanh toán; tự đồng bộ khi
+  // tổng đổi cho tới khi nhân viên tự nhập (store tự guard theo `firstAmountAuto`).
+  useEffect(() => {
+    setFirstLineAmountAuto(settlementAbs);
+  }, [settlementAbs, setFirstLineAmountAuto]);
 
   useEffect(() => {
     if (accounts.length === 0) return;

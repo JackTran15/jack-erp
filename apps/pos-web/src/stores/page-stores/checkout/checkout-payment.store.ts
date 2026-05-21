@@ -25,6 +25,12 @@ interface PosCheckoutPaymentState {
   preorder: boolean;
   selectedSuggestionId: string | null;
   deposit: number;
+  /**
+   * `true` khi số tiền dòng đầu vẫn đang tự đồng bộ theo "số tiền cần thanh toán".
+   * Chuyển `false` khi nhân viên tự nhập số / chọn gợi ý; reset `true` ở
+   * `resetPaymentDraft` (hóa đơn mới / sau thanh toán).
+   */
+  firstAmountAuto: boolean;
 
   setPaymentLines: (value: Updater<PaymentLine[]>) => void;
   setKeepChange: (value: Updater<boolean>) => void;
@@ -35,6 +41,8 @@ interface PosCheckoutPaymentState {
   setPreorder: (value: Updater<boolean>) => void;
   setSelectedSuggestionId: (value: Updater<string | null>) => void;
   setDeposit: (value: Updater<number>) => void;
+  /** Tự điền số tiền dòng đầu = `amount` khi còn ở chế độ auto (1 dòng). */
+  setFirstLineAmountAuto: (amount: number) => void;
 
   handleChangePaymentLines: (next: PaymentLine[]) => void;
   handlePickSuggestion: (suggestion: CashSuggestion) => void;
@@ -52,6 +60,7 @@ export const usePosCheckoutPaymentStore = create<PosCheckoutPaymentState>()(
     preorder: false,
     selectedSuggestionId: null,
     deposit: 0,
+    firstAmountAuto: true,
 
     setPaymentLines: (value) =>
       set((state) => ({ paymentLines: apply(state.paymentLines, value) })),
@@ -71,8 +80,32 @@ export const usePosCheckoutPaymentStore = create<PosCheckoutPaymentState>()(
     setDeposit: (value) =>
       set((state) => ({ deposit: apply(state.deposit, value) })),
 
+    setFirstLineAmountAuto: (amount) =>
+      set((state) => {
+        if (!state.firstAmountAuto || state.paymentLines.length !== 1) {
+          return {};
+        }
+        const first = state.paymentLines[0]!;
+        if (first.amount === amount) return {};
+        return {
+          paymentLines: [{ ...first, amount }],
+          selectedSuggestionId: null,
+        };
+      }),
+
     handleChangePaymentLines: (next) =>
-      set({ paymentLines: next, selectedSuggestionId: null }),
+      set((state) => {
+        // Nhân viên tự sửa số tiền dòng đầu (khi đang 1 dòng) → ngừng auto.
+        const manualFirstAmountEdit =
+          state.paymentLines.length === 1 &&
+          next.length === 1 &&
+          next[0]?.amount !== state.paymentLines[0]?.amount;
+        return {
+          paymentLines: next,
+          selectedSuggestionId: null,
+          firstAmountAuto: manualFirstAmountEdit ? false : state.firstAmountAuto,
+        };
+      }),
 
     handlePickSuggestion: (suggestion) =>
       set((state) => {
@@ -91,6 +124,7 @@ export const usePosCheckoutPaymentStore = create<PosCheckoutPaymentState>()(
         return {
           selectedSuggestionId: suggestion.id,
           paymentLines: nextLines,
+          firstAmountAuto: false,
         };
       }),
 
@@ -102,6 +136,7 @@ export const usePosCheckoutPaymentStore = create<PosCheckoutPaymentState>()(
         note: "",
         selectedSuggestionId: null,
         deposit: 0,
+        firstAmountAuto: true,
       }),
   }),
 );
