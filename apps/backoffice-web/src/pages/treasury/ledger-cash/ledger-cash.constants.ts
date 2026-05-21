@@ -17,3 +17,12 @@ export const VOUCHER_FORM_LABEL_WIDTH = "10rem";
 export const READONLY_INPUT_CLASS = "bg-muted/30";
 
 export const TABLE_NUM_CLASS = "text-right tabular-nums";
+
+export const DOCUMENT_SECTION_LABELS = {
+  GENERAL_INFO: "Thông tin chung",
+  DOCUMENT: "Chứng từ",
+  DETAIL: "Chi tiết",
+} as const;
+
+export const DOCUMENT_SECTION_HEADING_CLASS =
+  "mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";

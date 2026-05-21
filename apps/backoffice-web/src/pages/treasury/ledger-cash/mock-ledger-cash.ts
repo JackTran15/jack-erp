@@ -5,6 +5,7 @@ import {
   LedgerCashVoucherKindEnum,
   LedgerCashVoucherPaymentModeEnum,
   LedgerCashVoucherPurposeEnum,
+  type LedgerCashInvoiceDetail,
   type LedgerCashRow,
 } from "./ledger-cash.types";
 
@@ -395,7 +396,135 @@ export const MOCK_LEDGER_CASH_ROWS: LedgerCashRow[] = [
       },
     },
   },
+  {
+    id: "pt-000002",
+    documentDate: d("2026-05-13T10:00:00"),
+    receiptNo: "PT000002",
+    description: "Thu nợ của khách hàng duc anh",
+    amountIn: 175_000,
+    amountOut: 0,
+    balance: 7_615_000,
+    counterparty: "duc anh",
+    employee: EMPLOYEE,
+    documentType: LedgerCashDocumentTypeEnum.CASH_RECEIPT,
+    detail: {
+      type: LedgerCashDetailTypeEnum.VOUCHER,
+      data: {
+        kind: LedgerCashVoucherKindEnum.RECEIPT,
+        purpose: LedgerCashVoucherPurposeEnum.DEBT_COLLECTION,
+        voucherNo: "PT000002",
+        voucherDate: d("2026-05-13T00:00:00"),
+        counterpartyCode: "KH000017",
+        counterpartyName: "duc anh",
+        payerName: "duc anh",
+        address: "",
+        reason: "Thu nợ của khách hàng duc anh",
+        employeeCode: EMPLOYEE_CODE,
+        employeeName: EMPLOYEE,
+        reference: "2605010002",
+        lines: [
+          {
+            description: "Thu nợ của khách hàng duc anh",
+            amount: 175_000,
+            category: "",
+          },
+        ],
+        documentLines: [
+          {
+            documentDate: d("2026-05-06T00:00:00"),
+            documentNo: "2605010002",
+            debtAmount: 175_000,
+            collectedAmount: 0,
+            remainingAmount: 175_000,
+            collectAmount: 175_000,
+          },
+        ],
+      },
+    },
+  },
+  {
+    id: "pt-000004",
+    documentDate: d("2026-05-15T14:30:00"),
+    receiptNo: "PT000004",
+    description: "Thu nợ của khách hàng duc anh",
+    amountIn: 175_000,
+    amountOut: 0,
+    balance: 7_790_000,
+    counterparty: "duc anh",
+    employee: EMPLOYEE,
+    documentType: LedgerCashDocumentTypeEnum.CASH_RECEIPT,
+    detail: {
+      type: LedgerCashDetailTypeEnum.VOUCHER,
+      data: {
+        kind: LedgerCashVoucherKindEnum.RECEIPT,
+        purpose: LedgerCashVoucherPurposeEnum.DEBT_COLLECTION,
+        voucherNo: "PT000004",
+        voucherDate: d("2026-05-15T00:00:00"),
+        counterpartyCode: "KH000017",
+        counterpartyName: "duc anh",
+        payerName: "duc anh",
+        address: "",
+        reason: "Thu nợ của khách hàng duc anh",
+        employeeCode: EMPLOYEE_CODE,
+        employeeName: EMPLOYEE,
+        lines: [
+          {
+            description: "Thu nợ của khách hàng duc anh",
+            amount: 175_000,
+            category: "Thu từ bán hàng",
+          },
+        ],
+      },
+    },
+  },
+  {
+    id: "pc-000002",
+    documentDate: d("2026-05-21T09:00:00"),
+    paymentNo: "PC000002",
+    description: "Chi khác",
+    amountIn: 0,
+    amountOut: 0,
+    balance: 6_042_500,
+    counterparty: "",
+    employee: EMPLOYEE,
+    documentType: LedgerCashDocumentTypeEnum.CASH_PAYMENT,
+    detail: {
+      type: LedgerCashDetailTypeEnum.VOUCHER,
+      data: {
+        kind: LedgerCashVoucherKindEnum.PAYMENT,
+        purpose: LedgerCashVoucherPurposeEnum.OTHER,
+        voucherNo: "PC000002",
+        voucherDate: d("2026-05-21T00:00:00"),
+        counterpartyCode: "",
+        counterpartyName: "",
+        address: "",
+        reason: "",
+        employeeCode: EMPLOYEE_CODE,
+        employeeName: EMPLOYEE,
+        lines: [{ description: "", amount: 0, category: "" }],
+      },
+    },
+  },
 ];
+
+/** Find invoice detail by document code across ledger rows. */
+export function findLedgerCashInvoiceByCode(
+  code: string,
+  rows: LedgerCashRow[] = MOCK_LEDGER_CASH_ROWS,
+): LedgerCashInvoiceDetail | null {
+  const normalized = code.trim();
+  if (!normalized) return null;
+
+  for (const row of rows) {
+    if (row.detail.type !== LedgerCashDetailTypeEnum.INVOICE) continue;
+    const inv = row.detail.data;
+    if (inv.code === normalized) return inv;
+    if (row.receiptNo === normalized || row.paymentNo === normalized) {
+      return inv;
+    }
+  }
+  return null;
+}
 
 /** Parse `YYYY-MM-DD` as local calendar date (avoids UTC shift). */
 export function parseLedgerPeriodDate(iso: string, endOfDay = false): Date {
@@ -426,8 +555,9 @@ export function buildLedgerCashViewRows(
   const to = parseLedgerPeriodDate(periodTo, true);
 
   const opening =
-    rows.find((r) => r.documentType === LedgerCashDocumentTypeEnum.OPENING_BALANCE) ??
-    null;
+    rows.find(
+      (r) => r.documentType === LedgerCashDocumentTypeEnum.OPENING_BALANCE,
+    ) ?? null;
 
   const transactions = rows
     .filter(

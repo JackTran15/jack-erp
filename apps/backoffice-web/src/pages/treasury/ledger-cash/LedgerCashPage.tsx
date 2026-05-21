@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Button,
   DocumentListShell,
@@ -11,15 +12,18 @@ import {
   TreasuryCashTabIdEnum,
   TreasuryTabBar,
 } from "../../../components/document/treasuryTabs";
-import { toast } from "sonner";
 import { PaginationControls } from "../../../components/table/PaginationControls";
 import { DEFAULT_PAGINATION } from "../../../components/table/pagination.dto";
-import { LedgerCashInvoiceDetailDialog } from "./components/invoice-dialog/LedgerCashInvoiceDetailDialog";
-import { LedgerCashPaymentVoucherDialog } from "./components/payment-voucher-dialog/LedgerCashPaymentVoucherDialog";
-import { LedgerCashReceiptVoucherDialog } from "./components/receipt-voucher-dialog/LedgerCashReceiptVoucherDialog";
+import {
+  InvoiceDetailDialog,
+  PaymentVoucherDialog,
+  ReceiptVoucherDialog,
+  TreasuryVoucherDialogModeEnum,
+} from "../documents";
 import { LedgerCashTable } from "./components/ledger/LedgerCashTable";
 import {
   buildLedgerCashViewRows,
+  findLedgerCashInvoiceByCode,
   MOCK_LEDGER_CASH_ROWS,
 } from "./mock-ledger-cash";
 import {
@@ -28,6 +32,7 @@ import {
   LedgerCashDrillDownEnum,
   LedgerCashVoucherKindEnum,
   resolveLedgerCashDrillDown,
+  type LedgerCashInvoiceDetail,
   type LedgerCashRow,
 } from "./ledger-cash.types";
 
@@ -42,6 +47,8 @@ export function LedgerCashPage() {
   const [dialogKind, setDialogKind] = useState<LedgerCashDrillDownEnum | null>(
     null,
   );
+  const [linkedInvoiceDetail, setLinkedInvoiceDetail] =
+    useState<LedgerCashInvoiceDetail | null>(null);
 
   const { openingRow, transactionRows } = useMemo(() => {
     if (!appliedPeriod.from || !appliedPeriod.to) {
@@ -97,6 +104,22 @@ export function LedgerCashPage() {
       ? selectedRow.detail.data
       : null;
 
+  const openInvoiceByCode = useCallback((code: string) => {
+    const inv = findLedgerCashInvoiceByCode(code, MOCK_LEDGER_CASH_ROWS);
+    if (!inv) {
+      toast.info(`Không tìm thấy hóa đơn ${code}.`);
+      return;
+    }
+    setLinkedInvoiceDetail(inv);
+  }, []);
+
+  const receiptVoucherOpen =
+    dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
+    voucherDetail?.kind === LedgerCashVoucherKindEnum.RECEIPT;
+  const paymentVoucherOpen =
+    dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
+    voucherDetail?.kind === LedgerCashVoucherKindEnum.PAYMENT;
+
   return (
     <>
       <DocumentListShell
@@ -141,47 +164,50 @@ export function LedgerCashPage() {
         </div>
       </DocumentListShell>
 
-      <LedgerCashInvoiceDetailDialog
-        open={dialogKind === LedgerCashDrillDownEnum.INVOICE}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialogKind(null);
-            setSelectedRow(null);
-          }
-        }}
-        detail={invoiceDetail}
-      />
-
-      <LedgerCashReceiptVoucherDialog
+      <InvoiceDetailDialog
         open={
-          dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
-          voucherDetail?.kind === LedgerCashVoucherKindEnum.RECEIPT
+          dialogKind === LedgerCashDrillDownEnum.INVOICE ||
+          !!linkedInvoiceDetail
         }
         onOpenChange={(open) => {
           if (!open) {
+            setLinkedInvoiceDetail(null);
+            if (dialogKind === LedgerCashDrillDownEnum.INVOICE) {
+              setDialogKind(null);
+              setSelectedRow(null);
+            }
+          }
+        }}
+        detail={linkedInvoiceDetail ?? invoiceDetail}
+      />
+
+      <ReceiptVoucherDialog
+        open={receiptVoucherOpen}
+        onOpenChange={(open) => {
+          if (!open) {
             setDialogKind(null);
             setSelectedRow(null);
           }
         }}
-        detail={
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={
           voucherDetail?.kind === LedgerCashVoucherKindEnum.RECEIPT
             ? voucherDetail
             : null
         }
+        onOpenInvoice={openInvoiceByCode}
       />
 
-      <LedgerCashPaymentVoucherDialog
-        open={
-          dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
-          voucherDetail?.kind === LedgerCashVoucherKindEnum.PAYMENT
-        }
+      <PaymentVoucherDialog
+        open={paymentVoucherOpen}
         onOpenChange={(open) => {
           if (!open) {
             setDialogKind(null);
             setSelectedRow(null);
           }
         }}
-        detail={
+        mode={TreasuryVoucherDialogModeEnum.VIEW}
+        initial={
           voucherDetail?.kind === LedgerCashVoucherKindEnum.PAYMENT
             ? voucherDetail
             : null

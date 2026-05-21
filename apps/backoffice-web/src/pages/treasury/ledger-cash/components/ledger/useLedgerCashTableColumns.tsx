@@ -7,7 +7,7 @@ import {
   resolveLedgerCashDrillDown,
   type LedgerCashRow,
 } from "../../ledger-cash.types";
-import { LedgerCashVoucherLink } from "./LedgerCashVoucherLink";
+import { VoucherLink } from "../../../documents";
 
 export function useLedgerCashTableColumns(
   openDrillDown: (row: LedgerCashRow) => void,
@@ -30,7 +30,7 @@ export function useLedgerCashTableColumns(
         width: 120,
         filterKind: "none",
         render: (r) => (
-          <LedgerCashVoucherLink
+          <VoucherLink
             code={r.receiptNo}
             clickable={
               !!r.receiptNo &&
@@ -47,7 +47,7 @@ export function useLedgerCashTableColumns(
         width: 120,
         filterKind: "none",
         render: (r) => (
-          <LedgerCashVoucherLink
+          <VoucherLink
             code={r.paymentNo}
             clickable={
               !!r.paymentNo &&

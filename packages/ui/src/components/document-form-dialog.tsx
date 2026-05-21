@@ -2,8 +2,46 @@ import * as React from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { AppModal } from "./app-modal";
 import { PageToolbar, type ToolbarItem } from "./page-toolbar";
-import { Button } from "./button";
 import { cn } from "./../lib/utils";
+
+interface DocumentFormCollapseBarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  collapseLabel?: string;
+  expandLabel?: string;
+  className?: string;
+}
+
+function DocumentFormCollapseBar({
+  collapsed,
+  onToggle,
+  collapseLabel = "Thu gọn",
+  expandLabel = "Mở rộng",
+  className,
+}: DocumentFormCollapseBarProps) {
+  return (
+    <div className={cn("relative shrink-0 py-1", className)}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border"
+      />
+      <button
+        type="button"
+        className={cn(
+          "relative z-10 mx-auto flex items-center gap-1 rounded border bg-background px-3 py-0.5 text-xs font-medium text-indigo-600 shadow-sm hover:bg-gray-100",
+        )}
+        onClick={onToggle}
+      >
+        {collapsed ? expandLabel : collapseLabel}
+        {collapsed ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronUp className="h-3.5 w-3.5" />
+        )}
+      </button>
+    </div>
+  );
+}
 
 export interface DocumentFormDialogProps {
   open: boolean;
@@ -18,9 +56,14 @@ export interface DocumentFormDialogProps {
    */
   purpose?: React.ReactNode;
   /** Left column under THÔNG TIN CHUNG. */
-  generalInfo: React.ReactNode;
+  generalInfo?: React.ReactNode;
   /** Right column under CHỨNG TỪ. */
-  documentInfo: React.ReactNode;
+  documentInfo?: React.ReactNode;
+  /**
+   * Full-width header block (replaces purpose + two-column header when set).
+   * Use for layouts that do not fit the default general/document split.
+   */
+  headerContent?: React.ReactNode;
   /** Optional row(s) below the two columns: Tham chiếu, Tài liệu đính kèm, ... */
   attachments?: React.ReactNode;
   /** CHI TIẾT region — typically a <LineItemGrid />. */
@@ -45,6 +88,7 @@ export function DocumentFormDialog({
   purpose,
   generalInfo,
   documentInfo,
+  headerContent,
   attachments,
   detail,
   detailActions,
@@ -68,58 +112,61 @@ export function DocumentFormDialog({
     >
       <div className="flex h-full min-h-0 flex-col">
         <div className="shrink-0">
-          <PageToolbar tone="primary" items={toolbarItems} className="rounded-none" />
+          <PageToolbar
+            tone="primary"
+            items={toolbarItems}
+            className="rounded-none"
+          />
         </div>
 
         {!collapsed ? (
-          <div className="shrink-0 border-b px-4 pt-3">
-            {purpose ? <div className="mb-3">{purpose}</div> : null}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[7fr_3fr]">
-              <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Thông tin chung
-                </h3>
-                <div className="space-y-2">{generalInfo}</div>
-              </section>
-              <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Chứng từ
-                </h3>
-                <div className="space-y-2">{documentInfo}</div>
-              </section>
-            </div>
-            {attachments ? <div className="mt-3 space-y-2">{attachments}</div> : null}
+          <div className="shrink-0 px-2 pt-2">
+            {headerContent ? (
+              headerContent
+            ) : (
+              <>
+                {purpose ? <div className="mb-3">{purpose}</div> : null}
+                <div className="grid grid-cols-1 gap-x-8 gap-y-2 lg:grid-cols-[7fr_3fr]">
+                  <section>
+                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Thông tin chung
+                    </h3>
+                    <div className="space-y-1">{generalInfo}</div>
+                  </section>
+                  <section>
+                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Chứng từ
+                    </h3>
+                    <div className="space-y-1">{documentInfo}</div>
+                  </section>
+                </div>
+                {attachments ? (
+                  <div className="mt-3 space-y-2">{attachments}</div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
 
-        <div className="flex shrink-0 items-center justify-center border-b py-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1 text-primary"
-            onClick={() => setCollapsed((c) => !c)}
-          >
-            {collapsed ? (
-              <>
-                <ChevronDown className="h-4 w-4" /> Mở rộng
-              </>
-            ) : (
-              <>
-                <ChevronUp className="h-4 w-4" /> Thu gọn
-              </>
-            )}
-          </Button>
-        </div>
+        <DocumentFormCollapseBar
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
 
-        <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Chi tiết
           </h3>
-          {detailActions ? <div className="flex items-center gap-3 text-sm">{detailActions}</div> : null}
+          {detailActions ? (
+            <div className="flex items-center gap-3 text-sm">
+              {detailActions}
+            </div>
+          ) : null}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{detail}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {detail}
+        </div>
 
         {footerSummary ? (
           <div className="shrink-0 border-t bg-muted/40 px-4 py-2 text-sm font-medium">

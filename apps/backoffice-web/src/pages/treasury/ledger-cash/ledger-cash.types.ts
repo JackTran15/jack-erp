@@ -140,7 +140,8 @@ export function isGoodsReceiptPaymentVoucher(
   detail: LedgerCashVoucherDetail,
 ): boolean {
   return (
-    detail.kind === LedgerCashVoucherKindEnum.PAYMENT && detail.goodsReceipt != null
+    detail.kind === LedgerCashVoucherKindEnum.PAYMENT &&
+    detail.goodsReceipt != null
   );
 }
 
@@ -187,4 +188,12 @@ export function resolveLedgerCashDrillDown(
 
 export function isOpeningBalanceRow(row: LedgerCashRow): boolean {
   return row.documentType === LedgerCashDocumentTypeEnum.OPENING_BALANCE;
+}
+
+export function resolveInvoiceCodeFromVoucher(
+  detail: LedgerCashVoucherDetail,
+): string | null {
+  if (detail.reference?.trim()) return detail.reference.trim();
+  const firstDoc = detail.documentLines?.[0]?.documentNo;
+  return firstDoc?.trim() || null;
 }

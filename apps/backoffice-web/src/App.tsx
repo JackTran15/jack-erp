@@ -22,7 +22,7 @@ import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
 import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
-import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/TreasuryCashReceiptsPage";
+import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expenses/TreasuryCashReceiptsPage";
 import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
 import { StockSummaryReportPage } from "./pages/reports/storage/StockSummaryReportPage";
