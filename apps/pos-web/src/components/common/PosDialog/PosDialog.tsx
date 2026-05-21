@@ -87,6 +87,7 @@ export function PosDialog({
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         style={{ maxWidth: `${width}px`, ...contentStyle }}
+        overlayClassName="bg-black/40"
         className={cn(BASE_CONTENT_CLASSES, contentClassName)}
         onOpenAutoFocus={(event) => {
           const target = initialFocusRef?.current;
