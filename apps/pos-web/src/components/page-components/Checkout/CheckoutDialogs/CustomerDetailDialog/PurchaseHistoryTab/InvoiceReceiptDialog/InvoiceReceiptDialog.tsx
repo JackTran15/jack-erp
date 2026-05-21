@@ -73,13 +73,6 @@ export function InvoiceReceiptDialog({
 
   return (
     <PosDialog open={open} onClose={onClose} width={660}>
-      <PosIconButton
-        icon={<CloseIcon size={20} />}
-        ariaLabel="Đóng"
-        onClick={onClose}
-        className="absolute right-4 top-4 z-[1] text-[#9CA3AF]"
-      />
-
       {invoice ? (
         <>
           <header className="flex flex-col items-center gap-1 px-8 pb-5 pt-8 text-center">

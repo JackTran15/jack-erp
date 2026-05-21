@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { formatVnd } from "@erp/ui";
 import { PosDataTable, type PosDataTableColumn } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
@@ -15,6 +15,12 @@ import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/StatusBadge/StatusBadge";
 import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+import {
+  matchesDateFilter,
+  matchesNumberFilter,
+  matchesTextFilter,
+} from "@erp/pos/lib/common/columnFilter";
+import type { ColumnFilterState } from "@erp/pos/interfaces/column-filter.interface";
 import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface PurchaseHistoryTabProps {
@@ -35,10 +41,29 @@ const STATUS_FILTER_TO_STATUS: Record<
   [PurchaseHistoryStatusFilterEnum.DEBT]: PurchaseHistoryStatusEnum.DEBT,
 };
 
+/** Per-column filter state for the text/number/date columns (status uses its own select). */
+interface PurchaseHistoryColumnFilters {
+  invoiceDate: ColumnFilterState;
+  invoiceNumber: ColumnFilterState;
+  storeName: ColumnFilterState;
+  totalAmount: ColumnFilterState;
+  note: ColumnFilterState;
+}
+
+/** Default operators mirror each cell's `leadingOperator`; values start empty. */
+const DEFAULT_COLUMN_FILTERS: PurchaseHistoryColumnFilters = {
+  invoiceDate: { operator: FilterOperatorEnum.LESS_THAN_OR_EQUAL, value: "" },
+  invoiceNumber: { operator: FilterOperatorEnum.CONTAINS, value: "" },
+  storeName: { operator: FilterOperatorEnum.EQUALS, value: "" },
+  totalAmount: { operator: FilterOperatorEnum.LESS_THAN_OR_EQUAL, value: "" },
+  note: { operator: FilterOperatorEnum.CONTAINS, value: "" },
+};
+
 /**
  * "Lịch sử mua hàng" tab — data table with header + filter row + body +
- * pagination + grand-total footer. Filters are visual placeholders for now;
- * wire `onFilterChange` once a real query layer exists.
+ * pagination + grand-total footer. Per-column filters run client-side over the
+ * already-loaded rows: text columns use CONTAINS/EQUALS/STARTS_WITH/…, the date
+ * column parses `dd/MM/yyyy`, and amounts use `= < ≤ > ≥` (see `columnFilter.ts`).
  */
 export function PurchaseHistoryTab({
   rows,
@@ -50,10 +75,18 @@ export function PurchaseHistoryTab({
     useState<PurchaseHistoryStatusFilterEnum>(
       PurchaseHistoryStatusFilterEnum.ALL,
     );
+  const [columnFilters, setColumnFilters] =
+    useState<PurchaseHistoryColumnFilters>(DEFAULT_COLUMN_FILTERS);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null,
   );
   const selectedStatus = STATUS_FILTER_TO_STATUS[statusFilter];
+
+  const updateFilter = useCallback(
+    (key: keyof PurchaseHistoryColumnFilters, patch: Partial<ColumnFilterState>) =>
+      setColumnFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } })),
+    [],
+  );
 
   const statusOptions = useMemo(
     () => [
@@ -69,10 +102,16 @@ export function PurchaseHistoryTab({
 
   const filtered = useMemo(
     () =>
-      selectedStatus === null
-        ? rows
-        : rows.filter((r) => r.status === selectedStatus),
-    [rows, selectedStatus],
+      rows.filter(
+        (r) =>
+          (selectedStatus === null || r.status === selectedStatus) &&
+          matchesDateFilter(r.invoiceDate, columnFilters.invoiceDate) &&
+          matchesTextFilter(r.invoiceNumber, columnFilters.invoiceNumber) &&
+          matchesTextFilter(r.storeName, columnFilters.storeName) &&
+          matchesNumberFilter(r.totalAmount, columnFilters.totalAmount) &&
+          matchesTextFilter(r.note ?? "", columnFilters.note),
+      ),
+    [rows, selectedStatus, columnFilters],
   );
 
   const grandTotal = filtered.reduce((s, r) => s + r.totalAmount, 0);
@@ -86,7 +125,11 @@ export function PurchaseHistoryTab({
         render: (row) => formatViDateTime(row.invoiceDate),
         filterRender: (
           <PosDataTableFilterCell
-            placeholder=""
+            placeholder="dd/MM/yyyy"
+            value={columnFilters.invoiceDate.value}
+            onChange={(next) => updateFilter("invoiceDate", { value: next })}
+            operator={columnFilters.invoiceDate.operator}
+            onOperatorChange={(op) => updateFilter("invoiceDate", { operator: op })}
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
           />
@@ -107,6 +150,12 @@ export function PurchaseHistoryTab({
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.invoiceNumber.value}
+            onChange={(next) => updateFilter("invoiceNumber", { value: next })}
+            operator={columnFilters.invoiceNumber.operator}
+            onOperatorChange={(op) =>
+              updateFilter("invoiceNumber", { operator: op })
+            }
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
           />
@@ -119,6 +168,10 @@ export function PurchaseHistoryTab({
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.storeName.value}
+            onChange={(next) => updateFilter("storeName", { value: next })}
+            operator={columnFilters.storeName.operator}
+            onOperatorChange={(op) => updateFilter("storeName", { operator: op })}
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.EQUALS}
           />
@@ -151,6 +204,12 @@ export function PurchaseHistoryTab({
           <PosDataTableFilterCell
             placeholder=""
             align="right"
+            value={columnFilters.totalAmount.value}
+            onChange={(next) => updateFilter("totalAmount", { value: next })}
+            operator={columnFilters.totalAmount.operator}
+            onOperatorChange={(op) =>
+              updateFilter("totalAmount", { operator: op })
+            }
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
           />
@@ -163,13 +222,17 @@ export function PurchaseHistoryTab({
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.note.value}
+            onChange={(next) => updateFilter("note", { value: next })}
+            operator={columnFilters.note.operator}
+            onOperatorChange={(op) => updateFilter("note", { operator: op })}
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
           />
         ),
       },
     ],
-    [statusFilter],
+    [statusFilter, statusOptions, columnFilters, updateFilter],
   );
 
   return (
