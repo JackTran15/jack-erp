@@ -1,6 +1,7 @@
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 import { usePosCheckoutLabelsStore } from "@erp/pos/stores/page-stores/checkout/checkout-labels.store";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { usePosCheckoutPromotionStore } from "@erp/pos/stores/page-stores/checkout/checkout-promotion.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 /**
@@ -13,4 +14,5 @@ export function resetCheckoutDraftState(): void {
   usePosCheckoutCustomerStore.getState().resetCustomerDraft();
   usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
   usePosCheckoutLabelsStore.getState().resetLabelsDraft();
+  usePosCheckoutPromotionStore.getState().resetPromotionDraft();
 }

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 
-import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type {
   PriceBook,
   Salesperson,
@@ -23,7 +22,6 @@ interface PosCheckoutUiState {
    * "signal counter" tránh state boolean phải reset thủ công.
    */
   productSearchFocusSeq: number;
-  appliedPromotion: PromotionItem | null;
   selectedSalesperson: Salesperson | null;
   selectedPriceBook: PriceBook | null;
 
@@ -46,8 +44,6 @@ interface PosCheckoutUiState {
 
   requestProductSearchFocus: () => void;
 
-  setAppliedPromotion: (promotion: PromotionItem | null) => void;
-
   setSelectedSalesperson: (next: Salesperson | null) => void;
   setSelectedPriceBook: (next: PriceBook | null) => void;
 
@@ -62,7 +58,6 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   cartError: "",
   pendingQtyFocusLineId: null,
   productSearchFocusSeq: 0,
-  appliedPromotion: null,
   selectedSalesperson: null,
   selectedPriceBook: null,
 
@@ -103,8 +98,6 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   requestProductSearchFocus: () =>
     set((state) => ({ productSearchFocusSeq: state.productSearchFocusSeq + 1 })),
 
-  setAppliedPromotion: (promotion) => set({ appliedPromotion: promotion }),
-
   setSelectedSalesperson: (next) => set({ selectedSalesperson: next }),
   setSelectedPriceBook: (next) => set({ selectedPriceBook: next }),
 
@@ -113,6 +106,5 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
       cancelInvoiceOpen: false,
       oversellOpen: false,
       cartError: "",
-      appliedPromotion: null,
     }),
 }));
