@@ -59,6 +59,25 @@ export interface CashSuggestion {
   amount: number;
 }
 
+/** Bảng giá (toolbar selector). Tạm dùng option tĩnh — chờ API. */
+export interface PriceBook {
+  id: string;
+  name: string;
+}
+
+/** Nhân viên bán hàng (toolbar selector). Tạm dùng option tĩnh — chờ API. */
+export interface Salesperson {
+  id: string;
+  name: string;
+  code: string;
+}
+
+/** Nhóm hàng hoá (catalog group filter). Tạm dùng option tĩnh — chờ API. */
+export interface ProductGroup {
+  id: string;
+  name: string;
+}
+
 /**
  * One payment entry inside a saved draft. Denormalized by design — we capture
  * the human label at save time so a draft keeps its display string even if

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
-import { customerService } from "@erp/pos/services/customer.service";
+import { useCustomerSearch } from "@erp/pos/hooks/react-query/use-query-customer";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
@@ -54,12 +54,14 @@ export function useCheckoutCustomer() {
     (s) => s.clearCustomer,
   );
 
+  const { search } = useCustomerSearch();
+
   const customerSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<CustomerRow>[]> => {
-      const res = await customerService.search(q);
+      const res = await search(q);
       return res.data.slice(0, 8).map((c) => ({ item: c }));
     },
-    [],
+    [search],
   );
 
   const pickCustomer = useCallback(
@@ -84,7 +86,7 @@ export function useCheckoutCustomer() {
       setCustomerFieldError("");
       void (async () => {
         try {
-          const res = await customerService.search(raw);
+          const res = await search(raw);
           const rows = res.data;
           if (rows.length === 1) {
             pickCustomer(rows[0]!);
@@ -103,6 +105,7 @@ export function useCheckoutCustomer() {
       return true;
     },
     [
+      search,
       pickCustomer,
       setCustomerFieldError,
       setCreateDefaultQuery,

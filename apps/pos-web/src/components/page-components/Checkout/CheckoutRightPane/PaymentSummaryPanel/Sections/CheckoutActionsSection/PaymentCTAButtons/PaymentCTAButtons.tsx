@@ -1,9 +1,8 @@
 import { ArrowLeftIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { KeyboardHint } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/PaymentCTAButtons/KeyboardHint/KeyboardHint";
-import { useCheckoutCancelFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cancel-flow";
+import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutCollectState } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-collect-state";
 import { useCheckoutDraft } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-draft";
-import { useCheckoutFinalize } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-finalize";
 import {
   selectIsReturnExchangeInvoice,
   usePosCheckoutSessionStore,
@@ -18,8 +17,8 @@ export function PaymentCTAButtons() {
     selectIsReturnExchangeInvoice,
   );
   const { saveDraft, isSaving } = useCheckoutDraft();
-  const { finalizeCheckoutAndPrint, isFinalizing } = useCheckoutFinalize();
-  const { requestCancelInvoice } = useCheckoutCancelFlow();
+  const { finalizeCheckoutAndPrint, isFinalizing, requestCancelInvoice } =
+    useCheckoutActions();
   const { collectDisabled } = useCheckoutCollectState();
 
   const busy = isSaving || isFinalizing;

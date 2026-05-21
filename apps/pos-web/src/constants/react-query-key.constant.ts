@@ -23,8 +23,14 @@ export const INVOICE_KEYS = {
 export const CUSTOMER_KEYS = {
   ALL: ["customers"] as const,
   DETAIL: (id: string) => ["customers", id] as const,
+  SEARCH: (query: string) => ["customers", "search", query] as const,
   PURCHASE_HISTORY: (customerId: string) =>
     ["customers", "purchase-history", customerId] as const,
+} as const;
+
+export const CATALOG_KEYS = {
+  ALL: ["catalog"] as const,
+  LIST: (branchId: string) => ["catalog", branchId] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {

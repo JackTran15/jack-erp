@@ -1,24 +1,19 @@
 import { AlertBar } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/AlertBar/AlertBar";
-import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
-
-interface CatalogErrorAlertProps {
-  branchId: string;
-}
+import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 
 /**
- * Wrapper hiển thị catalog error + nút "Tải lại" — đọc trực tiếp từ catalog
- * store, không cần prop drilling từ Page.
+ * Wrapper hiển thị catalog error + nút "Tải lại" — đọc từ catalog adapter
+ * (React Query), không cần prop drilling từ Page.
  */
-export function CatalogErrorAlert({ branchId }: CatalogErrorAlertProps) {
-  const catalogError = usePosCheckoutCatalogStore((s) => s.catalogError);
-  const loadCatalog = usePosCheckoutCatalogStore((s) => s.loadCatalog);
+export function CatalogErrorAlert() {
+  const { catalogError, refetchCatalog } = useCheckoutCatalog();
 
   if (!catalogError) return null;
 
   return (
     <AlertBar
       variant="error"
-      action={{ label: "Tải lại", onClick: () => void loadCatalog(branchId) }}
+      action={{ label: "Tải lại", onClick: refetchCatalog }}
     >
       {catalogError}
     </AlertBar>

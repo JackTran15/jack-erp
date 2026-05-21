@@ -1,9 +1,13 @@
-import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
+import { useMemo } from "react";
+
+import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
+import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import {
   selectHasAnyCartLines,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
+import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 export interface UseCheckoutCollectStateResult {
   hasAnyCartLines: boolean;
@@ -13,20 +17,34 @@ export interface UseCheckoutCollectStateResult {
 /**
  * Tính `collectDisabled` cho nút "Thu tiền" (F12) cross-store:
  * - true khi giỏ trống, hoặc thiếu tiền trong khi không forgive/debt.
+ *
+ * Đọc đúng các field cần thiết qua selector + `deriveSettlement` (thay vì
+ * phụ thuộc cả `useCheckoutPayment`) để thu hẹp subscription + cắt phụ thuộc hook.
  */
 export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
   const hasAnyCartLines = usePosCheckoutSessionStore(selectHasAnyCartLines);
   const selectedCustomer = usePosCheckoutCustomerStore(
     (s) => s.selectedCustomer,
   );
-  const payment = useCheckoutPayment();
+
+  const grandTotal = useCheckoutGrandTotal();
+  const deposit = usePosCheckoutPaymentStore((s) => s.deposit);
+  const paymentLines = usePosCheckoutPaymentStore((s) => s.paymentLines);
+  const keepChange = usePosCheckoutPaymentStore((s) => s.keepChange);
+  const debt = usePosCheckoutPaymentStore((s) => s.debt);
+
+  const { settlementGrandTotal, changeAmount, shortageAmount } = useMemo(
+    () =>
+      deriveSettlement({ grandTotal, deposit, paymentLines, keepChange, debt }),
+    [grandTotal, deposit, paymentLines, keepChange, debt],
+  );
 
   const blockedByShortPayment = (() => {
-    if (payment.settlementGrandTotal <= 0) return false;
-    const net = payment.changeAmount - payment.shortageAmount;
+    if (settlementGrandTotal <= 0) return false;
+    const net = changeAmount - shortageAmount;
     if (net >= 0) return false;
-    if (payment.keepChange) return false;
-    if (payment.debt && selectedCustomer) return false;
+    if (keepChange) return false;
+    if (debt && selectedCustomer) return false;
     return true;
   })();
 

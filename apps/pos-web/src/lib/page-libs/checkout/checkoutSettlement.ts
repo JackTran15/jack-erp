@@ -57,6 +57,50 @@ export function derivePaymentDisplay(input: {
   };
 }
 
+export interface SettlementSnapshot {
+  /** Net cần tất toán sau khi trừ đặt cọc (âm = hoàn tiền). */
+  settlementGrandTotal: number;
+  /** Độ lớn tuyệt đối cần thu/chi. */
+  settlementAbs: number;
+  /** Tổng đã nhập trên các dòng thanh toán. */
+  totalPaid: number;
+  changeAmount: number;
+  shortageAmount: number;
+  debtAmount: number;
+}
+
+/**
+ * Single source of truth cho settlement: gộp `settlementGrandTotal / settlementAbs
+ * / totalPaid` + {@link derivePaymentDisplay}. Dùng chung bởi `useCheckoutPayment`,
+ * `useCheckoutCollectState`, `useCheckoutActions` — các hook phụ thuộc helper này
+ * thay vì phụ thuộc lẫn nhau. `paymentLines` nhận shape tối giản `{ amount }`.
+ */
+export function deriveSettlement(input: {
+  grandTotal: number;
+  deposit: number;
+  paymentLines: ReadonlyArray<{ amount: number }>;
+  keepChange: boolean;
+  debt: boolean;
+}): SettlementSnapshot {
+  const settlementGrandTotal = input.grandTotal - input.deposit;
+  const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
+  const totalPaid = input.paymentLines.reduce((sum, l) => sum + l.amount, 0);
+  const { changeAmount, shortageAmount, debtAmount } = derivePaymentDisplay({
+    grandTotal: settlementGrandTotal,
+    totalPaid,
+    keepChange: input.keepChange,
+    debt: input.debt,
+  });
+  return {
+    settlementGrandTotal,
+    settlementAbs,
+    totalPaid,
+    changeAmount,
+    shortageAmount,
+    debtAmount,
+  };
+}
+
 export interface DerivedInvoiceTotals {
   change: number;
   keptChange?: number;

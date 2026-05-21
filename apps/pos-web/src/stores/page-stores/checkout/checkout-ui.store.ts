@@ -1,8 +1,10 @@
 import { create } from "zustand";
 
 import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
-import type { PriceBook } from "@erp/pos/hooks/page-hooks/checkout/use-price-books";
-import type { Salesperson } from "@erp/pos/hooks/page-hooks/checkout/use-salespersons";
+import type {
+  PriceBook,
+  Salesperson,
+} from "@erp/pos/interfaces/checkout.interface";
 
 const DEFAULT_ANNOUNCEMENT_DURATION_MS = 3_000;
 

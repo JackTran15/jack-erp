@@ -15,8 +15,6 @@ import {
 } from "@erp/pos/stores/common/checkout-session.store";
 
 export interface CheckoutLeftPaneProps {
-  /** Trigger fetch lại khi click "Tải lại" trên AlertBar. */
-  branchId: string;
   productSearchRef: RefObject<HTMLInputElement | null>;
   salespersonRef: RefObject<HTMLInputElement | null>;
   priceBookRef: RefObject<HTMLInputElement | null>;
@@ -29,7 +27,6 @@ export interface CheckoutLeftPaneProps {
  * chỉ là refs (forwardRef pattern cho focus management).
  */
 export function CheckoutLeftPane({
-  branchId,
   productSearchRef,
   salespersonRef,
   priceBookRef,
@@ -51,7 +48,7 @@ export function CheckoutLeftPane({
         priceBookRef={priceBookRef}
       />
 
-      <CatalogErrorAlert branchId={branchId} />
+      <CatalogErrorAlert />
 
       <InvoiceLineItemTable />
 

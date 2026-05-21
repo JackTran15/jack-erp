@@ -1,5 +1,8 @@
 import type {
   PaymentMethodOption,
+  PriceBook,
+  ProductGroup,
+  Salesperson,
   SaleChannelOption,
 } from "@erp/pos/interfaces/checkout.interface";
 import type {
@@ -149,6 +152,29 @@ export const PAYMENT_METHODS: readonly PaymentMethodOption[] = [
   { value: PaymentMethodEnum.CASH, label: "Tiền mặt" },
   { value: PaymentMethodEnum.CARD, label: "Thẻ" },
   { value: PaymentMethodEnum.TRANSFER, label: "Chuyển khoản" },
+];
+
+// ============================================================================
+// Toolbar option tĩnh (chờ API thay thế)
+// ============================================================================
+
+export const PRICE_BOOK_OPTIONS: readonly PriceBook[] = [
+  { id: "default", name: "Bảng giá chuẩn" },
+  { id: "vip", name: "Bảng giá VIP" },
+  { id: "wholesale", name: "Bảng giá sỉ" },
+];
+
+export const SALESPERSON_OPTIONS: readonly Salesperson[] = [
+  { id: "nv01", code: "NV01", name: "Nguyễn Văn A" },
+  { id: "nv02", code: "NV02", name: "Trần Thị B" },
+  { id: "nv03", code: "NV03", name: "Lê Văn C" },
+];
+
+export const CATALOG_GROUP_OPTIONS: readonly ProductGroup[] = [
+  { id: "all", name: "Tất cả" },
+  { id: "drink", name: "Nước uống" },
+  { id: "food", name: "Đồ ăn" },
+  { id: "other", name: "Khác" },
 ];
 
 // ============================================================================

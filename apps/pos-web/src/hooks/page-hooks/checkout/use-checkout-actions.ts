@@ -7,7 +7,6 @@ import {
   useReceivableAccountsQuery,
   useRevenueAccountsQuery,
 } from "@erp/pos/hooks/react-query/use-query-account";
-import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import {
   useCheckoutInvoiceMutation,
@@ -16,6 +15,7 @@ import {
 import type { AccountRow } from "@erp/pos/interfaces/account.interface";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
+import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import {
   getOversellSaleLines,
   paymentLabel,
@@ -28,9 +28,13 @@ import {
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
-import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
+import {
+  PAYMENT_METHODS,
+  PaymentMethodEnum,
+} from "@erp/pos/constants/checkout.constant";
 import {
   computeReceiptLines,
+  selectGrandTotal,
   selectHasAnyCartLines,
   selectPurchaseCart,
   usePosCheckoutSessionStore,
@@ -39,11 +43,17 @@ import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkou
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
-export interface UseCheckoutFinalizeResult {
+export interface UseCheckoutActionsResult {
   finalizeCheckoutAndPrint: (options?: {
     bypassOversellModal?: boolean;
   }) => Promise<void>;
   isFinalizing: boolean;
+  /** Mở dialog xác nhận huỷ hoá đơn (return/exchange). */
+  requestCancelInvoice: () => void;
+  /** Xác nhận huỷ: remove session (nếu >1) hoặc reset session + draft UI. */
+  confirmCancelInvoice: () => void;
+  /** Người dùng đồng ý "vẫn bán" trên dialog oversell → finalize bỏ qua modal. */
+  confirmOversell: () => Promise<void>;
 }
 
 function describeResolveError(error: ResolveCheckoutPayloadError): string {
@@ -62,11 +72,12 @@ function describeResolveError(error: ResolveCheckoutPayloadError): string {
 }
 
 /**
- * Validate cart + payment, gọi 2 API (`POST /invoices` → `POST /:id/checkout`),
- * sau đó announce/reset/in. Lỗi backend → toast, không reset state.
+ * Terminal actions của checkout: finalize (validate + 2 API + in + reset),
+ * cancel-invoice và oversell-confirm. Toàn bộ đọc state qua `getState()` tại
+ * thời điểm click + `deriveSettlement` (không subscribe payment store reactive),
+ * nên component consume hook này không re-render khi user gõ tiền.
  */
-export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
-  const payment = useCheckoutPayment();
+export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const invoicePrinter = useInvoicePrinter();
   const createMutation = useCreateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
@@ -104,123 +115,6 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
     [invoicePrinter],
   );
 
-  //  const finalizeCheckoutAndPrint = useCallback(
-  //   async (options?: { bypassOversellModal?: boolean }) => {
-  //     const sessionState = usePosCheckoutSessionStore.getState();
-  //     const selectedCustomer =
-  //       usePosCheckoutCustomerStore.getState().selectedCustomer;
-  //     const purchaseCart = selectPurchaseCart(sessionState);
-  //     const ui = usePosCheckoutUiStore.getState();
-
-  //     const result = validateCheckout({
-  //       hasAnyCartLines: selectHasAnyCartLines(sessionState),
-  //       debt: payment.debt,
-  //       keepChange: payment.keepChange,
-  //       selectedCustomer,
-  //       purchaseCart,
-  //       settlementGrandTotal: payment.settlementGrandTotal,
-  //       settlementAbs: payment.settlementAbs,
-  //       totalPaid: payment.totalPaid,
-  //       changeAmount: payment.changeAmount,
-  //       shortageAmount: payment.shortageAmount,
-  //     });
-
-  //     if (!result.ok) {
-  //       ui.setCartError(result.message);
-  //       return;
-  //     }
-  //     if (
-  //       !options?.bypassOversellModal &&
-  //       getOversellSaleLines(purchaseCart).length > 0
-  //     ) {
-  //       ui.openOversell();
-  //       return;
-  //     }
-
-  //     const checkoutResolve = buildCheckoutInvoiceApiPayload({
-  //       paymentLines: payment.paymentLines,
-  //       debt: payment.debt,
-  //       amountDue: payment.settlementGrandTotal,
-  //       revenueAccountId,
-  //       receivableAccountId,
-  //       accountById,
-  //     });
-
-  //   console.log('checkoutResolve::: ', checkoutResolve)
-  //   //   if (!checkoutResolve.ok) {
-  //   //     toast.error(describeResolveError(checkoutResolve.error));
-  //   //     return;
-  //   //   }
-
-  //   //   const receiptPayload = buildCheckoutInvoicePayload({
-  //   //     printInvoice: payment.printInvoice,
-  //   //     cart: computeReceiptLines(sessionState),
-  //   //     grandTotal: payment.grandTotal,
-  //   //     totalPaid: payment.totalPaid,
-  //   //     paymentLines: payment.paymentLines,
-  //   //     primaryMethodLabel: payment.primaryMethodLabel,
-  //   //     methods: PAYMENT_METHODS,
-  //   //     keepChange: payment.keepChange,
-  //   //     debt: payment.debt,
-  //   //   });
-
-  //   //   const note = usePosCheckoutPaymentStore.getState().note || undefined;
-  //   //   const createPayload = buildCreateInvoicePayload({
-  //   //     sessionId: sessionState.activeSessionId,
-  //   //     cart: purchaseCart,
-  //   //     customer: selectedCustomer,
-  //   //     note,
-  //   //   });
-
-  //   //   try {
-  //   //     const created = await createMutation.mutateAsync(createPayload);
-  //   //     await checkoutMutation.mutateAsync({
-  //   //       id: created.id,
-  //   //       body: checkoutResolve.body,
-  //   //     });
-  //   //   } catch (err) {
-  //   //     toast.error(
-  //   //       err instanceof Error ? err.message : "Không thu được tiền",
-  //   //     );
-  //   //     return;
-  //   //   }
-
-  //   //   const who = selectedCustomer
-  //   //     ? ` cho ${formatCustomerDisplay(selectedCustomer)}`
-  //   //     : " (khách lẻ)";
-  //   //   ui.setAnnouncement(
-  //   //     `Đã ghi nhận thanh toán${who}, ${new Intl.NumberFormat("vi-VN", {
-  //   //       style: "currency",
-  //   //       currency: "VND",
-  //   //       maximumFractionDigits: 0,
-  //   //     }).format(payment.settlementGrandTotal)}, ${paymentLabel(payment.primaryMethod)}.`,
-  //   //   );
-  //   //   usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
-  //   //   resetCheckoutDraftState();
-  //   //   await printReceiptIfNeeded(receiptPayload);
-  //   },
-  //   [
-  //     payment.debt,
-  //     payment.keepChange,
-  //     payment.printInvoice,
-  //     payment.grandTotal,
-  //     payment.totalPaid,
-  //     payment.paymentLines,
-  //     payment.primaryMethodLabel,
-  //     payment.primaryMethod,
-  //     payment.settlementGrandTotal,
-  //     payment.settlementAbs,
-  //     payment.changeAmount,
-  //     payment.shortageAmount,
-  //     revenueAccountId,
-  //     receivableAccountId,
-  //     accountById,
-  //     createMutation,
-  //     checkoutMutation,
-  //     printReceiptIfNeeded,
-  //   ],
-  // );
-
   const finalizeCheckoutAndPrint = useCallback(
     async (options?: { bypassOversellModal?: boolean }) => {
       const sessionState = usePosCheckoutSessionStore.getState();
@@ -228,18 +122,38 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
         usePosCheckoutCustomerStore.getState().selectedCustomer;
       const purchaseCart = selectPurchaseCart(sessionState);
       const ui = usePosCheckoutUiStore.getState();
+      const p = usePosCheckoutPaymentStore.getState();
+
+      const grandTotal = selectGrandTotal(sessionState);
+      const {
+        settlementGrandTotal,
+        settlementAbs,
+        totalPaid,
+        changeAmount,
+        shortageAmount,
+      } = deriveSettlement({
+        grandTotal,
+        deposit: p.deposit,
+        paymentLines: p.paymentLines,
+        keepChange: p.keepChange,
+        debt: p.debt,
+      });
+      const primaryMethod = p.paymentLines[0]?.method ?? PaymentMethodEnum.CASH;
+      const primaryMethodLabel =
+        PAYMENT_METHODS.find((m) => m.value === primaryMethod)?.label ??
+        String(primaryMethod);
 
       const result = validateCheckout({
         hasAnyCartLines: selectHasAnyCartLines(sessionState),
-        debt: payment.debt,
-        keepChange: payment.keepChange,
+        debt: p.debt,
+        keepChange: p.keepChange,
         selectedCustomer,
         purchaseCart,
-        settlementGrandTotal: payment.settlementGrandTotal,
-        settlementAbs: payment.settlementAbs,
-        totalPaid: payment.totalPaid,
-        changeAmount: payment.changeAmount,
-        shortageAmount: payment.shortageAmount,
+        settlementGrandTotal,
+        settlementAbs,
+        totalPaid,
+        changeAmount,
+        shortageAmount,
       });
 
       if (!result.ok) {
@@ -255,33 +169,32 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
       }
 
       const checkoutResolve = buildCheckoutInvoiceApiPayload({
-        paymentLines: payment.paymentLines,
-        debt: payment.debt,
-        amountDue: payment.settlementGrandTotal,
+        paymentLines: p.paymentLines,
+        debt: p.debt,
+        amountDue: settlementGrandTotal,
         revenueAccountId,
         receivableAccountId,
         accountById,
       });
 
-    console.log('checkoutResolve::: ', checkoutResolve)
       if (!checkoutResolve.ok) {
         toast.error(describeResolveError(checkoutResolve.error));
         return;
       }
 
       const receiptPayload = buildCheckoutInvoicePayload({
-        printInvoice: payment.printInvoice,
+        printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
-        grandTotal: payment.grandTotal,
-        totalPaid: payment.totalPaid,
-        paymentLines: payment.paymentLines,
-        primaryMethodLabel: payment.primaryMethodLabel,
+        grandTotal,
+        totalPaid,
+        paymentLines: p.paymentLines,
+        primaryMethodLabel,
         methods: PAYMENT_METHODS,
-        keepChange: payment.keepChange,
-        debt: payment.debt,
+        keepChange: p.keepChange,
+        debt: p.debt,
       });
 
-      const note = usePosCheckoutPaymentStore.getState().note || undefined;
+      const note = p.note || undefined;
       const createPayload = buildCreateInvoicePayload({
         sessionId: sessionState.activeSessionId,
         cart: purchaseCart,
@@ -296,9 +209,7 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
           body: checkoutResolve.body,
         });
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Không thu được tiền",
-        );
+        toast.error(err instanceof Error ? err.message : "Không thu được tiền");
         return;
       }
 
@@ -310,25 +221,13 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
           style: "currency",
           currency: "VND",
           maximumFractionDigits: 0,
-        }).format(payment.settlementGrandTotal)}, ${paymentLabel(payment.primaryMethod)}.`,
+        }).format(settlementGrandTotal)}, ${paymentLabel(primaryMethod)}.`,
       );
       usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
       resetCheckoutDraftState();
       await printReceiptIfNeeded(receiptPayload);
     },
     [
-      payment.debt,
-      payment.keepChange,
-      payment.printInvoice,
-      payment.grandTotal,
-      payment.totalPaid,
-      payment.paymentLines,
-      payment.primaryMethodLabel,
-      payment.primaryMethod,
-      payment.settlementGrandTotal,
-      payment.settlementAbs,
-      payment.changeAmount,
-      payment.shortageAmount,
       revenueAccountId,
       receivableAccountId,
       accountById,
@@ -338,8 +237,33 @@ export const useCheckoutFinalize = (): UseCheckoutFinalizeResult => {
     ],
   );
 
+  const requestCancelInvoice = useCallback(() => {
+    usePosCheckoutUiStore.getState().openCancelInvoice();
+  }, []);
+
+  const confirmCancelInvoice = useCallback(() => {
+    const ui = usePosCheckoutUiStore.getState();
+    const session = usePosCheckoutSessionStore.getState();
+    ui.closeCancelInvoice();
+    if (session.sessions.length > 1) {
+      session.removeSession(session.activeSessionId);
+    } else {
+      session.resetActiveSessionAfterCheckout();
+      resetCheckoutDraftState();
+    }
+    ui.setAnnouncement("Đã hủy hóa đơn.");
+  }, []);
+
+  const confirmOversell = useCallback(async () => {
+    usePosCheckoutUiStore.getState().closeOversell();
+    await finalizeCheckoutAndPrint({ bypassOversellModal: true });
+  }, [finalizeCheckoutAndPrint]);
+
   return {
     finalizeCheckoutAndPrint,
     isFinalizing: createMutation.isPending || checkoutMutation.isPending,
+    requestCancelInvoice,
+    confirmCancelInvoice,
+    confirmOversell,
   };
 };

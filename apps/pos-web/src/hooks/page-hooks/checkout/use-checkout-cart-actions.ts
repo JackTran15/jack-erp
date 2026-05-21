@@ -31,7 +31,7 @@ export interface UseCheckoutCartActionsResult {
 export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
   const { addProduct, handleCatalogSelect: handleCatalogSelectFromCart } =
     useCheckoutSessionCart();
-  const { filteredProducts } = useCheckoutCatalog();
+  const { filteredProducts, catalog } = useCheckoutCatalog();
 
   const addProductByItem = useCallback(
     (product: PosCatalogLine, qty = 1) => {
@@ -78,13 +78,12 @@ export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
 
   const addProductByCatalogCard = useCallback(
     (product: CatalogProduct) => {
-      const catalog = usePosCheckoutCatalogStore.getState().catalog;
       const lineId = handleCatalogSelectFromCart(product, catalog);
       if (lineId) {
         usePosCheckoutUiStore.getState().setPendingQtyFocusLineId(lineId);
       }
     },
-    [handleCatalogSelectFromCart],
+    [handleCatalogSelectFromCart, catalog],
   );
 
   const commitQty = useCallback(() => {

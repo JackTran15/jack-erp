@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -14,8 +15,32 @@ import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type {
   CreateCustomerBody,
+  PaginatedCustomers,
   UpdateCustomerBody,
 } from "@erp/pos/dtos/customer.dto";
+
+export interface UseCustomerSearchResult {
+  /**
+   * Tìm khách theo từ khoá — `GET /customers?search=`. Dùng cho typeahead
+   * imperative (search adapter của popover + submit Enter). `fetchQuery` cache
+   * theo `CUSTOMER_KEYS.SEARCH(query)` nên gõ lại cùng từ khoá không gọi lại API.
+   */
+  search: (query: string) => Promise<PaginatedCustomers>;
+}
+
+export function useCustomerSearch(): UseCustomerSearchResult {
+  const qc = useQueryClient();
+  const search = useCallback(
+    (query: string) =>
+      qc.fetchQuery({
+        queryKey: CUSTOMER_KEYS.SEARCH(query.trim()),
+        queryFn: () => customerService.search(query),
+        staleTime: 30_000,
+      }),
+    [qc],
+  );
+  return { search };
+}
 
 /**
  * Fetches the full customer record via `GET /customers/:id`.

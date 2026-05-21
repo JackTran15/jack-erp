@@ -5,9 +5,8 @@ import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/
 import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerCreateDialog";
 import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailDialog";
 import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";
-import { useCheckoutCancelFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cancel-flow";
+import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
-import { useCheckoutOversellFlow } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-oversell-flow";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import {
   computeOversellLines,
@@ -60,8 +59,7 @@ export const CheckoutDialogs = ({
     [sessionState],
   );
 
-  const { confirmCancelInvoice } = useCheckoutCancelFlow();
-  const { confirmOversell } = useCheckoutOversellFlow();
+  const { confirmCancelInvoice, confirmOversell } = useCheckoutActions();
 
   return (
     <>
