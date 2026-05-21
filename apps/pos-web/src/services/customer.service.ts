@@ -5,6 +5,7 @@ import type {
 } from "@erp/pos/interfaces/customer.interface";
 import type {
   CreateCustomerBody,
+  ListCustomersParams,
   PaginatedCustomers,
   UpdateCustomerBody,
 } from "@erp/pos/dtos/customer.dto";
@@ -17,6 +18,14 @@ export const customerService = {
       search: search.trim(),
     });
     return http.get<PaginatedCustomers>(`/customers?${params.toString()}`);
+  },
+
+  list: (params: ListCustomersParams = {}): Promise<PaginatedCustomers> => {
+    const qs = new URLSearchParams({
+      page: String(params.page ?? 1),
+      pageSize: String(params.pageSize ?? 50),
+    });
+    return http.get<PaginatedCustomers>(`/customers?${qs.toString()}`);
   },
 
   create: (body: CreateCustomerBody): Promise<CustomerRow> =>

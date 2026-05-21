@@ -23,6 +23,8 @@ export const INVOICE_KEYS = {
 export const CUSTOMER_KEYS = {
   ALL: ["customers"] as const,
   DETAIL: (id: string) => ["customers", id] as const,
+  LIST: (params: { page?: number; pageSize?: number } = {}) =>
+    ["customers", "list", params] as const,
   SEARCH: (query: string) => ["customers", "search", query] as const,
   PURCHASE_HISTORY: (customerId: string) =>
     ["customers", "purchase-history", customerId] as const,

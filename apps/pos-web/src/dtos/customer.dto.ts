@@ -11,6 +11,12 @@ export interface PaginatedCustomers {
   pageSize: number;
 }
 
+/** Query params cho `GET /customers` (list không kèm từ khoá search). */
+export interface ListCustomersParams {
+  page?: number;
+  pageSize?: number;
+}
+
 export interface CreateMembershipCardInlineBody {
   cardNumber: string;
   tier?: MembershipTierEnum;

@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type UseMutationResult,
@@ -15,6 +16,7 @@ import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type {
   CreateCustomerBody,
+  ListCustomersParams,
   PaginatedCustomers,
   UpdateCustomerBody,
 } from "@erp/pos/dtos/customer.dto";
@@ -40,6 +42,53 @@ export function useCustomerSearch(): UseCustomerSearchResult {
     [qc],
   );
   return { search };
+}
+
+/**
+ * Prefetch danh sách khách — `GET /customers?page=&pageSize=`. Dùng cho customer
+ * picker: nạp sẵn một trang khách khi mount để hiển thị/lọc local ngay khi click,
+ * chỉ fallback `useCustomerSearch` khi từ khoá không khớp danh sách prefetch.
+ */
+export function useCustomerListQuery(
+  params: ListCustomersParams = {},
+): UseQueryResult<PaginatedCustomers, Error> {
+  return useQuery<PaginatedCustomers, Error>({
+    queryKey: CUSTOMER_KEYS.LIST(params),
+    queryFn: () => customerService.list(params),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Resolve nhiều khách theo `customerId` (mỗi id 1 `GET /customers/:id`, cache
+ * chung `CUSTOMER_KEYS.DETAIL`). Trả `Map<id, CustomerDetail>` cho các id đã có
+ * dữ liệu — dùng để hiển thị tên/SĐT khách trong danh sách hoá đơn lưu tạm.
+ */
+export function useCustomersByIds(
+  ids: string[],
+): Map<string, CustomerDetail> {
+  const uniqueIds = useMemo(
+    () => Array.from(new Set(ids.filter(Boolean))),
+    [ids],
+  );
+
+  const results = useQueries({
+    queries: uniqueIds.map((id) => ({
+      queryKey: CUSTOMER_KEYS.DETAIL(id),
+      queryFn: () => customerService.get(id),
+      enabled: Boolean(id),
+      staleTime: 30_000,
+    })),
+  });
+
+  return useMemo(() => {
+    const map = new Map<string, CustomerDetail>();
+    results.forEach((result, index) => {
+      const id = uniqueIds[index];
+      if (id && result.data) map.set(id, result.data);
+    });
+    return map;
+  }, [results, uniqueIds]);
 }
 
 /**

@@ -5,6 +5,7 @@ import type {
   DraftInvoice,
   DraftInvoicePayment,
 } from "@erp/pos/interfaces/checkout.interface";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { coerceCheckoutVariant } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
@@ -56,10 +57,13 @@ interface PosCheckoutSessionState {
   cashierDisplayName: string | null;
   draftsDialogOpen: boolean;
   pendingDraftPaymentLines: DraftInvoicePayment[] | null;
+  /** Khách của draft đang restore — áp lại sau khi đổi session (giống pendingDraftPaymentLines). */
+  pendingDraftCustomer: CustomerRow | null;
 
   setCashierDisplayName: (name: string | null) => void;
   setDraftsDialogOpen: (open: boolean) => void;
   setPendingDraftPaymentLines: (value: DraftInvoicePayment[] | null) => void;
+  setPendingDraftCustomer: (value: CustomerRow | null) => void;
   setActiveSessionId: (id: string) => void;
   setActiveCheckoutPane: (pane: CheckoutPane) => void;
   patchActiveSession: (partial: Partial<InvoiceSession>) => void;
@@ -105,6 +109,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       cashierDisplayName: null,
       draftsDialogOpen: false,
       pendingDraftPaymentLines: null,
+      pendingDraftCustomer: null,
 
       setCashierDisplayName: (name) => set({ cashierDisplayName: name }),
 
@@ -112,6 +117,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
 
       setPendingDraftPaymentLines: (value) =>
         set({ pendingDraftPaymentLines: value }),
+
+      setPendingDraftCustomer: (value) =>
+        set({ pendingDraftCustomer: value }),
 
       setActiveSessionId: (id) => {
         const { sessions } = get();
@@ -313,6 +321,13 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           sessions: [...sessions, newSession],
           activeSessionId: newId,
           pendingDraftPaymentLines: draft.payments ?? null,
+          pendingDraftCustomer: draft.customerId
+            ? {
+                id: draft.customerId,
+                name: draft.customerName ?? "",
+                phone: draft.customerPhone ?? null,
+              }
+            : null,
         });
       },
     }),

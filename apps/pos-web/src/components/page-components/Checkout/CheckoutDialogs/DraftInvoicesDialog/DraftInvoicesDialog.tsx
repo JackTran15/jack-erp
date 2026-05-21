@@ -7,6 +7,7 @@ import {
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
+import { useCustomersByIds } from "@erp/pos/hooks/react-query/use-query-customer";
 import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/FilterBar/FilterBar";
@@ -65,9 +66,27 @@ export function DraftInvoicesDialog({
   onDateFilterChange,
 }: DraftInvoicesDialogProps) {
   const draftsQuery = useDraftInvoicesQuery({ sessionId, enabled: open });
-  const drafts = useMemo<DraftInvoice[]>(
-    () => (draftsQuery.data ?? []).map((row) => mapInvoiceRowToDraftInvoice(row)),
+
+  // API drafts chỉ trả `customerId` → resolve tên/SĐT khách qua `GET /customers/:id`
+  // (mỗi id 1 request, cache chung) để hiển thị + filter trong dialog.
+  const customerIds = useMemo(
+    () =>
+      (draftsQuery.data ?? [])
+        .map((row) => row.customerId)
+        .filter((id): id is string => Boolean(id)),
     [draftsQuery.data],
+  );
+  const customerMap = useCustomersByIds(customerIds);
+
+  const drafts = useMemo<DraftInvoice[]>(
+    () =>
+      (draftsQuery.data ?? []).map((row) =>
+        mapInvoiceRowToDraftInvoice(
+          row,
+          row.customerId ? (customerMap.get(row.customerId) ?? null) : null,
+        ),
+      ),
+    [draftsQuery.data, customerMap],
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(

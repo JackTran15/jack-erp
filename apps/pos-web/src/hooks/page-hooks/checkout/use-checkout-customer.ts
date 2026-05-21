@@ -1,7 +1,13 @@
 import { useCallback } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
-import { useCustomerSearch } from "@erp/pos/hooks/react-query/use-query-customer";
+import {
+  formatCustomerDisplay,
+  phoneDigitsOnly,
+} from "@erp/pos/lib/common/customerUtils";
+import {
+  useCustomerListQuery,
+  useCustomerSearch,
+} from "@erp/pos/hooks/react-query/use-query-customer";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
@@ -55,13 +61,36 @@ export function useCheckoutCustomer() {
   );
 
   const { search } = useCustomerSearch();
+  // Prefetch một trang khách (50) ngay khi CustomerSection mount → click vào ô
+  // khách là hiện danh sách + lọc local tức thì, không cần gọi API mỗi lần gõ.
+  const customerListQuery = useCustomerListQuery({ pageSize: 50 });
+  const prefetched = customerListQuery.data?.data;
 
   const customerSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<CustomerRow>[]> => {
+      const list = prefetched ?? [];
+      const term = q.trim().toLowerCase();
+
+      // Chưa gõ gì (focus) → hiện danh sách prefetch.
+      if (!term) return list.slice(0, 8).map((c) => ({ item: c }));
+
+      // Lọc local theo tên hoặc SĐT trước khi gọi server.
+      const digits = phoneDigitsOnly(term);
+      const local = list.filter((c) => {
+        const nameHit = formatCustomerDisplay(c).toLowerCase().includes(term);
+        const phoneHit =
+          digits.length > 0 && c.phone
+            ? phoneDigitsOnly(c.phone).includes(digits)
+            : false;
+        return nameHit || phoneHit;
+      });
+      if (local.length > 0) return local.slice(0, 8).map((c) => ({ item: c }));
+
+      // Không khớp trong danh sách prefetch → fallback gọi API search.
       const res = await search(q);
       return res.data.slice(0, 8).map((c) => ({ item: c }));
     },
-    [search],
+    [prefetched, search],
   );
 
   const pickCustomer = useCallback(

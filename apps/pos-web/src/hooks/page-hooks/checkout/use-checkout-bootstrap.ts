@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { createPaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
+import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 /**
@@ -47,6 +48,14 @@ export function useCheckoutBootstrap(): void {
           createPaymentLine(row.method, row.amount),
         ),
       );
+    }
+
+    // Restore khách của draft (nếu có) — chạy SAU resetCheckoutDraftState().
+    const pendingDraftCustomer =
+      usePosCheckoutSessionStore.getState().pendingDraftCustomer;
+    usePosCheckoutSessionStore.getState().setPendingDraftCustomer(null);
+    if (pendingDraftCustomer) {
+      usePosCheckoutCustomerStore.getState().pickCustomer(pendingDraftCustomer);
     }
   }, [activeSessionId]);
 }
