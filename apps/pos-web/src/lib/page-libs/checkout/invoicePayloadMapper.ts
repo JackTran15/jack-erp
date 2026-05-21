@@ -149,6 +149,11 @@ export function buildCheckoutInvoiceApiPayload(
  * Map `InvoiceRow` từ API (`/invoices/drafts` hoặc `/invoices/:id`) sang shape
  * `DraftInvoice` mà dialog + restore-tab flow đang dùng. Không trả về customer
  * name/phone vì endpoint drafts không kèm — cần fetch riêng nếu hiển thị đầy đủ.
+ *
+ * Các cột `numeric` (quantity, unitPrice, amountDue) được API trả về dạng
+ * **string** (Postgres numeric → string), nên phải `Number(...)` về số — nếu
+ * không `qty` là string sẽ làm `bumpQty` nối chuỗi và `<input type="number">`
+ * hiển thị trống.
  */
 export function mapInvoiceRowToDraftInvoice(
   row: InvoiceRow,
@@ -160,8 +165,8 @@ export function mapInvoiceRowToDraftInvoice(
     name: item.itemName,
     code: item.itemCode,
     unit: item.unit,
-    unitPrice: item.unitPrice,
-    qty: item.quantity,
+    unitPrice: Number(item.unitPrice) || 0,
+    qty: Number(item.quantity) || 0,
     locationId: item.locationId ?? "",
     maxQty: Number.MAX_SAFE_INTEGER,
   }));
@@ -174,6 +179,6 @@ export function mapInvoiceRowToDraftInvoice(
     customerPhone: customer?.phone ?? null,
     createdAt: new Date(row.createdAt),
     lines,
-    total: row.amountDue,
+    total: Number(row.amountDue) || 0,
   };
 }
