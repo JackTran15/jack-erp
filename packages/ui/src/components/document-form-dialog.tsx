@@ -111,13 +111,15 @@ export function DocumentFormDialog({
       className={cn("min-w-[800px]", className)}
     >
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0">
-          <PageToolbar
-            tone="primary"
-            items={toolbarItems}
-            className="rounded-none"
-          />
-        </div>
+        {toolbarItems.length > 0 ? (
+          <div className="shrink-0">
+            <PageToolbar
+              tone="primary"
+              items={toolbarItems}
+              className="rounded-none"
+            />
+          </div>
+        ) : null}
 
         {!collapsed ? (
           <div className="shrink-0 px-2 pt-2">
