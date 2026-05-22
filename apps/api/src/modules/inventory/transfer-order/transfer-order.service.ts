@@ -8,11 +8,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  DocumentType,
   PaginatedResponse,
   PaginationQuery,
   TransferOrderStatus,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { TransferOrderEntity } from './transfer-order.entity';
 import { TransferOrderLineEntity } from './transfer-order-line.entity';
 
@@ -38,6 +40,7 @@ export class TransferOrderService {
   constructor(
     @InjectRepository(TransferOrderEntity)
     private readonly toRepo: Repository<TransferOrderEntity>,
+    private readonly documentNumberingService: DocumentNumberingService,
   ) {}
 
   async create(
@@ -58,10 +61,17 @@ export class TransferOrderService {
       );
     }
 
+    const documentNumber = await this.documentNumberingService.generate(
+      DocumentType.TRANSFER_ORDER,
+      actor.branchId,
+      actor,
+    );
+
     const to = this.toRepo.create({
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
+      documentNumber,
       status: TransferOrderStatus.DRAFT,
       sourceBranchId: dto.sourceBranchId,
       destinationBranchId: dto.destinationBranchId,
@@ -82,7 +92,7 @@ export class TransferOrderService {
     });
 
     const saved = await this.toRepo.save(to);
-    this.logger.log(`Transfer order ${saved.id} created as DRAFT`);
+    this.logger.log(`Transfer order ${saved.id} created as DRAFT ${documentNumber}`);
     return this.findOrFail(saved.id, actor.organizationId);
   }
 
