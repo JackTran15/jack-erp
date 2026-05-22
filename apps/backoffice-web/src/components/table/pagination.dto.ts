@@ -41,7 +41,10 @@ export const TABLE_COLUMN_WIDTH_PX: Record<ColumnWidthVariant, number> = {
 };
 
 /** Ghi đè theo entityKey + fieldKey để kiểm soát độ rộng cột. */
-export const ENTITY_COLUMN_WIDTHS: Record<string, Record<string, ColumnWidthVariant>> = {
+export const ENTITY_COLUMN_WIDTHS: Record<
+  string,
+  Record<string, ColumnWidthVariant>
+> = {
   "inventory-items": {
     code: "medium",
     name: "large",
@@ -70,6 +73,26 @@ export function clampPage(page: number, totalPages: number): number {
   return Math.min(Math.max(1, Math.trunc(page)), Math.max(1, totalPages));
 }
 
+/** Total for PaginationControls when API doesn't return `total`. */
+export function resolveLookupPaginationTotal(
+  total: number | null,
+  hasMore: boolean,
+  page: number,
+  pageSize: number,
+  itemsLength: number,
+): { total: number; estimated: boolean } {
+  if (total != null) {
+    return { total, estimated: false };
+  }
+  if (hasMore) {
+    return { total: page * pageSize + 1, estimated: true };
+  }
+  return {
+    total: Math.max(0, (page - 1) * pageSize + itemsLength),
+    estimated: true,
+  };
+}
+
 export function describeFilterMode(mode: ColumnFilterMode): string {
   const option = COLUMN_FILTER_MODE_OPTIONS.find((item) => item.value === mode);
   return option ? `${option.symbol}: ${option.label}` : "Chứa";
@@ -83,7 +106,10 @@ export function toComparableText(value: unknown): string {
   return String(value);
 }
 
-export function applyColumnFilter(comparable: string, filter: ColumnFilter): boolean {
+export function applyColumnFilter(
+  comparable: string,
+  filter: ColumnFilter,
+): boolean {
   const haystack = comparable.toLowerCase();
   const needle = filter.value.trim().toLowerCase();
   if (!needle) return true;
@@ -104,7 +130,10 @@ export function applyColumnFilter(comparable: string, filter: ColumnFilter): boo
   }
 }
 
-export function resolveColumnWidthVariant(entityKey: string, field: FieldDefinition): ColumnWidthVariant {
+export function resolveColumnWidthVariant(
+  entityKey: string,
+  field: FieldDefinition,
+): ColumnWidthVariant {
   const entityWidths = ENTITY_COLUMN_WIDTHS[entityKey];
   const configuredWidth = entityWidths?.[field.key];
   if (configuredWidth) {

@@ -6,20 +6,24 @@ import {
   LEDGER_CASH_VI_DATE,
   TABLE_NUM_CLASS,
 } from "../../ledger-cash/ledger-cash.constants";
+import { receiptPaymentDocumentTypeLabel } from "../../cash-vouchers.labels";
+import type { ReceiptPaymentListItem } from "../../cash-vouchers.types";
 import { RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS } from "./receipt-cash.constants";
-import type { ReceiptCashListRow } from "./receipt-cash.types";
 
 export function useReceiptCashTableColumns(
-  onOpenVoucher: (row: ReceiptCashListRow) => void,
+  onOpenVoucher: (row: ReceiptPaymentListItem) => void,
 ) {
   return useMemo(
-    (): TableColumn<ReceiptCashListRow>[] => [
+    (): TableColumn<ReceiptPaymentListItem>[] => [
       {
         key: "documentDate",
         label: "Ngày",
         width: 110,
         render: (r) =>
-          r.documentDate.toLocaleDateString("vi-VN", LEDGER_CASH_VI_DATE),
+          new Date(`${r.voucherDate}T12:00:00`).toLocaleDateString(
+            "vi-VN",
+            LEDGER_CASH_VI_DATE,
+          ),
       },
       {
         key: "voucherNo",
@@ -27,7 +31,7 @@ export function useReceiptCashTableColumns(
         width: 130,
         render: (r) => (
           <VoucherLink
-            code={r.voucherNo}
+            code={r.documentNumber}
             clickable
             onClick={() => onOpenVoucher(r)}
           />
@@ -42,7 +46,8 @@ export function useReceiptCashTableColumns(
           value: o.label,
           label: o.label,
         })),
-        render: (r) => r.documentTypeLabel,
+        render: (r) =>
+          receiptPaymentDocumentTypeLabel(r.kind, r.referenceType),
       },
       {
         key: "totalAmount",
@@ -62,7 +67,7 @@ export function useReceiptCashTableColumns(
         key: "reason",
         label: "Lý do",
         width: 240,
-        render: (r) => r.description,
+        render: (r) => r.reason,
       },
     ],
     [onOpenVoucher],

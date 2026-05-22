@@ -82,6 +82,8 @@ export interface LookupFieldProps<T> {
   searchModalTitle?: string;
   /** Placeholder shown in the search modal's search input. */
   searchModalPlaceholder?: string;
+  /** When set, the trailing search button calls this instead of opening the inline list or default modal. */
+  onSearchButtonClick?: () => void;
 }
 
 interface PopoverRect {
@@ -119,6 +121,7 @@ export function LookupField<T>({
   enableSearchModal,
   searchModalTitle,
   searchModalPlaceholder,
+  onSearchButtonClick,
 }: LookupFieldProps<T>) {
   const fallbackId = useId();
   const resolvedId = inputId ?? fallbackId;
@@ -546,6 +549,11 @@ export function LookupField<T>({
         aria-label="Tìm kiếm"
         disabled={disabled}
         onClick={() => {
+          if (onSearchButtonClick) {
+            setOpen(false);
+            onSearchButtonClick();
+            return;
+          }
           if (enableSearchModal) {
             setOpen(false);
             setSearchModalOpen(true);

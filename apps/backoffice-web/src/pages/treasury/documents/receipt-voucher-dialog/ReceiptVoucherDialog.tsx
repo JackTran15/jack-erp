@@ -18,7 +18,17 @@ import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
 import { Tabs } from "../../../../components/tabs";
 import { VoucherLink } from "../_shared/VoucherLink";
-import { RECEIPT_VOUCHER_PURPOSE_OPTIONS } from "./receipt-voucher.constants";
+import { CashVoucherCategoryDirection } from "../../cash-vouchers.types";
+import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import {
+  DebtCollectionPickDialog,
+  type DebtCollectionPickResult,
+} from "./DebtCollectionPickDialog";
+import {
+  RECEIPT_VOUCHER_DETAIL_TABS,
+  RECEIPT_VOUCHER_PURPOSE_OPTIONS,
+  ReceiptVoucherDetailTabEnum,
+} from "./receipt-voucher.constants";
 import { useReceiptVoucherDetailColumns } from "./useReceiptVoucherDetailColumns";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
@@ -28,8 +38,6 @@ import {
   type LedgerCashVoucherDetail,
 } from "../../ledger-cash/ledger-cash.types";
 import {
-  DEFAULT_VOUCHER_EMPLOYEE_CODE,
-  DEFAULT_VOUCHER_EMPLOYEE_NAME,
   emptyFormLine,
   type VoucherFormLine,
 } from "../_shared/voucher-dialog.constants";
@@ -39,16 +47,21 @@ import {
   toIsoDate,
   voucherLineTotal,
 } from "../_shared/voucher-dialog.utils";
-
-enum DetailTabEnum {
-  LINES = "lines",
-  DOCUMENTS = "documents",
-}
-
-const DETAIL_TABS = [
-  { id: DetailTabEnum.LINES, label: "Chi tiết" },
-  { id: DetailTabEnum.DOCUMENTS, label: "Chứng từ" },
-] as const;
+import { VoucherDocumentNumberField } from "../_shared/VoucherDocumentNumberField";
+import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
+import type { VoucherEntitySearchTarget } from "../_shared/voucher-entity-search.store";
+import { VoucherPartnerFields } from "../_shared/VoucherPartnerFields";
+import { VoucherStaffFields } from "../_shared/VoucherStaffFields";
+import type { VoucherMergedPartnerOption } from "../_shared/voucher-partner-search";
+import {
+  VOUCHER_PARTNER_KIND_LABEL,
+  VoucherPartnerKindUi,
+  inferPartnerKindFromBe,
+} from "../_shared/voucher-partner.constants";
+import {
+  fetchVoucherPartnerByBeType,
+  fetchVoucherStaffById,
+} from "../_shared/voucher-partner-search";
 
 const LABELS = {
   purpose: "Mục đích thu",
@@ -68,7 +81,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   mode: TreasuryVoucherDialogModeEnum;
   initial: LedgerCashVoucherDetail | null;
-  nextVoucherNo?: string;
   onSave?: (detail: LedgerCashVoucherDetail) => void;
   onRequestEdit?: () => void;
   onOpenInvoice?: (code: string) => void;
@@ -83,7 +95,6 @@ export function ReceiptVoucherDialog({
   onOpenChange,
   mode,
   initial,
-  nextVoucherNo = "",
   onSave,
   onRequestEdit,
   onOpenInvoice,
@@ -93,56 +104,86 @@ export function ReceiptVoucherDialog({
   const [purpose, setPurpose] = useState<LedgerCashVoucherPurposeEnum>(
     LedgerCashVoucherPurposeEnum.OTHER,
   );
+  const [partnerKind, setPartnerKind] = useState<VoucherPartnerKindUi>(
+    VoucherPartnerKindUi.SUPPLIER,
+  );
+  const [partnerId, setPartnerId] = useState("");
   const [counterpartyCode, setCounterpartyCode] = useState("");
   const [counterpartyName, setCounterpartyName] = useState("");
+  const [counterpartyPhone, setCounterpartyPhone] = useState("");
   const [personName, setPersonName] = useState("");
   const [address, setAddress] = useState("");
   const [reason, setReason] = useState("");
-  const [employeeCode, setEmployeeCode] = useState(
-    DEFAULT_VOUCHER_EMPLOYEE_CODE,
-  );
-  const [employeeName, setEmployeeName] = useState(
-    DEFAULT_VOUCHER_EMPLOYEE_NAME,
-  );
+  const [staffId, setStaffId] = useState("");
+  const [employeeCode, setEmployeeCode] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   const [reference, setReference] = useState("");
   const [voucherNo, setVoucherNo] = useState("");
   const [voucherDate, setVoucherDate] = useState(toIsoDate(new Date()));
   const [lines, setLines] = useState<VoucherFormLine[]>([emptyFormLine()]);
+  const [entitySearchTarget, setEntitySearchTarget] =
+    useState<VoucherEntitySearchTarget | null>(null);
   const [documentLines, setDocumentLines] = useState<
     LedgerCashVoucherDetail["documentLines"]
   >([]);
-  const [detailTab, setDetailTab] = useState<DetailTabEnum>(
-    DetailTabEnum.LINES,
+  const [detailTab, setDetailTab] = useState<ReceiptVoucherDetailTabEnum>(
+    ReceiptVoucherDetailTabEnum.LINES,
+  );
+  const [countAsRevenue, setCountAsRevenue] = useState(false);
+  const [debtPickOpen, setDebtPickOpen] = useState(false);
+
+  const { data: receiptCategories = [] } = useCashVoucherCategories(
+    CashVoucherCategoryDirection.IN,
   );
 
-  const resetKey = `receipt-${mode}-${initial?.voucherNo ?? nextVoucherNo}`;
+  const debtCollectionCategoryName = useMemo(() => {
+    const cat =
+      receiptCategories.find((c) => c.code === "THU_BAN_HANG") ??
+      receiptCategories.find((c) => c.code === "THU_NO_KH");
+    return cat?.name ?? "Thu bán hàng";
+  }, [receiptCategories]);
+
+  const isDebtCollection =
+    purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
+
+  const resetKey = `receipt-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
 
   useEffect(() => {
     if (!open) return;
     if (mode === TreasuryVoucherDialogModeEnum.CREATE) {
       setPurpose(LedgerCashVoucherPurposeEnum.OTHER);
+      setPartnerKind(VoucherPartnerKindUi.SUPPLIER);
+      setPartnerId("");
       setCounterpartyCode("");
       setCounterpartyName("");
+      setCounterpartyPhone("");
       setPersonName("");
       setAddress("");
       setReason("");
-      setEmployeeCode(DEFAULT_VOUCHER_EMPLOYEE_CODE);
-      setEmployeeName(DEFAULT_VOUCHER_EMPLOYEE_NAME);
+      setStaffId("");
+      setEmployeeCode("");
+      setEmployeeName("");
       setReference("");
-      setVoucherNo(nextVoucherNo);
+      setVoucherNo("");
       setVoucherDate(toIsoDate(new Date()));
       setLines([emptyFormLine()]);
       setDocumentLines([]);
-      setDetailTab(DetailTabEnum.LINES);
+      setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
       return;
     }
     if (initial) {
       setPurpose(initial.purpose);
+      setPartnerKind(
+        initial.partnerKind ??
+          inferPartnerKindFromBe(initial.partnerType, initial.counterpartyCode),
+      );
+      setPartnerId(initial.partnerId ?? "");
       setCounterpartyCode(initial.counterpartyCode);
       setCounterpartyName(initial.counterpartyName);
       setPersonName(initial.payerName ?? "");
       setAddress(initial.address ?? "");
       setReason(initial.reason);
+      setStaffId(initial.staffId ?? "");
       setEmployeeCode(initial.employeeCode);
       setEmployeeName(initial.employeeName);
       setReference(initial.reference ?? "");
@@ -158,9 +199,116 @@ export function ReceiptVoucherDialog({
           : [emptyFormLine()],
       );
       setDocumentLines(initial.documentLines ?? []);
-      setDetailTab(DetailTabEnum.LINES);
+      setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
     }
-  }, [resetKey, open, mode, initial, nextVoucherNo]);
+  }, [resetKey, open, mode, initial]);
+
+  useEffect(() => {
+    if (!open) setEntitySearchTarget(null);
+  }, [open]);
+
+  const applyPartnerFromSearch = useCallback(
+    (item: VoucherMergedPartnerOption) => {
+      setPartnerKind(item.kind);
+      setPartnerId(item.id);
+      setCounterpartyCode(item.code);
+      setCounterpartyName(item.name);
+      setCounterpartyPhone(item.phone ?? "");
+      if (item.address) setAddress(item.address);
+      setPersonName((prev) => prev.trim() || item.name);
+    },
+    [],
+  );
+
+  const applyStaffFromSearch = useCallback(
+    (item: VoucherMergedPartnerOption) => {
+      setStaffId(item.id);
+      setEmployeeCode(item.code);
+      setEmployeeName(item.name);
+    },
+    [],
+  );
+
+  const handlePurposeChange = useCallback(
+    (next: LedgerCashVoucherPurposeEnum) => {
+      setPurpose(next);
+      if (next !== LedgerCashVoucherPurposeEnum.DEBT_COLLECTION) {
+        setDocumentLines([]);
+        setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
+      }
+    },
+    [],
+  );
+
+  const debtPickInitialPartner = useMemo((): VoucherMergedPartnerOption | null => {
+    if (!partnerId || !counterpartyCode) return null;
+    return {
+      lookupKey: `${partnerKind}:${partnerId}`,
+      id: partnerId,
+      code: counterpartyCode,
+      name: counterpartyName,
+      phone: counterpartyPhone || undefined,
+      kind: partnerKind,
+      kindLabel: VOUCHER_PARTNER_KIND_LABEL[partnerKind],
+    };
+  }, [
+    partnerId,
+    counterpartyCode,
+    counterpartyName,
+    counterpartyPhone,
+    partnerKind,
+  ]);
+
+  const handleDebtCollectionConfirm = useCallback(
+    (result: DebtCollectionPickResult) => {
+      const { partner: p, documentLines: docs, totalCollect } = result;
+      applyPartnerFromSearch(p);
+      setDocumentLines(docs);
+      const reasonText = `Thu nợ của ${p.name}`;
+      setReason(reasonText);
+      setLines([
+        {
+          description: reasonText,
+          amount: totalCollect,
+          category: debtCollectionCategoryName,
+        },
+      ]);
+      setDetailTab(ReceiptVoucherDetailTabEnum.DOCUMENTS);
+    },
+    [applyPartnerFromSearch, debtCollectionCategoryName],
+  );
+
+  useEffect(() => {
+    if (!open || mode === TreasuryVoucherDialogModeEnum.CREATE || !initial) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      if (initial.partnerId && initial.partnerType) {
+        const partner = await fetchVoucherPartnerByBeType(
+          initial.partnerType,
+          initial.partnerId,
+        );
+        if (!cancelled && partner) {
+          setPartnerKind(partner.kind);
+          setCounterpartyCode(partner.code);
+          setCounterpartyName(partner.name);
+          setCounterpartyPhone(partner.phone ?? "");
+          if (partner.address) setAddress(partner.address);
+        }
+      }
+      if (initial.staffId) {
+        const staff = await fetchVoucherStaffById(initial.staffId);
+        if (!cancelled && staff) {
+          setEmployeeCode(staff.code);
+          setEmployeeName(staff.name);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, initial?.partnerId, initial?.partnerType, initial?.staffId]);
 
   const lineTotal = useMemo(() => voucherLineTotal(lines), [lines]);
 
@@ -201,7 +349,8 @@ export function ReceiptVoucherDialog({
     ],
   );
 
-  const showDocumentTab = (documentLines?.length ?? 0) > 0;
+  const showDetailTabs =
+    isDebtCollection || (documentLines?.length ?? 0) > 0;
 
   const detailForColumns = useMemo(
     (): LedgerCashVoucherDetail => ({
@@ -329,19 +478,17 @@ export function ReceiptVoucherDialog({
       toast.error("Tổng số tiền phải lớn hơn 0.");
       return;
     }
-    if (!voucherNo.trim()) {
-      toast.error(`${LABELS.voucherNo} không được để trống.`);
-      return;
-    }
-
     onSave(
       buildReceiptDetailFromForm({
         purpose,
+        partnerKind,
+        partnerId,
         counterpartyCode,
         counterpartyName,
         payerName: personName,
         address,
         reason,
+        staffId,
         employeeCode,
         employeeName,
         reference,
@@ -361,11 +508,14 @@ export function ReceiptVoucherDialog({
     lines,
     voucherNo,
     purpose,
+    partnerKind,
+    partnerId,
     counterpartyCode,
     counterpartyName,
     personName,
     address,
     reason,
+    staffId,
     employeeCode,
     employeeName,
     reference,
@@ -417,218 +567,280 @@ export function ReceiptVoucherDialog({
   if (!open) return null;
 
   return (
-    <DocumentFormDialog
-      open
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) handleClose();
-      }}
-      title={title}
-      toolbarItems={toolbarItems}
-      purpose={
-        <FormField label={LABELS.purpose} layout="horizontal" labelWidth="8rem">
-          <RadioGroup
-            name="voucher-purpose"
-            value={purpose}
-            options={[...RECEIPT_VOUCHER_PURPOSE_OPTIONS]}
-            onChange={setPurpose}
-            readOnly={readOnly}
-          />
-        </FormField>
-      }
-      generalInfo={
-        <>
-          <FormField
-            label={LABELS.counterparty}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={counterpartyCode}
-                onChange={(e) => setCounterpartyCode(e.target.value)}
-                placeholder="Mã"
-                {...inputProps}
-              />
-              <Input
-                value={counterpartyName}
-                onChange={(e) => setCounterpartyName(e.target.value)}
-                placeholder="Tên"
-                {...inputProps}
-              />
-            </div>
-          </FormField>
-          <FormField
-            label={LABELS.person}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Input
-              value={personName}
-              onChange={(e) => setPersonName(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField label="Địa chỉ" layout="horizontal" labelWidth="8rem">
-            <Input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField
-            label={LABELS.reason}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField
-            label={LABELS.employee}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={employeeCode}
-                onChange={(e) => setEmployeeCode(e.target.value)}
-                {...inputProps}
-              />
-              <Input
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                {...inputProps}
-              />
-            </div>
-          </FormField>
-          <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
-            <Input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          {linkedInvoiceCode ? (
-            <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
-              <VoucherLink
-                code={linkedInvoiceCode}
-                clickable={!!onOpenInvoice}
-                onClick={() => onOpenInvoice?.(linkedInvoiceCode)}
+    <>
+      <DocumentFormDialog
+        open
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) handleClose();
+        }}
+        title={title}
+        toolbarItems={toolbarItems}
+        purpose={
+          <div className="flex flex-wrap items-center gap-3">
+            <FormField
+              label={LABELS.purpose}
+              layout="horizontal"
+              labelWidth="8rem"
+              className="mb-0"
+            >
+              <RadioGroup
+                name="voucher-purpose"
+                value={purpose}
+                options={[...RECEIPT_VOUCHER_PURPOSE_OPTIONS]}
+                onChange={handlePurposeChange}
+                readOnly={readOnly}
               />
             </FormField>
-          ) : null}
-          <FormField
-            label="Tài liệu đính kèm"
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Button variant="outline" size="sm" disabled>
-              Tải tệp…
-            </Button>
-          </FormField>
-        </>
-      }
-      documentInfo={
-        <>
-          <FormField
-            label={LABELS.voucherNo}
-            layout="horizontal"
-            labelWidth="7.5rem"
-          >
-            <Input
+            {isDebtCollection && !readOnly ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDebtPickOpen(true)}
+              >
+                Chọn hóa đơn thu nợ
+              </Button>
+            ) : null}
+          </div>
+        }
+        generalInfo={
+          <>
+            <VoucherPartnerFields
+              label={LABELS.counterparty}
+              readOnly={readOnly}
+              partnerKind={partnerKind}
+              partnerId={partnerId}
+              partnerCode={counterpartyCode}
+              partnerName={counterpartyName}
+              partnerPhone={counterpartyPhone}
+              onPartnerSelect={(p) => {
+                setPartnerKind(p.partnerKind);
+                setPartnerId(p.partnerId);
+                setCounterpartyCode(p.partnerCode);
+                setCounterpartyName(p.partnerName);
+                setCounterpartyPhone(p.partnerPhone ?? "");
+                if (p.address) setAddress(p.address);
+                setPersonName((prev) => prev.trim() || p.partnerName);
+              }}
+              onPartnerLookupChange={(code) => {
+                setCounterpartyCode(code);
+                setPartnerId("");
+                setCounterpartyName("");
+                setCounterpartyPhone("");
+              }}
+              onPartnerClear={() => {
+                setPartnerId("");
+                setCounterpartyCode("");
+                setCounterpartyName("");
+                setCounterpartyPhone("");
+              }}
+              onOpenSearchDialog={() => setEntitySearchTarget("partner")}
+            />
+            <FormField
+              label={LABELS.person}
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Input
+                value={personName}
+                onChange={(e) => setPersonName(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <FormField label="Địa chỉ" layout="horizontal" labelWidth="8rem">
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <FormField
+              label={LABELS.reason}
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <VoucherStaffFields
+              label={LABELS.employee}
+              readOnly={readOnly}
+              staffId={staffId}
+              staffCode={employeeCode}
+              staffName={employeeName}
+              onStaffSelect={(s) => {
+                setStaffId(s.staffId);
+                setEmployeeCode(s.staffCode);
+                setEmployeeName(s.staffName);
+              }}
+              onStaffLookupChange={(code) => {
+                setEmployeeCode(code);
+                setStaffId("");
+                setEmployeeName("");
+              }}
+              onStaffClear={() => {
+                setStaffId("");
+                setEmployeeCode("");
+                setEmployeeName("");
+              }}
+              onOpenSearchDialog={() => setEntitySearchTarget("staff")}
+            />
+            <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            {linkedInvoiceCode ? (
+              <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
+                <VoucherLink
+                  code={linkedInvoiceCode}
+                  clickable={!!onOpenInvoice}
+                  onClick={() => onOpenInvoice?.(linkedInvoiceCode)}
+                />
+              </FormField>
+            ) : null}
+            <FormField
+              label="Tài liệu đính kèm"
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Button variant="outline" size="sm" disabled>
+                Tải tệp…
+              </Button>
+            </FormField>
+          </>
+        }
+        documentInfo={
+          <>
+            <VoucherDocumentNumberField
+              label={LABELS.voucherNo}
               value={voucherNo}
-              onChange={(e) => setVoucherNo(e.target.value)}
-              readOnly={readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT}
-              disabled={readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT}
-              className={fieldClass(
-                readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT,
-              )}
+              mode={mode}
+              readOnly={readOnly}
             />
-          </FormField>
-          <FormField
-            label={LABELS.voucherDate}
-            layout="horizontal"
-            labelWidth="7.5rem"
-          >
-            <DateTimeField
-              value={voucherDate}
-              onChange={(e) => setVoucherDate(e.target.value)}
-              includeTime={false}
-              disabled={readOnly}
-              className={cn(fieldClass(readOnly))}
-            />
-          </FormField>
-        </>
-      }
-      detail={
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {showDocumentTab && readOnly ? (
-            <Tabs
-              tabs={DETAIL_TABS}
-              activeTab={detailTab}
-              onTabChange={setDetailTab}
-            />
-          ) : null}
-          {detailTab === DetailTabEnum.DOCUMENTS &&
-          showDocumentTab &&
-          readOnly ? (
-            <BaseDataTable
-              columns={documentColumnsWithFooter}
-              rows={docRows}
-              loading={false}
-              emptyLabel="Không có chứng từ."
-              getRowKey={(r) => r.documentNo}
-              className="min-h-0 flex-1"
-            />
-          ) : readOnly ? (
-            <BaseDataTable
-              columns={lineColumnsWithFooter}
-              rows={detailForColumns.lines}
-              loading={false}
-              emptyLabel="Không có dòng chi tiết."
-              getRowKey={(_, index) => String(index)}
-              className="min-h-0 flex-1"
-            />
-          ) : (
-            <LineItemGrid
-              className="min-h-0 flex-1"
-              columns={lineColumnsWithFooterEdit}
-              rows={lines}
-              onChangeCell={
-                readOnly
-                  ? undefined
-                  : (idx, key, value) => {
-                      setLines((prev) =>
-                        prev.map((l, i) =>
-                          i === idx ? { ...l, [key]: value } : l,
-                        ),
-                      );
-                    }
-              }
-              onAddRow={
-                readOnly
-                  ? undefined
-                  : () => setLines((prev) => [...prev, emptyFormLine()])
-              }
-              onDeleteRow={
-                readOnly
-                  ? undefined
-                  : (idx) =>
-                      setLines((prev) =>
-                        prev.length > 1
-                          ? prev.filter((_, i) => i !== idx)
-                          : prev,
-                      )
-              }
-              showAddRow={!readOnly}
-              showRowActions={!readOnly}
-            />
-          )}
-        </div>
-      }
-    />
+            <FormField
+              label={LABELS.voucherDate}
+              layout="horizontal"
+              labelWidth="7.5rem"
+            >
+              <DateTimeField
+                value={voucherDate}
+                onChange={(e) => setVoucherDate(e.target.value)}
+                includeTime={false}
+                disabled={readOnly}
+                className={cn(fieldClass(readOnly))}
+              />
+            </FormField>
+            <FormField
+              label="Tính vào doanh thu"
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <input
+                type="checkbox"
+                checked={countAsRevenue}
+                onChange={(e) => setCountAsRevenue(e.target.checked)}
+                disabled={readOnly}
+                className={cn("h-9", fieldClass(readOnly))}
+              />
+            </FormField>
+          </>
+        }
+        detail={
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {showDetailTabs ? (
+              <Tabs
+                tabs={RECEIPT_VOUCHER_DETAIL_TABS}
+                activeTab={detailTab}
+                onTabChange={setDetailTab}
+              />
+            ) : null}
+            {detailTab === ReceiptVoucherDetailTabEnum.DOCUMENTS &&
+            showDetailTabs ? (
+              <BaseDataTable
+                columns={documentColumnsWithFooter}
+                rows={docRows}
+                loading={false}
+                emptyLabel={
+                  isDebtCollection
+                    ? "Chưa có chứng từ — bấm Chọn hóa đơn thu nợ."
+                    : "Không có chứng từ."
+                }
+                getRowKey={(r) => r.debtId ?? r.documentNo}
+                className="min-h-0 flex-1"
+              />
+            ) : readOnly ? (
+              <BaseDataTable
+                columns={lineColumnsWithFooter}
+                rows={detailForColumns.lines}
+                loading={false}
+                emptyLabel="Không có dòng chi tiết."
+                getRowKey={(_, index) => String(index)}
+                className="min-h-0 flex-1"
+              />
+            ) : (
+              <LineItemGrid
+                className="min-h-0 flex-1"
+                columns={lineColumnsWithFooterEdit}
+                rows={lines}
+                onChangeCell={
+                  readOnly
+                    ? undefined
+                    : (idx, key, value) => {
+                        setLines((prev) =>
+                          prev.map((l, i) =>
+                            i === idx ? { ...l, [key]: value } : l,
+                          ),
+                        );
+                      }
+                }
+                onAddRow={
+                  readOnly || isDebtCollection
+                    ? undefined
+                    : () => setLines((prev) => [...prev, emptyFormLine()])
+                }
+                onDeleteRow={
+                  readOnly || isDebtCollection
+                    ? undefined
+                    : (idx) =>
+                        setLines((prev) =>
+                          prev.length > 1
+                            ? prev.filter((_, i) => i !== idx)
+                            : prev,
+                        )
+                }
+                showAddRow={!readOnly && !isDebtCollection}
+                showRowActions={!readOnly && !isDebtCollection}
+              />
+            )}
+          </div>
+        }
+      />
+      {entitySearchTarget ? (
+        <VoucherEntitySearchModal
+          open
+          target={entitySearchTarget}
+          onOpenChange={(next) => {
+            if (!next) setEntitySearchTarget(null);
+          }}
+          onSelectPartner={applyPartnerFromSearch}
+          onSelectStaff={applyStaffFromSearch}
+        />
+      ) : null}
+      {debtPickOpen ? (
+        <DebtCollectionPickDialog
+          open
+          onOpenChange={setDebtPickOpen}
+          defaultCollectionDate={voucherDate}
+          initialPartner={debtPickInitialPartner}
+          onConfirm={handleDebtCollectionConfirm}
+        />
+      ) : null}
+    </>
   );
 }
