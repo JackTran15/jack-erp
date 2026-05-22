@@ -1,15 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AppModal,
   Button,
+  DocumentFormDialog,
   DocumentListShell,
-  FormField,
   Input,
+  LineItemGrid,
   PageToolbar,
-  Textarea,
+  PeriodFilter,
+  resolvePeriodRange,
+  type LineColumn,
+  type PeriodValue,
   type ToolbarItem,
+  UnsavedChangesDialog,
+  type UnsavedChangesChoice,
 } from "@erp/ui";
-import { CheckCircle, Eye, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CloudUpload,
+  Copy,
+  Eye,
+  HelpCircle,
+  Pencil,
+  Plus,
+  Printer,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -19,38 +39,43 @@ import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 
 type TOStatus = "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
 
+// Misa lumps DRAFT and APPROVED into "Chưa thực hiện" — internal granularity
+// is preserved on the row, but users only see two outcomes: not-yet vs done.
 const STATUS_LABEL: Record<TOStatus, string> = {
-  DRAFT: "Nháp",
-  APPROVED: "Đã duyệt",
+  DRAFT: "Chưa thực hiện",
+  APPROVED: "Chưa thực hiện",
   EXECUTED: "Đã thực hiện",
-  CANCELLED: "Đã huỷ",
+  CANCELLED: "Đã hủy",
 };
 
-interface TOLine {
+interface TransferOrderLine {
   id: string;
   itemId: string;
   requestedQty: string | number;
-  note?: string;
-  item?: { id: string; code: string; name: string; unit: string };
+  note?: string | null;
+  item?: { id: string; code: string; name: string; unit?: string } | null;
 }
 
 interface TransferOrder {
   id: string;
-  documentNumber?: string;
+  documentNumber?: string | null;
   status: TOStatus;
   sourceBranchId: string;
   destinationBranchId: string;
   sourceStorageId?: string | null;
   destinationStorageId?: string | null;
   requestedDate?: string | null;
-  notes?: string;
-  lines: TOLine[];
+  notes?: string | null;
+  lines: TransferOrderLine[];
   createdAt: string;
 }
 
@@ -61,9 +86,16 @@ interface PaginatedResponse<T> {
   pageSize: number;
 }
 
-interface Branch {
+interface BranchOption {
   id: string;
   name: string;
+  address?: string | null;
+}
+
+interface InventoryStorage {
+  id: string;
+  name: string;
+  branchId: string;
 }
 
 interface InventoryItem {
@@ -73,15 +105,48 @@ interface InventoryItem {
   unit: string;
 }
 
+const FILTER_KEYS = [
+  "date",
+  "documentNumber",
+  "notes",
+  "destinationBranch",
+  "status",
+] as const;
+
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce((acc, k) => {
+    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+    return acc;
+  }, {} as Record<FilterKey, ColumnFilter>);
+}
+
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
+  );
+}
+
 export function TransferOrdersPage() {
   const [records, setRecords] = useState<PaginatedResponse<TransferOrder> | null>(null);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [period, setPeriod] = useState<PeriodValue>(() => {
+    const range = resolvePeriodRange("this_week");
+    return { preset: "this_week", ...range };
+  });
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [viewing, setViewing] = useState<TransferOrder | null>(null);
-  const [confirmCancel, setConfirmCancel] = useState<TransferOrder | null>(null);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
+  const [editingOrder, setEditingOrder] = useState<TransferOrder | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<TransferOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -102,21 +167,68 @@ export function TransferOrdersPage() {
     }
   }, [pagination]);
 
+  const loadBranches = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<BranchOption>>(
+        "/branches?page=1&pageSize=200",
+      );
+      setBranches(data.data);
+    } catch {
+      // best-effort; fall back to ID rendering in the table
+    }
+  }, []);
+
+  const loadStorages = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+        "/inventory/storages?page=1&pageSize=200",
+      );
+      setStorages(data.data);
+    } catch {
+      // best-effort; storage name will display as fallback dash
+    }
+  }, []);
+
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
 
-  const selected = useMemo(
-    () => records?.data.find((r) => r.id === selectedId) ?? null,
+  useEffect(() => {
+    void loadBranches();
+  }, [loadBranches]);
+
+  useEffect(() => {
+    void loadStorages();
+  }, [loadStorages]);
+
+  const branchNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of branches) map.set(b.id, b.name);
+    return map;
+  }, [branches]);
+
+  const storageNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of storages) map.set(s.id, s.name);
+    return map;
+  }, [storages]);
+
+  const selectedOrder = useMemo(
+    () => records?.data.find((o) => o.id === selectedId) ?? null,
     [records, selectedId],
   );
 
-  const handleApprove = async (to: TransferOrder) => {
-    setActionLoading(to.id);
+  const reloadAfterMutation = useCallback(async () => {
+    await loadRecords();
+  }, [loadRecords]);
+
+  const handleDelete = async (order: TransferOrder) => {
+    setActionLoading(order.id);
     try {
-      await apiClient.post(`/inventory/transfer-orders/${to.id}/approve`);
-      toast.success("Đã duyệt lệnh điều chuyển.");
-      await loadRecords();
+      await apiClient.delete(`/inventory/transfer-orders/${order.id}`);
+      setConfirmDelete(null);
+      if (selectedId === order.id) setSelectedId(null);
+      await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     } finally {
@@ -124,98 +236,152 @@ export function TransferOrdersPage() {
     }
   };
 
-  const handleCancel = async (to: TransferOrder) => {
-    setActionLoading(to.id);
-    try {
-      await apiClient.delete(`/inventory/transfer-orders/${to.id}`);
-      toast.success("Đã huỷ lệnh.");
-      setConfirmCancel(null);
-      if (selectedId === to.id) setSelectedId(null);
-      await loadRecords();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const editable = selectedOrder?.status === "DRAFT";
+  const deletable =
+    !!selectedOrder &&
+    selectedOrder.status !== "EXECUTED" &&
+    selectedOrder.status !== "CANCELLED";
 
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
-      label: "Tạo lệnh",
+      label: "Thêm mới",
       icon: Plus,
-      onClick: () => setCreateOpen(true),
+      onClick: () => {
+        setEditingOrder(null);
+        setDialogMode("create");
+      },
+    },
+    {
+      id: "duplicate",
+      label: "Nhân bản",
+      icon: Copy,
+      disabled: !selectedOrder,
+      onClick: () => {
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("create");
+      },
     },
     {
       id: "view",
       label: "Xem",
       icon: Eye,
-      disabled: !selected,
-      onClick: () => selected && setViewing(selected),
+      disabled: !selectedOrder,
+      onClick: () => {
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("view");
+      },
     },
     {
-      id: "approve",
-      label: "Duyệt",
-      icon: CheckCircle,
-      disabled: !selected || selected.status !== "DRAFT",
-      onClick: () => selected && void handleApprove(selected),
+      id: "edit",
+      label: "Sửa",
+      icon: Pencil,
+      disabled: !selectedOrder || !editable,
+      onClick: () => {
+        if (!editable) {
+          toast.info("Chỉ sửa được lệnh ở trạng thái Chưa thực hiện (chưa duyệt).");
+          return;
+        }
+        toast.info("Tính năng sửa lệnh đang được cập nhật. Vui lòng nhân bản phiếu mới.");
+      },
     },
     {
-      id: "cancel",
-      label: "Huỷ",
+      id: "delete",
+      label: "Xóa",
       icon: Trash2,
       variant: "danger",
-      disabled:
-        !selected ||
-        selected.status === "EXECUTED" ||
-        selected.status === "CANCELLED",
-      onClick: () => selected && setConfirmCancel(selected),
+      disabled: !deletable,
+      onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
     },
-    { id: "sep", type: "separator" },
+    { id: "sep1", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
   ];
 
   const columns: TableColumn<TransferOrder>[] = [
     {
-      key: "createdAt",
-      label: "Ngày tạo",
-      width: 130,
-      render: (r) => new Date(r.createdAt).toLocaleDateString("vi-VN"),
+      key: "date",
+      label: "Ngày",
+      width: 110,
+      render: (row) =>
+        row.requestedDate
+          ? new Date(row.requestedDate).toLocaleDateString("vi-VN")
+          : new Date(row.createdAt).toLocaleDateString("vi-VN"),
     },
     {
       key: "documentNumber",
-      label: "Số lệnh",
-      width: 150,
-      render: (r) =>
-        r.documentNumber ?? (
-          <span className="italic text-muted-foreground">—</span>
+      label: "Số chứng từ",
+      width: 140,
+      render: (row) =>
+        row.documentNumber ? (
+          <button
+            type="button"
+            className="text-primary hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedId(row.id);
+              setEditingOrder(row);
+              setDialogMode("view");
+            }}
+            title={row.documentNumber}
+          >
+            {row.documentNumber}
+          </button>
+        ) : (
+          <span className="italic text-muted-foreground">(chưa có số)</span>
         ),
     },
     {
-      key: "route",
-      label: "Tuyến chuyển",
-      render: (r) => `${r.sourceBranchId.slice(0, 8)} → ${r.destinationBranchId.slice(0, 8)}`,
+      key: "notes",
+      label: "Lý do",
+      render: (row) => row.notes ?? "",
+    },
+    {
+      key: "destinationBranch",
+      label: "Điều chuyển đến",
+      width: 200,
+      render: (row) =>
+        branchNameById.get(row.destinationBranchId) ??
+        row.destinationBranchId.slice(0, 8),
     },
     {
       key: "status",
       label: "Trạng thái",
-      width: 130,
-      render: (r) => STATUS_LABEL[r.status],
-    },
-    {
-      key: "lineCount",
-      label: "Số dòng",
-      width: 90,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (r) => r.lines.length,
-    },
-    {
-      key: "notes",
-      label: "Ghi chú",
-      render: (r) => r.notes ?? "",
+      width: 140,
+      render: (row) => STATUS_LABEL[row.status],
     },
   ];
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) =>
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+        })),
+      onValueChange: (key: string, value: string) =>
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], value },
+        })),
+    }),
+    [columnFilters],
+  );
+
+  const nextDocumentNumber = useMemo(() => {
+    const rows = records?.data ?? [];
+    let max = 0;
+    for (const row of rows) {
+      const m = row.documentNumber?.match(/(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    return `LDC${String(max + 1).padStart(6, "0")}`;
+  }, [records]);
 
   return (
     <>
@@ -223,16 +389,28 @@ export function TransferOrdersPage() {
         title="Lệnh điều chuyển"
         tabs={<InventoryTabBar activeId="transfer-order" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        filters={
+          <PeriodFilter
+            value={period}
+            onChange={setPeriod}
+            onApply={() => void loadRecords()}
+          />
+        }
         pagination={
           <PaginationControls
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={records?.total ?? 0}
             onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
-            onPageSizeChange={(s) =>
-              setPagination((prev) => ({ ...prev, page: 1, pageSize: s }))
+            onPageSizeChange={(nextPageSize) =>
+              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
             }
-            onRefresh={() => void loadRecords()}
+          />
+        }
+        detailPanel={
+          <DetailPanel
+            order={selectedOrder}
+            storageNameById={storageNameById}
           />
         }
       >
@@ -241,398 +419,691 @@ export function TransferOrdersPage() {
           rows={records?.data ?? []}
           loading={loading}
           emptyLabel="Chưa có lệnh điều chuyển."
-          getRowKey={(r) => r.id}
-          onRowClick={(r) => setSelectedId(r.id)}
+          getRowKey={(row) => row.id}
+          onRowClick={(row) => setSelectedId(row.id)}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,
-            cell: (r) => (
+            cell: (row) => (
               <input
                 type="checkbox"
                 aria-label="Chọn dòng"
-                checked={selectedId === r.id}
-                onChange={() =>
-                  setSelectedId(selectedId === r.id ? null : r.id)
-                }
+                checked={selectedId === row.id}
+                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
                 onClick={(e) => e.stopPropagation()}
               />
             ),
           }}
+          columnFilterControl={columnFilterControl}
         />
       </DocumentListShell>
 
-      {createOpen && (
-        <CreateTransferOrderDialog
-          onClose={() => setCreateOpen(false)}
-          onCreated={async () => {
-            setCreateOpen(false);
+      {dialogMode && (
+        <TransferOrderFormDialog
+          mode={dialogMode}
+          initial={editingOrder}
+          branches={branches}
+          storages={storages}
+          previewDocumentNumber={nextDocumentNumber}
+          actionLoading={!!actionLoading}
+          onClose={() => {
+            setDialogMode(null);
+            setEditingOrder(null);
+          }}
+          onSaved={async () => {
+            setDialogMode(null);
+            setEditingOrder(null);
             await loadRecords();
           }}
+          onRequestDelete={
+            editingOrder && editingOrder.status !== "EXECUTED" && editingOrder.status !== "CANCELLED"
+              ? () => setConfirmDelete(editingOrder)
+              : undefined
+          }
         />
       )}
 
-      {viewing && (
-        <ViewTransferOrderDialog
-          order={viewing}
-          onClose={() => setViewing(null)}
-        />
-      )}
-
-      {confirmCancel && (
+      {confirmDelete && (
         <ConfirmActionModal
-          title="Huỷ lệnh điều chuyển"
-          message="Xác nhận huỷ lệnh này?"
-          confirmLabel="Huỷ"
+          title="Hủy lệnh điều chuyển"
+          message={`Xác nhận hủy lệnh ${confirmDelete.documentNumber ?? confirmDelete.id}? Lệnh sẽ chuyển sang trạng thái Đã hủy.`}
+          confirmLabel="Hủy lệnh"
           cancelLabel="Quay lại"
-          loading={actionLoading === confirmCancel.id}
-          onCancel={() => setConfirmCancel(null)}
-          onConfirm={() => void handleCancel(confirmCancel)}
+          loading={actionLoading === confirmDelete.id}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => void handleDelete(confirmDelete)}
         />
       )}
     </>
   );
 }
 
-// ─── Create dialog ──────────────────────────────────────────────────────────
+// ─── Detail panel (selected order's lines) ────────────────────────────────────
 
-interface DraftLine {
-  rowKey: string;
+function DetailPanel({
+  order,
+  storageNameById,
+}: {
+  order: TransferOrder | null;
+  storageNameById: Map<string, string>;
+}) {
+  return (
+    <div className="px-4 py-3">
+      <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
+        Chi tiết
+      </div>
+      {!order ? (
+        <p className="text-sm text-muted-foreground">
+          Chọn một lệnh để xem chi tiết.
+        </p>
+      ) : order.lines.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Lệnh này chưa có dòng hàng.
+        </p>
+      ) : (
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-muted/40">
+            <tr className="border-b">
+              <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
+              <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.lines.map((line) => {
+              const code = line.item?.code ?? line.itemId.slice(0, 8);
+              const name = line.item?.name ?? "—";
+              const unit = line.item?.unit ?? "—";
+              const storageName = order.sourceStorageId
+                ? storageNameById.get(order.sourceStorageId) ?? "—"
+                : "—";
+              return (
+                <tr key={line.id} className="border-b">
+                  <td className="border-r px-2 py-1 font-mono text-xs">{code}</td>
+                  <td className="border-r px-2 py-1">{name}</td>
+                  <td className="border-r px-2 py-1">{storageName}</td>
+                  <td className="border-r px-2 py-1">{unit}</td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {Number(line.requestedQty).toLocaleString("vi-VN")}
+                  </td>
+                  <td className="px-2 py-1">{line.note ?? ""}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─── Form dialog (create / view) ──────────────────────────────────────────────
+
+interface FormLine {
   itemId: string;
-  itemCode: string;
+  itemLabel: string;
   itemName: string;
   unit: string;
   requestedQty: number;
   note: string;
 }
 
-function CreateTransferOrderDialog({
+const emptyLine = (): FormLine => ({
+  itemId: "",
+  itemLabel: "",
+  itemName: "",
+  unit: "",
+  requestedQty: 1,
+  note: "",
+});
+
+function TransferOrderFormDialog({
+  mode,
+  initial,
+  branches,
+  storages,
+  previewDocumentNumber,
+  actionLoading,
   onClose,
-  onCreated,
+  onSaved,
+  onRequestDelete,
 }: {
+  mode: "create" | "edit" | "view";
+  initial: TransferOrder | null;
+  branches: BranchOption[];
+  storages: InventoryStorage[];
+  previewDocumentNumber?: string;
+  actionLoading: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => Promise<void> | void;
+  onRequestDelete?: () => void;
 }) {
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [sourceBranchId, setSourceBranchId] = useState<string>("");
-  const [destBranchId, setDestBranchId] = useState<string>("");
-  const [requestedDate, setRequestedDate] = useState<string>(
-    new Date().toISOString().slice(0, 10),
+  const isView = mode === "view";
+
+  // For Misa-style behavior: source branch defaults to the active branch
+  // the user is currently scoped to, so they only need to pick destination.
+  const fallbackSourceBranchId = getActiveBranchId() ?? "";
+  const initialSourceBranchId = initial?.sourceBranchId ?? fallbackSourceBranchId;
+  const initialSourceBranchName =
+    branches.find((b) => b.id === initialSourceBranchId)?.name ?? "";
+  const initialDestBranchId = initial?.destinationBranchId ?? "";
+  const initialDestBranchName =
+    branches.find((b) => b.id === initialDestBranchId)?.name ?? "";
+
+  const initialSourceStorageId =
+    initial?.sourceStorageId ??
+    storages.find((s) => s.branchId === initialSourceBranchId)?.id ??
+    "";
+  const initialSourceStorageName =
+    storages.find((s) => s.id === initialSourceStorageId)?.name ?? "";
+
+  const [sourceBranchId, setSourceBranchId] = useState(initialSourceBranchId);
+  const [sourceBranchLabel, setSourceBranchLabel] = useState(initialSourceBranchName);
+  const [destBranchId, setDestBranchId] = useState(initialDestBranchId);
+  const [destBranchLabel, setDestBranchLabel] = useState(initialDestBranchName);
+  const [sourceStorageId, setSourceStorageId] = useState(initialSourceStorageId);
+  const [sourceStorageLabel, setSourceStorageLabel] = useState(initialSourceStorageName);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [docDate, setDocDate] = useState(
+    initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([]);
+  const [lines, setLines] = useState<FormLine[]>(() =>
+    initial
+      ? initial.lines.map((l) => ({
+          itemId: l.itemId,
+          itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+          itemName: l.item?.name ?? "",
+          unit: l.item?.unit ?? "",
+          requestedQty: Number(l.requestedQty),
+          note: l.note ?? "",
+        }))
+      : [emptyLine()],
+  );
+
   const [saving, setSaving] = useState(false);
-  const [pickerNonce, setPickerNonce] = useState(0);
-  const [pickerValue, setPickerValue] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data } = await apiClient.get<PaginatedResponse<Branch>>(
-          "/branches?page=1&pageSize=100",
-        );
-        if (!cancelled) setBranches(data.data);
-      } catch {
-        // best-effort
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "8" });
-    if (query.trim()) params.set("search", query.trim());
-    const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
-      `/inventory/items?${params}`,
-    );
-    return data.data;
-  }, []);
-
-  const addLine = (item: InventoryItem) => {
-    if (lines.some((l) => l.itemId === item.id)) {
-      toast.error(`"${item.code}" đã có trong danh sách.`);
-      return;
-    }
-    setLines((prev) => [
-      ...prev,
-      {
-        rowKey: `pending-${item.id}-${Date.now()}`,
-        itemId: item.id,
-        itemCode: item.code,
-        itemName: item.name,
-        unit: item.unit,
-        requestedQty: 1,
-        note: "",
-      },
-    ]);
-    setPickerValue("");
-    setPickerNonce((n) => n + 1);
+  const markDirty = () => {
+    if (!dirty) setDirty(true);
   };
 
-  const handleSave = async () => {
-    if (!sourceBranchId || !destBranchId) {
-      toast.error("Chọn chi nhánh nguồn và đích.");
-      return;
+  // When user picks a new source branch and we don't yet have a storage
+  // resolved, auto-pick the first storage of that branch (Misa shows storage
+  // per line without a dedicated header field, so user shouldn't have to
+  // hunt for it explicitly).
+  useEffect(() => {
+    if (!sourceBranchId || sourceStorageId) return;
+    const first = storages.find((s) => s.branchId === sourceBranchId);
+    if (first) {
+      setSourceStorageId(first.id);
+      setSourceStorageLabel(first.name);
     }
-    if (sourceBranchId === destBranchId) {
-      toast.error("Chi nhánh nguồn và đích phải khác nhau.");
-      return;
+  }, [sourceBranchId, sourceStorageId, storages]);
+
+  // Once branches finish loading, backfill the source branch label if we
+  // started with just an active_branch_id from localStorage.
+  useEffect(() => {
+    if (sourceBranchLabel || !sourceBranchId) return;
+    const found = branches.find((b) => b.id === sourceBranchId);
+    if (found) setSourceBranchLabel(found.name);
+  }, [branches, sourceBranchId, sourceBranchLabel]);
+
+  const searchBranches = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 8;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data } = await apiClient.get<PaginatedResponse<BranchOption>>(
+        `/branches?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+    },
+    [],
+  );
+
+  const searchItems = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const effectivePageSize = pageSize ?? 10;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(effectivePageSize),
+      });
+      if (query.trim()) params.set("search", query.trim());
+      const { data } = await apiClient.get<PaginatedResponse<InventoryItem>>(
+        `/inventory/items?${params}`,
+      );
+      const fetched = data.page * data.pageSize;
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
+    },
+    [],
+  );
+
+  const totalQty = lines.reduce((s, l) => s + Number(l.requestedQty || 0), 0);
+
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!sourceBranchId) {
+      toast.error("Vui lòng chọn chi nhánh nguồn.");
+      return false;
     }
-    if (lines.length === 0) {
-      toast.error("Cần ít nhất 1 dòng hàng.");
-      return;
+    if (!destBranchId) {
+      toast.error("Vui lòng chọn chi nhánh đích.");
+      return false;
+    }
+    if (sourceBranchId === destBranchId && !sourceStorageId) {
+      toast.error("Điều chuyển nội bộ phải chọn kho nguồn cụ thể.");
+      return false;
+    }
+    const validLines = lines.filter((l) => l.itemId);
+    if (validLines.length === 0) {
+      toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
+      return false;
+    }
+    if (validLines.some((l) => Number(l.requestedQty) <= 0)) {
+      toast.error("Số lượng phải lớn hơn 0.");
+      return false;
     }
     setSaving(true);
     try {
       await apiClient.post("/inventory/transfer-orders", {
         sourceBranchId,
         destinationBranchId: destBranchId,
-        requestedDate: requestedDate || undefined,
+        sourceStorageId: sourceStorageId || undefined,
+        requestedDate: docDate || undefined,
         notes: notes || undefined,
-        lines: lines.map((l) => ({
+        lines: validLines.map((l) => ({
           itemId: l.itemId,
           requestedQty: Number(l.requestedQty),
           note: l.note || undefined,
         })),
       });
+      setDirty(false);
       toast.success("Đã tạo lệnh điều chuyển.");
-      onCreated();
+      await onSaved();
+      return true;
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
+      return false;
     } finally {
       setSaving(false);
     }
+  }, [
+    sourceBranchId,
+    destBranchId,
+    sourceStorageId,
+    docDate,
+    notes,
+    lines,
+    onSaved,
+  ]);
+
+  const requestClose = () => {
+    if (dirtyRef.current && !isView) {
+      setUnsavedOpen(true);
+      return;
+    }
+    onClose();
   };
 
+  const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
+    if (choice === "save") {
+      const ok = await handleSave();
+      if (ok) onClose();
+    } else if (choice === "discard") {
+      onClose();
+    }
+  };
+
+  const dialogToolbar: ToolbarItem[] = [
+    { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
+    { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
+    { id: "sep1", type: "separator" },
+    {
+      id: "create-new",
+      label: "Thêm mới",
+      icon: Plus,
+      disabled: mode === "create",
+      onClick: () => toast.info("Đóng phiếu hiện tại trước khi tạo phiếu mới."),
+    },
+    {
+      id: "edit",
+      label: "Sửa",
+      icon: Pencil,
+      disabled: !isView || initial?.status !== "DRAFT",
+      onClick: () =>
+        toast.info("Tính năng sửa lệnh đang được cập nhật. Vui lòng nhân bản phiếu mới."),
+    },
+    {
+      id: "save",
+      label: "Lưu",
+      icon: Save,
+      disabled: isView || saving,
+      onClick: () => void handleSave(),
+    },
+    {
+      id: "delete",
+      label: "Xóa",
+      icon: Trash2,
+      variant: "danger",
+      disabled:
+        !onRequestDelete ||
+        initial?.status === "EXECUTED" ||
+        initial?.status === "CANCELLED",
+      onClick: () => onRequestDelete?.(),
+    },
+    {
+      id: "void",
+      label: "Hoãn",
+      icon: RotateCcw,
+      disabled: true,
+      onClick: () => {},
+    },
+    { id: "sep2", type: "separator" },
+    { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
+    { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
+    { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
+    { id: "close", label: "Đóng", icon: X, onClick: requestClose },
+  ];
+
+  const lineColumns: LineColumn<FormLine>[] = [
+    {
+      key: "itemLabel",
+      label: "Mã SKU",
+      width: 180,
+      placeholder: "Tìm mã hoặc tên",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn hàng hóa"
+          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          dropdownMinWidth={520}
+          placeholder="Tìm mã hoặc tên"
+          value={row.itemLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, itemLabel: val, itemId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(item) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      itemId: item.id,
+                      itemLabel: item.code,
+                      itemName: item.name,
+                      unit: item.unit,
+                    }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchItems}
+          itemKey={(item) => item.id}
+          renderItem={(item) => item.name}
+          renderMeta={(item) => `${item.code} · ${item.unit}`}
+          columns={[
+            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
+            { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
+            { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
+          ]}
+          disabled={isView}
+          className="h-full"
+        />
+      ),
+    },
+    {
+      key: "itemName",
+      label: "Tên hàng hóa",
+      width: 240,
+      type: "readonly",
+      getValue: (row) => row.itemName,
+    },
+    {
+      key: "warehouse",
+      label: "Kho",
+      width: 180,
+      type: "readonly",
+      getValue: () => sourceStorageLabel,
+    },
+    {
+      key: "unit",
+      label: "Đơn vị tính",
+      width: 110,
+      type: "readonly",
+      getValue: (row) => row.unit,
+    },
+    {
+      key: "requestedQty",
+      label: "Số lượng",
+      width: 110,
+      type: "number",
+      align: "right",
+      filterSymbol: "≤",
+    },
+    {
+      key: "note",
+      label: "Ghi chú",
+      placeholder: "Nhập ghi chú",
+    },
+  ];
+
+  const statusLabel = initial?.status ? STATUS_LABEL[initial.status] : "Chưa thực hiện";
+
   return (
-    <AppModal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title="Tạo lệnh điều chuyển"
-      defaultWidth={780}
-      defaultHeight={620}
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving || lines.length === 0}
-          >
-            <Send className="mr-1.5 h-4 w-4" />
-            {saving ? "Đang lưu…" : "Tạo lệnh"}
-          </Button>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Huỷ
-          </Button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Từ chi nhánh *">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={sourceBranchId}
-              onChange={(e) => setSourceBranchId(e.target.value)}
+    <>
+      <DocumentFormDialog
+        open
+        onOpenChange={(o) => {
+          if (!o) requestClose();
+        }}
+        title={
+          mode === "create"
+            ? "Thêm mới lệnh điều chuyển"
+            : `Lệnh điều chuyển ${initial?.documentNumber ?? ""}`
+        }
+        toolbarItems={dialogToolbar}
+        generalInfo={
+          <>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)_70px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+              <label className="text-sm text-muted-foreground">Điều chuyển từ</label>
+              <LookupField
+                enableSearchModal
+                searchModalTitle="Chọn chi nhánh nguồn"
+                searchModalPlaceholder="Nhập tên chi nhánh"
+                placeholder="Chọn chi nhánh nguồn"
+                value={sourceBranchLabel}
+                onValueChange={(v) => {
+                  setSourceBranchLabel(v);
+                  setSourceBranchId("");
+                  setSourceStorageId("");
+                  setSourceStorageLabel("");
+                  markDirty();
+                }}
+                onSelect={(b) => {
+                  setSourceBranchId(b.id);
+                  setSourceBranchLabel(b.name);
+                  setSourceStorageId("");
+                  setSourceStorageLabel("");
+                  markDirty();
+                }}
+                search={searchBranches}
+                itemKey={(b) => b.id}
+                renderItem={(b) => b.name}
+                renderMeta={(b) => b.address ?? ""}
+                columns={[
+                  { key: "name", label: "Tên chi nhánh", render: (b) => b.name },
+                  { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                ]}
+                disabled={isView}
+              />
+              <label className="text-sm text-muted-foreground">Đến</label>
+              <LookupField
+                enableSearchModal
+                searchModalTitle="Chọn chi nhánh đích"
+                searchModalPlaceholder="Nhập tên chi nhánh"
+                placeholder="Chọn chi nhánh đích"
+                value={destBranchLabel}
+                onValueChange={(v) => {
+                  setDestBranchLabel(v);
+                  setDestBranchId("");
+                  markDirty();
+                }}
+                onSelect={(b) => {
+                  setDestBranchId(b.id);
+                  setDestBranchLabel(b.name);
+                  markDirty();
+                }}
+                search={searchBranches}
+                itemKey={(b) => b.id}
+                renderItem={(b) => b.name}
+                renderMeta={(b) => b.address ?? ""}
+                columns={[
+                  { key: "name", label: "Tên chi nhánh", render: (b) => b.name },
+                  { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                ]}
+                disabled={isView}
+              />
+            </div>
+            <FieldRow label="Lý do">
+              <Input
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Tham chiếu">
+              <span className="text-sm text-muted-foreground">—</span>
+            </FieldRow>
+            <FieldRow label="Tài liệu đính kèm">
+              <Button type="button" variant="outline" size="sm" disabled>
+                Tải tệp …
+              </Button>
+            </FieldRow>
+          </>
+        }
+        documentInfo={
+          <>
+            <FieldRow label="Số phiếu">
+              <Input
+                value={initial?.documentNumber ?? previewDocumentNumber ?? ""}
+                readOnly
+                title={
+                  initial?.documentNumber
+                    ? undefined
+                    : "Số dự kiến — hệ thống sẽ chốt khi lưu"
+                }
+              />
+            </FieldRow>
+            <FieldRow label="Ngày chứng từ">
+              <Input
+                type="date"
+                value={docDate}
+                onChange={(e) => {
+                  setDocDate(e.target.value);
+                  markDirty();
+                }}
+                disabled={isView}
+              />
+            </FieldRow>
+            <FieldRow label="Trạng thái">
+              <Input value={statusLabel} readOnly disabled />
+            </FieldRow>
+          </>
+        }
+        detailActions={
+          <>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" disabled />
+              <span>Quét mã vạch</span>
+            </label>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              disabled
             >
-              <option value="">— Chọn —</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Đến chi nhánh *">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={destBranchId}
-              onChange={(e) => setDestBranchId(e.target.value)}
+              Chọn kho
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              disabled
             >
-              <option value="">— Chọn —</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-
-        <FormField label="Ngày mong muốn">
-          <Input
-            type="date"
-            value={requestedDate}
-            onChange={(e) => setRequestedDate(e.target.value)}
+              Nhập khẩu
+            </button>
+          </>
+        }
+        detail={
+          <LineItemGrid
+            columns={lineColumns}
+            rows={lines}
+            onChangeCell={(idx, key, value) => {
+              setLines((prev) =>
+                prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
+              );
+              markDirty();
+            }}
+            onAddRow={() => {
+              setLines((prev) => [...prev, emptyLine()]);
+              markDirty();
+            }}
+            onDeleteRow={(idx) => {
+              setLines((prev) =>
+                prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev,
+              );
+              markDirty();
+            }}
+            showAddRow={!isView}
+            showRowActions={!isView}
           />
-        </FormField>
+        }
+        footerSummary={
+          <div className="flex items-center justify-between">
+            <span>Số dòng = {lines.length}</span>
+            <span>
+              Số lượng: <strong className="ml-1">{totalQty}</strong>
+            </span>
+          </div>
+        }
+      />
 
-        <FormField label="Ghi chú">
-          <Textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </FormField>
-
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Chi tiết hàng yêu cầu</div>
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="border-b border-r px-3 py-1.5 text-left w-[120px]">Mã</th>
-                <th className="border-b border-r px-3 py-1.5 text-left">Tên hàng</th>
-                <th className="border-b border-r px-3 py-1.5 text-left w-[70px]">ĐVT</th>
-                <th className="border-b border-r px-3 py-1.5 text-right w-[120px]">SL</th>
-                <th className="border-b px-3 py-1.5 text-center w-[50px]"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l, idx) => (
-                <tr key={l.rowKey} className="border-b">
-                  <td className="border-r px-3 py-1 font-mono text-xs">{l.itemCode}</td>
-                  <td className="border-r px-3 py-1">{l.itemName}</td>
-                  <td className="border-r px-3 py-1">{l.unit}</td>
-                  <td className="border-r px-1 py-1">
-                    <Input
-                      type="number"
-                      min={0.001}
-                      className="h-7 text-right"
-                      value={String(l.requestedQty)}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((p, i) =>
-                            i === idx
-                              ? { ...p, requestedQty: Number(e.target.value) }
-                              : p,
-                          ),
-                        )
-                      }
-                    />
-                  </td>
-                  <td className="px-1 py-1 text-center">
-                    <button
-                      type="button"
-                      aria-label="Xoá dòng"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10"
-                      onClick={() =>
-                        setLines((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              <tr>
-                <td colSpan={5} className="px-2 py-1.5">
-                  <LookupField
-                    key={pickerNonce}
-                    placeholder="Tìm mã hoặc tên hàng để thêm…"
-                    value={pickerValue}
-                    onValueChange={setPickerValue}
-                    onSelect={addLine}
-                    search={searchItems}
-                    itemKey={(it) => it.id}
-                    renderItem={(it) => it.name}
-                    renderMeta={(it) => `${it.code} · ${it.unit}`}
-                    columns={[
-                      { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
-                      { key: "name", label: "Tên", render: (it) => it.name },
-                    ]}
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </AppModal>
+      <UnsavedChangesDialog
+        open={unsavedOpen}
+        onOpenChange={setUnsavedOpen}
+        onChoose={(c) => void handleUnsavedChoice(c)}
+        saveDisabled={actionLoading || saving}
+      />
+    </>
   );
 }
 
-// ─── View dialog ────────────────────────────────────────────────────────────
-
-function ViewTransferOrderDialog({
-  order,
-  onClose,
-}: {
-  order: TransferOrder;
-  onClose: () => void;
-}) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <AppModal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title={`Lệnh điều chuyển ${order.documentNumber ?? order.id.slice(0, 8)}`}
-      defaultWidth={780}
-      defaultHeight={520}
-      footer={
-        <div className="flex justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Đóng
-          </Button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-xs text-muted-foreground">Từ chi nhánh</div>
-            <div>{order.sourceBranchId}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Đến chi nhánh</div>
-            <div>{order.destinationBranchId}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Trạng thái</div>
-            <div>{STATUS_LABEL[order.status]}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Ngày mong muốn</div>
-            <div>{order.requestedDate ?? "—"}</div>
-          </div>
-        </div>
-
-        {order.notes ? (
-          <div>
-            <div className="text-xs text-muted-foreground">Ghi chú</div>
-            <div className="text-sm">{order.notes}</div>
-          </div>
-        ) : null}
-
-        <table className="w-full border-collapse text-sm">
-          <thead className="bg-muted/40">
-            <tr>
-              <th className="border-b border-r px-3 py-1.5 text-left">Mã SKU</th>
-              <th className="border-b border-r px-3 py-1.5 text-left">Tên hàng hóa</th>
-              <th className="border-b border-r px-3 py-1.5 text-left">ĐVT</th>
-              <th className="border-b px-3 py-1.5 text-right">SL yêu cầu</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.lines.map((l) => (
-              <tr key={l.id} className="border-b">
-                <td className="border-r px-3 py-1 font-mono text-xs">
-                  {l.item?.code ?? l.itemId.slice(0, 8)}
-                </td>
-                <td className="border-r px-3 py-1">{l.item?.name ?? "—"}</td>
-                <td className="border-r px-3 py-1">{l.item?.unit ?? "—"}</td>
-                <td className="px-3 py-1 text-right tabular-nums">
-                  {Number(l.requestedQty).toLocaleString("vi-VN")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </AppModal>
+    <div className="grid grid-cols-[120px_1fr] items-center gap-3">
+      <label className="text-sm text-muted-foreground">{label}</label>
+      <div>{children}</div>
+    </div>
   );
 }
