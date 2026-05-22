@@ -43,6 +43,7 @@ export const invoiceService = {
 
   listDrafts: (sessionId: string): Promise<InvoiceRow[]> => {
     const params = new URLSearchParams({ session_id: sessionId });
-    return http.get<InvoiceRow[]>(`/invoices/drafts?${params.toString()}`);
+    // return http.get<InvoiceRow[]>(`/invoices/drafts?${params.toString()}`);
+    return http.get<InvoiceRow[]>(`/invoices/drafts`);
   },
 };
