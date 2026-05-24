@@ -1,3 +1,6 @@
+import type { CashVoucherPartnerType } from "../cash-vouchers.types";
+import type { VoucherPartnerKindUi } from "../documents/_shared/voucher-partner.constants";
+
 export enum LedgerCashDocumentTypeEnum {
   OPENING_BALANCE = "opening_balance",
   INVOICE_SALE = "invoice_sale",
@@ -79,7 +82,6 @@ export interface LedgerCashVoucherLine {
   category: string;
 }
 
-/** Dòng chứng từ công nợ (tab Chứng từ — phiếu thu thu nợ). */
 export interface LedgerCashVoucherDocumentLine {
   documentDate: Date;
   documentNo: string;
@@ -87,6 +89,8 @@ export interface LedgerCashVoucherDocumentLine {
   collectedAmount: number;
   remainingAmount: number;
   collectAmount: number;
+  debtId?: string;
+  invoiceId?: string;
 }
 
 export interface LedgerCashVoucherSkuLine {
@@ -99,7 +103,6 @@ export interface LedgerCashVoucherSkuLine {
   unitPrice: number;
 }
 
-/** Phiếu nhập kèm phiếu chi tiền mặt (tab Phiếu nhập). */
 export interface LedgerCashGoodsReceiptInfo {
   receiptNo: string;
   receiptDate: Date;
@@ -117,19 +120,21 @@ export interface LedgerCashVoucherDetail {
   voucherDate: Date;
   counterpartyCode: string;
   counterpartyName: string;
+  partnerKind?: VoucherPartnerKindUi;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
   payerName?: string;
   address?: string;
   reason: string;
   employeeCode: string;
   employeeName: string;
+  staffId?: string;
   reference?: string;
   lines: LedgerCashVoucherLine[];
-  /** Tab Chứng từ (phiếu thu thu nợ). */
   documentLines?: LedgerCashVoucherDocumentLine[];
   skuLines?: LedgerCashVoucherSkuLine[];
   discountAmount?: number;
   taxAmount?: number;
-  /** Phiếu nhập hàng — hiển thị tab Phiếu nhập | Phiếu chi. */
   goodsReceipt?: LedgerCashGoodsReceiptInfo;
   paymentMode?: LedgerCashVoucherPaymentModeEnum;
   paymentMethod?: string;
@@ -151,6 +156,9 @@ export type LedgerCashDetailPayload =
 
 export interface LedgerCashRow {
   id: string;
+  /** BE cash receipt/payment id for drill-down (when kind is PT/PC). */
+  apiVoucherId?: string;
+  apiLedgerKind?: "PT" | "PC" | "Khác";
   documentDate: Date;
   receiptNo?: string;
   paymentNo?: string;

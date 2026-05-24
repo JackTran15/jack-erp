@@ -1,31 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
-  cn,
   DateTimeField,
   DocumentFormDialog,
   FormField,
   Input,
   LineItemGrid,
   MoneyInput,
+  cn,
   formatMoneyInteger,
   type LineColumn,
   type ToolbarItem,
 } from "@erp/ui";
 import { Pencil, Save, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { VoucherLink } from "../_shared/VoucherLink";
-import { GoodsReceiptPaymentDialog } from "../goods-receipt-payment-dialog/GoodsReceiptPaymentDialog";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
-  isGoodsReceiptPaymentVoucher,
-  LedgerCashVoucherKindEnum,
   LedgerCashVoucherPurposeEnum,
+  isGoodsReceiptPaymentVoucher,
   type LedgerCashVoucherDetail,
 } from "../../ledger-cash/ledger-cash.types";
+import { VoucherDocumentNumberField } from "../_shared/VoucherDocumentNumberField";
+import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
+import { VoucherLink } from "../_shared/VoucherLink";
+import { VoucherPartnerFields } from "../_shared/VoucherPartnerFields";
+import { VoucherStaffFields } from "../_shared/VoucherStaffFields";
 import {
-  DEFAULT_VOUCHER_EMPLOYEE_CODE,
-  DEFAULT_VOUCHER_EMPLOYEE_NAME,
   PAYMENT_PURPOSE_DETAIL_OPTIONS,
   PAYMENT_PURPOSE_GROUP_OPTIONS,
   PaymentVoucherPurposeDetailEnum,
@@ -39,6 +39,17 @@ import {
   toIsoDate,
   voucherLineTotal,
 } from "../_shared/voucher-dialog.utils";
+import type { VoucherEntitySearchTarget } from "../_shared/voucher-entity-search.store";
+import type { VoucherMergedPartnerOption } from "../_shared/voucher-partner-search";
+import {
+  fetchVoucherPartnerByBeType,
+  fetchVoucherStaffById,
+} from "../_shared/voucher-partner-search";
+import {
+  VoucherPartnerKindUi,
+  inferPartnerKindFromBe,
+} from "../_shared/voucher-partner.constants";
+import { GoodsReceiptPaymentDialog } from "../goods-receipt-payment-dialog/GoodsReceiptPaymentDialog";
 
 const LABELS = {
   purpose: "Mục đích chi",
@@ -58,7 +69,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   mode: TreasuryVoucherDialogModeEnum;
   initial: LedgerCashVoucherDetail | null;
-  nextVoucherNo?: string;
   onSave?: (detail: LedgerCashVoucherDetail) => void;
   onRequestEdit?: () => void;
 }
@@ -72,7 +82,6 @@ export function PaymentVoucherDialog({
   onOpenChange,
   mode,
   initial,
-  nextVoucherNo = "",
   onSave,
   onRequestEdit,
 }: Props) {
@@ -86,50 +95,64 @@ export function PaymentVoucherDialog({
   const [purposeDetail, setPurposeDetail] = useState(
     PaymentVoucherPurposeDetailEnum.OTHER_EXPENSE,
   );
+  const [partnerKind, setPartnerKind] = useState<VoucherPartnerKindUi>(
+    VoucherPartnerKindUi.SUPPLIER,
+  );
+  const [partnerId, setPartnerId] = useState("");
   const [counterpartyCode, setCounterpartyCode] = useState("");
   const [counterpartyName, setCounterpartyName] = useState("");
+  const [counterpartyPhone, setCounterpartyPhone] = useState("");
   const [personName, setPersonName] = useState("");
   const [address, setAddress] = useState("");
   const [reason, setReason] = useState("");
-  const [employeeCode, setEmployeeCode] = useState(
-    DEFAULT_VOUCHER_EMPLOYEE_CODE,
-  );
-  const [employeeName, setEmployeeName] = useState(
-    DEFAULT_VOUCHER_EMPLOYEE_NAME,
-  );
+  const [staffId, setStaffId] = useState("");
+  const [employeeCode, setEmployeeCode] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   const [reference, setReference] = useState("");
   const [voucherNo, setVoucherNo] = useState("");
   const [voucherDate, setVoucherDate] = useState(toIsoDate(new Date()));
   const [countAsExpense, setCountAsExpense] = useState(true);
   const [lines, setLines] = useState<VoucherFormLine[]>([emptyFormLine()]);
+  const [entitySearchTarget, setEntitySearchTarget] =
+    useState<VoucherEntitySearchTarget | null>(null);
 
-  const resetKey = `payment-${mode}-${initial?.voucherNo ?? nextVoucherNo}`;
+  const resetKey = `payment-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
 
   useEffect(() => {
     if (!open || isGoodsView) return;
     if (mode === TreasuryVoucherDialogModeEnum.CREATE) {
       setPurposeGroup(PaymentVoucherPurposeGroupEnum.OTHER);
       setPurposeDetail(PaymentVoucherPurposeDetailEnum.OTHER_EXPENSE);
+      setPartnerKind(VoucherPartnerKindUi.SUPPLIER);
+      setPartnerId("");
       setCounterpartyCode("");
       setCounterpartyName("");
+      setCounterpartyPhone("");
       setPersonName("");
       setAddress("");
       setReason("");
-      setEmployeeCode(DEFAULT_VOUCHER_EMPLOYEE_CODE);
-      setEmployeeName(DEFAULT_VOUCHER_EMPLOYEE_NAME);
+      setStaffId("");
+      setEmployeeCode("");
+      setEmployeeName("");
       setReference("");
-      setVoucherNo(nextVoucherNo);
+      setVoucherNo("");
       setVoucherDate(toIsoDate(new Date()));
       setCountAsExpense(true);
       setLines([emptyFormLine()]);
       return;
     }
     if (initial && !isGoodsReceiptPaymentVoucher(initial)) {
+      setPartnerKind(
+        initial.partnerKind ??
+          inferPartnerKindFromBe(initial.partnerType, initial.counterpartyCode),
+      );
+      setPartnerId(initial.partnerId ?? "");
       setCounterpartyCode(initial.counterpartyCode);
       setCounterpartyName(initial.counterpartyName);
       setPersonName(initial.payerName ?? "");
       setAddress(initial.address ?? "");
       setReason(initial.reason);
+      setStaffId(initial.staffId ?? "");
       setEmployeeCode(initial.employeeCode);
       setEmployeeName(initial.employeeName);
       setReference(initial.reference ?? "");
@@ -145,7 +168,77 @@ export function PaymentVoucherDialog({
           : [emptyFormLine()],
       );
     }
-  }, [resetKey, open, mode, initial, nextVoucherNo, isGoodsView]);
+  }, [resetKey, open, mode, initial, isGoodsView]);
+
+  useEffect(() => {
+    if (!open) setEntitySearchTarget(null);
+  }, [open]);
+
+  const applyPartnerFromSearch = useCallback(
+    (item: VoucherMergedPartnerOption) => {
+      setPartnerKind(item.kind);
+      setPartnerId(item.id);
+      setCounterpartyCode(item.code);
+      setCounterpartyName(item.name);
+      setCounterpartyPhone(item.phone ?? "");
+      if (item.address) setAddress(item.address);
+      setPersonName((prev) => prev.trim() || item.name);
+    },
+    [],
+  );
+
+  const applyStaffFromSearch = useCallback(
+    (item: VoucherMergedPartnerOption) => {
+      setStaffId(item.id);
+      setEmployeeCode(item.code);
+      setEmployeeName(item.name);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (
+      !open ||
+      isGoodsView ||
+      mode === TreasuryVoucherDialogModeEnum.CREATE ||
+      !initial
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      if (initial.partnerId && initial.partnerType) {
+        const partner = await fetchVoucherPartnerByBeType(
+          initial.partnerType,
+          initial.partnerId,
+        );
+        if (!cancelled && partner) {
+          setPartnerKind(partner.kind);
+          setCounterpartyCode(partner.code);
+          setCounterpartyName(partner.name);
+          setCounterpartyPhone(partner.phone ?? "");
+          if (partner.address) setAddress(partner.address);
+        }
+      }
+      if (initial.staffId) {
+        const staff = await fetchVoucherStaffById(initial.staffId);
+        if (!cancelled && staff) {
+          setEmployeeCode(staff.code);
+          setEmployeeName(staff.name);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    isGoodsView,
+    mode,
+    initial?.partnerId,
+    initial?.partnerType,
+    initial?.staffId,
+  ]);
 
   const lineTotal = useMemo(() => voucherLineTotal(lines), [lines]);
 
@@ -218,11 +311,6 @@ export function PaymentVoucherDialog({
       toast.error("Tổng số tiền phải lớn hơn 0.");
       return;
     }
-    if (!voucherNo.trim()) {
-      toast.error(`${LABELS.voucherNo} không được để trống.`);
-      return;
-    }
-
     const categoryDefault =
       PAYMENT_PURPOSE_DETAIL_OPTIONS[purposeGroup].find(
         (o) => o.value === purposeDetail,
@@ -231,11 +319,14 @@ export function PaymentVoucherDialog({
     onSave(
       buildPaymentDetailFromForm({
         purpose: LedgerCashVoucherPurposeEnum.OTHER,
+        partnerKind,
+        partnerId,
         counterpartyCode,
         counterpartyName,
         payerName: personName,
         address,
         reason: reason || categoryDefault,
+        staffId,
         employeeCode,
         employeeName,
         reference,
@@ -256,11 +347,14 @@ export function PaymentVoucherDialog({
     voucherNo,
     purposeGroup,
     purposeDetail,
+    partnerKind,
+    partnerId,
     counterpartyCode,
     counterpartyName,
     personName,
     address,
     reason,
+    staffId,
     employeeCode,
     employeeName,
     reference,
@@ -325,238 +419,266 @@ export function PaymentVoucherDialog({
   const linkedDocCode = initial?.goodsReceipt?.receiptNo ?? initial?.reference;
 
   return (
-    <DocumentFormDialog
-      open
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) handleClose();
-      }}
-      title={title}
-      toolbarItems={toolbarItems}
-      purpose={
-        <FormField label={LABELS.purpose} layout="horizontal" labelWidth="8rem">
-          {readOnly ? (
-            <span className="text-sm">
-              {PAYMENT_PURPOSE_GROUP_OPTIONS[0]?.label} —{" "}
-              {purposePaymentOptions.find((o) => o.value === purposeDetail)
-                ?.label ?? "Chi khác"}
-            </span>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                value={purposeGroup}
-                onChange={(e) => {
-                  const g = e.target.value as PaymentVoucherPurposeGroupEnum;
-                  setPurposeGroup(g);
-                  setPurposeDetail(PAYMENT_PURPOSE_DETAIL_OPTIONS[g][0]!.value);
-                }}
-              >
-                {PAYMENT_PURPOSE_GROUP_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                value={purposeDetail}
-                onChange={(e) =>
-                  setPurposeDetail(
-                    e.target.value as PaymentVoucherPurposeDetailEnum,
-                  )
-                }
-              >
-                {purposePaymentOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </FormField>
-      }
-      generalInfo={
-        <>
+    <>
+      <DocumentFormDialog
+        open
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) handleClose();
+        }}
+        title={title}
+        toolbarItems={toolbarItems}
+        purpose={
           <FormField
-            label={LABELS.counterparty}
+            label={LABELS.purpose}
             layout="horizontal"
             labelWidth="8rem"
           >
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={counterpartyCode}
-                onChange={(e) => setCounterpartyCode(e.target.value)}
-                placeholder="Mã"
-                {...inputProps}
-              />
-              <Input
-                value={counterpartyName}
-                onChange={(e) => setCounterpartyName(e.target.value)}
-                placeholder="Tên"
-                {...inputProps}
-              />
-            </div>
-          </FormField>
-          <FormField
-            label={LABELS.person}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Input
-              value={personName}
-              onChange={(e) => setPersonName(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField label="Địa chỉ" layout="horizontal" labelWidth="8rem">
-            <Input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField
-            label={LABELS.reason}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          <FormField
-            label={LABELS.employee}
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={employeeCode}
-                onChange={(e) => setEmployeeCode(e.target.value)}
-                {...inputProps}
-              />
-              <Input
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                {...inputProps}
-              />
-            </div>
-          </FormField>
-          <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
-            <Input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              {...inputProps}
-            />
-          </FormField>
-          {linkedDocCode ? (
-            <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
-              <VoucherLink code={linkedDocCode} clickable={false} />
-            </FormField>
-          ) : null}
-          <FormField
-            label="Tài liệu đính kèm"
-            layout="horizontal"
-            labelWidth="8rem"
-          >
-            <Button variant="outline" size="sm" disabled>
-              Tải tệp…
-            </Button>
-          </FormField>
-        </>
-      }
-      documentInfo={
-        <>
-          <FormField
-            label={LABELS.voucherNo}
-            layout="horizontal"
-            labelWidth="7.5rem"
-          >
-            <Input
-              value={voucherNo}
-              onChange={(e) => setVoucherNo(e.target.value)}
-              readOnly={readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT}
-              disabled={readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT}
-              className={fieldClass(
-                readOnly || mode === TreasuryVoucherDialogModeEnum.EDIT,
-              )}
-            />
-          </FormField>
-          <FormField
-            label={LABELS.voucherDate}
-            layout="horizontal"
-            labelWidth="7.5rem"
-          >
-            <DateTimeField
-              value={voucherDate}
-              onChange={(e) => setVoucherDate(e.target.value)}
-              includeTime={false}
-              disabled={readOnly}
-              className={cn(fieldClass(readOnly))}
-            />
-          </FormField>
-          <FormField label="Tính vào" layout="horizontal" labelWidth="7.5rem">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={countAsExpense}
-                onChange={(e) => setCountAsExpense(e.target.checked)}
-                disabled={readOnly}
-              />
-              <select
-                className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-60"
-                disabled={readOnly || !countAsExpense}
-              >
-                <option value="expense">Chi phí</option>
-              </select>
-            </div>
-          </FormField>
-        </>
-      }
-      detail={
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-          <LineItemGrid
-            columns={lineColumns}
-            rows={lines}
-            onChangeCell={
-              readOnly
-                ? undefined
-                : (idx, key, value) => {
-                    setLines((prev) =>
-                      prev.map((l, i) =>
-                        i === idx ? { ...l, [key]: value } : l,
-                      ),
+            {readOnly ? (
+              <span className="text-sm">
+                {PAYMENT_PURPOSE_GROUP_OPTIONS[0]?.label} —{" "}
+                {purposePaymentOptions.find((o) => o.value === purposeDetail)
+                  ?.label ?? "Chi khác"}
+              </span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={purposeGroup}
+                  onChange={(e) => {
+                    const g = e.target.value as PaymentVoucherPurposeGroupEnum;
+                    setPurposeGroup(g);
+                    setPurposeDetail(
+                      PAYMENT_PURPOSE_DETAIL_OPTIONS[g][0]!.value,
                     );
-                  }
-            }
-            onAddRow={
-              readOnly
-                ? undefined
-                : () => setLines((prev) => [...prev, emptyFormLine()])
-            }
-            onDeleteRow={
-              readOnly
-                ? undefined
-                : (idx) =>
-                    setLines((prev) =>
-                      prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev,
+                  }}
+                >
+                  {PAYMENT_PURPOSE_GROUP_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={purposeDetail}
+                  onChange={(e) =>
+                    setPurposeDetail(
+                      e.target.value as PaymentVoucherPurposeDetailEnum,
                     )
-            }
-            showAddRow={!readOnly}
-            showRowActions={!readOnly}
-          />
-        </div>
-      }
-      footerSummary={
-        <div className="flex justify-end gap-8">
-          <span>
-            Tổng số tiền: <strong>{formatMoneyInteger(lineTotal)}</strong>
-          </span>
-        </div>
-      }
-    />
+                  }
+                >
+                  {purposePaymentOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </FormField>
+        }
+        generalInfo={
+          <>
+            <VoucherPartnerFields
+              label={LABELS.counterparty}
+              readOnly={readOnly}
+              partnerKind={partnerKind}
+              partnerId={partnerId}
+              partnerCode={counterpartyCode}
+              partnerName={counterpartyName}
+              partnerPhone={counterpartyPhone}
+              onPartnerSelect={(p) => {
+                setPartnerKind(p.partnerKind);
+                setPartnerId(p.partnerId);
+                setCounterpartyCode(p.partnerCode);
+                setCounterpartyName(p.partnerName);
+                setCounterpartyPhone(p.partnerPhone ?? "");
+                if (p.address) setAddress(p.address);
+                setPersonName((prev) => prev.trim() || p.partnerName);
+              }}
+              onPartnerLookupChange={(code) => {
+                setCounterpartyCode(code);
+                setPartnerId("");
+                setCounterpartyName("");
+                setCounterpartyPhone("");
+              }}
+              onPartnerClear={() => {
+                setPartnerId("");
+                setCounterpartyCode("");
+                setCounterpartyName("");
+                setCounterpartyPhone("");
+              }}
+              onOpenSearchDialog={() => setEntitySearchTarget("partner")}
+            />
+            <FormField
+              label={LABELS.person}
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Input
+                value={personName}
+                onChange={(e) => setPersonName(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <FormField label="Địa chỉ" layout="horizontal" labelWidth="8rem">
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <FormField
+              label={LABELS.reason}
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            <VoucherStaffFields
+              label={LABELS.employee}
+              readOnly={readOnly}
+              staffId={staffId}
+              staffCode={employeeCode}
+              staffName={employeeName}
+              onStaffSelect={(s) => {
+                setStaffId(s.staffId);
+                setEmployeeCode(s.staffCode);
+                setEmployeeName(s.staffName);
+              }}
+              onStaffLookupChange={(code) => {
+                setEmployeeCode(code);
+                setStaffId("");
+                setEmployeeName("");
+              }}
+              onStaffClear={() => {
+                setStaffId("");
+                setEmployeeCode("");
+                setEmployeeName("");
+              }}
+              onOpenSearchDialog={() => setEntitySearchTarget("staff")}
+            />
+            <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                {...inputProps}
+              />
+            </FormField>
+            {linkedDocCode ? (
+              <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
+                <VoucherLink code={linkedDocCode} clickable={false} />
+              </FormField>
+            ) : null}
+            <FormField
+              label="Tài liệu đính kèm"
+              layout="horizontal"
+              labelWidth="8rem"
+            >
+              <Button variant="outline" size="sm" disabled>
+                Tải tệp…
+              </Button>
+            </FormField>
+          </>
+        }
+        documentInfo={
+          <>
+            <VoucherDocumentNumberField
+              label={LABELS.voucherNo}
+              value={voucherNo}
+              mode={mode}
+              readOnly={readOnly}
+            />
+            <FormField
+              label={LABELS.voucherDate}
+              layout="horizontal"
+              labelWidth="7.5rem"
+            >
+              <DateTimeField
+                value={voucherDate}
+                onChange={(e) => setVoucherDate(e.target.value)}
+                includeTime={false}
+                disabled={readOnly}
+                className={cn(fieldClass(readOnly))}
+              />
+            </FormField>
+            <FormField label="Tính vào" layout="horizontal" labelWidth="7.5rem">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={countAsExpense}
+                  onChange={(e) => setCountAsExpense(e.target.checked)}
+                  disabled={readOnly}
+                />
+                <select
+                  className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-60"
+                  disabled={readOnly || !countAsExpense}
+                >
+                  <option value="expense">Chi phí</option>
+                </select>
+              </div>
+            </FormField>
+          </>
+        }
+        detail={
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+            <LineItemGrid
+              columns={lineColumns}
+              rows={lines}
+              onChangeCell={
+                readOnly
+                  ? undefined
+                  : (idx, key, value) => {
+                      setLines((prev) =>
+                        prev.map((l, i) =>
+                          i === idx ? { ...l, [key]: value } : l,
+                        ),
+                      );
+                    }
+              }
+              onAddRow={
+                readOnly
+                  ? undefined
+                  : () => setLines((prev) => [...prev, emptyFormLine()])
+              }
+              onDeleteRow={
+                readOnly
+                  ? undefined
+                  : (idx) =>
+                      setLines((prev) =>
+                        prev.length > 1
+                          ? prev.filter((_, i) => i !== idx)
+                          : prev,
+                      )
+              }
+              showAddRow={!readOnly}
+              showRowActions={!readOnly}
+            />
+          </div>
+        }
+        footerSummary={
+          <div className="flex justify-end gap-8">
+            <span>
+              Tổng số tiền: <strong>{formatMoneyInteger(lineTotal)}</strong>
+            </span>
+          </div>
+        }
+      />
+      {entitySearchTarget ? (
+        <VoucherEntitySearchModal
+          open
+          target={entitySearchTarget}
+          onOpenChange={(next) => {
+            if (!next) setEntitySearchTarget(null);
+          }}
+          onSelectPartner={applyPartnerFromSearch}
+          onSelectStaff={applyStaffFromSearch}
+        />
+      ) : null}
+    </>
   );
 }

@@ -323,7 +323,7 @@ export const CUSTOMER_ENTITY_CONFIG: CrudEntityConfig = {
       enumValues: Object.values(CustomerStatus),
     },
   ],
-  searchableFields: ['name', 'email', 'phone'],
+  searchableFields: ['code', 'name', 'email', 'phone'],
   filterDefinitions: [
     {
       key: 'status',
