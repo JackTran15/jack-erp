@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
-import { useTempWarehouseSessionDetail } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-temp-warehouse-lines";
+import { useTempWarehouseSessionDetail } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 /**
  * Mount-only side effects for Fast Stock Transfer. Gọi một lần từ {@link FastStockTransferPage}.
  */

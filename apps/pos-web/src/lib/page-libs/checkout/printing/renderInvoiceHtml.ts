@@ -1,4 +1,4 @@
-import type { InvoicePayload } from "./types";
+import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 
 /**

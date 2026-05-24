@@ -1,13 +1,13 @@
 import type { Ref } from "react";
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
-import { PosRadioGroup } from "@erp/pos/components/common/PosRadioGroup/PosRadioGroup";
+import { PosRadio } from "@erp/pos/components/common/PosRadio/PosRadio";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
+import { posFormItemLabelTopPad } from "@erp/pos/components/common/posFormDimensions";
 import { CalendarIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { CustomerGenderEnum } from "@erp/pos/lib/common/customerApi";
+import { CustomerGenderEnum } from "@erp/pos/types/customer.type";
 import { GENDER_OPTIONS } from "@erp/pos/lib/page-libs/checkout/customerFormUtils";
-import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
+import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/interfaces/customer-dialog.interface";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 
@@ -60,173 +60,165 @@ export function BasicInfoSection({
       <PosSectionBanner>Thông tin cơ bản</PosSectionBanner>
 
       <div className="grid grid-cols-1 gap-y-5 gap-x-8 md:grid-cols-2">
-        <PosFormItem
+        <PosTextInput
+          id={ids.code}
           label="Mã khách hàng"
-          htmlFor={ids.code}
           required
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
           error={showCodeError ? codeError : undefined}
-        >
-          <PosTextInput
-            id={ids.code}
-            value={values.code ?? ""}
-            onChange={(v) => onChange("code", v)}
-            variant="underline"
-            invalid={showCodeError}
-            readOnly
-          />
-        </PosFormItem>
+          value={values.code ?? ""}
+          onChange={(v) => onChange("code", v)}
+          variant="underline"
+          invalid={showCodeError}
+          readOnly
+        />
 
-        <PosFormItem
+        <PosTextInput
+          inputRef={nameInputRef}
+          id={ids.name}
           label="Khách hàng"
-          htmlFor={ids.name}
           required
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
           error={showNameError ? nameError : undefined}
-        >
-          <PosTextInput
-            inputRef={nameInputRef}
-            id={ids.name}
-            value={values.name}
-            onChange={(v) => onChange("name", v)}
-            onBlur={onTouchName}
-            variant="underline"
-            placeholder="Tên khách hàng"
-            invalid={showNameError}
-            autoComplete="name"
-          />
-        </PosFormItem>
+          value={values.name}
+          onChange={(v) => onChange("name", v)}
+          onBlur={onTouchName}
+          variant="underline"
+          placeholder="Tên khách hàng"
+          invalid={showNameError}
+          autoComplete="name"
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.phone}
           label="Số điện thoại"
-          htmlFor={ids.phone}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.phone}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            variant="underline"
-            value={values.phone ?? ""}
-            onChange={(v) => onChange("phone", v)}
-            placeholder="Số điện thoại"
-          />
-        </PosFormItem>
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          variant="underline"
+          value={values.phone ?? ""}
+          onChange={(v) => onChange("phone", v)}
+          placeholder="Số điện thoại"
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.email}
           label="Email"
-          htmlFor={ids.email}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.email}
-            type="email"
-            autoComplete="email"
-            variant="underline"
-            value={values.email ?? ""}
-            onChange={(v) => onChange("email", v)}
-          />
-        </PosFormItem>
+          type="email"
+          autoComplete="email"
+          variant="underline"
+          value={values.email ?? ""}
+          onChange={(v) => onChange("email", v)}
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.cccd}
           label="CCCD"
-          htmlFor={ids.cccd}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.cccd}
-            variant="underline"
-            value={values.cccd ?? ""}
-            onChange={(v) => onChange("cccd", v)}
-            placeholder="Số căn cước công dân"
-          />
-        </PosFormItem>
+          variant="underline"
+          value={values.cccd ?? ""}
+          onChange={(v) => onChange("cccd", v)}
+          placeholder="Số căn cước công dân"
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.birthday}
           label="Ngày sinh"
-          htmlFor={ids.birthday}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.birthday}
-            type="date"
-            variant="underline"
-            value={values.birthday ?? ""}
-            onChange={(v) => onChange("birthday", v)}
-            trailing={<CalendarIcon size={18} className="text-gray-500" />}
-          />
-        </PosFormItem>
+          type="date"
+          variant="underline"
+          value={values.birthday ?? ""}
+          onChange={(v) => onChange("birthday", v)}
+          trailing={<CalendarIcon size={18} className="text-gray-500" />}
+        />
 
-        <PosFormItem
-          label="Giới tính"
-          layout="horizontal"
-          labelClassName={FORM_ITEM_LABEL_CLASS}
-          className="col-span-2"
-        >
-          <PosRadioGroup<CustomerGenderEnum>
-            name="gender"
-            value={values.gender ?? CustomerGenderEnum.UNSPECIFIED}
-            onChange={(v) => onChange("gender", v)}
-            options={GENDER_OPTIONS}
-          />
-        </PosFormItem>
+        <div className="col-span-2 flex min-w-0 items-center gap-2 text-sm">
+          <label className={FORM_ITEM_LABEL_CLASS}>Giới tính</label>
+          <div className="min-w-0 flex-1">
+            <div
+              role="radiogroup"
+              aria-label="Giới tính"
+              className="flex h-7 items-center gap-6"
+            >
+              {GENDER_OPTIONS.map((opt) => (
+                <PosRadio
+                  key={opt.value}
+                  name="gender"
+                  value={opt.value}
+                  label={opt.label}
+                  selected={
+                    (values.gender ?? CustomerGenderEnum.UNSPECIFIED) ===
+                    opt.value
+                  }
+                  onChange={() => onChange("gender", opt.value)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
 
-        <PosFormItem
-          label="Địa chỉ"
-          layout="horizontal"
-          alignTop
-          className="md:col-span-2"
-          labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              <PosSelect
-                value={provinces.find((o) => o.value === values.province) ?? null}
-                onChange={(item) => onChange("province", item.value)}
-                items={provinces}
-                itemKey={(o) => o.value}
-                renderItem={(o) => o.label}
+        <div className="flex min-w-0 items-start gap-2 text-sm md:col-span-2">
+          <label
+            className={`${FORM_ITEM_LABEL_CLASS} ${posFormItemLabelTopPad.md}`}
+          >
+            Địa chỉ
+          </label>
+          <div className="min-w-0 flex-1">
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <PosSelect
+                  value={
+                    provinces.find((o) => o.value === values.province) ?? null
+                  }
+                  onChange={(item) => onChange("province", item.value)}
+                  items={provinces}
+                  itemKey={(o) => o.value}
+                  renderItem={(o) => o.label}
+                  variant="underline"
+                  placeholder="Tỉnh/Thành phố"
+                  ariaLabel="Tỉnh/Thành phố"
+                />
+                <PosSelect
+                  value={
+                    districts.find((o) => o.value === values.district) ?? null
+                  }
+                  onChange={(item) => onChange("district", item.value)}
+                  items={districts}
+                  itemKey={(o) => o.value}
+                  renderItem={(o) => o.label}
+                  variant="underline"
+                  placeholder="Quận/huyện"
+                  ariaLabel="Quận/huyện"
+                />
+                <PosSelect
+                  value={wards.find((o) => o.value === values.ward) ?? null}
+                  onChange={(item) => onChange("ward", item.value)}
+                  items={wards}
+                  itemKey={(o) => o.value}
+                  renderItem={(o) => o.label}
+                  variant="underline"
+                  placeholder="Xã/phường"
+                  ariaLabel="Xã/phường"
+                />
+              </div>
+              <PosTextInput
                 variant="underline"
-                placeholder="Tỉnh/Thành phố"
-                ariaLabel="Tỉnh/Thành phố"
-              />
-              <PosSelect
-                value={districts.find((o) => o.value === values.district) ?? null}
-                onChange={(item) => onChange("district", item.value)}
-                items={districts}
-                itemKey={(o) => o.value}
-                renderItem={(o) => o.label}
-                variant="underline"
-                placeholder="Quận/huyện"
-                ariaLabel="Quận/huyện"
-              />
-              <PosSelect
-                value={wards.find((o) => o.value === values.ward) ?? null}
-                onChange={(item) => onChange("ward", item.value)}
-                items={wards}
-                itemKey={(o) => o.value}
-                renderItem={(o) => o.label}
-                variant="underline"
-                placeholder="Xã/phường"
-                ariaLabel="Xã/phường"
+                value={values.addressLine ?? ""}
+                onChange={(v) => onChange("addressLine", v)}
+                placeholder="Số nhà, tên đường"
+                ariaLabel="Số nhà, tên đường"
               />
             </div>
-            <PosTextInput
-              variant="underline"
-              value={values.addressLine ?? ""}
-              onChange={(v) => onChange("addressLine", v)}
-              placeholder="Số nhà, tên đường"
-              ariaLabel="Số nhà, tên đường"
-            />
           </div>
-        </PosFormItem>
+        </div>
       </div>
     </>
   );

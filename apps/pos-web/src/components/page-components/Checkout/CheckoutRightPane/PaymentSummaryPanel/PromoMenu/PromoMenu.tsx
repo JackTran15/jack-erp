@@ -9,7 +9,7 @@ import {
 import { DiscountPointDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/DiscountPointDialog";
 import { VoucherDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/VoucherDialog";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   computeVoucherLineSource,

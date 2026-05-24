@@ -1,7 +1,7 @@
 import { cn } from "@erp/ui";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import type { DraftInvoice } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
 
 interface DraftRowProps {
   draft: DraftInvoice;

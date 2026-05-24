@@ -1,6 +1,6 @@
 import type { InvoicePrinter } from "./InvoicePrinter";
 import { renderInvoiceHtml } from "./renderInvoiceHtml";
-import type { InvoicePayload } from "./types";
+import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 
 /**
  * Default printer: builds the receipt HTML and pipes it through a hidden

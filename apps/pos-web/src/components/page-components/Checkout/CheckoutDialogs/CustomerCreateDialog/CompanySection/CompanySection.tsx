@@ -1,7 +1,6 @@
-import { PosFormItem } from "@erp/pos/components/common/PosFormItem/PosFormItem";
 import { PosSectionBanner } from "@erp/pos/components/common/PosSectionBanner/PosSectionBanner";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
-import type { CustomerFormValues } from "@erp/pos/lib/page-libs/checkout/customerCreate.types";
+import type { CustomerFormValues } from "@erp/pos/interfaces/customer-dialog.interface";
 
 const FORM_ITEM_LABEL_CLASS = "w-[140px] shrink-0 text-sm text-gray-700";
 
@@ -26,33 +25,25 @@ export function CompanySection({ values, ids, onChange }: CompanySectionProps) {
       <PosSectionBanner>Thông tin công ty</PosSectionBanner>
 
       <div className="grid grid-cols-1 gap-y-5 gap-x-8 pb-6 md:grid-cols-2">
-        <PosFormItem
+        <PosTextInput
+          id={ids.company}
           label="Công ty"
-          htmlFor={ids.company}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.company}
-            variant="underline"
-            value={values.companyName ?? ""}
-            onChange={(v) => onChange("companyName", v)}
-          />
-        </PosFormItem>
+          variant="underline"
+          value={values.companyName ?? ""}
+          onChange={(v) => onChange("companyName", v)}
+        />
 
-        <PosFormItem
+        <PosTextInput
+          id={ids.taxCode}
           label="Mã số thuế"
-          htmlFor={ids.taxCode}
-          layout="horizontal"
+          fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
-        >
-          <PosTextInput
-            id={ids.taxCode}
-            variant="underline"
-            value={values.taxCode ?? ""}
-            onChange={(v) => onChange("taxCode", v)}
-          />
-        </PosFormItem>
+          variant="underline"
+          value={values.taxCode ?? ""}
+          onChange={(v) => onChange("taxCode", v)}
+        />
       </div>
     </>
   );

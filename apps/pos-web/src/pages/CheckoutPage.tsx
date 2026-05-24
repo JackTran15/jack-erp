@@ -2,25 +2,14 @@ import { CheckoutAnnouncer } from "@erp/pos/components/page-components/Checkout/
 import { CheckoutDialogs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CheckoutDialogs";
 import { CheckoutLeftPane } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/CheckoutLeftPane";
 import { CheckoutRightPane } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/CheckoutRightPane";
-import { useCheckoutActiveSessionWatcher } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-active-session-watcher";
-import { useCheckoutCatalogLoader } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog-loader";
+import { useCheckoutBootstrap } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-bootstrap";
 import { useCheckoutFocusManager } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-focus-manager";
 import { useCheckoutHotkeys } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-hotkeys";
-import { useEnsureSessionHydrated } from "@erp/pos/hooks/page-hooks/checkout/use-ensure-session-hydrated";
-import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 
-/**
- * Composer thuần: gọi orchestrator hooks (hydrate, session-watcher, catalog
- * loader, hotkeys) rồi render 4 component với refs forwardRef cho focus
- * management. Mọi state/handler do component con tự consume stores+hooks.
- */
 export function CheckoutPage() {
-  const branchId = usePosBranchStore((s) => s.branchId)!;
   const focus = useCheckoutFocusManager();
 
-  useEnsureSessionHydrated();
-  useCheckoutActiveSessionWatcher();
-  useCheckoutCatalogLoader(branchId);
+  useCheckoutBootstrap();
   useCheckoutHotkeys({ refs: focus.refs });
 
   return (
@@ -28,7 +17,6 @@ export function CheckoutPage() {
       <CheckoutAnnouncer />
       <div className="flex flex-1 overflow-hidden">
         <CheckoutLeftPane
-          branchId={branchId}
           productSearchRef={focus.refs.productSearch}
           salespersonRef={focus.refs.salesperson}
           priceBookRef={focus.refs.priceBook}

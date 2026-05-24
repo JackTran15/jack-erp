@@ -1,6 +1,6 @@
 import { formatVnd } from "@erp/ui";
 import { StatsSection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/OverviewTab/CustomerStatsPanel/StatsSection/StatsSection";
-import type { CustomerStatsData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { CustomerStatsData } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface CustomerStatsPanelProps {
   stats?: CustomerStatsData;

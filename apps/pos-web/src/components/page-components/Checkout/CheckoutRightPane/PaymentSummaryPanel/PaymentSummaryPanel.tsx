@@ -9,7 +9,6 @@ import type { CustomerActionItem } from "@erp/pos/components/common/PosCustomerA
 import { PromoMenu } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/PromoMenu";
 import { QuickExchangeBadges } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/QuickExchangeBadges/QuickExchangeBadges";
 import { DepositDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DepositDialog/DepositDialog";
-import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailDialog";
 import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/PromotionSelectionModal/PromotionSelectionModal";
 import { CheckoutActionsSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/CheckoutActionsSection";
 import { CustomerSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/CustomerSection";
@@ -22,7 +21,6 @@ import {
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
 
 export interface PaymentSummaryPanelProps {
   customerSearchRef: RefObject<HTMLInputElement | null>;
@@ -30,11 +28,6 @@ export interface PaymentSummaryPanelProps {
   addCustomerButtonRef: RefObject<HTMLButtonElement | null>;
 }
 
-/**
- * Right-hand sticky panel containing the entire payment / customer summary.
- * Concrete cho CustomerRow — đọc state/handlers từ stores+hooks. Props chỉ
- * còn 3 refs phục vụ focus management (F4 / F12 / return-focus sau dialog).
- */
 export function PaymentSummaryPanel({
   customerSearchRef,
   paymentAmountRef,
@@ -51,7 +44,6 @@ export function PaymentSummaryPanel({
 
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [draftDepositAmount, setDraftDepositAmount] = useState(0);
   const [draftDepositMethod, setDraftDepositMethod] = useState<PaymentMethod>(
@@ -139,15 +131,6 @@ export function PaymentSummaryPanel({
       </div>
 
       <CheckoutActionsSection />
-
-      {selectedCustomer ? (
-        <CustomerDetailDialog
-          open={detailOpen}
-          onClose={() => setDetailOpen(false)}
-          customerId={selectedCustomer.id}
-          fallbackName={formatCustomerDisplay(selectedCustomer)}
-        />
-      ) : null}
 
       <DepositDialog
         open={depositDialogOpen}

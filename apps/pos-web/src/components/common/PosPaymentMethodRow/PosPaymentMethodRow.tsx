@@ -1,18 +1,26 @@
 import { forwardRef } from "react";
-import { cn, formatVnd } from "@erp/ui";
+import { cn } from "@erp/ui";
 import { CloseIcon, PlusCircleIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { PaymentMethod, PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 
 /**
  * One payment-method line: the user can split a sale across N methods, each
  * line carrying its own selected method + amount.
+ *
+ * `cashAccountId` (UUID) là COA account.id của tài khoản tiền (CASH 111x /
+ * BANK 112x) — dùng trực tiếp làm `payments[].accountId` khi submit checkout
+ * (không cần lookup thêm). `method` giữ lại cho receipt display + legacy
+ * code (draft snapshot, primary method label).
  */
 export interface PaymentLine {
   /** Stable id (UUID) so React keys + remove handlers don't depend on index. */
   id: string;
   method: PaymentMethod;
+  /** COA account.id (CASH 111x / BANK 112x) — null khi chưa có dữ liệu API. */
+  cashAccountId: string | null;
   amount: number;
 }
 
@@ -23,8 +31,9 @@ export interface PaymentLine {
 export function createPaymentLine(
   method: PaymentMethod,
   amount = 0,
+  cashAccountId: string | null = null,
 ): PaymentLine {
-  return { id: crypto.randomUUID(), method, amount };
+  return { id: crypto.randomUUID(), method, cashAccountId, amount };
 }
 
 // ---------------------------------------------------------------------------
@@ -33,33 +42,19 @@ export function createPaymentLine(
 
 export interface PosPaymentMethodRowProps {
   line: PaymentLine;
-  /** All available payment methods (used to render the dropdown). */
-  methods: readonly PaymentMethodOption[];
-  /**
-   * Leading-icon variant. The first line in a list uses `add` (green plus
-   * that appends a new row); subsequent lines use `remove` (red × that
-   * deletes that row).
-   */
+  accounts: readonly AccountRow[];
   variant: "add" | "remove";
-  /** Lock the amount input. */
   amountReadOnly?: boolean;
-  /**
-   * Methods already chosen by other lines — disabled in this row's dropdown
-   * to prevent duplicates. The row's own current method is always enabled.
-   */
-  unavailableMethods?: ReadonlyArray<PaymentMethod>;
-
-  onChangeMethod: (method: PaymentMethod) => void;
+  unavailableAccountIds?: ReadonlyArray<string>;
+  onChangeAccount: (account: AccountRow) => void;
   onChangeAmount: (amount: number) => void;
-  /** Triggered by the leading `+` icon — only when `variant="add"`. */
   onAdd?: () => void;
-  /** Triggered by the leading `×` icon — only when `variant="remove"`. */
   onRemove?: () => void;
 }
 
 /**
  * One payment-method line: leading action icon (+ to add another row, × to
- * remove this row) + select + editable amount input.
+ * remove this row) + select (cash accounts) + editable amount input.
  */
 export const PosPaymentMethodRow = forwardRef<
   HTMLInputElement,
@@ -67,11 +62,11 @@ export const PosPaymentMethodRow = forwardRef<
 >(function PosPaymentMethodRow(
   {
     line,
-    methods,
+    accounts,
     variant,
     amountReadOnly,
-    unavailableMethods,
-    onChangeMethod,
+    unavailableAccountIds,
+    onChangeAccount,
     onChangeAmount,
     onAdd,
     onRemove,
@@ -79,7 +74,9 @@ export const PosPaymentMethodRow = forwardRef<
   amountInputRef,
 ) {
   const isAdd = variant === "add";
-  const unavailable = new Set(unavailableMethods ?? []);
+  const unavailable = new Set(unavailableAccountIds ?? []);
+  const selected =
+    accounts.find((a) => a.id === line.cashAccountId) ?? null;
 
   return (
     <div className="grid grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
@@ -102,15 +99,18 @@ export const PosPaymentMethodRow = forwardRef<
 
       <div className="min-w-0">
         <PosSelect
-          value={methods.find((m) => m.value === line.method) ?? null}
-          onChange={(item) => onChangeMethod(item.value)}
+          value={selected}
+          onChange={(item) => onChangeAccount(item)}
           ariaLabel="Phương thức thanh toán"
           variant="underline"
-          items={methods}
-          itemKey={(m) => m.value}
-          renderItem={(m) => m.label}
-          isItemDisabled={(m) =>
-            m.value !== line.method && unavailable.has(m.value)
+          items={accounts}
+          itemKey={(a) => a.id}
+          renderItem={(a) => a.name}
+          isItemDisabled={(a) =>
+            a.id !== line.cashAccountId && unavailable.has(a.id)
+          }
+          placeholder={
+            accounts.length === 0 ? "Chưa có tài khoản" : "Chọn tài khoản"
           }
           className="w-full"
           menuClassName="w-[280px]"
@@ -124,7 +124,7 @@ export const PosPaymentMethodRow = forwardRef<
         value={line.amount}
         onChange={onChangeAmount}
         readOnly={amountReadOnly}
-        ariaLabel={`Số tiền ${line.method}`}
+        ariaLabel={`Số tiền ${selected?.name ?? line.method}`}
         placeholder="0"
       />
     </div>
@@ -137,7 +137,7 @@ export const PosPaymentMethodRow = forwardRef<
 
 export interface PosPaymentMethodListProps {
   lines: PaymentLine[];
-  methods: readonly PaymentMethodOption[];
+  accounts: readonly AccountRow[];
   /** Single source of truth — host owns the array. */
   onChange: (lines: PaymentLine[]) => void;
   /**
@@ -151,29 +151,36 @@ export interface PosPaymentMethodListProps {
 
 /**
  * Stack of `PosPaymentMethodRow`s. The first row's leading icon adds a new line;
- * subsequent rows show a remove (`×`) button. Methods already in use are
- * disabled inside other rows' dropdowns, so users can't pick the same one
- * twice. When the available methods are exhausted the add button is hidden.
+ * subsequent rows show a remove (`×`) button. Cash accounts đã chọn ở dòng khác
+ * sẽ bị disable để tránh trùng. Khi hết tài khoản khả dụng, nút add ẩn đi.
  */
 export function PosPaymentMethodList({
   lines,
-  methods,
+  accounts,
   onChange,
   amountReadOnly,
   amountInputRef,
 }: PosPaymentMethodListProps) {
-  const used = new Set(lines.map((l) => l.method));
+  const used = new Set(
+    lines.map((l) => l.cashAccountId).filter((id): id is string => Boolean(id)),
+  );
 
-  const handleChangeMethod = (id: string, next: PaymentMethod) => {
-    onChange(lines.map((l) => (l.id === id ? { ...l, method: next } : l)));
+  const handleChangeAccount = (id: string, next: AccountRow) => {
+    onChange(
+      lines.map((l) =>
+        l.id === id ? { ...l, cashAccountId: next.id } : l,
+      ),
+    );
   };
   const handleChangeAmount = (id: string, next: number) => {
     onChange(lines.map((l) => (l.id === id ? { ...l, amount: next } : l)));
   };
   const handleAdd = () => {
-    const free = methods.find((m) => !used.has(m.value));
+    const free = accounts.find((a) => !used.has(a.id));
     if (!free) return;
-    onChange([...lines, createPaymentLine(free.value)]);
+    const seedMethod = lines[0]?.method;
+    if (!seedMethod) return;
+    onChange([...lines, createPaymentLine(seedMethod, 0, free.id)]);
   };
   const handleRemove = (id: string) => {
     if (lines.length <= 1) return;
@@ -187,14 +194,14 @@ export function PosPaymentMethodList({
           key={line.id}
           ref={idx === 0 ? amountInputRef : undefined}
           line={line}
-          methods={methods}
+          accounts={accounts}
           variant={idx === 0 ? "add" : "remove"}
-          unavailableMethods={Array.from(used)}
+          unavailableAccountIds={Array.from(used)}
           amountReadOnly={amountReadOnly?.(line, idx)}
-          onChangeMethod={(m) => handleChangeMethod(line.id, m)}
+          onChangeAccount={(a) => handleChangeAccount(line.id, a)}
           onChangeAmount={(amt) => handleChangeAmount(line.id, amt)}
           onAdd={
-            idx === 0 && used.size < methods.length ? handleAdd : undefined
+            idx === 0 && used.size < accounts.length ? handleAdd : undefined
           }
           onRemove={idx > 0 ? () => handleRemove(line.id) : undefined}
         />

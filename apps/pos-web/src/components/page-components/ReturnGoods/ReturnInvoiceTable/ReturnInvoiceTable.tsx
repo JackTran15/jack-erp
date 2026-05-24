@@ -12,7 +12,8 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { ReturnInvoiceColumnKey } from "@erp/pos/constants/return-goods.constant";
 import { sumInvoiceTotals } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
-import type { ReturnInvoiceFilters, ReturnInvoiceRow } from "@erp/pos/lib/page-libs/return-goods/return-goods.types";
+import type { ReturnInvoiceFilters } from "@erp/pos/dtos/return-goods.dto";
+import type { ReturnInvoiceRow } from "@erp/pos/interfaces/return-goods.interface";
 
 export interface ReturnInvoiceTableProps {
   rows: ReadonlyArray<ReturnInvoiceRow>;

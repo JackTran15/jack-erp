@@ -1,4 +1,4 @@
-import type { ReturnInvoiceRow } from "./return-goods.types";
+import type { ReturnInvoiceRow } from "@erp/pos/interfaces/return-goods.interface";
 
 /**
  * Static seed data used while the feature is mocked. Real wiring will replace

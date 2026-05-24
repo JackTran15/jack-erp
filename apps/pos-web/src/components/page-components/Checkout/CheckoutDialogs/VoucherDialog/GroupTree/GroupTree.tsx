@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { useMemo } from "react";
-import type { VoucherSelectableGroup } from "@erp/pos/lib/page-libs/checkout/voucher.types";
+import type { VoucherSelectableGroup } from "@erp/pos/interfaces/voucher.interface";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { GroupNode } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/GroupTree/GroupNode/GroupNode";
 

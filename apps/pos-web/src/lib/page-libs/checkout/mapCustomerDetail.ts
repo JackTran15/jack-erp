@@ -1,5 +1,5 @@
-import type { CustomerDetail } from "@erp/pos/lib/common/customerApi";
-import type { CustomerDetailData } from "./customerDetail.types";
+import type { CustomerDetail } from "@erp/pos/interfaces/customer.interface";
+import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface MapCustomerDetailLookups {
   /** Resolves `groupId` to a human-readable group name. */

@@ -77,7 +77,7 @@ export function PosUserMenu({ name, initials, onLogout }: PosUserMenuProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
-          "inline-flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-gray-700 transition-colors hover:bg-gray-100",
+          "inline-flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-gray-700 transition-colors hover:bg-gray-100 flex-shrink-0",
           open && "bg-gray-100",
         )}
       >

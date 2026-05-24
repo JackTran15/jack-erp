@@ -1,5 +1,5 @@
 import { RefreshIcon, ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import type { CustomerDetailData } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface MembershipCardProps {
   data: CustomerDetailData;

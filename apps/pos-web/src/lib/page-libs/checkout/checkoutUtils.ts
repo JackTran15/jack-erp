@@ -2,12 +2,24 @@ import type { PromoMenuOption } from "@erp/pos/constants/checkout.constant";
 import type {
   CartLine,
   CashSuggestion,
-  PaymentMethod,
   PaymentMethodOption,
-} from "./checkout.types";
+} from "@erp/pos/interfaces/checkout.interface";
+import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
 import { PromoMenuOptionEnum } from "@erp/pos/constants/checkout.constant";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+
+/** Normalize persisted / loose string into {@link CheckoutVariantEnum}. */
+export function coerceCheckoutVariant(raw: unknown): CheckoutVariantEnum {
+  if (raw === CheckoutVariantEnum.QUICK_EXCHANGE || raw === "quick_exchange") {
+    return CheckoutVariantEnum.QUICK_EXCHANGE;
+  }
+  if (raw === CheckoutVariantEnum.INVOICE_RETURN || raw === "invoice_return") {
+    return CheckoutVariantEnum.INVOICE_RETURN;
+  }
+  return CheckoutVariantEnum.SALE;
+}
 
 export const qtyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 2,

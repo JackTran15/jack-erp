@@ -2,17 +2,14 @@ import { useCallback, useMemo } from "react";
 import {
   type PaymentLine,
 } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import type { CashSuggestion } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CashSuggestion } from "@erp/pos/interfaces/checkout.interface";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { buildSuggestions } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import {
-  derivePaymentDisplay,
-  settlementAbsFromGrand,
-} from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -98,29 +95,22 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     (s) => s.handlePickSuggestion,
   );
 
-  const settlementGrandTotal = grandTotal - deposit;
-  const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
-  const isRefundFlow = settlementGrandTotal < 0;
-
-  const totalPaid = useMemo(
-    () => paymentLines.reduce((sum, l) => sum + l.amount, 0),
-    [paymentLines],
+  const {
+    settlementGrandTotal,
+    settlementAbs,
+    totalPaid,
+    changeAmount,
+    shortageAmount,
+    debtAmount,
+  } = useMemo(
+    () =>
+      deriveSettlement({ grandTotal, deposit, paymentLines, keepChange, debt }),
+    [grandTotal, deposit, paymentLines, keepChange, debt],
   );
 
+  const isRefundFlow = settlementGrandTotal < 0;
   const rawChangeAmount = Math.max(0, totalPaid - settlementAbs);
   const rawShortageAmount = Math.max(0, settlementAbs - totalPaid);
-
-  const { changeAmount, shortageAmount, debtAmount } = useMemo(
-    () =>
-      derivePaymentDisplay({
-        grandTotal: settlementGrandTotal,
-        totalPaid,
-        keepChange,
-        debt,
-      }),
-    [settlementGrandTotal, totalPaid, keepChange, debt],
-  );
-
   const isShort = settlementGrandTotal > 0 && rawShortageAmount > 0;
 
   const suggestions = useMemo(

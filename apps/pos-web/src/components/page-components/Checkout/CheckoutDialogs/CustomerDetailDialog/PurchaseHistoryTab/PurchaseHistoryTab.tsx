@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { formatVnd } from "@erp/ui";
 import { PosDataTable, type PosDataTableColumn } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
@@ -13,11 +13,23 @@ import {
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/StatusBadge/StatusBadge";
+import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
-import type { PurchaseHistoryEntry } from "@erp/pos/lib/page-libs/checkout/customerDetail.types";
+import {
+  matchesDateFilter,
+  matchesNumberFilter,
+  matchesTextFilter,
+} from "@erp/pos/lib/common/columnFilter";
+import type { ColumnFilterState } from "@erp/pos/interfaces/column-filter.interface";
+import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface PurchaseHistoryTabProps {
   rows: PurchaseHistoryEntry[];
+  /** Hiển thị "Đang tải…" thay cho empty-state trong lúc fetch lịch sử. */
+  isLoading?: boolean;
+  /** Tên + SĐT khách (hiển thị trong biên lai chi tiết). */
+  customerName?: string;
+  customerPhone?: string | null;
 }
 
 const STATUS_FILTER_TO_STATUS: Record<
@@ -29,17 +41,52 @@ const STATUS_FILTER_TO_STATUS: Record<
   [PurchaseHistoryStatusFilterEnum.DEBT]: PurchaseHistoryStatusEnum.DEBT,
 };
 
+/** Per-column filter state for the text/number/date columns (status uses its own select). */
+interface PurchaseHistoryColumnFilters {
+  invoiceDate: ColumnFilterState;
+  invoiceNumber: ColumnFilterState;
+  storeName: ColumnFilterState;
+  totalAmount: ColumnFilterState;
+  note: ColumnFilterState;
+}
+
+/** Default operators mirror each cell's `leadingOperator`; values start empty. */
+const DEFAULT_COLUMN_FILTERS: PurchaseHistoryColumnFilters = {
+  invoiceDate: { operator: FilterOperatorEnum.LESS_THAN_OR_EQUAL, value: "" },
+  invoiceNumber: { operator: FilterOperatorEnum.CONTAINS, value: "" },
+  storeName: { operator: FilterOperatorEnum.EQUALS, value: "" },
+  totalAmount: { operator: FilterOperatorEnum.LESS_THAN_OR_EQUAL, value: "" },
+  note: { operator: FilterOperatorEnum.CONTAINS, value: "" },
+};
+
 /**
  * "Lịch sử mua hàng" tab — data table with header + filter row + body +
- * pagination + grand-total footer. Filters are visual placeholders for now;
- * wire `onFilterChange` once a real query layer exists.
+ * pagination + grand-total footer. Per-column filters run client-side over the
+ * already-loaded rows: text columns use CONTAINS/EQUALS/STARTS_WITH/…, the date
+ * column parses `dd/MM/yyyy`, and amounts use `= < ≤ > ≥` (see `columnFilter.ts`).
  */
-export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
+export function PurchaseHistoryTab({
+  rows,
+  isLoading,
+  customerName,
+  customerPhone,
+}: PurchaseHistoryTabProps) {
   const [statusFilter, setStatusFilter] =
     useState<PurchaseHistoryStatusFilterEnum>(
       PurchaseHistoryStatusFilterEnum.ALL,
     );
+  const [columnFilters, setColumnFilters] =
+    useState<PurchaseHistoryColumnFilters>(DEFAULT_COLUMN_FILTERS);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
+    null,
+  );
   const selectedStatus = STATUS_FILTER_TO_STATUS[statusFilter];
+
+  const updateFilter = useCallback(
+    (key: keyof PurchaseHistoryColumnFilters, patch: Partial<ColumnFilterState>) =>
+      setColumnFilters((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } })),
+    [],
+  );
 
   const statusOptions = useMemo(
     () => [
@@ -55,10 +102,16 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
 
   const filtered = useMemo(
     () =>
-      selectedStatus === null
-        ? rows
-        : rows.filter((r) => r.status === selectedStatus),
-    [rows, selectedStatus],
+      rows.filter(
+        (r) =>
+          (selectedStatus === null || r.status === selectedStatus) &&
+          matchesDateFilter(r.invoiceDate, columnFilters.invoiceDate) &&
+          matchesTextFilter(r.invoiceNumber, columnFilters.invoiceNumber) &&
+          matchesTextFilter(r.storeName, columnFilters.storeName) &&
+          matchesNumberFilter(r.totalAmount, columnFilters.totalAmount) &&
+          matchesTextFilter(r.note ?? "", columnFilters.note),
+      ),
+    [rows, selectedStatus, columnFilters],
   );
 
   const grandTotal = filtered.reduce((s, r) => s + r.totalAmount, 0);
@@ -72,7 +125,11 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         render: (row) => formatViDateTime(row.invoiceDate),
         filterRender: (
           <PosDataTableFilterCell
-            placeholder=""
+            placeholder="dd/MM/yyyy"
+            value={columnFilters.invoiceDate.value}
+            onChange={(next) => updateFilter("invoiceDate", { value: next })}
+            operator={columnFilters.invoiceDate.operator}
+            onOperatorChange={(op) => updateFilter("invoiceDate", { operator: op })}
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
           />
@@ -82,13 +139,23 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         key: "invoiceNumber",
         title: "Số hóa đơn",
         render: (row) => (
-          <span className="font-medium text-[#5C6BC0]">
+          <button
+            type="button"
+            onClick={() => setSelectedInvoiceId(row.id)}
+            className="font-medium text-[#5C6BC0] hover:underline focus:outline-none focus-visible:underline"
+          >
             {row.invoiceNumber}
-          </span>
+          </button>
         ),
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.invoiceNumber.value}
+            onChange={(next) => updateFilter("invoiceNumber", { value: next })}
+            operator={columnFilters.invoiceNumber.operator}
+            onOperatorChange={(op) =>
+              updateFilter("invoiceNumber", { operator: op })
+            }
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
           />
@@ -101,6 +168,10 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.storeName.value}
+            onChange={(next) => updateFilter("storeName", { value: next })}
+            operator={columnFilters.storeName.operator}
+            onOperatorChange={(op) => updateFilter("storeName", { operator: op })}
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.EQUALS}
           />
@@ -133,6 +204,12 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
           <PosDataTableFilterCell
             placeholder=""
             align="right"
+            value={columnFilters.totalAmount.value}
+            onChange={(next) => updateFilter("totalAmount", { value: next })}
+            operator={columnFilters.totalAmount.operator}
+            onOperatorChange={(op) =>
+              updateFilter("totalAmount", { operator: op })
+            }
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
           />
@@ -145,42 +222,56 @@ export function PurchaseHistoryTab({ rows }: PurchaseHistoryTabProps) {
         filterRender: (
           <PosDataTableFilterCell
             placeholder=""
+            value={columnFilters.note.value}
+            onChange={(next) => updateFilter("note", { value: next })}
+            operator={columnFilters.note.operator}
+            onOperatorChange={(op) => updateFilter("note", { operator: op })}
             operatorType={FilterOperatorTypeEnum.TEXT}
             leadingOperator={FilterOperatorEnum.CONTAINS}
           />
         ),
       },
     ],
-    [statusFilter],
+    [statusFilter, statusOptions, columnFilters, updateFilter],
   );
 
   return (
-    <div className="flex flex-col">
-      <div className="max-h-[360px] overflow-auto border border-gray-200">
-        <PosDataTable
-          columns={columns}
-          dataSource={filtered}
-          rowKey={(row) => row.id}
-          emptyText="Chưa có hóa đơn nào."
-          summaryRow={
-            filtered.length > 0 ? (
-              <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
-                <td colSpan={4} className="px-3">
-                  Tổng hóa đơn: {filtered.length}
-                </td>
-                <td className="px-3 text-right">{formatVnd(grandTotal)}</td>
-                <td />
-              </tr>
-            ) : null
-          }
+    <>
+      <div className="flex flex-col">
+        <div className="max-h-[360px] overflow-auto border border-gray-200">
+          <PosDataTable
+            columns={columns}
+            dataSource={filtered}
+            rowKey={(row) => row.id}
+            emptyText={isLoading ? "Đang tải…" : "Chưa có hóa đơn nào."}
+            summaryRow={
+              filtered.length > 0 ? (
+                <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
+                  <td colSpan={4} className="px-3">
+                    Tổng hóa đơn: {filtered.length}
+                  </td>
+                  <td className="px-3 text-right">{formatVnd(grandTotal)}</td>
+                  <td />
+                </tr>
+              ) : null
+            }
+          />
+        </div>
+        <PosPaginationBar
+          page={1}
+          totalPages={1}
+          pageSize={100}
+          total={filtered.length}
         />
       </div>
-      <PosPaginationBar
-        page={1}
-        totalPages={1}
-        pageSize={100}
-        total={filtered.length}
+
+      <InvoiceReceiptDialog
+        open={selectedInvoiceId !== null}
+        invoiceId={selectedInvoiceId}
+        onClose={() => setSelectedInvoiceId(null)}
+        customerName={customerName}
+        customerPhone={customerPhone}
       />
-    </div>
+    </>
   );
 }

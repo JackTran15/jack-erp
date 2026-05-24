@@ -2,9 +2,9 @@ import { useCallback } from "react";
 
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
-import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 import { locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -31,7 +31,7 @@ export interface UseCheckoutCartActionsResult {
 export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
   const { addProduct, handleCatalogSelect: handleCatalogSelectFromCart } =
     useCheckoutSessionCart();
-  const { filteredProducts } = useCheckoutCatalog();
+  const { filteredProducts, catalog } = useCheckoutCatalog();
 
   const addProductByItem = useCallback(
     (product: PosCatalogLine, qty = 1) => {
@@ -78,13 +78,12 @@ export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
 
   const addProductByCatalogCard = useCallback(
     (product: CatalogProduct) => {
-      const catalog = usePosCheckoutCatalogStore.getState().catalog;
       const lineId = handleCatalogSelectFromCart(product, catalog);
       if (lineId) {
         usePosCheckoutUiStore.getState().setPendingQtyFocusLineId(lineId);
       }
     },
-    [handleCatalogSelectFromCart],
+    [handleCatalogSelectFromCart, catalog],
   );
 
   const commitQty = useCallback(() => {

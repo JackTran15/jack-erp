@@ -39,7 +39,7 @@ export function posFormUnderlineShadow(
   return "shadow-[inset_0_-1px_0_0_#E5E7EB] focus-within:shadow-[inset_0_-2px_0_0_#5B5BD6]";
 }
 
-/** Horizontal {@link PosFormItem} label offset when `alignTop` matches control height. */
+/** Horizontal label offset for `alignTop` label rows, matched to control height. */
 export const posFormItemLabelTopPad: Record<PosFormSize, string> = {
   sm: "pt-0.5",
   md: "pt-2",

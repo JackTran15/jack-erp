@@ -1,4 +1,4 @@
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   isFastStockTransferDraftCompleteForAdd,
   isFastStockTransferDraftCompleteForSave,
@@ -20,7 +20,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
-import { useTempWarehouseMutations } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-temp-warehouse-mutations";
+import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 
 export function useFastStockTransferActions() {
   const branchId = usePosBranchStore((s) => s.branchId);

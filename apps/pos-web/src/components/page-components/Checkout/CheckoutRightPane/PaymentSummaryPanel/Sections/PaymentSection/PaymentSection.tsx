@@ -1,7 +1,6 @@
-import type { RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 import { cn, formatVnd } from "@erp/ui";
 import { PosTextarea } from "@erp/pos/components/common/PosTextarea/PosTextarea";
-import { PAYMENT_METHODS } from "@erp/pos/constants/checkout.constant";
 import { DebtCheckRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/DebtCheckRow/DebtCheckRow";
 import { ForgiveShortageRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/ForgiveShortageRow/ForgiveShortageRow";
 import { KeepChangeRow } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/KeepChangeRow/KeepChangeRow";
@@ -11,19 +10,14 @@ import { QrPaymentButton } from "@erp/pos/components/page-components/Checkout/Ch
 import { LabelTagButton } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/LabelTagButton/LabelTagButton";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
+import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
-  /** Mở deposit dialog ở PaymentSummaryPanel level. */
   onDepositClick: () => void;
 }
 
-/**
- * Payment block: summary (total/deposit) → còn phải thu + payment method list →
- * trả lại khách → keep-change/forgive/debt rows → note + QR button. Đọc payment
- * raw + derived qua hook; quyết định row visibility dựa trên rawAmounts.
- */
 export function PaymentSection({
   paymentAmountRef,
   onDepositClick,
@@ -31,6 +25,7 @@ export function PaymentSection({
   const {
     deposit,
     grandTotal: total,
+    settlementAbs,
     paymentLines,
     handleChangePaymentLines,
     changeAmount,
@@ -42,6 +37,36 @@ export function PaymentSection({
     setNote,
   } = useCheckoutPayment();
   const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
+  const setFirstLineAmountAuto = usePosCheckoutPaymentStore(
+    (s) => s.setFirstLineAmountAuto,
+  );
+  const paymentAccountsQuery = usePaymentAccountsQuery();
+  const accounts = paymentAccountsQuery.accounts;
+
+  // Mặc định số tiền dòng thanh toán đầu = số tiền cần thanh toán; tự đồng bộ khi
+  // tổng đổi cho tới khi nhân viên tự nhập (store tự guard theo `firstAmountAuto`).
+  useEffect(() => {
+    setFirstLineAmountAuto(settlementAbs);
+  }, [settlementAbs, setFirstLineAmountAuto]);
+
+  useEffect(() => {
+    if (accounts.length === 0) return;
+    const used = new Set(
+      paymentLines
+        .map((l) => l.cashAccountId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    let mutated = false;
+    const next = paymentLines.map((line) => {
+      if (line.cashAccountId) return line;
+      const free = accounts.find((a) => !used.has(a.id));
+      if (!free) return line;
+      used.add(free.id);
+      mutated = true;
+      return { ...line, cashAccountId: free.id };
+    });
+    if (mutated) handleChangePaymentLines(next);
+  }, [accounts, paymentLines, handleChangePaymentLines]);
 
   const amountDue = Math.max(0, total - deposit);
   const isRefundFlow = total < 0;
@@ -75,7 +100,7 @@ export function PaymentSection({
           <div className="border-t border-gray-200 px-4">
             <PosPaymentMethodList
               lines={paymentLines}
-              methods={PAYMENT_METHODS}
+              accounts={accounts}
               onChange={handleChangePaymentLines}
               amountInputRef={paymentAmountRef}
             />
@@ -109,7 +134,7 @@ export function PaymentSection({
           <div className="border-t border-gray-200 px-4">
             <PosPaymentMethodList
               lines={paymentLines}
-              methods={PAYMENT_METHODS}
+              accounts={accounts}
               onChange={handleChangePaymentLines}
             />
           </div>

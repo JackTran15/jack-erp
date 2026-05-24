@@ -1,4 +1,4 @@
-import type { InvoicePayload } from "./types";
+import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 
 /**
  * Strategy interface for printing a receipt. Swap implementations to retarget

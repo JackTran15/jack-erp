@@ -2,8 +2,9 @@ import { useCallback } from "react";
 
 import type { PromoMenuOption } from "@erp/pos/constants/checkout.constant";
 import { promoOptionLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import type { PromotionItem } from "@erp/pos/lib/page-libs/checkout/promotion.types";
-import type { VoucherFormResult } from "@erp/pos/lib/page-libs/checkout/voucher.types";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
+import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
+import { usePosCheckoutPromotionStore } from "@erp/pos/stores/page-stores/checkout/checkout-promotion.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutPromotionResult {
@@ -19,8 +20,10 @@ export interface UseCheckoutPromotionResult {
  * `promotions` list ở Page là static `[]` nên không expose từ đây.
  */
 export function useCheckoutPromotion(): UseCheckoutPromotionResult {
-  const appliedPromotion = usePosCheckoutUiStore((s) => s.appliedPromotion);
-  const setAppliedPromotion = usePosCheckoutUiStore(
+  const appliedPromotion = usePosCheckoutPromotionStore(
+    (s) => s.appliedPromotion,
+  );
+  const setAppliedPromotion = usePosCheckoutPromotionStore(
     (s) => s.setAppliedPromotion,
   );
 

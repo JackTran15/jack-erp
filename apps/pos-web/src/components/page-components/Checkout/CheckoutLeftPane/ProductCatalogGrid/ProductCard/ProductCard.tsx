@@ -1,7 +1,7 @@
 import { ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PriceBadge } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCard/PriceBadge/PriceBadge";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
-import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 
 export interface ProductCardProps {
   product: CatalogProduct;

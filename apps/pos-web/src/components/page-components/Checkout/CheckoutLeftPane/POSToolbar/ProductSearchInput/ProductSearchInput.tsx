@@ -7,7 +7,7 @@ import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconB
 import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 

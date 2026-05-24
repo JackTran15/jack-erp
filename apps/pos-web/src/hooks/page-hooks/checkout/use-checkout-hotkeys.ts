@@ -1,8 +1,8 @@
 import type { RefObject } from "react";
 import { POS_HOTKEYS } from "@erp/pos/constants/hotkeys.constant";
 import { usePosHotkey } from "@erp/pos/hooks/common/use-pos-hotkey";
+import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutDraft } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-draft";
-import { useCheckoutFinalize } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-finalize";
 import {
   selectHasAnyCartLines,
   selectIsReturnExchangeInvoice,
@@ -25,7 +25,7 @@ export interface CheckoutHotkeyRefs {
  * F3 / F4 / F9 / F10 / F12 / Shift+F3 / Alt+N / Alt+B / Alt+1
  */
 export function useCheckoutHotkeys({ refs }: { refs: CheckoutHotkeyRefs }): void {
-  const { finalizeCheckoutAndPrint } = useCheckoutFinalize();
+  const { finalizeCheckoutAndPrint } = useCheckoutActions();
   const { saveDraft } = useCheckoutDraft();
 
   const addSession = usePosCheckoutSessionStore((s) => s.addSession);

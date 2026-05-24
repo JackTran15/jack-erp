@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   EMPTY_FAST_STOCK_TRANSFER_FILTERS,
   EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT,
@@ -9,7 +9,7 @@ import {
 import type {
   FastStockTransferFilters,
   FastStockTransferToolbarDraft,
-} from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+} from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import { TempWarehouseDirection } from "@erp/shared-interfaces";
 
 type Updater<T> = T | ((prev: T) => T);

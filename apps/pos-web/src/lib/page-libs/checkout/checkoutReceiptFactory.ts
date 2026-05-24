@@ -1,9 +1,9 @@
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import type { InvoicePayload } from "./printing/types";
+import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
 import type {
   CartLine,
   PaymentMethodOption,
-} from "./checkout.types";
+} from "@erp/pos/interfaces/checkout.interface";
 import { deriveInvoiceTotals } from "./checkoutSettlement";
 import { lineTotal, resolvePaymentMethodLabel } from "./checkoutUtils";
 

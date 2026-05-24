@@ -1,7 +1,7 @@
 import { PosDataTable } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { useFastStockTransferTableColumns } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-table-columns";
 import { useFastStockTransferData } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-data";
-import type { FastStockTransferTableRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferTableRow } from "@erp/pos/types/fast-stock-transfer.type";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
 
 export function FastStockTransferTable() {

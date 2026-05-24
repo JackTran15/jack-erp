@@ -1,8 +1,10 @@
 import { useCallback, useMemo } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import type { CatalogProduct } from "@erp/pos/lib/page-libs/checkout/checkout.types";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import { useCatalogQuery } from "@erp/pos/hooks/react-query/use-query-catalog";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 
 type Updater<T> = T | ((prev: T) => T);
@@ -17,6 +19,7 @@ interface UseCheckoutCatalogResult {
   catalog: PosCatalogLine[];
   catalogLoading: boolean;
   catalogError: string;
+  refetchCatalog: () => void;
   toolbar: ToolbarState;
   setToolbar: (value: Updater<ToolbarState>) => void;
   catalogQuery: string;
@@ -33,13 +36,25 @@ interface UseCheckoutCatalogResult {
 }
 
 /**
- * Zero-input adapter. Trigger fetch nằm ở `useCheckoutCatalogLoader(branchId)`
- * (Page gọi); adapter này chỉ đọc state + tính derived.
+ * Zero-input adapter. Dữ liệu catalog đến từ React Query (`useCatalogQuery`,
+ * tự fetch theo `branchId` lấy từ branch store, dedupe across callsites);
+ * toolbar / filter / collapse đọc từ catalog store. Phần derived giữ nguyên.
  */
 export function useCheckoutCatalog(): UseCheckoutCatalogResult {
-  const catalog = usePosCheckoutCatalogStore((s) => s.catalog);
-  const catalogLoading = usePosCheckoutCatalogStore((s) => s.catalogLoading);
-  const catalogError = usePosCheckoutCatalogStore((s) => s.catalogError);
+  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  const catalogQueryResult = useCatalogQuery(branchId);
+  const catalog = useMemo(
+    () => catalogQueryResult.data ?? [],
+    [catalogQueryResult.data],
+  );
+  const catalogLoading = catalogQueryResult.isLoading;
+  const catalogError = catalogQueryResult.error
+    ? `Không tải được tồn kho: ${catalogQueryResult.error.message}`
+    : "";
+  const refetchCatalog = useCallback(() => {
+    void catalogQueryResult.refetch();
+  }, [catalogQueryResult]);
+
   const toolbar = usePosCheckoutCatalogStore((s) => s.toolbar);
   const setToolbar = usePosCheckoutCatalogStore((s) => s.setToolbar);
   const catalogQuery = usePosCheckoutCatalogStore((s) => s.catalogQuery);
@@ -84,6 +99,7 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     catalog,
     catalogLoading,
     catalogError,
+    refetchCatalog,
     toolbar,
     setToolbar,
     catalogQuery,

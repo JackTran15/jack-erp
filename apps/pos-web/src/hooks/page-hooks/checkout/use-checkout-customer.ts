@@ -2,9 +2,13 @@ import { useCallback } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
   formatCustomerDisplay,
-  searchCustomers,
-  type CustomerRow,
-} from "@erp/pos/lib/common/customerApi";
+  phoneDigitsOnly,
+} from "@erp/pos/lib/common/customerUtils";
+import {
+  useCustomerListQuery,
+  useCustomerSearch,
+} from "@erp/pos/hooks/react-query/use-query-customer";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
@@ -43,11 +47,11 @@ export function useCheckoutCustomer() {
   const setCreateDefaultQuery = usePosCheckoutCustomerStore(
     (s) => s.setCreateDefaultQuery,
   );
-  const editCustomerOpen = usePosCheckoutCustomerStore(
-    (s) => s.editCustomerOpen,
+  const customerDetailOpen = usePosCheckoutCustomerStore(
+    (s) => s.customerDetailOpen,
   );
-  const setEditCustomerOpen = usePosCheckoutCustomerStore(
-    (s) => s.setEditCustomerOpen,
+  const setCustomerDetailOpen = usePosCheckoutCustomerStore(
+    (s) => s.setCustomerDetailOpen,
   );
   const pickCustomerAction = usePosCheckoutCustomerStore(
     (s) => s.pickCustomer,
@@ -56,12 +60,37 @@ export function useCheckoutCustomer() {
     (s) => s.clearCustomer,
   );
 
+  const { search } = useCustomerSearch();
+  // Prefetch một trang khách (50) ngay khi CustomerSection mount → click vào ô
+  // khách là hiện danh sách + lọc local tức thì, không cần gọi API mỗi lần gõ.
+  const customerListQuery = useCustomerListQuery({ pageSize: 50 });
+  const prefetched = customerListQuery.data?.data;
+
   const customerSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<CustomerRow>[]> => {
-      const res = await searchCustomers(q);
+      const list = prefetched ?? [];
+      const term = q.trim().toLowerCase();
+
+      // Chưa gõ gì (focus) → hiện danh sách prefetch.
+      if (!term) return list.slice(0, 8).map((c) => ({ item: c }));
+
+      // Lọc local theo tên hoặc SĐT trước khi gọi server.
+      const digits = phoneDigitsOnly(term);
+      const local = list.filter((c) => {
+        const nameHit = formatCustomerDisplay(c).toLowerCase().includes(term);
+        const phoneHit =
+          digits.length > 0 && c.phone
+            ? phoneDigitsOnly(c.phone).includes(digits)
+            : false;
+        return nameHit || phoneHit;
+      });
+      if (local.length > 0) return local.slice(0, 8).map((c) => ({ item: c }));
+
+      // Không khớp trong danh sách prefetch → fallback gọi API search.
+      const res = await search(q);
       return res.data.slice(0, 8).map((c) => ({ item: c }));
     },
-    [],
+    [prefetched, search],
   );
 
   const pickCustomer = useCallback(
@@ -86,7 +115,7 @@ export function useCheckoutCustomer() {
       setCustomerFieldError("");
       void (async () => {
         try {
-          const res = await searchCustomers(raw);
+          const res = await search(raw);
           const rows = res.data;
           if (rows.length === 1) {
             pickCustomer(rows[0]!);
@@ -105,6 +134,7 @@ export function useCheckoutCustomer() {
       return true;
     },
     [
+      search,
       pickCustomer,
       setCustomerFieldError,
       setCreateDefaultQuery,
@@ -122,9 +152,13 @@ export function useCheckoutCustomer() {
     setCreateCustomerOpen(true);
   }, [customerQuery, setCreateDefaultQuery, setCreateCustomerOpen]);
 
-  const handleEditCustomer = useCallback(() => {
-    setEditCustomerOpen(true);
-  }, [setEditCustomerOpen]);
+  const handleOpenCustomerDetail = useCallback(() => {
+    setCustomerDetailOpen(true);
+  }, [setCustomerDetailOpen]);
+
+  const closeCustomerDetail = useCallback(() => {
+    setCustomerDetailOpen(false);
+  }, [setCustomerDetailOpen]);
 
   // Dialog lifecycle handlers
   const closeCreateDialog = useCallback(() => {
@@ -141,16 +175,11 @@ export function useCheckoutCustomer() {
     [pickCustomer, setCreateCustomerOpen],
   );
 
-  const closeEditDialog = useCallback(() => {
-    setEditCustomerOpen(false);
-  }, [setEditCustomerOpen]);
-
   const handleCustomerSubmitted = useCallback(
     (c: CustomerRow) => {
-      setEditCustomerOpen(false);
       pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
     },
-    [pickCustomer, setEditCustomerOpen],
+    [pickCustomer],
   );
 
   return {
@@ -164,17 +193,17 @@ export function useCheckoutCustomer() {
     setCreateCustomerOpen,
     createDefaultQuery,
     setCreateDefaultQuery,
-    editCustomerOpen,
-    setEditCustomerOpen,
+    customerDetailOpen,
+    setCustomerDetailOpen,
     customerSearchAdapter,
     pickCustomer,
     handleCustomerSubmitQuery,
     handleClearCustomer,
     handleAddCustomer,
-    handleEditCustomer,
+    handleOpenCustomerDetail,
+    closeCustomerDetail,
     closeCreateDialog,
     handleCustomerCreated,
-    closeEditDialog,
     handleCustomerSubmitted,
   };
 }

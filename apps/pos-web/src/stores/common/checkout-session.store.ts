@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  type CartLine,
-  CheckoutVariantEnum,
-  coerceCheckoutVariant,
-  type DraftInvoice,
-  type DraftInvoicePayment,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type {
+  CartLine,
+  DraftInvoice,
+  DraftInvoicePayment,
+} from "@erp/pos/interfaces/checkout.interface";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
+import { coerceCheckoutVariant } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 import { getOversellSaleLines } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 
@@ -34,6 +35,11 @@ export interface InvoiceSession {
   activeCheckoutPane: CheckoutPane;
   selectedLinePurchaseId: string | null;
   selectedLineReturnId: string | null;
+  /**
+   * Khi tab được mở từ một draft đã lưu (restore), đây là id của draft đó.
+   * Lưu/thanh toán lại sẽ ghi đè (PATCH/checkout) chính draft này thay vì tạo mới.
+   */
+  sourceInvoiceId?: string;
 }
 
 function createSaleSession(id: string, label: string): InvoiceSession {
@@ -49,36 +55,26 @@ function createSaleSession(id: string, label: string): InvoiceSession {
   };
 }
 
-function reviveDraft(d: DraftInvoice): DraftInvoice {
-  return {
-    ...d,
-    createdAt:
-      d.createdAt instanceof Date
-        ? d.createdAt
-        : new Date(d.createdAt as unknown as string),
-    lines: d.lines.map((l) => ({ ...l })),
-    quickExchangePurchase: d.quickExchangePurchase?.map((l) => ({ ...l })),
-    quickExchangeReturn: d.quickExchangeReturn?.map((l) => ({ ...l })),
-    checkoutVariant:
-      d.checkoutVariant !== undefined
-        ? coerceCheckoutVariant(d.checkoutVariant)
-        : undefined,
-  };
-}
-
 interface PosCheckoutSessionState {
   version: number;
+  /**
+   * POS session id cố định cho terminal — dùng làm `session_id` khi tạo/liệt kê
+   * draft (`/invoices/drafts`). Tách khỏi id tab (`activeSessionId`) để danh sách
+   * HĐ lưu tạm + badge ổn định, không đổi khi chuyển tab / restore.
+   */
+  posSessionId: string;
   sessions: InvoiceSession[];
   activeSessionId: string;
-  draftInvoices: DraftInvoice[];
-  draftSeq: number;
   cashierDisplayName: string | null;
   draftsDialogOpen: boolean;
   pendingDraftPaymentLines: DraftInvoicePayment[] | null;
+  /** Khách của draft đang restore — áp lại sau khi đổi session (giống pendingDraftPaymentLines). */
+  pendingDraftCustomer: CustomerRow | null;
 
   setCashierDisplayName: (name: string | null) => void;
   setDraftsDialogOpen: (open: boolean) => void;
   setPendingDraftPaymentLines: (value: DraftInvoicePayment[] | null) => void;
+  setPendingDraftCustomer: (value: CustomerRow | null) => void;
   setActiveSessionId: (id: string) => void;
   setActiveCheckoutPane: (pane: CheckoutPane) => void;
   patchActiveSession: (partial: Partial<InvoiceSession>) => void;
@@ -102,10 +98,6 @@ interface PosCheckoutSessionState {
   /** New invoice tab with return lines from an existing sale invoice (`invoice_return`). */
   enterInvoiceReturnWithLines: (lines: CartLine[]) => void;
 
-  addDraft: (draft: DraftInvoice) => void;
-  removeDraft: (id: string) => void;
-  nextDraftSeq: () => number;
-
   /** Hydration helper — ensure at least one sale session exists. */
   ensureHydratedShape: () => void;
 
@@ -116,19 +108,20 @@ interface PosCheckoutSessionState {
   openDraftInNewSession: (draft: DraftInvoice) => void;
 }
 
-const initialId = `s-${crypto.randomUUID()}`;
+// const initialId = `s-${crypto.randomUUID()}`;
+const initialId = `section-1`;
 
 export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
   persist(
     (set, get) => ({
       version: STORE_VERSION,
+      posSessionId: crypto.randomUUID(),
       sessions: [createSaleSession(initialId, "Hóa đơn 1")],
       activeSessionId: initialId,
-      draftInvoices: [],
-      draftSeq: 1,
       cashierDisplayName: null,
       draftsDialogOpen: false,
       pendingDraftPaymentLines: null,
+      pendingDraftCustomer: null,
 
       setCashierDisplayName: (name) => set({ cashierDisplayName: name }),
 
@@ -136,6 +129,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
 
       setPendingDraftPaymentLines: (value) =>
         set({ pendingDraftPaymentLines: value }),
+
+      setPendingDraftCustomer: (value) =>
+        set({ pendingDraftCustomer: value }),
 
       setActiveSessionId: (id) => {
         const { sessions } = get();
@@ -261,22 +257,6 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         });
       },
 
-      addDraft: (draft) =>
-        set((s) => ({
-          draftInvoices: [draft, ...s.draftInvoices],
-        })),
-
-      removeDraft: (id) =>
-        set((s) => ({
-          draftInvoices: s.draftInvoices.filter((d) => d.id !== id),
-        })),
-
-      nextDraftSeq: () => {
-        const n = get().draftSeq;
-        set({ draftSeq: n + 1 });
-        return n;
-      },
-
       ensureHydratedShape: () => {
         const { sessions } = get();
         if (sessions.length === 0) {
@@ -293,10 +273,13 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       resetActiveSessionAfterCheckout: () => {
         const id = get().activeSessionId;
         set({
-          sessions: get().sessions.map((s) =>
+          sessions: get().sessions.map((s, idx) =>
             s.id === id
               ? {
                   ...s,
+                  // Tab từng gắn với 1 draft (restore) → trả tên về mặc định.
+                  label: s.sourceInvoiceId ? `Hóa đơn ${idx + 1}` : s.label,
+                  sourceInvoiceId: undefined,
                   checkoutVariant: CheckoutVariantEnum.SALE,
                   purchaseCart: [],
                   returnCart: [],
@@ -312,8 +295,8 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       openDraftInNewSession: (draft) => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
-        const nextIdx = sessions.length + 1;
-        const label = `Hóa đơn ${nextIdx}`;
+        // Tab restore mang tên = số hóa đơn của draft, và gắn với draft đó.
+        const label = draft.invoiceNumber;
         const variant = coerceCheckoutVariant(draft.checkoutVariant);
 
         let newSession: InvoiceSession;
@@ -332,6 +315,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
+            sourceInvoiceId: draft.id,
           };
         } else {
           newSession = {
@@ -346,14 +330,21 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
             activeCheckoutPane: CheckoutPane.RETURN,
             selectedLinePurchaseId: null,
             selectedLineReturnId: null,
+            sourceInvoiceId: draft.id,
           };
         }
 
         set({
           sessions: [...sessions, newSession],
           activeSessionId: newId,
-          draftInvoices: get().draftInvoices.filter((d) => d.id !== draft.id),
           pendingDraftPaymentLines: draft.payments ?? null,
+          pendingDraftCustomer: draft.customerId
+            ? {
+                id: draft.customerId,
+                name: draft.customerName ?? "",
+                phone: draft.customerPhone ?? null,
+              }
+            : null,
         });
       },
     }),
@@ -362,19 +353,15 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       version: STORE_VERSION,
       partialize: (s) => ({
         version: s.version,
+        posSessionId: s.posSessionId,
         sessions: s.sessions,
         activeSessionId: s.activeSessionId,
-        draftInvoices: s.draftInvoices,
-        draftSeq: s.draftSeq,
         cashierDisplayName: s.cashierDisplayName,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<PosCheckoutSessionState> | undefined;
         if (!p || typeof p !== "object")
           return current as PosCheckoutSessionState;
-        const drafts = (p.draftInvoices ?? []).map((d) =>
-          reviveDraft(d as DraftInvoice),
-        );
         const sessionsRaw = p.sessions ?? [];
         const sessions: InvoiceSession[] =
           sessionsRaw.length > 0
@@ -397,6 +384,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   ),
                   selectedLinePurchaseId: raw.selectedLinePurchaseId ?? null,
                   selectedLineReturnId: raw.selectedLineReturnId ?? null,
+                  sourceInvoiceId: raw.sourceInvoiceId,
                 };
               })
             : current.sessions;
@@ -405,10 +393,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         return {
           ...(current as PosCheckoutSessionState),
           version: typeof p.version === "number" ? p.version : STORE_VERSION,
+          posSessionId: p.posSessionId ?? current.posSessionId,
           sessions,
           activeSessionId: activeOk ? p.activeSessionId! : sessions[0]!.id,
-          draftInvoices: drafts,
-          draftSeq: typeof p.draftSeq === "number" ? p.draftSeq : 1,
           cashierDisplayName:
             p.cashierDisplayName !== undefined
               ? p.cashierDisplayName

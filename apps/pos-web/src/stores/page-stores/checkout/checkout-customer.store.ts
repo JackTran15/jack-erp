@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { CustomerRow } from "@erp/pos/lib/common/customerApi";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -13,14 +13,14 @@ interface PosCheckoutCustomerState {
   customerFieldError: string;
   createCustomerOpen: boolean;
   createDefaultQuery: string;
-  editCustomerOpen: boolean;
+  customerDetailOpen: boolean;
 
   setSelectedCustomer: (value: Updater<CustomerRow | null>) => void;
   setCustomerQuery: (value: Updater<string>) => void;
   setCustomerFieldError: (value: Updater<string>) => void;
   setCreateCustomerOpen: (value: Updater<boolean>) => void;
   setCreateDefaultQuery: (value: Updater<string>) => void;
-  setEditCustomerOpen: (value: Updater<boolean>) => void;
+  setCustomerDetailOpen: (value: Updater<boolean>) => void;
 
   pickCustomer: (customer: CustomerRow) => void;
   clearCustomer: () => void;
@@ -35,7 +35,7 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
     customerFieldError: "",
     createCustomerOpen: false,
     createDefaultQuery: "",
-    editCustomerOpen: false,
+    customerDetailOpen: false,
 
     setSelectedCustomer: (value) =>
       set((state) => ({
@@ -55,9 +55,9 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
       set((state) => ({
         createDefaultQuery: apply(state.createDefaultQuery, value),
       })),
-    setEditCustomerOpen: (value) =>
+    setCustomerDetailOpen: (value) =>
       set((state) => ({
-        editCustomerOpen: apply(state.editCustomerOpen, value),
+        customerDetailOpen: apply(state.customerDetailOpen, value),
       })),
 
     pickCustomer: (customer) =>
@@ -81,7 +81,7 @@ export const usePosCheckoutCustomerStore = create<PosCheckoutCustomerState>()(
         customerFieldError: "",
         createCustomerOpen: false,
         createDefaultQuery: "",
-        editCustomerOpen: false,
+        customerDetailOpen: false,
       }),
   }),
 );

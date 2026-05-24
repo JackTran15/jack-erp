@@ -44,3 +44,25 @@ export function formatViDateTime(
   const separatorValue = separator === "space" ? " " : " - ";
   return `${part(parts, "day")}/${part(parts, "month")}/${part(parts, "year")}${separatorValue}${part(parts, "hour")}:${part(parts, "minute")}`;
 }
+
+/**
+ * Parse a Vietnamese-style `dd/MM/yyyy` date string (tolerant of `d/M/yyyy`)
+ * into a local `Date` at midnight. Returns `null` for anything that is not a
+ * valid calendar date — callers treat `null` as "no filter".
+ */
+export function parseViDate(input: string): Date | null {
+  const match = input.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const d = new Date(year, month - 1, day);
+  if (
+    d.getFullYear() !== year ||
+    d.getMonth() !== month - 1 ||
+    d.getDate() !== day
+  ) {
+    return null;
+  }
+  return d;
+}

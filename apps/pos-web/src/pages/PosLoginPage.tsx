@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getStoredOrganizationId, isPosAuthenticated, loginPos } from "@erp/pos/lib/common/posAuth";
+import { authService } from "@erp/pos/services/auth.service";
 
 const DEFAULT_DEV_ORG_ID = "10000000-0000-4000-8000-000000000001";
 
@@ -23,7 +23,7 @@ export function PosLoginPage() {
   }, [location.state]);
 
   const [organizationId, setOrganizationId] = useState(
-    getStoredOrganizationId() ??
+    authService.getStoredOrganizationId() ??
       import.meta.env.VITE_DEV_ORG_ID ??
       DEFAULT_DEV_ORG_ID,
   );
@@ -36,7 +36,7 @@ export function PosLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (isPosAuthenticated()) {
+  if (authService.isAuthenticated()) {
     return <Navigate to={from} replace />;
   }
 
@@ -45,7 +45,7 @@ export function PosLoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await loginPos({
+      await authService.login({
         organizationId: organizationId.trim(),
         email: email.trim(),
         password,

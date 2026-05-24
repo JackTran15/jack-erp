@@ -9,13 +9,13 @@ import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { VoucherApplyScopeEnum } from "@erp/pos/constants/checkout.constant";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
+import type { VoucherApplyScope } from "@erp/pos/constants/checkout.constant";
 import type {
-  VoucherApplyScope,
   VoucherDialogData,
-  VoucherFormResult,
   VoucherOption,
   VoucherSelectableItem,
-} from "@erp/pos/lib/page-libs/checkout/voucher.types";
+} from "@erp/pos/interfaces/voucher.interface";
+import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
 import { FormRow } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/FormRow/FormRow";
 import { QuantityStepper } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/QuantityStepper/QuantityStepper";
 import { MetricColumn } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/MetricColumn/MetricColumn";

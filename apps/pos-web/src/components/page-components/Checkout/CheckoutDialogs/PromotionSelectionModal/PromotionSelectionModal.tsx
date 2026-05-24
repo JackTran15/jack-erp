@@ -5,9 +5,7 @@ import { useControllableState } from "@erp/pos/hooks/common/use-controllable-sta
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { PlusCircleIcon, SearchIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PromotionTable } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/PromotionSelectionModal/PromotionTable/PromotionTable";
-import type {
-  PromotionItem,
-} from "@erp/pos/lib/page-libs/checkout/promotion.types";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 
 export interface PromotionSelectionModalProps {
   open: boolean;

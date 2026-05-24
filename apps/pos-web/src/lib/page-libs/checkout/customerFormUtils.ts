@@ -1,12 +1,14 @@
 import {
   CustomerGenderEnum,
   MembershipTierEnum,
-  phoneDigitsOnly,
-  type CreateCustomerBody,
-  type CreateMembershipCardInlineBody,
-  type UpdateCustomerBody,
-} from "@erp/pos/lib/common/customerApi";
-import type { CustomerFormValues, CustomerSelectOption } from "./customerCreate.types";
+} from "@erp/pos/types/customer.type";
+import { phoneDigitsOnly } from "@erp/pos/lib/common/customerUtils";
+import type {
+  CreateCustomerBody,
+  CreateMembershipCardInlineBody,
+  UpdateCustomerBody,
+} from "@erp/pos/dtos/customer.dto";
+import type { CustomerFormValues, CustomerSelectOption } from "@erp/pos/interfaces/customer-dialog.interface";
 
 export const DEFAULT_PROVINCES: CustomerSelectOption[] = [
   { value: "HN", label: "Hà Nội" },

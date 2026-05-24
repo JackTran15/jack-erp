@@ -1,5 +1,5 @@
 import { cn, formatVnd } from "@erp/ui";
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import {
   posFormFieldClass,
   posFormHeight,
@@ -62,6 +62,25 @@ export interface PosNumberInputProps {
   invalid?: boolean;
   className?: string;
   inputClassName?: string;
+  id?: string;
+
+  /**
+   * When provided, the input renders inside a label + control + inline-error
+   * row. Omit `label` for a bare input.
+   */
+  label?: ReactNode;
+  /** Shows a red asterisk after the label. Only used when `label` is set. */
+  required?: boolean;
+  /** Inline error message rendered below the control. Only used when `label` is set. */
+  error?: ReactNode;
+  /** Label/control arrangement when `label` is set. */
+  fieldLayout?: "vertical" | "horizontal";
+  /** Class for the `<label>` (e.g. fixed-width column in horizontal forms). */
+  labelClassName?: string;
+  /** Class for the outer field-row wrapper. */
+  fieldClassName?: string;
+  /** Class for the control area (control + error). */
+  contentClassName?: string;
 }
 
 export function PosNumberInput({
@@ -84,6 +103,14 @@ export function PosNumberInput({
   invalid,
   className,
   inputClassName,
+  id,
+  label,
+  required,
+  error,
+  fieldLayout = "vertical",
+  labelClassName,
+  fieldClassName,
+  contentClassName,
 }: PosNumberInputProps) {
   const parse =
     parser ??
@@ -96,6 +123,7 @@ export function PosNumberInput({
   const input = (
     <input
       ref={ref}
+      id={id}
       type="text"
       inputMode={inputMode}
       min={min}
@@ -120,17 +148,51 @@ export function PosNumberInput({
     />
   );
 
-  if (variant === "ghost") return input;
+  const control =
+    variant === "ghost" ? (
+      input
+    ) : (
+      <div
+        className={cn(
+          numberInputVariant[variant](size, invalid),
+          posFormPadX[size],
+          className,
+        )}
+      >
+        {input}
+      </div>
+    );
+
+  if (label === undefined) return control;
 
   return (
     <div
       className={cn(
-        numberInputVariant[variant](size, invalid),
-        posFormPadX[size],
-        className,
+        "min-w-0 text-sm",
+        fieldLayout === "vertical" && "flex flex-col gap-1",
+        fieldLayout === "horizontal" && "flex items-center gap-2",
+        fieldClassName,
       )}
     >
-      {input}
+      <label
+        htmlFor={id}
+        className={cn(fieldLayout === "horizontal" && "shrink-0", labelClassName)}
+      >
+        {label}
+        {required ? <span className="ml-0.5 text-[#E53E3E]">*</span> : null}
+      </label>
+      <div className={cn("min-w-0 flex-1", contentClassName)}>
+        {control}
+        {error ? (
+          <p
+            className="mt-1 text-xs text-[#E53E3E]"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

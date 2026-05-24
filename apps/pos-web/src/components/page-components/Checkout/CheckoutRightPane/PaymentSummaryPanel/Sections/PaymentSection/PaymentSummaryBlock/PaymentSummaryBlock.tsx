@@ -9,14 +9,9 @@ import {
 } from "@erp/pos/stores/common/checkout-session.store";
 
 export interface PaymentSummaryBlockProps {
-  /** Click "Đặt cọc" — host mở deposit dialog. */
   onDepositClick?: () => void;
 }
 
-/**
- * "Tổng tiền / Đặt cọc" block. Item count appears as a small CountBadge
- * inline with the "Tổng tiền" label. Đọc từ session store + payment hook.
- */
 export function PaymentSummaryBlock({ onDepositClick }: PaymentSummaryBlockProps) {
   const itemCount = usePosCheckoutSessionStore(selectItemCountForPayment);
   const total = useCheckoutGrandTotal();

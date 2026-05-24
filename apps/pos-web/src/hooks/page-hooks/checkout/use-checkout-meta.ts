@@ -2,17 +2,15 @@ import { useMemo } from "react";
 
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
 import {
-  usePriceBooks,
-  type PriceBook,
-} from "@erp/pos/hooks/page-hooks/checkout/use-price-books";
-import {
-  useProductGroups,
-  type ProductGroup,
-} from "@erp/pos/hooks/page-hooks/checkout/use-product-groups";
-import {
-  useSalespersons,
-  type Salesperson,
-} from "@erp/pos/hooks/page-hooks/checkout/use-salespersons";
+  CATALOG_GROUP_OPTIONS,
+  PRICE_BOOK_OPTIONS,
+  SALESPERSON_OPTIONS,
+} from "@erp/pos/constants/checkout.constant";
+import type {
+  PriceBook,
+  ProductGroup,
+  Salesperson,
+} from "@erp/pos/interfaces/checkout.interface";
 import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
@@ -37,12 +35,12 @@ export interface CheckoutMeta {
 /**
  * Zero-input adapter: `selectedSalesperson/PriceBook` từ ui store,
  * `selectedProductGroup` derive từ `catalogGroup` (catalog store) +
- * `productGroups` (static hook).
+ * `productGroups` (option tĩnh từ constants).
  */
 export const useCheckoutMeta = (): CheckoutMeta => {
-  const { salespersons } = useSalespersons();
-  const { priceBooks } = usePriceBooks();
-  const { productGroups } = useProductGroups();
+  const salespersons = SALESPERSON_OPTIONS;
+  const priceBooks = PRICE_BOOK_OPTIONS;
+  const productGroups = CATALOG_GROUP_OPTIONS;
 
   const selectedSalesperson = usePosCheckoutUiStore(
     (s) => s.selectedSalesperson,

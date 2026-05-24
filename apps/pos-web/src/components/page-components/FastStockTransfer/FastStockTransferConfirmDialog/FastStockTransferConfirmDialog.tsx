@@ -3,7 +3,7 @@ import {
   type PosDataTableColumn,
 } from "@erp/pos/components/common/PosDataTable/PosDataTable";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
-import type { FastStockTransferConfirmRow } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer.types";
+import type { FastStockTransferConfirmRow } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import { useMemo } from "react";
 
 interface FastStockTransferConfirmDialogProps {

@@ -1,4 +1,14 @@
-import type { PaymentMethodOption } from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type {
+  PaymentMethodOption,
+  PriceBook,
+  ProductGroup,
+  Salesperson,
+  SaleChannelOption,
+} from "@erp/pos/interfaces/checkout.interface";
+import type {
+  ApiPaymentMethod,
+  InvoicePaymentMethod,
+} from "@erp/pos/types/invoice.type";
 
 // ============================================================================
 // Customer (purchase history, debt, detail tabs)
@@ -143,6 +153,76 @@ export const PAYMENT_METHODS: readonly PaymentMethodOption[] = [
   { value: PaymentMethodEnum.CARD, label: "Thẻ" },
   { value: PaymentMethodEnum.TRANSFER, label: "Chuyển khoản" },
 ];
+
+// ============================================================================
+// Toolbar option tĩnh (chờ API thay thế)
+// ============================================================================
+
+export const PRICE_BOOK_OPTIONS: readonly PriceBook[] = [
+  { id: "default", name: "Bảng giá chuẩn" },
+  { id: "vip", name: "Bảng giá VIP" },
+  { id: "wholesale", name: "Bảng giá sỉ" },
+];
+
+export const SALESPERSON_OPTIONS: readonly Salesperson[] = [
+  { id: "nv01", code: "NV01", name: "Nguyễn Văn A" },
+  { id: "nv02", code: "NV02", name: "Trần Thị B" },
+  { id: "nv03", code: "NV03", name: "Lê Văn C" },
+];
+
+export const CATALOG_GROUP_OPTIONS: readonly ProductGroup[] = [
+  { id: "all", name: "Tất cả" },
+  { id: "drink", name: "Nước uống" },
+  { id: "food", name: "Đồ ăn" },
+  { id: "other", name: "Khác" },
+];
+
+// ============================================================================
+// Sale channel (kênh bán hàng — popover "Tại cửa hàng")
+// ============================================================================
+
+export const DEFAULT_SALE_CHANNEL_ID = "at-store";
+
+/** Bộ màu bubble lấy từ design token mục 2.1 của TaiCuaHang.md. */
+export const SALE_CHANNELS: readonly SaleChannelOption[] = [
+  {
+    id: "at-store",
+    label: "Tại cửa hàng",
+    bubbleClassName: "bg-gradient-to-br from-[#7C7FE8] to-[#5A5DD8]",
+    isStore: true,
+  },
+  { id: "facebook", label: "Facebook", bubbleClassName: "bg-[#1877F2]", initial: "f" },
+  { id: "zalo", label: "Zalo", bubbleClassName: "bg-[#0084FF]", initial: "Z" },
+  { id: "instagram", label: "Instagram", bubbleClassName: "bg-[#E1306C]", initial: "I" },
+  { id: "tiki", label: "Tiki", bubbleClassName: "bg-[#1BA9E1]", initial: "T" },
+  { id: "lazada", label: "Lazada", bubbleClassName: "bg-[#0F1F8F]", initial: "L" },
+  { id: "shopee", label: "Shopee", bubbleClassName: "bg-[#EE4D2D]", initial: "S" },
+];
+
+// ============================================================================
+// Invoice API — payment method ↔ BE enum
+// ============================================================================
+// `revenueAccountId`, `receivableAccountId` và per-line `accountId` được
+// resolve runtime qua `useRevenueAccountsQuery` / `useReceivableAccountsQuery`
+// / `usePaymentAccountsQuery` (xem `hooks/react-query/use-query-account.ts`).
+
+export const PAYMENT_METHOD_TO_API_METHOD: Record<
+  PaymentMethod,
+  ApiPaymentMethod
+> = {
+  [PaymentMethodEnum.CASH]: "cash",
+  [PaymentMethodEnum.CARD]: "card",
+  [PaymentMethodEnum.TRANSFER]: "bank_transfer",
+};
+
+/** Nhãn tiếng Việt cho `invoice.paymentMethod` (dùng ở biên lai chi tiết). */
+export const INVOICE_PAYMENT_METHOD_LABEL: Record<InvoicePaymentMethod, string> =
+  {
+    cash: "Tiền mặt",
+    bank_transfer: "Chuyển khoản",
+    card: "Thẻ",
+    debt: "Ghi nợ",
+  };
 
 // ============================================================================
 // Promo menu

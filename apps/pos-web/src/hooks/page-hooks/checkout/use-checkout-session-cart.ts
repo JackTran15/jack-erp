@@ -1,16 +1,16 @@
 import { useCallback, useMemo } from "react";
-import type { PosCatalogLine } from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
+import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   CheckoutPane,
   selectActiveSession,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
-import {
-  type CartLine,
-  type CatalogProduct,
-  CheckoutVariantEnum,
-} from "@erp/pos/lib/page-libs/checkout/checkout.types";
+import type {
+  CartLine,
+  CatalogProduct,
+} from "@erp/pos/interfaces/checkout.interface";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
   isCartLineWarning,
   locationQtyFor,

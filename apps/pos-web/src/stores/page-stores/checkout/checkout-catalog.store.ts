@@ -1,10 +1,5 @@
 import { create } from "zustand";
 
-import {
-  fetchPosCatalog,
-  type PosCatalogLine,
-} from "@erp/pos/lib/page-libs/checkout/posCatalogApi";
-
 type Updater<T> = T | ((prev: T) => T);
 
 const apply = <T>(prev: T, value: Updater<T>): T =>
@@ -22,43 +17,29 @@ const initialToolbar = (): ToolbarState => ({
   splitLine: false,
 });
 
+/**
+ * UI state cho catalog (toolbar + filter + collapse). Dữ liệu catalog (rows /
+ * loading / error) đã chuyển sang React Query (`useCatalogQuery`), store này
+ * chỉ giữ state thao tác phía client — không gọi service.
+ */
 interface PosCheckoutCatalogState {
-  catalog: PosCatalogLine[];
-  catalogLoading: boolean;
-  catalogError: string;
   toolbar: ToolbarState;
   catalogQuery: string;
   catalogGroup: string | undefined;
   catalogCollapsed: boolean;
 
-  setCatalog: (value: Updater<PosCatalogLine[]>) => void;
-  setCatalogLoading: (value: Updater<boolean>) => void;
-  setCatalogError: (value: Updater<string>) => void;
-
   setToolbar: (value: Updater<ToolbarState>) => void;
   setCatalogQuery: (value: Updater<string>) => void;
   setCatalogGroup: (value: Updater<string | undefined>) => void;
   setCatalogCollapsed: (value: Updater<boolean>) => void;
-
-  loadCatalog: (branchId: string) => Promise<void>;
 }
 
 export const usePosCheckoutCatalogStore = create<PosCheckoutCatalogState>()(
   (set) => ({
-    catalog: [],
-    catalogLoading: true,
-    catalogError: "",
     toolbar: initialToolbar(),
     catalogQuery: "",
     catalogGroup: undefined,
     catalogCollapsed: false,
-
-    setCatalog: (value) =>
-      set((state) => ({ catalog: apply(state.catalog, value) })),
-    setCatalogLoading: (value) =>
-      set((state) => ({ catalogLoading: apply(state.catalogLoading, value) })),
-    setCatalogError: (value) =>
-      set((state) => ({ catalogError: apply(state.catalogError, value) })),
 
     setToolbar: (value) =>
       set((state) => ({ toolbar: apply(state.toolbar, value) })),
@@ -70,22 +51,5 @@ export const usePosCheckoutCatalogStore = create<PosCheckoutCatalogState>()(
       set((state) => ({
         catalogCollapsed: apply(state.catalogCollapsed, value),
       })),
-
-    loadCatalog: async (branchId) => {
-      set({ catalogError: "", catalogLoading: true });
-      try {
-        const rows = await fetchPosCatalog(branchId);
-        set({ catalog: rows, catalogLoading: false });
-      } catch (e) {
-        set({
-          catalog: [],
-          catalogError:
-            e instanceof Error
-              ? `Không tải được tồn kho: ${e.message}`
-              : "Không tải được tồn kho.",
-          catalogLoading: false,
-        });
-      }
-    },
   }),
 );

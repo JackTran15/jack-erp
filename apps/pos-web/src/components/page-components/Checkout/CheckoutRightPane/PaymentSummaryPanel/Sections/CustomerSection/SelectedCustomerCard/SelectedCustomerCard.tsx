@@ -5,7 +5,7 @@ import {
   type CustomerActionItem,
 } from "@erp/pos/components/common/PosCustomerActions/PosCustomerActions";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
-import { formatCustomerDisplay } from "@erp/pos/lib/common/customerApi";
+import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 
 export interface SelectedCustomerCardProps {
   /** Actions group (Voucher / quà tặng nếu đã chọn khách). */
@@ -14,11 +14,12 @@ export interface SelectedCustomerCardProps {
 
 /**
  * Compact "selected customer" chip rendered inside the customer field area
- * after a customer is picked. Đọc customer từ store; click name → mở edit
- * dialog. Customer debt hiện chưa có data → ẩn (truyền null xuống).
+ * after a customer is picked. Đọc customer từ store; click name → mở dialog
+ * chi tiết khách (CustomerDetailDialog). Customer debt hiện chưa có data →
+ * ẩn (truyền null xuống).
  */
 export function SelectedCustomerCard({ actions = [] }: SelectedCustomerCardProps) {
-  const { selectedCustomer, handleClearCustomer, handleEditCustomer } =
+  const { selectedCustomer, handleClearCustomer, handleOpenCustomerDetail } =
     useCheckoutCustomer();
 
   if (!selectedCustomer) return null;
@@ -30,7 +31,7 @@ export function SelectedCustomerCard({ actions = [] }: SelectedCustomerCardProps
     <div className="flex h-12 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3">
       <button
         type="button"
-        onClick={handleEditCustomer}
+        onClick={handleOpenCustomerDetail}
         aria-label={`Xem chi tiết khách ${name}`}
         className="flex min-w-0 flex-1 items-center gap-2 text-left rounded-md outline-none transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-indigo-500/40"
       >

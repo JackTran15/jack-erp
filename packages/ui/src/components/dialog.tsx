@@ -36,10 +36,12 @@ const DialogContent = React.forwardRef<
      * Dùng cho popup kéo thả / resize.
      */
     freePosition?: boolean;
+    /** Override classes cho lớp overlay (vd. làm sáng/tối nền: `bg-black/40`). */
+    overlayClassName?: string;
   }
->(({ className, children, fullscreen, showCloseButton = true, freePosition, ...props }, ref) => (
+>(({ className, children, fullscreen, showCloseButton = true, freePosition, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

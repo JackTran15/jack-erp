@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBranchById, type BranchRow } from "@erp/pos/lib/common/branchApi";
+import { branchService } from "@erp/pos/services/branch.service";
+import type { BranchRow } from "@erp/pos/interfaces/branch.interface";
 import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
 import { usePosBranchStore } from "../stores/common/branch.store";
 
@@ -34,7 +35,9 @@ export function BranchSelectPage() {
     }
     try {
       const rows = await Promise.all(
-        payload.branchIds.map((id) => getBranchById(id).catch((): null => null)),
+        payload.branchIds.map((id) =>
+          branchService.getById(id).catch((): null => null),
+        ),
       );
       const options: BranchOption[] = [];
       for (let i = 0; i < payload.branchIds.length; i++) {

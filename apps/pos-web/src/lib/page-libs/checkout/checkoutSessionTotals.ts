@@ -1,4 +1,5 @@
-import { type CartLine, CheckoutVariantEnum } from "./checkout.types";
+import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { lineTotal } from "./checkoutUtils";
 
 /** Sum of line totals for a list (uses `isReturnCredit` on each line). */
