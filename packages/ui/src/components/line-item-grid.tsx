@@ -23,6 +23,8 @@ export interface LineColumn<R> {
   className?: string;
   /** Placeholder shown in empty cells (e.g. "Tìm mã hoặc tên" for the SKU column). */
   placeholder?: string;
+  /** Optional footer cell in a sticky `<tfoot>` row aligned with this column. */
+  footer?: React.ReactNode;
 }
 
 export interface LineItemGridProps<R> {
@@ -208,6 +210,35 @@ export function LineItemGrid<R>({
             </tr>
           ) : null}
         </tbody>
+        {columns.some((c) => c.footer != null) ? (
+          <tfoot>
+            <tr>
+              {columns.map((col) => (
+                <td
+                  key={`${col.key}-footer`}
+                  className={cn(
+                    "border-t border-border bg-muted px-2 py-2 text-sm font-semibold",
+                    alignClass(col.align),
+                    col.className,
+                  )}
+                  style={{
+                    position: "sticky",
+                    bottom: 0,
+                    ...(col.width ? { width: col.width } : {}),
+                  }}
+                >
+                  {col.footer ?? null}
+                </td>
+              ))}
+              {showRowActions ? (
+                <td
+                  className="border-t border-border bg-muted"
+                  style={{ position: "sticky", bottom: 0 }}
+                />
+              ) : null}
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );
