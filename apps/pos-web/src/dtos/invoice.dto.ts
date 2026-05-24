@@ -40,18 +40,18 @@ export interface UpdateInvoiceBody {
 export interface InvoicePaymentLineBody {
   paymentMethod: ApiPaymentMethod;
   amount: number;
-  accountId: string;
+  /** id của tài khoản nhận tiền đã cấu hình (payment_accounts.id). */
+  paymentAccountId: string;
   reference?: string;
 }
 
 /**
  * Body cho `POST /invoices/:id/checkout` — chuyển draft → paid/debt/partial_debt.
- * `payments: []` đồng nghĩa "nợ toàn phần" và bắt buộc kèm `receivableAccountId`.
+ * `payments: []` đồng nghĩa "nợ toàn phần" (cần khách hàng trên hóa đơn). BE tự
+ * resolve tài khoản doanh thu / công nợ phải thu từ cấu hình, FE không gửi.
  */
 export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
-  revenueAccountId: string;
-  receivableAccountId?: string;
 }
 
 /** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */

@@ -1,5 +1,8 @@
 import { http } from "@erp/pos/lib/common/http";
-import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import type {
+  AccountRow,
+  PaymentAccountRow,
+} from "@erp/pos/interfaces/account.interface";
 import type { ListAccountsParams } from "@erp/pos/dtos/account.dto";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 
@@ -15,12 +18,11 @@ export const accountService = {
     return http.get<Paginated<AccountRow>>(`/cash/accounts${suffix}`);
   },
 
-  listPaymentAccounts: (): Promise<Paginated<AccountRow>> => {
-    const qs = new URLSearchParams();
-    qs.set("page", String(1));
-    qs.set("pageSize", String(100))
-    qs.set("filters", JSON.stringify({  type: 'ASSET', isActive: true }));
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return http.get<Paginated<AccountRow>>(`/accounts${suffix}`);
-  }
+  /**
+   * Danh sách tài khoản nhận tiền đã cấu hình cho chi nhánh hiện tại (BE tự scope
+   * theo org + branch qua `X-Branch-Id`). Dùng cho picker thanh toán ở checkout.
+   */
+  listPaymentAccounts: (): Promise<PaymentAccountRow[]> => {
+    return http.get<PaymentAccountRow[]>(`/payment-accounts`);
+  },
 };

@@ -60,6 +60,12 @@ const IDS = {
   accountBank: 'B0000000-0000-4000-8000-000000000002',
   accountRevenue: 'B0000000-0000-4000-8000-000000000003',
   accountReceivable: 'B0000000-0000-4000-8000-000000000004',
+  // Payment-account & default-account config (resolved server-side at checkout)
+  defaultAccountRevenue:    'E0000000-0000-4000-8000-000000000001',
+  defaultAccountReceivable: 'E0000000-0000-4000-8000-000000000002',
+  paymentAccountCash:       'E0000000-0000-4000-8000-000000000003',
+  paymentAccountBank:       'E0000000-0000-4000-8000-000000000004',
+  paymentAccountCard:       'E0000000-0000-4000-8000-000000000005',
   // POS / Customer
   cashAccountRegister: 'C0000000-0000-4000-8000-000000000001',
   customerWalkIn:    'D0000000-0000-4000-8000-000000000001',
@@ -350,6 +356,50 @@ async function seedInventoryData() {
       ON CONFLICT (id) DO NOTHING
       `,
       [IDS.cashAccountRegister, IDS.organization, IDS.branch, IDS.accountCash, IDS.user],
+    );
+
+    // Default COA accounts resolved server-side at checkout (org-wide, branch_id NULL).
+    await AppDataSource.query(
+      `
+      INSERT INTO accounting_default_account
+        (id, organization_id, branch_id, account_role, account_id, created_by, created_at, updated_at)
+      VALUES
+        ($1, $5, NULL, 'REVENUE',    $3, $6, NOW(), NOW()),
+        ($2, $5, NULL, 'RECEIVABLE', $4, $6, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        IDS.defaultAccountRevenue,
+        IDS.defaultAccountReceivable,
+        IDS.accountRevenue,
+        IDS.accountReceivable,
+        IDS.organization,
+        IDS.user,
+      ],
+    );
+
+    // Payment method → receiving COA account, branch-scoped.
+    await AppDataSource.query(
+      `
+      INSERT INTO payment_accounts
+        (id, organization_id, branch_id, payment_method, account_id, label, is_active, sort_order, created_by, created_at, updated_at)
+      VALUES
+        ($1, $7, $8, 'cash',          $4, 'Tiền mặt',     true, 0, $9, NOW(), NOW()),
+        ($2, $7, $8, 'bank_transfer', $5, 'Chuyển khoản', true, 0, $9, NOW(), NOW()),
+        ($3, $7, $8, 'card',          $6, 'Quẹt thẻ',     true, 0, $9, NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        IDS.paymentAccountCash,
+        IDS.paymentAccountBank,
+        IDS.paymentAccountCard,
+        IDS.accountCash,
+        IDS.accountBank,
+        IDS.accountBank,
+        IDS.organization,
+        IDS.branch,
+        IDS.user,
+      ],
     );
 
     // Customers — walk-in (debt scenarios) + a few sample retail/B2B records.

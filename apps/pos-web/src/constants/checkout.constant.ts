@@ -202,9 +202,9 @@ export const SALE_CHANNELS: readonly SaleChannelOption[] = [
 // ============================================================================
 // Invoice API — payment method ↔ BE enum
 // ============================================================================
-// `revenueAccountId`, `receivableAccountId` và per-line `accountId` được
-// resolve runtime qua `useRevenueAccountsQuery` / `useReceivableAccountsQuery`
-// / `usePaymentAccountsQuery` (xem `hooks/react-query/use-query-account.ts`).
+// Mỗi dòng thanh toán mang `paymentAccountId` (id của tài khoản đã cấu hình, lấy
+// từ `usePaymentAccountsQuery`). BE tự suy ra COA account + tài khoản doanh thu /
+// công nợ phải thu; FE không gửi `revenueAccountId` / `receivableAccountId` nữa.
 
 export const PAYMENT_METHOD_TO_API_METHOD: Record<
   PaymentMethod,
@@ -213,6 +213,16 @@ export const PAYMENT_METHOD_TO_API_METHOD: Record<
   [PaymentMethodEnum.CASH]: "cash",
   [PaymentMethodEnum.CARD]: "card",
   [PaymentMethodEnum.TRANSFER]: "bank_transfer",
+};
+
+/** Chiều ngược lại: method BE trên một tài khoản đã cấu hình → enum UI. */
+export const API_METHOD_TO_PAYMENT_METHOD: Record<
+  ApiPaymentMethod,
+  PaymentMethod
+> = {
+  cash: PaymentMethodEnum.CASH,
+  card: PaymentMethodEnum.CARD,
+  bank_transfer: PaymentMethodEnum.TRANSFER,
 };
 
 /** Nhãn tiếng Việt cho `invoice.paymentMethod` (dùng ở biên lai chi tiết). */

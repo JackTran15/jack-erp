@@ -3,24 +3,27 @@ import { cn } from "@erp/ui";
 import { CloseIcon, PlusCircleIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
-import type { AccountRow } from "@erp/pos/interfaces/account.interface";
-import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
+import type { PaymentAccountRow } from "@erp/pos/interfaces/account.interface";
+import {
+  API_METHOD_TO_PAYMENT_METHOD,
+  type PaymentMethod,
+} from "@erp/pos/constants/checkout.constant";
 
 /**
  * One payment-method line: the user can split a sale across N methods, each
- * line carrying its own selected method + amount.
+ * line carrying its own selected account + amount.
  *
- * `cashAccountId` (UUID) là COA account.id của tài khoản tiền (CASH 111x /
- * BANK 112x) — dùng trực tiếp làm `payments[].accountId` khi submit checkout
- * (không cần lookup thêm). `method` giữ lại cho receipt display + legacy
- * code (draft snapshot, primary method label).
+ * `paymentAccountId` (UUID) là id của tài khoản nhận tiền đã cấu hình
+ * (`payment_accounts` ở BE) — gửi trực tiếp làm `payments[].paymentAccountId` khi
+ * checkout; BE tự suy ra COA account. `method` được suy từ account đã chọn, giữ
+ * lại cho receipt display + primary method label.
  */
 export interface PaymentLine {
   /** Stable id (UUID) so React keys + remove handlers don't depend on index. */
   id: string;
   method: PaymentMethod;
-  /** COA account.id (CASH 111x / BANK 112x) — null khi chưa có dữ liệu API. */
-  cashAccountId: string | null;
+  /** payment_accounts.id của tài khoản nhận tiền — null khi chưa chọn. */
+  paymentAccountId: string | null;
   amount: number;
 }
 
@@ -31,9 +34,19 @@ export interface PaymentLine {
 export function createPaymentLine(
   method: PaymentMethod,
   amount = 0,
-  cashAccountId: string | null = null,
+  paymentAccountId: string | null = null,
 ): PaymentLine {
-  return { id: crypto.randomUUID(), method, cashAccountId, amount };
+  return { id: crypto.randomUUID(), method, paymentAccountId, amount };
+}
+
+/** Nhãn hiển thị cho một tài khoản nhận tiền trong dropdown. */
+export function formatPaymentAccountLabel(account: PaymentAccountRow): string {
+  if (account.label) return account.label;
+  const bankParts = [account.accountNumber, account.bankCode, account.bankName]
+    .filter((p): p is string => Boolean(p))
+    .join(" - ");
+  if (bankParts) return bankParts;
+  return account.paymentMethod === "cash" ? "Tiền mặt" : account.paymentMethod;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,11 +55,11 @@ export function createPaymentLine(
 
 export interface PosPaymentMethodRowProps {
   line: PaymentLine;
-  accounts: readonly AccountRow[];
+  accounts: readonly PaymentAccountRow[];
   variant: "add" | "remove";
   amountReadOnly?: boolean;
   unavailableAccountIds?: ReadonlyArray<string>;
-  onChangeAccount: (account: AccountRow) => void;
+  onChangeAccount: (account: PaymentAccountRow) => void;
   onChangeAmount: (amount: number) => void;
   onAdd?: () => void;
   onRemove?: () => void;
@@ -76,7 +89,7 @@ export const PosPaymentMethodRow = forwardRef<
   const isAdd = variant === "add";
   const unavailable = new Set(unavailableAccountIds ?? []);
   const selected =
-    accounts.find((a) => a.id === line.cashAccountId) ?? null;
+    accounts.find((a) => a.id === line.paymentAccountId) ?? null;
 
   return (
     <div className="grid grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 py-2">
@@ -105,9 +118,9 @@ export const PosPaymentMethodRow = forwardRef<
           variant="underline"
           items={accounts}
           itemKey={(a) => a.id}
-          renderItem={(a) => a.name}
+          renderItem={(a) => formatPaymentAccountLabel(a)}
           isItemDisabled={(a) =>
-            a.id !== line.cashAccountId && unavailable.has(a.id)
+            a.id !== line.paymentAccountId && unavailable.has(a.id)
           }
           placeholder={
             accounts.length === 0 ? "Chưa có tài khoản" : "Chọn tài khoản"
@@ -124,7 +137,7 @@ export const PosPaymentMethodRow = forwardRef<
         value={line.amount}
         onChange={onChangeAmount}
         readOnly={amountReadOnly}
-        ariaLabel={`Số tiền ${selected?.name ?? line.method}`}
+        ariaLabel={`Số tiền ${selected ? formatPaymentAccountLabel(selected) : line.method}`}
         placeholder="0"
       />
     </div>
@@ -137,7 +150,7 @@ export const PosPaymentMethodRow = forwardRef<
 
 export interface PosPaymentMethodListProps {
   lines: PaymentLine[];
-  accounts: readonly AccountRow[];
+  accounts: readonly PaymentAccountRow[];
   /** Single source of truth — host owns the array. */
   onChange: (lines: PaymentLine[]) => void;
   /**
@@ -162,13 +175,21 @@ export function PosPaymentMethodList({
   amountInputRef,
 }: PosPaymentMethodListProps) {
   const used = new Set(
-    lines.map((l) => l.cashAccountId).filter((id): id is string => Boolean(id)),
+    lines
+      .map((l) => l.paymentAccountId)
+      .filter((id): id is string => Boolean(id)),
   );
 
-  const handleChangeAccount = (id: string, next: AccountRow) => {
+  const handleChangeAccount = (id: string, next: PaymentAccountRow) => {
     onChange(
       lines.map((l) =>
-        l.id === id ? { ...l, cashAccountId: next.id } : l,
+        l.id === id
+          ? {
+              ...l,
+              paymentAccountId: next.id,
+              method: API_METHOD_TO_PAYMENT_METHOD[next.paymentMethod],
+            }
+          : l,
       ),
     );
   };
@@ -178,9 +199,14 @@ export function PosPaymentMethodList({
   const handleAdd = () => {
     const free = accounts.find((a) => !used.has(a.id));
     if (!free) return;
-    const seedMethod = lines[0]?.method;
-    if (!seedMethod) return;
-    onChange([...lines, createPaymentLine(seedMethod, 0, free.id)]);
+    onChange([
+      ...lines,
+      createPaymentLine(
+        API_METHOD_TO_PAYMENT_METHOD[free.paymentMethod],
+        0,
+        free.id,
+      ),
+    ]);
   };
   const handleRemove = (id: string) => {
     if (lines.length <= 1) return;

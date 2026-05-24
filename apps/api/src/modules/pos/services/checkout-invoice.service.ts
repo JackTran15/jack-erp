@@ -21,6 +21,11 @@ import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduct
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import {
+  AccountingDefaultAccountRole,
+  PaymentAccountMethod,
+} from '../../accounting/payment-accounts/enums';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -32,6 +37,17 @@ import { PosSessionEntity } from '../entities/pos-session.entity';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
+
+/** POS payment method → payment-account config method. Values are identical
+ * strings; this map keeps the two enums decoupled at the type level. */
+const PAYMENT_METHOD_TO_ACCOUNT_METHOD: Record<
+  InvoicePaymentMethod,
+  PaymentAccountMethod
+> = {
+  [InvoicePaymentMethod.CASH]: PaymentAccountMethod.CASH,
+  [InvoicePaymentMethod.BANK_TRANSFER]: PaymentAccountMethod.BANK_TRANSFER,
+  [InvoicePaymentMethod.CARD]: PaymentAccountMethod.CARD,
+};
 
 @Injectable()
 export class CheckoutInvoiceService {
@@ -54,6 +70,7 @@ export class CheckoutInvoiceService {
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
     private readonly journalSalePublisher: JournalSalePublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
+    private readonly accountResolver: AccountResolverService,
   ) {}
 
   async checkout(
@@ -108,17 +125,45 @@ export class CheckoutInvoiceService {
       );
     }
 
-    if (remainder > 0) {
-      if (!invoice.customerId) {
-        throw new BadRequestException(
-          'Invoice must have a customer when there is a remaining debt balance',
+    if (remainder > 0 && !invoice.customerId) {
+      throw new BadRequestException(
+        'Invoice must have a customer when there is a remaining debt balance',
+      );
+    }
+
+    // Posting accounts are resolved server-side from configuration; any account
+    // IDs the client put on the DTO are ignored.
+    const revenueAccountId = await this.accountResolver.resolveDefaultAccount(
+      AccountingDefaultAccountRole.REVENUE,
+      actor,
+    );
+    const receivableAccountId =
+      remainder > 0
+        ? await this.accountResolver.resolveDefaultAccount(
+            AccountingDefaultAccountRole.RECEIVABLE,
+            actor,
+          )
+        : undefined;
+
+    // Resolve the receiving COA account per payment line. The client picks a
+    // configured payment_accounts row (paymentAccountId) — e.g. which bank a
+    // transfer went into; the resolver validates it against the actor's branch +
+    // method. Results are index-aligned with dto.payments and cached by the chosen
+    // account (or method, for the unspecified default) to avoid duplicate lookups.
+    const resolvedAccountByKey = new Map<string, string>();
+    const resolvedAccountIds: string[] = [];
+    for (const p of dto.payments) {
+      const cacheKey = p.paymentAccountId ?? `default:${p.paymentMethod}`;
+      let accountId = resolvedAccountByKey.get(cacheKey);
+      if (!accountId) {
+        accountId = await this.accountResolver.resolvePaymentAccount(
+          PAYMENT_METHOD_TO_ACCOUNT_METHOD[p.paymentMethod],
+          actor,
+          p.paymentAccountId,
         );
+        resolvedAccountByKey.set(cacheKey, accountId);
       }
-      if (!dto.receivableAccountId) {
-        throw new BadRequestException(
-          'receivableAccountId is required when total payments are less than the amount due',
-        );
-      }
+      resolvedAccountIds.push(accountId);
     }
 
     const newStatus =
@@ -152,7 +197,7 @@ export class CheckoutInvoiceService {
 
         let savedPayments: InvoicePaymentEntity[] = [];
         if (dto.payments.length > 0) {
-          const paymentEntities = dto.payments.map((p) =>
+          const paymentEntities = dto.payments.map((p, idx) =>
             manager.create(InvoicePaymentEntity, {
               organizationId: actor.organizationId,
               branchId: actor.branchId,
@@ -160,7 +205,7 @@ export class CheckoutInvoiceService {
               invoiceId: saved.id,
               paymentMethod: p.paymentMethod,
               amount: p.amount,
-              accountId: p.accountId,
+              accountId: resolvedAccountIds[idx],
               reference: p.reference,
             }),
           );
@@ -206,10 +251,10 @@ export class CheckoutInvoiceService {
         branchId: updatedInvoice.branchId,
         amountDue,
         remainder,
-        revenueAccountId: dto.revenueAccountId,
-        receivableAccountId: dto.receivableAccountId,
-        payments: dto.payments.map((p) => ({
-          accountId: p.accountId,
+        revenueAccountId,
+        receivableAccountId,
+        payments: dto.payments.map((p, idx) => ({
+          accountId: resolvedAccountIds[idx],
           amount: p.amount,
         })),
       },
@@ -238,7 +283,7 @@ export class CheckoutInvoiceService {
             invoiceCode: realCode,
             sessionId: activeSession?.id,
             cashAccountId: activeSession?.cashAccountId ?? cp.accountId,
-            contraAccountId: dto.revenueAccountId,
+            contraAccountId: revenueAccountId,
             amount: Number(cp.amount),
             branchId: updatedInvoice.branchId,
           },

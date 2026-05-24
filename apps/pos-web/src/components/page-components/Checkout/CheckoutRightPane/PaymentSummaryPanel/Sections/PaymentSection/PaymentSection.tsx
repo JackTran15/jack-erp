@@ -11,6 +11,7 @@ import { LabelTagButton } from "@erp/pos/components/page-components/Checkout/Che
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
+import { API_METHOD_TO_PAYMENT_METHOD } from "@erp/pos/constants/checkout.constant";
 import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 interface PaymentSectionProps {
@@ -53,17 +54,21 @@ export function PaymentSection({
     if (accounts.length === 0) return;
     const used = new Set(
       paymentLines
-        .map((l) => l.cashAccountId)
+        .map((l) => l.paymentAccountId)
         .filter((id): id is string => Boolean(id)),
     );
     let mutated = false;
     const next = paymentLines.map((line) => {
-      if (line.cashAccountId) return line;
+      if (line.paymentAccountId) return line;
       const free = accounts.find((a) => !used.has(a.id));
       if (!free) return line;
       used.add(free.id);
       mutated = true;
-      return { ...line, cashAccountId: free.id };
+      return {
+        ...line,
+        paymentAccountId: free.id,
+        method: API_METHOD_TO_PAYMENT_METHOD[free.paymentMethod],
+      };
     });
     if (mutated) handleChangePaymentLines(next);
   }, [accounts, paymentLines, handleChangePaymentLines]);

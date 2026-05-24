@@ -1,19 +1,12 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 
-import {
-  pickAccountByCodePrefix,
-  usePaymentAccountsQuery,
-  useReceivableAccountsQuery,
-  useRevenueAccountsQuery,
-} from "@erp/pos/hooks/react-query/use-query-account";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import {
   useCheckoutInvoiceMutation,
   useCreateInvoiceMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
-import type { AccountRow } from "@erp/pos/interfaces/account.interface";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
@@ -61,16 +54,10 @@ export interface UseCheckoutActionsResult {
 
 function describeResolveError(error: ResolveCheckoutPayloadError): string {
   switch (error.code) {
-    case "missing_revenue_account":
-      return "Chưa cấu hình tài khoản doanh thu. Vui lòng kiểm tra COA.";
-    case "missing_receivable_account":
-      return "Chưa cấu hình tài khoản công nợ phải thu (131).";
-    case "missing_cash_account":
-      return error.cashAccountId
-        ? "Tài khoản thanh toán không tồn tại trong danh sách. Vui lòng tải lại."
-        : "Vui lòng chọn tài khoản thanh toán cho mỗi dòng.";
+    case "missing_payment_account":
+      return "Vui lòng chọn tài khoản thanh toán cho mỗi dòng.";
     default:
-      return "Không xác định được tài khoản kế toán.";
+      return "Không xác định được tài khoản thanh toán.";
   }
 }
 
@@ -85,26 +72,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createMutation = useCreateInvoiceMutation();
   const updateMutation = useUpdateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
-
-  const paymentAccountsQuery = usePaymentAccountsQuery();
-  const revenueAccountsQuery = useRevenueAccountsQuery();
-  const receivableAccountsQuery = useReceivableAccountsQuery();
-
-  const accountById = useMemo<Map<string, AccountRow>>(() => {
-    const map = new Map<string, AccountRow>();
-    for (const a of paymentAccountsQuery.accounts) map.set(a.id, a);
-    return map;
-  }, [paymentAccountsQuery.accounts]);
-
-  const revenueAccountId = useMemo(
-    () => revenueAccountsQuery.data?.data?.[0]?.id ?? "",
-    [revenueAccountsQuery.data],
-  );
-  const receivableAccountId = useMemo(
-    () =>
-      pickAccountByCodePrefix(receivableAccountsQuery.data?.data, "131")?.id,
-    [receivableAccountsQuery.data],
-  );
 
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
@@ -175,10 +142,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const checkoutResolve = buildCheckoutInvoiceApiPayload({
         paymentLines: p.paymentLines,
         debt: p.debt,
-        amountDue: settlementGrandTotal,
-        revenueAccountId,
-        receivableAccountId,
-        accountById,
       });
 
       if (!checkoutResolve.ok) {
@@ -250,9 +213,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       await printReceiptIfNeeded(receiptPayload);
     },
     [
-      revenueAccountId,
-      receivableAccountId,
-      accountById,
       createMutation,
       updateMutation,
       checkoutMutation,

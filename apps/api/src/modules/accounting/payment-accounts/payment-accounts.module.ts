@@ -2,12 +2,16 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { AccountingDefaultAccountEntity } from './accounting-default-account.entity';
+import { AccountResolverService } from './account-resolver.service';
+import { PaymentAccountsService } from './payment-accounts.service';
+import { PaymentAccountsController } from './payment-accounts.controller';
 
 /**
- * Payment-account & default-account config module.
- *
- * Schema-only skeleton (TKT-2405-01). The controller, PaymentAccountService and
- * DefaultAccountResolverService are added in TKT-2405-02 / TKT-2405-03.
+ * Payment-account & default-account config module. Exposes
+ * {@link AccountResolverService} so sale/cash posting resolves COA accounts
+ * server-side instead of trusting client-supplied account IDs, and a read-only
+ * `/payment-accounts` endpoint so the POS can let cashiers pick a configured
+ * account (e.g. which bank a transfer went into).
  */
 @Module({
   imports: [
@@ -16,5 +20,8 @@ import { AccountingDefaultAccountEntity } from './accounting-default-account.ent
       AccountingDefaultAccountEntity,
     ]),
   ],
+  controllers: [PaymentAccountsController],
+  providers: [AccountResolverService, PaymentAccountsService],
+  exports: [AccountResolverService],
 })
 export class PaymentAccountsModule {}

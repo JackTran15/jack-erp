@@ -15,6 +15,11 @@ import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduct
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import {
+  AccountingDefaultAccountRole,
+  PaymentAccountMethod,
+} from '../../accounting/payment-accounts/enums';
 import { PosSessionEntity } from '../entities/pos-session.entity';
 
 const actor = {
@@ -25,14 +30,14 @@ const actor = {
   permissions: [],
 };
 
+// Accounts the resolver returns (server-side config). Client never supplies these.
 const CASH_ACCOUNT       = 'acct-cash-1';
 const BANK_ACCOUNT       = 'acct-bank-1';
 const REVENUE_ACCOUNT    = 'acct-rev-1';
 const RECEIVABLE_ACCOUNT = 'acct-ar-1';
 
 const cashPaymentDto = (overrides: Partial<CheckoutInvoiceDto> = {}): CheckoutInvoiceDto => ({
-  payments: [{ paymentMethod: 'cash' as any, amount: 200, accountId: CASH_ACCOUNT }],
-  revenueAccountId: REVENUE_ACCOUNT,
+  payments: [{ paymentMethod: 'cash' as any, amount: 200 }],
   ...overrides,
 });
 
@@ -96,6 +101,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
+  let accountResolver: {
+    resolveDefaultAccount: jest.Mock;
+    resolvePaymentAccount: jest.Mock;
+  };
   let sessionRepo: { findOne: jest.Mock };
   let mockManager: Record<string, jest.Mock>;
 
@@ -124,6 +133,20 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    accountResolver = {
+      resolveDefaultAccount: jest.fn().mockImplementation((role) =>
+        Promise.resolve(
+          role === AccountingDefaultAccountRole.RECEIVABLE
+            ? RECEIVABLE_ACCOUNT
+            : REVENUE_ACCOUNT,
+        ),
+      ),
+      resolvePaymentAccount: jest.fn().mockImplementation((method) =>
+        Promise.resolve(
+          method === PaymentAccountMethod.CASH ? CASH_ACCOUNT : BANK_ACCOUNT,
+        ),
+      ),
+    };
     sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -142,6 +165,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
+        { provide: AccountResolverService,                useValue: accountResolver },
       ],
     }).compile();
 
@@ -169,25 +193,105 @@ describe('CheckoutInvoiceService (event-driven)', () => {
 
     it('throws when totalPaid > amountDue (overpayment)', async () => {
       const dto = cashPaymentDto({
-        payments: [{ paymentMethod: 'cash' as any, amount: 999, accountId: CASH_ACCOUNT }],
+        payments: [{ paymentMethod: 'cash' as any, amount: 999 }],
       });
       await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/exceed/);
     });
 
-    it('throws when remainder > 0 but no receivableAccountId', async () => {
+    it('resolves the receivable account server-side when remainder > 0', async () => {
       const dto = cashPaymentDto({
-        payments: [{ paymentMethod: 'cash' as any, amount: 100, accountId: CASH_ACCOUNT }],
+        payments: [{ paymentMethod: 'cash' as any, amount: 100 }],
       });
-      await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/receivableAccountId/);
+      await service.checkout('inv-1', dto, actor);
+      expect(accountResolver.resolveDefaultAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.RECEIVABLE,
+        actor,
+      );
+    });
+
+    it('throws when the receivable default account is not configured', async () => {
+      accountResolver.resolveDefaultAccount.mockImplementation((role) =>
+        role === AccountingDefaultAccountRole.RECEIVABLE
+          ? Promise.reject(new BadRequestException('No default RECEIVABLE account configured'))
+          : Promise.resolve(REVENUE_ACCOUNT),
+      );
+      const dto = cashPaymentDto({
+        payments: [{ paymentMethod: 'cash' as any, amount: 100 }],
+      });
+      await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/RECEIVABLE/);
     });
 
     it('throws when remainder > 0 but invoice has no customerId', async () => {
       invoiceRepo.findOne.mockResolvedValue(invoiceStub({ customerId: undefined }));
       const dto = cashPaymentDto({
-        payments: [{ paymentMethod: 'cash' as any, amount: 100, accountId: CASH_ACCOUNT }],
-        receivableAccountId: RECEIVABLE_ACCOUNT,
+        payments: [{ paymentMethod: 'cash' as any, amount: 100 }],
       });
       await expect(service.checkout('inv-1', dto, actor)).rejects.toThrow(/customer/);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Server-side account resolution
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('server-side account resolution', () => {
+    it('forwards the selected paymentAccountId and posts the resolved COA account', async () => {
+      const dto = cashPaymentDto({
+        payments: [
+          { paymentMethod: 'cash' as any, amount: 200, paymentAccountId: 'pa-cash-1' },
+        ],
+      });
+
+      await service.checkout('inv-1', dto, actor);
+
+      expect(accountResolver.resolveDefaultAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.REVENUE,
+        actor,
+      );
+      // Resolver decides the COA account; the client only references the mapping id.
+      expect(accountResolver.resolvePaymentAccount).toHaveBeenCalledWith(
+        PaymentAccountMethod.CASH,
+        actor,
+        'pa-cash-1',
+      );
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          revenueAccountId: REVENUE_ACCOUNT,
+          payments: [expect.objectContaining({ accountId: CASH_ACCOUNT })],
+        }),
+        actor,
+      );
+    });
+
+    it('resolves a repeated (method, paymentAccountId) only once', async () => {
+      const dto = cashPaymentDto({
+        payments: [
+          { paymentMethod: 'cash' as any, amount: 100 },
+          { paymentMethod: 'cash' as any, amount: 100 },
+        ],
+      });
+      await service.checkout('inv-1', dto, actor);
+      expect(accountResolver.resolvePaymentAccount).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves each distinct selected account independently', async () => {
+      const dto = cashPaymentDto({
+        payments: [
+          { paymentMethod: 'bank_transfer' as any, amount: 100, paymentAccountId: 'pa-vcb' },
+          { paymentMethod: 'bank_transfer' as any, amount: 100, paymentAccountId: 'pa-tcb' },
+        ],
+      });
+      await service.checkout('inv-1', dto, actor);
+      expect(accountResolver.resolvePaymentAccount).toHaveBeenCalledTimes(2);
+      expect(accountResolver.resolvePaymentAccount).toHaveBeenCalledWith(
+        PaymentAccountMethod.BANK_TRANSFER,
+        actor,
+        'pa-vcb',
+      );
+      expect(accountResolver.resolvePaymentAccount).toHaveBeenCalledWith(
+        PaymentAccountMethod.BANK_TRANSFER,
+        actor,
+        'pa-tcb',
+      );
     });
   });
 
@@ -218,9 +322,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   // ═══════════════════════════════════════════════════════════════════════════
   describe('partial DEBT (totalPaid < amountDue)', () => {
     const partialDto = (): CheckoutInvoiceDto => ({
-      payments: [{ paymentMethod: 'cash' as any, amount: 120, accountId: CASH_ACCOUNT }],
-      revenueAccountId: REVENUE_ACCOUNT,
-      receivableAccountId: RECEIVABLE_ACCOUNT,
+      payments: [{ paymentMethod: 'cash' as any, amount: 120 }],
     });
 
     it('sets status=PARTIAL_DEBT', async () => {
@@ -237,7 +339,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       );
     });
 
-    it('publishes journal event with receivableAccountId and remainder', async () => {
+    it('publishes journal event with resolved receivableAccountId and remainder', async () => {
       await service.checkout('inv-1', partialDto(), actor);
       expect(journalSalePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -258,8 +360,6 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   describe('full DEBT (no payments)', () => {
     const debtDto = (): CheckoutInvoiceDto => ({
       payments: [],
-      revenueAccountId: REVENUE_ACCOUNT,
-      receivableAccountId: RECEIVABLE_ACCOUNT,
     });
 
     it('sets status=DEBT', async () => {
@@ -283,13 +383,12 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   describe('split payment CASH + BANK_TRANSFER', () => {
     const splitDto = (): CheckoutInvoiceDto => ({
       payments: [
-        { paymentMethod: 'cash' as any,          amount: 100, accountId: CASH_ACCOUNT },
-        { paymentMethod: 'bank_transfer' as any, amount: 100, accountId: BANK_ACCOUNT },
+        { paymentMethod: 'cash' as any,          amount: 100 },
+        { paymentMethod: 'bank_transfer' as any, amount: 100 },
       ],
-      revenueAccountId: REVENUE_ACCOUNT,
     });
 
-    it('publishes journal with both payment accounts and revenue', async () => {
+    it('publishes journal with both resolved payment accounts and revenue', async () => {
       await service.checkout('inv-1', splitDto(), actor);
       expect(journalSalePublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -365,8 +464,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   // ═══════════════════════════════════════════════════════════════════════════
   describe('cash movement integration', () => {
     const cardOnlyDto: CheckoutInvoiceDto = {
-      payments: [{ paymentMethod: 'card' as any, amount: 200, accountId: BANK_ACCOUNT }],
-      revenueAccountId: REVENUE_ACCOUNT,
+      payments: [{ paymentMethod: 'card' as any, amount: 200 }],
     };
 
     it('publishes cash event for CASH payment using session cash_account', async () => {
@@ -391,7 +489,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       );
     });
 
-    it('falls back to payment.accountId when no active session', async () => {
+    it('falls back to the resolved cash account when no active session', async () => {
       sessionRepo.findOne.mockResolvedValue(null);
 
       await service.checkout('inv-1', cashPaymentDto(), actor);
@@ -418,11 +516,10 @@ describe('CheckoutInvoiceService (event-driven)', () => {
 
       const splitDto: CheckoutInvoiceDto = {
         payments: [
-          { paymentMethod: 'cash' as any, amount: 100, accountId: CASH_ACCOUNT },
-          { paymentMethod: 'card' as any, amount: 50, accountId: BANK_ACCOUNT },
-          { paymentMethod: 'cash' as any, amount: 50, accountId: CASH_ACCOUNT },
+          { paymentMethod: 'cash' as any, amount: 100 },
+          { paymentMethod: 'card' as any, amount: 50 },
+          { paymentMethod: 'cash' as any, amount: 50 },
         ],
-        revenueAccountId: REVENUE_ACCOUNT,
       };
 
       await service.checkout('inv-1', splitDto, actor);
