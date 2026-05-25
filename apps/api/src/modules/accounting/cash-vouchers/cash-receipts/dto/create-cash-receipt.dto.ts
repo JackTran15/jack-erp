@@ -16,6 +16,11 @@ import { CashReceiptPurpose, CashVoucherPartnerType } from '../../enums';
 import { CashReceiptLineDto } from './cash-receipt-line.dto';
 
 export class CreateCashReceiptDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  documentNumber?: string;
+
   /** "Ngày thu" (YYYY-MM-DD). */
   @IsISO8601()
   voucherDate: string;

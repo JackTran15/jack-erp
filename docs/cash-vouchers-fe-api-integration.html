@@ -35,17 +35,18 @@
 <body>
   <header>
     <h1>Mapping API FE — Quỹ tiền</h1>
-    <p>EPIC-18052026 · BE done · FE integration · Types BE-first · Không sửa BE (gap ghi nhận)</p>
+    <p>EPIC-18052026 · Updated 2026-05-25 PM · Enum consolidation · React Query · Auto doc numbering · Payment purpose mapping · Debt repayment placeholder · Auto-select két tiền</p>
   </header>
   <main>
     <section>
       <nav class="toc">
         <a href="#tasks">Tasks</a>
         <a href="#receipts">Thu/chi</a>
-        <a href="#debt">Thu nợ</a>
+        <a href="#debt-receipt">Thu nợ (PT)</a>
+        <a href="#debt-payment">Trả nợ (PC)</a>
         <a href="#count">Kiểm kê</a>
         <a href="#ledger">Sổ chi tiết</a>
-        <a href="#gaps">Gap G1–G16</a>
+        <a href="#gaps">Gap G1–G20</a>
         <a href="#qa">QA</a>
       </nav>
       <p>Chi tiết gap: <a href="cash-vouchers-fe-be-gaps.md">cash-vouchers-fe-be-gaps.md</a></p>
@@ -55,13 +56,30 @@
       <h2>Triển khai (tick khi xong)</h2>
       <ul class="tasks">
         <li><label><input type="checkbox" checked /> P0 — <code>cash-vouchers.types.ts</code>, <code>labels.ts</code>, <code>adapters.ts</code></label></li>
-        <li><label><input type="checkbox" checked /> P0 — <code>hooks/treasury/*</code> + <code>CashAccountSelect</code></label></li>
+        <li><label><input type="checkbox" checked /> P0 — <code>hooks/treasury/*</code> + auto-select két tiền (bỏ <code>CashAccountSelect</code>)</label></li>
         <li><label><input type="checkbox" checked /> P1 — Thu/chi: <code>TreasuryCashReceiptsPage</code> API</label></li>
         <li><label><input type="checkbox" checked /> P1 — Phiếu thu: tra cứu đối tượng (<code>VoucherEntitySearchModal</code>, G14)</label></li>
         <li><label><input type="checkbox" checked /> P1 — Phiếu thu: UI thu nợ (dialog chọn HĐ, tab Chi tiết / Chứng từ)</label></li>
         <li><label><input type="checkbox" /> P1 — Lưu thu nợ nhiều HĐ lên BE (<code>ledgerDetailToCreateReceiptBody</code>, G16)</label></li>
         <li><label><input type="checkbox" checked /> P2 — Kiểm kê: <code>TreasuryCashCountPage</code> API (Xóa disabled G9)</label></li>
         <li><label><input type="checkbox" checked /> P3 — Sổ: <code>LedgerCashPage</code> cursor buffer + offset pagination (G11)</label></li>
+        <li><label><input type="checkbox" checked /> P0 — Unified partner search → <code>GET /cash-vouchers/partners</code> (G5/G14) + React Query cache</label></li>
+        <li><label><input type="checkbox" checked /> P0 — Debt collection search → <code>GET /cash-vouchers/partners/customers-with-debt</code></label></li>
+        <li><label><input type="checkbox" checked /> P0 — Debt API → <code>GET /cash-vouchers/partners/debts</code></label></li>
+        <li><label><input type="checkbox" checked /> P1 — <code>CashPaymentListQuery.source</code> filter</label></li>
+        <li><label><input type="checkbox" checked /> P1 — G3: auto-load documentLines khi VIEW phiếu thu DEBT_COLLECTION</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Cleanup dead mock stores</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Enum consolidation: <code>PartnerLookupType</code> single enum, bỏ <code>VoucherPartnerKind</code></label></li>
+        <li><label><input type="checkbox" checked /> P1 — Auto document numbering (receipt + payment) via <code>useGenerateDocumentNumber</code></label></li>
+        <li><label><input type="checkbox" checked /> P1 — Required: Số phiếu, Ngày thu/chi</label></li>
+        <li><label><input type="checkbox" checked /> P1 — <code>documentNumber</code> truyền qua BE create DTO (receipt + payment)</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Mục thu/chi: dropdown từ API categories</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Phiếu chi: map <code>CashPaymentPurpose</code> enum, radio Khác/Trả nợ + sub-select</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Phiếu chi: Tham chiếu display-only, Tính vào chi phí = checkbox</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Phiếu chi: <code>DebtRepaymentPickDialog</code> placeholder (trả nợ NCC, BE chưa có API)</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Auto-select két tiền đầu tiên, bỏ <code>CashAccountSelect</code> khỏi cả Thu/chi + Kiểm kê</label></li>
+        <li><label><input type="checkbox" checked /> P1 — Fix <code>documentNumber</code> not sent on update (strip from update payload)</label></li>
+        <li><label><input type="checkbox" /> P2 — Ghép API hóa đơn (<code>GET /invoices/by-code/:code</code>) — tạm dừng, cần BE endpoint</label></li>
         <li><label><input type="checkbox" /> OpenAPI regen commit (chạy <code>pnpm openapi:generate</code> khi API :4000)</label></li>
       </ul>
     </section>
@@ -75,42 +93,38 @@
           <tr><td>List gộp PT+PC</td><td><code>GET /cash-receipts</code> + <code>GET /cash-payments</code></td><td><code>useMergedReceiptPayments</code></td></tr>
           <tr><td>Chi tiết / modal</td><td><code>GET /cash-receipts/:id</code> · <code>GET /cash-payments/:id</code></td><td><code>useCashReceipt</code> · <code>useCashPayment</code></td></tr>
           <tr><td>Tạo / sửa / xóa</td><td>POST · PATCH · DELETE</td><td><code>useCashReceiptMutations</code> · <code>useCashPaymentMutations</code></td></tr>
-          <tr><td>Chọn két</td><td><code>GET /cash/accounts</code></td><td><code>CashAccountSelect</code></td></tr>
+          <tr><td>Két tiền</td><td><code>GET /cash/accounts</code></td><td>Auto-select <code>cashAccounts[0]</code> — <code>useCashAccounts</code></td></tr>
           <tr><td>TK đối ứng</td><td><code>GET /accounts</code></td><td><code>useCoaAccounts</code> (tạm account đầu tiên)</td></tr>
-          <tr><td>Đối tượng nộp / NV thu</td><td><code>GET /customers</code> · <code>GET /inventory/providers</code> · <code>GET /admin/users</code></td><td><code>VoucherPartnerFields</code> · <code>VoucherEntitySearchModal</code></td></tr>
-          <tr><td>Mục thu (dòng)</td><td><code>GET /admin/entities/cash-voucher-categories/records</code></td><td><code>useCashVoucherCategories</code></td></tr>
+          <tr><td>Đối tượng nộp / NV thu</td><td><code>GET /cash-vouchers/partners?type=…</code> (unified)</td><td><code>VoucherPartnerFields</code> · <code>VoucherEntitySearchModal</code> (React Query)</td></tr>
+          <tr><td>Mục thu/chi (dòng)</td><td><code>GET /admin/entities/cash-voucher-categories/records?direction=IN|OUT</code></td><td><code>useCashVoucherCategories</code></td></tr>
+          <tr><td>Số phiếu thu/chi</td><td><code>POST /document-numbering/generate</code></td><td><code>useGenerateDocumentNumber</code> (auto trên CREATE)</td></tr>
         </tbody>
       </table>
     </section>
 
-    <section id="debt">
+    <section id="debt-receipt">
       <h2>Phiếu thu — Mục đích Thu nợ</h2>
       <p>Component: <code>ReceiptVoucherDialog</code> · <code>DebtCollectionPickDialog</code></p>
       <table>
         <thead><tr><th>Bước UI</th><th>API / nguồn</th><th>Trạng thái</th></tr></thead>
         <tbody>
           <tr>
-            <td>Chọn <strong>Thu nợ</strong> → 2 tab <strong>Chi tiết</strong> + <strong>Chứng từ</strong></td>
+            <td>Chọn <strong>Thu nợ</strong> → reset Thông tin chung, disabled fields</td>
             <td>State FE</td>
             <td><span class="badge badge-done">Done</span></td>
           </tr>
           <tr>
             <td><strong>Chọn hóa đơn thu nợ</strong> → Thu nợ từ (lookup + search)</td>
-            <td>KH: <code>GET /customers</code> · DTGH: <code>GET /inventory/providers</code> (lọc DTGH)</td>
-            <td><span class="badge badge-done">Done</span> modal <code>target=debtCollection</code> (Khách hàng | Đối tác giao hàng)</td>
+            <td><code>GET /cash-vouchers/partners/customers-with-debt</code></td>
+            <td><span class="badge badge-done">Done</span> unified debt-collection search (chỉ KH có nợ)</td>
           </tr>
           <tr>
             <td><strong>Lấy dữ liệu</strong> — bảng HĐ nợ</td>
-            <td><code>GET /invoices/customers/:customerId/debts?status=open</code></td>
+            <td><code>GET /cash-vouchers/partners/debts?customerId=…&amp;status=open</code></td>
             <td><span class="badge badge-done">Done</span> (chỉ Khách hàng)</td>
           </tr>
           <tr>
-            <td>Lấy dữ liệu — Đối tác giao hàng</td>
-            <td>—</td>
-            <td><span class="badge badge-gap">G15</span> chưa có API</td>
-          </tr>
-          <tr>
-            <td><strong>Thu nợ</strong> → điền đối tượng, lý do, tab Chứng từ, 1 dòng Chi tiết</td>
+            <td><strong>Thu nợ</strong> → điền đối tượng, lý do, dòng Chi tiết</td>
             <td>State FE (<code>documentLines</code>, <code>debtId</code>)</td>
             <td><span class="badge badge-done">Done</span></td>
           </tr>
@@ -120,20 +134,56 @@
             <td><span class="badge badge-partial">G16</span> chưa gửi phân bổ <code>debtId</code></td>
           </tr>
           <tr>
-            <td>Xem/sửa PT thu nợ từ list — tab Chứng từ</td>
-            <td><code>GET /cash-receipts/:id</code></td>
-            <td><span class="badge badge-gap">G3</span> adapter chưa map <code>documentLines</code></td>
+            <td>Xem/sửa PT thu nợ từ list</td>
+            <td><code>GET /cash-vouchers/partners/debts?customerId=…</code></td>
+            <td><span class="badge badge-partial">G3</span> auto-fetch debts khi VIEW DEBT_COLLECTION</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="debt-payment">
+      <h2>Phiếu chi — Mục đích Trả nợ NCC</h2>
+      <p>Component: <code>PaymentVoucherDialog</code> · <code>DebtRepaymentPickDialog</code></p>
+      <table>
+        <thead><tr><th>Bước UI</th><th>API / nguồn</th><th>Trạng thái</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Radio: <strong>Khác</strong> (sub-select CashPaymentPurpose) / <strong>Trả nợ</strong></td>
+            <td>State FE — <code>CashPaymentPurpose</code> enum</td>
+            <td><span class="badge badge-done">Done</span></td>
+          </tr>
+          <tr>
+            <td>Chọn <strong>Trả nợ</strong> → lock partner/person/address/reason, reset fields</td>
+            <td>State FE</td>
+            <td><span class="badge badge-done">Done</span></td>
+          </tr>
+          <tr>
+            <td><strong>Chọn hóa đơn trả nợ</strong> → search NCC</td>
+            <td><code>GET /cash-vouchers/partners?type=supplier</code></td>
+            <td><span class="badge badge-done">Done</span></td>
+          </tr>
+          <tr>
+            <td><strong>Lấy dữ liệu</strong> — bảng HĐ nợ NCC</td>
+            <td>—</td>
+            <td><span class="badge badge-gap">G15</span> Placeholder: toast "API trả nợ NCC chưa sẵn sàng"</td>
+          </tr>
+          <tr>
+            <td>Xác nhận trả nợ → điền đối tượng, lý do, dòng Chi tiết</td>
+            <td>State FE (<code>documentLines</code>)</td>
+            <td><span class="badge badge-done">Done</span> (wiring ready, chờ data)</td>
           </tr>
         </tbody>
       </table>
       <h3>Luồng (tóm tắt)</h3>
-      <pre style="font-size:0.75rem;background:#f1f5f9;padding:0.75rem;border-radius:6px;overflow:auto">Mục đích Thu nợ
-  → [Chọn hóa đơn thu nợ] → DebtCollectionPickDialog
-       → Thu nợ từ (search: Khách hàng | Đối tác giao hàng)
-       → Lấy dữ liệu → GET .../customers/:id/debts?status=open
-       → chọn HĐ + Số thu → Thu nợ
-  → ReceiptVoucherDialog: tab Chứng từ + dòng Chi tiết
-  → Lưu → POST /cash-receipts (G16: allocations backlog)</pre>
+      <pre style="font-size:0.75rem;background:#f1f5f9;padding:0.75rem;border-radius:6px;overflow:auto">Mục đích chi: ◉ Khác [Chi khác ▾]  ○ Trả nợ
+  → Chọn "Trả nợ" → lock fields, reset partner
+  → [Chọn hóa đơn trả nợ] → DebtRepaymentPickDialog
+       → Trả nợ cho (search: GET /cash-vouchers/partners?type=supplier)
+       → Lấy dữ liệu → toast placeholder (G15: chưa có API)
+       → chọn HĐ + Số trả → Trả nợ
+  → PaymentVoucherDialog: dòng Chi tiết auto-fill
+  → Lưu → POST /cash-payments (purpose=SUPPLIER_PAYMENT)</pre>
     </section>
 
     <section id="count">
@@ -142,6 +192,7 @@
       <table>
         <thead><tr><th>UI</th><th>API</th><th>Ghi chú</th></tr></thead>
         <tbody>
+          <tr><td>Két tiền</td><td><code>GET /cash/accounts</code></td><td>Auto-select <code>cashAccounts[0]</code></td></tr>
           <tr><td>List</td><td><code>GET /cash-counts</code></td><td>Lọc kỳ client (G10)</td></tr>
           <tr><td>Tạo / sửa</td><td>POST · PATCH</td><td><code>countedAt</code> ← ngày+giờ form</td></tr>
           <tr><td>Xử lý</td><td><code>POST /cash-counts/:id/post</code></td><td>—</td></tr>
@@ -157,34 +208,38 @@
       <table>
         <thead><tr><th>UI</th><th>API</th><th>Ghi chú</th></tr></thead>
         <tbody>
-          <tr><td>Load sổ</td><td><code>GET /cash-ledger</code></td><td>Cursor buffer → offset slice (G11)</td></tr>
+          <tr><td>Load sổ</td><td><code>GET /cash-ledger?page=…&amp;pageSize=…</code></td><td>Offset pagination (G11 resolved)</td></tr>
           <tr><td>Drill-down PT/PC</td><td><code>GET /cash-receipts/:id</code> · payments</td><td><code>apiVoucherId</code> trên row</td></tr>
-          <tr><td>Pagination</td><td>Cursor BE</td><td><span class="badge badge-fe">FE</span> giữ PaginationControls — QA sau</td></tr>
+          <tr><td>Pagination</td><td>Offset (<code>page</code>/<code>pageSize</code>)</td><td><span class="badge badge-done">Done</span> BE now native offset</td></tr>
         </tbody>
       </table>
     </section>
 
     <section id="gaps">
-      <h2>Ma trận chênh lệch BE ↔ FE (không sửa BE)</h2>
+      <h2>Ma trận chênh lệch BE ↔ FE</h2>
       <table>
         <thead><tr><th>ID</th><th>Màn</th><th>FE</th><th>BE</th><th>Xử lý</th></tr></thead>
         <tbody>
           <tr><td>G1</td><td>Thu/chi</td><td>List gộp</td><td>2 API</td><td><span class="badge badge-fe">FE merge</span></td></tr>
           <tr><td>G2</td><td>Thu/chi</td><td>List + lines</td><td>GET :id</td><td><span class="badge badge-fe">FE</span></td></tr>
-          <tr><td>G3</td><td>Thu/chi</td><td>Tab Chứng từ thu nợ</td><td>sourceLink; no documentLines on GET</td><td><span class="badge badge-partial">UI done</span> <span class="badge badge-gap">load/save BE</span></td></tr>
-          <tr><td>G4</td><td>Thu/chi</td><td>Modal HĐ SKU</td><td>sourceLink</td><td><span class="badge badge-fe">FE / mock tạm</span></td></tr>
-          <tr><td>G5</td><td>Thu/chi</td><td>Đối tượng / NV thu</td><td>partnerId, staffId</td><td><span class="badge badge-done">Modal + lookup</span></td></tr>
+          <tr><td>G3</td><td>Thu</td><td>Tab Chứng từ thu nợ</td><td>GET /cash-vouchers/partners/debts</td><td><span class="badge badge-partial">Partial</span> auto-load debts khi VIEW</td></tr>
+          <tr><td>G4</td><td>Thu/chi</td><td>Modal HĐ SKU</td><td>sourceLink</td><td><span class="badge badge-gap">Tạm dừng — cần BE API</span></td></tr>
+          <tr><td>G5</td><td>Thu/chi</td><td>Đối tượng / NV thu</td><td>GET /cash-vouchers/partners (unified)</td><td><span class="badge badge-done">Resolved</span></td></tr>
           <tr><td>G6</td><td>KK</td><td>Thành viên</td><td>—</td><td><span class="badge badge-fe">localStorage</span></td></tr>
           <tr><td>G7</td><td>KK</td><td>inventoryUntilDate</td><td>countedAt</td><td><span class="badge badge-fe">FE map</span></td></tr>
           <tr><td>G8</td><td>KK</td><td>denom description</td><td>—</td><td><span class="badge badge-fe">UI only</span></td></tr>
           <tr><td>G9</td><td>KK</td><td>Xóa</td><td>no DELETE</td><td><span class="badge badge-fe">ẩn Xóa</span></td></tr>
           <tr><td>G10</td><td>KK</td><td>Lọc kỳ</td><td>no date query</td><td><span class="badge badge-fe">client filter</span></td></tr>
-          <tr><td>G11</td><td>Sổ</td><td>offset pages</td><td>cursor</td><td><span class="badge badge-fe">adapter</span> QA sau</td></tr>
+          <tr><td>G11</td><td>Sổ</td><td>offset pages</td><td>page/pageSize native</td><td><span class="badge badge-done">Resolved</span></td></tr>
           <tr><td>G12</td><td>Sổ</td><td>Dòng HĐ</td><td>movements</td><td><span class="badge badge-fe">qua phiếu</span></td></tr>
-          <tr><td>G13</td><td>Chung</td><td>cashAccountId</td><td>required</td><td><span class="badge badge-done">CashAccountSelect</span></td></tr>
-          <tr><td>G14</td><td>Thu/chi</td><td>Lookup đối tượng</td><td>1 API / loại</td><td><span class="badge badge-done">By-kind modal</span></td></tr>
-          <tr><td>G15</td><td>Thu/chi</td><td>Thu nợ DTGH</td><td>debts by customerId</td><td><span class="badge badge-gap">BE backlog</span></td></tr>
-          <tr><td>G16</td><td>Thu/chi</td><td>Lưu nhiều HĐ thu nợ</td><td>single reference</td><td><span class="badge badge-gap">POST body</span></td></tr>
+          <tr><td>G13</td><td>Chung</td><td>cashAccountId</td><td>required</td><td><span class="badge badge-done">Auto-select [0]</span></td></tr>
+          <tr><td>G14</td><td>Thu/chi</td><td>Lookup đối tượng</td><td>GET /cash-vouchers/partners (unified)</td><td><span class="badge badge-done">Resolved</span></td></tr>
+          <tr><td>G15</td><td>Chi</td><td>Trả nợ NCC</td><td>no supplier-debts API</td><td><span class="badge badge-gap">Placeholder UI — BE backlog</span></td></tr>
+          <tr><td>G16</td><td>Thu</td><td>Lưu nhiều HĐ thu nợ</td><td>single reference</td><td><span class="badge badge-gap">POST body</span></td></tr>
+          <tr><td>G17</td><td>Thu/chi</td><td>Auto document number</td><td>POST /document-numbering/generate</td><td><span class="badge badge-done">Resolved</span></td></tr>
+          <tr><td>G18</td><td>Chi</td><td>Mục đích chi mapping</td><td>CashPaymentPurpose enum</td><td><span class="badge badge-done">Resolved</span></td></tr>
+          <tr><td>G19</td><td>Chi</td><td>Mục chi (category)</td><td>API categories direction=OUT</td><td><span class="badge badge-done">Resolved</span></td></tr>
+          <tr><td>G20</td><td>Thu</td><td>Mục thu (category)</td><td>API categories direction=IN</td><td><span class="badge badge-done">Resolved</span></td></tr>
         </tbody>
       </table>
     </section>
@@ -193,23 +248,31 @@
       <h2>QA checklist</h2>
       <h3>Thu, chi</h3>
       <ul class="tasks">
-        <li><label><input type="checkbox" /> QA-1: Sidebar → Thu, chi tiền mặt</label></li>
-        <li><label><input type="checkbox" /> QA-2: Chọn két + lọc kỳ + Nạp</label></li>
+        <li><label><input type="checkbox" /> QA-1: Sidebar → Thu, chi tiền mặt → list tự load (két auto-select)</label></li>
+        <li><label><input type="checkbox" /> QA-2: Lọc kỳ + Nạp</label></li>
         <li><label><input type="checkbox" /> QA-3: Panel chi tiết dòng phiếu</label></li>
-        <li><label><input type="checkbox" /> QA-7: Thêm phiếu thu/chi → Lưu</label></li>
+        <li><label><input type="checkbox" /> QA-7: Thêm phiếu thu/chi → Số phiếu auto-gen, Ngày required → Lưu</label></li>
       </ul>
       <h3>Phiếu thu — Thu nợ</h3>
       <ul class="tasks">
-        <li><label><input type="checkbox" /> QA-D1: Chọn mục đích <strong>Thu nợ</strong> → hiện 2 tab Chi tiết / Chứng từ</label></li>
-        <li><label><input type="checkbox" /> QA-D2: <strong>Chọn hóa đơn thu nợ</strong> → search Thu nợ từ: dropdown <strong>Khách hàng</strong> | <strong>Đối tác giao hàng</strong></label></li>
-        <li><label><input type="checkbox" /> QA-D3: KH + Lấy dữ liệu → bảng HĐ; chọn + Số thu → Thu nợ → tab Chứng từ + dòng Chi tiết</label></li>
-        <li><label><input type="checkbox" /> QA-D4: DTGH + Lấy dữ liệu → trống / thông báo (G15)</label></li>
+        <li><label><input type="checkbox" /> QA-D1: Chọn mục đích <strong>Thu nợ</strong> → reset + disabled thông tin chung</label></li>
+        <li><label><input type="checkbox" /> QA-D2: <strong>Chọn hóa đơn thu nợ</strong> → search KH có nợ</label></li>
+        <li><label><input type="checkbox" /> QA-D3: KH + Lấy dữ liệu → bảng HĐ; chọn + Số thu → Thu nợ → dòng Chi tiết</label></li>
         <li><label><input type="checkbox" /> QA-D5: Lưu phiếu thu thu nợ — kiểm BE payload (G16)</label></li>
-        <li><label><input type="checkbox" /> QA-D6: Mở PT thu nợ từ list — tab Chứng từ từ API (G3)</label></li>
+        <li><label><input type="checkbox" /> QA-D6: Mở PT thu nợ từ list — auto-fetch debts (G3)</label></li>
+      </ul>
+      <h3>Phiếu chi — Trả nợ</h3>
+      <ul class="tasks">
+        <li><label><input type="checkbox" /> QA-P1: Mục đích chi radio: Khác (sub-select) / Trả nợ</label></li>
+        <li><label><input type="checkbox" /> QA-P2: Chọn "Khác" → sub-select CashPaymentPurpose options</label></li>
+        <li><label><input type="checkbox" /> QA-P3: Chọn "Trả nợ" → lock partner/person/address/reason</label></li>
+        <li><label><input type="checkbox" /> QA-P4: Chọn hóa đơn trả nợ → search NCC → Lấy dữ liệu → toast placeholder (G15)</label></li>
+        <li><label><input type="checkbox" /> QA-P5: Tham chiếu display-only, Tính vào chi phí = checkbox</label></li>
+        <li><label><input type="checkbox" /> QA-P6: Mục chi = dropdown từ API categories</label></li>
       </ul>
       <h3>Kiểm kê</h3>
       <ul class="tasks">
-        <li><label><input type="checkbox" /> QA-1: Sidebar → Kiểm kê</label></li>
+        <li><label><input type="checkbox" /> QA-1: Sidebar → Kiểm kê → list tự load (két auto-select)</label></li>
         <li><label><input type="checkbox" /> QA-7: Xử lý → Đã xử lý</label></li>
       </ul>
       <h3>Sổ chi tiết</h3>

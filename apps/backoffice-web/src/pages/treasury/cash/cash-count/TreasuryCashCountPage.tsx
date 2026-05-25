@@ -1,4 +1,3 @@
-import { useCallback, useMemo, useState } from "react";
 import {
   DocumentListShell,
   PageToolbar,
@@ -8,6 +7,7 @@ import {
   type ToolbarItem,
 } from "@erp/ui";
 import { Eye, Pencil, Plus, RefreshCw } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   TreasuryCashTabIdEnum,
@@ -22,6 +22,7 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   loadCashCountParticipants,
   saveCashCountParticipants,
@@ -29,14 +30,13 @@ import {
   useCashCountMutations,
   useCashCountsList,
 } from "../../../../hooks/treasury/use-cash-counts";
-import { CashAccountSelect } from "../../components/CashAccountSelect";
+import { CashCountDetailPanel } from "./CashCountDetailPanel";
+import { CashCountFormDialog } from "./CashCountFormDialog";
+import { CreateCashCountDialog } from "./CreateCashCountDialog";
 import {
   cashCountToRecord,
   recordToCreateCashCountBody,
 } from "./cash-count.api-adapter";
-import { CashCountDetailPanel } from "./CashCountDetailPanel";
-import { CashCountFormDialog } from "./CashCountFormDialog";
-import { CreateCashCountDialog } from "./CreateCashCountDialog";
 import {
   CASH_COUNT_FILTER_KEYS,
   type CashCountFilterKey,
@@ -63,7 +63,8 @@ function emptyColumnFilters(): Record<CashCountFilterKey, ColumnFilter> {
 }
 
 export function TreasuryCashCountPage() {
-  const [cashAccountId, setCashAccountId] = useState("");
+  const { data: cashAccounts } = useCashAccounts();
+  const cashAccountId = cashAccounts?.[0]?.id ?? "";
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),
@@ -90,10 +91,11 @@ export function TreasuryCashCountPage() {
     [cashAccountId],
   );
 
-  const { data: listData, isLoading, refetch } = useCashCountsList(
-    listQuery,
-    Boolean(cashAccountId),
-  );
+  const {
+    data: listData,
+    isLoading,
+    refetch,
+  } = useCashCountsList(listQuery, Boolean(cashAccountId));
 
   const records = useMemo(() => {
     const raw = (listData?.data ?? []).map(cashCountToRecord);
@@ -235,9 +237,10 @@ export function TreasuryCashCountPage() {
       label: "Sửa",
       icon: Pencil,
       disabled: !canMutateSelected,
-      tooltip: selected?.status === CashCountStatusEnum.PROCESSED
-        ? "Phiếu đã xử lý chỉ xem"
-        : undefined,
+      tooltip:
+        selected?.status === CashCountStatusEnum.PROCESSED
+          ? "Phiếu đã xử lý chỉ xem"
+          : undefined,
       onClick: () => {
         if (selected) openForm(selected, CashCountDialogModeEnum.EDIT);
       },
@@ -254,7 +257,7 @@ export function TreasuryCashCountPage() {
   const handleSaveFromForm = useCallback(
     async (payload: CashCountRecord) => {
       if (!cashAccountId) {
-        toast.error("Chọn két tiền mặt.");
+        toast.error("Chưa có két tiền mặt.");
         return;
       }
       const countedAt = `${payload.countDate}T${payload.countTime || "12:00"}:00.000Z`;
@@ -308,13 +311,7 @@ export function TreasuryCashCountPage() {
             <button
               type="button"
               className="flex items-center gap-1.5 rounded-none bg-[#1f2d8a] px-3 py-2 text-sm font-medium text-white hover:bg-[#1a266f]"
-              onClick={() => {
-                if (!cashAccountId) {
-                  toast.error("Chọn két tiền mặt trước.");
-                  return;
-                }
-                setCreatePickerOpen(true);
-              }}
+              onClick={() => setCreatePickerOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
               Thêm mới
@@ -328,11 +325,6 @@ export function TreasuryCashCountPage() {
         }
         filters={
           <div className="flex flex-wrap items-end gap-4">
-            <CashAccountSelect
-              value={cashAccountId}
-              onChange={setCashAccountId}
-              required
-            />
             <PeriodFilter
               value={period}
               onChange={setPeriod}
@@ -359,11 +351,7 @@ export function TreasuryCashCountPage() {
           columns={columns}
           rows={pagedRecords}
           loading={isLoading}
-          emptyLabel={
-            cashAccountId
-              ? "Không có phiếu kiểm kê trong kỳ đã chọn."
-              : "Chọn két tiền mặt để xem danh sách."
-          }
+          emptyLabel="Không có phiếu kiểm kê trong kỳ đã chọn."
           getRowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id)}
           columnFilterControl={columnFilterControl}
@@ -398,7 +386,9 @@ export function TreasuryCashCountPage() {
       {formOpen ? (
         <CashCountFormDialog
           mode={formMode}
-          initial={formMode === CashCountDialogModeEnum.CREATE ? null : formRecord}
+          initial={
+            formMode === CashCountDialogModeEnum.CREATE ? null : formRecord
+          }
           createDraft={
             createDraftDate ? { inventoryUntilDate: createDraftDate } : null
           }

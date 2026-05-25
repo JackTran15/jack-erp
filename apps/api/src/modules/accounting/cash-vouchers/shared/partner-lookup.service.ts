@@ -83,14 +83,14 @@ export class PartnerLookupService {
   private readonly CUSTOMER_SELECT = `
     SELECT 'customer'::text AS type, c.id, c.name, c.code, c.address
     FROM customers c
-    WHERE c.organization_id = $1
+    WHERE c.organization_id::text = $1
       AND c.status <> 'MERGED'
       AND ($2::text IS NULL OR c.name ILIKE $2 OR c.code ILIKE $2)`;
 
   private readonly SUPPLIER_SELECT = `
     SELECT 'supplier'::text AS type, p.id, p.name, p.code, p.notes AS address
     FROM inventory_providers p
-    WHERE p.organization_id = $1
+    WHERE p.organization_id::text = $1
       AND p.is_active = true
       AND ($2::text IS NULL OR p.name ILIKE $2 OR p.code ILIKE $2)`;
 
@@ -100,8 +100,8 @@ export class PartnerLookupService {
       ep.code, NULL::text AS address
     FROM users u
     LEFT JOIN employee_profiles ep
-      ON ep.user_id = u.id AND ep.organization_id = $1
-    WHERE u.organization_id = $1
+      ON ep.user_id = u.id AND ep.organization_id::text = $1
+    WHERE u.organization_id::text = $1
       AND u.is_active = true
       AND ($2::text IS NULL
         OR btrim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) ILIKE $2
@@ -156,7 +156,7 @@ export class PartnerLookupService {
         original_amount, paid_amount, remaining_amount,
         issued_at, due_date, settled_at, status, note
       FROM invoice_debts
-      WHERE organization_id = $1 AND customer_id = $2 AND status = $3
+      WHERE organization_id::text = $1 AND customer_id::text = $2 AND status = $3
       ORDER BY issued_at DESC, id DESC`;
     const rows = await this.dataSource.query(sql, [
       actor.organizationId,
@@ -204,8 +204,8 @@ export class PartnerLookupService {
         d.due_date, d.status, c.name AS customer_name, c.code AS customer_code
       FROM invoice_debts d
       JOIN customers c
-        ON c.id = d.customer_id AND c.organization_id = $1
-      WHERE d.organization_id = $1
+        ON c.id = d.customer_id AND c.organization_id::text = $1
+      WHERE d.organization_id::text = $1
         AND d.remaining_amount > 0
         AND c.status <> 'MERGED'
         AND ($2::text IS NULL OR c.name ILIKE $2 OR c.code ILIKE $2)`;

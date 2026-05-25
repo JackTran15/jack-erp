@@ -1,20 +1,20 @@
 import { create } from "zustand";
 import {
-  VOUCHER_PARTNER_DEFAULT_KIND,
-  VoucherPartnerKindUi,
+  PARTNER_LOOKUP_DEFAULT,
+  PartnerLookupType,
 } from "./voucher-partner.constants";
-import type { VoucherMergedPartnerOption } from "./voucher-partner-search";
+import type { VoucherPartnerOption } from "./voucher-partner-search";
 
 export type VoucherEntitySearchTarget = "partner" | "staff" | "debtCollection";
 
 export interface VoucherEntitySearchCacheEntry {
-  items: VoucherMergedPartnerOption[];
+  items: VoucherPartnerOption[];
   hasMore: boolean;
   total: number | null;
 }
 
 export interface VoucherEntitySearchSession {
-  kindFilter: VoucherPartnerKindUi;
+  kindFilter: PartnerLookupType;
   page: number;
   pageSize: number;
   searchInput: string;
@@ -30,8 +30,8 @@ export function defaultVoucherEntitySearchSession(
   return {
     kindFilter:
       target === "staff"
-        ? VoucherPartnerKindUi.EMPLOYEE
-        : VOUCHER_PARTNER_DEFAULT_KIND,
+        ? PartnerLookupType.EMPLOYEE
+        : PARTNER_LOOKUP_DEFAULT,
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
     searchInput: "",
@@ -40,7 +40,6 @@ export function defaultVoucherEntitySearchSession(
   };
 }
 
-// Stable defaults — avoids render loops when subscribing to getSession().
 const STABLE_DEFAULT_SESSIONS: Record<
   VoucherEntitySearchTarget,
   VoucherEntitySearchSession
@@ -52,7 +51,7 @@ const STABLE_DEFAULT_SESSIONS: Record<
 
 export function buildVoucherEntitySearchCacheKey(
   target: VoucherEntitySearchTarget,
-  kind: VoucherPartnerKindUi,
+  kind: PartnerLookupType,
   query: string,
   page: number,
   pageSize: number,

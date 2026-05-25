@@ -12,7 +12,6 @@ import { Check, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   LookupField,
-  type LookupSearchResult,
 } from "../../../../components/forms/LookupField";
 import {
   BaseDataTable,
@@ -23,34 +22,30 @@ import {
   TABLE_NUM_CLASS,
 } from "../../ledger-cash/ledger-cash.constants";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
-import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
 import {
   mergePartnerSearchWithSelection,
+  usePartnerSearch,
   type VoucherPartnerOption,
 } from "../_shared/voucher-partner-search";
 import { PartnerLookupType } from "../_shared/voucher-partner.constants";
-import {
-  useCustomerOpenDebts,
-  mapInvoiceDebtsToPickRows,
-} from "./debt-collection.api";
-import { useDebtCollectionSearch } from "./debt-collection-search";
 
 const PARTNER_LOOKUP_COLUMNS = [
   {
     key: "code",
     label: "Mã",
-    className: "w-28",
-    render: (item: VoucherPartnerOption) => item.code || "—",
+    className: "w-32",
+    render: (item: VoucherPartnerOption) => item.code,
   },
   {
     key: "name",
     label: "Tên",
+    className: "flex-1 min-w-[120px]",
     render: (item: VoucherPartnerOption) => item.name,
   },
   {
-    key: "kind",
+    key: "kindLabel",
     label: "Loại",
-    className: "w-36",
+    className: "w-32",
     render: (item: VoucherPartnerOption) => item.kindLabel,
   },
   {
@@ -63,22 +58,22 @@ const PARTNER_LOOKUP_COLUMNS = [
 
 type PickRow = LedgerCashVoucherDocumentLine & { selected: boolean };
 
-export interface DebtCollectionPickResult {
+export interface DebtRepaymentPickResult {
   partner: VoucherPartnerOption;
-  collectionDate: string;
+  repaymentDate: string;
   documentLines: LedgerCashVoucherDocumentLine[];
-  totalCollect: number;
+  totalRepay: number;
 }
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultCollectionDate: string;
+  defaultRepaymentDate: string;
   initialPartner?: VoucherPartnerOption | null;
-  onConfirm: (result: DebtCollectionPickResult) => void;
+  onConfirm: (result: DebtRepaymentPickResult) => void;
 }
 
-function sumCollect(rows: PickRow[]): number {
+function sumRepay(rows: PickRow[]): number {
   return rows.reduce(
     (s, r) => (r.selected ? s + (Number(r.collectAmount) || 0) : s),
     0,
@@ -89,29 +84,21 @@ function sumField(rows: PickRow[], key: keyof PickRow): number {
   return rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 }
 
-export function DebtCollectionPickDialog({
+export function DebtRepaymentPickDialog({
   open,
   onOpenChange,
-  defaultCollectionDate,
+  defaultRepaymentDate,
   initialPartner,
   onConfirm,
 }: Props) {
-  const searchDebtParties = useDebtCollectionSearch();
-  const fetchDebts = useCustomerOpenDebts();
+  const searchPartners = usePartnerSearch();
   const [partner, setPartner] = useState<VoucherPartnerOption | null>(null);
   const [partnerCode, setPartnerCode] = useState("");
-  const [collectionDate, setCollectionDate] = useState(defaultCollectionDate);
+  const [repaymentDate, setRepaymentDate] = useState(defaultRepaymentDate);
   const [rows, setRows] = useState<PickRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [partnerSearchOpen, setPartnerSearchOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setPartner(initialPartner ?? null);
-    setPartnerCode(initialPartner?.code ?? "");
-    setCollectionDate(defaultCollectionDate);
-    setRows([]);
-  }, [open, defaultCollectionDate, initialPartner]);
+  const selectedPartner = partner ?? initialPartner ?? null;
 
   const prevPartnerId = useRef(partner?.id);
   useEffect(() => {
@@ -121,85 +108,52 @@ export function DebtCollectionPickDialog({
     }
   }, [partner?.id]);
 
-  const selectedPartner = partner;
+  useEffect(() => {
+    if (open && initialPartner && !partner) {
+      setPartner(initialPartner);
+      setPartnerCode(initialPartner.code);
+    }
+  }, [open, initialPartner, partner]);
 
-  const searchParties = useCallback(
+  const searchSuppliers = useCallback(
     async (query: string, page: number, pageSize?: number) => {
-      const raw = await searchDebtParties(
+      const raw = await searchPartners(
+        PartnerLookupType.SUPPLIER,
         query,
         page,
         pageSize,
       );
-      return mergePartnerSearchWithSelection(
-        raw as LookupSearchResult<VoucherPartnerOption>,
-        selectedPartner,
-        page,
-      );
+      return mergePartnerSearchWithSelection(raw, selectedPartner, page);
     },
-    [selectedPartner, searchDebtParties],
+    [selectedPartner, searchPartners],
   );
-
-  const totalCollect = useMemo(() => sumCollect(rows), [rows]);
 
   const loadDebts = useCallback(async () => {
     if (!partner) {
-      toast.error("Vui lòng chọn đối tượng thu nợ.");
-      return;
-    }
-    if (partner.kind !== PartnerLookupType.CUSTOMER) {
-      toast.message("Hiện chỉ hỗ trợ tải hóa đơn nợ của khách hàng.");
-      setRows([]);
+      toast.error("Vui lòng chọn nhà cung cấp.");
       return;
     }
     setLoading(true);
     try {
-      const debts = await fetchDebts(partner.id);
-      const mapped = mapInvoiceDebtsToPickRows(debts);
-      setRows(
-        mapped.map((line) => ({
-          ...line,
-          selected: false,
-          collectAmount: line.remainingAmount,
-        })),
-      );
-      if (mapped.length === 0) {
-        toast.message("Không có hóa đơn nợ mở cho đối tượng này.");
-      }
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Không tải được danh sách công nợ.";
-      toast.error(msg);
+      toast.info("API trả nợ NCC chưa sẵn sàng.");
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [partner, fetchDebts]);
+  }, [partner]);
 
   const updateRow = useCallback(
     (documentNo: string, patch: Partial<PickRow>) => {
       setRows((prev) =>
-        prev.map((r) => (r.documentNo === documentNo ? { ...r, ...patch } : r)),
+        prev.map((r) =>
+          r.documentNo === documentNo ? { ...r, ...patch } : r,
+        ),
       );
     },
     [],
   );
 
-  const allSelected = rows.length > 0 && rows.every((r) => r.selected);
-
-  const toggleAll = useCallback(() => {
-    const next = !allSelected;
-    setRows((prev) =>
-      prev.map((r) => ({
-        ...r,
-        selected: next,
-        collectAmount: next
-          ? r.collectAmount > 0
-            ? r.collectAmount
-            : r.remainingAmount
-          : 0,
-      })),
-    );
-  }, [allSelected]);
+  const totalRepay = useMemo(() => sumRepay(rows), [rows]);
 
   const columns: TableColumn<PickRow>[] = useMemo(
     () => [
@@ -208,13 +162,20 @@ export function DebtCollectionPickDialog({
         label: "Ngày chứng từ",
         width: 110,
         render: (r) =>
-          r.documentDate.toLocaleDateString("vi-VN", LEDGER_CASH_VI_DATE),
+          r.documentDate
+            ? new Date(r.documentDate).toLocaleDateString(
+                "vi-VN",
+                LEDGER_CASH_VI_DATE,
+              )
+            : "",
       },
       {
         key: "documentNo",
         label: "Số chứng từ",
-        width: 130,
-        render: (r) => r.documentNo,
+        width: 140,
+        render: (r) => (
+          <span className="font-medium text-primary">{r.documentNo}</span>
+        ),
       },
       {
         key: "debtAmount",
@@ -226,7 +187,7 @@ export function DebtCollectionPickDialog({
       },
       {
         key: "collectedAmount",
-        label: "Số đã thu",
+        label: "Số đã trả",
         width: 110,
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
@@ -234,7 +195,7 @@ export function DebtCollectionPickDialog({
       },
       {
         key: "remainingAmount",
-        label: "Số còn phải thu",
+        label: "Số còn phải trả",
         width: 130,
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
@@ -242,7 +203,7 @@ export function DebtCollectionPickDialog({
       },
       {
         key: "collectAmount",
-        label: "Số thu",
+        label: "Số trả",
         width: 130,
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
@@ -306,32 +267,32 @@ export function DebtCollectionPickDialog({
             ...col,
             footer: (
               <span className={cn("font-semibold", TABLE_NUM_CLASS)}>
-                {formatMoneyInteger(totalCollect)}
+                {formatMoneyInteger(totalRepay)}
               </span>
             ),
           };
         }
         return col;
       }),
-    [columns, rows, totalCollect],
+    [columns, rows, totalRepay],
   );
 
   const handleConfirm = useCallback(() => {
     if (!partner) {
-      toast.error("Vui lòng chọn đối tượng thu nợ.");
+      toast.error("Vui lòng chọn nhà cung cấp.");
       return;
     }
     const picked = rows.filter(
       (r) => r.selected && Number(r.collectAmount) > 0,
     );
     if (picked.length === 0) {
-      toast.error("Vui lòng chọn ít nhất một hóa đơn và nhập số thu.");
+      toast.error("Vui lòng chọn ít nhất một hóa đơn và nhập số trả.");
       return;
     }
     for (const r of picked) {
       if (r.collectAmount > r.remainingAmount) {
         toast.error(
-          `Số thu (${r.documentNo}) không được lớn hơn số còn phải thu.`,
+          `Số trả (${r.documentNo}) không được lớn hơn số còn phải trả.`,
         );
         return;
       }
@@ -339,15 +300,14 @@ export function DebtCollectionPickDialog({
     const documentLines: LedgerCashVoucherDocumentLine[] = picked.map(
       ({ selected: _s, ...line }) => line,
     );
-    const total = sumCollect(picked);
     onConfirm({
       partner,
-      collectionDate,
+      repaymentDate,
       documentLines,
-      totalCollect: total,
+      totalRepay: sumRepay(picked),
     });
     onOpenChange(false);
-  }, [partner, rows, collectionDate, onConfirm, onOpenChange]);
+  }, [partner, rows, repaymentDate, onConfirm, onOpenChange]);
 
   if (!open) return null;
 
@@ -355,7 +315,7 @@ export function DebtCollectionPickDialog({
     <AppModal
       open
       onOpenChange={onOpenChange}
-      title="Chọn hóa đơn thu nợ"
+      title="Chọn hóa đơn trả nợ"
       defaultWidth={960}
       defaultHeight={560}
       minWidth={720}
@@ -373,13 +333,13 @@ export function DebtCollectionPickDialog({
           </Button>
           <Button type="button" onClick={handleConfirm}>
             <Check className="mr-1 h-4 w-4" />
-            Thu nợ
+            Trả nợ
           </Button>
         </div>
       }
     >
       <div className="grid shrink-0 grid-cols-[1fr_auto_auto] items-end gap-3">
-        <FormField label="Thu nợ từ" layout="horizontal" labelWidth="8rem">
+        <FormField label="Trả nợ cho" layout="horizontal" labelWidth="8rem">
           <LookupField
             value={partnerCode}
             onValueChange={(code) => {
@@ -390,20 +350,19 @@ export function DebtCollectionPickDialog({
               setPartner(item);
               setPartnerCode(item.code);
             }}
-            search={searchParties}
+            search={searchSuppliers}
             itemKey={(item) => item.lookupKey}
             renderItem={(item) => item.name}
             columns={PARTNER_LOOKUP_COLUMNS}
-            placeholder="Chọn khách hàng"
+            placeholder="Chọn nhà cung cấp"
             portalToBody
             dropdownMinWidth={520}
-            onSearchButtonClick={() => setPartnerSearchOpen(true)}
           />
         </FormField>
-        <FormField label="Ngày thu nợ" layout="horizontal" labelWidth="8rem">
+        <FormField label="Ngày trả nợ" layout="horizontal" labelWidth="8rem">
           <DateTimeField
-            value={collectionDate}
-            onChange={(e) => setCollectionDate(e.target.value)}
+            value={repaymentDate}
+            onChange={(e) => setRepaymentDate(e.target.value)}
             includeTime={false}
           />
         </FormField>
@@ -417,9 +376,9 @@ export function DebtCollectionPickDialog({
           <Search className="mr-1 h-4 w-4" />
           Lấy dữ liệu
         </Button>
-        <FormField label="Số thu" layout="horizontal" labelWidth="8rem">
+        <FormField label="Số trả" layout="horizontal" labelWidth="8rem">
           <MoneyInput
-            value={totalCollect}
+            value={totalRepay}
             onChange={() => {}}
             disabled
             className="bg-muted"
@@ -432,49 +391,32 @@ export function DebtCollectionPickDialog({
         columns={columnsWithFooter}
         rows={rows}
         loading={loading}
-        emptyLabel="Chưa có dữ liệu — chọn đối tượng và bấm Lấy dữ liệu."
+        emptyLabel="Chọn nhà cung cấp và bấm Lấy dữ liệu."
         getRowKey={(r) => r.debtId ?? r.documentNo}
         leadingColumn={{
           width: 40,
           header: (
             <input
               type="checkbox"
-              checked={allSelected}
-              onChange={toggleAll}
-              aria-label="Chọn tất cả"
+              checked={rows.length > 0 && rows.every((r) => r.selected)}
+              onChange={(e) =>
+                setRows((prev) =>
+                  prev.map((r) => ({ ...r, selected: e.target.checked })),
+                )
+              }
             />
           ),
-          cell: (r) => (
+          cell: (row) => (
             <input
               type="checkbox"
-              checked={r.selected}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                updateRow(r.documentNo, {
-                  selected: checked,
-                  collectAmount: checked
-                    ? r.collectAmount > 0
-                      ? r.collectAmount
-                      : r.remainingAmount
-                    : 0,
-                });
-              }}
-              aria-label={`Chọn ${r.documentNo}`}
+              checked={row.selected}
+              onChange={(e) =>
+                updateRow(row.documentNo, { selected: e.target.checked })
+              }
             />
           ),
         }}
       />
-      {partnerSearchOpen ? (
-        <VoucherEntitySearchModal
-          open
-          target="debtCollection"
-          onOpenChange={setPartnerSearchOpen}
-          onSelectPartner={(item) => {
-            setPartner(item);
-            setPartnerCode(item.code);
-          }}
-        />
-      ) : null}
     </AppModal>
   );
 }

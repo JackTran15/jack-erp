@@ -256,6 +256,7 @@ export interface ReceiptPaymentListItem {
 }
 
 export interface CreateCashReceiptBody {
+  documentNumber?: string;
   voucherDate: string;
   purpose?: CashReceiptPurpose;
   partnerType?: CashVoucherPartnerType;
@@ -277,6 +278,7 @@ export interface CreateCashReceiptBody {
 }
 
 export interface CreateCashPaymentBody {
+  documentNumber?: string;
   voucherDate: string;
   purpose?: CashPaymentPurpose;
   partnerType?: CashVoucherPartnerType;
@@ -326,6 +328,7 @@ export interface CashPaymentListQuery {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  source?: "GOODS_RECEIPT" | "EXPENSE" | "MANUAL";
   page?: number;
   pageSize?: number;
 }

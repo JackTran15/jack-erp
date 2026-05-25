@@ -1,5 +1,5 @@
-import type { CashVoucherPartnerType } from "../cash-vouchers.types";
-import type { VoucherPartnerKindUi } from "../documents/_shared/voucher-partner.constants";
+import type { CashPaymentPurpose, CashVoucherPartnerType } from "../cash-vouchers.types";
+import type { PartnerLookupType } from "../documents/_shared/voucher-partner.constants";
 
 export enum LedgerCashDocumentTypeEnum {
   OPENING_BALANCE = "opening_balance",
@@ -116,11 +116,12 @@ export interface LedgerCashGoodsReceiptInfo {
 export interface LedgerCashVoucherDetail {
   kind: LedgerCashVoucherKindEnum;
   purpose: LedgerCashVoucherPurposeEnum;
+  paymentPurpose?: CashPaymentPurpose;
   voucherNo: string;
   voucherDate: Date;
   counterpartyCode: string;
   counterpartyName: string;
-  partnerKind?: VoucherPartnerKindUi;
+  partnerKind?: PartnerLookupType;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
   payerName?: string;

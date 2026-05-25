@@ -11,4 +11,14 @@ export const treasuryQueryKeys = {
   cashCounts: (filters: unknown) => ["cash-counts", filters] as const,
   cashCount: (id: string | undefined) => ["cash-counts", "detail", id] as const,
   cashLedger: (params: unknown) => ["cash-ledger", params] as const,
+  partnerSearch: (type: string, query: string, page: number, pageSize: number) =>
+    ["voucher-partners", "search", type, query, page, pageSize] as const,
+  partnerById: (partnerType: string | undefined, partnerId: string | undefined) =>
+    ["voucher-partners", "detail", partnerType, partnerId] as const,
+  staffById: (id: string | undefined) =>
+    ["voucher-partners", "staff", id] as const,
+  debtCollectionParties: (query: string, page: number, pageSize: number) =>
+    ["voucher-partners", "debt-parties", query, page, pageSize] as const,
+  customerDebts: (customerId: string) =>
+    ["voucher-partners", "customer-debts", customerId] as const,
 };

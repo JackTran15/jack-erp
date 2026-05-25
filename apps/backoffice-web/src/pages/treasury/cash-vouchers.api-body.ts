@@ -6,13 +6,13 @@ import {
   type CreateCashReceiptBody,
 } from "./cash-vouchers.types";
 import { toIsoDate } from "./documents/_shared/voucher-dialog.utils";
-import { partnerKindToBeType } from "./documents/_shared/voucher-partner.constants";
+import { lookupTypeToPartnerType } from "./documents/_shared/voucher-partner.constants";
 
 function mapPartnerFields(detail: LedgerCashVoucherDetail) {
   const partnerType =
     detail.partnerType ??
     (detail.partnerId && detail.partnerKind
-      ? partnerKindToBeType(detail.partnerKind)
+      ? lookupTypeToPartnerType(detail.partnerKind)
       : undefined);
   return {
     partnerType,
@@ -32,6 +32,7 @@ export function ledgerDetailToCreateReceiptBody(
   }));
   const totalAmount = lines.reduce((s, l) => s + l.amount, 0);
   return {
+    documentNumber: detail.voucherNo || undefined,
     voucherDate: toIsoDate(detail.voucherDate),
     purpose:
       detail.purpose === "debt_collection"
@@ -58,8 +59,9 @@ export function ledgerDetailToCreatePaymentBody(
   }));
   const totalAmount = lines.reduce((s, l) => s + l.amount, 0);
   return {
+    documentNumber: detail.voucherNo || undefined,
     voucherDate: toIsoDate(detail.voucherDate),
-    purpose: CashPaymentPurpose.OTHER,
+    purpose: detail.paymentPurpose ?? CashPaymentPurpose.OTHER,
     payeeName: detail.payerName ?? detail.counterpartyName,
     reason: detail.reason,
     ...mapPartnerFields(detail),

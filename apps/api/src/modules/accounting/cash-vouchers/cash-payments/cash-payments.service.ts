@@ -107,6 +107,7 @@ export class CashPaymentsService {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
         createdBy: actor.userId,
+        documentNumber: dto.documentNumber ?? undefined,
         voucherDate: dto.voucherDate,
         status: CashVoucherStatus.DRAFT,
         purpose: dto.purpose ?? CashPaymentPurpose.OTHER,

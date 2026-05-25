@@ -17,7 +17,7 @@ import {
   type CashReceiptLine,
   type ReceiptPaymentListItem,
 } from "./cash-vouchers.types";
-import { inferPartnerKindFromBe } from "./documents/_shared/voucher-partner.constants";
+import { inferLookupType } from "./documents/_shared/voucher-partner.constants";
 import {
   isAutoVoucherReference,
   receiptPaymentDocumentTypeLabel,
@@ -131,7 +131,7 @@ export function cashReceiptToVoucherDetail(
     voucherDate: new Date(`${r.voucherDate}T12:00:00`),
     partnerType: r.partnerType,
     partnerId: r.partnerId,
-    partnerKind: inferPartnerKindFromBe(r.partnerType, undefined),
+    partnerKind: inferLookupType(r.partnerType),
     counterpartyCode: "",
     counterpartyName: r.partnerNameSnapshot ?? "",
     payerName: r.payerName,
@@ -153,11 +153,12 @@ export function cashPaymentToVoucherDetail(
   return {
     kind: LedgerCashVoucherKindEnum.PAYMENT,
     purpose: LedgerCashVoucherPurposeEnum.OTHER,
+    paymentPurpose: p.purpose,
     voucherNo: p.documentNumber ?? "",
     voucherDate: new Date(`${p.voucherDate}T12:00:00`),
     partnerType: p.partnerType,
     partnerId: p.partnerId,
-    partnerKind: inferPartnerKindFromBe(p.partnerType, undefined),
+    partnerKind: inferLookupType(p.partnerType),
     counterpartyCode: "",
     counterpartyName: p.partnerNameSnapshot ?? "",
     payerName: p.payeeName,

@@ -1,4 +1,7 @@
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { apiClient } from "../../../../lib/api-axios";
+import { treasuryQueryKeys } from "../../../../hooks/treasury/treasury-query-keys";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
 
 export enum InvoiceDebtStatusApi {
@@ -11,12 +14,22 @@ export interface InvoiceDebtApiRow {
   id: string;
   referenceCode: string;
   invoiceId: string;
-  customerId: string;
+  documentType?: string;
   originalAmount: number;
   paidAmount: number;
   remainingAmount: number;
   issuedAt: string;
-  status: InvoiceDebtStatusApi;
+  dueDate?: string | null;
+  settledAt?: string | null;
+  status: string;
+  note?: string | null;
+}
+
+interface CustomerDebtsResponse {
+  data: InvoiceDebtApiRow[];
+  totalRemaining: number;
+  totalOriginal: number;
+  count: number;
 }
 
 function toMoney(value: string | number | undefined): number {
@@ -24,14 +37,35 @@ function toMoney(value: string | number | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function fetchCustomerOpenDebts(
+async function fetchCustomerOpenDebtsRaw(
   customerId: string,
 ): Promise<InvoiceDebtApiRow[]> {
-  const { data } = await apiClient.get<InvoiceDebtApiRow[]>(
-    `/invoices/customers/${customerId}/debts`,
-    { params: { status: InvoiceDebtStatusApi.OPEN } },
+  const { data } = await apiClient.get<CustomerDebtsResponse>(
+    "/cash-vouchers/partners/debts",
+    { params: { customerId, status: InvoiceDebtStatusApi.OPEN } },
   );
-  return data ?? [];
+  return data?.data ?? [];
+}
+
+const STALE_TIME = 60_000;
+
+export function fetchCustomerOpenDebts(
+  qc: QueryClient,
+  customerId: string,
+): Promise<InvoiceDebtApiRow[]> {
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.customerDebts(customerId),
+    queryFn: () => fetchCustomerOpenDebtsRaw(customerId),
+    staleTime: STALE_TIME,
+  });
+}
+
+export function useCustomerOpenDebts() {
+  const qc = useQueryClient();
+  return useCallback(
+    (customerId: string) => fetchCustomerOpenDebts(qc, customerId),
+    [qc],
+  );
 }
 
 export function mapInvoiceDebtToDocumentLine(
