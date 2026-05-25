@@ -3,7 +3,6 @@ import {
   IsInt,
   IsISO8601,
   IsOptional,
-  IsString,
   IsUUID,
   Max,
   Min,
@@ -25,15 +24,17 @@ export class QueryCashLedgerDto {
   @IsUUID()
   branchId?: string;
 
-  /** Opaque cursor from a previous page (`nextCursor`). */
+  /** 1-based page number. */
   @IsOptional()
-  @IsString()
-  cursor?: string;
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Transform(({ value }) => parseInt(value, 10))
   @IsInt()
   @Min(1)
   @Max(500)
-  limit?: number;
+  pageSize?: number;
 }

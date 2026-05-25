@@ -110,6 +110,7 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "accounting.cash_count.update", module: "accounting" },
   { key: "accounting.cash_count.post", module: "accounting" },
   { key: "accounting.cash_ledger.read", module: "accounting" },
+  { key: "accounting.cash_voucher_partner.read", module: "accounting" },
   { key: "accounting.cash_voucher_category.create", module: "accounting" },
   { key: "accounting.cash_voucher_category.read", module: "accounting" },
   { key: "accounting.cash_voucher_category.update", module: "accounting" },

@@ -18,6 +18,8 @@ import {
 } from './cash-voucher-categories/cash-voucher-categories.service';
 import { CashVoucherCategorySeederService } from './cash-voucher-categories/cash-voucher-category.seeder';
 import { PartnerResolverService } from './shared/partner-resolver.service';
+import { PartnerLookupService } from './shared/partner-lookup.service';
+import { PartnerLookupController } from './shared/partner-lookup.controller';
 import { CashVoucherCategoryResolverService } from './shared/category-resolver.service';
 import { PosCashSaleConsumer } from './cash-voucher-consumers/pos-cash-sale.consumer';
 import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collection-cash.consumer';
@@ -52,6 +54,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashPaymentsController,
     CashLedgerController,
     CashCountsController,
+    PartnerLookupController,
   ],
   providers: [
     CashVoucherCategoriesService,
@@ -61,6 +64,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     },
     CashVoucherCategorySeederService,
     PartnerResolverService,
+    PartnerLookupService,
     CashVoucherCategoryResolverService,
     CashReceiptsService,
     CashPaymentsService,

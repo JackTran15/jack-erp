@@ -8,7 +8,7 @@ import { CashPaymentEntity } from '../cash-payments/cash-payment.entity';
 import { QueryCashLedgerDto } from './dto/query-cash-ledger.dto';
 
 const NO_VOUCHER_LABEL = '(Chưa có chứng từ)';
-const DEFAULT_LIMIT = 100;
+const DEFAULT_PAGE_SIZE = 50;
 
 export interface CashLedgerRow {
   movementId: string;
@@ -29,7 +29,9 @@ export interface CashLedgerResult {
   pageOpeningBalance: number;
   rows: CashLedgerRow[];
   pageClosingBalance: number;
-  nextCursor: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
   closingBalance: number;
   totalDebit: number;
   totalCredit: number;
@@ -44,10 +46,12 @@ interface VoucherInfo {
 }
 
 /**
- * Sổ chi tiết tiền mặt (cash detail ledger). Scalar `SUM` (no GROUP BY / window
- * function) for opening/closing/totals; running balance is computed in RAM per
- * page. Filters on `(cash_account_id = X OR to_account_id = X)` so internal
- * transfers appear in both the source and destination accounts' ledgers.
+ * Sổ chi tiết tiền mặt (cash detail ledger). Scalar `SUM`/`COUNT` (no GROUP BY /
+ * window function) for opening/closing/totals; running balance is computed in RAM
+ * per page. Offset pagination: the page opening balance is the global opening plus
+ * the signed sum of the in-range rows that precede the page. Filters on
+ * `(cash_account_id = X OR to_account_id = X)` so internal transfers appear in both
+ * the source and destination accounts' ledgers.
  */
 @Injectable()
 export class CashLedgerService {
@@ -76,13 +80,14 @@ export class CashLedgerService {
     query: QueryCashLedgerDto,
     actor: ActorContext,
   ): Promise<CashLedgerResult> {
-    const limit = query.limit ?? DEFAULT_LIMIT;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+    const offset = (page - 1) * pageSize;
     const accountId = query.cashAccountId;
     const org = actor.organizationId;
     const branchId = query.branchId;
-    const cursor = this.decodeCursor(query.cursor);
 
-    // --- scalar SUMs (no GROUP BY) ----------------------------------------
+    // --- scalar SUMs / COUNT (no GROUP BY) --------------------------------
     const openingBalance = await this.sumSigned(accountId, org, branchId, {
       dateToExclusive: query.dateFrom, // movements strictly before the range
     });
@@ -99,29 +104,38 @@ export class CashLedgerService {
       query.dateTo,
     );
 
-    // Δ of in-range rows that precede the current page (before the cursor).
-    const pageDelta = cursor
-      ? await this.sumSigned(accountId, org, branchId, {
-          dateFromInclusive: query.dateFrom,
-          dateToInclusive: query.dateTo,
-          beforeCursor: cursor,
-        })
-      : 0;
-    const pageOpeningBalance = openingBalance + pageDelta;
-
-    // --- page rows ---------------------------------------------------------
-    const rawRows = await this.fetchPageRows(
+    const total = await this.countInRange(
       accountId,
       org,
       branchId,
       query.dateFrom,
       query.dateTo,
-      cursor,
-      limit + 1,
     );
 
-    const hasMore = rawRows.length > limit;
-    const pageRows = hasMore ? rawRows.slice(0, limit) : rawRows;
+    // Δ of in-range rows that precede the current page (the first `offset` rows).
+    const pageDelta =
+      offset > 0
+        ? await this.sumSignedBeforeOffset(
+            accountId,
+            org,
+            branchId,
+            query.dateFrom,
+            query.dateTo,
+            offset,
+          )
+        : 0;
+    const pageOpeningBalance = openingBalance + pageDelta;
+
+    // --- page rows ---------------------------------------------------------
+    const pageRows = await this.fetchPageRows(
+      accountId,
+      org,
+      branchId,
+      query.dateFrom,
+      query.dateTo,
+      pageSize,
+      offset,
+    );
 
     const voucherMap = await this.loadVouchers(
       pageRows.map((r) => r.id),
@@ -151,18 +165,15 @@ export class CashLedgerService {
     });
 
     const pageClosingBalance = running;
-    const lastRow = pageRows[pageRows.length - 1];
-    const nextCursor =
-      hasMore && lastRow
-        ? this.encodeCursor(lastRow.created_at, lastRow.id)
-        : null;
 
     return {
       openingBalance,
       pageOpeningBalance,
       rows,
       pageClosingBalance,
-      nextCursor,
+      total,
+      page,
+      pageSize,
       closingBalance,
       totalDebit,
       totalCredit,
@@ -181,7 +192,6 @@ export class CashLedgerService {
       dateFromInclusive?: string;
       dateToInclusive?: string;
       dateToExclusive?: string;
-      beforeCursor?: { ts: string; id: string };
     },
   ): Promise<number> {
     const params: any[] = [accountId, org];
@@ -206,19 +216,88 @@ export class CashLedgerService {
       params.push(bounds.dateToExclusive);
       where.push(`m.created_at < $${params.length}::date`);
     }
-    if (bounds.beforeCursor) {
-      params.push(bounds.beforeCursor.ts);
-      const tsIdx = params.length;
-      params.push(bounds.beforeCursor.id);
-      const idIdx = params.length;
-      where.push(`(m.created_at, m.id) <= ($${tsIdx}::timestamptz, $${idIdx}::uuid)`);
-    }
 
     const sql = `SELECT COALESCE(SUM(${this.signedCase()}), 0) AS sum
       FROM cash_movements m
       WHERE ${where.join(' AND ')}`;
     const rows = await this.movementRepo.query(sql, params);
     return Number(rows[0]?.sum ?? 0);
+  }
+
+  /**
+   * Signed sum of the first `offset` in-range rows in ledger order. The inner
+   * ORDER BY matches the page query's total order (`created_at`, then unique `id`),
+   * so these are exactly the rows displayed on the pages preceding the current one.
+   */
+  private async sumSignedBeforeOffset(
+    accountId: string,
+    org: string,
+    branchId: string | undefined,
+    dateFrom: string | undefined,
+    dateTo: string | undefined,
+    offset: number,
+  ): Promise<number> {
+    const params: any[] = [accountId, org];
+    const where: string[] = [
+      'm.organization_id = $2',
+      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
+    ];
+    if (branchId) {
+      params.push(branchId);
+      where.push(`m.branch_id = $${params.length}`);
+    }
+    if (dateFrom) {
+      params.push(dateFrom);
+      where.push(`m.created_at >= $${params.length}::date`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+    }
+    params.push(offset);
+    const offsetIdx = params.length;
+
+    const sql = `SELECT COALESCE(SUM(sub.s), 0) AS sum
+      FROM (
+        SELECT (${this.signedCase()}) AS s
+        FROM cash_movements m
+        WHERE ${where.join(' AND ')}
+        ORDER BY m.created_at ASC, m.id ASC
+        LIMIT $${offsetIdx}
+      ) sub`;
+    const rows = await this.movementRepo.query(sql, params);
+    return Number(rows[0]?.sum ?? 0);
+  }
+
+  private async countInRange(
+    accountId: string,
+    org: string,
+    branchId: string | undefined,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<number> {
+    const params: any[] = [accountId, org];
+    const where: string[] = [
+      'm.organization_id = $2',
+      '(m.cash_account_id = $1 OR m.to_account_id = $1)',
+    ];
+    if (branchId) {
+      params.push(branchId);
+      where.push(`m.branch_id = $${params.length}`);
+    }
+    if (dateFrom) {
+      params.push(dateFrom);
+      where.push(`m.created_at >= $${params.length}::date`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+    }
+    const sql = `SELECT COUNT(*)::int AS total
+      FROM cash_movements m
+      WHERE ${where.join(' AND ')}`;
+    const rows = await this.movementRepo.query(sql, params);
+    return Number(rows[0]?.total ?? 0);
   }
 
   private async sumDebitCredit(
@@ -264,8 +343,8 @@ export class CashLedgerService {
     branchId: string | undefined,
     dateFrom: string | undefined,
     dateTo: string | undefined,
-    cursor: { ts: string; id: string } | null,
-    take: number,
+    pageSize: number,
+    offset: number,
   ): Promise<
     Array<{
       id: string;
@@ -294,22 +373,17 @@ export class CashLedgerService {
       params.push(dateTo);
       where.push(`m.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
-    if (cursor) {
-      params.push(cursor.ts);
-      const tsIdx = params.length;
-      params.push(cursor.id);
-      const idIdx = params.length;
-      where.push(`(m.created_at, m.id) > ($${tsIdx}::timestamptz, $${idIdx}::uuid)`);
-    }
-    params.push(take);
+    params.push(pageSize);
     const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
 
     const sql = `SELECT m.id, m.cash_account_id, m.to_account_id, m.type, m.amount,
         m.notes, m.created_at
       FROM cash_movements m
       WHERE ${where.join(' AND ')}
       ORDER BY m.created_at ASC, m.id ASC
-      LIMIT $${limitIdx}`;
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
     return this.movementRepo.query(sql, params);
   }
 
@@ -378,22 +452,6 @@ export class CashLedgerService {
         return 0;
       default:
         return 0;
-    }
-  }
-
-  private encodeCursor(ts: Date, id: string): string {
-    return Buffer.from(`${new Date(ts).toISOString()}|${id}`).toString('base64');
-  }
-
-  private decodeCursor(cursor?: string): { ts: string; id: string } | null {
-    if (!cursor) return null;
-    try {
-      const decoded = Buffer.from(cursor, 'base64').toString('utf8');
-      const sep = decoded.lastIndexOf('|');
-      if (sep < 0) return null;
-      return { ts: decoded.slice(0, sep), id: decoded.slice(sep + 1) };
-    } catch {
-      return null;
     }
   }
 }

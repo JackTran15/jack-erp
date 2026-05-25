@@ -12,7 +12,6 @@ import {
   CashReceipt,
   CashReceiptReferenceType,
   CashLedgerRow,
-  CashLedgerResult,
   ReceiptPaymentKind,
   type CashPaymentLine,
   type CashReceiptLine,
@@ -212,15 +211,6 @@ export function receiptPaymentToLedgerRow(
   };
 }
 
-export interface LedgerPageSlice {
-  openingBalance: number;
-  totalDebit: number;
-  totalCredit: number;
-  closingBalance: number;
-  rows: LedgerCashRow[];
-  total: number;
-}
-
 export function buildOpeningLedgerRow(balance: number): LedgerCashRow {
   return {
     id: "__opening__",
@@ -288,66 +278,6 @@ export function cashLedgerRowToUiRow(row: CashLedgerRow): LedgerCashRow {
         lines: [],
       },
     },
-  };
-}
-
-/** Fetch all ledger rows for period (cursor loop) then client-paginate. */
-export async function fetchCashLedgerAllPages(
-  fetchPage: (cursor?: string) => Promise<CashLedgerResult>,
-  maxPages = 20,
-): Promise<{
-  result: CashLedgerResult;
-  allRows: CashLedgerRow[];
-}> {
-  let cursor: string | null | undefined;
-  const allRows: CashLedgerRow[] = [];
-  let last: CashLedgerResult | null = null;
-
-  for (let i = 0; i < maxPages; i++) {
-    const page = await fetchPage(cursor ?? undefined);
-    last = page;
-    allRows.push(...page.rows);
-    cursor = page.nextCursor;
-    if (!cursor) break;
-  }
-
-  if (!last) {
-    return {
-      result: {
-        openingBalance: 0,
-        pageOpeningBalance: 0,
-        rows: [],
-        pageClosingBalance: 0,
-        nextCursor: null,
-        closingBalance: 0,
-        totalDebit: 0,
-        totalCredit: 0,
-      },
-      allRows: [],
-    };
-  }
-
-  return {
-    result: { ...last, rows: allRows },
-    allRows,
-  };
-}
-
-export function sliceLedgerForOffsetPage(
-  ledger: CashLedgerResult,
-  allUiRows: LedgerCashRow[],
-  page: number,
-  pageSize: number,
-): LedgerPageSlice {
-  const start = (page - 1) * pageSize;
-  const pageRows = allUiRows.slice(start, start + pageSize);
-  return {
-    openingBalance: num(ledger.openingBalance),
-    totalDebit: num(ledger.totalDebit),
-    totalCredit: num(ledger.totalCredit),
-    closingBalance: num(ledger.closingBalance),
-    rows: pageRows,
-    total: allUiRows.length,
   };
 }
 

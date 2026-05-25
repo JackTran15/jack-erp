@@ -14,6 +14,9 @@ const actor: ActorContext = {
 };
 const ACC = 'acc-1';
 
+// getLedger issues scalar queries in this order:
+//   1) opening   2) closing   3) totals   4) count
+//   5) sumSignedBeforeOffset (ONLY when offset > 0)   then page rows.
 describe('CashLedgerService', () => {
   let service: CashLedgerService;
   let movementRepo: { query: jest.Mock };
@@ -42,6 +45,7 @@ describe('CashLedgerService', () => {
       .mockResolvedValueOnce([{ sum: 1000 }]) // opening
       .mockResolvedValueOnce([{ sum: 1150 }]) // closing
       .mockResolvedValueOnce([{ debit: 200, credit: 50 }]) // totals
+      .mockResolvedValueOnce([{ total: 2 }]) // count
       .mockResolvedValueOnce([
         {
           id: 'm1',
@@ -66,7 +70,7 @@ describe('CashLedgerService', () => {
     const res = await service.getLedger({ cashAccountId: ACC }, actor);
 
     expect(res.openingBalance).toBe(1000);
-    expect(res.pageOpeningBalance).toBe(1000);
+    expect(res.pageOpeningBalance).toBe(1000); // page 1 → no preceding rows
     expect(res.rows).toHaveLength(2);
     expect(res.rows[0]).toMatchObject({ debit: 200, credit: 0, balance: 1200 });
     expect(res.rows[1]).toMatchObject({ debit: 0, credit: 50, balance: 1150 });
@@ -74,7 +78,9 @@ describe('CashLedgerService', () => {
     expect(res.closingBalance).toBe(1150);
     expect(res.totalDebit).toBe(200);
     expect(res.totalCredit).toBe(50);
-    expect(res.nextCursor).toBeNull();
+    expect(res.total).toBe(2);
+    expect(res.page).toBe(1);
+    expect(res.pageSize).toBe(50);
     // movements without a voucher render the placeholder label.
     expect(res.rows[0].voucherNumber).toBe('(Chưa có chứng từ)');
   });
@@ -84,6 +90,7 @@ describe('CashLedgerService', () => {
       .mockResolvedValueOnce([{ sum: 0 }]) // opening
       .mockResolvedValueOnce([{ sum: 100 }]) // closing
       .mockResolvedValueOnce([{ debit: 300, credit: 200 }]) // totals
+      .mockResolvedValueOnce([{ total: 2 }]) // count
       .mockResolvedValueOnce([
         {
           id: 't-in',
@@ -111,21 +118,14 @@ describe('CashLedgerService', () => {
     expect(res.rows[1]).toMatchObject({ debit: 0, credit: 200, balance: 100 });
   });
 
-  it('returns nextCursor when more rows exist than the limit', async () => {
+  it('offset paging: page 2 opens from opening + signed sum of preceding rows', async () => {
     movementRepo.query
-      .mockResolvedValueOnce([{ sum: 0 }])
-      .mockResolvedValueOnce([{ sum: 0 }])
-      .mockResolvedValueOnce([{ debit: 0, credit: 0 }])
+      .mockResolvedValueOnce([{ sum: 0 }]) // opening
+      .mockResolvedValueOnce([{ sum: 20 }]) // closing
+      .mockResolvedValueOnce([{ debit: 20, credit: 0 }]) // totals
+      .mockResolvedValueOnce([{ total: 2 }]) // count
+      .mockResolvedValueOnce([{ sum: 10 }]) // sumSignedBeforeOffset (page-1 row)
       .mockResolvedValueOnce([
-        {
-          id: 'm1',
-          type: 'DEPOSIT',
-          amount: '10',
-          cash_account_id: ACC,
-          to_account_id: null,
-          notes: null,
-          created_at: new Date('2026-05-01T08:00:00Z'),
-        },
         {
           id: 'm2',
           type: 'DEPOSIT',
@@ -135,19 +135,28 @@ describe('CashLedgerService', () => {
           notes: null,
           created_at: new Date('2026-05-01T09:00:00Z'),
         },
-      ]);
+      ]); // page-2 rows
 
-    const res = await service.getLedger({ cashAccountId: ACC, limit: 1 }, actor);
+    const res = await service.getLedger(
+      { cashAccountId: ACC, page: 2, pageSize: 1 },
+      actor,
+    );
 
+    expect(res.page).toBe(2);
+    expect(res.pageSize).toBe(1);
+    expect(res.total).toBe(2);
+    expect(res.pageOpeningBalance).toBe(10); // opening(0) + preceding(10)
     expect(res.rows).toHaveLength(1);
-    expect(res.nextCursor).not.toBeNull();
+    expect(res.rows[0]).toMatchObject({ debit: 10, credit: 0, balance: 20 });
+    expect(res.pageClosingBalance).toBe(20);
   });
 
   it('inlines voucher metadata per row (no root id map)', async () => {
     movementRepo.query
-      .mockResolvedValueOnce([{ sum: 0 }])
-      .mockResolvedValueOnce([{ sum: 200 }])
-      .mockResolvedValueOnce([{ debit: 200, credit: 0 }])
+      .mockResolvedValueOnce([{ sum: 0 }]) // opening
+      .mockResolvedValueOnce([{ sum: 200 }]) // closing
+      .mockResolvedValueOnce([{ debit: 200, credit: 0 }]) // totals
+      .mockResolvedValueOnce([{ total: 1 }]) // count
       .mockResolvedValueOnce([
         {
           id: 'm1',

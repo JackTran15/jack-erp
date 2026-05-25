@@ -225,7 +225,9 @@ export interface CashLedgerResult {
   pageOpeningBalance: number;
   rows: CashLedgerRow[];
   pageClosingBalance: number;
-  nextCursor: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
   closingBalance: number;
   totalDebit: number;
   totalCredit: number;
@@ -340,6 +342,6 @@ export interface CashLedgerQuery {
   dateFrom?: string;
   dateTo?: string;
   branchId?: string;
-  cursor?: string;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
 }

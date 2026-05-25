@@ -3,8 +3,6 @@ import { erpApi, requireErpData } from "../../lib/erp-api";
 import {
   buildOpeningLedgerRow,
   cashLedgerRowToUiRow,
-  fetchCashLedgerAllPages,
-  sliceLedgerForOffsetPage,
 } from "../../pages/treasury/cash-vouchers.adapters";
 import type {
   CashLedgerQuery,
@@ -13,43 +11,7 @@ import type {
 import type { LedgerCashRow } from "../../pages/treasury/ledger-cash/ledger-cash.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
 
-const LEDGER_FETCH_LIMIT = 500;
-
-export function useCashLedgerBuffer(
-  params: CashLedgerQuery | null,
-  enabled = true,
-) {
-  return useQuery({
-    queryKey: treasuryQueryKeys.cashLedger({ ...params, mode: "buffer" }),
-    queryFn: async () => {
-      if (!params?.cashAccountId) {
-        throw new Error("cashAccountId is required");
-      }
-      const fetchPage = async (cursor?: string) =>
-        requireErpData(
-          await erpApi.GET<CashLedgerResult>("/cash-ledger", {
-            params: {
-              query: {
-                cashAccountId: params.cashAccountId,
-                dateFrom: params.dateFrom,
-                dateTo: params.dateTo,
-                branchId: params.branchId,
-                cursor,
-                limit: LEDGER_FETCH_LIMIT,
-              },
-            },
-          }),
-        );
-
-      const { result, allRows } = await fetchCashLedgerAllPages(fetchPage);
-      const uiRows = allRows.map(cashLedgerRowToUiRow);
-      return { result, uiRows };
-    },
-    enabled: enabled && Boolean(params?.cashAccountId),
-    staleTime: 30_000,
-  });
-}
-
+/** Fetch one offset page of the cash ledger directly from the API. */
 export function useCashLedgerOffsetPage(
   params: CashLedgerQuery | null,
   page: number,
@@ -66,9 +28,29 @@ export function useCashLedgerOffsetPage(
   isError: boolean;
   refetch: () => void;
 } {
-  const buffer = useCashLedgerBuffer(params, enabled);
+  const query = useQuery({
+    queryKey: treasuryQueryKeys.cashLedger({ ...params, page, pageSize }),
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<CashLedgerResult>("/cash-ledger", {
+          params: {
+            query: {
+              cashAccountId: params!.cashAccountId,
+              dateFrom: params!.dateFrom,
+              dateTo: params!.dateTo,
+              branchId: params!.branchId,
+              page,
+              pageSize,
+            },
+          },
+        }),
+      ),
+    enabled: enabled && Boolean(params?.cashAccountId),
+    staleTime: 30_000,
+  });
 
-  if (!buffer.data) {
+  const result = query.data;
+  if (!result) {
     return {
       openingRow: null,
       transactionRows: [],
@@ -76,28 +58,22 @@ export function useCashLedgerOffsetPage(
       totalDebit: 0,
       totalCredit: 0,
       closingBalance: 0,
-      isLoading: buffer.isLoading,
-      isError: buffer.isError,
-      refetch: () => void buffer.refetch(),
+      isLoading: query.isLoading,
+      isError: query.isError,
+      refetch: () => void query.refetch(),
     };
   }
 
-  const slice = sliceLedgerForOffsetPage(
-    buffer.data.result,
-    buffer.data.uiRows,
-    page,
-    pageSize,
-  );
-
   return {
-    openingRow: buildOpeningLedgerRow(slice.openingBalance),
-    transactionRows: slice.rows,
-    total: slice.total,
-    totalDebit: slice.totalDebit,
-    totalCredit: slice.totalCredit,
-    closingBalance: slice.closingBalance,
-    isLoading: buffer.isLoading,
-    isError: buffer.isError,
-    refetch: () => void buffer.refetch(),
+    // Opening row shows the balance carried into this page (global opening on page 1).
+    openingRow: buildOpeningLedgerRow(result.pageOpeningBalance),
+    transactionRows: result.rows.map(cashLedgerRowToUiRow),
+    total: result.total,
+    totalDebit: result.totalDebit,
+    totalCredit: result.totalCredit,
+    closingBalance: result.closingBalance,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: () => void query.refetch(),
   };
 }
