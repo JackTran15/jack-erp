@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   DocumentFormDialog,
@@ -9,6 +9,7 @@ import {
   formatMoneyInteger,
   type ToolbarItem,
 } from "@erp/ui";
+import { DocumentType } from "@erp/shared-interfaces";
 import {
   CloudUpload,
   Pencil,
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { Tabs } from "../../../../components/tabs";
 import type { TabItem } from "../../../../components/tabs";
 import { ConfirmActionModal } from "../../../../components/table/ConfirmActionModal";
+import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
 import {
   READONLY_INPUT_CLASS,
   VOUCHER_FORM_LABEL_WIDTH,
@@ -42,7 +44,6 @@ import {
   emptyDenominationLines,
   emptyParticipant,
   mockBookBalanceForDate,
-  nextKkqNumber,
   syncLineAmounts,
   todayIsoDate,
 } from "./cash-count.utils";
@@ -59,12 +60,11 @@ const DETAIL_TABS: readonly TabItem<DetailTabEnum>[] = [
 ];
 
 interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   mode: CashCountDialogModeEnum;
   initial: CashCountRecord | null;
   createDraft?: CashCountCreateDraft | null;
-  previewDocumentNumber: string;
-  allRecords: CashCountRecord[];
-  onClose: () => void;
   onSaved: (record: CashCountRecord) => void;
   onProcess: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -73,12 +73,11 @@ interface Props {
 }
 
 export function CashCountFormDialog({
+  open,
+  onOpenChange,
   mode,
   initial,
   createDraft,
-  previewDocumentNumber,
-  allRecords,
-  onClose,
   onSaved,
   onProcess,
   onDelete,
@@ -89,32 +88,61 @@ export function CashCountFormDialog({
   const isView = mode === CashCountDialogModeEnum.VIEW;
   const isProcessed = initial?.status === CashCountStatusEnum.PROCESSED;
   const isLocked = isProcessed || isView;
-  const pickedInventoryUntilDate = createDraft?.inventoryUntilDate ?? "";
 
-  const [purpose, setPurpose] = useState(initial?.purpose ?? "");
-  const [inventoryUntilDate, setInventoryUntilDate] = useState(
-    initial?.inventoryUntilDate ?? pickedInventoryUntilDate,
-  );
-  const [reference, setReference] = useState(initial?.reference ?? "");
-  const [countDate, setCountDate] = useState(
-    initial?.countDate ?? todayIsoDate(),
-  );
-  const [countTime, setCountTime] = useState(initial?.countTime ?? "12:00");
+  const [purpose, setPurpose] = useState("");
+  const [inventoryUntilDate, setInventoryUntilDate] = useState("");
+  const [countDate, setCountDate] = useState(todayIsoDate());
+  const [countTime, setCountTime] = useState("12:00");
+  const [voucherNo, setVoucherNo] = useState("");
+  const { mutateAsync: generateDocNumber } = useGenerateDocumentNumber();
   const [lines, setLines] = useState(() =>
-    syncLineAmounts(
-      initial?.lines?.length ? initial.lines : emptyDenominationLines(),
-    ),
+    syncLineAmounts(emptyDenominationLines()),
   );
   const [participants, setParticipants] = useState<CashCountParticipant[]>(
-    () =>
-      initial?.participants?.length
-        ? [...initial.participants]
-        : [emptyParticipant()],
+    () => [emptyParticipant()],
   );
-  const [conclusion, setConclusion] = useState(initial?.conclusion ?? "");
+  const [conclusion, setConclusion] = useState("");
   const [detailTab, setDetailTab] = useState<DetailTabEnum>(
     DetailTabEnum.LINES,
   );
+
+  const resetKey = `cc-${mode}-${initial?.id ?? "new"}`;
+  useEffect(() => {
+    if (!open) return;
+    if (mode === CashCountDialogModeEnum.CREATE) {
+      setPurpose("");
+      setInventoryUntilDate(createDraft?.inventoryUntilDate ?? "");
+      setCountDate(todayIsoDate());
+      setCountTime("12:00");
+      setVoucherNo("");
+      setLines(syncLineAmounts(emptyDenominationLines()));
+      setParticipants([emptyParticipant()]);
+      setConclusion("");
+      setDetailTab(DetailTabEnum.LINES);
+      return;
+    }
+    if (initial) {
+      setPurpose(initial.purpose ?? "");
+      setInventoryUntilDate(initial.inventoryUntilDate ?? "");
+      setCountDate(initial.countDate ?? todayIsoDate());
+      setCountTime(initial.countTime ?? "12:00");
+      setVoucherNo(initial.documentNumber ?? "");
+      setLines(
+        syncLineAmounts(
+          initial.lines?.length ? initial.lines : emptyDenominationLines(),
+        ),
+      );
+      setParticipants(
+        initial.participants?.length
+          ? [...initial.participants]
+          : [emptyParticipant()],
+      );
+      setConclusion(initial.conclusion ?? "");
+      setDetailTab(DetailTabEnum.LINES);
+    }
+  }, [resetKey, open, mode, initial, createDraft]);
+
+  const reference = initial?.reference ?? "";
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -132,10 +160,24 @@ export function CashCountFormDialog({
     [lines, bookBalance],
   );
 
-  const documentNumber =
-    initial?.documentNumber ??
-    previewDocumentNumber ??
-    nextKkqNumber(allRecords);
+  const documentNumber = initial?.documentNumber || voucherNo || "";
+
+  useEffect(() => {
+    if (!open || mode !== CashCountDialogModeEnum.CREATE) return;
+    let cancelled = false;
+    void generateDocNumber({ documentType: DocumentType.CASH_COUNT })
+      .then((no) => {
+        if (!cancelled) setVoucherNo(no);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Không sinh được số phiếu KK. Vui lòng thử lại.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, generateDocNumber]);
 
   const handleLineChange = useCallback(
     (index: number, patch: { quantity?: number; description?: string }) => {
@@ -173,7 +215,7 @@ export function CashCountFormDialog({
     const totals = computeTotals(synced, bookBalance);
     return {
       id: initial?.id,
-      documentNumber: initial?.documentNumber,
+      documentNumber: initial?.documentNumber || voucherNo || undefined,
       countDate,
       inventoryUntilDate,
       countTime,
@@ -197,6 +239,7 @@ export function CashCountFormDialog({
     initial,
     participants,
     conclusion,
+    voucherNo,
   ]);
 
   const handleSave = useCallback(() => {
@@ -204,10 +247,18 @@ export function CashCountFormDialog({
       toast.error("Vui lòng chọn kiểm kê đến ngày.");
       return;
     }
+    if (!countDate) {
+      toast.error("Ngày kiểm kê là bắt buộc.");
+      return;
+    }
+    if (!countTime) {
+      toast.error("Giờ kiểm kê là bắt buộc.");
+      return;
+    }
     const payload = buildPayload();
     onSaved(payload as CashCountRecord);
     toast.success("Đã lưu phiếu kiểm kê.");
-  }, [buildPayload, inventoryUntilDate, onSaved]);
+  }, [buildPayload, inventoryUntilDate, countDate, countTime, onSaved]);
 
   const toolbarItems: ToolbarItem[] = useMemo(() => {
     if (isProcessed) return [];
@@ -246,7 +297,7 @@ export function CashCountFormDialog({
       id: "close",
       label: "Đóng",
       icon: X,
-      onClick: onClose,
+      onClick: () => onOpenChange(false),
     });
     return items;
   }, [
@@ -254,7 +305,7 @@ export function CashCountFormDialog({
     isView,
     initial,
     handleSave,
-    onClose,
+    onOpenChange,
     onRequestCreate,
     onRequestEdit,
   ]);
@@ -273,10 +324,8 @@ export function CashCountFormDialog({
   return (
     <>
       <DocumentFormDialog
-        open
-        onOpenChange={(o) => {
-          if (!o) onClose();
-        }}
+        open={open}
+        onOpenChange={onOpenChange}
         title={title}
         toolbarItems={toolbarItems}
         defaultWidth={1180}
@@ -311,18 +360,17 @@ export function CashCountFormDialog({
                 }`}
               />
             </FormField>
-            <FormField
-              label="Tham chiếu"
-              layout="horizontal"
-              labelWidth={VOUCHER_FORM_LABEL_WIDTH}
-            >
-              <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                disabled={isLocked}
-                className={`h-8 ${isLocked ? READONLY_INPUT_CLASS : ""}`}
-              />
-            </FormField>
+            {reference ? (
+              <FormField
+                label="Tham chiếu"
+                layout="horizontal"
+                labelWidth={VOUCHER_FORM_LABEL_WIDTH}
+              >
+                <span className="flex h-8 items-center text-sm">
+                  {reference}
+                </span>
+              </FormField>
+            ) : null}
             <FormField
               label="Tài liệu đính kèm"
               layout="horizontal"
@@ -356,6 +404,7 @@ export function CashCountFormDialog({
             </FormField>
             <FormField
               label="Ngày kiểm kê"
+              required
               layout="horizontal"
               labelWidth={DOCUMENT_LABEL_WIDTH}
             >
@@ -369,6 +418,7 @@ export function CashCountFormDialog({
             </FormField>
             <FormField
               label="Giờ kiểm kê"
+              required
               layout="horizontal"
               labelWidth={DOCUMENT_LABEL_WIDTH}
             >
@@ -492,7 +542,7 @@ export function CashCountFormDialog({
             toast.success(
               "Đã xử lý — phiếu thu/chi sẽ được sinh khi tích hợp API.",
             );
-            onClose();
+            onOpenChange(false);
           }}
         />
       ) : null}
@@ -507,7 +557,7 @@ export function CashCountFormDialog({
           onConfirm={() => {
             onDelete?.(initial.id);
             setConfirmDelete(false);
-            onClose();
+            onOpenChange(false);
           }}
         />
       ) : null}

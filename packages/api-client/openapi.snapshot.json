@@ -12841,6 +12841,10 @@
       "CreateCashReceiptDto": {
         "type": "object",
         "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
           "voucherDate": {
             "type": "string",
             "description": "\"Ngày thu\" (YYYY-MM-DD)."
@@ -13252,6 +13256,10 @@
       "CreateCashPaymentDto": {
         "type": "object",
         "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
           "voucherDate": {
             "type": "string",
             "description": "\"Ngày chi\" (YYYY-MM-DD)."
@@ -13670,6 +13678,9 @@
             "type": "number",
             "description": "Counted physical cash (nhập tay).",
             "minimum": 0
+          },
+          "documentNumber": {
+            "type": "string"
           },
           "notes": {
             "type": "string"

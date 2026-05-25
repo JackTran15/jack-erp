@@ -44,7 +44,7 @@ export function cashCountToRecord(c: CashCount): CashCountRecord {
 }
 
 export function recordToCreateCashCountBody(
-  record: Pick<CashCountRecord, "actualAmount" | "lines" | "conclusion">,
+  record: Pick<CashCountRecord, "actualAmount" | "lines" | "conclusion" | "documentNumber">,
   cashAccountId: string,
   countedAtIso: string,
 ): import("../../cash-vouchers.types").CreateCashCountBody {
@@ -55,6 +55,7 @@ export function recordToCreateCashCountBody(
     cashAccountId,
     countedAt: countedAtIso,
     actualAmount: record.actualAmount,
+    documentNumber: record.documentNumber || undefined,
     notes: record.conclusion || undefined,
     denominations: denominations.length ? denominations : undefined,
   };

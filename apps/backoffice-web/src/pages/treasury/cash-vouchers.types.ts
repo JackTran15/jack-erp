@@ -303,6 +303,7 @@ export interface CreateCashCountBody {
   cashAccountId: string;
   countedAt: string;
   actualAmount: number;
+  documentNumber?: string;
   notes?: string;
   denominations?: CashCountDenomination[];
 }

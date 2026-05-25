@@ -25,6 +25,10 @@ export class CreateCashCountDto {
 
   @IsOptional()
   @IsString()
+  documentNumber?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   /** Optional breakdown — when present, sum(denom*count) must equal actualAmount. */

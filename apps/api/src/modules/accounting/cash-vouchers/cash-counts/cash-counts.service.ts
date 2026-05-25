@@ -73,6 +73,7 @@ export class CashCountsService {
       countedAt: new Date(dto.countedAt),
       actualAmount: dto.actualAmount,
       status: CashCountStatus.DRAFT,
+      documentNumber: dto.documentNumber,
       notes: dto.notes,
       denominations: dto.denominations,
     });

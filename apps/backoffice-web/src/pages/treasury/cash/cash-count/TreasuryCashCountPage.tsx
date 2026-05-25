@@ -142,8 +142,6 @@ export function TreasuryCashCountPage() {
     return filteredRecords.slice(start, start + pagination.pageSize);
   }, [filteredRecords, pagination]);
 
-  const allRecords = records;
-
   const openForm = useCallback(
     (
       record: CashCountRecord | null,
@@ -270,30 +268,18 @@ export function TreasuryCashCountPage() {
           );
           const created = await mutations.create.mutateAsync(body);
           saveCashCountParticipants(created.id, payload.participants);
-          const record = {
-            ...cashCountToRecord(created),
-            participants: payload.participants,
-          };
           setSelectedId(created.id);
-          setFormRecord(record);
-          setFormMode(CashCountDialogModeEnum.EDIT);
         } else if (payload.id) {
-          const body = recordToCreateCashCountBody(
-            payload,
-            cashAccountId,
-            countedAt,
-          );
-          const updated = await mutations.update.mutateAsync({
+          const { cashAccountId: _ca, documentNumber: _dn, ...updateBody } =
+            recordToCreateCashCountBody(payload, cashAccountId, countedAt);
+          await mutations.update.mutateAsync({
             id: payload.id,
-            body,
+            body: updateBody,
           });
           saveCashCountParticipants(payload.id, payload.participants);
-          setFormRecord({
-            ...cashCountToRecord(updated),
-            participants: payload.participants,
-          });
         }
         toast.success("Đã lưu phiếu kiểm kê.");
+        closeForm();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
       }
@@ -383,40 +369,41 @@ export function TreasuryCashCountPage() {
         />
       ) : null}
 
-      {formOpen ? (
-        <CashCountFormDialog
-          mode={formMode}
-          initial={
-            formMode === CashCountDialogModeEnum.CREATE ? null : formRecord
+      <CashCountFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          if (!o) closeForm();
+        }}
+        mode={formMode}
+        initial={
+          formMode === CashCountDialogModeEnum.CREATE ? null : formRecord
+        }
+        createDraft={
+          createDraftDate ? { inventoryUntilDate: createDraftDate } : null
+        }
+        onSaved={handleSaveFromForm}
+        onProcess={async (id) => {
+          try {
+            const result = await mutations.post.mutateAsync(id);
+            const record = cashCountToRecord(result);
+            setFormRecord({
+              ...record,
+              participants: loadCashCountParticipants(id),
+            });
+            toast.success("Đã xử lý phiếu kiểm kê.");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Xử lý thất bại.");
           }
-          createDraft={
-            createDraftDate ? { inventoryUntilDate: createDraftDate } : null
-          }
-          previewDocumentNumber={formRecord?.documentNumber ?? "—"}
-          allRecords={allRecords}
-          onClose={closeForm}
-          onSaved={handleSaveFromForm}
-          onProcess={async (id) => {
-            try {
-              const result = await mutations.post.mutateAsync(id);
-              const record = cashCountToRecord(result);
-              setFormRecord({
-                ...record,
-                participants: loadCashCountParticipants(id),
-              });
-              toast.success("Đã xử lý phiếu kiểm kê.");
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Xử lý thất bại.");
-            }
-          }}
-          onDelete={undefined}
-          onRequestEdit={() => setFormMode(CashCountDialogModeEnum.EDIT)}
-          onRequestCreate={() => {
-            closeForm();
-            setCreatePickerOpen(true);
-          }}
-        />
-      ) : null}
+        }}
+        onDelete={(id) => {
+          toast.info("Chức năng xóa chưa được hỗ trợ.");
+        }}
+        onRequestEdit={() => setFormMode(CashCountDialogModeEnum.EDIT)}
+        onRequestCreate={() => {
+          closeForm();
+          setCreatePickerOpen(true);
+        }}
+      />
     </>
   );
 }
