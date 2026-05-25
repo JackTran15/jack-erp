@@ -29,6 +29,12 @@ export interface CartLine {
    * monetary effect is negative (refund credit). UI shows negative qty / pink row.
    */
   isReturnCredit?: boolean;
+  /**
+   * Đơn trả `regular`: id của dòng hóa đơn bán gốc (`invoice_items.id`) mà dòng
+   * trả này tham chiếu. Bắt buộc để BE cộng `returned_quantity` đúng dòng. Bỏ
+   * trống ở đơn trả `quick` (không có hóa đơn gốc).
+   */
+  originalInvoiceItemId?: string;
 }
 
 export interface CatalogProduct {

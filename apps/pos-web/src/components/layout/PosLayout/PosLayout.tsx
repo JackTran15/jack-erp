@@ -144,7 +144,7 @@ export function PosLayout() {
 
   const handleCloseTab = (id: string) => {
     if (id === "tab-draft") return;
-    if (sessions.length <= 1) return;
+    // Cho phép đóng cả tab cuối — removeSession sẽ tự tạo lại "Hóa đơn 1" (SALE).
     removeSession(id);
   };
 

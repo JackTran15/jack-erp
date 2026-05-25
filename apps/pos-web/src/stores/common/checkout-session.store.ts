@@ -40,6 +40,30 @@ export interface InvoiceSession {
    * Lưu/thanh toán lại sẽ ghi đè (PATCH/checkout) chính draft này thay vì tạo mới.
    */
   sourceInvoiceId?: string;
+  /**
+   * Đơn trả/đổi `regular` (mở từ trang return-goods): id hóa đơn bán gốc. Dùng
+   * làm `originalInvoiceId` khi gọi `POST /invoices/returns|exchanges`. Bỏ trống
+   * ở đơn trả `quick` (Đổi trả nhanh — không có hóa đơn gốc).
+   */
+  originalInvoiceId?: string;
+}
+
+/**
+ * Số tab kế tiếp = max số "Hóa đơn N" hiện có + 1 (1 nếu không còn tab nào). Quét
+ * theo label để không tái dùng số đã đóng: đóng "Hóa đơn 2" của [1,2,3] rồi tạo
+ * mới → "Hóa đơn 4". Tab restore từ draft mang label = số hóa đơn nên không tính
+ * vào dãy (đúng — chúng không thuộc chuỗi "Hóa đơn N").
+ */
+function nextInvoiceLabel(sessions: InvoiceSession[]): string {
+  let max = 0;
+  for (const s of sessions) {
+    const matched = /^Hóa đơn (\d+)$/.exec(s.label);
+    if (matched) {
+      const n = Number(matched[1]);
+      if (n > max) max = n;
+    }
+  }
+  return `Hóa đơn ${max + 1}`;
 }
 
 function createSaleSession(id: string, label: string): InvoiceSession {
@@ -96,7 +120,10 @@ interface PosCheckoutSessionState {
   /** New invoice tab in quick-exchange mode (empty carts). */
   enterQuickExchange: () => void;
   /** New invoice tab with return lines from an existing sale invoice (`invoice_return`). */
-  enterInvoiceReturnWithLines: (lines: CartLine[]) => void;
+  enterInvoiceReturnWithLines: (
+    lines: CartLine[],
+    originalInvoiceId?: string,
+  ) => void;
 
   /** Hydration helper — ensure at least one sale session exists. */
   ensureHydratedShape: () => void;
@@ -198,8 +225,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       addSession: () => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
-        const idx = sessions.length + 1;
-        const next = createSaleSession(newId, `Hóa đơn ${idx}`);
+        const next = createSaleSession(newId, nextInvoiceLabel(sessions));
         set({
           sessions: [...sessions, next],
           activeSessionId: newId,
@@ -209,7 +235,17 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       removeSession: (id) => {
         const { sessions, activeSessionId } = get();
         const real = sessions.filter((s) => s.id !== id);
-        if (real.length === 0) return;
+        // Đóng tab cuối cùng → tạo lại 1 tab bán hàng "Hóa đơn 1" với id mới, để
+        // watcher activeSessionId (use-checkout-bootstrap) fire và reset draft
+        // toàn cục — trạng thái return của tab vừa đóng vì thế cũng bị xóa.
+        if (real.length === 0) {
+          const freshId = `s-${Date.now()}`;
+          set({
+            sessions: [createSaleSession(freshId, "Hóa đơn 1")],
+            activeSessionId: freshId,
+          });
+          return;
+        }
         let nextActive = activeSessionId;
         if (id === activeSessionId) {
           nextActive = real[real.length - 1]!.id;
@@ -220,10 +256,9 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
       enterQuickExchange: () => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
-        const nextIdx = sessions.length + 1;
         const newSession: InvoiceSession = {
           id: newId,
-          label: `Hóa đơn ${nextIdx}`,
+          label: nextInvoiceLabel(sessions),
           checkoutVariant: CheckoutVariantEnum.QUICK_EXCHANGE,
           purchaseCart: [],
           returnCart: [],
@@ -237,19 +272,19 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         });
       },
 
-      enterInvoiceReturnWithLines: (lines) => {
+      enterInvoiceReturnWithLines: (lines, originalInvoiceId) => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
-        const nextIdx = sessions.length + 1;
         const newSession: InvoiceSession = {
           id: newId,
-          label: `Hóa đơn ${nextIdx}`,
+          label: nextInvoiceLabel(sessions),
           checkoutVariant: CheckoutVariantEnum.INVOICE_RETURN,
           purchaseCart: lines.map((l) => ({ ...l })),
           returnCart: [],
           activeCheckoutPane: CheckoutPane.RETURN,
           selectedLinePurchaseId: null,
           selectedLineReturnId: null,
+          originalInvoiceId,
         };
         set({
           sessions: [...sessions, newSession],
@@ -280,6 +315,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   // Tab từng gắn với 1 draft (restore) → trả tên về mặc định.
                   label: s.sourceInvoiceId ? `Hóa đơn ${idx + 1}` : s.label,
                   sourceInvoiceId: undefined,
+                  originalInvoiceId: undefined,
                   checkoutVariant: CheckoutVariantEnum.SALE,
                   purchaseCart: [],
                   returnCart: [],
@@ -385,6 +421,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   selectedLinePurchaseId: raw.selectedLinePurchaseId ?? null,
                   selectedLineReturnId: raw.selectedLineReturnId ?? null,
                   sourceInvoiceId: raw.sourceInvoiceId,
+                  originalInvoiceId: raw.originalInvoiceId,
                 };
               })
             : current.sessions;

@@ -1,4 +1,9 @@
-import type { ApiPaymentMethod, InvoiceStatus } from "@erp/pos/types/invoice.type";
+import type {
+  ApiPaymentMethod,
+  InvoiceStatus,
+  RefundMethod,
+  ReturnInvoiceMode,
+} from "@erp/pos/types/invoice.type";
 
 /**
  * Một item trên payload tạo invoice. Mirror `CreateInvoiceItemDto` ở backend
@@ -52,6 +57,70 @@ export interface InvoicePaymentLineBody {
  */
 export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
+}
+
+// ─── Return / Exchange (EPIC-011) ──────────────────────────────────────────
+// Đơn trả/đổi dùng endpoint riêng (không phải `type` trên POST /invoices):
+//   POST /invoices/returns      — tạo draft RETURN (mode quick|regular)
+//   POST /invoices/exchanges    — tạo draft EXCHANGE (bắt buộc có hóa đơn gốc)
+//   POST /invoices/:id/checkout-return — tất toán + hoàn tiền/ghi có
+
+/**
+ * Một dòng hàng trả lại. Mirror `ReturnInvoiceLineDto`
+ * (`apps/api/src/modules/pos/dto/create-return-invoice.dto.ts`).
+ * `originalInvoiceItemId` bắt buộc ở mode `regular` (trỏ về invoice_item gốc).
+ */
+export interface ReturnInvoiceLineBody {
+  originalInvoiceItemId?: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unit: string;
+  locationId: string;
+  quantity: number;
+  unitPrice: number;
+  lineDiscount?: number;
+  note?: string;
+}
+
+/** Body cho `POST /invoices/returns` — tạo draft RETURN. */
+export interface CreateReturnInvoiceBody {
+  mode: ReturnInvoiceMode;
+  /** Bắt buộc khi `mode = "regular"`. */
+  originalInvoiceId?: string;
+  customerId?: string;
+  sessionId: string;
+  reason: string;
+  lines: ReturnInvoiceLineBody[];
+}
+
+/** Body cho `POST /invoices/exchanges` — tạo draft EXCHANGE (trả + mua mới). */
+export interface CreateExchangeInvoiceBody {
+  sessionId: string;
+  originalInvoiceId: string;
+  reason: string;
+  customerId?: string;
+  /** Hàng trả lại (direction=IN), trỏ về dòng hóa đơn bán gốc. */
+  returnLines: ReturnInvoiceLineBody[];
+  /** Hàng mua mới (direction=OUT) — cùng shape dòng hàng SALE thường. */
+  newLines: CreateInvoiceItemBody[];
+}
+
+/**
+ * Body cho `POST /invoices/:id/checkout-return` — tất toán đơn trả/đổi.
+ * `revenueAccountId` bắt buộc (BE chưa tự resolve cho luồng trả). `payments` chỉ
+ * cần khi EXCHANGE có netAmount > 0. `cashAccountId` để trống → BE lấy theo ca
+ * quỹ đang mở.
+ */
+export interface CheckoutReturnBody {
+  refundMethod: RefundMethod;
+  revenueAccountId: string;
+  cashAccountId?: string;
+  receivableAccountId?: string;
+  creditLiabilityAccountId?: string;
+  creditExpiresAt?: string;
+  payments?: InvoicePaymentLineBody[];
+  note?: string;
 }
 
 /** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */

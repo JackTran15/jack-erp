@@ -1,11 +1,15 @@
 import { http } from "@erp/pos/lib/common/http";
 import type {
   CheckoutInvoiceBody,
+  CheckoutReturnBody,
+  CreateExchangeInvoiceBody,
   CreateInvoiceBody,
+  CreateReturnInvoiceBody,
   ListInvoicesParams,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
+import type { EligibleReturnLine } from "@erp/pos/interfaces/return-goods.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 
 export const invoiceService = {
@@ -46,4 +50,27 @@ export const invoiceService = {
     // return http.get<InvoiceRow[]>(`/invoices/drafts?${params.toString()}`);
     return http.get<InvoiceRow[]>(`/invoices/drafts`);
   },
+
+  // ─── Return / Exchange (EPIC-011) ─────────────────────────────────────────
+
+  /** `GET /invoices/:id/eligible-returns` — dòng hàng còn được phép trả. */
+  getEligibleReturns: (id: string): Promise<EligibleReturnLine[]> =>
+    http.get<EligibleReturnLine[]>(
+      `/invoices/${encodeURIComponent(id)}/eligible-returns`,
+    ),
+
+  /** `POST /invoices/returns` — tạo draft RETURN (mode quick|regular). */
+  createReturn: (body: CreateReturnInvoiceBody): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>("/invoices/returns", body),
+
+  /** `POST /invoices/exchanges` — tạo draft EXCHANGE. */
+  createExchange: (body: CreateExchangeInvoiceBody): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>("/invoices/exchanges", body),
+
+  /** `POST /invoices/:id/checkout-return` — tất toán đơn trả/đổi. */
+  checkoutReturn: (id: string, body: CheckoutReturnBody): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>(
+      `/invoices/${encodeURIComponent(id)}/checkout-return`,
+      body,
+    ),
 };

@@ -81,6 +81,8 @@ export function ReturnGoodsPage() {
       <ReturnItemsDialog
         open={dialog.open}
         invoice={dialog.invoice}
+        items={dialog.items}
+        loading={dialog.loading}
         selectedIds={dialog.selectedIds}
         qtyById={dialog.qtyById}
         onToggleItem={toggleItem}

@@ -11,3 +11,19 @@ export type InvoiceStatus =
   | "debt"
   | "partial_debt"
   | "cancelled";
+
+/** Loại hóa đơn — mirror `InvoiceType` ở backend (`invoice.entity.ts`). */
+export type InvoiceType = "SALE" | "RETURN" | "EXCHANGE";
+
+/**
+ * Chế độ tạo đơn trả — `quick` không cần hóa đơn gốc, `regular` tham chiếu hóa
+ * đơn bán gốc. Mirror `ReturnInvoiceMode` (`create-return-invoice.dto.ts`).
+ */
+export type ReturnInvoiceMode = "quick" | "regular";
+
+/**
+ * Cách hoàn tiền khi tất toán đơn trả/đổi — mirror `RefundMethod`
+ * (`invoice.entity.ts`). CASH = chi tiền mặt, STORE_CREDIT = ghi có cửa hàng,
+ * OFFSET = cấn trừ vào công nợ của hóa đơn gốc.
+ */
+export type RefundMethod = "CASH" | "STORE_CREDIT" | "OFFSET";

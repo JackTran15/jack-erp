@@ -18,6 +18,12 @@ export const INVOICE_KEYS = {
   DRAFTS: (sessionId: string) =>
     ["invoices", "drafts", sessionId] as const,
   DETAIL: (id: string) => ["invoices", "detail", id] as const,
+  /** Hóa đơn đã bán có thể đổi/trả (trang return-goods). */
+  RETURNABLE: (filters: Record<string, unknown>) =>
+    ["invoices", "returnable", filters] as const,
+  /** Danh sách dòng hàng được phép trả của một hóa đơn gốc. */
+  ELIGIBLE_RETURNS: (id: string) =>
+    ["invoices", "eligible-returns", id] as const,
 } as const;
 
 export const CUSTOMER_KEYS = {
