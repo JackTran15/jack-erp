@@ -10,6 +10,7 @@ import { BranchEntity } from './branch.entity';
 import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
 import { BranchService } from './branch.service';
 import { OrganizationService } from '../organization/organization.service';
+import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -75,6 +76,10 @@ describe('BranchService', () => {
           useValue: assignmentRepo,
         },
         { provide: OrganizationService, useValue: orgService },
+        {
+          provide: BranchCashProvisioningService,
+          useValue: { ensureBranchCashFund: jest.fn() },
+        },
       ],
     }).compile();
 

@@ -9,6 +9,7 @@ import { Repository, DataSource, EntityManager } from 'typeorm';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { CashService } from '../../accounting/cash/cash.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
 import { OutboxService } from '../../events/outbox/outbox.service';
 import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
@@ -43,6 +44,7 @@ export class InvoiceDebtService {
     private readonly paymentRepo: Repository<DebtPaymentEntity>,
     private readonly dataSource: DataSource,
     private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly outboxService: OutboxService,
   ) {}
 
@@ -167,11 +169,12 @@ export class InvoiceDebtService {
       // and creates the JE — atomic with the payment. Then enqueue the voucher
       // event so the Phiếu thu document is created async.
       if (dto.paymentMethod === DebtPaymentMethod.CASH) {
-        if (!dto.cashAccountId) {
-          throw new BadRequestException(
-            'paymentMethod=cash requires cashAccountId',
-          );
-        }
+        const cashAccountId = await this.cashFundResolver.resolveOrDefault(
+          actor.organizationId,
+          debt.branchId,
+          dto.cashAccountId,
+          manager,
+        );
         const receivableAccountId = await this.resolveAccountId(
           manager,
           actor.organizationId,
@@ -180,7 +183,7 @@ export class InvoiceDebtService {
         const { movement, journalEntryId } =
           await this.cashService.recordMovement(
             {
-              cashAccountId: dto.cashAccountId,
+              cashAccountId,
               type: CashMovementType.DEPOSIT,
               amount: dto.amount,
               contraAccountId: receivableAccountId,
@@ -201,7 +204,7 @@ export class InvoiceDebtService {
             sourceId: paymentEntity.id,
             sourceDocumentNumber: debt.referenceCode,
             amount: dto.amount,
-            cashAccountId: dto.cashAccountId,
+            cashAccountId,
             contraAccountId: receivableAccountId,
             cashMovementId: movement.id,
             journalEntryId,

@@ -338,7 +338,8 @@ export interface CashCountListQuery {
 }
 
 export interface CashLedgerQuery {
-  cashAccountId: string;
+  /** Optional. When omitted, the backend uses the branch's single cash fund. */
+  cashAccountId?: string;
   dateFrom?: string;
   dateTo?: string;
   branchId?: string;

@@ -14,6 +14,7 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { JournalService } from '../journal/journal.service';
 import { CashService } from '../cash/cash.service';
+import { CashFundResolverService } from '../cash/cash-fund-resolver.service';
 import { CashMovementType } from '../cash/cash-movement.entity';
 import { OutboxService } from '../../events/outbox/outbox.service';
 import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
@@ -41,6 +42,7 @@ export class ExpensesService extends BaseCrudService<
     protected readonly dataSource: DataSource,
     private readonly journalService: JournalService,
     private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly outboxService: OutboxService,
   ) {
     super(dataSource);
@@ -97,11 +99,6 @@ export class ExpensesService extends BaseCrudService<
 
     const now = new Date();
     const isCash = expense.paymentMethod === ExpensePaymentMethod.CASH;
-    if (isCash && !expense.cashAccountId) {
-      throw new BadRequestException(
-        `Expense ${id} has paymentMethod=CASH but no cashAccountId`,
-      );
-    }
 
     return this.dataSource.transaction(async (manager) => {
       expense.status = ExpenseStatus.POSTED;
@@ -109,13 +106,19 @@ export class ExpensesService extends BaseCrudService<
       expense.postedBy = actor.userId;
 
       if (isCash) {
-        // CASH (A-revised): recordMovement posts DR expense / CR cash, updates
-        // balance and creates the JE — all in this transaction. Insufficient
-        // balance throws 400 and rolls back (expense stays unposted).
+        // One cash fund per branch: default to the branch fund (or validate an
+        // explicitly supplied fund). recordMovement posts DR expense / CR cash,
+        // updates balance and creates the JE — all in this transaction.
+        const cashAccountId = await this.cashFundResolver.resolveOrDefault(
+          actor.organizationId,
+          expense.branchId,
+          expense.cashAccountId,
+          manager,
+        );
         const { movement, journalEntryId } =
           await this.cashService.recordMovement(
             {
-              cashAccountId: expense.cashAccountId!,
+              cashAccountId,
               type: CashMovementType.WITHDRAWAL,
               amount: Number(expense.amount),
               contraAccountId: expense.accountId,
@@ -137,7 +140,7 @@ export class ExpensesService extends BaseCrudService<
             sourceType: 'EXPENSE',
             sourceId: saved.id,
             amount: Number(expense.amount),
-            cashAccountId: expense.cashAccountId!,
+            cashAccountId,
             contraAccountId: expense.accountId,
             cashMovementId: movement.id,
             journalEntryId,

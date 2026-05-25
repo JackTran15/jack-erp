@@ -27,6 +27,7 @@ import {
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { CashService } from '../../accounting/cash/cash.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
 import { JournalService } from '../../accounting/journal/journal.service';
 import { OutboxService } from '../../events/outbox/outbox.service';
@@ -60,6 +61,7 @@ export class GoodsReceiptService {
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly eventPublisher: EventPublisher,
     private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly journalService: JournalService,
     private readonly outboxService: OutboxService,
   ) {}
@@ -235,20 +237,24 @@ export class GoodsReceiptService {
       0,
     );
     const isCash = receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH;
-    if (isCash && !receipt.cashAccountId) {
-      throw new BadRequestException(
-        'paymentMethod=CASH yêu cầu cashAccountId',
-      );
-    }
 
     await this.dataSource.transaction(async (manager) => {
       let journalEntryId: string | undefined;
       let cashMovementId: string | undefined;
       let cashContraAccountId: string | undefined;
+      let resolvedCashAccountId: string | undefined;
 
       if (isCash) {
-        // CASH: DR inventory (TK 156) / CR cash via recordMovement — atomic with
-        // the stock posting; insufficient balance throws 400 and rolls back.
+        // One cash fund per branch: default to the branch fund (or validate an
+        // explicitly supplied fund). DR inventory (TK 156) / CR cash via
+        // recordMovement — atomic with the stock posting; insufficient balance
+        // throws 400 and rolls back.
+        resolvedCashAccountId = await this.cashFundResolver.resolveOrDefault(
+          receipt.organizationId,
+          branchId,
+          receipt.cashAccountId,
+          manager,
+        );
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
@@ -257,7 +263,7 @@ export class GoodsReceiptService {
         cashContraAccountId = inventoryAccountId;
         const res = await this.cashService.recordMovement(
           {
-            cashAccountId: receipt.cashAccountId!,
+            cashAccountId: resolvedCashAccountId,
             type: CashMovementType.WITHDRAWAL,
             amount: total,
             contraAccountId: inventoryAccountId,
@@ -340,7 +346,7 @@ export class GoodsReceiptService {
             sourceId: receipt.id,
             sourceDocumentNumber: documentNumber,
             amount: total,
-            cashAccountId: receipt.cashAccountId!,
+            cashAccountId: resolvedCashAccountId!,
             contraAccountId: cashContraAccountId!,
             cashMovementId,
             journalEntryId,

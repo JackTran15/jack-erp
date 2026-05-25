@@ -571,6 +571,9 @@ export class CashPaymentsService {
       qb.andWhere('p.cashAccountId = :cashAccountId', {
         cashAccountId: query.cashAccountId,
       });
+    else if (actor.branchId)
+      // One cash fund per branch: default to branch-scoped vouchers.
+      qb.andWhere('p.branchId = :branchId', { branchId: actor.branchId });
     if (query.partnerId)
       qb.andWhere('p.partnerId = :partnerId', { partnerId: query.partnerId });
     if (query.dateFrom)

@@ -16,6 +16,7 @@ import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import {
   AccountingDefaultAccountRole,
   PaymentAccountMethod,
@@ -32,6 +33,7 @@ const actor = {
 
 // Accounts the resolver returns (server-side config). Client never supplies these.
 const CASH_ACCOUNT       = 'acct-cash-1';
+const CASH_FUND          = 'cash-fund-1';
 const BANK_ACCOUNT       = 'acct-bank-1';
 const REVENUE_ACCOUNT    = 'acct-rev-1';
 const RECEIVABLE_ACCOUNT = 'acct-ar-1';
@@ -101,6 +103,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
+  let cashFundResolver: { resolveBranchCashFund: jest.Mock };
   let accountResolver: {
     resolveDefaultAccount: jest.Mock;
     resolvePaymentAccount: jest.Mock;
@@ -133,6 +136,9 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
+    cashFundResolver = {
+      resolveBranchCashFund: jest.fn().mockResolvedValue(CASH_FUND),
+    };
     accountResolver = {
       resolveDefaultAccount: jest.fn().mockImplementation((role) =>
         Promise.resolve(
@@ -166,6 +172,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
         { provide: AccountResolverService,                useValue: accountResolver },
+        { provide: CashFundResolverService,               useValue: cashFundResolver },
       ],
     }).compile();
 
@@ -467,21 +474,20 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       payments: [{ paymentMethod: 'card' as any, amount: 200 }],
     };
 
-    it('publishes cash event for CASH payment using session cash_account', async () => {
-      sessionRepo.findOne.mockResolvedValue({
-        id: 'session-1',
-        cashAccountId: 'register-1',
-      });
-
+    it('publishes cash event for CASH payment using the branch cash fund', async () => {
       await service.checkout('inv-1', cashPaymentDto(), actor);
 
       expect(cashFromPaymentPublisher.publish).toHaveBeenCalledTimes(1);
+      expect(cashFundResolver.resolveBranchCashFund).toHaveBeenCalledWith(
+        actor.organizationId,
+        'branch-1',
+      );
       expect(cashFromPaymentPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           invoiceId: 'inv-1',
           invoiceCode: 'INV-2605-00001',
-          sessionId: 'session-1',
-          cashAccountId: 'register-1',
+          sessionId: undefined,
+          cashAccountId: CASH_FUND,
           contraAccountId: REVENUE_ACCOUNT,
           amount: 200,
         }),
@@ -489,7 +495,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       );
     });
 
-    it('falls back to the resolved cash account when no active session', async () => {
+    it('resolves the branch fund regardless of POS session (no session dependency)', async () => {
       sessionRepo.findOne.mockResolvedValue(null);
 
       await service.checkout('inv-1', cashPaymentDto(), actor);
@@ -497,7 +503,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       expect(cashFromPaymentPublisher.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: undefined,
-          cashAccountId: CASH_ACCOUNT,
+          cashAccountId: CASH_FUND,
         }),
         actor,
       );

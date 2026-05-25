@@ -9,8 +9,10 @@ import {
 } from 'class-validator';
 
 export class QueryCashLedgerDto {
+  /** Optional. When omitted, the branch's single cash fund is used. */
+  @IsOptional()
   @IsUUID()
-  cashAccountId: string;
+  cashAccountId?: string;
 
   @IsOptional()
   @IsISO8601()

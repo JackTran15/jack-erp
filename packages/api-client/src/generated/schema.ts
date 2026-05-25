@@ -2794,70 +2794,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/pos/sales/checkout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PosController_checkout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pos/sales/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PosController_getSale"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pos/sales/{id}/return": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PosController_processReturn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pos/sales/{id}/exchange": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PosController_processExchange"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/invoices": {
         parameters: {
             query?: never;
@@ -2980,6 +2916,70 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["InvoiceController_markAsDebt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/eligible-returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceController_getEligibleReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_createReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/exchanges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_createExchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/checkout-return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_checkoutReturn"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5610,199 +5610,6 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
-        CheckoutLineDto: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-            taxAmount: number;
-        };
-        CheckoutPaymentDto: {
-            /** @enum {string} */
-            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
-            amount: number;
-            reference?: string;
-        };
-        CheckoutDto: {
-            /** Format: uuid */
-            sessionId: string;
-            /** Format: uuid */
-            customerId?: string;
-            lines: components["schemas"]["CheckoutLineDto"][];
-            payments: components["schemas"]["CheckoutPaymentDto"][];
-            /** Format: uuid */
-            cashAccountId: string;
-            /** Format: uuid */
-            revenueAccountId: string;
-        };
-        PaymentEntity: {
-            saleId: string;
-            sale: components["schemas"]["SaleEntity"];
-            /** @enum {string} */
-            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
-            amount: number;
-            reference?: string;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        SaleEntity: {
-            documentNumber: string;
-            sessionId: string;
-            customerId?: string;
-            subtotal: number;
-            taxAmount: number;
-            totalAmount: number;
-            /** @enum {string} */
-            status: "COMPLETED" | "RETURNED" | "PARTIALLY_RETURNED";
-            /** Format: date-time */
-            saleDate: string;
-            lines: components["schemas"]["SaleLineEntity"][];
-            payments: components["schemas"]["PaymentEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        SaleLineEntity: {
-            saleId: string;
-            sale: components["schemas"]["SaleEntity"];
-            itemId: string;
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-            lineTotal: number;
-            taxAmount: number;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        ReturnLineDto: {
-            /** Format: uuid */
-            originalSaleLineId: string;
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-        };
-        ProcessReturnDto: {
-            /** Format: uuid */
-            sessionId: string;
-            reason: string;
-            lines: components["schemas"]["ReturnLineDto"][];
-            /** Format: uuid */
-            cashAccountId: string;
-            /** Format: uuid */
-            revenueAccountId: string;
-        };
-        ReturnEntity: {
-            documentNumber: string;
-            originalSaleId: string;
-            sessionId: string;
-            subtotal: number;
-            taxAmount: number;
-            totalAmount: number;
-            reason: string;
-            /** Format: date-time */
-            returnDate: string;
-            lines: components["schemas"]["ReturnLineEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        ReturnLineEntity: {
-            returnId: string;
-            returnDoc: components["schemas"]["ReturnEntity"];
-            originalSaleLineId: string;
-            itemId: string;
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-            lineTotal: number;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        ExchangeReturnLineDto: {
-            /** Format: uuid */
-            originalSaleLineId: string;
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-        };
-        ExchangeNewLineDto: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: uuid */
-            locationId: string;
-            quantity: number;
-            unitPrice: number;
-            taxAmount: number;
-        };
-        ExchangeSettlementDto: {
-            /** @enum {string} */
-            method: "CASH" | "CARD" | "CREDIT" | "OTHER";
-            amount: number;
-            reference?: string;
-        };
-        ProcessExchangeDto: {
-            /** Format: uuid */
-            sessionId: string;
-            reason: string;
-            returnLines: components["schemas"]["ExchangeReturnLineDto"][];
-            newLines: components["schemas"]["ExchangeNewLineDto"][];
-            settlement?: components["schemas"]["ExchangeSettlementDto"];
-            /** Format: uuid */
-            cashAccountId: string;
-            /** Format: uuid */
-            revenueAccountId: string;
-        };
         CreateInvoiceItemDto: {
             /** Format: uuid */
             itemId: string;
@@ -5831,6 +5638,14 @@ export interface components {
             issuedAt?: string;
             /** @enum {string} */
             status: "draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled";
+            /** @enum {string} */
+            type: "SALE" | "RETURN" | "EXCHANGE";
+            originalInvoiceId?: string;
+            originalInvoice?: components["schemas"]["InvoiceEntity"];
+            /** @enum {string} */
+            refundMethod?: "CASH" | "STORE_CREDIT" | "OFFSET";
+            refundedAmount: number;
+            netAmount: number;
             subtotal: number;
             discountAmount: number;
             depositAmount: number;
@@ -5858,6 +5673,38 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        InvoiceItemEntity: {
+            invoiceId: string;
+            itemId: string;
+            locationId?: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            unitPriceDefault: number;
+            costPrice: number;
+            lineDiscount: number;
+            lineTotal: number;
+            /** @enum {string} */
+            direction: "OUT" | "IN";
+            returnedQuantity: number;
+            originalInvoiceItemId?: string;
+            originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
+            note?: string;
+            sortOrder: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
         DraftInvoiceItemDto: {
             /** @description Resolved storage location for this line (null if locationId is unset or stale). */
             location: components["schemas"]["LocationEntity"] | null;
@@ -5873,6 +5720,11 @@ export interface components {
             costPrice: number;
             lineDiscount: number;
             lineTotal: number;
+            /** @enum {string} */
+            direction: "OUT" | "IN";
+            returnedQuantity: number;
+            originalInvoiceItemId?: string;
+            originalInvoiceItem?: components["schemas"]["InvoiceItemEntity"];
             note?: string;
             sortOrder: number;
             id: string;
@@ -5895,6 +5747,14 @@ export interface components {
             issuedAt?: string;
             /** @enum {string} */
             status: "draft" | "pending" | "paid" | "debt" | "partial_debt" | "cancelled";
+            /** @enum {string} */
+            type: "SALE" | "RETURN" | "EXCHANGE";
+            originalInvoiceId?: string;
+            originalInvoice?: components["schemas"]["InvoiceEntity"];
+            /** @enum {string} */
+            refundMethod?: "CASH" | "STORE_CREDIT" | "OFFSET";
+            refundedAmount: number;
+            netAmount: number;
             subtotal: number;
             discountAmount: number;
             depositAmount: number;
@@ -6018,6 +5878,76 @@ export interface components {
         };
         CancelInvoiceDto: {
             reason: string;
+        };
+        ReturnInvoiceLineDto: {
+            /**
+             * Format: uuid
+             * @description Required in REGULAR mode — points back to the original SALE invoice_item.
+             */
+            originalInvoiceItemId?: string;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice: number;
+            lineDiscount?: number;
+            note?: string;
+        };
+        CreateReturnInvoiceDto: {
+            /** @enum {string} */
+            mode: "quick" | "regular";
+            /**
+             * Format: uuid
+             * @description Required when mode = REGULAR.
+             */
+            originalInvoiceId?: string;
+            /** Format: uuid */
+            customerId?: string;
+            sessionId: string;
+            reason: string;
+            lines: components["schemas"]["ReturnInvoiceLineDto"][];
+        };
+        CreateExchangeInvoiceDto: {
+            sessionId: string;
+            /** Format: uuid */
+            originalInvoiceId: string;
+            reason: string;
+            /** Format: uuid */
+            customerId?: string;
+            /** @description Items being returned (direction=IN). Must reference original SALE lines. */
+            returnLines: components["schemas"]["ReturnInvoiceLineDto"][];
+            /** @description New items being purchased (direction=OUT). Same shape as a normal SALE. */
+            newLines: components["schemas"]["CreateInvoiceItemDto"][];
+        };
+        CheckoutReturnDto: {
+            /** @enum {string} */
+            refundMethod: "CASH" | "STORE_CREDIT" | "OFFSET";
+            /** Format: uuid */
+            revenueAccountId: string;
+            /**
+             * Format: uuid
+             * @description Required when refundMethod = CASH AND no active drawer session is found.
+             */
+            cashAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Required when refundMethod = OFFSET against an original AR (debt) invoice.
+             */
+            receivableAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Required when refundMethod = STORE_CREDIT (target liability GL).
+             */
+            creditLiabilityAccountId?: string;
+            /** @description Optional expiry date for the issued store credit (ISO date). */
+            creditExpiresAt?: string;
+            /** @description Payments — only required for EXCHANGE with netAmount > 0. */
+            payments?: components["schemas"]["InvoicePaymentLineDto"][];
+            note?: string;
         };
         DiscountCodeEntity: {
             code: string;
@@ -7914,8 +7844,9 @@ export interface operations {
     };
     CashLedgerController_getLedger: {
         parameters: {
-            query: {
-                cashAccountId: string;
+            query?: {
+                /** @description Optional. When omitted, the branch's single cash fund is used. */
+                cashAccountId?: string;
                 dateFrom?: string;
                 dateTo?: string;
                 branchId?: string;
@@ -12069,100 +12000,6 @@ export interface operations {
             };
         };
     };
-    PosController_checkout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CheckoutDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SaleEntity"];
-                };
-            };
-        };
-    };
-    PosController_getSale: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SaleEntity"];
-                };
-            };
-        };
-    };
-    PosController_processReturn: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProcessReturnDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReturnEntity"];
-                };
-            };
-        };
-    };
-    PosController_processExchange: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProcessExchangeDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
     InvoiceController_findAll: {
         parameters: {
             query?: {
@@ -12430,6 +12267,98 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CheckoutInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_getEligibleReturns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    InvoiceController_createReturn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_createExchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExchangeInvoiceDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_checkoutReturn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutReturnDto"];
             };
         };
         responses: {

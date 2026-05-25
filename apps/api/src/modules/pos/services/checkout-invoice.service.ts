@@ -22,6 +22,7 @@ import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import {
   AccountingDefaultAccountRole,
   PaymentAccountMethod,
@@ -71,6 +72,7 @@ export class CheckoutInvoiceService {
     private readonly journalSalePublisher: JournalSalePublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
     private readonly accountResolver: AccountResolverService,
+    private readonly cashFundResolver: CashFundResolverService,
   ) {}
 
   async checkout(
@@ -267,13 +269,13 @@ export class CheckoutInvoiceService {
       (p) => p.paymentMethod === InvoicePaymentMethod.CASH,
     );
     if (cashPayments.length > 0) {
-      const activeSession = await this.sessionRepo.findOne({
-        where: {
-          organizationId: actor.organizationId,
-          openedBy: actor.userId,
-          status: In([SessionStatus.OPEN, SessionStatus.ACTIVE_SALES]),
-        },
-      });
+      // One cash fund per branch: cash always lands in the branch's fund (mapped
+      // to COA 1111). Never use cp.accountId here — that is a COA account id, not
+      // a cash_accounts id.
+      const branchCashFundId = await this.cashFundResolver.resolveBranchCashFund(
+        actor.organizationId,
+        updatedInvoice.branchId,
+      );
 
       for (const cp of cashPayments) {
         await this.cashFromPaymentPublisher.publish(
@@ -281,8 +283,8 @@ export class CheckoutInvoiceService {
             invoiceId: updatedInvoice.id,
             invoicePaymentId: cp.id,
             invoiceCode: realCode,
-            sessionId: activeSession?.id,
-            cashAccountId: activeSession?.cashAccountId ?? cp.accountId,
+            sessionId: undefined,
+            cashAccountId: branchCashFundId,
             contraAccountId: revenueAccountId,
             amount: Number(cp.amount),
             branchId: updatedInvoice.branchId,

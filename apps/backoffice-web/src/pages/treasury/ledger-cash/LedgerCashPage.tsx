@@ -23,7 +23,6 @@ import {
   cashReceiptToVoucherDetail,
 } from "../cash-vouchers.adapters";
 import { CashVoucherCategoryDirection } from "../cash-vouchers.types";
-import { CashAccountSelect } from "../components/CashAccountSelect";
 import {
   InvoiceDetailDialog,
   PaymentVoucherDialog,
@@ -42,7 +41,6 @@ import {
 } from "./ledger-cash.types";
 
 export function LedgerCashPage() {
-  const [cashAccountId, setCashAccountId] = useState("");
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),
@@ -56,23 +54,21 @@ export function LedgerCashPage() {
   const [linkedInvoiceDetail, setLinkedInvoiceDetail] =
     useState<LedgerCashInvoiceDetail | null>(null);
 
+  // One cash fund per branch: the backend resolves it from the active branch
+  // (X-Branch-Id), so no cash-account selection is needed here.
   const ledgerParams = useMemo(
-    () =>
-      cashAccountId
-        ? {
-            cashAccountId,
-            dateFrom: appliedPeriod.from,
-            dateTo: appliedPeriod.to,
-          }
-        : null,
-    [cashAccountId, appliedPeriod],
+    () => ({
+      dateFrom: appliedPeriod.from,
+      dateTo: appliedPeriod.to,
+    }),
+    [appliedPeriod],
   );
 
   const ledger = useCashLedgerOffsetPage(
     ledgerParams,
     pagination.page,
     pagination.pageSize,
-    Boolean(cashAccountId),
+    true,
   );
 
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
@@ -147,11 +143,6 @@ export function LedgerCashPage() {
         filters={
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-end gap-4">
-              <CashAccountSelect
-                value={cashAccountId}
-                onChange={setCashAccountId}
-                required
-              />
               <PeriodFilter
                 value={period}
                 onChange={setPeriod}
