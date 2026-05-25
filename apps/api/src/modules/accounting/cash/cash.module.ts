@@ -7,7 +7,6 @@ import { CashService } from './cash.service';
 import { CashController } from './cash.controller';
 import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publisher';
-import { CashFromPaymentConsumer } from '../consumers/cash-from-payment.consumer';
 import { CashRefundPublisher } from '../publishers/cash-refund.publisher';
 import { CashRefundConsumer } from '../consumers/cash-refund.consumer';
 
@@ -20,7 +19,6 @@ import { CashRefundConsumer } from '../consumers/cash-refund.consumer';
   providers: [
     CashService,
     CashFromPaymentPublisher,
-    CashFromPaymentConsumer,
     CashRefundPublisher,
     CashRefundConsumer,
   ],

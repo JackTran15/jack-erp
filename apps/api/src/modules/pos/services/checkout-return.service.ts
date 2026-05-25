@@ -23,6 +23,8 @@ import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
 import { CustomerCreditService } from '../../customer/services/customer-credit.service';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import { PaymentAccountMethod } from '../../accounting/payment-accounts/enums';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
@@ -56,6 +58,17 @@ const RETURN_INVOICE_TYPES = new Set<InvoiceType>([
   InvoiceType.EXCHANGE,
 ]);
 
+/** POS payment method → payment-account config method. Values are identical
+ * strings; this map keeps the two enums decoupled at the type level. */
+const PAYMENT_METHOD_TO_ACCOUNT_METHOD: Record<
+  InvoicePaymentMethod,
+  PaymentAccountMethod
+> = {
+  [InvoicePaymentMethod.CASH]: PaymentAccountMethod.CASH,
+  [InvoicePaymentMethod.BANK_TRANSFER]: PaymentAccountMethod.BANK_TRANSFER,
+  [InvoicePaymentMethod.CARD]: PaymentAccountMethod.CARD,
+};
+
 @Injectable()
 export class CheckoutReturnService {
   private readonly logger = new Logger(CheckoutReturnService.name);
@@ -71,6 +84,7 @@ export class CheckoutReturnService {
     private readonly numbering: DocumentNumberingService,
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly customerCredit: CustomerCreditService,
+    private readonly accountResolver: AccountResolverService,
     private readonly returnPostedPublisher: ReturnPostedPublisher,
     private readonly stockReturnInPublisher: StockReturnInPublisher,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
@@ -144,6 +158,29 @@ export class CheckoutReturnService {
       }
     }
 
+    // Resolve the receiving COA account for each EXCHANGE payment line — the
+    // same server-side derivation as a normal sale checkout: the client sends a
+    // configured `payment_accounts` row id (which bank a transfer hit), never a
+    // raw COA id. Resolve before the transaction so an invalid/ambiguous mapping
+    // fails fast. Index-aligned with dto.payments.
+    const resolvedPaymentAccountIds: string[] = [];
+    if (totals.netAmount > 0 && dto.payments && dto.payments.length > 0) {
+      const resolvedByKey = new Map<string, string>();
+      for (const p of dto.payments) {
+        const cacheKey = p.paymentAccountId ?? `default:${p.paymentMethod}`;
+        let accountId = resolvedByKey.get(cacheKey);
+        if (!accountId) {
+          accountId = await this.accountResolver.resolvePaymentAccount(
+            PAYMENT_METHOD_TO_ACCOUNT_METHOD[p.paymentMethod],
+            actor,
+            p.paymentAccountId,
+          );
+          resolvedByKey.set(cacheKey, accountId);
+        }
+        resolvedPaymentAccountIds.push(accountId);
+      }
+    }
+
     const now = new Date();
     let originalInvoice: InvoiceEntity | null = null;
     if (invoice.originalInvoiceId) {
@@ -192,7 +229,7 @@ export class CheckoutReturnService {
       // Save InvoicePayment rows when EXCHANGE net > 0.
       let savedPayments: InvoicePaymentEntity[] = [];
       if (totals.netAmount > 0 && dto.payments && dto.payments.length > 0) {
-        const paymentEntities = dto.payments.map((p) =>
+        const paymentEntities = dto.payments.map((p, idx) =>
           manager.create(InvoicePaymentEntity, {
             organizationId: actor.organizationId,
             branchId: actor.branchId,
@@ -200,7 +237,7 @@ export class CheckoutReturnService {
             invoiceId: savedInvoice.id,
             paymentMethod: p.paymentMethod,
             amount: p.amount,
-            accountId: p.accountId,
+            accountId: resolvedPaymentAccountIds[idx],
             reference: p.reference,
           }),
         );

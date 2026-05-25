@@ -1,9 +1,8 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn, DeleteDateColumn } from 'typeorm';
-import { CustomerCreditStatus } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../database/entities/base.entity';
 import { CustomerEntity } from './customer.entity';
+import { CustomerCreditStatus } from '@erp/shared-interfaces';
 
-export { CustomerCreditStatus };
 
 /**
  * Store credit ledger row — issued when a RETURN invoice settles with
