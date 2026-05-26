@@ -182,9 +182,16 @@ export function useReturnableInvoicesQuery(
         page: 1,
         limit: RETURN_GOODS_DEFAULT_PAGE_SIZE,
       });
+      // Chỉ hóa đơn BÁN mới đổi/trả được. Đơn RETURN/EXCHANGE sau tất toán cũng
+      // `status=paid` nên lọt vào list — loại trừ chúng để bấm vào không bị BE
+      // báo "only SALE can be returned". Lọc kiểu loại trừ (giữ SALE + thiếu type)
+      // để an toàn nếu response không kèm `type`.
+      const saleInvoices = page.data.filter(
+        (inv) => inv.type !== "RETURN" && inv.type !== "EXCHANGE",
+      );
       const ids = Array.from(
         new Set(
-          page.data
+          saleInvoices
             .map((inv) => inv.customerId)
             .filter((id): id is string => Boolean(id)),
         ),
@@ -200,7 +207,7 @@ export function useReturnableInvoicesQuery(
         }),
       );
       const byId = new Map(entries);
-      return page.data.map((inv) =>
+      return saleInvoices.map((inv) =>
         mapInvoiceToReturnRow(
           inv,
           inv.customerId ? byId.get(inv.customerId) ?? null : null,

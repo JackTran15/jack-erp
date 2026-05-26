@@ -240,6 +240,13 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             toast.error(CHECKOUT_TOASTS.NO_RETURN_LINES);
             return;
           }
+          // BE `ReturnInvoiceLineDto.locationId` là `@IsUUID()` bắt buộc — chặn
+          // sớm dòng trả thiếu vị trí kho (eligible-returns có thể trả locationId
+          // rỗng) để tránh 400 "locationId must be a UUID" khó hiểu cho thu ngân.
+          if (returnLines.some((l) => !l.locationId)) {
+            toast.error(CHECKOUT_TOASTS.RETURN_LINE_MISSING_LOCATION);
+            return;
+          }
 
           const revenueAccountId = pickAccountByCodePrefix(
             revenueQuery.data?.data,

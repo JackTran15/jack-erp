@@ -44,6 +44,8 @@ export const CHECKOUT_ANNOUNCEMENTS = {
 /** Toast (sonner) cho thành công/thất bại của thao tác checkout. */
 export const CHECKOUT_TOASTS = {
   NO_RETURN_LINES: "Chưa có hàng nào để trả.",
+  RETURN_LINE_MISSING_LOCATION:
+    "Hàng trả thiếu thông tin kho/vị trí — vui lòng kiểm tra lại.",
   REVENUE_ACCOUNT_UNAVAILABLE:
     "Chưa lấy được tài khoản doanh thu để hạch toán đổi trả. Vui lòng thử lại.",
   EXCHANGE_NEEDS_ORIGINAL:
