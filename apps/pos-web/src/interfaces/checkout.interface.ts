@@ -153,6 +153,11 @@ export interface CheckoutPaymentDraft {
   selectedSuggestionId: string | null;
   deposit: number;
   /**
+   * Phí đổi trả (chỉ dùng ở tab return / quick-exchange) — khách trả thêm, cộng
+   * vào số phải thu / trừ vào số hoàn. 0 ở tab bán thường.
+   */
+  returnFee: number;
+  /**
    * `true` khi số tiền dòng đầu vẫn tự đồng bộ theo "số tiền cần thanh toán".
    * Chuyển `false` khi nhân viên tự nhập số / chọn gợi ý.
    */

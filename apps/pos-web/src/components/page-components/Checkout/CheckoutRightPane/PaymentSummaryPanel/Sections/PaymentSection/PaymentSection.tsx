@@ -16,15 +16,16 @@ import { API_METHOD_TO_PAYMENT_METHOD } from "@erp/pos/constants/checkout.consta
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
   onDepositClick: () => void;
+  onReturnFeeClick: () => void;
 }
 
 export function PaymentSection({
   paymentAmountRef,
   onDepositClick,
+  onReturnFeeClick,
 }: PaymentSectionProps) {
   const {
-    deposit,
-    grandTotal: total,
+    settlementGrandTotal,
     settlementAbs,
     paymentLines,
     handleChangePaymentLines,
@@ -70,10 +71,12 @@ export function PaymentSection({
     if (mutated) handleChangePaymentLines(next);
   }, [accounts, paymentLines, handleChangePaymentLines]);
 
-  const amountDue = Math.max(0, total - deposit);
-  const isRefundFlow = total < 0;
+  // Dùng settlementGrandTotal (đã trừ đặt cọc + cộng phí đổi trả) để Còn phải thu /
+  // hoàn tiền + chiều refund tự đúng khi phí/đặt cọc lật dấu.
+  const amountDue = Math.max(0, settlementGrandTotal);
+  const isRefundFlow = settlementGrandTotal < 0;
   const netChangeDisplay = changeAmount - shortageAmount;
-  const refundDisplayAmount = Math.max(0, -total);
+  const refundDisplayAmount = Math.max(0, -settlementGrandTotal);
 
   const showKeepChange =
     !debt &&
@@ -86,7 +89,10 @@ export function PaymentSection({
   return (
     <>
       <div className="px-4">
-        <PaymentSummaryBlock onDepositClick={onDepositClick} />
+        <PaymentSummaryBlock
+          onDepositClick={onDepositClick}
+          onReturnFeeClick={onReturnFeeClick}
+        />
       </div>
       {!isRefundFlow ? (
         <>

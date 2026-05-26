@@ -46,6 +46,9 @@ interface UseCheckoutPaymentResult {
   setSelectedSuggestionId: (value: Updater<string | null>) => void;
   deposit: number;
   setDeposit: (value: Updater<number>) => void;
+  /** Phí đổi trả (return/exchange) — cộng vào settlement. */
+  returnFee: number;
+  setReturnFee: (value: Updater<number>) => void;
   /** Tự điền số tiền dòng đầu = `amount` khi còn ở chế độ auto (1 dòng). */
   setFirstLineAmountAuto: (amount: number) => void;
   grandTotal: number;
@@ -84,6 +87,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     preorder,
     selectedSuggestionId,
     deposit,
+    returnFee,
   } = payment;
 
   // Action generic + behavior action lấy từ session store (reference ổn định).
@@ -168,6 +172,14 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       })),
     [updateDraftSlice],
   );
+  const setReturnFee = useCallback(
+    (value: Updater<number>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        returnFee: apply(p.returnFee, value),
+      })),
+    [updateDraftSlice],
+  );
 
   const {
     settlementGrandTotal,
@@ -178,8 +190,15 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     debtAmount,
   } = useMemo(
     () =>
-      deriveSettlement({ grandTotal, deposit, paymentLines, keepChange, debt }),
-    [grandTotal, deposit, paymentLines, keepChange, debt],
+      deriveSettlement({
+        grandTotal,
+        deposit,
+        returnFee,
+        paymentLines,
+        keepChange,
+        debt,
+      }),
+    [grandTotal, deposit, returnFee, paymentLines, keepChange, debt],
   );
 
   const isRefundFlow = settlementGrandTotal < 0;
@@ -241,6 +260,8 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     setSelectedSuggestionId,
     deposit,
     setDeposit,
+    returnFee,
+    setReturnFee,
     setFirstLineAmountAuto,
     grandTotal,
     settlementGrandTotal,

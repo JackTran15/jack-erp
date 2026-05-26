@@ -9,6 +9,7 @@ import type { CustomerActionItem } from "@erp/pos/components/common/PosCustomerA
 import { PromoMenu } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/PromoMenu";
 import { QuickExchangeBadges } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/QuickExchangeBadges/QuickExchangeBadges";
 import { DepositDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DepositDialog/DepositDialog";
+import { ReturnFeeDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/ReturnFeeDialog/ReturnFeeDialog";
 import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/PromotionSelectionModal/PromotionSelectionModal";
 import { CheckoutActionsSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/CheckoutActionsSection";
 import { CustomerSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/CustomerSection";
@@ -42,6 +43,8 @@ export function PaymentSummaryPanel({
   const {
     deposit,
     setDeposit,
+    returnFee,
+    setReturnFee,
     paymentLines,
     handleRequireCustomerForDeposit,
   } = useCheckoutPayment();
@@ -58,6 +61,8 @@ export function PaymentSummaryPanel({
   const [draftDepositMethod, setDraftDepositMethod] = useState<PaymentMethod>(
     PaymentMethodEnum.CASH,
   );
+  const [returnFeeDialogOpen, setReturnFeeDialogOpen] = useState(false);
+  const [draftReturnFee, setDraftReturnFee] = useState(0);
 
   const hasCustomer = Boolean(selectedCustomer);
 
@@ -128,6 +133,16 @@ export function PaymentSummaryPanel({
     setDepositDialogOpen(false);
   };
 
+  const handleOpenReturnFeeDialog = () => {
+    setDraftReturnFee(returnFee);
+    setReturnFeeDialogOpen(true);
+  };
+
+  const handleConfirmReturnFee = () => {
+    setReturnFee(Math.max(0, draftReturnFee));
+    setReturnFeeDialogOpen(false);
+  };
+
   return (
     <aside className="flex h-full min-w-[350px] w-[26dvw] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
       <div className="flex-1 overflow-y-auto">
@@ -142,6 +157,7 @@ export function PaymentSummaryPanel({
         <PaymentSection
           paymentAmountRef={paymentAmountRef}
           onDepositClick={handleOpenDepositDialog}
+          onReturnFeeClick={handleOpenReturnFeeDialog}
         />
       </div>
 
@@ -156,6 +172,14 @@ export function PaymentSummaryPanel({
         onAmountChange={setDraftDepositAmount}
         onMethodChange={setDraftDepositMethod}
         onConfirm={handleConfirmDeposit}
+      />
+
+      <ReturnFeeDialog
+        open={returnFeeDialogOpen}
+        amount={draftReturnFee}
+        onClose={() => setReturnFeeDialogOpen(false)}
+        onAmountChange={setDraftReturnFee}
+        onConfirm={handleConfirmReturnFee}
       />
 
       <PromotionSelectionModal

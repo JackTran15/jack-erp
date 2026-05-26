@@ -130,6 +130,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       } = deriveSettlement({
         grandTotal,
         deposit: p.deposit,
+        returnFee: p.returnFee,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,

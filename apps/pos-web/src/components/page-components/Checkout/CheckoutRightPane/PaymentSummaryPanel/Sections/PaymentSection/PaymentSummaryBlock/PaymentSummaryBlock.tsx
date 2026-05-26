@@ -4,18 +4,26 @@ import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSumma
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import {
+  selectIsReturnExchangeInvoice,
   selectItemCountForPayment,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 
 export interface PaymentSummaryBlockProps {
   onDepositClick?: () => void;
+  onReturnFeeClick?: () => void;
 }
 
-export function PaymentSummaryBlock({ onDepositClick }: PaymentSummaryBlockProps) {
+export function PaymentSummaryBlock({
+  onDepositClick,
+  onReturnFeeClick,
+}: PaymentSummaryBlockProps) {
   const itemCount = usePosCheckoutSessionStore(selectItemCountForPayment);
+  const isReturnExchange = usePosCheckoutSessionStore(
+    selectIsReturnExchangeInvoice,
+  );
   const total = useCheckoutGrandTotal();
-  const { deposit } = useCheckoutPayment();
+  const { deposit, returnFee } = useCheckoutPayment();
 
   return (
     <div className="space-y-2 py-3">
@@ -44,6 +52,24 @@ export function PaymentSummaryBlock({ onDepositClick }: PaymentSummaryBlockProps
         }
         value={formatVnd(deposit)}
       />
+      {isReturnExchange ? (
+        <PosSummaryRow
+          label={
+            onReturnFeeClick ? (
+              <button
+                type="button"
+                onClick={onReturnFeeClick}
+                className="text-sm text-indigo-600 hover:text-indigo-700"
+              >
+                Phí đổi trả
+              </button>
+            ) : (
+              "Phí đổi trả"
+            )
+          }
+          value={formatVnd(returnFee)}
+        />
+      ) : null}
     </div>
   );
 }

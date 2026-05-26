@@ -60,7 +60,7 @@ export function PaymentCTAButtons() {
         disabled={collectDisabled || busy}
         className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#22C55E] text-[15px] font-semibold text-white transition-colors hover:bg-[#16A34A] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
       >
-        Thu tiền
+        {isReturnExchange ? "Thanh toán" : "Thu tiền"}
         <KeyboardHint className="text-[13px] text-white/80">(F9)</KeyboardHint>
       </button>
     </div>

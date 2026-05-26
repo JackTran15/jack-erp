@@ -28,13 +28,20 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
   );
 
   const grandTotal = useCheckoutGrandTotal();
-  const { deposit, paymentLines, keepChange, debt } =
+  const { deposit, returnFee, paymentLines, keepChange, debt } =
     usePosCheckoutSessionStore(selectPaymentDraft);
 
   const { settlementGrandTotal, changeAmount, shortageAmount } = useMemo(
     () =>
-      deriveSettlement({ grandTotal, deposit, paymentLines, keepChange, debt }),
-    [grandTotal, deposit, paymentLines, keepChange, debt],
+      deriveSettlement({
+        grandTotal,
+        deposit,
+        returnFee,
+        paymentLines,
+        keepChange,
+        debt,
+      }),
+    [grandTotal, deposit, returnFee, paymentLines, keepChange, debt],
   );
 
   const blockedByShortPayment = (() => {

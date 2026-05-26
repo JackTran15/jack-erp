@@ -29,6 +29,7 @@ export function initialCheckoutDraft(): CheckoutDraft {
       preorder: false,
       selectedSuggestionId: null,
       deposit: 0,
+      returnFee: 0,
       firstAmountAuto: true,
     },
     promotion: {
