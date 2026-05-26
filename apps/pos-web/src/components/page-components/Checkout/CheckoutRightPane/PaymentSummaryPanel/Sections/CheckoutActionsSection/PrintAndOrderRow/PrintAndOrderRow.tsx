@@ -1,16 +1,15 @@
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { PosToggle } from "@erp/pos/components/common/PosToggle/PosToggle";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 
 /**
  * "In hóa đơn" toggle + "Đặt hàng" checkbox — sticky-bar style row pinned
- * above the cash-hint chips. Đọc/set printInvoice + preorder từ payment store.
+ * above the cash-hint chips. Đọc/set printInvoice + preorder qua payment hook
+ * (state per-tab nằm trong session draft).
  */
 export function PrintAndOrderRow() {
-  const printInvoice = usePosCheckoutPaymentStore((s) => s.printInvoice);
-  const setPrintInvoice = usePosCheckoutPaymentStore((s) => s.setPrintInvoice);
-  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
-  const setPreorder = usePosCheckoutPaymentStore((s) => s.setPreorder);
+  const { printInvoice, setPrintInvoice, preorder, setPreorder } =
+    useCheckoutPayment();
 
   return (
     <div className="flex h-11 items-center justify-between gap-3 bg-[#F5F5F5] px-4 text-[14px] text-gray-900">

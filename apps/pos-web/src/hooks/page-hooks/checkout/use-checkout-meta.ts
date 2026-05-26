@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
 import {
@@ -11,8 +11,11 @@ import type {
   ProductGroup,
   Salesperson,
 } from "@erp/pos/interfaces/checkout.interface";
-import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
-import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
+import {
+  selectCatalogDraft,
+  selectMetaDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 export interface CheckoutMeta {
   salespersons: ReadonlyArray<Salesperson>;
@@ -42,18 +45,27 @@ export const useCheckoutMeta = (): CheckoutMeta => {
   const priceBooks = PRICE_BOOK_OPTIONS;
   const productGroups = CATALOG_GROUP_OPTIONS;
 
-  const selectedSalesperson = usePosCheckoutUiStore(
-    (s) => s.selectedSalesperson,
+  const { selectedSalesperson, selectedPriceBook } = usePosCheckoutSessionStore(
+    selectMetaDraft,
   );
-  const setSelectedSalesperson = usePosCheckoutUiStore(
-    (s) => s.setSelectedSalesperson,
-  );
-  const selectedPriceBook = usePosCheckoutUiStore((s) => s.selectedPriceBook);
-  const setSelectedPriceBook = usePosCheckoutUiStore(
-    (s) => s.setSelectedPriceBook,
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
   );
 
-  const catalogGroupId = usePosCheckoutCatalogStore((s) => s.catalogGroup);
+  const setSelectedSalesperson = useCallback(
+    (next: Salesperson | null) =>
+      updateDraftSlice("meta", (m) => ({ ...m, selectedSalesperson: next })),
+    [updateDraftSlice],
+  );
+  const setSelectedPriceBook = useCallback(
+    (next: PriceBook | null) =>
+      updateDraftSlice("meta", (m) => ({ ...m, selectedPriceBook: next })),
+    [updateDraftSlice],
+  );
+
+  const catalogGroupId = usePosCheckoutSessionStore(
+    (s) => selectCatalogDraft(s).catalogGroup,
+  );
 
   const selectedProductGroup = useMemo<ProductGroup | null>(
     () => productGroups.find((g) => g.id === catalogGroupId) ?? null,

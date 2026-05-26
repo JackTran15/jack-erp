@@ -3,11 +3,11 @@ import { useMemo } from "react";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import {
+  selectCustomerDraft,
   selectHasAnyCartLines,
+  selectPaymentDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 export interface UseCheckoutCollectStateResult {
   hasAnyCartLines: boolean;
@@ -23,15 +23,13 @@ export interface UseCheckoutCollectStateResult {
  */
 export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
   const hasAnyCartLines = usePosCheckoutSessionStore(selectHasAnyCartLines);
-  const selectedCustomer = usePosCheckoutCustomerStore(
-    (s) => s.selectedCustomer,
+  const selectedCustomer = usePosCheckoutSessionStore(
+    (s) => selectCustomerDraft(s).selectedCustomer,
   );
 
   const grandTotal = useCheckoutGrandTotal();
-  const deposit = usePosCheckoutPaymentStore((s) => s.deposit);
-  const paymentLines = usePosCheckoutPaymentStore((s) => s.paymentLines);
-  const keepChange = usePosCheckoutPaymentStore((s) => s.keepChange);
-  const debt = usePosCheckoutPaymentStore((s) => s.debt);
+  const { deposit, paymentLines, keepChange, debt } =
+    usePosCheckoutSessionStore(selectPaymentDraft);
 
   const { settlementGrandTotal, changeAmount, shortageAmount } = useMemo(
     () =>

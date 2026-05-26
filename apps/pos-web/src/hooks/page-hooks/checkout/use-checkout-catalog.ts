@@ -5,9 +5,15 @@ import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { useCatalogQuery } from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
-import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
+import {
+  selectCatalogDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 type Updater<T> = T | ((prev: T) => T);
+
+const apply = <T>(prev: T, value: Updater<T>): T =>
+  typeof value === "function" ? (value as (p: T) => T)(prev) : value;
 
 interface ToolbarState {
   query: string;
@@ -55,21 +61,43 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     void catalogQueryResult.refetch();
   }, [catalogQueryResult]);
 
-  const toolbar = usePosCheckoutCatalogStore((s) => s.toolbar);
-  const setToolbar = usePosCheckoutCatalogStore((s) => s.setToolbar);
-  const catalogQuery = usePosCheckoutCatalogStore((s) => s.catalogQuery);
-  const setCatalogQuery = usePosCheckoutCatalogStore(
-    (s) => s.setCatalogQuery,
+  const { toolbar, catalogQuery, catalogGroup, catalogCollapsed } =
+    usePosCheckoutSessionStore(selectCatalogDraft);
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
   );
-  const catalogGroup = usePosCheckoutCatalogStore((s) => s.catalogGroup);
-  const setCatalogGroup = usePosCheckoutCatalogStore(
-    (s) => s.setCatalogGroup,
+
+  const setToolbar = useCallback(
+    (value: Updater<ToolbarState>) =>
+      updateDraftSlice("catalog", (c) => ({
+        ...c,
+        toolbar: apply(c.toolbar, value),
+      })),
+    [updateDraftSlice],
   );
-  const catalogCollapsed = usePosCheckoutCatalogStore(
-    (s) => s.catalogCollapsed,
+  const setCatalogQuery = useCallback(
+    (value: Updater<string>) =>
+      updateDraftSlice("catalog", (c) => ({
+        ...c,
+        catalogQuery: apply(c.catalogQuery, value),
+      })),
+    [updateDraftSlice],
   );
-  const setCatalogCollapsed = usePosCheckoutCatalogStore(
-    (s) => s.setCatalogCollapsed,
+  const setCatalogGroup = useCallback(
+    (value: Updater<string | undefined>) =>
+      updateDraftSlice("catalog", (c) => ({
+        ...c,
+        catalogGroup: apply(c.catalogGroup, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setCatalogCollapsed = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("catalog", (c) => ({
+        ...c,
+        catalogCollapsed: apply(c.catalogCollapsed, value),
+      })),
+    [updateDraftSlice],
   );
 
   const filteredProducts = useMemo(() => {

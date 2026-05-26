@@ -1,7 +1,10 @@
 import { formatVnd } from "@erp/ui";
 import { PosCheckbox } from "@erp/pos/components/common/PosCheckbox/PosCheckbox";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
+import {
+  selectCustomerDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 
 /**
  * "Tính vào công nợ" row — checkbox + label + amount. handleDebtChange yêu
@@ -9,8 +12,8 @@ import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkou
  */
 export function DebtCheckRow() {
   const { debt, handleDebtChange, debtAmount } = useCheckoutPayment();
-  const selectedCustomer = usePosCheckoutCustomerStore(
-    (s) => s.selectedCustomer,
+  const selectedCustomer = usePosCheckoutSessionStore(
+    (s) => selectCustomerDraft(s).selectedCustomer,
   );
 
   return (

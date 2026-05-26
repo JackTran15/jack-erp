@@ -35,22 +35,27 @@ import {
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
-import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
 } from "@erp/pos/constants/checkout.constant";
 import {
+  CHECKOUT_ANNOUNCEMENTS,
+  CHECKOUT_ERRORS,
+  CHECKOUT_RETURN_REASONS,
+  CHECKOUT_TOASTS,
+} from "@erp/pos/constants/checkout-messages.constant";
+import {
   computeReceiptLines,
   selectActiveSession,
+  selectCustomerDraft,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectPaymentDraft,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutActionsResult {
@@ -69,9 +74,9 @@ export interface UseCheckoutActionsResult {
 function describeResolveError(error: ResolveCheckoutPayloadError): string {
   switch (error.code) {
     case "missing_payment_account":
-      return "Vui lòng chọn tài khoản thanh toán cho mỗi dòng.";
+      return CHECKOUT_ERRORS.MISSING_PAYMENT_ACCOUNT;
     default:
-      return "Không xác định được tài khoản thanh toán.";
+      return CHECKOUT_ERRORS.UNKNOWN_PAYMENT_ACCOUNT;
   }
 }
 
@@ -109,11 +114,11 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const finalizeCheckoutAndPrint = useCallback(
     async (options?: { bypassOversellModal?: boolean }) => {
       const sessionState = usePosCheckoutSessionStore.getState();
-      const selectedCustomer =
-        usePosCheckoutCustomerStore.getState().selectedCustomer;
+      const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
       const purchaseCart = selectPurchaseCart(sessionState);
       const ui = usePosCheckoutUiStore.getState();
-      const p = usePosCheckoutPaymentStore.getState();
+      // Slice payment của tab đang active (snapshot tại thời điểm click F12).
+      const p = selectPaymentDraft(sessionState);
 
       const grandTotal = selectGrandTotal(sessionState);
       const {
@@ -231,7 +236,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           const originalInvoiceId = session?.originalInvoiceId;
 
           if (returnLines.length === 0) {
-            toast.error("Chưa có hàng nào để trả.");
+            toast.error(CHECKOUT_TOASTS.NO_RETURN_LINES);
             return;
           }
 
@@ -240,9 +245,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             "511",
           )?.id;
           if (!revenueAccountId) {
-            toast.error(
-              "Chưa lấy được tài khoản doanh thu để hạch toán đổi trả. Vui lòng thử lại.",
-            );
+            toast.error(CHECKOUT_TOASTS.REVENUE_ACCOUNT_UNAVAILABLE);
             return;
           }
 
@@ -272,9 +275,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // Đổi hàng (trả + mua mới) → bắt buộc có hóa đơn gốc (BE exchange
             // yêu cầu originalInvoiceId; không có endpoint exchange "nhanh").
             if (!originalInvoiceId) {
-              toast.error(
-                "Đổi hàng cần chọn từ hóa đơn gốc — đổi trả nhanh chưa hỗ trợ thêm hàng mua mới.",
-              );
+              toast.error(CHECKOUT_TOASTS.EXCHANGE_NEEDS_ORIGINAL);
               return;
             }
             const created = await createExchangeMutation.mutateAsync(
@@ -282,7 +283,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 sessionId: sessionState.posSessionId,
                 originalInvoiceId,
                 customer: selectedCustomer,
-                reason: note ?? "Đổi hàng tại POS",
+                reason: note ?? CHECKOUT_RETURN_REASONS.EXCHANGE,
                 returnLines,
                 newLines,
               }),
@@ -295,7 +296,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 sessionId: sessionState.posSessionId,
                 originalInvoiceId,
                 customer: selectedCustomer,
-                reason: note ?? "Đổi trả tại POS",
+                reason: note ?? CHECKOUT_RETURN_REASONS.RETURN,
                 returnLines,
               }),
             );
@@ -311,34 +312,39 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           err instanceof Error
             ? err.message
             : isReturnFlow
-              ? "Không ghi nhận được đổi trả"
-              : "Không thu được tiền",
+              ? CHECKOUT_TOASTS.RETURN_FAILED
+              : CHECKOUT_TOASTS.PAYMENT_FAILED,
         );
         return;
       }
 
-      const who = selectedCustomer
-        ? ` cho ${formatCustomerDisplay(selectedCustomer)}`
-        : " (khách lẻ)";
+      const who = CHECKOUT_ANNOUNCEMENTS.customerSuffix(
+        selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null,
+      );
+      const formatVndAmount = (value: number) =>
+        new Intl.NumberFormat("vi-VN", {
+          style: "currency",
+          currency: "VND",
+          maximumFractionDigits: 0,
+        }).format(value);
       if (isReturnFlow) {
         ui.setAnnouncement(
-          `Đã ghi nhận đổi trả${who}, ${new Intl.NumberFormat("vi-VN", {
-            style: "currency",
-            currency: "VND",
-            maximumFractionDigits: 0,
-          }).format(Math.abs(settlementGrandTotal))}.`,
+          CHECKOUT_ANNOUNCEMENTS.returnRecorded(
+            who,
+            formatVndAmount(Math.abs(settlementGrandTotal)),
+          ),
         );
       } else {
         ui.setAnnouncement(
-          `Đã ghi nhận thanh toán${who}, ${new Intl.NumberFormat("vi-VN", {
-            style: "currency",
-            currency: "VND",
-            maximumFractionDigits: 0,
-          }).format(settlementGrandTotal)}, ${paymentLabel(primaryMethod)}.`,
+          CHECKOUT_ANNOUNCEMENTS.paymentRecorded(
+            who,
+            formatVndAmount(settlementGrandTotal),
+            paymentLabel(primaryMethod),
+          ),
         );
       }
       usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
-      resetCheckoutDraftState();
+      usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
       await printReceiptIfNeeded(receiptPayload);
     },
     [
@@ -360,14 +366,15 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const confirmCancelInvoice = useCallback(() => {
     const ui = usePosCheckoutUiStore.getState();
     const session = usePosCheckoutSessionStore.getState();
-    ui.closeCancelInvoice();
     if (session.sessions.length > 1) {
+      // Đóng tab hiện tại; draft per-tab của nó biến mất theo session.
       session.removeSession(session.activeSessionId);
     } else {
       session.resetActiveSessionAfterCheckout();
-      resetCheckoutDraftState();
     }
-    ui.setAnnouncement("Đã hủy hóa đơn.");
+    // Đóng mọi dialog + xóa cartError (transient toàn cục, không theo tab).
+    ui.resetCheckoutUiDraft();
+    ui.setAnnouncement(CHECKOUT_ANNOUNCEMENTS.invoiceCanceled);
   }, []);
 
   const confirmOversell = useCallback(async () => {

@@ -6,18 +6,21 @@ import {
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import {
+  CHECKOUT_ANNOUNCEMENTS,
+  CHECKOUT_TOASTS,
+} from "@erp/pos/constants/checkout-messages.constant";
+import {
   buildCreateInvoicePayload,
   buildUpdateInvoicePayload,
 } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
-import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import {
   selectActiveSession,
+  selectCustomerDraft,
   selectHasAnyCartLines,
+  selectPaymentDraft,
   selectPurchaseCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutDraftResult {
@@ -38,9 +41,8 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
     if (!selectHasAnyCartLines(sessionState)) return;
 
     const purchaseCart = selectPurchaseCart(sessionState);
-    const selectedCustomer =
-      usePosCheckoutCustomerStore.getState().selectedCustomer;
-    const note = usePosCheckoutPaymentStore.getState().note || undefined;
+    const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
+    const note = selectPaymentDraft(sessionState).note || undefined;
     // Tab mở từ một draft đã lưu → PATCH chính draft đó thay vì tạo bản mới.
     const sourceInvoiceId = selectActiveSession(sessionState)?.sourceInvoiceId;
 
@@ -63,15 +65,17 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
             }),
           );
       const message = sourceInvoiceId
-        ? `Đã cập nhật hóa đơn lưu tạm ${saved.code}`
-        : `Đã lưu tạm hóa đơn ${saved.code}`;
+        ? CHECKOUT_ANNOUNCEMENTS.draftUpdated(saved.code)
+        : CHECKOUT_ANNOUNCEMENTS.draftSaved(saved.code);
       usePosCheckoutUiStore.getState().setAnnouncement(`${message}.`);
       toast.success(message);
+      // Draft per-tab nằm trong session → reset session là đủ; xóa thêm UI draft
+      // (cờ dialog/cartError) cho gọn.
       sessionState.resetActiveSessionAfterCheckout();
-      resetCheckoutDraftState();
+      usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Không lưu được hóa đơn lưu tạm",
+        err instanceof Error ? err.message : CHECKOUT_TOASTS.DRAFT_SAVE_FAILED,
       );
     }
   }, [createMutation, updateMutation]);

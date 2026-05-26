@@ -12,7 +12,6 @@ import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSumma
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
 import { API_METHOD_TO_PAYMENT_METHOD } from "@erp/pos/constants/checkout.constant";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
@@ -36,11 +35,9 @@ export function PaymentSection({
     debt,
     note,
     setNote,
+    preorder,
+    setFirstLineAmountAuto,
   } = useCheckoutPayment();
-  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
-  const setFirstLineAmountAuto = usePosCheckoutPaymentStore(
-    (s) => s.setFirstLineAmountAuto,
-  );
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
 

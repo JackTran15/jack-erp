@@ -1,13 +1,25 @@
 import { useCallback } from "react";
 
+import { CHECKOUT_ERRORS } from "@erp/pos/constants/checkout-messages.constant";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 import { locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
-import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
+import {
+  selectCatalogDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
+
+/** Xóa ô tìm sản phẩm (toolbar query) trên tab đang active. */
+function clearToolbarQuery(): void {
+  usePosCheckoutSessionStore.getState().updateActiveDraftSlice("catalog", (c) => ({
+    ...c,
+    toolbar: { ...c.toolbar, query: "" },
+  }));
+}
 
 export interface UseCheckoutCartActionsResult {
   /** Thêm sản phẩm cụ thể (từ ProductSearchInput đã chọn). */
@@ -38,14 +50,12 @@ export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
       const atDef = locationQtyFor(product);
       const ui = usePosCheckoutUiStore.getState();
       if (atDef < 1) {
-        ui.setCartError("Hết tồn.");
+        ui.setCartError(CHECKOUT_ERRORS.OUT_OF_STOCK);
         return;
       }
       const requested = clampPosCheckoutQtyNumber(qty);
       const lineId = addProduct(product, requested);
-      usePosCheckoutCatalogStore
-        .getState()
-        .setToolbar((s) => ({ ...s, query: "" }));
+      clearToolbarQuery();
       if (lineId) {
         ui.setPendingQtyFocusLineId(lineId);
       } else {
@@ -57,22 +67,22 @@ export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
 
   const addProductByQuery = useCallback(() => {
     const ui = usePosCheckoutUiStore.getState();
-    const toolbar = usePosCheckoutCatalogStore.getState().toolbar;
+    const toolbar = selectCatalogDraft(
+      usePosCheckoutSessionStore.getState(),
+    ).toolbar;
     if (filteredProducts.length === 1) {
       const requested = clampPosCheckoutQtyNumber(toolbar.qty);
       const lineId = addProduct(filteredProducts[0]!, requested);
-      usePosCheckoutCatalogStore
-        .getState()
-        .setToolbar((s) => ({ ...s, query: "" }));
+      clearToolbarQuery();
       if (lineId) {
         ui.setPendingQtyFocusLineId(lineId);
       } else {
         ui.requestProductSearchFocus();
       }
     } else if (filteredProducts.length === 0) {
-      ui.setCartError("Không tìm thấy hàng phù hợp.");
+      ui.setCartError(CHECKOUT_ERRORS.PRODUCT_NOT_FOUND);
     } else {
-      ui.setCartError("Nhiều kết quả — chọn hàng bên dưới hoặc thu hẹp từ khóa.");
+      ui.setCartError(CHECKOUT_ERRORS.PRODUCT_MULTIPLE_RESULTS);
     }
   }, [addProduct, filteredProducts]);
 

@@ -1,10 +1,14 @@
 import { useCallback } from "react";
 
 import type { PromoMenuOption } from "@erp/pos/constants/checkout.constant";
+import { CHECKOUT_ANNOUNCEMENTS } from "@erp/pos/constants/checkout-messages.constant";
 import { promoOptionLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
-import { usePosCheckoutPromotionStore } from "@erp/pos/stores/page-stores/checkout/checkout-promotion.store";
+import {
+  selectPromotionDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutPromotionResult {
@@ -20,37 +24,39 @@ export interface UseCheckoutPromotionResult {
  * `promotions` list ở Page là static `[]` nên không expose từ đây.
  */
 export function useCheckoutPromotion(): UseCheckoutPromotionResult {
-  const appliedPromotion = usePosCheckoutPromotionStore(
-    (s) => s.appliedPromotion,
+  const appliedPromotion = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).appliedPromotion,
   );
-  const setAppliedPromotion = usePosCheckoutPromotionStore(
-    (s) => s.setAppliedPromotion,
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
   );
 
   const applyPromotion = useCallback(
     (promotion: PromotionItem | null) => {
-      setAppliedPromotion(promotion);
+      updateDraftSlice("promotion", () => ({ appliedPromotion: promotion }));
       usePosCheckoutUiStore
         .getState()
         .setAnnouncement(
           promotion
-            ? `Đã áp dụng ${promotion.name}.`
-            : "Đã bỏ chương trình khuyến mãi.",
+            ? CHECKOUT_ANNOUNCEMENTS.promotionApplied(promotion.name)
+            : CHECKOUT_ANNOUNCEMENTS.PROMOTION_CLEARED,
         );
     },
-    [setAppliedPromotion],
+    [updateDraftSlice],
   );
 
   const pickPromoOption = useCallback((option: PromoMenuOption) => {
     usePosCheckoutUiStore
       .getState()
-      .setAnnouncement(`Đã chọn ${promoOptionLabel(option)}.`);
+      .setAnnouncement(
+        CHECKOUT_ANNOUNCEMENTS.promoOptionPicked(promoOptionLabel(option)),
+      );
   }, []);
 
   const searchVoucher = useCallback((code: string) => {
     usePosCheckoutUiStore
       .getState()
-      .setAnnouncement(`Đang tìm mã ưu đãi ${code}.`);
+      .setAnnouncement(CHECKOUT_ANNOUNCEMENTS.searchingVoucher(code));
   }, []);
 
   const applyVoucher = useCallback((result: VoucherFormResult) => {
@@ -58,7 +64,9 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
     usePosCheckoutUiStore
       .getState()
       .setAnnouncement(
-        code ? `Đã áp dụng voucher ${code}.` : "Đã áp dụng voucher.",
+        code
+          ? CHECKOUT_ANNOUNCEMENTS.voucherAppliedCode(code)
+          : CHECKOUT_ANNOUNCEMENTS.VOUCHER_APPLIED,
       );
   }, []);
 
