@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
+import { apiClient } from "../../lib/api-axios";
 import type {
   CashReceipt,
   CashReceiptListQuery,
   CreateCashReceiptBody,
+  CreateDebtCollectionBody,
+  DebtCollectionResult,
   PaginatedList,
 } from "../../pages/treasury/cash-vouchers.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
@@ -42,6 +45,9 @@ export function useCashReceiptMutations() {
     void qc.invalidateQueries({ queryKey: ["cash-payments"] });
     void qc.invalidateQueries({ queryKey: ["cash-receipts-payments-merged"] });
     void qc.invalidateQueries({ queryKey: ["cash-ledger"] });
+    void qc.invalidateQueries({ queryKey: ["cash-accounts"] });
+    void qc.invalidateQueries({ queryKey: ["customer-debts"] });
+    void qc.invalidateQueries({ queryKey: ["customers-with-debt"] });
   };
 
   const create = useMutation({
@@ -94,5 +100,20 @@ export function useCashReceiptMutations() {
     onSuccess: invalidate,
   });
 
-  return { create, update, remove, post, reverse };
+  // Debt collection (thu hồi nợ): create+post a receipt that settles the picked
+  // invoice debts and credits the cash fund atomically (saga). Uses the raw
+  // axios client (auth + X-Idempotency-Key auto-injected) since this endpoint is
+  // not part of the generated OpenAPI client yet.
+  const debtCollection = useMutation({
+    mutationFn: async (body: CreateDebtCollectionBody) => {
+      const { data } = await apiClient.post<DebtCollectionResult>(
+        "/cash-receipts/debt-collection",
+        body,
+      );
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { create, update, remove, post, reverse, debtCollection };
 }

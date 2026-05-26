@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { BranchStatus, PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { OrganizationService } from '../organization/organization.service';
+import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
 import { BranchEntity } from './branch.entity';
 import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
 import { CreateBranchDto, UpdateBranchDto } from './dto';
@@ -24,6 +25,7 @@ export class BranchService {
     @InjectRepository(UserBranchAssignmentEntity)
     private readonly assignmentRepo: Repository<UserBranchAssignmentEntity>,
     private readonly orgService: OrganizationService,
+    private readonly branchCashProvisioning: BranchCashProvisioningService,
   ) {}
 
   async create(
@@ -70,6 +72,22 @@ export class BranchService {
       await this.orgService.setMainBranch(actor.organizationId, saved.id);
       this.logger.log(
         `Main branch created: ${saved.id} for org ${actor.organizationId}`,
+      );
+    }
+
+    // Provision the branch's single cash fund (one-fund-per-branch model).
+    // Best-effort: a cash-side failure must not roll back branch creation; the
+    // fund is recoverable via the backfill migration / next provisioning run.
+    try {
+      await this.branchCashProvisioning.ensureBranchCashFund(
+        actor.organizationId,
+        saved.id,
+        saved.name,
+        actor.userId,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to provision cash fund for branch ${saved.id}: ${err instanceof Error ? err.message : err}`,
       );
     }
 

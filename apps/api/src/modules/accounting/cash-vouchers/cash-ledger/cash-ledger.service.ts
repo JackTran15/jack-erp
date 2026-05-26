@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { CashMovementEntity, CashMovementType } from '../../cash/cash-movement.entity';
+import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { CashReceiptEntity } from '../cash-receipts/cash-receipt.entity';
 import { CashPaymentEntity } from '../cash-payments/cash-payment.entity';
 import { QueryCashLedgerDto } from './dto/query-cash-ledger.dto';
@@ -62,6 +63,7 @@ export class CashLedgerService {
     private readonly receiptRepo: Repository<CashReceiptEntity>,
     @InjectRepository(CashPaymentEntity)
     private readonly paymentRepo: Repository<CashPaymentEntity>,
+    private readonly cashFundResolver: CashFundResolverService,
   ) {}
 
   /** Signed amount of a movement from cash account `$1`'s perspective. */
@@ -83,9 +85,15 @@ export class CashLedgerService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
     const offset = (page - 1) * pageSize;
-    const accountId = query.cashAccountId;
     const org = actor.organizationId;
     const branchId = query.branchId;
+    // One cash fund per branch: default to the branch fund when no account given.
+    const accountId =
+      query.cashAccountId ??
+      (await this.cashFundResolver.resolveBranchCashFund(
+        org,
+        branchId ?? actor.branchId,
+      ));
 
     // --- scalar SUMs / COUNT (no GROUP BY) --------------------------------
     const openingBalance = await this.sumSigned(accountId, org, branchId, {

@@ -1,5 +1,5 @@
-import type { CashVoucherPartnerType } from "../cash-vouchers.types";
-import type { VoucherPartnerKindUi } from "../documents/_shared/voucher-partner.constants";
+import type { CashPaymentPurpose, CashVoucherPartnerType } from "../cash-vouchers.types";
+import type { PartnerLookupType } from "../documents/_shared/voucher-partner.constants";
 
 export enum LedgerCashDocumentTypeEnum {
   OPENING_BALANCE = "opening_balance",
@@ -23,6 +23,7 @@ export enum LedgerCashVoucherKindEnum {
 export enum LedgerCashVoucherPurposeEnum {
   OTHER = "other",
   DEBT_COLLECTION = "debt_collection",
+  DEBT_REPAYMENT = "debt_repayment",
 }
 
 export enum LedgerCashVoucherPaymentModeEnum {
@@ -80,6 +81,7 @@ export interface LedgerCashVoucherLine {
   description: string;
   amount: number;
   category: string;
+  categoryId?: string;
 }
 
 export interface LedgerCashVoucherDocumentLine {
@@ -116,11 +118,12 @@ export interface LedgerCashGoodsReceiptInfo {
 export interface LedgerCashVoucherDetail {
   kind: LedgerCashVoucherKindEnum;
   purpose: LedgerCashVoucherPurposeEnum;
+  paymentPurpose?: CashPaymentPurpose;
   voucherNo: string;
   voucherDate: Date;
   counterpartyCode: string;
   counterpartyName: string;
-  partnerKind?: VoucherPartnerKindUi;
+  partnerKind?: PartnerLookupType;
   partnerType?: CashVoucherPartnerType;
   partnerId?: string;
   payerName?: string;
@@ -139,6 +142,7 @@ export interface LedgerCashVoucherDetail {
   paymentMode?: LedgerCashVoucherPaymentModeEnum;
   paymentMethod?: string;
   receiveWithInvoice?: boolean;
+  transferAccountId?: string;
 }
 
 export function isGoodsReceiptPaymentVoucher(

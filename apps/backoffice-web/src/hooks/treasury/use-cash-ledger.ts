@@ -45,7 +45,7 @@ export function useCashLedgerOffsetPage(
           },
         }),
       ),
-    enabled: enabled && Boolean(params?.cashAccountId),
+    enabled: enabled && Boolean(params),
     staleTime: 30_000,
   });
 

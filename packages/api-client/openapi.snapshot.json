@@ -2054,8 +2054,9 @@
         "parameters": [
           {
             "name": "cashAccountId",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Optional. When omitted, the branch's single cash fund is used.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9146,147 +9147,6 @@
         ]
       }
     },
-    "/pos/sales/checkout": {
-      "post": {
-        "operationId": "PosController_checkout",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckoutDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Pos"
-        ]
-      }
-    },
-    "/pos/sales/{id}": {
-      "get": {
-        "operationId": "PosController_getSale",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Pos"
-        ]
-      }
-    },
-    "/pos/sales/{id}/return": {
-      "post": {
-        "operationId": "PosController_processReturn",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProcessReturnDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReturnEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Pos"
-        ]
-      }
-    },
-    "/pos/sales/{id}/exchange": {
-      "post": {
-        "operationId": "PosController_processExchange",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProcessExchangeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Pos"
-        ]
-      }
-    },
     "/invoices": {
       "post": {
         "operationId": "InvoiceController_create",
@@ -9744,6 +9604,141 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CheckoutInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
+    "/invoices/{id}/eligible-returns": {
+      "get": {
+        "operationId": "InvoiceController_getEligibleReturns",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
+    "/invoices/returns": {
+      "post": {
+        "operationId": "InvoiceController_createReturn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReturnInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
+    "/invoices/exchanges": {
+      "post": {
+        "operationId": "InvoiceController_createExchange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExchangeInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
+    "/invoices/{id}/checkout-return": {
+      "post": {
+        "operationId": "InvoiceController_checkoutReturn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutReturnDto"
               }
             }
           }
@@ -12846,6 +12841,10 @@
       "CreateCashReceiptDto": {
         "type": "object",
         "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
           "voucherDate": {
             "type": "string",
             "description": "\"Ngày thu\" (YYYY-MM-DD)."
@@ -13257,6 +13256,10 @@
       "CreateCashPaymentDto": {
         "type": "object",
         "properties": {
+          "documentNumber": {
+            "type": "string",
+            "maxLength": 64
+          },
           "voucherDate": {
             "type": "string",
             "description": "\"Ngày chi\" (YYYY-MM-DD)."
@@ -13675,6 +13678,9 @@
             "type": "number",
             "description": "Counted physical cash (nhập tay).",
             "minimum": 0
+          },
+          "documentNumber": {
+            "type": "string"
           },
           "notes": {
             "type": "string"
@@ -18449,661 +18455,6 @@
           "createdBy"
         ]
       },
-      "CheckoutLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          },
-          "taxAmount": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice",
-          "taxAmount"
-        ]
-      },
-      "CheckoutPaymentDto": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "string",
-            "enum": [
-              "CASH",
-              "CARD",
-              "CREDIT",
-              "OTHER"
-            ]
-          },
-          "amount": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "reference": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "method",
-          "amount"
-        ]
-      },
-      "CheckoutDto": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "customerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CheckoutLineDto"
-            }
-          },
-          "payments": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CheckoutPaymentDto"
-            }
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "revenueAccountId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "sessionId",
-          "lines",
-          "payments",
-          "cashAccountId",
-          "revenueAccountId"
-        ]
-      },
-      "PaymentEntity": {
-        "type": "object",
-        "properties": {
-          "saleId": {
-            "type": "string"
-          },
-          "sale": {
-            "$ref": "#/components/schemas/SaleEntity"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "CASH",
-              "CARD",
-              "CREDIT",
-              "OTHER"
-            ]
-          },
-          "amount": {
-            "type": "number"
-          },
-          "reference": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "saleId",
-          "sale",
-          "method",
-          "amount",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "SaleEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "sessionId": {
-            "type": "string"
-          },
-          "customerId": {
-            "type": "string"
-          },
-          "subtotal": {
-            "type": "number"
-          },
-          "taxAmount": {
-            "type": "number"
-          },
-          "totalAmount": {
-            "type": "number"
-          },
-          "status": {
-            "enum": [
-              "COMPLETED",
-              "RETURNED",
-              "PARTIALLY_RETURNED"
-            ],
-            "type": "string"
-          },
-          "saleDate": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SaleLineEntity"
-            }
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PaymentEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "documentNumber",
-          "sessionId",
-          "subtotal",
-          "taxAmount",
-          "totalAmount",
-          "status",
-          "saleDate",
-          "lines",
-          "payments",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "SaleLineEntity": {
-        "type": "object",
-        "properties": {
-          "saleId": {
-            "type": "string"
-          },
-          "sale": {
-            "$ref": "#/components/schemas/SaleEntity"
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "unitPrice": {
-            "type": "number"
-          },
-          "lineTotal": {
-            "type": "number"
-          },
-          "taxAmount": {
-            "type": "number"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "saleId",
-          "sale",
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice",
-          "lineTotal",
-          "taxAmount",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "ReturnLineDto": {
-        "type": "object",
-        "properties": {
-          "originalSaleLineId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "originalSaleLineId",
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice"
-        ]
-      },
-      "ProcessReturnDto": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReturnLineDto"
-            }
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "revenueAccountId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "sessionId",
-          "reason",
-          "lines",
-          "cashAccountId",
-          "revenueAccountId"
-        ]
-      },
-      "ReturnEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "originalSaleId": {
-            "type": "string"
-          },
-          "sessionId": {
-            "type": "string"
-          },
-          "subtotal": {
-            "type": "number"
-          },
-          "taxAmount": {
-            "type": "number"
-          },
-          "totalAmount": {
-            "type": "number"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "returnDate": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReturnLineEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "documentNumber",
-          "originalSaleId",
-          "sessionId",
-          "subtotal",
-          "taxAmount",
-          "totalAmount",
-          "reason",
-          "returnDate",
-          "lines",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "ReturnLineEntity": {
-        "type": "object",
-        "properties": {
-          "returnId": {
-            "type": "string"
-          },
-          "returnDoc": {
-            "$ref": "#/components/schemas/ReturnEntity"
-          },
-          "originalSaleLineId": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "unitPrice": {
-            "type": "number"
-          },
-          "lineTotal": {
-            "type": "number"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "returnId",
-          "returnDoc",
-          "originalSaleLineId",
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice",
-          "lineTotal",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "ExchangeReturnLineDto": {
-        "type": "object",
-        "properties": {
-          "originalSaleLineId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "originalSaleLineId",
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice"
-        ]
-      },
-      "ExchangeNewLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "locationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.01
-          },
-          "unitPrice": {
-            "type": "number",
-            "minimum": 0
-          },
-          "taxAmount": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "required": [
-          "itemId",
-          "locationId",
-          "quantity",
-          "unitPrice",
-          "taxAmount"
-        ]
-      },
-      "ExchangeSettlementDto": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "string",
-            "enum": [
-              "CASH",
-              "CARD",
-              "CREDIT",
-              "OTHER"
-            ]
-          },
-          "amount": {
-            "type": "number"
-          },
-          "reference": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "method",
-          "amount"
-        ]
-      },
-      "ProcessExchangeDto": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 2000
-          },
-          "returnLines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ExchangeReturnLineDto"
-            }
-          },
-          "newLines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ExchangeNewLineDto"
-            }
-          },
-          "settlement": {
-            "$ref": "#/components/schemas/ExchangeSettlementDto"
-          },
-          "cashAccountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "revenueAccountId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "sessionId",
-          "reason",
-          "returnLines",
-          "newLines",
-          "cashAccountId",
-          "revenueAccountId"
-        ]
-      },
       "CreateInvoiceItemDto": {
         "type": "object",
         "properties": {
@@ -19200,6 +18551,34 @@
             ],
             "type": "string"
           },
+          "type": {
+            "enum": [
+              "SALE",
+              "RETURN",
+              "EXCHANGE"
+            ],
+            "type": "string"
+          },
+          "originalInvoiceId": {
+            "type": "string"
+          },
+          "originalInvoice": {
+            "$ref": "#/components/schemas/InvoiceEntity"
+          },
+          "refundMethod": {
+            "enum": [
+              "CASH",
+              "STORE_CREDIT",
+              "OFFSET"
+            ],
+            "type": "string"
+          },
+          "refundedAmount": {
+            "type": "number"
+          },
+          "netAmount": {
+            "type": "number"
+          },
           "subtotal": {
             "type": "number"
           },
@@ -19270,6 +18649,9 @@
         "required": [
           "code",
           "status",
+          "type",
+          "refundedAmount",
+          "netAmount",
           "subtotal",
           "discountAmount",
           "depositAmount",
@@ -19278,6 +18660,113 @@
           "isDraft",
           "sessionId",
           "staffId",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "InvoiceItemEntity": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "unitPriceDefault": {
+            "type": "number"
+          },
+          "costPrice": {
+            "type": "number"
+          },
+          "lineDiscount": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "OUT",
+              "IN"
+            ]
+          },
+          "returnedQuantity": {
+            "type": "number"
+          },
+          "originalInvoiceItemId": {
+            "type": "string"
+          },
+          "originalInvoiceItem": {
+            "$ref": "#/components/schemas/InvoiceItemEntity"
+          },
+          "note": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "quantity",
+          "unitPrice",
+          "unitPriceDefault",
+          "costPrice",
+          "lineDiscount",
+          "lineTotal",
+          "direction",
+          "returnedQuantity",
+          "sortOrder",
           "id",
           "organizationId",
           "createdAt",
@@ -19334,6 +18823,22 @@
           "lineTotal": {
             "type": "number"
           },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "OUT",
+              "IN"
+            ]
+          },
+          "returnedQuantity": {
+            "type": "number"
+          },
+          "originalInvoiceItemId": {
+            "type": "string"
+          },
+          "originalInvoiceItem": {
+            "$ref": "#/components/schemas/InvoiceItemEntity"
+          },
           "note": {
             "type": "string"
           },
@@ -19377,6 +18882,8 @@
           "costPrice",
           "lineDiscount",
           "lineTotal",
+          "direction",
+          "returnedQuantity",
           "sortOrder",
           "id",
           "organizationId",
@@ -19412,6 +18919,34 @@
               "cancelled"
             ],
             "type": "string"
+          },
+          "type": {
+            "enum": [
+              "SALE",
+              "RETURN",
+              "EXCHANGE"
+            ],
+            "type": "string"
+          },
+          "originalInvoiceId": {
+            "type": "string"
+          },
+          "originalInvoice": {
+            "$ref": "#/components/schemas/InvoiceEntity"
+          },
+          "refundMethod": {
+            "enum": [
+              "CASH",
+              "STORE_CREDIT",
+              "OFFSET"
+            ],
+            "type": "string"
+          },
+          "refundedAmount": {
+            "type": "number"
+          },
+          "netAmount": {
+            "type": "number"
           },
           "subtotal": {
             "type": "number"
@@ -19484,6 +19019,9 @@
           "items",
           "code",
           "status",
+          "type",
+          "refundedAmount",
+          "netAmount",
           "subtotal",
           "discountAmount",
           "depositAmount",
@@ -19786,6 +19324,186 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "ReturnInvoiceLineDto": {
+        "type": "object",
+        "properties": {
+          "originalInvoiceItemId": {
+            "type": "string",
+            "description": "Required in REGULAR mode — points back to the original SALE invoice_item.",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lineDiscount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "locationId",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "CreateReturnInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "regular"
+            ]
+          },
+          "originalInvoiceId": {
+            "type": "string",
+            "description": "Required when mode = REGULAR.",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReturnInvoiceLineDto"
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "sessionId",
+          "reason",
+          "lines"
+        ]
+      },
+      "CreateExchangeInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "originalInvoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnLines": {
+            "description": "Items being returned (direction=IN). Must reference original SALE lines.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReturnInvoiceLineDto"
+            }
+          },
+          "newLines": {
+            "description": "New items being purchased (direction=OUT). Same shape as a normal SALE.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateInvoiceItemDto"
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "originalInvoiceId",
+          "reason",
+          "returnLines",
+          "newLines"
+        ]
+      },
+      "CheckoutReturnDto": {
+        "type": "object",
+        "properties": {
+          "refundMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "STORE_CREDIT",
+              "OFFSET"
+            ]
+          },
+          "revenueAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Required when refundMethod = CASH AND no active drawer session is found.",
+            "format": "uuid"
+          },
+          "receivableAccountId": {
+            "type": "string",
+            "description": "Required when refundMethod = OFFSET against an original AR (debt) invoice.",
+            "format": "uuid"
+          },
+          "creditLiabilityAccountId": {
+            "type": "string",
+            "description": "Required when refundMethod = STORE_CREDIT (target liability GL).",
+            "format": "uuid"
+          },
+          "creditExpiresAt": {
+            "type": "string",
+            "description": "Optional expiry date for the issued store credit (ISO date)."
+          },
+          "payments": {
+            "description": "Payments — only required for EXCHANGE with netAmount > 0.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoicePaymentLineDto"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refundMethod",
+          "revenueAccountId"
         ]
       },
       "DiscountCodeEntity": {

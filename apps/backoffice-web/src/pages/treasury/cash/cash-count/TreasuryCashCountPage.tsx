@@ -1,4 +1,3 @@
-import { useCallback, useMemo, useState } from "react";
 import {
   DocumentListShell,
   PageToolbar,
@@ -8,6 +7,7 @@ import {
   type ToolbarItem,
 } from "@erp/ui";
 import { Eye, Pencil, Plus, RefreshCw } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   TreasuryCashTabIdEnum,
@@ -22,6 +22,7 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   loadCashCountParticipants,
   saveCashCountParticipants,
@@ -29,14 +30,15 @@ import {
   useCashCountMutations,
   useCashCountsList,
 } from "../../../../hooks/treasury/use-cash-counts";
+import { CashCountDetailPanel } from "./CashCountDetailPanel";
+import { CashCountFormDialog } from "./CashCountFormDialog";
+import { CreateCashCountDialog } from "./CreateCashCountDialog";
+import { useCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
 import { CashAccountSelect } from "../../components/CashAccountSelect";
 import {
   cashCountToRecord,
   recordToCreateCashCountBody,
 } from "./cash-count.api-adapter";
-import { CashCountDetailPanel } from "./CashCountDetailPanel";
-import { CashCountFormDialog } from "./CashCountFormDialog";
-import { CreateCashCountDialog } from "./CreateCashCountDialog";
 import {
   CASH_COUNT_FILTER_KEYS,
   type CashCountFilterKey,
@@ -63,7 +65,8 @@ function emptyColumnFilters(): Record<CashCountFilterKey, ColumnFilter> {
 }
 
 export function TreasuryCashCountPage() {
-  const [cashAccountId, setCashAccountId] = useState("");
+  const { data: cashAccounts } = useCashAccounts();
+  const cashAccountId = cashAccounts?.[0]?.id ?? "";
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),
@@ -90,10 +93,11 @@ export function TreasuryCashCountPage() {
     [cashAccountId],
   );
 
-  const { data: listData, isLoading, refetch } = useCashCountsList(
-    listQuery,
-    Boolean(cashAccountId),
-  );
+  const {
+    data: listData,
+    isLoading,
+    refetch,
+  } = useCashCountsList(listQuery, Boolean(cashAccountId));
 
   const records = useMemo(() => {
     const raw = (listData?.data ?? []).map(cashCountToRecord);
@@ -121,6 +125,9 @@ export function TreasuryCashCountPage() {
     return null;
   }, [formRecord, selectedId, records, detailCount]);
 
+  const selectedAccount = useCashAccount(cashAccountId || undefined);
+  const accountBalance = Number(selectedAccount?.balance ?? 0);
+
   const mutations = useCashCountMutations();
 
   const filteredRecords = useMemo(() => {
@@ -139,8 +146,6 @@ export function TreasuryCashCountPage() {
     const start = (pagination.page - 1) * pagination.pageSize;
     return filteredRecords.slice(start, start + pagination.pageSize);
   }, [filteredRecords, pagination]);
-
-  const allRecords = records;
 
   const openForm = useCallback(
     (
@@ -235,9 +240,10 @@ export function TreasuryCashCountPage() {
       label: "Sửa",
       icon: Pencil,
       disabled: !canMutateSelected,
-      tooltip: selected?.status === CashCountStatusEnum.PROCESSED
-        ? "Phiếu đã xử lý chỉ xem"
-        : undefined,
+      tooltip:
+        selected?.status === CashCountStatusEnum.PROCESSED
+          ? "Phiếu đã xử lý chỉ xem"
+          : undefined,
       onClick: () => {
         if (selected) openForm(selected, CashCountDialogModeEnum.EDIT);
       },
@@ -254,7 +260,7 @@ export function TreasuryCashCountPage() {
   const handleSaveFromForm = useCallback(
     async (payload: CashCountRecord) => {
       if (!cashAccountId) {
-        toast.error("Chọn két tiền mặt.");
+        toast.error("Chưa có két tiền mặt.");
         return;
       }
       const countedAt = `${payload.countDate}T${payload.countTime || "12:00"}:00.000Z`;
@@ -267,30 +273,18 @@ export function TreasuryCashCountPage() {
           );
           const created = await mutations.create.mutateAsync(body);
           saveCashCountParticipants(created.id, payload.participants);
-          const record = {
-            ...cashCountToRecord(created),
-            participants: payload.participants,
-          };
           setSelectedId(created.id);
-          setFormRecord(record);
-          setFormMode(CashCountDialogModeEnum.EDIT);
         } else if (payload.id) {
-          const body = recordToCreateCashCountBody(
-            payload,
-            cashAccountId,
-            countedAt,
-          );
-          const updated = await mutations.update.mutateAsync({
+          const { cashAccountId: _ca, documentNumber: _dn, ...updateBody } =
+            recordToCreateCashCountBody(payload, cashAccountId, countedAt);
+          await mutations.update.mutateAsync({
             id: payload.id,
-            body,
+            body: updateBody,
           });
           saveCashCountParticipants(payload.id, payload.participants);
-          setFormRecord({
-            ...cashCountToRecord(updated),
-            participants: payload.participants,
-          });
         }
         toast.success("Đã lưu phiếu kiểm kê.");
+        closeForm();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
       }
@@ -308,13 +302,7 @@ export function TreasuryCashCountPage() {
             <button
               type="button"
               className="flex items-center gap-1.5 rounded-none bg-[#1f2d8a] px-3 py-2 text-sm font-medium text-white hover:bg-[#1a266f]"
-              onClick={() => {
-                if (!cashAccountId) {
-                  toast.error("Chọn két tiền mặt trước.");
-                  return;
-                }
-                setCreatePickerOpen(true);
-              }}
+              onClick={() => setCreatePickerOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
               Thêm mới
@@ -328,11 +316,6 @@ export function TreasuryCashCountPage() {
         }
         filters={
           <div className="flex flex-wrap items-end gap-4">
-            <CashAccountSelect
-              value={cashAccountId}
-              onChange={setCashAccountId}
-              required
-            />
             <PeriodFilter
               value={period}
               onChange={setPeriod}
@@ -359,11 +342,7 @@ export function TreasuryCashCountPage() {
           columns={columns}
           rows={pagedRecords}
           loading={isLoading}
-          emptyLabel={
-            cashAccountId
-              ? "Không có phiếu kiểm kê trong kỳ đã chọn."
-              : "Chọn két tiền mặt để xem danh sách."
-          }
+          emptyLabel="Không có phiếu kiểm kê trong kỳ đã chọn."
           getRowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id)}
           columnFilterControl={columnFilterControl}
@@ -395,38 +374,42 @@ export function TreasuryCashCountPage() {
         />
       ) : null}
 
-      {formOpen ? (
-        <CashCountFormDialog
-          mode={formMode}
-          initial={formMode === CashCountDialogModeEnum.CREATE ? null : formRecord}
-          createDraft={
-            createDraftDate ? { inventoryUntilDate: createDraftDate } : null
+      <CashCountFormDialog
+        open={formOpen}
+        onOpenChange={(o) => {
+          if (!o) closeForm();
+        }}
+        mode={formMode}
+        initial={
+          formMode === CashCountDialogModeEnum.CREATE ? null : formRecord
+        }
+        createDraft={
+          createDraftDate ? { inventoryUntilDate: createDraftDate } : null
+        }
+        accountBalance={accountBalance}
+        onSaved={handleSaveFromForm}
+        onProcess={async (id) => {
+          try {
+            const result = await mutations.post.mutateAsync(id);
+            const record = cashCountToRecord(result);
+            setFormRecord({
+              ...record,
+              participants: loadCashCountParticipants(id),
+            });
+            toast.success("Đã xử lý phiếu kiểm kê.");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Xử lý thất bại.");
           }
-          previewDocumentNumber={formRecord?.documentNumber ?? "—"}
-          allRecords={allRecords}
-          onClose={closeForm}
-          onSaved={handleSaveFromForm}
-          onProcess={async (id) => {
-            try {
-              const result = await mutations.post.mutateAsync(id);
-              const record = cashCountToRecord(result);
-              setFormRecord({
-                ...record,
-                participants: loadCashCountParticipants(id),
-              });
-              toast.success("Đã xử lý phiếu kiểm kê.");
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Xử lý thất bại.");
-            }
-          }}
-          onDelete={undefined}
-          onRequestEdit={() => setFormMode(CashCountDialogModeEnum.EDIT)}
-          onRequestCreate={() => {
-            closeForm();
-            setCreatePickerOpen(true);
-          }}
-        />
-      ) : null}
+        }}
+        onDelete={(id) => {
+          toast.info("Chức năng xóa chưa được hỗ trợ.");
+        }}
+        onRequestEdit={() => setFormMode(CashCountDialogModeEnum.EDIT)}
+        onRequestCreate={() => {
+          closeForm();
+          setCreatePickerOpen(true);
+        }}
+      />
     </>
   );
 }

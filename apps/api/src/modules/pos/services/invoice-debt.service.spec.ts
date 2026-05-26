@@ -8,7 +8,9 @@ import { DebtPaymentEntity, DebtPaymentMethod } from '../entities/debt-payment.e
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { CashService } from '../../accounting/cash/cash.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { OutboxService } from '../../events/outbox/outbox.service';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -63,7 +65,9 @@ describe('InvoiceDebtService', () => {
   };
   let dataSource: { transaction: jest.Mock };
   let cashService: { recordMovement: jest.Mock };
+  let cashFundResolver: { resolveOrDefault: jest.Mock };
   let outboxService: { enqueue: jest.Mock };
+  let accountResolver: { resolveDefaultAccount: jest.Mock };
   let mockManager: {
     create: jest.Mock;
     save: jest.Mock;
@@ -89,7 +93,17 @@ describe('InvoiceDebtService', () => {
         .fn()
         .mockResolvedValue({ movement: { id: 'mv-1' }, journalEntryId: 'je-1' }),
     };
+    cashFundResolver = {
+      resolveOrDefault: jest
+        .fn()
+        .mockImplementation((_org, _branch, cashAccountId?: string) =>
+          Promise.resolve(cashAccountId ?? 'branch-fund'),
+        ),
+    };
     outboxService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    accountResolver = {
+      resolveDefaultAccount: jest.fn().mockResolvedValue('acc-131'),
+    };
 
     debtRepo = {
       findOne: jest.fn(),
@@ -116,7 +130,9 @@ describe('InvoiceDebtService', () => {
         { provide: getRepositoryToken(DebtPaymentEntity), useValue: paymentRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: CashService, useValue: cashService },
+        { provide: CashFundResolverService, useValue: cashFundResolver },
         { provide: OutboxService, useValue: outboxService },
+        { provide: AccountResolverService, useValue: accountResolver },
       ],
     }).compile();
 
@@ -370,19 +386,29 @@ describe('InvoiceDebtService', () => {
       );
     });
 
-    it('CASH without cashAccountId throws BadRequestException', async () => {
+    it('CASH without cashAccountId defaults to the branch cash fund', async () => {
       const debt = debtStub({ remainingAmount: 500, paidAmount: 0 });
       mockManager.findOne.mockResolvedValue(debt);
       mockManager.create.mockReturnValue({ id: 'pay-1' });
       mockManager.save.mockResolvedValue(debt);
 
-      await expect(
-        service.collectPayment(
-          'debt-1',
-          { amount: 100, paymentMethod: DebtPaymentMethod.CASH, staffId: 's-1' },
-          actor,
-        ),
-      ).rejects.toThrow(BadRequestException);
+      await service.collectPayment(
+        'debt-1',
+        { amount: 100, paymentMethod: DebtPaymentMethod.CASH, staffId: 's-1' },
+        actor,
+      );
+
+      expect(cashFundResolver.resolveOrDefault).toHaveBeenCalledWith(
+        'org-1',
+        'branch-1',
+        undefined,
+        mockManager,
+      );
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({ cashAccountId: 'branch-fund', amount: 100 }),
+        actor,
+        mockManager,
+      );
     });
   });
 

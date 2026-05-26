@@ -1,33 +1,70 @@
+import { CashPaymentPurpose } from "../../cash-vouchers.types";
+
 export const DEFAULT_VOUCHER_EMPLOYEE_CODE = "0000";
 export const DEFAULT_VOUCHER_EMPLOYEE_NAME = "Phan Thanh Hà";
 
-export enum PaymentVoucherPurposeGroupEnum {
-  OTHER = "other",
-}
-
-export enum PaymentVoucherPurposeDetailEnum {
-  OTHER_EXPENSE = "other_expense",
-}
-
-export const PAYMENT_PURPOSE_GROUP_OPTIONS = [
-  { value: PaymentVoucherPurposeGroupEnum.OTHER, label: "Khác" },
+export const PAYMENT_PURPOSE_OPTIONS: readonly {
+  value: CashPaymentPurpose;
+  label: string;
+}[] = [
+  { value: CashPaymentPurpose.OTHER, label: "Chi khác" },
+  { value: CashPaymentPurpose.SUPPLIER_PAYMENT, label: "Trả tiền nhà cung cấp" },
+  { value: CashPaymentPurpose.PURCHASE, label: "Chi mua hàng" },
+  { value: CashPaymentPurpose.EXPENSE, label: "Chi phí" },
+  { value: CashPaymentPurpose.SALARY, label: "Chi lương" },
+  { value: CashPaymentPurpose.REFUND, label: "Hoàn tiền" },
 ] as const;
 
-export const PAYMENT_PURPOSE_DETAIL_OPTIONS: Record<
-  PaymentVoucherPurposeGroupEnum,
-  readonly { value: PaymentVoucherPurposeDetailEnum; label: string }[]
-> = {
-  [PaymentVoucherPurposeGroupEnum.OTHER]: [
-    { value: PaymentVoucherPurposeDetailEnum.OTHER_EXPENSE, label: "Chi khác" },
-  ],
-};
+export const PAYMENT_PURPOSE_LABEL: Record<CashPaymentPurpose, string> =
+  Object.fromEntries(
+    PAYMENT_PURPOSE_OPTIONS.map((o) => [o.value, o.label]),
+  ) as Record<CashPaymentPurpose, string>;
+
+export enum PaymentPurposeRadio {
+  OTHER_GROUP = "OTHER_GROUP",
+  DEBT_GROUP = "DEBT_GROUP",
+}
+
+export const PAYMENT_VOUCHER_PURPOSE_RADIO_OPTIONS = [
+  { value: PaymentPurposeRadio.OTHER_GROUP, label: "Khác" },
+  { value: PaymentPurposeRadio.DEBT_GROUP, label: "Trả nợ" },
+];
+
+export enum PaymentOtherSubOption {
+  OTHER = "OTHER",
+  CASH_TO_DEPOSIT = "CASH_TO_DEPOSIT",
+  BRANCH_TRANSFER = "BRANCH_TRANSFER",
+}
+
+export const PAYMENT_OTHER_SUB_OPTIONS: readonly {
+  value: PaymentOtherSubOption;
+  label: string;
+}[] = [
+  { value: PaymentOtherSubOption.OTHER, label: "Chi khác" },
+  { value: PaymentOtherSubOption.CASH_TO_DEPOSIT, label: "Chuyển tiền mặt thành tiền gửi" },
+  { value: PaymentOtherSubOption.BRANCH_TRANSFER, label: "Chuyển tiền đến cửa hàng khác" },
+];
+
+export function isTransferSubOption(sub: PaymentOtherSubOption): boolean {
+  return (
+    sub === PaymentOtherSubOption.CASH_TO_DEPOSIT ||
+    sub === PaymentOtherSubOption.BRANCH_TRANSFER
+  );
+}
+
+export function subOptionToApiPurpose(
+  sub: PaymentOtherSubOption,
+): CashPaymentPurpose {
+  return CashPaymentPurpose.OTHER;
+}
 
 export interface VoucherFormLine {
   description: string;
   amount: number;
   category: string;
+  categoryId?: string;
 }
 
 export function emptyFormLine(): VoucherFormLine {
-  return { description: "", amount: 0, category: "" };
+  return { description: "", amount: 0, category: "", categoryId: undefined };
 }

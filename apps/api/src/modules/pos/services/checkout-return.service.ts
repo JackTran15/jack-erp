@@ -24,6 +24,7 @@ import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
 import { CustomerCreditService } from '../../customer/services/customer-credit.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { PaymentAccountMethod } from '../../accounting/payment-accounts/enums';
 import {
   InvoiceEntity,
@@ -85,6 +86,7 @@ export class CheckoutReturnService {
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly customerCredit: CustomerCreditService,
     private readonly accountResolver: AccountResolverService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly returnPostedPublisher: ReturnPostedPublisher,
     private readonly stockReturnInPublisher: StockReturnInPublisher,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
@@ -143,20 +145,17 @@ export class CheckoutReturnService {
       actor,
     );
 
-    const activeSession = await this.findActiveSession(actor);
-    const resolvedCashAccountId = activeSession?.cashAccountId ?? dto.cashAccountId;
-
-    // Validate that we have the cash account when needed.
-    if (
+    // One cash fund per branch: resolve it only when a cash movement is needed
+    // (a cash refund, or an exchange with a positive net paid in cash).
+    const needsCashFund =
       (dto.refundMethod === RefundMethod.CASH && totals.refundedAmount > 0) ||
-      (totals.netAmount > 0 && this.hasCashPayments(dto))
-    ) {
-      if (!resolvedCashAccountId) {
-        throw new BadRequestException(
-          'cashAccountId is required (no active drawer session and no explicit account supplied)',
-        );
-      }
-    }
+      (totals.netAmount > 0 && this.hasCashPayments(dto));
+    const resolvedCashAccountId = needsCashFund
+      ? await this.cashFundResolver.resolveBranchCashFund(
+          actor.organizationId,
+          invoice.branchId,
+        )
+      : undefined;
 
     // Resolve the receiving COA account for each EXCHANGE payment line — the
     // same server-side derivation as a normal sale checkout: the client sends a
@@ -282,7 +281,6 @@ export class CheckoutReturnService {
       items,
       totals,
       dto,
-      activeSession,
       resolvedCashAccountId,
       actor,
     );
@@ -458,7 +456,6 @@ export class CheckoutReturnService {
     items: InvoiceItemEntity[],
     totals: ComputedTotals,
     dto: CheckoutReturnDto,
-    activeSession: PosSessionEntity | null,
     resolvedCashAccountId: string | undefined,
     actor: ActorContext,
   ): Promise<void> {
@@ -526,7 +523,7 @@ export class CheckoutReturnService {
           cashAccountId: resolvedCashAccountId,
           contraAccountId: dto.revenueAccountId,
           amount: totals.refundedAmount,
-          sessionId: activeSession?.id,
+          sessionId: undefined,
           branchId,
         },
         actor,
@@ -534,7 +531,7 @@ export class CheckoutReturnService {
     }
 
     // 5. CASH_MOVEMENT_FROM_PAYMENT — EXCHANGE net > 0 with cash payments.
-    if (totals.netAmount > 0) {
+    if (totals.netAmount > 0 && resolvedCashAccountId) {
       const cashPayments = payments.filter(
         (p) => p.paymentMethod === InvoicePaymentMethod.CASH,
       );
@@ -544,8 +541,8 @@ export class CheckoutReturnService {
             invoiceId: invoice.id,
             invoicePaymentId: cp.id,
             invoiceCode: invoice.code,
-            sessionId: activeSession?.id,
-            cashAccountId: activeSession?.cashAccountId ?? cp.accountId,
+            sessionId: undefined,
+            cashAccountId: resolvedCashAccountId,
             contraAccountId: dto.revenueAccountId,
             amount: Number(cp.amount),
             branchId,

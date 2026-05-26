@@ -11,14 +11,14 @@ import { BaseDataTable, type TableColumn } from "../../../../components/table/Ba
 import { PaginationControls } from "../../../../components/table/PaginationControls";
 import { resolveLookupPaginationTotal } from "../../../../components/table/pagination.dto";
 import {
-  DEBT_COLLECTION_PARTNER_KIND_OPTIONS,
-  VOUCHER_PARTNER_DEFAULT_KIND,
-  VOUCHER_PARTNER_KIND_DIALOG_OPTIONS,
-  VoucherPartnerKindUi,
+  DEBT_COLLECTION_PARTNER_OPTIONS,
+  PARTNER_LOOKUP_DEFAULT,
+  PARTNER_LOOKUP_DIALOG_OPTIONS,
+  PartnerLookupType,
 } from "./voucher-partner.constants";
 import {
-  searchVoucherPartnersByKind,
-  type VoucherMergedPartnerOption,
+  usePartnerSearch,
+  type VoucherPartnerOption,
 } from "./voucher-partner-search";
 import {
   buildVoucherEntitySearchCacheKey,
@@ -34,12 +34,12 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: VoucherEntitySearchTarget;
-  onSelectPartner?: (item: VoucherMergedPartnerOption) => void;
-  onSelectStaff?: (item: VoucherMergedPartnerOption) => void;
+  onSelectPartner?: (item: VoucherPartnerOption) => void;
+  onSelectStaff?: (item: VoucherPartnerOption) => void;
 }
 
 function normalizeSearchResult(
-  raw: LookupSearchResult<VoucherMergedPartnerOption>,
+  raw: LookupSearchResult<VoucherPartnerOption>,
 ) {
   if (Array.isArray(raw)) {
     return { items: raw, hasMore: false, total: raw.length };
@@ -59,9 +59,10 @@ export function VoucherEntitySearchModal({
   onSelectPartner,
   onSelectStaff,
 }: Props) {
+  const searchPartners = usePartnerSearch();
   const isStaffTarget = target === "staff";
   const isDebtCollectionTarget = target === "debtCollection";
-  const lockedKind = isStaffTarget ? VoucherPartnerKindUi.EMPLOYEE : null;
+  const lockedKind = isStaffTarget ? PartnerLookupType.EMPLOYEE : null;
 
   const getPageCache = useVoucherEntitySearchStore((s) => s.getPageCache);
   const setPageCache = useVoucherEntitySearchStore((s) => s.setPageCache);
@@ -70,7 +71,7 @@ export function VoucherEntitySearchModal({
   );
   const patchSession = useVoucherEntitySearchStore((s) => s.patchSession);
 
-  const [kindFilter, setKindFilter] = useState<VoucherPartnerKindUi>(() =>
+  const [kindFilter, setKindFilter] = useState<PartnerLookupType>(() =>
     useVoucherEntitySearchStore.getState().getSession(target).kindFilter,
   );
   const [pageSize, setPageSize] = useState(
@@ -79,7 +80,7 @@ export function VoucherEntitySearchModal({
   const [page, setPage] = useState(
     () => useVoucherEntitySearchStore.getState().getSession(target).page,
   );
-  const [items, setItems] = useState<VoucherMergedPartnerOption[]>([]);
+  const [items, setItems] = useState<VoucherPartnerOption[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [searchInput, setSearchInput] = useState(
@@ -98,7 +99,7 @@ export function VoucherEntitySearchModal({
   const reqIdRef = useRef(0);
   const wasOpenRef = useRef(false);
 
-  const effectiveKindFilter: VoucherPartnerKindUi = lockedKind ?? kindFilter;
+  const effectiveKindFilter: PartnerLookupType = lockedKind ?? kindFilter;
 
   const title = isStaffTarget
     ? "Chọn nhân viên thu"
@@ -146,7 +147,7 @@ export function VoucherEntitySearchModal({
       nextPage: number,
       query: string,
       ps: number,
-      kind: VoucherPartnerKindUi,
+      kind: PartnerLookupType,
       opts?: { force?: boolean },
     ) => {
       const key = buildVoucherEntitySearchCacheKey(target, kind, query, nextPage, ps);
@@ -162,7 +163,7 @@ export function VoucherEntitySearchModal({
       const reqId = ++reqIdRef.current;
       setLoading(true);
       try {
-        const raw = await searchVoucherPartnersByKind(kind, query, nextPage, ps);
+        const raw = await searchPartners(kind, query, nextPage, ps);
         if (reqId !== reqIdRef.current) return;
         const pageResult = normalizeSearchResult(raw);
         setPageCache(key, pageResult);
@@ -180,7 +181,7 @@ export function VoucherEntitySearchModal({
         if (reqId === reqIdRef.current) setLoading(false);
       }
     },
-    [target, getPageCache, setPageCache],
+    [target, getPageCache, setPageCache, searchPartners],
   );
 
   useEffect(() => {
@@ -235,7 +236,7 @@ export function VoucherEntitySearchModal({
     onOpenChange(false);
   };
 
-  const columns: TableColumn<VoucherMergedPartnerOption>[] = useMemo(() => {
+  const columns: TableColumn<VoucherPartnerOption>[] = useMemo(() => {
     const codeLabel = isStaffTarget
       ? "Mã nhân viên"
       : isDebtCollectionTarget
@@ -246,7 +247,7 @@ export function VoucherEntitySearchModal({
       : isDebtCollectionTarget
         ? "Tên"
         : "Tên đối tượng nộp";
-    const cols: TableColumn<VoucherMergedPartnerOption>[] = [
+    const cols: TableColumn<VoucherPartnerOption>[] = [
       {
         key: "code",
         label: codeLabel,
@@ -297,7 +298,7 @@ export function VoucherEntitySearchModal({
       value={effectiveKindFilter}
       disabled={Boolean(lockedKind)}
       onChange={(e) => {
-        const next = e.target.value as VoucherPartnerKindUi;
+        const next = e.target.value as PartnerLookupType;
         setKindFilter(next);
         clearPageCacheForTarget(target);
         persistSession({ kindFilter: next, page: 1, selectedKey: null });
@@ -306,10 +307,10 @@ export function VoucherEntitySearchModal({
       }}
     >
       {(isStaffTarget
-        ? [{ value: VoucherPartnerKindUi.EMPLOYEE, label: "Nhân viên" }]
+        ? [{ value: PartnerLookupType.EMPLOYEE, label: "Nhân viên" }]
         : isDebtCollectionTarget
-          ? DEBT_COLLECTION_PARTNER_KIND_OPTIONS
-          : VOUCHER_PARTNER_KIND_DIALOG_OPTIONS
+          ? DEBT_COLLECTION_PARTNER_OPTIONS
+          : PARTNER_LOOKUP_DIALOG_OPTIONS
       ).map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}

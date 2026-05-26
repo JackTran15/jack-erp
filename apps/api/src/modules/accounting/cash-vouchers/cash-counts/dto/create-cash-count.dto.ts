@@ -23,6 +23,15 @@ export class CreateCashCountDto {
   @Min(0)
   actualAmount: number;
 
+  /** "Mục đích" — free-text purpose of the count. */
+  @IsOptional()
+  @IsString()
+  purpose?: string;
+
+  @IsOptional()
+  @IsString()
+  documentNumber?: string;
+
   @IsOptional()
   @IsString()
   notes?: string;

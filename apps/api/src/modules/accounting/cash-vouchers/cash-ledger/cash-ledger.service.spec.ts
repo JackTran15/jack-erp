@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CashLedgerService } from './cash-ledger.service';
+import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { CashMovementEntity } from '../../cash/cash-movement.entity';
 import { CashReceiptEntity } from '../cash-receipts/cash-receipt.entity';
 import { CashPaymentEntity } from '../cash-payments/cash-payment.entity';
@@ -34,6 +35,12 @@ describe('CashLedgerService', () => {
         { provide: getRepositoryToken(CashMovementEntity), useValue: movementRepo },
         { provide: getRepositoryToken(CashReceiptEntity), useValue: receiptRepo },
         { provide: getRepositoryToken(CashPaymentEntity), useValue: paymentRepo },
+        {
+          provide: CashFundResolverService,
+          useValue: {
+            resolveBranchCashFund: jest.fn().mockResolvedValue(ACC),
+          },
+        },
       ],
     }).compile();
 

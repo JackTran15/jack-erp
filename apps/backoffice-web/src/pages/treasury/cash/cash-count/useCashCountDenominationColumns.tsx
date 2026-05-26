@@ -41,23 +41,17 @@ export function useCashCountDenominationColumns({
       {
         key: "denomination",
         label: "Mệnh giá",
-        width: 100,
+        width: 140,
         headerClassName: "text-right",
-        className: TABLE_NUM_CLASS,
-        footer: (
-          <span className="font-normal text-muted-foreground">
-            Số dòng = {totals.rowCount}
-          </span>
-        ),
+        className: `${TABLE_NUM_CLASS} bg-muted`,
         render: (line) => formatMoneyInteger(line.denomination),
       },
       {
         key: "quantity",
         label: "Số lượng",
-        width: 88,
+        width: 140,
         headerClassName: "text-right",
         className: `${TABLE_NUM_CLASS} !px-1 !py-0`,
-        footer: totals.quantity.toLocaleString("vi-VN"),
         render: (line) => {
           const index = lineIndex(line);
           if (readOnly) {
@@ -69,14 +63,22 @@ export function useCashCountDenominationColumns({
           }
           return (
             <Input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="numeric"
               className="h-8 w-full rounded-none border-0 bg-transparent px-2 text-right shadow-none focus-visible:ring-0"
               value={line.quantity === 0 ? "" : String(line.quantity)}
+              onKeyDown={(e) => {
+                if (
+                  e.key.length === 1 &&
+                  !/[0-9]/.test(e.key) &&
+                  !e.ctrlKey &&
+                  !e.metaKey
+                )
+                  e.preventDefault();
+              }}
               onChange={(e) => {
-                const raw = e.target.value;
-                const quantity =
-                  raw === "" ? 0 : Math.max(0, Number(raw) || 0);
+                const raw = e.target.value.replace(/\D/g, "");
+                const quantity = raw === "" ? 0 : parseInt(raw, 10);
                 onChangeLine?.(index, { quantity });
               }}
             />
@@ -86,10 +88,9 @@ export function useCashCountDenominationColumns({
       {
         key: "amount",
         label: "Thành tiền",
-        width: 112,
+        width: 140,
         headerClassName: "text-right",
-        className: TABLE_NUM_CLASS,
-        footer: formatMoneyInteger(totals.amount),
+        className: `${TABLE_NUM_CLASS} bg-muted`,
         render: (line) =>
           formatMoneyInteger(lineAmount(line.denomination, line.quantity)),
       },
@@ -97,7 +98,6 @@ export function useCashCountDenominationColumns({
         key: "description",
         label: "Diễn giải",
         className: "!px-1 !py-0 min-w-[140px]",
-        footer: null,
         render: (line) => {
           const index = lineIndex(line);
           if (readOnly) {

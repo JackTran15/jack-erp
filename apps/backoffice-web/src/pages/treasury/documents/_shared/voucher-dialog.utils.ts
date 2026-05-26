@@ -2,6 +2,7 @@ import {
   LedgerCashVoucherKindEnum,
   LedgerCashVoucherPurposeEnum,
   type LedgerCashVoucherDetail,
+  type LedgerCashVoucherDocumentLine,
 } from "../../ledger-cash/ledger-cash.types";
 import type { VoucherFormLine } from "./voucher-dialog.constants";
 
@@ -18,13 +19,13 @@ export function voucherLineTotal(lines: { amount: number }[]): number {
 
 import type { CashVoucherPartnerType } from "../../cash-vouchers.types";
 import {
-  partnerKindToBeType,
-  type VoucherPartnerKindUi,
+  lookupTypeToPartnerType,
+  type PartnerLookupType,
 } from "./voucher-partner.constants";
 
 export function buildReceiptDetailFromForm(state: {
   purpose: LedgerCashVoucherPurposeEnum;
-  partnerKind: VoucherPartnerKindUi;
+  partnerKind: PartnerLookupType;
   partnerId: string;
   counterpartyCode: string;
   counterpartyName: string;
@@ -41,7 +42,7 @@ export function buildReceiptDetailFromForm(state: {
   documentLines?: LedgerCashVoucherDetail["documentLines"];
 }): LedgerCashVoucherDetail {
   const partnerType: CashVoucherPartnerType | undefined = state.partnerId
-    ? partnerKindToBeType(state.partnerKind)
+    ? lookupTypeToPartnerType(state.partnerKind)
     : undefined;
   return {
     kind: LedgerCashVoucherKindEnum.RECEIPT,
@@ -64,14 +65,18 @@ export function buildReceiptDetailFromForm(state: {
       description: l.description,
       amount: Number(l.amount) || 0,
       category: l.category,
+      categoryId: l.categoryId,
     })),
     documentLines: state.documentLines,
   };
 }
 
+import type { CashPaymentPurpose } from "../../cash-vouchers.types";
+
 export function buildPaymentDetailFromForm(state: {
   purpose: LedgerCashVoucherPurposeEnum;
-  partnerKind: VoucherPartnerKindUi;
+  paymentPurpose: CashPaymentPurpose;
+  partnerKind: PartnerLookupType;
   partnerId: string;
   counterpartyCode: string;
   counterpartyName: string;
@@ -85,14 +90,16 @@ export function buildPaymentDetailFromForm(state: {
   voucherNo: string;
   voucherDate: string;
   lines: VoucherFormLine[];
-  categoryDefault: string;
+  documentLines?: LedgerCashVoucherDocumentLine[];
+  transferAccountId?: string;
 }): LedgerCashVoucherDetail {
   const partnerType: CashVoucherPartnerType | undefined = state.partnerId
-    ? partnerKindToBeType(state.partnerKind)
+    ? lookupTypeToPartnerType(state.partnerKind)
     : undefined;
   return {
     kind: LedgerCashVoucherKindEnum.PAYMENT,
     purpose: state.purpose,
+    paymentPurpose: state.paymentPurpose,
     voucherNo: state.voucherNo,
     voucherDate: new Date(state.voucherDate),
     partnerKind: state.partnerKind,
@@ -110,7 +117,10 @@ export function buildPaymentDetailFromForm(state: {
     lines: state.lines.map((l) => ({
       description: l.description,
       amount: Number(l.amount) || 0,
-      category: l.category || state.categoryDefault,
+      category: l.category,
+      categoryId: l.categoryId,
     })),
+    documentLines: state.documentLines,
+    transferAccountId: state.transferAccountId || undefined,
   };
 }

@@ -16,6 +16,11 @@ import { CashPaymentPurpose, CashVoucherPartnerType } from '../../enums';
 import { CashPaymentLineDto } from './cash-payment-line.dto';
 
 export class CreateCashPaymentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  documentNumber?: string;
+
   /** "Ngày chi" (YYYY-MM-DD). */
   @IsISO8601()
   voucherDate: string;

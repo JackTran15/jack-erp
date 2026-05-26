@@ -9,6 +9,7 @@ import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { DebtCollectionSagaService } from '../debt-collection/debt-collection-saga.service';
 import {
   CashReceiptPurpose,
   CashReceiptReferenceType,
@@ -82,6 +83,10 @@ describe('CashReceiptsService', () => {
         { provide: CashService, useValue: cashService },
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: PartnerResolverService, useValue: partnerResolver },
+        {
+          provide: DebtCollectionSagaService,
+          useValue: { compensate: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

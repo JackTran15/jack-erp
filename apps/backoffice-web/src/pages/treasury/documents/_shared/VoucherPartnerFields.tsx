@@ -4,18 +4,17 @@ import { LookupField } from "../../../../components/forms/LookupField";
 import type { LookupSearchResult } from "../../../../components/forms/LookupField";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
 import {
-  VOUCHER_PARTNER_DEFAULT_KIND,
-  VOUCHER_PARTNER_KIND_LABEL,
-  VoucherPartnerKindUi,
+  PartnerLookupType,
+  PARTNER_LOOKUP_LABEL,
 } from "./voucher-partner.constants";
 import {
   mergePartnerSearchWithSelection,
-  searchVoucherPartnersByKind,
-  type VoucherMergedPartnerOption,
+  usePartnerSearch,
+  type VoucherPartnerOption,
 } from "./voucher-partner-search";
 
 export interface VoucherPartnerSelection {
-  partnerKind: VoucherPartnerKindUi;
+  partnerKind: PartnerLookupType;
   partnerId: string;
   partnerCode: string;
   partnerName: string;
@@ -26,7 +25,7 @@ export interface VoucherPartnerSelection {
 interface Props {
   label: string;
   readOnly: boolean;
-  partnerKind?: VoucherPartnerKindUi;
+  partnerKind?: PartnerLookupType;
   partnerId: string;
   partnerCode: string;
   partnerName: string;
@@ -42,24 +41,24 @@ const PARTNER_LOOKUP_COLUMNS = [
     key: "code",
     label: "Mã",
     className: "w-28",
-    render: (item: VoucherMergedPartnerOption) => item.code || "—",
+    render: (item: VoucherPartnerOption) => item.code || "—",
   },
   {
     key: "name",
     label: "Tên",
-    render: (item: VoucherMergedPartnerOption) => item.name,
+    render: (item: VoucherPartnerOption) => item.name,
   },
   {
     key: "kind",
     label: "Loại",
     className: "w-32",
-    render: (item: VoucherMergedPartnerOption) => item.kindLabel,
+    render: (item: VoucherPartnerOption) => item.kindLabel,
   },
   {
     key: "phone",
     label: "Điện thoại",
     className: "w-32",
-    render: (item: VoucherMergedPartnerOption) => item.phone ?? "—",
+    render: (item: VoucherPartnerOption) => item.phone ?? "—",
   },
 ];
 
@@ -76,10 +75,13 @@ export function VoucherPartnerFields({
   onPartnerClear,
   onOpenSearchDialog,
 }: Props) {
-  const kindLabel = partnerKind ? VOUCHER_PARTNER_KIND_LABEL[partnerKind] : "";
-  const inlineSearchKind = partnerKind ?? VOUCHER_PARTNER_DEFAULT_KIND;
+  const searchPartners = usePartnerSearch();
+  const kindLabel = partnerKind ? PARTNER_LOOKUP_LABEL[partnerKind] : "";
+  const inlineSearchKind = partnerId
+    ? (partnerKind ?? PartnerLookupType.ALL)
+    : PartnerLookupType.ALL;
 
-  const currentSelection = useMemo((): VoucherMergedPartnerOption | null => {
+  const currentSelection = useMemo((): VoucherPartnerOption | null => {
     if (!partnerId || !partnerKind) return null;
     return {
       lookupKey: `${partnerKind}:${partnerId}`,
@@ -88,7 +90,7 @@ export function VoucherPartnerFields({
       name: partnerName,
       phone: partnerPhone,
       kind: partnerKind,
-      kindLabel: VOUCHER_PARTNER_KIND_LABEL[partnerKind],
+      kindLabel: PARTNER_LOOKUP_LABEL[partnerKind],
     };
   }, [partnerId, partnerKind, partnerCode, partnerName, partnerPhone]);
 
@@ -97,9 +99,9 @@ export function VoucherPartnerFields({
       query: string,
       page: number,
       pageSize?: number,
-    ): Promise<LookupSearchResult<VoucherMergedPartnerOption>> => {
+    ): Promise<LookupSearchResult<VoucherPartnerOption>> => {
       const q = query.trim();
-      const ps = pageSize ?? 8;
+      const ps = pageSize;
 
       if (
         currentSelection &&
@@ -111,7 +113,7 @@ export function VoucherPartnerFields({
         }
       }
 
-      const raw = await searchVoucherPartnersByKind(
+      const raw = await searchPartners(
         inlineSearchKind,
         query,
         page,
@@ -119,11 +121,11 @@ export function VoucherPartnerFields({
       );
       return mergePartnerSearchWithSelection(raw, currentSelection, page);
     },
-    [inlineSearchKind, currentSelection, partnerCode, partnerName],
+    [inlineSearchKind, currentSelection, partnerCode, partnerName, searchPartners],
   );
 
   const handleSelect = useCallback(
-    (item: VoucherMergedPartnerOption) => {
+    (item: VoucherPartnerOption) => {
       onPartnerSelect({
         partnerKind: item.kind,
         partnerId: item.id,
