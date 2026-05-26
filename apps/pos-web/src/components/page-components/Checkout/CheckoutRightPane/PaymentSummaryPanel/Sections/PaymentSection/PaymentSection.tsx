@@ -28,6 +28,7 @@ export function PaymentSection({
     settlementGrandTotal,
     settlementAbs,
     paymentLines,
+    setPaymentLines,
     handleChangePaymentLines,
     changeAmount,
     shortageAmount,
@@ -48,28 +49,36 @@ export function PaymentSection({
     setFirstLineAmountAuto(settlementAbs);
   }, [settlementAbs, setFirstLineAmountAuto]);
 
+  // Gán tài khoản mặc định cho dòng thanh toán chưa chọn. Dùng `setPaymentLines`
+  // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì
+  // `handleChangePaymentLines` để không vô tình tắt auto-fill / ghi đè số tiền vừa
+  // được auto-fill — race này chỉ lộ ở invoice_return (mở tab với giỏ khác rỗng).
+  const needsAssign =
+    accounts.length > 0 && paymentLines.some((l) => !l.paymentAccountId);
   useEffect(() => {
-    if (accounts.length === 0) return;
-    const used = new Set(
-      paymentLines
-        .map((l) => l.paymentAccountId)
-        .filter((id): id is string => Boolean(id)),
-    );
-    let mutated = false;
-    const next = paymentLines.map((line) => {
-      if (line.paymentAccountId) return line;
-      const free = accounts.find((a) => !used.has(a.id));
-      if (!free) return line;
-      used.add(free.id);
-      mutated = true;
-      return {
-        ...line,
-        paymentAccountId: free.id,
-        method: API_METHOD_TO_PAYMENT_METHOD[free.paymentMethod],
-      };
+    if (!needsAssign) return;
+    setPaymentLines((prev) => {
+      const used = new Set(
+        prev
+          .map((l) => l.paymentAccountId)
+          .filter((id): id is string => Boolean(id)),
+      );
+      let mutated = false;
+      const next = prev.map((line) => {
+        if (line.paymentAccountId) return line;
+        const free = accounts.find((a) => !used.has(a.id));
+        if (!free) return line;
+        used.add(free.id);
+        mutated = true;
+        return {
+          ...line,
+          paymentAccountId: free.id,
+          method: API_METHOD_TO_PAYMENT_METHOD[free.paymentMethod],
+        };
+      });
+      return mutated ? next : prev;
     });
-    if (mutated) handleChangePaymentLines(next);
-  }, [accounts, paymentLines, handleChangePaymentLines]);
+  }, [needsAssign, accounts, setPaymentLines]);
 
   // Dùng settlementGrandTotal (đã trừ đặt cọc + cộng phí đổi trả) để Còn phải thu /
   // hoàn tiền + chiều refund tự đúng khi phí/đặt cọc lật dấu.
