@@ -420,6 +420,47 @@ async function seedInventoryData() {
       ],
     );
 
+    // Cash voucher categories (Mục thu / Mục chi)
+    await AppDataSource.query(
+      `
+      INSERT INTO cash_voucher_categories
+        (id, organization_id, code, name, direction, display_order, is_active, created_by, created_at, updated_at)
+      VALUES
+        (gen_random_uuid(), $1, 'THU_BAN_HANG',        'Thu từ bán hàng',                    'IN',  1,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_KHAC',            'Thu khác',                           'IN',  2,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_THANH_LY_TS',     'Thu thanh lý tài sản',               'IN',  3,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_BAN_PHE_LIEU',    'Thu từ bán phế liệu',                'IN',  4,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_HOAN_UNG',        'Thu hoàn ứng',                       'IN',  5,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_CH_KHAC',         'Thu từ cửa hàng khác chuyển đến',    'IN',  6,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_TIEN_MAT_NHAP_QUY','Thu nhận tiền mặt về nhập quỹ',     'IN',  7,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_TIEN_GUI_NH',     'Thu nhận tiền gửi vào ngân hàng',    'IN',  8,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'THU_NO_KH',           'Thu nợ khách hàng',                  'IN',  9,  true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TIEN_DIEN',       'Tiền điện',                          'OUT', 10, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TIEN_DIEN_THOAI', 'Tiền điện thoại',                    'OUT', 11, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TIEN_INTERNET',   'Tiền internet',                      'OUT', 12, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TIEN_NUOC',       'Tiền nước',                          'OUT', 13, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_THUE_CUA_HANG',   'Tiền thuê cửa hàng',                'OUT', 14, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_LUONG',           'Tiền lương',                         'OUT', 15, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_THUONG',          'Tiền thưởng',                        'OUT', 16, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_PHU_CAP',         'Tiền phụ cấp',                       'OUT', 17, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_CCDC',            'Công cụ dụng cụ',                    'OUT', 18, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TSCD',            'Tài sản cố định',                    'OUT', 19, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_KHAC',            'Chi khác',                           'OUT', 20, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TIEP_KHACH',      'Chi tiếp khách',                     'OUT', 21, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_VAN_PHONG_PHAM',  'Mua văn phòng phẩm',                'OUT', 22, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_TAM_UNG',         'Chi tạm ứng',                        'OUT', 23, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_MUA_HANG',        'Chi mua hàng hóa',                   'OUT', 24, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_CHUYEN_TIEN_CH',  'Chi chuyển tiền sang cửa hàng khác', 'OUT', 25, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_RUT_TIEN_GUI',    'Rút tiền gửi về nhập quỹ',           'OUT', 26, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_GUI_TIEN_NH',     'Chi gửi tiền vào ngân hàng',         'OUT', 27, true, $2, NOW(), NOW()),
+        (gen_random_uuid(), $1, 'CHI_NO_NCC',          'Chi trả nợ nhà cung cấp',            'OUT', 28, true, $2, NOW(), NOW())
+      ON CONFLICT (organization_id, code) DO UPDATE SET
+        name = EXCLUDED.name,
+        display_order = EXCLUDED.display_order
+      `,
+      [IDS.organization, IDS.user],
+    );
+
     // Customers — walk-in (debt scenarios) + a few sample retail/B2B records.
     // Phone/email columns are unique-per-org so values must not collide across rows.
     await AppDataSource.query(

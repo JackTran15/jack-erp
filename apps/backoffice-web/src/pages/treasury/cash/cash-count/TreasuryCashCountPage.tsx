@@ -386,6 +386,7 @@ export function TreasuryCashCountPage() {
         createDraft={
           createDraftDate ? { inventoryUntilDate: createDraftDate } : null
         }
+        accountBalance={accountBalance}
         onSaved={handleSaveFromForm}
         onProcess={async (id) => {
           try {

@@ -331,6 +331,36 @@ export interface CreateCashPaymentBody {
   }>;
 }
 
+export interface SupplierDebtPaymentAllocation {
+  supplierDebtId: string;
+  amount: number;
+}
+
+export interface CreateSupplierDebtPaymentBody {
+  voucherDate: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payeeName?: string;
+  reason?: string;
+  staffId?: string;
+  cashAccountId?: string;
+  allocations: SupplierDebtPaymentAllocation[];
+}
+
+export interface SupplierDebtPaymentResult {
+  sagaId: string;
+  paymentId: string;
+  documentNumber: string;
+  totalAmount: number;
+  status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+  allocations: Array<{
+    supplierDebtId: string;
+    amount: number;
+    debtPaymentId?: string;
+    settled: boolean;
+  }>;
+}
+
 export interface CreateCashCountBody {
   cashAccountId: string;
   countedAt: string;

@@ -142,13 +142,6 @@ export function ReceiptVoucherDialog({
     CashVoucherCategoryDirection.IN,
   );
 
-  const debtCollectionCategoryName = useMemo(() => {
-    const cat =
-      receiptCategories.find((c) => c.code === "THU_BAN_HANG") ??
-      receiptCategories.find((c) => c.code === "THU_NO_KH");
-    return cat?.name ?? "Thu bán hàng";
-  }, [receiptCategories]);
-
   const isDebtCollection =
     purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
   const debtFieldsLocked = isDebtCollection && !readOnly;
@@ -201,6 +194,7 @@ export function ReceiptVoucherDialog({
               description: l.description,
               amount: l.amount,
               category: l.category,
+              categoryId: l.categoryId,
             }))
           : [emptyFormLine()],
       );
@@ -299,12 +293,12 @@ export function ReceiptVoucherDialog({
         {
           description: reasonText,
           amount: totalCollect,
-          category: debtCollectionCategoryName,
+          category: "",
         },
       ]);
       setDetailTab(ReceiptVoucherDetailTabEnum.DOCUMENTS);
     },
-    [applyPartnerFromSearch, debtCollectionCategoryName],
+    [applyPartnerFromSearch],
   );
 
   useEffect(() => {
@@ -380,42 +374,14 @@ export function ReceiptVoucherDialog({
 
   const lineTotal = useMemo(() => voucherLineTotal(lines), [lines]);
 
-  const linkedInvoiceCode = useMemo(
-    () =>
-      initial
-        ? resolveInvoiceCodeFromVoucher({
-            ...initial,
-            reference,
-            documentLines,
-          })
-        : resolveInvoiceCodeFromVoucher({
-            kind: LedgerCashVoucherKindEnum.RECEIPT,
-            purpose,
-            voucherNo,
-            voucherDate: new Date(voucherDate),
-            counterpartyCode,
-            counterpartyName,
-            reason,
-            employeeCode,
-            employeeName,
-            reference: reference || undefined,
-            lines: [],
-            documentLines,
-          }),
-    [
-      initial,
-      reference,
-      documentLines,
-      purpose,
-      voucherNo,
-      voucherDate,
-      counterpartyCode,
-      counterpartyName,
-      reason,
-      employeeCode,
-      employeeName,
-    ],
-  );
+  const linkedInvoiceCodes = useMemo(() => {
+    const codes = (documentLines ?? [])
+      .map((d) => d.documentNo?.trim())
+      .filter((c): c is string => !!c);
+    if (codes.length > 0) return codes;
+    if (reference?.trim()) return [reference.trim()];
+    return [];
+  }, [documentLines, reference]);
 
   const showDetailTabs = isDebtCollection || (documentLines?.length ?? 0) > 0;
 
@@ -434,6 +400,7 @@ export function ReceiptVoucherDialog({
         description: l.description,
         amount: Number(l.amount) || 0,
         category: l.category,
+        categoryId: l.categoryId,
       })),
       documentLines,
     }),
@@ -495,18 +462,22 @@ export function ReceiptVoucherDialog({
         label: LABELS.category,
         width: 200,
         type: readOnly ? "readonly" : undefined,
-        getValue: (r) => r.category,
+        getValue: (r) =>
+          r.categoryId
+            ? (receiptCategories.find((c) => c.id === r.categoryId)?.name ??
+              r.category)
+            : r.category,
         renderEditor: readOnly
           ? undefined
           : (row, _idx, onChange) => (
               <select
                 className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={row.category}
+                value={row.categoryId ?? ""}
                 onChange={(e) => onChange(e.target.value)}
               >
                 <option value="">-- Chọn --</option>
                 {receiptCategories.map((c) => (
-                  <option key={c.id} value={c.name}>
+                  <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
@@ -788,13 +759,21 @@ export function ReceiptVoucherDialog({
                 </span>
               </FormField>
             ) : null}
-            {linkedInvoiceCode ? (
+            {linkedInvoiceCodes.length > 0 ? (
               <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
-                <VoucherLink
-                  code={linkedInvoiceCode}
-                  clickable={!!onOpenInvoice}
-                  onClick={() => onOpenInvoice?.(linkedInvoiceCode)}
-                />
+                <div className="flex flex-wrap items-center gap-1.5 line-clamp-1 text-sm text-indigo-500">
+                  {linkedInvoiceCodes.map((code, index) => (
+                    <>
+                      <VoucherLink
+                        key={code}
+                        code={code}
+                        clickable={!!onOpenInvoice}
+                        onClick={() => onOpenInvoice?.(code)}
+                      />
+                      {index < linkedInvoiceCodes.length - 1 ? "," : ""}
+                    </>
+                  ))}
+                </div>
               </FormField>
             ) : null}
             <FormField
@@ -887,9 +866,20 @@ export function ReceiptVoucherDialog({
                     ? undefined
                     : (idx, key, value) => {
                         setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx ? { ...l, [key]: value } : l,
-                          ),
+                          prev.map((l, i) => {
+                            if (i !== idx) return l;
+                            if (key === "category") {
+                              const cat = receiptCategories.find(
+                                (c) => c.id === value,
+                              );
+                              return {
+                                ...l,
+                                categoryId: (value as string) || undefined,
+                                category: cat?.name ?? "",
+                              };
+                            }
+                            return { ...l, [key]: value };
+                          }),
                         );
                       }
                 }

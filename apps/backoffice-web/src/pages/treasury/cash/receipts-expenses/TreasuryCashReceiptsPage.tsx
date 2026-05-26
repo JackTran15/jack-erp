@@ -57,6 +57,7 @@ import {
   ledgerDetailToCreatePaymentBody,
   ledgerDetailToCreateReceiptBody,
   ledgerDetailToDebtCollectionBody,
+  ledgerDetailToSupplierDebtPaymentBody,
 } from "../../cash-vouchers.api-body";
 import {
   CashVoucherCategoryDirection,
@@ -452,27 +453,44 @@ export function TreasuryCashReceiptsPage() {
               const created = await receiptMutations.create.mutateAsync(body);
               setSelectedId(created.id);
             } else if (selectedId) {
+              const { documentNumber: _, ...updateBody } = body;
               await receiptMutations.update.mutateAsync({
                 id: selectedId,
-                body,
+                body: updateBody,
               });
             }
           }
         } else {
-          const body = ledgerDetailToCreatePaymentBody(
-            detail,
-            cashAccountId,
-            contraAccountId,
-          );
-          if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
-            const created = await paymentMutations.create.mutateAsync(body);
-            setSelectedId(created.id);
-          } else if (selectedId) {
-            const { documentNumber: _, ...updateBody } = body;
-            await paymentMutations.update.mutateAsync({
-              id: selectedId,
-              body: updateBody,
-            });
+          const isSupplierDebtRepayment =
+            detail.purpose === LedgerCashVoucherPurposeEnum.DEBT_REPAYMENT;
+          if (
+            isSupplierDebtRepayment &&
+            voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE
+          ) {
+            const body = ledgerDetailToSupplierDebtPaymentBody(detail, cashAccountId);
+            if (body.allocations.length === 0) {
+              toast.error("Chọn ít nhất một hóa đơn nợ để trả.");
+              return;
+            }
+            const result =
+              await paymentMutations.supplierDebtPayment.mutateAsync(body);
+            setSelectedId(result.paymentId);
+          } else {
+            const body = ledgerDetailToCreatePaymentBody(
+              detail,
+              cashAccountId,
+              contraAccountId,
+            );
+            if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
+              const created = await paymentMutations.create.mutateAsync(body);
+              setSelectedId(created.id);
+            } else if (selectedId) {
+              const { documentNumber: _, ...updateBody } = body;
+              await paymentMutations.update.mutateAsync({
+                id: selectedId,
+                body: updateBody,
+              });
+            }
           }
         }
         closeVoucherDialogs();

@@ -201,11 +201,12 @@ export class CashCountsService {
         };
       }
 
-      const documentNumber = await this.docNumbering.generate(
-        DocumentType.CASH_COUNT,
-        actor.branchId,
-        actor,
-      );
+      const documentNumber = count.documentNumber
+        || await this.docNumbering.generate(
+          DocumentType.CASH_COUNT,
+          actor.branchId,
+          actor,
+        );
 
       count.expectedAmount = expected;
       count.variance = variance;
