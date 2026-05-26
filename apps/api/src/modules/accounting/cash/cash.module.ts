@@ -4,9 +4,12 @@ import { JournalModule } from '../journal/journal.module';
 import { CashAccountEntity } from './cash-account.entity';
 import { CashMovementEntity } from './cash-movement.entity';
 import { CashService } from './cash.service';
+import { CashFundResolverService } from './cash-fund-resolver.service';
+import { BranchCashProvisioningService } from './branch-cash-provisioning.service';
 import { CashController } from './cash.controller';
 import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publisher';
+import { CashRefundPublisher } from '../publishers/cash-refund.publisher';
 
 @Module({
   imports: [
@@ -14,9 +17,19 @@ import { CashFromPaymentPublisher } from '../publishers/cash-from-payment.publis
     JournalModule,
   ],
   controllers: [CashController],
-  providers: [CashService, CashFromPaymentPublisher],
-  // CashFromPaymentConsumer relocated to cash-vouchers/cash-voucher-consumers/
-  // pos-cash-sale.consumer.ts (now creates the Phiếu thu voucher too).
-  exports: [CashService, CashFromPaymentPublisher],
+  providers: [
+    CashService,
+    CashFundResolverService,
+    BranchCashProvisioningService,
+    CashFromPaymentPublisher,
+    CashRefundPublisher,
+  ],
+  exports: [
+    CashService,
+    CashFundResolverService,
+    BranchCashProvisioningService,
+    CashFromPaymentPublisher,
+    CashRefundPublisher,
+  ],
 })
 export class CashModule {}

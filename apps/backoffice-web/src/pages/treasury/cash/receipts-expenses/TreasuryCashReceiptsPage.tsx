@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DocumentListShell,
   DropdownMenu,
@@ -21,6 +20,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   TreasuryCashTabIdEnum,
@@ -37,12 +37,17 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
+import {
+  useCashPayment,
+  useCashPaymentMutations,
+} from "../../../../hooks/treasury/use-cash-payments";
+import {
+  useCashReceipt,
+  useCashReceiptMutations,
+} from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
 import { useCoaAccounts } from "../../../../hooks/treasury/use-coa-accounts";
-import { useCashPayment } from "../../../../hooks/treasury/use-cash-payments";
-import { useCashPaymentMutations } from "../../../../hooks/treasury/use-cash-payments";
-import { useCashReceipt } from "../../../../hooks/treasury/use-cash-receipts";
-import { useCashReceiptMutations } from "../../../../hooks/treasury/use-cash-receipts";
 import { useMergedReceiptPayments } from "../../../../hooks/treasury/use-merged-receipt-payments";
 import {
   cashPaymentToVoucherDetail,
@@ -51,6 +56,8 @@ import {
 import {
   ledgerDetailToCreatePaymentBody,
   ledgerDetailToCreateReceiptBody,
+  ledgerDetailToDebtCollectionBody,
+  ledgerDetailToSupplierDebtPaymentBody,
 } from "../../cash-vouchers.api-body";
 import {
   CashVoucherCategoryDirection,
@@ -58,20 +65,19 @@ import {
   ReceiptPaymentKind,
   type ReceiptPaymentListItem,
 } from "../../cash-vouchers.types";
-import { CashAccountSelect } from "../../components/CashAccountSelect";
-import {
-  LedgerCashVoucherKindEnum,
-  type LedgerCashInvoiceDetail,
-  type LedgerCashVoucherDetail,
-} from "../../ledger-cash/ledger-cash.types";
-import { MOCK_LEDGER_CASH_ROWS } from "../../ledger-cash/mock-ledger-cash";
-import { findLedgerCashInvoiceByCode } from "../../ledger-cash/mock-ledger-cash";
 import {
   InvoiceDetailDialog,
   PaymentVoucherDialog,
   ReceiptVoucherDialog,
   TreasuryVoucherDialogModeEnum,
 } from "../../documents";
+import {
+  LedgerCashVoucherKindEnum,
+  LedgerCashVoucherPurposeEnum,
+  type LedgerCashInvoiceDetail,
+  type LedgerCashVoucherDetail,
+} from "../../ledger-cash/ledger-cash.types";
+import { MOCK_LEDGER_CASH_ROWS, findLedgerCashInvoiceByCode } from "../../ledger-cash/mock-ledger-cash";
 import { ReceiptCashDetailPanel } from "./ReceiptCashDetailPanel";
 import {
   RECEIPT_CASH_FILTER_KEYS,
@@ -102,7 +108,8 @@ function dialogKindFromItem(
 }
 
 export function TreasuryCashReceiptsPage() {
-  const [cashAccountId, setCashAccountId] = useState("");
+  const { data: cashAccounts } = useCashAccounts();
+  const cashAccountId = cashAccounts?.[0]?.id ?? "";
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),
@@ -151,10 +158,14 @@ export function TreasuryCashReceiptsPage() {
   );
 
   const { data: receiptDetail } = useCashReceipt(
-    selectedItem?.kind === ReceiptPaymentKind.RECEIPT ? selectedId ?? undefined : undefined,
+    selectedItem?.kind === ReceiptPaymentKind.RECEIPT
+      ? (selectedId ?? undefined)
+      : undefined,
   );
   const { data: paymentDetail } = useCashPayment(
-    selectedItem?.kind === ReceiptPaymentKind.PAYMENT ? selectedId ?? undefined : undefined,
+    selectedItem?.kind === ReceiptPaymentKind.PAYMENT
+      ? (selectedId ?? undefined)
+      : undefined,
   );
 
   const selectedVoucher: LedgerCashVoucherDetail | null = useMemo(() => {
@@ -171,9 +182,9 @@ export function TreasuryCashReceiptsPage() {
 
   const filteredRows = useMemo(() => {
     return listRows.filter((row) => {
-      const dateText = new Date(`${row.voucherDate}T12:00:00`).toLocaleDateString(
-        "vi-VN",
-      );
+      const dateText = new Date(
+        `${row.voucherDate}T12:00:00`,
+      ).toLocaleDateString("vi-VN");
       const typeLabel =
         row.kind === ReceiptPaymentKind.RECEIPT
           ? "Phiếu thu tiền mặt"
@@ -181,12 +192,18 @@ export function TreasuryCashReceiptsPage() {
             ? "Phiếu nhập hàng - Tiền mặt"
             : "Phiếu chi tiền mặt";
       return (
-        applyColumnFilter(toComparableText(dateText), columnFilters.documentDate) &&
+        applyColumnFilter(
+          toComparableText(dateText),
+          columnFilters.documentDate,
+        ) &&
         applyColumnFilter(
           toComparableText(row.documentNumber),
           columnFilters.voucherNo,
         ) &&
-        applyColumnFilter(toComparableText(typeLabel), columnFilters.documentTypeLabel) &&
+        applyColumnFilter(
+          toComparableText(typeLabel),
+          columnFilters.documentTypeLabel,
+        ) &&
         applyColumnFilter(
           toComparableText(row.totalAmount),
           columnFilters.totalAmount,
@@ -388,59 +405,92 @@ export function TreasuryCashReceiptsPage() {
   );
 
   const openCreateReceipt = useCallback(() => {
-    if (!cashAccountId) {
-      toast.error("Chọn két tiền mặt trước khi thêm phiếu thu.");
-      return;
-    }
     setShowGoodsPaymentView(false);
     setVoucherDialog({
       kind: ReceiptCashVoucherDialogKindEnum.RECEIPT,
       mode: TreasuryVoucherDialogModeEnum.CREATE,
     });
-  }, [cashAccountId]);
+  }, []);
 
   const openCreatePayment = useCallback(() => {
-    if (!cashAccountId) {
-      toast.error("Chọn két tiền mặt trước khi thêm phiếu chi.");
-      return;
-    }
     setShowGoodsPaymentView(false);
     setVoucherDialog({
       kind: ReceiptCashVoucherDialogKindEnum.PAYMENT,
       mode: TreasuryVoucherDialogModeEnum.CREATE,
     });
-  }, [cashAccountId]);
+  }, []);
 
   const handleSaveVoucher = useCallback(
     async (detail: LedgerCashVoucherDetail) => {
       if (!voucherDialog || !cashAccountId || !contraAccountId) {
-        toast.error("Chọn két tiền và cấu hình tài khoản đối ứng.");
+        toast.error("Chưa có két tiền hoặc tài khoản đối ứng.");
         return;
       }
       try {
         if (voucherDialog.kind === ReceiptCashVoucherDialogKindEnum.RECEIPT) {
-          const body = ledgerDetailToCreateReceiptBody(
-            detail,
-            cashAccountId,
-            contraAccountId,
-          );
-          if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
-            const created = await receiptMutations.create.mutateAsync(body);
-            setSelectedId(created.id);
-          } else if (selectedId) {
-            await receiptMutations.update.mutateAsync({ id: selectedId, body });
+          const isDebtCollection =
+            detail.purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
+          if (
+            isDebtCollection &&
+            voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE
+          ) {
+            // Thu hồi nợ: settle the picked invoice debts + credit the két (saga).
+            const body = ledgerDetailToDebtCollectionBody(detail, cashAccountId);
+            if (body.allocations.length === 0) {
+              toast.error("Chọn ít nhất một hóa đơn nợ để thu.");
+              return;
+            }
+            const result =
+              await receiptMutations.debtCollection.mutateAsync(body);
+            setSelectedId(result.receiptId);
+          } else {
+            const body = ledgerDetailToCreateReceiptBody(
+              detail,
+              cashAccountId,
+              contraAccountId,
+            );
+            if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
+              const created = await receiptMutations.create.mutateAsync(body);
+              setSelectedId(created.id);
+            } else if (selectedId) {
+              const { documentNumber: _, ...updateBody } = body;
+              await receiptMutations.update.mutateAsync({
+                id: selectedId,
+                body: updateBody,
+              });
+            }
           }
         } else {
-          const body = ledgerDetailToCreatePaymentBody(
-            detail,
-            cashAccountId,
-            contraAccountId,
-          );
-          if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
-            const created = await paymentMutations.create.mutateAsync(body);
-            setSelectedId(created.id);
-          } else if (selectedId) {
-            await paymentMutations.update.mutateAsync({ id: selectedId, body });
+          const isSupplierDebtRepayment =
+            detail.purpose === LedgerCashVoucherPurposeEnum.DEBT_REPAYMENT;
+          if (
+            isSupplierDebtRepayment &&
+            voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE
+          ) {
+            const body = ledgerDetailToSupplierDebtPaymentBody(detail, cashAccountId);
+            if (body.allocations.length === 0) {
+              toast.error("Chọn ít nhất một hóa đơn nợ để trả.");
+              return;
+            }
+            const result =
+              await paymentMutations.supplierDebtPayment.mutateAsync(body);
+            setSelectedId(result.paymentId);
+          } else {
+            const body = ledgerDetailToCreatePaymentBody(
+              detail,
+              cashAccountId,
+              contraAccountId,
+            );
+            if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
+              const created = await paymentMutations.create.mutateAsync(body);
+              setSelectedId(created.id);
+            } else if (selectedId) {
+              const { documentNumber: _, ...updateBody } = body;
+              await paymentMutations.update.mutateAsync({
+                id: selectedId,
+                body: updateBody,
+              });
+            }
           }
         }
         closeVoucherDialogs();
@@ -519,11 +569,6 @@ export function TreasuryCashReceiptsPage() {
         }
         filters={
           <div className="flex flex-wrap items-end gap-4">
-            <CashAccountSelect
-              value={cashAccountId}
-              onChange={setCashAccountId}
-              required
-            />
             <PeriodFilter
               value={period}
               onChange={setPeriod}
@@ -558,11 +603,7 @@ export function TreasuryCashReceiptsPage() {
           columns={columns}
           rows={pagedRows}
           loading={isLoading}
-          emptyLabel={
-            cashAccountId
-              ? "Không có chứng từ thu chi tiền mặt trong kỳ đã chọn."
-              : "Chọn két tiền mặt để xem danh sách."
-          }
+          emptyLabel="Không có chứng từ thu chi tiền mặt trong kỳ đã chọn."
           getRowKey={(row) => `${row.kind}-${row.id}`}
           onRowClick={(row) => setSelectedId(row.id)}
           columnFilterControl={columnFilterControl}

@@ -1,117 +1,54 @@
 import type { UserListItem } from "@erp/shared-interfaces";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { apiClient } from "../../../../lib/api-axios";
 import type { LookupSearchResult } from "../../../../components/forms/LookupField";
 import { CashVoucherPartnerType } from "../../cash-vouchers.types";
+import { treasuryQueryKeys } from "../../../../hooks/treasury/treasury-query-keys";
 import {
-  VOUCHER_PARTNER_KIND_FILTER_ALL,
-  VOUCHER_PARTNER_KIND_LABEL,
-  VoucherPartnerKindUi,
-  providerUiKindFromCode,
-  type VoucherPartnerKindFilter,
+  PartnerLookupType,
+  PARTNER_LOOKUP_LABEL,
 } from "./voucher-partner.constants";
 
-const MERGE_SOURCE_PAGE_SIZE = 100;
+// ── Response shape from GET /cash-vouchers/partners ──────────────
 
-type Paginated<T> = {
-  data: T[];
+interface PartnerLookupRow {
+  type: PartnerLookupType.EMPLOYEE | PartnerLookupType.CUSTOMER | PartnerLookupType.SUPPLIER;
+  id: string;
+  name: string;
+  code: string | null;
+  address: string | null;
+}
+
+interface PartnerLookupResponse {
+  data: PartnerLookupRow[];
   total: number;
   page: number;
   pageSize: number;
-};
-
-export interface VoucherCustomerOption {
-  id: string;
-  code: string;
-  name: string;
-  phone?: string;
-  address?: string;
 }
 
-export interface VoucherProviderOption {
-  id: string;
-  code: string;
-  name: string;
-  phone?: string;
-}
+const SEARCH_STALE_TIME = 30_000;
+const DETAIL_STALE_TIME = 5 * 60_000;
 
-export interface VoucherStaffOption {
-  id: string;
-  code: string;
-  name: string;
-  phone?: string;
-}
+// ── Public types ─────────────────────────────────────────────────
 
-export interface VoucherMergedPartnerOption {
+export interface VoucherPartnerOption {
   lookupKey: string;
   id: string;
   code: string;
   name: string;
   phone?: string;
   address?: string;
-  kind: VoucherPartnerKindUi;
+  kind: PartnerLookupType;
   kindLabel: string;
-}
-
-export function toMergedCustomer(c: VoucherCustomerOption): VoucherMergedPartnerOption {
-  return {
-    lookupKey: `${VoucherPartnerKindUi.CUSTOMER}:${c.id}`,
-    id: c.id,
-    code: c.code,
-    name: c.name,
-    phone: c.phone,
-    address: c.address,
-    kind: VoucherPartnerKindUi.CUSTOMER,
-    kindLabel: VOUCHER_PARTNER_KIND_LABEL[VoucherPartnerKindUi.CUSTOMER],
-  };
-}
-
-export function toMergedProvider(p: VoucherProviderOption): VoucherMergedPartnerOption {
-  const kind = providerUiKindFromCode(p.code);
-  return {
-    lookupKey: `${kind}:${p.id}`,
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    phone: p.phone,
-    kind,
-    kindLabel: VOUCHER_PARTNER_KIND_LABEL[kind],
-  };
-}
-
-function toMergedStaff(u: VoucherStaffOption): VoucherMergedPartnerOption {
-  return {
-    lookupKey: `${VoucherPartnerKindUi.EMPLOYEE}:${u.id}`,
-    id: u.id,
-    code: u.code,
-    name: u.name,
-    phone: u.phone,
-    kind: VoucherPartnerKindUi.EMPLOYEE,
-    kindLabel: VOUCHER_PARTNER_KIND_LABEL[VoucherPartnerKindUi.EMPLOYEE],
-  };
-}
-
-export function sortMergedPartners(
-  items: VoucherMergedPartnerOption[],
-): VoucherMergedPartnerOption[] {
-  return [...items].sort((a, b) => {
-    const byName = a.name.localeCompare(b.name, "vi");
-    if (byName !== 0) return byName;
-    return a.code.localeCompare(b.code, "vi");
-  });
-}
-
-function itemsFromSearchResult<T>(
-  result: LookupSearchResult<T> | T[],
-): T[] {
-  return Array.isArray(result) ? result : (result.items ?? []);
 }
 
 /** Pin the current selection on page 1 (API search may not match by code). */
 export function mergePartnerSearchWithSelection(
-  result: LookupSearchResult<VoucherMergedPartnerOption>,
-  current: VoucherMergedPartnerOption | null,
+  result: LookupSearchResult<VoucherPartnerOption>,
+  current: VoucherPartnerOption | null,
   page: number,
-): LookupSearchResult<VoucherMergedPartnerOption> {
+): LookupSearchResult<VoucherPartnerOption> {
   if (!current || page !== 1) return result;
   const items = Array.isArray(result)
     ? result
@@ -126,245 +63,55 @@ export function mergePartnerSearchWithSelection(
   };
 }
 
-/** One failed source must not clear the whole merged lookup. */
-async function safePartnerSourceSearch<T>(
-  label: string,
-  fn: () => Promise<LookupSearchResult<T>>,
-): Promise<T[]> {
-  try {
-    return itemsFromSearchResult(await fn());
-  } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn(`[voucher-partner] ${label}:`, err);
-    }
-    return [];
-  }
-}
+// ── Raw fetch functions (used as queryFn) ────────────────────────
 
-function mapPaginatedToMerged<C>(
-  raw: LookupSearchResult<C>,
-  mapItem: (row: C) => VoucherMergedPartnerOption,
-): LookupSearchResult<VoucherMergedPartnerOption> {
-  const items = itemsFromSearchResult(raw).map(mapItem);
-  if (Array.isArray(raw)) {
-    return { items, hasMore: false, total: items.length };
-  }
+function partnerRowToOption(row: PartnerLookupRow): VoucherPartnerOption {
+  const code = row.code ?? "";
+  const kind = row.type as PartnerLookupType;
   return {
-    items,
-    hasMore: Boolean(raw.hasMore),
-    total: raw.total ?? items.length,
+    lookupKey: `${kind}:${row.id}`,
+    id: row.id,
+    code,
+    name: row.name,
+    address: row.address ?? undefined,
+    kind,
+    kindLabel: PARTNER_LOOKUP_LABEL[kind],
   };
 }
 
-export async function searchVoucherPartnersByKind(
-  kindFilter: VoucherPartnerKindFilter,
-  query: string,
-  page: number,
-  pageSize = 50,
-): Promise<LookupSearchResult<VoucherMergedPartnerOption>> {
-  if (kindFilter === VOUCHER_PARTNER_KIND_FILTER_ALL) {
-    return searchVoucherPartnersMerged(query, page, pageSize);
-  }
-  if (kindFilter === VoucherPartnerKindUi.CUSTOMER) {
-    return mapPaginatedToMerged(
-      await searchVoucherCustomers(query, page, pageSize),
-      toMergedCustomer,
-    );
-  }
-  if (kindFilter === VoucherPartnerKindUi.EMPLOYEE) {
-    return mapPaginatedToMerged(
-      await searchVoucherStaff(query, page, pageSize),
-      toMergedStaff,
-    );
-  }
-  if (
-    kindFilter === VoucherPartnerKindUi.SUPPLIER ||
-    kindFilter === VoucherPartnerKindUi.PARTNER
-  ) {
-    return mapPaginatedToMerged(
-      await searchVoucherProviders(kindFilter, query, page, pageSize),
-      toMergedProvider,
-    );
-  }
-  return { items: [], hasMore: false, total: 0 };
-}
-
-/**
- * Merges customers, providers, and staff (3 APIs per request, client-side paging).
- * Prefer `searchVoucherPartnersByKind` for single-kind server paging.
- */
-export async function searchVoucherPartnersMerged(
-  query: string,
-  page: number,
-  pageSize = 8,
-): Promise<LookupSearchResult<VoucherMergedPartnerOption>> {
-  const [customerItems, providerItems, staffItems] = await Promise.all([
-    safePartnerSourceSearch("customers", () =>
-      searchVoucherCustomers(query, 1, MERGE_SOURCE_PAGE_SIZE),
-    ),
-    safePartnerSourceSearch("providers", () =>
-      searchVoucherProvidersAll(query, 1, MERGE_SOURCE_PAGE_SIZE),
-    ),
-    safePartnerSourceSearch("staff", () =>
-      searchVoucherStaff(query, 1, MERGE_SOURCE_PAGE_SIZE),
-    ),
-  ]);
-
-  const merged = sortMergedPartners([
-    ...customerItems.map(toMergedCustomer),
-    ...providerItems.map(toMergedProvider),
-    ...staffItems.map(toMergedStaff),
-  ]);
-
-  const start = (page - 1) * pageSize;
-  const items = merged.slice(start, start + pageSize);
-  return {
-    items,
-    hasMore: start + pageSize < merged.length,
-    total: merged.length,
-  };
-}
-
-async function searchVoucherProvidersAll(
+async function fetchPartnerSearch(
+  type: PartnerLookupType,
   query: string,
   page: number,
   pageSize: number,
-): Promise<LookupSearchResult<VoucherProviderOption>> {
-  const { data } = await apiClient.get<Paginated<VoucherProviderOption>>(
-    `/inventory/providers?${buildListParams(query, page, pageSize)}`,
-  );
-  return paginate(data, page, pageSize);
-}
-
-function paginate<T>(
-  data: Paginated<T> | null | undefined,
-  page: number,
-  pageSize: number,
-): LookupSearchResult<T> {
-  const rows = data?.data ?? [];
-  const total = data?.total ?? 0;
-  const currentPage = data?.page ?? page;
-  const currentPageSize = data?.pageSize ?? pageSize;
-  const fetched = currentPage * currentPageSize;
-  return {
-    items: rows,
-    hasMore: fetched < total,
-    total,
-  };
-}
-
-function filterProvidersByKind(
-  items: VoucherProviderOption[],
-  kind: VoucherPartnerKindUi,
-): VoucherProviderOption[] {
-  if (kind === VoucherPartnerKindUi.PARTNER) {
-    return items.filter(
-      (p) => providerUiKindFromCode(p.code) === VoucherPartnerKindUi.PARTNER,
-    );
-  }
-  if (kind === VoucherPartnerKindUi.SUPPLIER) {
-    return items.filter(
-      (p) => providerUiKindFromCode(p.code) === VoucherPartnerKindUi.SUPPLIER,
-    );
-  }
-  return items;
-}
-
-function buildListParams(
-  query: string,
-  page: number,
-  pageSize: number,
-  extra?: Record<string, string>,
-): URLSearchParams {
-  const params = new URLSearchParams({
-    page: String(page),
-    pageSize: String(pageSize),
-    ...extra,
-  });
+): Promise<LookupSearchResult<VoucherPartnerOption>> {
+  const params: Record<string, string | number> = { type, page, pageSize };
   const q = query.trim();
-  if (q) params.set("search", q);
-  return params;
-}
-
-export async function searchVoucherCustomers(
-  query: string,
-  page: number,
-  pageSize = 8,
-): Promise<LookupSearchResult<VoucherCustomerOption>> {
-  const { data } = await apiClient.get<Paginated<VoucherCustomerOption>>(
-    `/customers?${buildListParams(query, page, pageSize)}`,
+  if (q) params.search = q;
+  const { data } = await apiClient.get<PartnerLookupResponse>(
+    "/cash-vouchers/partners",
+    { params },
   );
-  return paginate(data, page, pageSize);
-}
-
-export async function searchVoucherProviders(
-  kind: VoucherPartnerKindUi,
-  query: string,
-  page: number,
-  pageSize = 8,
-): Promise<LookupSearchResult<VoucherProviderOption>> {
-  const { data } = await apiClient.get<Paginated<VoucherProviderOption>>(
-    `/inventory/providers?${buildListParams(query, page, pageSize)}`,
-  );
-  const filtered = filterProvidersByKind(data.data, kind);
-  const hasMore = data.page * data.pageSize < data.total;
-  return {
-    items: filtered,
-    hasMore,
-    total: data.total,
-  };
-}
-
-export async function searchVoucherStaff(
-  query: string,
-  page: number,
-  pageSize = 8,
-): Promise<LookupSearchResult<VoucherStaffOption>> {
-  const { data } = await apiClient.get<Paginated<UserListItem>>(
-    `/admin/users?${buildListParams(query, page, pageSize, { isActive: "true" })}`,
-  );
-  const items: VoucherStaffOption[] = data.data.map((u) => ({
-    id: u.id,
-    code: u.code ?? u.profile?.code ?? "",
-    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email,
-    phone: u.profile?.mobile ?? undefined,
-  }));
+  const items = data.data.map(partnerRowToOption);
+  const fetched = data.page * data.pageSize;
   return {
     items,
-    hasMore: data.page * data.pageSize < data.total,
+    hasMore: fetched < data.total,
     total: data.total,
   };
 }
 
-export async function fetchVoucherCustomerById(
-  id: string,
-): Promise<VoucherCustomerOption | null> {
-  try {
-    const { data } = await apiClient.get<VoucherCustomerOption>(
-      `/customers/${id}`,
-    );
-    return data;
-  } catch {
-    return null;
-  }
+interface VoucherPartnerByIdResult {
+  code: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  kind: PartnerLookupType;
 }
 
-export async function fetchVoucherProviderById(
+async function fetchStaffByIdRaw(
   id: string,
-): Promise<VoucherProviderOption | null> {
-  try {
-    const { data } = await apiClient.get<VoucherProviderOption>(
-      `/inventory/providers/${id}`,
-    );
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchVoucherStaffById(
-  id: string,
-): Promise<VoucherStaffOption | null> {
+): Promise<{ id: string; code: string; name: string; phone?: string } | null> {
   try {
     const { data } = await apiClient.get<UserListItem>(`/admin/users/${id}`);
     return {
@@ -378,43 +125,109 @@ export async function fetchVoucherStaffById(
   }
 }
 
-export async function fetchVoucherPartnerByBeType(
+async function fetchPartnerByTypeRaw(
+  partnerType: CashVoucherPartnerType,
+  partnerId: string,
+): Promise<VoucherPartnerByIdResult | null> {
+  if (partnerType === CashVoucherPartnerType.CUSTOMER) {
+    try {
+      const { data } = await apiClient.get<{ id: string; code: string; name: string; phone?: string; address?: string }>(
+        `/customers/${partnerId}`,
+      );
+      return {
+        code: data.code,
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
+        kind: PartnerLookupType.CUSTOMER,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  if (partnerType === CashVoucherPartnerType.EMPLOYEE) {
+    const u = await fetchStaffByIdRaw(partnerId);
+    if (!u) return null;
+    return { code: u.code, name: u.name, phone: u.phone, kind: PartnerLookupType.EMPLOYEE };
+  }
+
+  if (partnerType === CashVoucherPartnerType.SUPPLIER) {
+    try {
+      const { data } = await apiClient.get<{ id: string; code: string; name: string; phone?: string }>(
+        `/inventory/providers/${partnerId}`,
+      );
+      return { code: data.code, name: data.name, phone: data.phone, kind: PartnerLookupType.SUPPLIER };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+// ── Cached functions (via queryClient.fetchQuery) ────────────────
+
+export function searchVoucherPartners(
+  qc: QueryClient,
+  type: PartnerLookupType,
+  query: string,
+  page: number,
+  pageSize = 50,
+): Promise<LookupSearchResult<VoucherPartnerOption>> {
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.partnerSearch(type, query.trim(), page, pageSize),
+    queryFn: () => fetchPartnerSearch(type, query, page, pageSize),
+    staleTime: SEARCH_STALE_TIME,
+  });
+}
+
+export function fetchVoucherStaffById(
+  qc: QueryClient,
+  id: string,
+): Promise<{ id: string; code: string; name: string; phone?: string } | null> {
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.staffById(id),
+    queryFn: () => fetchStaffByIdRaw(id),
+    staleTime: DETAIL_STALE_TIME,
+  });
+}
+
+export function fetchVoucherPartnerByType(
+  qc: QueryClient,
   partnerType: CashVoucherPartnerType | undefined,
   partnerId: string | undefined,
-): Promise<{
-  code: string;
-  name: string;
-  phone?: string;
-  address?: string;
-  kind: VoucherPartnerKindUi;
-} | null> {
-  if (!partnerType || !partnerId) return null;
-  if (partnerType === CashVoucherPartnerType.CUSTOMER) {
-    const c = await fetchVoucherCustomerById(partnerId);
-    if (!c) return null;
-    return {
-      code: c.code,
-      name: c.name,
-      phone: c.phone,
-      address: c.address,
-      kind: VoucherPartnerKindUi.CUSTOMER,
-    };
-  }
-  if (partnerType === CashVoucherPartnerType.EMPLOYEE) {
-    const u = await fetchVoucherStaffById(partnerId);
-    if (!u) return null;
-    return {
-      code: u.code,
-      name: u.name,
-      phone: u.phone,
-      kind: VoucherPartnerKindUi.EMPLOYEE,
-    };
-  }
-  if (partnerType === CashVoucherPartnerType.SUPPLIER) {
-    const p = await fetchVoucherProviderById(partnerId);
-    if (!p) return null;
-    const kind = providerUiKindFromCode(p.code);
-    return { code: p.code, name: p.name, phone: p.phone, kind };
-  }
-  return null;
+): Promise<VoucherPartnerByIdResult | null> {
+  if (!partnerType || !partnerId) return Promise.resolve(null);
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.partnerById(partnerType, partnerId),
+    queryFn: () => fetchPartnerByTypeRaw(partnerType, partnerId),
+    staleTime: DETAIL_STALE_TIME,
+  });
+}
+
+// ── Hooks (convenience wrappers for components) ──────────────────
+
+export function usePartnerSearch() {
+  const qc = useQueryClient();
+  return useCallback(
+    (type: PartnerLookupType, query: string, page: number, pageSize = 50) =>
+      searchVoucherPartners(qc, type, query, page, pageSize),
+    [qc],
+  );
+}
+
+export function usePartnerLookup() {
+  const qc = useQueryClient();
+  return {
+    fetchPartnerByType: useCallback(
+      (partnerType: CashVoucherPartnerType | undefined, partnerId: string | undefined) =>
+        fetchVoucherPartnerByType(qc, partnerType, partnerId),
+      [qc],
+    ),
+    fetchStaffById: useCallback(
+      (id: string) => fetchVoucherStaffById(qc, id),
+      [qc],
+    ),
+  };
 }

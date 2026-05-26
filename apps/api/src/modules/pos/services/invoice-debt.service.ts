@@ -9,7 +9,10 @@ import { Repository, DataSource, EntityManager } from 'typeorm';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { CashService } from '../../accounting/cash/cash.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
+import { AccountingDefaultAccountRole } from '../../accounting/payment-accounts/enums';
 import { OutboxService } from '../../events/outbox/outbox.service';
 import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
 import { InvoiceEntity } from '../entities/invoice.entity';
@@ -29,9 +32,6 @@ export interface CollectPaymentDto {
   cashAccountId?: string;
 }
 
-/** TK 131 "Phải thu khách hàng" — contra when collecting a debt in cash. */
-const RECEIVABLE_ACCOUNT_CODE = '131';
-
 @Injectable()
 export class InvoiceDebtService {
   private readonly logger = new Logger(InvoiceDebtService.name);
@@ -43,7 +43,9 @@ export class InvoiceDebtService {
     private readonly paymentRepo: Repository<DebtPaymentEntity>,
     private readonly dataSource: DataSource,
     private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly outboxService: OutboxService,
+    private readonly accountResolver: AccountResolverService,
   ) {}
 
   async createFromInvoice(
@@ -167,20 +169,21 @@ export class InvoiceDebtService {
       // and creates the JE — atomic with the payment. Then enqueue the voucher
       // event so the Phiếu thu document is created async.
       if (dto.paymentMethod === DebtPaymentMethod.CASH) {
-        if (!dto.cashAccountId) {
-          throw new BadRequestException(
-            'paymentMethod=cash requires cashAccountId',
-          );
-        }
-        const receivableAccountId = await this.resolveAccountId(
-          manager,
+        const cashAccountId = await this.cashFundResolver.resolveOrDefault(
           actor.organizationId,
-          RECEIVABLE_ACCOUNT_CODE,
+          debt.branchId,
+          dto.cashAccountId,
+          manager,
         );
+        const receivableAccountId =
+          await this.accountResolver.resolveDefaultAccount(
+            AccountingDefaultAccountRole.RECEIVABLE,
+            actor,
+          );
         const { movement, journalEntryId } =
           await this.cashService.recordMovement(
             {
-              cashAccountId: dto.cashAccountId,
+              cashAccountId,
               type: CashMovementType.DEPOSIT,
               amount: dto.amount,
               contraAccountId: receivableAccountId,
@@ -201,7 +204,7 @@ export class InvoiceDebtService {
             sourceId: paymentEntity.id,
             sourceDocumentNumber: debt.referenceCode,
             amount: dto.amount,
-            cashAccountId: dto.cashAccountId,
+            cashAccountId,
             contraAccountId: receivableAccountId,
             cashMovementId: movement.id,
             journalEntryId,
@@ -222,24 +225,6 @@ export class InvoiceDebtService {
 
       return updatedDebt;
     });
-  }
-
-  /** Resolve an account id by code within an org. */
-  private async resolveAccountId(
-    manager: EntityManager,
-    organizationId: string,
-    code: string,
-  ): Promise<string> {
-    const rows = await manager.query(
-      `SELECT "id" FROM "accounts" WHERE "organization_id" = $1 AND "code" = $2 AND "is_active" = true LIMIT 1`,
-      [organizationId, code],
-    );
-    if (!rows || rows.length === 0) {
-      throw new BadRequestException(
-        `Account ${code} is not configured in the chart of accounts`,
-      );
-    }
-    return rows[0].id;
   }
 
   async getPaymentHistory(

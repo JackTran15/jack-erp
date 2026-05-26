@@ -12,8 +12,10 @@ import {
   type LineColumn,
   type ToolbarItem,
 } from "@erp/ui";
+import { DocumentType } from "@erp/shared-interfaces";
 import { Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
+import { useGenerateDocumentNumber } from "../../../../hooks/document-numbering/useGenerateDocumentNumber";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
 import { Tabs } from "../../../../components/tabs";
@@ -52,16 +54,17 @@ import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
 import type { VoucherEntitySearchTarget } from "../_shared/voucher-entity-search.store";
 import { VoucherPartnerFields } from "../_shared/VoucherPartnerFields";
 import { VoucherStaffFields } from "../_shared/VoucherStaffFields";
-import type { VoucherMergedPartnerOption } from "../_shared/voucher-partner-search";
+import type { VoucherPartnerOption } from "../_shared/voucher-partner-search";
 import {
-  VOUCHER_PARTNER_KIND_LABEL,
-  VoucherPartnerKindUi,
-  inferPartnerKindFromBe,
+  PARTNER_LOOKUP_LABEL,
+  PartnerLookupType,
+  inferLookupType,
 } from "../_shared/voucher-partner.constants";
+import { usePartnerLookup } from "../_shared/voucher-partner-search";
 import {
-  fetchVoucherPartnerByBeType,
-  fetchVoucherStaffById,
-} from "../_shared/voucher-partner-search";
+  useCustomerOpenDebts,
+  mapInvoiceDebtsToPickRows,
+} from "./debt-collection.api";
 
 const LABELS = {
   purpose: "Mục đích thu",
@@ -100,12 +103,15 @@ export function ReceiptVoucherDialog({
   onOpenInvoice,
 }: Props) {
   const readOnly = mode === TreasuryVoucherDialogModeEnum.VIEW;
+  const { mutateAsync: generateDocNumber } = useGenerateDocumentNumber();
+  const { fetchPartnerByType, fetchStaffById } = usePartnerLookup();
+  const fetchDebts = useCustomerOpenDebts();
 
   const [purpose, setPurpose] = useState<LedgerCashVoucherPurposeEnum>(
     LedgerCashVoucherPurposeEnum.OTHER,
   );
-  const [partnerKind, setPartnerKind] = useState<VoucherPartnerKindUi>(
-    VoucherPartnerKindUi.SUPPLIER,
+  const [partnerKind, setPartnerKind] = useState<PartnerLookupType>(
+    PartnerLookupType.SUPPLIER,
   );
   const [partnerId, setPartnerId] = useState("");
   const [counterpartyCode, setCounterpartyCode] = useState("");
@@ -136,15 +142,9 @@ export function ReceiptVoucherDialog({
     CashVoucherCategoryDirection.IN,
   );
 
-  const debtCollectionCategoryName = useMemo(() => {
-    const cat =
-      receiptCategories.find((c) => c.code === "THU_BAN_HANG") ??
-      receiptCategories.find((c) => c.code === "THU_NO_KH");
-    return cat?.name ?? "Thu bán hàng";
-  }, [receiptCategories]);
-
   const isDebtCollection =
     purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
+  const debtFieldsLocked = isDebtCollection && !readOnly;
 
   const resetKey = `receipt-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
 
@@ -152,7 +152,7 @@ export function ReceiptVoucherDialog({
     if (!open) return;
     if (mode === TreasuryVoucherDialogModeEnum.CREATE) {
       setPurpose(LedgerCashVoucherPurposeEnum.OTHER);
-      setPartnerKind(VoucherPartnerKindUi.SUPPLIER);
+      setPartnerKind(PartnerLookupType.SUPPLIER);
       setPartnerId("");
       setCounterpartyCode("");
       setCounterpartyName("");
@@ -174,8 +174,7 @@ export function ReceiptVoucherDialog({
     if (initial) {
       setPurpose(initial.purpose);
       setPartnerKind(
-        initial.partnerKind ??
-          inferPartnerKindFromBe(initial.partnerType, initial.counterpartyCode),
+        initial.partnerKind ?? inferLookupType(initial.partnerType),
       );
       setPartnerId(initial.partnerId ?? "");
       setCounterpartyCode(initial.counterpartyCode);
@@ -195,6 +194,7 @@ export function ReceiptVoucherDialog({
               description: l.description,
               amount: l.amount,
               category: l.category,
+              categoryId: l.categoryId,
             }))
           : [emptyFormLine()],
       );
@@ -204,35 +204,58 @@ export function ReceiptVoucherDialog({
   }, [resetKey, open, mode, initial]);
 
   useEffect(() => {
+    if (!open || mode !== TreasuryVoucherDialogModeEnum.CREATE) return;
+    let cancelled = false;
+    void generateDocNumber({ documentType: DocumentType.CASH_RECEIPT })
+      .then((no) => {
+        if (!cancelled) setVoucherNo(no);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Không sinh được số phiếu thu. Vui lòng thử lại.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, generateDocNumber]);
+
+  useEffect(() => {
     if (!open) setEntitySearchTarget(null);
   }, [open]);
 
-  const applyPartnerFromSearch = useCallback(
-    (item: VoucherMergedPartnerOption) => {
-      setPartnerKind(item.kind);
-      setPartnerId(item.id);
-      setCounterpartyCode(item.code);
-      setCounterpartyName(item.name);
-      setCounterpartyPhone(item.phone ?? "");
-      if (item.address) setAddress(item.address);
-      setPersonName((prev) => prev.trim() || item.name);
-    },
-    [],
-  );
+  const applyPartnerFromSearch = useCallback((item: VoucherPartnerOption) => {
+    setPartnerKind(item.kind);
+    setPartnerId(item.id);
+    setCounterpartyCode(item.code);
+    setCounterpartyName(item.name);
+    setCounterpartyPhone(item.phone ?? "");
+    if (item.address) setAddress(item.address);
+    setPersonName((prev) => prev.trim() || item.name);
+  }, []);
 
-  const applyStaffFromSearch = useCallback(
-    (item: VoucherMergedPartnerOption) => {
-      setStaffId(item.id);
-      setEmployeeCode(item.code);
-      setEmployeeName(item.name);
-    },
-    [],
-  );
+  const applyStaffFromSearch = useCallback((item: VoucherPartnerOption) => {
+    setStaffId(item.id);
+    setEmployeeCode(item.code);
+    setEmployeeName(item.name);
+  }, []);
 
   const handlePurposeChange = useCallback(
     (next: LedgerCashVoucherPurposeEnum) => {
       setPurpose(next);
-      if (next !== LedgerCashVoucherPurposeEnum.DEBT_COLLECTION) {
+      if (next === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION) {
+        setPartnerKind(PartnerLookupType.CUSTOMER);
+        setPartnerId("");
+        setCounterpartyCode("");
+        setCounterpartyName("");
+        setCounterpartyPhone("");
+        setPersonName("");
+        setAddress("");
+        setReason("");
+        setLines([emptyFormLine()]);
+        setDocumentLines([]);
+        setDetailTab(ReceiptVoucherDetailTabEnum.DOCUMENTS);
+      } else {
         setDocumentLines([]);
         setDetailTab(ReceiptVoucherDetailTabEnum.LINES);
       }
@@ -240,7 +263,7 @@ export function ReceiptVoucherDialog({
     [],
   );
 
-  const debtPickInitialPartner = useMemo((): VoucherMergedPartnerOption | null => {
+  const debtPickInitialPartner = useMemo((): VoucherPartnerOption | null => {
     if (!partnerId || !counterpartyCode) return null;
     return {
       lookupKey: `${partnerKind}:${partnerId}`,
@@ -249,7 +272,7 @@ export function ReceiptVoucherDialog({
       name: counterpartyName,
       phone: counterpartyPhone || undefined,
       kind: partnerKind,
-      kindLabel: VOUCHER_PARTNER_KIND_LABEL[partnerKind],
+      kindLabel: PARTNER_LOOKUP_LABEL[partnerKind],
     };
   }, [
     partnerId,
@@ -270,12 +293,12 @@ export function ReceiptVoucherDialog({
         {
           description: reasonText,
           amount: totalCollect,
-          category: debtCollectionCategoryName,
+          category: "",
         },
       ]);
       setDetailTab(ReceiptVoucherDetailTabEnum.DOCUMENTS);
     },
-    [applyPartnerFromSearch, debtCollectionCategoryName],
+    [applyPartnerFromSearch],
   );
 
   useEffect(() => {
@@ -285,7 +308,7 @@ export function ReceiptVoucherDialog({
     let cancelled = false;
     void (async () => {
       if (initial.partnerId && initial.partnerType) {
-        const partner = await fetchVoucherPartnerByBeType(
+        const partner = await fetchPartnerByType(
           initial.partnerType,
           initial.partnerId,
         );
@@ -298,7 +321,7 @@ export function ReceiptVoucherDialog({
         }
       }
       if (initial.staffId) {
-        const staff = await fetchVoucherStaffById(initial.staffId);
+        const staff = await fetchStaffById(initial.staffId);
         if (!cancelled && staff) {
           setEmployeeCode(staff.code);
           setEmployeeName(staff.name);
@@ -308,49 +331,59 @@ export function ReceiptVoucherDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, mode, initial?.partnerId, initial?.partnerType, initial?.staffId]);
+  }, [
+    open,
+    mode,
+    initial?.partnerId,
+    initial?.partnerType,
+    initial?.staffId,
+    fetchPartnerByType,
+    fetchStaffById,
+  ]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      mode === TreasuryVoucherDialogModeEnum.CREATE ||
+      !initial ||
+      initial.purpose !== LedgerCashVoucherPurposeEnum.DEBT_COLLECTION ||
+      !initial.partnerId ||
+      (initial.documentLines && initial.documentLines.length > 0)
+    ) {
+      return;
+    }
+    const partnerKindResolved =
+      initial.partnerKind ?? inferLookupType(initial.partnerType);
+    if (partnerKindResolved !== PartnerLookupType.CUSTOMER) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const debts = await fetchDebts(initial.partnerId!);
+        if (!cancelled && debts.length > 0) {
+          setDocumentLines(mapInvoiceDebtsToPickRows(debts));
+        }
+      } catch {
+        // G3: best-effort — silent on failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, initial, fetchDebts]);
 
   const lineTotal = useMemo(() => voucherLineTotal(lines), [lines]);
 
-  const linkedInvoiceCode = useMemo(
-    () =>
-      initial
-        ? resolveInvoiceCodeFromVoucher({
-            ...initial,
-            reference,
-            documentLines,
-          })
-        : resolveInvoiceCodeFromVoucher({
-            kind: LedgerCashVoucherKindEnum.RECEIPT,
-            purpose,
-            voucherNo,
-            voucherDate: new Date(voucherDate),
-            counterpartyCode,
-            counterpartyName,
-            reason,
-            employeeCode,
-            employeeName,
-            reference: reference || undefined,
-            lines: [],
-            documentLines,
-          }),
-    [
-      initial,
-      reference,
-      documentLines,
-      purpose,
-      voucherNo,
-      voucherDate,
-      counterpartyCode,
-      counterpartyName,
-      reason,
-      employeeCode,
-      employeeName,
-    ],
-  );
+  const linkedInvoiceCodes = useMemo(() => {
+    const codes = (documentLines ?? [])
+      .map((d) => d.documentNo?.trim())
+      .filter((c): c is string => !!c);
+    if (codes.length > 0) return codes;
+    if (reference?.trim()) return [reference.trim()];
+    return [];
+  }, [documentLines, reference]);
 
-  const showDetailTabs =
-    isDebtCollection || (documentLines?.length ?? 0) > 0;
+  const showDetailTabs = isDebtCollection || (documentLines?.length ?? 0) > 0;
 
   const detailForColumns = useMemo(
     (): LedgerCashVoucherDetail => ({
@@ -367,6 +400,7 @@ export function ReceiptVoucherDialog({
         description: l.description,
         amount: Number(l.amount) || 0,
         category: l.category,
+        categoryId: l.categoryId,
       })),
       documentLines,
     }),
@@ -426,20 +460,32 @@ export function ReceiptVoucherDialog({
       {
         key: "category",
         label: LABELS.category,
-        width: 160,
+        width: 200,
         type: readOnly ? "readonly" : undefined,
-        getValue: (r) => r.category,
+        getValue: (r) =>
+          r.categoryId
+            ? (receiptCategories.find((c) => c.id === r.categoryId)?.name ??
+              r.category)
+            : r.category,
         renderEditor: readOnly
           ? undefined
           : (row, _idx, onChange) => (
-              <Input
-                value={row.category}
+              <select
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                value={row.categoryId ?? ""}
                 onChange={(e) => onChange(e.target.value)}
-              />
+              >
+                <option value="">-- Chọn --</option>
+                {receiptCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             ),
       },
     ],
-    [readOnly],
+    [readOnly, receiptCategories],
   );
 
   const lineColumnsWithFooterEdit = useMemo(
@@ -467,6 +513,14 @@ export function ReceiptVoucherDialog({
 
   const handleSave = useCallback(() => {
     if (!onSave) return;
+    if (!voucherNo.trim()) {
+      toast.error("Số phiếu thu là bắt buộc.");
+      return;
+    }
+    if (!voucherDate) {
+      toast.error("Ngày thu là bắt buộc.");
+      return;
+    }
     const validLines = lines.filter(
       (l) => l.description.trim() || Number(l.amount) > 0,
     );
@@ -607,7 +661,7 @@ export function ReceiptVoucherDialog({
           <>
             <VoucherPartnerFields
               label={LABELS.counterparty}
-              readOnly={readOnly}
+              readOnly={readOnly || isDebtCollection}
               partnerKind={partnerKind}
               partnerId={partnerId}
               partnerCode={counterpartyCode}
@@ -644,14 +698,18 @@ export function ReceiptVoucherDialog({
               <Input
                 value={personName}
                 onChange={(e) => setPersonName(e.target.value)}
-                {...inputProps}
+                readOnly={readOnly || debtFieldsLocked}
+                disabled={readOnly || debtFieldsLocked}
+                className={fieldClass(readOnly || debtFieldsLocked)}
               />
             </FormField>
             <FormField label="Địa chỉ" layout="horizontal" labelWidth="8rem">
               <Input
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                {...inputProps}
+                readOnly={readOnly || debtFieldsLocked}
+                disabled={readOnly || debtFieldsLocked}
+                className={fieldClass(readOnly || debtFieldsLocked)}
               />
             </FormField>
             <FormField
@@ -662,7 +720,9 @@ export function ReceiptVoucherDialog({
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                {...inputProps}
+                readOnly={readOnly || debtFieldsLocked}
+                disabled={readOnly || debtFieldsLocked}
+                className={fieldClass(readOnly || debtFieldsLocked)}
               />
             </FormField>
             <VoucherStaffFields
@@ -688,20 +748,32 @@ export function ReceiptVoucherDialog({
               }}
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
             />
-            <FormField label="Tham chiếu" layout="horizontal" labelWidth="8rem">
-              <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                {...inputProps}
-              />
-            </FormField>
-            {linkedInvoiceCode ? (
+            {reference ? (
+              <FormField
+                label="Tham chiếu"
+                layout="horizontal"
+                labelWidth="8rem"
+              >
+                <span className="flex h-9 items-center text-sm">
+                  {reference}
+                </span>
+              </FormField>
+            ) : null}
+            {linkedInvoiceCodes.length > 0 ? (
               <FormField label="Chứng từ" layout="horizontal" labelWidth="8rem">
-                <VoucherLink
-                  code={linkedInvoiceCode}
-                  clickable={!!onOpenInvoice}
-                  onClick={() => onOpenInvoice?.(linkedInvoiceCode)}
-                />
+                <div className="flex flex-wrap items-center gap-1.5 line-clamp-1 text-sm text-indigo-500">
+                  {linkedInvoiceCodes.map((code, index) => (
+                    <>
+                      <VoucherLink
+                        key={code}
+                        code={code}
+                        clickable={!!onOpenInvoice}
+                        onClick={() => onOpenInvoice?.(code)}
+                      />
+                      {index < linkedInvoiceCodes.length - 1 ? "," : ""}
+                    </>
+                  ))}
+                </div>
               </FormField>
             ) : null}
             <FormField
@@ -725,6 +797,7 @@ export function ReceiptVoucherDialog({
             />
             <FormField
               label={LABELS.voucherDate}
+              required
               layout="horizontal"
               labelWidth="7.5rem"
             >
@@ -793,9 +866,20 @@ export function ReceiptVoucherDialog({
                     ? undefined
                     : (idx, key, value) => {
                         setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx ? { ...l, [key]: value } : l,
-                          ),
+                          prev.map((l, i) => {
+                            if (i !== idx) return l;
+                            if (key === "category") {
+                              const cat = receiptCategories.find(
+                                (c) => c.id === value,
+                              );
+                              return {
+                                ...l,
+                                categoryId: (value as string) || undefined,
+                                category: cat?.name ?? "",
+                              };
+                            }
+                            return { ...l, [key]: value };
+                          }),
                         );
                       }
                 }

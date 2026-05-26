@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppModal,
   Button,
@@ -26,45 +26,45 @@ import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cas
 import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
 import {
   mergePartnerSearchWithSelection,
-  type VoucherMergedPartnerOption,
+  type VoucherPartnerOption,
 } from "../_shared/voucher-partner-search";
-import { VoucherPartnerKindUi } from "../_shared/voucher-partner.constants";
+import { PartnerLookupType } from "../_shared/voucher-partner.constants";
 import {
-  fetchCustomerOpenDebts,
+  useCustomerOpenDebts,
   mapInvoiceDebtsToPickRows,
 } from "./debt-collection.api";
-import { searchVoucherDebtCollectionParties } from "./debt-collection-search";
+import { useDebtCollectionSearch } from "./debt-collection-search";
 
 const PARTNER_LOOKUP_COLUMNS = [
   {
     key: "code",
     label: "Mã",
     className: "w-28",
-    render: (item: VoucherMergedPartnerOption) => item.code || "—",
+    render: (item: VoucherPartnerOption) => item.code || "—",
   },
   {
     key: "name",
     label: "Tên",
-    render: (item: VoucherMergedPartnerOption) => item.name,
+    render: (item: VoucherPartnerOption) => item.name,
   },
   {
     key: "kind",
     label: "Loại",
     className: "w-36",
-    render: (item: VoucherMergedPartnerOption) => item.kindLabel,
+    render: (item: VoucherPartnerOption) => item.kindLabel,
   },
   {
     key: "phone",
     label: "Điện thoại",
     className: "w-32",
-    render: (item: VoucherMergedPartnerOption) => item.phone ?? "—",
+    render: (item: VoucherPartnerOption) => item.phone ?? "—",
   },
 ];
 
 type PickRow = LedgerCashVoucherDocumentLine & { selected: boolean };
 
 export interface DebtCollectionPickResult {
-  partner: VoucherMergedPartnerOption;
+  partner: VoucherPartnerOption;
   collectionDate: string;
   documentLines: LedgerCashVoucherDocumentLine[];
   totalCollect: number;
@@ -74,7 +74,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCollectionDate: string;
-  initialPartner?: VoucherMergedPartnerOption | null;
+  initialPartner?: VoucherPartnerOption | null;
   onConfirm: (result: DebtCollectionPickResult) => void;
 }
 
@@ -96,9 +96,9 @@ export function DebtCollectionPickDialog({
   initialPartner,
   onConfirm,
 }: Props) {
-  const [partner, setPartner] = useState<VoucherMergedPartnerOption | null>(
-    null,
-  );
+  const searchDebtParties = useDebtCollectionSearch();
+  const fetchDebts = useCustomerOpenDebts();
+  const [partner, setPartner] = useState<VoucherPartnerOption | null>(null);
   const [partnerCode, setPartnerCode] = useState("");
   const [collectionDate, setCollectionDate] = useState(defaultCollectionDate);
   const [rows, setRows] = useState<PickRow[]>([]);
@@ -113,22 +113,30 @@ export function DebtCollectionPickDialog({
     setRows([]);
   }, [open, defaultCollectionDate, initialPartner]);
 
+  const prevPartnerId = useRef(partner?.id);
+  useEffect(() => {
+    if (partner?.id !== prevPartnerId.current) {
+      prevPartnerId.current = partner?.id;
+      setRows([]);
+    }
+  }, [partner?.id]);
+
   const selectedPartner = partner;
 
   const searchParties = useCallback(
     async (query: string, page: number, pageSize?: number) => {
-      const raw = await searchVoucherDebtCollectionParties(
+      const raw = await searchDebtParties(
         query,
         page,
-        pageSize ?? 8,
+        pageSize,
       );
       return mergePartnerSearchWithSelection(
-        raw as LookupSearchResult<VoucherMergedPartnerOption>,
+        raw as LookupSearchResult<VoucherPartnerOption>,
         selectedPartner,
         page,
       );
     },
-    [selectedPartner],
+    [selectedPartner, searchDebtParties],
   );
 
   const totalCollect = useMemo(() => sumCollect(rows), [rows]);
@@ -138,16 +146,14 @@ export function DebtCollectionPickDialog({
       toast.error("Vui lòng chọn đối tượng thu nợ.");
       return;
     }
-    if (partner.kind !== VoucherPartnerKindUi.CUSTOMER) {
-      toast.message(
-        "Đối tác giao hàng chưa có API công nợ mở — hiện chỉ tải được hóa đơn nợ của khách hàng.",
-      );
+    if (partner.kind !== PartnerLookupType.CUSTOMER) {
+      toast.message("Hiện chỉ hỗ trợ tải hóa đơn nợ của khách hàng.");
       setRows([]);
       return;
     }
     setLoading(true);
     try {
-      const debts = await fetchCustomerOpenDebts(partner.id);
+      const debts = await fetchDebts(partner.id);
       const mapped = mapInvoiceDebtsToPickRows(debts);
       setRows(
         mapped.map((line) => ({
@@ -167,7 +173,7 @@ export function DebtCollectionPickDialog({
     } finally {
       setLoading(false);
     }
-  }, [partner]);
+  }, [partner, fetchDebts]);
 
   const updateRow = useCallback(
     (documentNo: string, patch: Partial<PickRow>) => {
@@ -388,7 +394,7 @@ export function DebtCollectionPickDialog({
             itemKey={(item) => item.lookupKey}
             renderItem={(item) => item.name}
             columns={PARTNER_LOOKUP_COLUMNS}
-            placeholder="Chọn khách hàng hoặc đối tác giao hàng"
+            placeholder="Chọn khách hàng"
             portalToBody
             dropdownMinWidth={520}
             onSearchButtonClick={() => setPartnerSearchOpen(true)}

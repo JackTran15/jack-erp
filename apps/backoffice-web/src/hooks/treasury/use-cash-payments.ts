@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "../../lib/api-axios";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
 import type {
   CashPayment,
   CashPaymentListQuery,
   CreateCashPaymentBody,
+  CreateSupplierDebtPaymentBody,
+  SupplierDebtPaymentResult,
   PaginatedList,
 } from "../../pages/treasury/cash-vouchers.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
@@ -94,5 +97,20 @@ export function useCashPaymentMutations() {
     onSuccess: invalidate,
   });
 
-  return { create, update, remove, post, reverse };
+  const supplierDebtPayment = useMutation({
+    mutationFn: async (body: CreateSupplierDebtPaymentBody) => {
+      const { data } = await apiClient.post<SupplierDebtPaymentResult>(
+        "/cash-payments/supplier-debt-payment",
+        body,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: ["voucher-partners", "supplier-debts"] });
+      void qc.invalidateQueries({ queryKey: ["voucher-partners", "supplier-debt-parties"] });
+    },
+  });
+
+  return { create, update, remove, post, reverse, supplierDebtPayment };
 }

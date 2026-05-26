@@ -25,6 +25,7 @@ import { CreateCashReceiptDto } from './dto/create-cash-receipt.dto';
 import { UpdateCashReceiptDto } from './dto/update-cash-receipt.dto';
 import { CashReceiptLineDto } from './dto/cash-receipt-line.dto';
 import { QueryCashReceiptDto, CashReceiptSource } from './dto/query-cash-receipt.dto';
+import { DebtCollectionSagaService } from '../debt-collection/debt-collection-saga.service';
 
 /** Internal args for movement+JE+voucher atomic creation (POS / cash-count variance). */
 export interface CashReceiptCreateAndPostArgs {
@@ -84,6 +85,7 @@ export class CashReceiptsService {
     private readonly cashService: CashService,
     private readonly docNumbering: DocumentNumberingService,
     private readonly partnerResolver: PartnerResolverService,
+    private readonly debtCollectionSaga: DebtCollectionSagaService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -110,6 +112,7 @@ export class CashReceiptsService {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
         createdBy: actor.userId,
+        documentNumber: dto.documentNumber ?? undefined,
         voucherDate: dto.voucherDate,
         status: CashVoucherStatus.DRAFT,
         purpose: dto.purpose ?? CashReceiptPurpose.OTHER,
@@ -373,6 +376,12 @@ export class CashReceiptsService {
       original.reversedByVoucherId = savedReversal.id;
       await manager.save(original);
 
+      // Compensating action for debt-collection receipts: reopen the settled
+      // invoice debts so the customer's balance is restored.
+      if (original.referenceType === CashReceiptReferenceType.INVOICE_DEBT) {
+        await this.debtCollectionSaga.compensate(original.id, manager);
+      }
+
       this.logger.log(
         `Reversed cash receipt ${original.documentNumber} → ${documentNumber}`,
       );
@@ -582,6 +591,9 @@ export class CashReceiptsService {
       qb.andWhere('r.cashAccountId = :cashAccountId', {
         cashAccountId: query.cashAccountId,
       });
+    else if (actor.branchId)
+      // One cash fund per branch: default to branch-scoped vouchers.
+      qb.andWhere('r.branchId = :branchId', { branchId: actor.branchId });
     if (query.partnerId)
       qb.andWhere('r.partnerId = :partnerId', { partnerId: query.partnerId });
     if (query.dateFrom)

@@ -23,7 +23,11 @@ const TOPIC_SPECS: TopicSpec[] = [
   { topic: ERP_TOPICS.CASH_VOUCHER_NEEDED_EXPENSE, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CASH_VOUCHER_CREATED, numPartitions: 3, replicationFactor: 1 },
   { topic: ERP_TOPICS.CUSTOMER_MERGED, numPartitions: 1, replicationFactor: 1 },
-  { topic: ERP_TOPICS.TEMP_WAREHOUSE_TRANSFER_REQUESTED, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.RETURN_POSTED, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.STOCK_RETURN_IN, numPartitions: 6, replicationFactor: 1 },
+  { topic: ERP_TOPICS.LOYALTY_POINTS_REVERSE, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.CASH_REFUND, numPartitions: 3, replicationFactor: 1 },
+  { topic: ERP_TOPICS.JOURNAL_POST_RETURN, numPartitions: 3, replicationFactor: 1 },
 ];
 
 @Injectable()

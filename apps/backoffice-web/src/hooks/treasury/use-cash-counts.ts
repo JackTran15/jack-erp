@@ -7,6 +7,7 @@ import type {
   CreateCashCountBody,
   PaginatedList,
 } from "../../pages/treasury/cash-vouchers.types";
+import type { CashCountParticipant } from "../../pages/treasury/cash/cash-count/cash-count.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
 
 export function useCashCountsList(query: CashCountListQuery, enabled = true) {
@@ -86,13 +87,11 @@ const PARTICIPANTS_KEY = "erp.cash-count.participants";
 
 export function loadCashCountParticipants(
   countId: string,
-): import("../../pages/treasury/cash/cash-count/cash-count.types").CashCountParticipant[] {
+): CashCountParticipant[] {
   try {
     const raw = localStorage.getItem(`${PARTICIPANTS_KEY}:${countId}`);
     if (!raw) return [];
-    return JSON.parse(
-      raw,
-    ) as import("../../pages/treasury/cash/cash-count/cash-count.types").CashCountParticipant[];
+    return JSON.parse(raw) as CashCountParticipant[];
   } catch {
     return [];
   }
@@ -100,7 +99,7 @@ export function loadCashCountParticipants(
 
 export function saveCashCountParticipants(
   countId: string,
-  participants: import("../../pages/treasury/cash/cash-count/cash-count.types").CashCountParticipant[],
+  participants: CashCountParticipant[],
 ): void {
   localStorage.setItem(
     `${PARTICIPANTS_KEY}:${countId}`,

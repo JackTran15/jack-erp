@@ -11,6 +11,8 @@ import { PartnerLookupService } from './partner-lookup.service';
 import { QueryPartnerLookupDto } from './dto/query-partner-lookup.dto';
 import { QueryCustomerDebtsDto } from './dto/query-customer-debts.dto';
 import { QueryCustomersWithDebtDto } from './dto/query-customers-with-debt.dto';
+import { QuerySupplierDebtsDto } from './dto/query-supplier-debts.dto';
+import { QuerySuppliersWithDebtDto } from './dto/query-suppliers-with-debt.dto';
 
 /**
  * Read-only helpers for the cash-voucher form: pick a party (đối tượng) and list
@@ -45,5 +47,23 @@ export class PartnerLookupController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.customersWithDebt(query, actor);
+  }
+
+  @Get('supplier-debts')
+  @RequirePermission('accounting.cash_voucher_partner.read')
+  supplierDebts(
+    @Query() query: QuerySupplierDebtsDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.supplierDebts(query, actor);
+  }
+
+  @Get('suppliers-with-debt')
+  @RequirePermission('accounting.cash_voucher_partner.read')
+  suppliersWithDebt(
+    @Query() query: QuerySuppliersWithDebtDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.suppliersWithDebt(query, actor);
   }
 }

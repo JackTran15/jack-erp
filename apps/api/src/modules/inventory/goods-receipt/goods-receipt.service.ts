@@ -27,6 +27,7 @@ import {
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { EventPublisher } from '../../events/event-publisher.service';
 import { CashService } from '../../accounting/cash/cash.service';
+import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
 import { JournalService } from '../../accounting/journal/journal.service';
 import { OutboxService } from '../../events/outbox/outbox.service';
@@ -36,6 +37,11 @@ import {
   GoodsReceiptPaymentMethod,
 } from './goods-receipt.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
+import {
+  SupplierDebtEntity,
+  SupplierDebtDocumentType,
+  SupplierDebtStatus,
+} from '../supplier-debt/supplier-debt.entity';
 import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 
@@ -60,6 +66,7 @@ export class GoodsReceiptService {
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly eventPublisher: EventPublisher,
     private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
     private readonly journalService: JournalService,
     private readonly outboxService: OutboxService,
   ) {}
@@ -173,7 +180,7 @@ export class GoodsReceiptService {
           'Không xác định được chi nhánh để đảo bút tồn kho',
         );
       }
-      await this.dataSource.transaction(async () => {
+      await this.dataSource.transaction(async (manager) => {
         const reversals: RecordMovementParams[] = receipt.lines.map((line) => ({
           itemId: line.itemId,
           locationId: line.locationId,
@@ -187,6 +194,27 @@ export class GoodsReceiptService {
           actorContext: actor,
         }));
         await this.stockLedger.recordBatchMovements(reversals);
+
+        // Void the supplier-debt ledger row (nợ NCC) for a CREDIT receipt.
+        // Refuse if it has already received any payment (partially settled).
+        if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
+          const debtRows = await manager.query(
+            `SELECT id FROM supplier_debts WHERE goods_receipt_id = $1 AND organization_id = $2`,
+            [receipt.id, receipt.organizationId],
+          );
+          if (debtRows.length > 0) {
+            const paid = await manager.query(
+              `SELECT 1 FROM supplier_debt_payments WHERE debt_id = $1 LIMIT 1`,
+              [debtRows[0].id],
+            );
+            if (paid.length > 0) {
+              throw new ConflictException(
+                'Không thể huỷ phiếu nhập: công nợ NCC đã có thanh toán',
+              );
+            }
+            await manager.delete(SupplierDebtEntity, debtRows[0].id);
+          }
+        }
       });
     }
 
@@ -235,20 +263,24 @@ export class GoodsReceiptService {
       0,
     );
     const isCash = receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH;
-    if (isCash && !receipt.cashAccountId) {
-      throw new BadRequestException(
-        'paymentMethod=CASH yêu cầu cashAccountId',
-      );
-    }
 
     await this.dataSource.transaction(async (manager) => {
       let journalEntryId: string | undefined;
       let cashMovementId: string | undefined;
       let cashContraAccountId: string | undefined;
+      let resolvedCashAccountId: string | undefined;
 
       if (isCash) {
-        // CASH: DR inventory (TK 156) / CR cash via recordMovement — atomic with
-        // the stock posting; insufficient balance throws 400 and rolls back.
+        // One cash fund per branch: default to the branch fund (or validate an
+        // explicitly supplied fund). DR inventory (TK 156) / CR cash via
+        // recordMovement — atomic with the stock posting; insufficient balance
+        // throws 400 and rolls back.
+        resolvedCashAccountId = await this.cashFundResolver.resolveOrDefault(
+          receipt.organizationId,
+          branchId,
+          receipt.cashAccountId,
+          manager,
+        );
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
@@ -257,7 +289,7 @@ export class GoodsReceiptService {
         cashContraAccountId = inventoryAccountId;
         const res = await this.cashService.recordMovement(
           {
-            cashAccountId: receipt.cashAccountId!,
+            cashAccountId: resolvedCashAccountId,
             type: CashMovementType.WITHDRAWAL,
             amount: total,
             contraAccountId: inventoryAccountId,
@@ -271,6 +303,11 @@ export class GoodsReceiptService {
         cashMovementId = res.movement.id;
       } else if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
         // CREDIT: DR inventory (156) / CR payable (331), no cash movement.
+        if (!receipt.providerId) {
+          throw new BadRequestException(
+            'Phiếu nhập kho công nợ phải có nhà cung cấp',
+          );
+        }
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
@@ -307,6 +344,27 @@ export class GoodsReceiptService {
           manager,
         );
         journalEntryId = entry.id;
+
+        // Track the amount owed to the supplier (nợ NCC). One ledger row per
+        // receipt (unique goods_receipt_id makes a re-post idempotent).
+        await manager.save(
+          manager.create(SupplierDebtEntity, {
+            organizationId: receipt.organizationId,
+            branchId,
+            createdBy: actor.userId,
+            referenceCode: documentNumber,
+            goodsReceiptId: receipt.id,
+            supplierId: receipt.providerId,
+            documentType: SupplierDebtDocumentType.GOODS_RECEIPT,
+            originalAmount: total,
+            paidAmount: 0,
+            remainingAmount: total,
+            issuedAt: new Date(receipt.receivedAt ?? Date.now())
+              .toISOString()
+              .slice(0, 10),
+            status: SupplierDebtStatus.OPEN,
+          }),
+        );
       }
 
       await manager.update(GoodsReceiptEntity, receipt.id, {
@@ -340,7 +398,7 @@ export class GoodsReceiptService {
             sourceId: receipt.id,
             sourceDocumentNumber: documentNumber,
             amount: total,
-            cashAccountId: receipt.cashAccountId!,
+            cashAccountId: resolvedCashAccountId!,
             contraAccountId: cashContraAccountId!,
             cashMovementId,
             journalEntryId,

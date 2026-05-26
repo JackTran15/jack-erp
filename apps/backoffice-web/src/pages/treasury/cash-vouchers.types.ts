@@ -151,6 +151,7 @@ export interface PaginatedList<T> {
 export interface CashCountDenomination {
   denom: number;
   count: number;
+  description?: string;
 }
 
 export interface CashCount extends BaseRecord {
@@ -161,6 +162,7 @@ export interface CashCount extends BaseRecord {
   actualAmount: number;
   variance?: number;
   status: CashCountStatus;
+  purpose?: string;
   notes?: string;
   denominations?: CashCountDenomination[];
   varianceCashMovementId?: string;
@@ -256,6 +258,7 @@ export interface ReceiptPaymentListItem {
 }
 
 export interface CreateCashReceiptBody {
+  documentNumber?: string;
   voucherDate: string;
   purpose?: CashReceiptPurpose;
   partnerType?: CashVoucherPartnerType;
@@ -276,7 +279,38 @@ export interface CreateCashReceiptBody {
   }>;
 }
 
+export interface DebtCollectionAllocation {
+  invoiceDebtId: string;
+  amount: number;
+}
+
+export interface CreateDebtCollectionBody {
+  voucherDate: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payerName?: string;
+  reason?: string;
+  staffId?: string;
+  cashAccountId?: string;
+  allocations: DebtCollectionAllocation[];
+}
+
+export interface DebtCollectionResult {
+  sagaId: string;
+  receiptId: string;
+  documentNumber: string;
+  totalAmount: number;
+  status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+  allocations: Array<{
+    invoiceDebtId: string;
+    amount: number;
+    debtPaymentId?: string;
+    settled: boolean;
+  }>;
+}
+
 export interface CreateCashPaymentBody {
+  documentNumber?: string;
   voucherDate: string;
   purpose?: CashPaymentPurpose;
   partnerType?: CashVoucherPartnerType;
@@ -297,10 +331,42 @@ export interface CreateCashPaymentBody {
   }>;
 }
 
+export interface SupplierDebtPaymentAllocation {
+  supplierDebtId: string;
+  amount: number;
+}
+
+export interface CreateSupplierDebtPaymentBody {
+  voucherDate: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payeeName?: string;
+  reason?: string;
+  staffId?: string;
+  cashAccountId?: string;
+  allocations: SupplierDebtPaymentAllocation[];
+}
+
+export interface SupplierDebtPaymentResult {
+  sagaId: string;
+  paymentId: string;
+  documentNumber: string;
+  totalAmount: number;
+  status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+  allocations: Array<{
+    supplierDebtId: string;
+    amount: number;
+    debtPaymentId?: string;
+    settled: boolean;
+  }>;
+}
+
 export interface CreateCashCountBody {
   cashAccountId: string;
   countedAt: string;
   actualAmount: number;
+  documentNumber?: string;
+  purpose?: string;
   notes?: string;
   denominations?: CashCountDenomination[];
 }
@@ -326,6 +392,7 @@ export interface CashPaymentListQuery {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  source?: "GOODS_RECEIPT" | "EXPENSE" | "MANUAL";
   page?: number;
   pageSize?: number;
 }
@@ -338,7 +405,8 @@ export interface CashCountListQuery {
 }
 
 export interface CashLedgerQuery {
-  cashAccountId: string;
+  /** Optional. When omitted, the backend uses the branch's single cash fund. */
+  cashAccountId?: string;
   dateFrom?: string;
   dateTo?: string;
   branchId?: string;

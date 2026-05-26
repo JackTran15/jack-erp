@@ -73,6 +73,8 @@ export class CashCountsService {
       countedAt: new Date(dto.countedAt),
       actualAmount: dto.actualAmount,
       status: CashCountStatus.DRAFT,
+      documentNumber: dto.documentNumber,
+      purpose: dto.purpose,
       notes: dto.notes,
       denominations: dto.denominations,
     });
@@ -97,6 +99,7 @@ export class CashCountsService {
     Object.assign(count, {
       countedAt: dto.countedAt ? new Date(dto.countedAt) : count.countedAt,
       actualAmount: nextActual,
+      purpose: dto.purpose ?? count.purpose,
       notes: dto.notes ?? count.notes,
       denominations: nextDenoms,
     });
@@ -198,11 +201,12 @@ export class CashCountsService {
         };
       }
 
-      const documentNumber = await this.docNumbering.generate(
-        DocumentType.CASH_COUNT,
-        actor.branchId,
-        actor,
-      );
+      const documentNumber = count.documentNumber
+        || await this.docNumbering.generate(
+          DocumentType.CASH_COUNT,
+          actor.branchId,
+          actor,
+        );
 
       count.expectedAmount = expected;
       count.variance = variance;

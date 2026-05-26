@@ -1,47 +1,90 @@
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { apiClient } from "../../../../lib/api-axios";
 import type { LookupSearchResult } from "../../../../components/forms/LookupField";
+import { treasuryQueryKeys } from "../../../../hooks/treasury/treasury-query-keys";
 import {
-  sortMergedPartners,
-  searchVoucherCustomers,
-  searchVoucherProviders,
-  toMergedCustomer,
-  toMergedProvider,
-  type VoucherMergedPartnerOption,
-} from "../_shared/voucher-partner-search";
-import { VoucherPartnerKindUi } from "../_shared/voucher-partner.constants";
+  PARTNER_LOOKUP_LABEL,
+  PartnerLookupType,
+} from "../_shared/voucher-partner.constants";
+import type { VoucherPartnerOption } from "../_shared/voucher-partner-search";
 
-const MERGE_SOURCE_PAGE_SIZE = 100;
-
-function itemsFromSearchResult<T>(
-  result: LookupSearchResult<T> | T[],
-): T[] {
-  return Array.isArray(result) ? result : (result.items ?? []);
+interface CustomerWithDebtRow {
+  customerId: string;
+  customerName: string;
+  customerCode: string | null;
+  debtCount: number;
+  totalOriginal: number;
+  totalRemaining: number;
+  earliestDueDate: string | null;
+  hasOverdue: boolean;
 }
 
-export async function searchVoucherDebtCollectionParties(
+interface CustomersWithDebtResponse {
+  data: CustomerWithDebtRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+function customerDebtRowToOption(
+  row: CustomerWithDebtRow,
+): VoucherPartnerOption {
+  return {
+    lookupKey: `${PartnerLookupType.CUSTOMER}:${row.customerId}`,
+    id: row.customerId,
+    code: row.customerCode ?? "",
+    name: row.customerName,
+    kind: PartnerLookupType.CUSTOMER,
+    kindLabel: PARTNER_LOOKUP_LABEL[PartnerLookupType.CUSTOMER],
+  };
+}
+
+const STALE_TIME = 30_000;
+
+async function fetchDebtCollectionParties(
   query: string,
   page: number,
-  pageSize = 8,
-): Promise<LookupSearchResult<VoucherMergedPartnerOption>> {
-  const [customerRes, partnerRes] = await Promise.all([
-    searchVoucherCustomers(query, 1, MERGE_SOURCE_PAGE_SIZE),
-    searchVoucherProviders(
-      VoucherPartnerKindUi.PARTNER,
-      query,
-      1,
-      MERGE_SOURCE_PAGE_SIZE,
-    ),
-  ]);
+  pageSize: number,
+): Promise<LookupSearchResult<VoucherPartnerOption>> {
+  const params: Record<string, string | number> = { page, pageSize };
+  const q = query.trim();
+  if (q) params.search = q;
 
-  const merged = sortMergedPartners([
-    ...itemsFromSearchResult(customerRes).map(toMergedCustomer),
-    ...itemsFromSearchResult(partnerRes).map(toMergedProvider),
-  ]);
+  const { data } = await apiClient.get<CustomersWithDebtResponse>(
+    "/cash-vouchers/partners/customers-with-debt",
+    { params },
+  );
 
-  const start = (page - 1) * pageSize;
-  const items = merged.slice(start, start + pageSize);
+  const items = (data?.data ?? []).map(customerDebtRowToOption);
+  const total = data?.total ?? 0;
+  const fetched = (data?.page ?? page) * (data?.pageSize ?? pageSize);
+
   return {
     items,
-    hasMore: start + pageSize < merged.length,
-    total: merged.length,
+    hasMore: fetched < total,
+    total,
   };
+}
+
+export function searchVoucherDebtCollectionParties(
+  qc: QueryClient,
+  query: string,
+  page: number,
+  pageSize = 50,
+): Promise<LookupSearchResult<VoucherPartnerOption>> {
+  return qc.fetchQuery({
+    queryKey: treasuryQueryKeys.debtCollectionParties(query.trim(), page, pageSize),
+    queryFn: () => fetchDebtCollectionParties(query, page, pageSize),
+    staleTime: STALE_TIME,
+  });
+}
+
+export function useDebtCollectionSearch() {
+  const qc = useQueryClient();
+  return useCallback(
+    (query: string, page: number, pageSize = 50) =>
+      searchVoucherDebtCollectionParties(qc, query, page, pageSize),
+    [qc],
+  );
 }

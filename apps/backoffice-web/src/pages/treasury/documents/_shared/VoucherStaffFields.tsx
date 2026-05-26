@@ -3,11 +3,11 @@ import { FormField, Input } from "@erp/ui";
 import { LookupField } from "../../../../components/forms/LookupField";
 import type { LookupSearchResult } from "../../../../components/forms/LookupField";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
-import { VoucherPartnerKindUi } from "./voucher-partner.constants";
+import { PartnerLookupType } from "./voucher-partner.constants";
 import {
   mergePartnerSearchWithSelection,
-  searchVoucherPartnersByKind,
-  type VoucherMergedPartnerOption,
+  usePartnerSearch,
+  type VoucherPartnerOption,
 } from "./voucher-partner-search";
 
 export interface VoucherStaffSelection {
@@ -33,18 +33,18 @@ const STAFF_LOOKUP_COLUMNS = [
     key: "code",
     label: "Mã",
     className: "w-28",
-    render: (item: VoucherMergedPartnerOption) => item.code || "—",
+    render: (item: VoucherPartnerOption) => item.code || "—",
   },
   {
     key: "name",
     label: "Tên",
-    render: (item: VoucherMergedPartnerOption) => item.name,
+    render: (item: VoucherPartnerOption) => item.name,
   },
   {
     key: "phone",
     label: "Điện thoại",
     className: "w-32",
-    render: (item: VoucherMergedPartnerOption) => item.phone ?? "—",
+    render: (item: VoucherPartnerOption) => item.phone ?? "—",
   },
 ];
 
@@ -59,14 +59,15 @@ export function VoucherStaffFields({
   onStaffClear,
   onOpenSearchDialog,
 }: Props) {
-  const currentSelection = useMemo((): VoucherMergedPartnerOption | null => {
+  const searchPartners = usePartnerSearch();
+  const currentSelection = useMemo((): VoucherPartnerOption | null => {
     if (!staffId) return null;
     return {
-      lookupKey: `${VoucherPartnerKindUi.EMPLOYEE}:${staffId}`,
+      lookupKey: `${PartnerLookupType.EMPLOYEE}:${staffId}`,
       id: staffId,
       code: staffCode,
       name: staffName,
-      kind: VoucherPartnerKindUi.EMPLOYEE,
+      kind: PartnerLookupType.EMPLOYEE,
       kindLabel: "Nhân viên",
     };
   }, [staffId, staffCode, staffName]);
@@ -76,9 +77,9 @@ export function VoucherStaffFields({
       query: string,
       page: number,
       pageSize?: number,
-    ): Promise<LookupSearchResult<VoucherMergedPartnerOption>> => {
+    ): Promise<LookupSearchResult<VoucherPartnerOption>> => {
       const q = query.trim();
-      const ps = pageSize ?? 8;
+      const ps = pageSize;
 
       if (
         currentSelection &&
@@ -90,19 +91,19 @@ export function VoucherStaffFields({
         }
       }
 
-      const raw = await searchVoucherPartnersByKind(
-        VoucherPartnerKindUi.EMPLOYEE,
+      const raw = await searchPartners(
+        PartnerLookupType.EMPLOYEE,
         query,
         page,
         ps,
       );
       return mergePartnerSearchWithSelection(raw, currentSelection, page);
     },
-    [currentSelection, staffCode, staffName],
+    [currentSelection, staffCode, staffName, searchPartners],
   );
 
   const handleSelect = useCallback(
-    (item: VoucherMergedPartnerOption) => {
+    (item: VoucherPartnerOption) => {
       onStaffSelect({
         staffId: item.id,
         staffCode: item.code,

@@ -55,6 +55,276 @@ CheckoutReturnService.checkout()
         └─ RETURN_POSTED + WebSocket POS_CHECKOUT_ACKNOWLEDGED (type=RETURN|EXCHANGE)
 ```
 
+## Sequence diagrams
+
+Bốn lưu đồ tuần tự (mermaid) mô tả các nhánh chính của flow. Mỗi flow chia làm 2 phase: **create draft** (tạo invoice nháp + items) và **checkout-return** (finalize + fan-out events). Tất cả consumers chạy **async** sau khi DB transaction commit.
+
+### Flow 1 — Đổi trả nhanh (Quick return, refund CASH)
+
+Không cần invoice gốc, items tự do, refund tiền mặt ngay tại quầy.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cashier
+    participant POS as POS Client
+    participant Ctl as InvoiceController
+    participant CRS as CreateReturnInvoiceService
+    participant ChkR as CheckoutReturnService
+    participant DocNum as DocumentNumberingService
+    participant DB as PostgreSQL
+    participant EB as EventPublisher (Kafka)
+    participant WS as WebSocketEmitter
+    participant SRC as StockReturnInConsumer
+    participant CRC as CashRefundConsumer
+    participant JRC as JournalReturnConsumer
+
+    Cashier->>POS: Chọn "Trả hàng nhanh" + nhập items
+    POS->>Ctl: POST /invoices/returns {mode:'quick', lines}
+    Ctl->>CRS: create(dto, actor)
+    CRS->>DB: INSERT invoices(type=RETURN, isDraft=true, code='DRAFT-xxx')
+    CRS->>DB: INSERT invoice_items(direction=IN)
+    CRS-->>Ctl: draft RETURN invoice
+    Ctl-->>POS: 201 {invoiceId, items}
+
+    Cashier->>POS: Xác nhận refund CASH
+    POS->>Ctl: POST /invoices/:id/checkout-return<br/>{refundMethod:'CASH', cashAccountId, revenueAccountId}
+    Ctl->>ChkR: checkout(id, dto, actor)
+    ChkR->>DB: load invoice + items
+    ChkR->>ChkR: validate(draft, type, refundMethod × net)
+    ChkR->>DocNum: generate(RETURN, branchId)
+    DocNum-->>ChkR: code (e.g. RT-2026-0001)
+    rect rgb(230, 244, 255)
+        Note over ChkR,DB: BEGIN TRANSACTION
+        ChkR->>DB: UPDATE invoices SET status=PAID, code, refundMethod, refundedAmount
+        ChkR->>DB: COMMIT
+    end
+    par fan-out events (after commit)
+        ChkR->>EB: STOCK_RETURN_IN
+        ChkR->>EB: JOURNAL_POST_RETURN
+        ChkR->>EB: CASH_REFUND
+        ChkR->>EB: RETURN_POSTED
+    end
+    ChkR->>WS: emitToBranch(POS_CHECKOUT_ACKNOWLEDGED, type=RETURN)
+    ChkR-->>Ctl: posted invoice
+    Ctl-->>POS: 200 {invoice}
+
+    par async consumers (idempotent)
+        EB-->>SRC: STOCK_RETURN_IN
+        SRC->>DB: stock_ledger_entries (RETURN_IN, +qty)
+    and
+        EB-->>CRC: CASH_REFUND
+        CRC->>DB: cash_movements (WITHDRAWAL)
+    and
+        EB-->>JRC: JOURNAL_POST_RETURN
+        JRC->>DB: journal_entries (DR revenue / CR cash)
+    end
+```
+
+### Flow 2 — Đổi trả thường (Regular partial return, refund STORE_CREDIT)
+
+Có invoice gốc, validate `returnedQuantity` cap, phát hành credit cho khách hàng.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cashier
+    participant POS as POS Client
+    participant Ctl as InvoiceController
+    participant ELG as ReturnEligibilityService
+    participant CRS as CreateReturnInvoiceService
+    participant ChkR as CheckoutReturnService
+    participant CCS as CustomerCreditService
+    participant DB as PostgreSQL
+    participant EB as EventPublisher
+    participant SRC as StockReturnInConsumer
+    participant LPR as LoyaltyPointsReverseConsumer
+    participant JRC as JournalReturnConsumer
+
+    Cashier->>POS: Scan invoice gốc
+    POS->>Ctl: GET /invoices/:id/eligible-returns
+    Ctl->>ELG: getEligibleLines(originalInvoiceId, actor)
+    ELG->>DB: SELECT invoice_items WHERE invoiceId AND org scope
+    ELG-->>Ctl: lines[] với maxReturnable = quantity - returnedQuantity
+    Ctl-->>POS: 200 {lines}
+
+    Cashier->>POS: Chọn line + qty (mua 5 trả 2)
+    POS->>Ctl: POST /invoices/returns<br/>{mode:'regular', originalInvoiceId, customerId, lines}
+    Ctl->>CRS: create(dto, actor)
+    CRS->>ELG: validate(line.qty ≤ maxReturnable) ∀ line
+    alt qty vượt cap
+        ELG-->>Ctl: 400 BadRequest
+    end
+    CRS->>DB: INSERT invoices(type=RETURN, originalInvoiceId)
+    CRS->>DB: INSERT invoice_items(direction=IN, originalInvoiceItemId)
+    Ctl-->>POS: 201 {invoiceId}
+
+    Cashier->>POS: Chọn refundMethod=STORE_CREDIT
+    POS->>Ctl: POST /invoices/:id/checkout-return<br/>{refundMethod:'STORE_CREDIT', creditExpiresAt?}
+    Ctl->>ChkR: checkout(id, dto, actor)
+    rect rgb(255, 244, 230)
+        Note over ChkR,DB: BEGIN TRANSACTION
+        ChkR->>DB: UPDATE invoices SET status=PAID, refundedAmount
+        loop mỗi return line
+            ChkR->>DB: UPDATE invoice_items<br/>SET returned_quantity = returned_quantity + :delta<br/>WHERE id=:origItemId AND returned_quantity + :delta ≤ quantity
+            DB-->>ChkR: rowsAffected
+            alt rowsAffected = 0 (race)
+                ChkR-->>Ctl: 409 ConflictException
+            end
+        end
+        ChkR->>CCS: issue(invoice, refundedAmount, manager)
+        CCS->>DB: INSERT customer_credits(status=OPEN, remainingAmount, referenceCode)
+        ChkR->>DB: COMMIT
+    end
+    par fan-out
+        ChkR->>EB: STOCK_RETURN_IN
+        ChkR->>EB: LOYALTY_POINTS_REVERSE
+        ChkR->>EB: JOURNAL_POST_RETURN
+        ChkR->>EB: RETURN_POSTED
+    end
+    ChkR-->>Ctl: {invoice, credit:{code, amount}}
+    Ctl-->>POS: 200
+
+    par async consumers
+        EB-->>SRC: STOCK_RETURN_IN
+        SRC->>DB: stock_ledger +qty
+    and
+        EB-->>LPR: LOYALTY_POINTS_REVERSE
+        LPR->>DB: card.points -= floor(refundSubtotal/1000)<br/>(floor về 0 nếu insufficient)
+    and
+        EB-->>JRC: JOURNAL_POST_RETURN
+        JRC->>DB: DR revenue / CR customer_credit_liability
+    end
+```
+
+### Flow 3 — Đổi hàng (Exchange, net < 0, refund CASH)
+
+Trả món đắt + mua món rẻ → chênh lệch hoàn tiền mặt. Phát đồng thời cả STOCK_RETURN_IN (return lines) và STOCK_DEDUCTION (new lines).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cashier
+    participant POS as POS Client
+    participant Ctl as InvoiceController
+    participant CES as CreateExchangeInvoiceService
+    participant ChkR as CheckoutReturnService
+    participant DB as PostgreSQL
+    participant EB as EventPublisher
+    participant SDC as StockDeductionConsumer
+    participant SRC as StockReturnInConsumer
+    participant CRC as CashRefundConsumer
+    participant JRC as JournalReturnConsumer
+
+    Cashier->>POS: Mở exchange (trả áo 500k, mua áo 300k)
+    POS->>Ctl: POST /invoices/exchanges<br/>{originalInvoiceId, returnLines, newLines}
+    Ctl->>CES: create(dto, actor)
+    CES->>CES: validate eligibility (returnLines)<br/>+ catalog/location (newLines)
+    CES->>DB: INSERT invoices(type=EXCHANGE)
+    CES->>DB: INSERT invoice_items: returnLines (direction=IN) + newLines (direction=OUT)
+    Ctl-->>POS: 201 {invoiceId, returnSubtotal:500k, newSubtotal:300k, net:-200k}
+
+    Cashier->>POS: Chốt refund CASH 200k
+    POS->>Ctl: POST /invoices/:id/checkout-return<br/>{refundMethod:'CASH', cashAccountId}
+    Ctl->>ChkR: checkout(id, dto, actor)
+    ChkR->>ChkR: returnSubtotal=500k, newSubtotal=300k<br/>net=-200k, refunded=200k
+    ChkR->>ChkR: assert refundMethod=CASH cho net<0
+    rect rgb(244, 244, 244)
+        Note over ChkR,DB: BEGIN TRANSACTION
+        ChkR->>DB: UPDATE invoices SET status=PAID,<br/>refundedAmount=200k, netAmount=-200k
+        ChkR->>DB: UPDATE invoice_items.returned_quantity (return lines, atomic guard)
+        ChkR->>DB: COMMIT
+    end
+    par fan-out
+        ChkR->>EB: STOCK_RETURN_IN (return lines)
+        ChkR->>EB: STOCK_DEDUCTION (new lines)
+        ChkR->>EB: JOURNAL_POST_RETURN
+        ChkR->>EB: CASH_REFUND (200k WITHDRAWAL)
+        ChkR->>EB: LOYALTY_POINTS_REVERSE (delta theo net)
+        ChkR->>EB: RETURN_POSTED
+    end
+    ChkR-->>Ctl: posted invoice
+    Ctl-->>POS: 200 {invoice}
+
+    par async consumers
+        EB-->>SRC: STOCK_RETURN_IN
+        SRC->>DB: stock_ledger +qty (RETURN_IN)
+    and
+        EB-->>SDC: STOCK_DEDUCTION
+        SDC->>DB: stock_ledger -qty (SALE)
+    and
+        EB-->>CRC: CASH_REFUND
+        CRC->>DB: cash_movements WITHDRAWAL 200k
+    and
+        EB-->>JRC: JOURNAL_POST_RETURN
+        JRC->>DB: balanced journal entries
+    end
+```
+
+### Flow 4 — Đổi hàng (Exchange, net > 0, khách trả thêm)
+
+Trả món rẻ + mua món đắt → khách trả thêm tiền. Reuse `CashFromPaymentConsumer` hiện hữu cho cash payments, không phát `CASH_REFUND`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cashier
+    participant POS as POS Client
+    participant Ctl as InvoiceController
+    participant CES as CreateExchangeInvoiceService
+    participant ChkR as CheckoutReturnService
+    participant DB as PostgreSQL
+    participant EB as EventPublisher
+    participant SDC as StockDeductionConsumer
+    participant SRC as StockReturnInConsumer
+    participant CFP as CashFromPaymentConsumer
+    participant JRC as JournalReturnConsumer
+
+    Cashier->>POS: Mở exchange (trả áo 300k, mua áo 500k)
+    POS->>Ctl: POST /invoices/exchanges {originalInvoiceId, returnLines, newLines}
+    Ctl->>CES: create(dto, actor)
+    CES->>DB: INSERT invoices(type=EXCHANGE) + items
+    Ctl-->>POS: 201 {invoiceId, net:+200k, amountDue:200k}
+
+    Cashier->>POS: Khách trả thêm 200k tiền mặt
+    POS->>Ctl: POST /invoices/:id/checkout-return<br/>{payments:[{method:CASH, amount:200k}], revenueAccountId}
+    Ctl->>ChkR: checkout(id, dto, actor)
+    ChkR->>ChkR: net=+200k → require payments sum=200k
+    rect rgb(230, 255, 230)
+        Note over ChkR,DB: BEGIN TRANSACTION
+        ChkR->>DB: UPDATE invoices SET status=PAID, netAmount=+200k
+        ChkR->>DB: INSERT invoice_payments (200k CASH)
+        ChkR->>DB: UPDATE invoice_items.returned_quantity (return lines)
+        ChkR->>DB: COMMIT
+    end
+    par fan-out
+        ChkR->>EB: STOCK_RETURN_IN (return lines)
+        ChkR->>EB: STOCK_DEDUCTION (new lines)
+        ChkR->>EB: JOURNAL_POST_RETURN
+        ChkR->>EB: CASH_MOVEMENT_FROM_PAYMENT (existing, cash inflow)
+        ChkR->>EB: LOYALTY_POINTS_REVERSE (net delta — có thể là EARN nếu net>0)
+        ChkR->>EB: RETURN_POSTED
+    end
+    Ctl-->>POS: 200 {invoice}
+
+    par async consumers
+        EB-->>SRC: STOCK_RETURN_IN → +qty
+    and
+        EB-->>SDC: STOCK_DEDUCTION → -qty
+    and
+        EB-->>CFP: CASH_MOVEMENT_FROM_PAYMENT → DEPOSIT 200k vào drawer
+    and
+        EB-->>JRC: JOURNAL_POST_RETURN
+    end
+```
+
+### Notes về thứ tự & invariants
+
+- **Transaction boundary**: Mọi mutation DB (invoice header, returned_quantity guard, customer_credits, invoice_debt settle) phải gom trong **một** `manager.transaction()`. Event publish luôn nằm **ngoài** transaction (after-commit) — nếu commit fail, không có event nào lên Kafka.
+- **Atomic returned_quantity guard**: `UPDATE ... WHERE returned_quantity + :delta <= quantity` + assert `rowsAffected === 1` là điểm chống race chính. Hai partial return song song trên cùng original line → một bên thắng, bên kia 409.
+- **Consumer idempotency**: Mỗi consumer SELECT theo unique key trước khi INSERT. Replay an toàn vì topic + key gắn `returnInvoiceId` (không phải `originalInvoiceId`), tránh đụng với INVOICE_CANCELLED.
+- **Net = 0 case** (EXCHANGE thuần swap): không có nhánh riêng — `refundMethod=OFFSET`, không emit `CASH_REFUND` lẫn `CASH_MOVEMENT_FROM_PAYMENT`. Chỉ stock + loyalty (delta=0) + journal (cân net).
+
 ## Implementation steps
 
 ### Step 1 — Legacy cleanup (zero behavior change)
