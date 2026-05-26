@@ -10,6 +10,8 @@ import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 export interface SelectedCustomerCardProps {
   /** Actions group (Voucher / quà tặng nếu đã chọn khách). */
   actions?: CustomerActionItem[];
+  /** Khóa khách (tab `invoice_return`): ẩn nút xóa (×) — không cho bỏ khách. */
+  readOnly?: boolean;
 }
 
 /**
@@ -18,7 +20,10 @@ export interface SelectedCustomerCardProps {
  * chi tiết khách (CustomerDetailDialog). Customer debt hiện chưa có data →
  * ẩn (truyền null xuống).
  */
-export function SelectedCustomerCard({ actions = [] }: SelectedCustomerCardProps) {
+export function SelectedCustomerCard({
+  actions = [],
+  readOnly = false,
+}: SelectedCustomerCardProps) {
   const { selectedCustomer, handleClearCustomer, handleOpenCustomerDetail } =
     useCheckoutCustomer();
 
@@ -53,14 +58,16 @@ export function SelectedCustomerCard({ actions = [] }: SelectedCustomerCardProps
         </span>
       </button>
       <PosCustomerActions actions={actions} />
-      <button
-        type="button"
-        onClick={handleClearCustomer}
-        aria-label={`Xóa khách ${name}`}
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50"
-      >
-        <CloseIcon size={16} />
-      </button>
+      {readOnly ? null : (
+        <button
+          type="button"
+          onClick={handleClearCustomer}
+          aria-label={`Xóa khách ${name}`}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50"
+        >
+          <CloseIcon size={16} />
+        </button>
+      )}
     </div>
   );
 }

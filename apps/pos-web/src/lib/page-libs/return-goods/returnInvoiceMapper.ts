@@ -26,6 +26,7 @@ export function mapInvoiceToReturnRow(
     id: inv.id,
     invoiceNumber: inv.code,
     createdAt: new Date(issued),
+    customerId: inv.customerId ?? null,
     customerName: customer?.name ?? "",
     customerPhone: customer?.phone ?? "",
     totalAmount: Number(inv.amountDue) || 0,

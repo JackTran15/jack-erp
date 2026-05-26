@@ -21,6 +21,11 @@ import {
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import {
+  selectCheckoutVariant,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 export interface PaymentSummaryPanelProps {
   customerSearchRef: RefObject<HTMLInputElement | null>;
@@ -41,6 +46,10 @@ export function PaymentSummaryPanel({
     handleRequireCustomerForDeposit,
   } = useCheckoutPayment();
   const { appliedPromotion, applyPromotion } = useCheckoutPromotion();
+
+  // Tab trả theo hóa đơn → khóa khách (lấy từ hóa đơn gốc, không cho đổi/thêm).
+  const variant = usePosCheckoutSessionStore(selectCheckoutVariant);
+  const customerLocked = variant === CheckoutVariantEnum.INVOICE_RETURN;
 
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
@@ -89,10 +98,15 @@ export function PaymentSummaryPanel({
         keepWhenSelected: true,
       },
     ];
-    const filtered = hasCustomer ? all.filter((a) => a.keepWhenSelected) : all;
+    const base = hasCustomer ? all.filter((a) => a.keepWhenSelected) : all;
+    // Khóa khách (invoice_return) → bỏ thao tác đổi khách (thêm khách / quét QR).
+    const filtered = customerLocked
+      ? base.filter((a) => a.key !== "add" && a.key !== "qr")
+      : base;
     return filtered.map(({ keepWhenSelected: _k, ...rest }) => rest);
   }, [
     hasCustomer,
+    customerLocked,
     handleAddCustomer,
     addCustomerButtonRef,
     promotionDialogOpen,
@@ -120,6 +134,7 @@ export function PaymentSummaryPanel({
         <CustomerSection
           customerInputRef={customerSearchRef}
           actions={customerActions}
+          locked={customerLocked}
         />
 
         <QuickExchangeBadges />

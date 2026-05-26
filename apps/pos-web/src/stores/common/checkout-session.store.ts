@@ -164,10 +164,15 @@ interface PosCheckoutSessionState {
 
   /** New invoice tab in quick-exchange mode (empty carts). */
   enterQuickExchange: () => void;
-  /** New invoice tab with return lines from an existing sale invoice (`invoice_return`). */
+  /**
+   * New invoice tab with return lines from an existing sale invoice
+   * (`invoice_return`). `customer` (nếu có) = khách của hóa đơn gốc → tự điền
+   * vào draft (sẽ bị khóa, không cho đổi ở checkout).
+   */
   enterInvoiceReturnWithLines: (
     lines: CartLine[],
     originalInvoiceId?: string,
+    customer?: CustomerRow | null,
   ) => void;
 
   /** Hydration helper — ensure at least one sale session exists. */
@@ -379,9 +384,20 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         });
       },
 
-      enterInvoiceReturnWithLines: (lines, originalInvoiceId) => {
+      enterInvoiceReturnWithLines: (lines, originalInvoiceId, customer) => {
         const { sessions } = get();
         const newId = `s-${Date.now()}`;
+        const base = initialCheckoutDraft();
+        // Tự điền khách của hóa đơn gốc (nếu có) — checkout sẽ khóa, không cho đổi.
+        const draft: CheckoutDraft = customer
+          ? {
+              ...base,
+              customer: {
+                selectedCustomer: customer,
+                customerQuery: customer.name?.trim() ?? "",
+              },
+            }
+          : base;
         const newSession: InvoiceSession = {
           id: newId,
           label: nextInvoiceLabel(sessions),
@@ -392,7 +408,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
           selectedLinePurchaseId: null,
           selectedLineReturnId: null,
           originalInvoiceId,
-          draft: initialCheckoutDraft(),
+          draft,
         };
         set({
           sessions: [...sessions, newSession],

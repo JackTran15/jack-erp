@@ -201,7 +201,15 @@ export function useReturnGoods(): UseReturnGoodsResult {
       setDialogOpen(false);
       return;
     }
-    enterInvoiceReturnWithLines(lines, activeInvoice.id);
+    // Mang khách của hóa đơn gốc sang tab trả hàng (tự điền + khóa ở checkout).
+    const customer = activeInvoice.customerId
+      ? {
+          id: activeInvoice.customerId,
+          name: activeInvoice.customerName,
+          phone: activeInvoice.customerPhone || null,
+        }
+      : null;
+    enterInvoiceReturnWithLines(lines, activeInvoice.id, customer);
     setDialogOpen(false);
     navigate("/");
   }, [activeInvoice, items, selectedIds, qtyById, enterInvoiceReturnWithLines, navigate]);

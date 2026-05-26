@@ -11,6 +11,11 @@ export interface ReturnInvoiceRow {
   invoiceNumber: string;
   /** "Ngày tạo" — thời điểm phát hành hóa đơn gốc. */
   createdAt: Date;
+  /**
+   * Customer id (UUID) của hóa đơn gốc — `null` khi khách lẻ. Dùng để tự điền +
+   * khóa khách trên tab `invoice_return` ở checkout.
+   */
+  customerId: string | null;
   /** "Khách hàng" — display name; empty string when walk-in. */
   customerName: string;
   /** "Số điện thoại" — empty string when not provided. */
