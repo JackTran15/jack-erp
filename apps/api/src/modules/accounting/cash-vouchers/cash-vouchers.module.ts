@@ -25,6 +25,7 @@ import { PosCashSaleConsumer } from './cash-voucher-consumers/pos-cash-sale.cons
 import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collection-cash.consumer';
 import { GoodsReceiptCashConsumer } from './cash-voucher-consumers/goods-receipt-cash.consumer';
 import { ExpenseCashConsumer } from './cash-voucher-consumers/expense-cash.consumer';
+import { RefundCashConsumer } from './cash-voucher-consumers/refund-cash.consumer';
 import { CashReceiptsService } from './cash-receipts/cash-receipts.service';
 import { CashReceiptsController } from './cash-receipts/cash-receipts.controller';
 import { CashPaymentsService } from './cash-payments/cash-payments.service';
@@ -33,6 +34,9 @@ import { CashLedgerService } from './cash-ledger/cash-ledger.service';
 import { CashLedgerController } from './cash-ledger/cash-ledger.controller';
 import { CashCountsService } from './cash-counts/cash-counts.service';
 import { CashCountsController } from './cash-counts/cash-counts.controller';
+import { DebtCollectionSagaEntity } from './debt-collection/debt-collection-saga.entity';
+import { DebtCollectionSagaService } from './debt-collection/debt-collection-saga.service';
+import { DebtCollectionController } from './debt-collection/debt-collection.controller';
 
 @Module({
   imports: [
@@ -45,6 +49,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
       CashVoucherCategoryEntity,
       CashMovementEntity,
       CashAccountEntity,
+      DebtCollectionSagaEntity,
     ]),
     CashModule,
     DocumentNumberingModule,
@@ -55,6 +60,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashLedgerController,
     CashCountsController,
     PartnerLookupController,
+    DebtCollectionController,
   ],
   providers: [
     CashVoucherCategoriesService,
@@ -70,10 +76,12 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashPaymentsService,
     CashLedgerService,
     CashCountsService,
+    DebtCollectionSagaService,
     PosCashSaleConsumer,
     DebtCollectionCashConsumer,
     GoodsReceiptCashConsumer,
     ExpenseCashConsumer,
+    RefundCashConsumer,
   ],
   exports: [
     CashVoucherCategorySeederService,
@@ -81,6 +89,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashPaymentsService,
     CashLedgerService,
     CashCountsService,
+    CashVoucherCategoryResolverService,
   ],
 })
 export class CashVouchersModule implements OnModuleInit {

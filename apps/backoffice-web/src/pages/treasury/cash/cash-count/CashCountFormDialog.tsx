@@ -44,6 +44,7 @@ import {
   emptyDenominationLines,
   emptyParticipant,
   mockBookBalanceForDate,
+  nextKkqNumber,
   syncLineAmounts,
   todayIsoDate,
 } from "./cash-count.utils";
@@ -65,6 +66,11 @@ interface Props {
   mode: CashCountDialogModeEnum;
   initial: CashCountRecord | null;
   createDraft?: CashCountCreateDraft | null;
+  previewDocumentNumber: string;
+  /** Live book balance of the selected cash fund (két) — "Số dư theo quỹ tiền mặt". */
+  accountBalance: number;
+  allRecords: CashCountRecord[];
+  onClose: () => void;
   onSaved: (record: CashCountRecord) => void;
   onProcess: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -78,6 +84,10 @@ export function CashCountFormDialog({
   mode,
   initial,
   createDraft,
+  previewDocumentNumber,
+  accountBalance,
+  allRecords,
+  onClose,
   onSaved,
   onProcess,
   onDelete,
@@ -146,13 +156,12 @@ export function CashCountFormDialog({
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // POSTED counts show the book balance snapshot frozen at post time
+  // (initial.bookBalance = expectedAmount). DRAFT/CREATE show the live cash
+  // fund balance, which is what the backend snapshots when "Xử lý" runs.
   const bookBalance = useMemo(
-    () =>
-      initial?.bookBalance ||
-      mockBookBalanceForDate(
-        inventoryUntilDate || createDraft?.inventoryUntilDate || "",
-      ),
-    [initial?.bookBalance, inventoryUntilDate, createDraft?.inventoryUntilDate],
+    () => (isProcessed ? (initial?.bookBalance ?? 0) : accountBalance),
+    [isProcessed, initial?.bookBalance, accountBalance],
   );
 
   const { actualAmount, variance } = useMemo(
@@ -543,6 +552,7 @@ export function CashCountFormDialog({
               "Đã xử lý — phiếu thu/chi sẽ được sinh khi tích hợp API.",
             );
             onOpenChange(false);
+            onClose();
           }}
         />
       ) : null}

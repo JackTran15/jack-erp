@@ -37,6 +37,7 @@ export const CASH_VOUCHER_CATEGORY_ENTITY_CONFIG: CrudEntityConfig = {
   fields: [
     { key: 'code', label: 'Mã', type: 'string', required: true },
     { key: 'name', label: 'Tên', type: 'string', required: true },
+    { key: 'description', label: 'Mô tả', type: 'string' },
     {
       key: 'direction',
       label: 'Loại',

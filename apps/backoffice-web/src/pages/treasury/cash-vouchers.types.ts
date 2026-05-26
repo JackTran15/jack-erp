@@ -151,6 +151,7 @@ export interface PaginatedList<T> {
 export interface CashCountDenomination {
   denom: number;
   count: number;
+  description?: string;
 }
 
 export interface CashCount extends BaseRecord {
@@ -161,6 +162,7 @@ export interface CashCount extends BaseRecord {
   actualAmount: number;
   variance?: number;
   status: CashCountStatus;
+  purpose?: string;
   notes?: string;
   denominations?: CashCountDenomination[];
   varianceCashMovementId?: string;
@@ -277,6 +279,36 @@ export interface CreateCashReceiptBody {
   }>;
 }
 
+export interface DebtCollectionAllocation {
+  invoiceDebtId: string;
+  amount: number;
+}
+
+export interface CreateDebtCollectionBody {
+  voucherDate: string;
+  partnerType?: CashVoucherPartnerType;
+  partnerId?: string;
+  payerName?: string;
+  reason?: string;
+  staffId?: string;
+  cashAccountId?: string;
+  allocations: DebtCollectionAllocation[];
+}
+
+export interface DebtCollectionResult {
+  sagaId: string;
+  receiptId: string;
+  documentNumber: string;
+  totalAmount: number;
+  status: "PENDING" | "COMPLETED" | "COMPENSATED" | "FAILED";
+  allocations: Array<{
+    invoiceDebtId: string;
+    amount: number;
+    debtPaymentId?: string;
+    settled: boolean;
+  }>;
+}
+
 export interface CreateCashPaymentBody {
   documentNumber?: string;
   voucherDate: string;
@@ -304,6 +336,7 @@ export interface CreateCashCountBody {
   countedAt: string;
   actualAmount: number;
   documentNumber?: string;
+  purpose?: string;
   notes?: string;
   denominations?: CashCountDenomination[];
 }

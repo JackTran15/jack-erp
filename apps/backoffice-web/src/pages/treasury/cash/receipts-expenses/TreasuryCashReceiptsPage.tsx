@@ -56,6 +56,7 @@ import {
 import {
   ledgerDetailToCreatePaymentBody,
   ledgerDetailToCreateReceiptBody,
+  ledgerDetailToDebtCollectionBody,
 } from "../../cash-vouchers.api-body";
 import {
   CashVoucherCategoryDirection,
@@ -71,13 +72,11 @@ import {
 } from "../../documents";
 import {
   LedgerCashVoucherKindEnum,
+  LedgerCashVoucherPurposeEnum,
   type LedgerCashInvoiceDetail,
   type LedgerCashVoucherDetail,
 } from "../../ledger-cash/ledger-cash.types";
-import {
-  MOCK_LEDGER_CASH_ROWS,
-  findLedgerCashInvoiceByCode,
-} from "../../ledger-cash/mock-ledger-cash";
+import { MOCK_LEDGER_CASH_ROWS, findLedgerCashInvoiceByCode } from "../../ledger-cash/mock-ledger-cash";
 import { ReceiptCashDetailPanel } from "./ReceiptCashDetailPanel";
 import {
   RECEIPT_CASH_FILTER_KEYS,
@@ -428,20 +427,36 @@ export function TreasuryCashReceiptsPage() {
       }
       try {
         if (voucherDialog.kind === ReceiptCashVoucherDialogKindEnum.RECEIPT) {
-          const body = ledgerDetailToCreateReceiptBody(
-            detail,
-            cashAccountId,
-            contraAccountId,
-          );
-          if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
-            const created = await receiptMutations.create.mutateAsync(body);
-            setSelectedId(created.id);
-          } else if (selectedId) {
-            const { documentNumber: _, ...updateBody } = body;
-            await receiptMutations.update.mutateAsync({
-              id: selectedId,
-              body: updateBody,
-            });
+          const isDebtCollection =
+            detail.purpose === LedgerCashVoucherPurposeEnum.DEBT_COLLECTION;
+          if (
+            isDebtCollection &&
+            voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE
+          ) {
+            // Thu hồi nợ: settle the picked invoice debts + credit the két (saga).
+            const body = ledgerDetailToDebtCollectionBody(detail, cashAccountId);
+            if (body.allocations.length === 0) {
+              toast.error("Chọn ít nhất một hóa đơn nợ để thu.");
+              return;
+            }
+            const result =
+              await receiptMutations.debtCollection.mutateAsync(body);
+            setSelectedId(result.receiptId);
+          } else {
+            const body = ledgerDetailToCreateReceiptBody(
+              detail,
+              cashAccountId,
+              contraAccountId,
+            );
+            if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
+              const created = await receiptMutations.create.mutateAsync(body);
+              setSelectedId(created.id);
+            } else if (selectedId) {
+              await receiptMutations.update.mutateAsync({
+                id: selectedId,
+                body,
+              });
+            }
           }
         } else {
           const body = ledgerDetailToCreatePaymentBody(

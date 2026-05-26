@@ -74,6 +74,7 @@ export class CashCountsService {
       actualAmount: dto.actualAmount,
       status: CashCountStatus.DRAFT,
       documentNumber: dto.documentNumber,
+      purpose: dto.purpose,
       notes: dto.notes,
       denominations: dto.denominations,
     });
@@ -98,6 +99,7 @@ export class CashCountsService {
     Object.assign(count, {
       countedAt: dto.countedAt ? new Date(dto.countedAt) : count.countedAt,
       actualAmount: nextActual,
+      purpose: dto.purpose ?? count.purpose,
       notes: dto.notes ?? count.notes,
       denominations: nextDenoms,
     });

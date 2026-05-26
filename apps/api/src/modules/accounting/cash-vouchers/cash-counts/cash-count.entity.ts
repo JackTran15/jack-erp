@@ -5,6 +5,8 @@ import { CashCountStatus, CashCountVarianceVoucherKind } from '../enums';
 export interface CashCountDenomination {
   denom: number;
   count: number;
+  /** Per-line note ("Diễn giải") for this denomination row. */
+  description?: string;
 }
 
 @Entity('cash_counts')
@@ -28,6 +30,10 @@ export class CashCountEntity extends BaseEntity {
 
   @Column({ type: 'numeric', precision: 18, scale: 2, nullable: true })
   variance?: number;
+
+  /** "Mục đích" — free-text purpose written by the user on the form. */
+  @Column({ type: 'text', nullable: true })
+  purpose?: string;
 
   @Column({
     type: 'enum',

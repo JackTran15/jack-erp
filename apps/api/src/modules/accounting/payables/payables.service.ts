@@ -17,10 +17,23 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { JournalService } from '../journal/journal.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { CashService } from '../cash/cash.service';
+import { CashFundResolverService } from '../cash/cash-fund-resolver.service';
+import { CashMovementType } from '../cash/cash-movement.entity';
+import { CashPaymentsService } from '../cash-vouchers/cash-payments/cash-payments.service';
+import { CashVoucherCategoryResolverService } from '../cash-vouchers/shared/category-resolver.service';
+import {
+  CashPaymentPurpose,
+  CashPaymentReferenceType,
+  CashVoucherPartnerType,
+} from '../cash-vouchers/enums';
 import { PayableEntity } from './payable.entity';
 import { PayableSettlementEntity } from './payable-settlement.entity';
 import { CreatePayableDto, SettlePayableDto } from './dto';
 import { BaseCrudService } from '../../crud/base-crud.service';
+
+/** dto.method values treated as physical cash → route through the till + Phiếu Chi. */
+const CASH_METHOD = 'CASH';
 
 export const PAYABLE_SERVICE_TOKEN = 'PayableService';
 
@@ -40,6 +53,10 @@ export class PayablesService extends BaseCrudService<
     protected readonly dataSource: DataSource,
     private readonly journalService: JournalService,
     private readonly documentNumberingService: DocumentNumberingService,
+    private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
+    private readonly cashPaymentsService: CashPaymentsService,
+    private readonly categoryResolver: CashVoucherCategoryResolverService,
   ) {
     super(dataSource);
   }
@@ -161,30 +178,80 @@ export class PayablesService extends BaseCrudService<
 
       const saved = await manager.save(payable);
 
-      await this.journalService.post(
-        {
-          source: JournalSource.EXPENSE,
-          sourceReferenceId: payable.id,
-          description: `Payable settlement: ${payable.documentNumber} — ${dto.method}`,
-          lines: [
+      const isCash = (dto.method ?? '').trim().toUpperCase() === CASH_METHOD;
+      if (isCash) {
+        // Cash settlement: debit the payable + credit the till via a Phiếu Chi.
+        // recordMovement posts DR payable account / CR cash, updates the balance
+        // and creates the JE — replacing the standalone journal entry.
+        const cashAccountId = await this.cashFundResolver.resolveOrDefault(
+          actor.organizationId,
+          actor.branchId,
+          undefined,
+          manager,
+        );
+        const { movement, journalEntryId } =
+          await this.cashService.recordMovement(
             {
-              accountId: payable.accountId,
-              debitAmount: Number(dto.amount),
-              creditAmount: 0,
-              description: 'Debit payable (reduce liability)',
-              lineOrder: 1,
+              cashAccountId,
+              type: CashMovementType.WITHDRAWAL,
+              amount: Number(dto.amount),
+              contraAccountId: payable.accountId,
+              reference: `PAY-${settlement.id}`,
+              notes: `Payable settlement ${payable.documentNumber ?? payable.id}`,
             },
-            {
-              accountId: payable.accountId,
-              debitAmount: 0,
-              creditAmount: Number(dto.amount),
-              description: 'Credit cash',
-              lineOrder: 2,
-            },
-          ],
-        },
-        actor,
-      );
+            actor,
+            manager,
+          );
+        const categoryId = await this.categoryResolver.resolveId(
+          actor.organizationId,
+          'CHI_NO_NCC',
+        );
+        await this.cashPaymentsService.createVoucherForMovement(
+          {
+            cashMovementId: movement.id,
+            journalEntryId,
+            purpose: CashPaymentPurpose.SUPPLIER_PAYMENT,
+            cashAccountId,
+            contraAccountId: payable.accountId,
+            amount: Number(dto.amount),
+            referenceType: CashPaymentReferenceType.MANUAL,
+            referenceId: settlement.id,
+            partnerType: CashVoucherPartnerType.SUPPLIER,
+            partnerName: payable.vendorName,
+            payeeName: payable.vendorName,
+            description: `Trả nợ NCC ${payable.documentNumber ?? ''}`.trim(),
+            categoryId,
+            actor,
+          },
+          manager,
+        );
+      } else {
+        // Non-cash (bank transfer, cheque, …): journal entry only.
+        await this.journalService.post(
+          {
+            source: JournalSource.EXPENSE,
+            sourceReferenceId: payable.id,
+            description: `Payable settlement: ${payable.documentNumber} — ${dto.method}`,
+            lines: [
+              {
+                accountId: payable.accountId,
+                debitAmount: Number(dto.amount),
+                creditAmount: 0,
+                description: 'Debit payable (reduce liability)',
+                lineOrder: 1,
+              },
+              {
+                accountId: payable.accountId,
+                debitAmount: 0,
+                creditAmount: Number(dto.amount),
+                description: 'Credit cash/bank',
+                lineOrder: 2,
+              },
+            ],
+          },
+          actor,
+        );
+      }
 
       return saved;
     });
