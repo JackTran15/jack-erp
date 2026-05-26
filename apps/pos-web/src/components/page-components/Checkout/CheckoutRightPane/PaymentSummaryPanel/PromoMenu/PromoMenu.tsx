@@ -13,9 +13,9 @@ import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   computeVoucherLineSource,
+  selectCustomerDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
 
 export interface PromoMenuProps {
   /** Visibility — caller (PaymentSummaryPanel) owns the open state. */
@@ -55,8 +55,8 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const { pickPromoOption, searchVoucher, applyVoucher } = useCheckoutPromotion();
-  const selectedCustomer = usePosCheckoutCustomerStore(
-    (s) => s.selectedCustomer,
+  const selectedCustomer = usePosCheckoutSessionStore(
+    (s) => selectCustomerDraft(s).selectedCustomer,
   );
   const sessionState = usePosCheckoutSessionStore();
   const voucherLines = useMemo(

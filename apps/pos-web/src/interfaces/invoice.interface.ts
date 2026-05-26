@@ -1,6 +1,7 @@
 import type {
   InvoicePaymentMethod,
   InvoiceStatus,
+  InvoiceType,
 } from "@erp/pos/types/invoice.type";
 
 export interface InvoiceItemRow {
@@ -26,6 +27,8 @@ export interface InvoiceRow {
   id: string;
   code: string;
   status: InvoiceStatus;
+  /** SALE | RETURN | EXCHANGE — chỉ SALE mới đổi/trả được (lọc ở trang return-goods). */
+  type?: InvoiceType;
   isDraft: boolean;
   draftLabel?: string;
   sessionId: string;

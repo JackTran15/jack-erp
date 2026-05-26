@@ -78,11 +78,14 @@ export interface SettlementSnapshot {
 export function deriveSettlement(input: {
   grandTotal: number;
   deposit: number;
+  /** Phí đổi trả (return/exchange) — khách trả thêm → tăng số phải thu. */
+  returnFee?: number;
   paymentLines: ReadonlyArray<{ amount: number }>;
   keepChange: boolean;
   debt: boolean;
 }): SettlementSnapshot {
-  const settlementGrandTotal = input.grandTotal - input.deposit;
+  const settlementGrandTotal =
+    input.grandTotal - input.deposit + (input.returnFee ?? 0);
   const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
   const totalPaid = input.paymentLines.reduce((sum, l) => sum + l.amount, 0);
   const { changeAmount, shortageAmount, debtAmount } = derivePaymentDisplay({

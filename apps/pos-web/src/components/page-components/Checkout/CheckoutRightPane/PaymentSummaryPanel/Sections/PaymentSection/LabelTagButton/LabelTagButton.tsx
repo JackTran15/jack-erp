@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { TagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
-import { usePosCheckoutLabelsStore } from "@erp/pos/stores/page-stores/checkout/checkout-labels.store";
+import {
+  selectSelectedLabelIds,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { LabelTagDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/LabelTagDialog/LabelTagDialog";
 
 export function LabelTagButton() {
   const [open, setOpen] = useState(false);
-  const selectedCount = usePosCheckoutLabelsStore(
-    (s) => s.selectedLabelIds.length,
+  const selectedCount = usePosCheckoutSessionStore(
+    (s) => selectSelectedLabelIds(s).length,
   );
 
   return (

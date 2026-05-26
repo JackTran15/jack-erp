@@ -15,7 +15,7 @@ export const usePaymentAccountsQuery = () => {
   });
 
   return {
-    accounts: query.data?.data ?? [],
+    accounts: query.data ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

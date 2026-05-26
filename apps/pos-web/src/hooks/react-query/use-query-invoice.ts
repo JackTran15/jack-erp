@@ -7,13 +7,24 @@ import {
 } from "@tanstack/react-query";
 
 import { INVOICE_KEYS } from "@erp/pos/constants/react-query-key.constant";
+import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
+import { customerService } from "@erp/pos/services/customer.service";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { mapInvoiceToReturnRow } from "@erp/pos/lib/page-libs/return-goods/returnInvoiceMapper";
 import type {
   CheckoutInvoiceBody,
+  CheckoutReturnBody,
+  CreateExchangeInvoiceBody,
   CreateInvoiceBody,
+  CreateReturnInvoiceBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
+import type {
+  EligibleReturnLine,
+  ReturnInvoiceRow,
+} from "@erp/pos/interfaces/return-goods.interface";
 
 export function useCreateInvoiceMutation(): UseMutationResult<
   InvoiceRow,
@@ -135,5 +146,127 @@ export function useDraftInvoicesQuery(
     queryFn: () => invoiceService.listDrafts(input.sessionId),
     enabled: Boolean(input.sessionId) && (input.enabled ?? true),
     staleTime: 5_000,
+  });
+}
+
+// ─── Return / Exchange (EPIC-011) ───────────────────────────────────────────
+
+interface UseReturnableInvoicesQueryInput {
+  dateFrom?: string;
+  dateTo?: string;
+  enabled?: boolean;
+}
+
+/**
+ * Hóa đơn đã thanh toán (`status=paid`) cho trang đổi trả. Enrich tên/sđt khách
+ * qua `customerService.get` (endpoint list chỉ trả `customerId`). `branchName`
+ * lấy từ branch store — POS scope 1 chi nhánh, BE đã lọc theo `X-Branch-Id`.
+ */
+export function useReturnableInvoicesQuery(
+  input: UseReturnableInvoicesQueryInput = {},
+): UseQueryResult<ReturnInvoiceRow[], Error> {
+  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  const branchName = usePosBranchStore((s) => s.branchName) ?? "—";
+  return useQuery<ReturnInvoiceRow[], Error>({
+    queryKey: INVOICE_KEYS.RETURNABLE({
+      branchId,
+      dateFrom: input.dateFrom,
+      dateTo: input.dateTo,
+    }),
+    queryFn: async () => {
+      const page = await invoiceService.list({
+        status: "paid",
+        isDraft: false,
+        dateFrom: input.dateFrom,
+        dateTo: input.dateTo,
+        page: 1,
+        limit: RETURN_GOODS_DEFAULT_PAGE_SIZE,
+      });
+      // Chỉ hóa đơn BÁN mới đổi/trả được. Đơn RETURN/EXCHANGE sau tất toán cũng
+      // `status=paid` nên lọt vào list — loại trừ chúng để bấm vào không bị BE
+      // báo "only SALE can be returned". Lọc kiểu loại trừ (giữ SALE + thiếu type)
+      // để an toàn nếu response không kèm `type`.
+      const saleInvoices = page.data.filter(
+        (inv) => inv.type !== "RETURN" && inv.type !== "EXCHANGE",
+      );
+      const ids = Array.from(
+        new Set(
+          saleInvoices
+            .map((inv) => inv.customerId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const customer = await customerService.get(id);
+            return [id, { name: customer.name, phone: customer.phone }] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      const byId = new Map(entries);
+      return saleInvoices.map((inv) =>
+        mapInvoiceToReturnRow(
+          inv,
+          inv.customerId ? byId.get(inv.customerId) ?? null : null,
+          branchName,
+        ),
+      );
+    },
+    enabled: input.enabled ?? true,
+    staleTime: 30_000,
+  });
+}
+
+/** `GET /invoices/:id/eligible-returns` — dòng hàng còn được phép trả. */
+export function useEligibleReturnsQuery(
+  invoiceId: string | undefined,
+): UseQueryResult<EligibleReturnLine[], Error> {
+  return useQuery<EligibleReturnLine[], Error>({
+    queryKey: INVOICE_KEYS.ELIGIBLE_RETURNS(invoiceId ?? ""),
+    queryFn: () => invoiceService.getEligibleReturns(invoiceId as string),
+    enabled: Boolean(invoiceId),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateReturnInvoiceMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  CreateReturnInvoiceBody
+> {
+  return useMutation<InvoiceRow, Error, CreateReturnInvoiceBody>({
+    mutationFn: (body) => invoiceService.createReturn(body),
+  });
+}
+
+export function useCreateExchangeInvoiceMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  CreateExchangeInvoiceBody
+> {
+  return useMutation<InvoiceRow, Error, CreateExchangeInvoiceBody>({
+    mutationFn: (body) => invoiceService.createExchange(body),
+  });
+}
+
+interface CheckoutReturnVars {
+  id: string;
+  body: CheckoutReturnBody;
+}
+
+export function useCheckoutReturnMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  CheckoutReturnVars
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, CheckoutReturnVars>({
+    mutationFn: ({ id, body }) => invoiceService.checkoutReturn(id, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+    },
   });
 }

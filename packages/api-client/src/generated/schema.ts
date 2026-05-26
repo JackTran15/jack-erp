@@ -476,6 +476,438 @@ export interface paths {
         patch: operations["CoaController_update"];
         trace?: never;
     };
+    "/cash-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashReceiptsController_list"];
+        put?: never;
+        post: operations["CashReceiptsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashReceiptsController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["CashReceiptsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CashReceiptsController_update"];
+        trace?: never;
+    };
+    "/cash-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashReceiptsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-receipts/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashReceiptsController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashPaymentsController_list"];
+        put?: never;
+        post: operations["CashPaymentsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashPaymentsController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["CashPaymentsController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CashPaymentsController_update"];
+        trace?: never;
+    };
+    "/cash-payments/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashPaymentsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-payments/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashPaymentsController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashLedgerController_getLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashCountsController_list"];
+        put?: never;
+        post: operations["CashCountsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-counts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashCountsController_getById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["CashCountsController_update"];
+        trace?: never;
+    };
+    "/cash-counts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashCountsController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-vouchers/partners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PartnerLookupController_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-vouchers/partners/debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PartnerLookupController_customerDebts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-vouchers/partners/customers-with-debt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PartnerLookupController_customersWithDebt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_listAccounts"];
+        put?: never;
+        post: operations["CashController_createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_getAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_listMovements"];
+        put?: never;
+        post: operations["CashController_recordMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JournalController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["JournalController_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["JournalController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["JournalController_findById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DocumentNumberingController_listRules"];
+        put?: never;
+        post: operations["DocumentNumberingController_createRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["DocumentNumberingController_updateRule"];
+        trace?: never;
+    };
+    "/document-number-rules/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_activateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-number-rules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_deactivateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-numbers/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DocumentNumberingController_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/branches": {
         parameters: {
             query?: never;
@@ -583,86 +1015,6 @@ export interface paths {
         put?: never;
         post: operations["BranchController_assignUser"];
         delete: operations["BranchController_unassignUser"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-number-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["DocumentNumberingController_listRules"];
-        put?: never;
-        post: operations["DocumentNumberingController_createRule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-number-rules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["DocumentNumberingController_updateRule"];
-        trace?: never;
-    };
-    "/document-number-rules/{id}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["DocumentNumberingController_activateRule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-number-rules/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["DocumentNumberingController_deactivateRule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-numbers/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["DocumentNumberingController_generate"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1568,70 +1920,6 @@ export interface paths {
         patch: operations["ProductAttributeController_updateOption"];
         trace?: never;
     };
-    "/journals/post": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["JournalController_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/journals/{id}/reverse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["JournalController_reverse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/journals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["JournalController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/journals/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["JournalController_findById"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/payables": {
         parameters: {
             query?: never;
@@ -1872,48 +2160,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/cash/accounts": {
+    "/payment-accounts": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["CashController_listAccounts"];
-        put?: never;
-        post: operations["CashController_createAccount"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/cash/accounts/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CashController_getAccount"];
+        /** List the active payment accounts for the actor's branch (POS checkout picker). */
+        get: operations["PaymentAccountsController_list"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/cash/movements": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CashController_listMovements"];
-        put?: never;
-        post: operations["CashController_recordMovement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3471,6 +3728,8 @@ export interface components {
             lastName: string;
             /** @description Temporary password set by the administrator; user is expected to change it on first login. */
             temporaryPassword: string;
+            /** @description Whether the user can sign in. Defaults to true when omitted. */
+            isActive?: boolean;
             /** @description Optional initial roles to assign on creation. */
             roleIds?: string[];
             /** @description Optional initial branch assignments. */
@@ -3621,6 +3880,503 @@ export interface components {
             parentAccountId?: string;
             isActive?: boolean;
         };
+        CashReceiptLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** @description "Diễn giải" */
+            description: string;
+            /**
+             * Format: uuid
+             * @description "Mục thu" — references a cash_voucher_categories row.
+             */
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+        };
+        CreateCashReceiptDto: {
+            /** @description "Ngày thu" (YYYY-MM-DD). */
+            voucherDate: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nộp" */
+            payerName?: string;
+            /** @description "Lý do nộp" */
+            reason?: string;
+            /**
+             * Format: uuid
+             * @description Cashier (thủ quỹ).
+             */
+            staffId?: string;
+            /** Format: uuid */
+            cashAccountId: string;
+            /**
+             * Format: uuid
+             * @description Contra GL account for the whole voucher (per-header, e.g. 511/131/711).
+             */
+            contraAccountId: string;
+            /** @description Denormalized total — must equal sum(lines.amount). */
+            totalAmount: number;
+            attachmentIds?: string[];
+            lines: components["schemas"]["CashReceiptLineDto"][];
+        };
+        CashReceiptEntity: {
+            documentNumber?: string;
+            voucherDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "REVERSED";
+            /** @enum {string} */
+            purpose: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            partnerNameSnapshot?: string;
+            partnerAddressSnapshot?: string;
+            payerName?: string;
+            reason?: string;
+            staffId?: string;
+            /** @enum {string} */
+            referenceType?: "INVOICE" | "INVOICE_DEBT" | "RECEIVABLE" | "MANUAL" | "REVERSAL";
+            referenceId?: string;
+            cashAccountId: string;
+            contraAccountId: string;
+            totalAmount: number;
+            attachmentIds: string[];
+            cashMovementId?: string;
+            journalEntryId?: string;
+            reversedByVoucherId?: string;
+            reversesVoucherId?: string;
+            reversalReason?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["CashReceiptLineEntity"][];
+            reversesVoucher?: components["schemas"]["CashReceiptEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CashReceiptLineEntity: {
+            cashReceiptId: string;
+            cashReceipt: components["schemas"]["CashReceiptEntity"];
+            lineOrder: number;
+            description: string;
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateCashReceiptDto: {
+            voucherDate?: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            payerName?: string;
+            reason?: string;
+            /** Format: uuid */
+            staffId?: string;
+            /** Format: uuid */
+            cashAccountId?: string;
+            /** Format: uuid */
+            contraAccountId?: string;
+            totalAmount?: number;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["CashReceiptLineDto"][];
+        };
+        ReverseCashReceiptDto: {
+            /** @description Reason for the reversal (đảo bút). Stored on the reversal voucher. */
+            reason: string;
+        };
+        CashPaymentLineDto: {
+            /** Format: uuid */
+            id?: string;
+            /** @description "Diễn giải" */
+            description: string;
+            /**
+             * Format: uuid
+             * @description "Mục chi" — references a cash_voucher_categories row.
+             */
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+        };
+        CreateCashPaymentDto: {
+            /** @description "Ngày chi" (YYYY-MM-DD). */
+            voucherDate: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            /** @description "Người nhận" */
+            payeeName?: string;
+            /** @description "Lý do chi" */
+            reason?: string;
+            /**
+             * Format: uuid
+             * @description Cashier (thủ quỹ).
+             */
+            staffId?: string;
+            /** Format: uuid */
+            cashAccountId: string;
+            /**
+             * Format: uuid
+             * @description Contra GL account for the whole voucher (per-header, e.g. 331/811).
+             */
+            contraAccountId: string;
+            /** @description Denormalized total — must equal sum(lines.amount). */
+            totalAmount: number;
+            attachmentIds?: string[];
+            lines: components["schemas"]["CashPaymentLineDto"][];
+        };
+        CashPaymentEntity: {
+            documentNumber?: string;
+            voucherDate: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "REVERSED";
+            /** @enum {string} */
+            purpose: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            partnerId?: string;
+            partnerNameSnapshot?: string;
+            partnerAddressSnapshot?: string;
+            payeeName?: string;
+            reason?: string;
+            staffId?: string;
+            /** @enum {string} */
+            referenceType?: "INVOICE_DEBT" | "GOODS_RECEIPT" | "EXPENSE" | "SALARY" | "REFUND" | "MANUAL" | "REVERSAL";
+            referenceId?: string;
+            cashAccountId: string;
+            contraAccountId: string;
+            totalAmount: number;
+            attachmentIds: string[];
+            cashMovementId?: string;
+            journalEntryId?: string;
+            reversedByVoucherId?: string;
+            reversesVoucherId?: string;
+            reversalReason?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["CashPaymentLineEntity"][];
+            reversesVoucher?: components["schemas"]["CashPaymentEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CashPaymentLineEntity: {
+            cashPaymentId: string;
+            cashPayment: components["schemas"]["CashPaymentEntity"];
+            lineOrder: number;
+            description: string;
+            categoryId?: string;
+            amount: number;
+            referenceNote?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateCashPaymentDto: {
+            voucherDate?: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+            /** @enum {string} */
+            partnerType?: "CUSTOMER" | "SUPPLIER" | "EMPLOYEE" | "OTHER";
+            /** Format: uuid */
+            partnerId?: string;
+            payeeName?: string;
+            reason?: string;
+            /** Format: uuid */
+            staffId?: string;
+            /** Format: uuid */
+            cashAccountId?: string;
+            /** Format: uuid */
+            contraAccountId?: string;
+            totalAmount?: number;
+            attachmentIds?: string[];
+            lines?: components["schemas"]["CashPaymentLineDto"][];
+        };
+        ReverseCashPaymentDto: {
+            /** @description Reason for the reversal (đảo bút). Stored on the reversal voucher. */
+            reason: string;
+        };
+        DenominationDto: {
+            /** @description Note/coin face value, e.g. 500000. */
+            denom: number;
+            /** @description Quantity of this denomination counted. */
+            count: number;
+        };
+        CreateCashCountDto: {
+            /** Format: uuid */
+            cashAccountId: string;
+            countedAt: string;
+            /** @description Counted physical cash (nhập tay). */
+            actualAmount: number;
+            notes?: string;
+            /** @description Optional breakdown — when present, sum(denom*count) must equal actualAmount. */
+            denominations?: components["schemas"]["DenominationDto"][];
+        };
+        UpdateCashCountDto: {
+            countedAt?: string;
+            actualAmount?: number;
+            notes?: string;
+            denominations?: components["schemas"]["DenominationDto"][];
+        };
+        CreateCashAccountDto: {
+            name: string;
+            /** @enum {string} */
+            type: "REGISTER" | "SAFE" | "PETTY_CASH";
+            /** Format: uuid */
+            accountId: string;
+            balance?: number;
+        };
+        CashAccountEntity: {
+            name: string;
+            /** @enum {string} */
+            type: "REGISTER" | "SAFE" | "PETTY_CASH";
+            balance: number;
+            accountId: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        RecordCashMovementDto: {
+            /** Format: uuid */
+            cashAccountId: string;
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            amount: number;
+            /**
+             * Format: uuid
+             * @description Required when type=TRANSFER (destination account).
+             */
+            toAccountId?: string;
+            /**
+             * Format: uuid
+             * @description Required for DEPOSIT/WITHDRAWAL/ADJUSTMENT — the GL account that offsets the cash leg.
+             */
+            contraAccountId?: string;
+            reference?: string;
+            notes?: string;
+        };
+        PosSessionEntity: {
+            terminalId?: string;
+            /** @enum {string} */
+            status: "OPEN" | "ACTIVE_SALES" | "CLOSING" | "CLOSED";
+            openedBy: string;
+            /** Format: date-time */
+            openedAt: string;
+            closedBy?: string;
+            /** Format: date-time */
+            closedAt?: string;
+            openingCashAmount: number;
+            cashAccountId?: string;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        CashMovementEntity: {
+            cashAccountId: string;
+            cashAccount: components["schemas"]["CashAccountEntity"];
+            toAccountId?: string;
+            toAccount?: components["schemas"]["CashAccountEntity"];
+            /** @enum {string} */
+            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
+            amount: number;
+            reference?: string;
+            notes?: string;
+            sessionId?: string;
+            session?: components["schemas"]["PosSessionEntity"];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        PostJournalLineDto: {
+            /** Format: uuid */
+            accountId: string;
+            debitAmount: number;
+            creditAmount: number;
+            description?: string;
+            lineOrder: number;
+        };
+        PostJournalDto: {
+            /** @enum {string} */
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            /** Format: uuid */
+            sourceReferenceId?: string;
+            description?: string;
+            notes?: string;
+            lines: components["schemas"]["PostJournalLineDto"][];
+        };
+        JournalEntryEntity: {
+            documentNumber: string;
+            /** @enum {string} */
+            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
+            sourceReferenceId?: string;
+            description?: string;
+            notes?: string;
+            /** @enum {string} */
+            status: "POSTED" | "REVERSED";
+            /** Format: date-time */
+            postedAt: string;
+            postedBy: string;
+            reversedByJournalId?: string;
+            reversalOfJournalId?: string;
+            lines: components["schemas"]["JournalLineEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        JournalLineEntity: {
+            journalEntryId: string;
+            journalEntry: components["schemas"]["JournalEntryEntity"];
+            accountId: string;
+            debitAmount: number;
+            creditAmount: number;
+            description?: string;
+            lineOrder: number;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        ReverseJournalDto: {
+            reason: string;
+        };
+        CreateDocumentNumberRuleDto: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            branchId?: string;
+            prefix: string;
+            suffix?: string;
+            includeDate?: boolean;
+            dateFormat?: string;
+            sequenceLength?: number;
+            /** @enum {string} */
+            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+        };
+        DocumentNumberRuleEntity: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            prefix: string;
+            suffix?: string;
+            includeDate: boolean;
+            dateFormat: string;
+            sequenceLength: number;
+            /** @enum {string} */
+            resetPolicy: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+            isActive: boolean;
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        UpdateDocumentNumberRuleDto: {
+            prefix?: string;
+            suffix?: string;
+            includeDate?: boolean;
+            dateFormat?: string;
+            sequenceLength?: number;
+            /** @enum {string} */
+            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
+        };
+        GenerateDocumentNumberDto: {
+            /** @enum {string} */
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            branchId?: string;
+        };
         CreateBranchDto: {
             name: string;
             address?: string;
@@ -3669,55 +4425,6 @@ export interface components {
             email?: string;
             /** @enum {string} */
             status?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
-        };
-        CreateDocumentNumberRuleDto: {
-            /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
-            branchId?: string;
-            prefix: string;
-            suffix?: string;
-            includeDate?: boolean;
-            dateFormat?: string;
-            sequenceLength?: number;
-            /** @enum {string} */
-            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
-        };
-        DocumentNumberRuleEntity: {
-            /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
-            prefix: string;
-            suffix?: string;
-            includeDate: boolean;
-            dateFormat: string;
-            sequenceLength: number;
-            /** @enum {string} */
-            resetPolicy: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
-            isActive: boolean;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        UpdateDocumentNumberRuleDto: {
-            prefix?: string;
-            suffix?: string;
-            includeDate?: boolean;
-            dateFormat?: string;
-            sequenceLength?: number;
-            /** @enum {string} */
-            resetPolicy?: "NEVER" | "DAILY" | "MONTHLY" | "YEARLY";
-        };
-        GenerateDocumentNumberDto: {
-            /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "STOCK_TAKE";
-            branchId?: string;
         };
         SalesmanAssignmentEntity: {
             id: string;
@@ -4459,73 +5166,6 @@ export interface components {
             sortOrder?: number;
             codeSuffix?: string;
         };
-        PostJournalLineDto: {
-            /** Format: uuid */
-            accountId: string;
-            debitAmount: number;
-            creditAmount: number;
-            description?: string;
-            lineOrder: number;
-        };
-        PostJournalDto: {
-            /** @enum {string} */
-            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
-            /** Format: uuid */
-            sourceReferenceId?: string;
-            description?: string;
-            notes?: string;
-            lines: components["schemas"]["PostJournalLineDto"][];
-        };
-        JournalEntryEntity: {
-            documentNumber: string;
-            /** @enum {string} */
-            source: "SALE" | "RETURN" | "EXCHANGE" | "EXPENSE" | "CASH_MOVEMENT" | "MANUAL" | "TRANSFER";
-            sourceReferenceId?: string;
-            description?: string;
-            notes?: string;
-            /** @enum {string} */
-            status: "POSTED" | "REVERSED";
-            /** Format: date-time */
-            postedAt: string;
-            postedBy: string;
-            reversedByJournalId?: string;
-            reversalOfJournalId?: string;
-            lines: components["schemas"]["JournalLineEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        JournalLineEntity: {
-            journalEntryId: string;
-            journalEntry: components["schemas"]["JournalEntryEntity"];
-            accountId: string;
-            debitAmount: number;
-            creditAmount: number;
-            description?: string;
-            lineOrder: number;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        ReverseJournalDto: {
-            reason: string;
-        };
         CreatePayableDto: {
             vendorName: string;
             amount: number;
@@ -4656,6 +5296,16 @@ export interface components {
             accountId: string;
             /** Format: uuid */
             payableId?: string;
+            /**
+             * @description Settlement method. CASH posts a cash movement + auto Phiếu chi on post.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "BANK" | "PAYABLE";
+            /**
+             * Format: uuid
+             * @description Cash account to pay from — required when paymentMethod=CASH.
+             */
+            cashAccountId?: string;
         };
         ExpenseEntity: {
             description: string;
@@ -4670,99 +5320,11 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             postedBy?: string;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        CreateCashAccountDto: {
-            name: string;
             /** @enum {string} */
-            type: "REGISTER" | "SAFE" | "PETTY_CASH";
-            /** Format: uuid */
-            accountId: string;
-            balance?: number;
-        };
-        CashAccountEntity: {
-            name: string;
-            /** @enum {string} */
-            type: "REGISTER" | "SAFE" | "PETTY_CASH";
-            balance: number;
-            accountId: string;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        RecordCashMovementDto: {
-            /** Format: uuid */
-            cashAccountId: string;
-            /** @enum {string} */
-            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
-            amount: number;
-            /**
-             * Format: uuid
-             * @description Required when type=TRANSFER (destination account).
-             */
-            toAccountId?: string;
-            /**
-             * Format: uuid
-             * @description Required for DEPOSIT/WITHDRAWAL/ADJUSTMENT — the GL account that offsets the cash leg.
-             */
-            contraAccountId?: string;
-            reference?: string;
-            notes?: string;
-        };
-        PosSessionEntity: {
-            terminalId?: string;
-            /** @enum {string} */
-            status: "OPEN" | "ACTIVE_SALES" | "CLOSING" | "CLOSED";
-            openedBy: string;
-            /** Format: date-time */
-            openedAt: string;
-            closedBy?: string;
-            /** Format: date-time */
-            closedAt?: string;
-            openingCashAmount: number;
+            paymentMethod?: "CASH" | "BANK" | "PAYABLE";
             cashAccountId?: string;
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        CashMovementEntity: {
-            cashAccountId: string;
-            cashAccount: components["schemas"]["CashAccountEntity"];
-            toAccountId?: string;
-            toAccount?: components["schemas"]["CashAccountEntity"];
-            /** @enum {string} */
-            type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "ADJUSTMENT";
-            amount: number;
-            reference?: string;
-            notes?: string;
-            sessionId?: string;
-            session?: components["schemas"]["PosSessionEntity"];
+            cashPaymentId?: string;
+            journalEntryId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -5296,7 +5858,9 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
-        InvoiceItemEntity: {
+        DraftInvoiceItemDto: {
+            /** @description Resolved storage location for this line (null if locationId is unset or stale). */
+            location: components["schemas"]["LocationEntity"] | null;
             invoiceId: string;
             itemId: string;
             locationId?: string;
@@ -5325,7 +5889,7 @@ export interface components {
         };
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
-            items: components["schemas"]["InvoiceItemEntity"][];
+            items: components["schemas"]["DraftInvoiceItemDto"][];
             code: string;
             /** Format: date-time */
             issuedAt?: string;
@@ -5395,6 +5959,8 @@ export interface components {
             /** Format: date-time */
             paidAt: string;
             note?: string;
+            cashReceiptId?: string;
+            journalEntryId?: string;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -5430,23 +5996,25 @@ export interface components {
             items?: components["schemas"]["UpdateInvoiceItemDto"][];
         };
         InvoicePaymentLineDto: {
+            /**
+             * Format: uuid
+             * @description The configured `payment_accounts` row this payment goes into — e.g. which bank
+             *     account a transfer landed in. The server validates the mapping belongs to the
+             *     actor's org + branch and matches `paymentMethod`, then derives the receiving COA
+             *     account; clients never send a COA account id directly.
+             *
+             *     Optional: when omitted the server falls back to the single account configured
+             *     for the method, and rejects the request if more than one exists.
+             */
+            paymentAccountId?: string;
             /** @enum {string} */
             paymentMethod: "cash" | "bank_transfer" | "card";
             amount: number;
-            /** Format: uuid */
-            accountId: string;
             reference?: string;
         };
         CheckoutInvoiceDto: {
-            /** @description Payment lines. Empty array = full debt (requires receivableAccountId + customerId on invoice). */
+            /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
             payments: components["schemas"]["InvoicePaymentLineDto"][];
-            /** Format: uuid */
-            revenueAccountId: string;
-            /**
-             * Format: uuid
-             * @description Required when totalPaid < amountDue — AR account to debit for the remainder.
-             */
-            receivableAccountId?: string;
         };
         CancelInvoiceDto: {
             reason: string;
@@ -5741,6 +6309,16 @@ export interface components {
             locationId: string;
             attachmentIds?: string[];
             lines: components["schemas"]["GoodsReceiptLineDto"][];
+            /**
+             * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
+             * @enum {string}
+             */
+            paymentMethod?: "CASH" | "CREDIT";
+            /**
+             * Format: uuid
+             * @description Cash account to pay from — required when paymentMethod=CASH.
+             */
+            cashAccountId?: string;
             cashPayment?: components["schemas"]["CashSettlementDto"];
             cashReceipt?: components["schemas"]["CashSettlementDto"];
         };
@@ -5763,6 +6341,10 @@ export interface components {
             receivedAt: string;
             locationId: string;
             attachmentIds: string[];
+            /** @enum {string} */
+            paymentMethod?: "CASH" | "CREDIT";
+            cashAccountId?: string;
+            journalEntryId?: string;
             cashPaymentId?: string;
             cashReceiptId?: string;
             /** Format: date-time */
@@ -5854,7 +6436,7 @@ export interface components {
             status: "DRAFT" | "POSTED" | "CANCELLED";
             storageId?: string;
             locationId?: string;
-            /** @description Mục đích — free-text purpose written by user on the form (matches MISA "Mục đích"). */
+            /** @description Mục đích — free-text purpose written by user on the form. */
             purpose?: string;
             /** @description Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time). */
             plannedDate?: string;
@@ -7002,6 +7584,881 @@ export interface operations {
             };
         };
     };
+    CashReceiptsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "POSTED" | "REVERSED";
+                purpose?: "OTHER" | "DEBT_COLLECTION" | "POS_SALE" | "OTHER_INCOME";
+                cashAccountId?: string;
+                partnerId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE over document_number, payer_name, reason. */
+                search?: string;
+                /** @description Filter by origin (maps to reference_type) — TKT-CV-22. */
+                source?: "POS_SALE" | "DEBT_COLLECTION" | "MANUAL";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashReceiptsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashReceiptEntity"];
+                };
+            };
+        };
+    };
+    CashReceiptsController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashReceiptsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashReceiptsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCashReceiptDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashReceiptEntity"];
+                };
+            };
+        };
+    };
+    CashReceiptsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashReceiptEntity"];
+                };
+            };
+        };
+    };
+    CashReceiptsController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseCashReceiptDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashPaymentsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "POSTED" | "REVERSED";
+                purpose?: "OTHER" | "SUPPLIER_PAYMENT" | "PURCHASE" | "EXPENSE" | "SALARY" | "REFUND";
+                cashAccountId?: string;
+                partnerId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+                /** @description ILIKE over document_number, payee_name, reason. */
+                search?: string;
+                /** @description Filter by origin (maps to reference_type) — TKT-CV-22. */
+                source?: "GOODS_RECEIPT" | "EXPENSE" | "MANUAL";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashPaymentsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentEntity"];
+                };
+            };
+        };
+    };
+    CashPaymentsController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashPaymentsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashPaymentsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCashPaymentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentEntity"];
+                };
+            };
+        };
+    };
+    CashPaymentsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentEntity"];
+                };
+            };
+        };
+    };
+    CashPaymentsController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseCashPaymentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashLedgerController_getLedger: {
+        parameters: {
+            query: {
+                cashAccountId: string;
+                dateFrom?: string;
+                dateTo?: string;
+                branchId?: string;
+                /** @description 1-based page number. */
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashCountsController_list: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "POSTED";
+                cashAccountId?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashCountsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashCountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashCountsController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashCountsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCashCountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashCountsController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PartnerLookupController_lookup: {
+        parameters: {
+            query: {
+                type: "employee" | "customer" | "supplier" | "all";
+                /** @description Case-insensitive match against the party name or code. */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PartnerLookupController_customerDebts: {
+        parameters: {
+            query: {
+                customerId: string;
+                /** @description Defaults to OPEN (outstanding debts) when omitted. */
+                status?: "open" | "paid" | "overdue";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    PartnerLookupController_customersWithDebt: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive match against the customer name or code. */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashController_listAccounts: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                branchId?: string;
+                type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashController_createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashAccountDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashAccountEntity"];
+                };
+            };
+        };
+    };
+    CashController_getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashAccountEntity"];
+                };
+            };
+        };
+    };
+    CashController_listMovements: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                cashAccountId?: string;
+                type?: string;
+                branchId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashController_recordMovement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCashMovementDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashMovementEntity"];
+                };
+            };
+        };
+    };
+    JournalController_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostJournalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    JournalController_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseJournalDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    JournalController_list: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                source?: string;
+                status?: string;
+                branchId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JournalController_findById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_listRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentNumberingController_createRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDocumentNumberRuleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_updateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDocumentNumberRuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_activateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_deactivateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
+                };
+            };
+        };
+    };
+    DocumentNumberingController_generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateDocumentNumberDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
     BranchController_list: {
         parameters: {
             query?: never;
@@ -7209,136 +8666,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    DocumentNumberingController_listRules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    DocumentNumberingController_createRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateDocumentNumberRuleDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
-                };
-            };
-        };
-    };
-    DocumentNumberingController_updateRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateDocumentNumberRuleDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
-                };
-            };
-        };
-    };
-    DocumentNumberingController_activateRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
-                };
-            };
-        };
-    };
-    DocumentNumberingController_deactivateRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentNumberRuleEntity"];
-                };
-            };
-        };
-    };
-    DocumentNumberingController_generate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateDocumentNumberDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": string;
-                };
             };
         };
     };
@@ -9336,100 +10663,6 @@ export interface operations {
             };
         };
     };
-    JournalController_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PostJournalDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JournalEntryEntity"];
-                };
-            };
-        };
-    };
-    JournalController_reverse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReverseJournalDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JournalEntryEntity"];
-                };
-            };
-        };
-    };
-    JournalController_list: {
-        parameters: {
-            query?: {
-                page?: string;
-                pageSize?: string;
-                source?: string;
-                status?: string;
-                branchId?: string;
-                dateFrom?: string;
-                dateTo?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    JournalController_findById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JournalEntryEntity"];
-                };
-            };
-        };
-    };
     PayablesController_list: {
         parameters: {
             query?: {
@@ -9835,13 +11068,11 @@ export interface operations {
             };
         };
     };
-    CashController_listAccounts: {
+    PaymentAccountsController_list: {
         parameters: {
             query?: {
-                page?: string;
-                pageSize?: string;
-                branchId?: string;
-                type?: string;
+                /** @description Filter to a single payment method (cash/bank_transfer/card). */
+                method?: "cash" | "bank_transfer" | "card";
             };
             header?: never;
             path?: never;
@@ -9849,101 +11080,12 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Active payment accounts for the current branch. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    CashController_createAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateCashAccountDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashAccountEntity"];
-                };
-            };
-        };
-    };
-    CashController_getAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashAccountEntity"];
-                };
-            };
-        };
-    };
-    CashController_listMovements: {
-        parameters: {
-            query?: {
-                page?: string;
-                pageSize?: string;
-                cashAccountId?: string;
-                type?: string;
-                branchId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    CashController_recordMovement: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecordCashMovementDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashMovementEntity"];
-                };
             };
         };
     };

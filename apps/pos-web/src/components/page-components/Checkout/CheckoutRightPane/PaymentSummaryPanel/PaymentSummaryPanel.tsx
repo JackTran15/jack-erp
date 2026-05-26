@@ -9,6 +9,7 @@ import type { CustomerActionItem } from "@erp/pos/components/common/PosCustomerA
 import { PromoMenu } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/PromoMenu/PromoMenu";
 import { QuickExchangeBadges } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/QuickExchangeBadges/QuickExchangeBadges";
 import { DepositDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DepositDialog/DepositDialog";
+import { ReturnFeeDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/ReturnFeeDialog/ReturnFeeDialog";
 import { PromotionSelectionModal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/PromotionSelectionModal/PromotionSelectionModal";
 import { CheckoutActionsSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/CheckoutActionsSection";
 import { CustomerSection } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CustomerSection/CustomerSection";
@@ -21,6 +22,11 @@ import {
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import {
+  selectCheckoutVariant,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 export interface PaymentSummaryPanelProps {
   customerSearchRef: RefObject<HTMLInputElement | null>;
@@ -37,10 +43,16 @@ export function PaymentSummaryPanel({
   const {
     deposit,
     setDeposit,
+    returnFee,
+    setReturnFee,
     paymentLines,
     handleRequireCustomerForDeposit,
   } = useCheckoutPayment();
   const { appliedPromotion, applyPromotion } = useCheckoutPromotion();
+
+  // Tab trả theo hóa đơn → khóa khách (lấy từ hóa đơn gốc, không cho đổi/thêm).
+  const variant = usePosCheckoutSessionStore(selectCheckoutVariant);
+  const customerLocked = variant === CheckoutVariantEnum.INVOICE_RETURN;
 
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
   const [promoMenuOpen, setPromoMenuOpen] = useState(false);
@@ -49,6 +61,8 @@ export function PaymentSummaryPanel({
   const [draftDepositMethod, setDraftDepositMethod] = useState<PaymentMethod>(
     PaymentMethodEnum.CASH,
   );
+  const [returnFeeDialogOpen, setReturnFeeDialogOpen] = useState(false);
+  const [draftReturnFee, setDraftReturnFee] = useState(0);
 
   const hasCustomer = Boolean(selectedCustomer);
 
@@ -89,10 +103,15 @@ export function PaymentSummaryPanel({
         keepWhenSelected: true,
       },
     ];
-    const filtered = hasCustomer ? all.filter((a) => a.keepWhenSelected) : all;
+    const base = hasCustomer ? all.filter((a) => a.keepWhenSelected) : all;
+    // Khóa khách (invoice_return) → bỏ thao tác đổi khách (thêm khách / quét QR).
+    const filtered = customerLocked
+      ? base.filter((a) => a.key !== "add" && a.key !== "qr")
+      : base;
     return filtered.map(({ keepWhenSelected: _k, ...rest }) => rest);
   }, [
     hasCustomer,
+    customerLocked,
     handleAddCustomer,
     addCustomerButtonRef,
     promotionDialogOpen,
@@ -114,12 +133,23 @@ export function PaymentSummaryPanel({
     setDepositDialogOpen(false);
   };
 
+  const handleOpenReturnFeeDialog = () => {
+    setDraftReturnFee(returnFee);
+    setReturnFeeDialogOpen(true);
+  };
+
+  const handleConfirmReturnFee = () => {
+    setReturnFee(Math.max(0, draftReturnFee));
+    setReturnFeeDialogOpen(false);
+  };
+
   return (
     <aside className="flex h-full min-w-[350px] w-[26dvw] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
       <div className="flex-1 overflow-y-auto">
         <CustomerSection
           customerInputRef={customerSearchRef}
           actions={customerActions}
+          locked={customerLocked}
         />
 
         <QuickExchangeBadges />
@@ -127,6 +157,7 @@ export function PaymentSummaryPanel({
         <PaymentSection
           paymentAmountRef={paymentAmountRef}
           onDepositClick={handleOpenDepositDialog}
+          onReturnFeeClick={handleOpenReturnFeeDialog}
         />
       </div>
 
@@ -141,6 +172,14 @@ export function PaymentSummaryPanel({
         onAmountChange={setDraftDepositAmount}
         onMethodChange={setDraftDepositMethod}
         onConfirm={handleConfirmDeposit}
+      />
+
+      <ReturnFeeDialog
+        open={returnFeeDialogOpen}
+        amount={draftReturnFee}
+        onClose={() => setReturnFeeDialogOpen(false)}
+        onAmountChange={setDraftReturnFee}
+        onConfirm={handleConfirmReturnFee}
       />
 
       <PromotionSelectionModal

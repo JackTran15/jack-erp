@@ -11,22 +11,24 @@ import { LabelTagButton } from "@erp/pos/components/page-components/Checkout/Che
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-account";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { API_METHOD_TO_PAYMENT_METHOD } from "@erp/pos/constants/checkout.constant";
 
 interface PaymentSectionProps {
   paymentAmountRef: RefObject<HTMLInputElement | null>;
   onDepositClick: () => void;
+  onReturnFeeClick: () => void;
 }
 
 export function PaymentSection({
   paymentAmountRef,
   onDepositClick,
+  onReturnFeeClick,
 }: PaymentSectionProps) {
   const {
-    deposit,
-    grandTotal: total,
+    settlementGrandTotal,
     settlementAbs,
     paymentLines,
+    setPaymentLines,
     handleChangePaymentLines,
     changeAmount,
     shortageAmount,
@@ -35,11 +37,9 @@ export function PaymentSection({
     debt,
     note,
     setNote,
+    preorder,
+    setFirstLineAmountAuto,
   } = useCheckoutPayment();
-  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
-  const setFirstLineAmountAuto = usePosCheckoutPaymentStore(
-    (s) => s.setFirstLineAmountAuto,
-  );
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
 
@@ -49,29 +49,43 @@ export function PaymentSection({
     setFirstLineAmountAuto(settlementAbs);
   }, [settlementAbs, setFirstLineAmountAuto]);
 
+  // Gán tài khoản mặc định cho dòng thanh toán chưa chọn. Dùng `setPaymentLines`
+  // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì
+  // `handleChangePaymentLines` để không vô tình tắt auto-fill / ghi đè số tiền vừa
+  // được auto-fill — race này chỉ lộ ở invoice_return (mở tab với giỏ khác rỗng).
+  const needsAssign =
+    accounts.length > 0 && paymentLines.some((l) => !l.paymentAccountId);
   useEffect(() => {
-    if (accounts.length === 0) return;
-    const used = new Set(
-      paymentLines
-        .map((l) => l.cashAccountId)
-        .filter((id): id is string => Boolean(id)),
-    );
-    let mutated = false;
-    const next = paymentLines.map((line) => {
-      if (line.cashAccountId) return line;
-      const free = accounts.find((a) => !used.has(a.id));
-      if (!free) return line;
-      used.add(free.id);
-      mutated = true;
-      return { ...line, cashAccountId: free.id };
+    if (!needsAssign) return;
+    setPaymentLines((prev) => {
+      const used = new Set(
+        prev
+          .map((l) => l.paymentAccountId)
+          .filter((id): id is string => Boolean(id)),
+      );
+      let mutated = false;
+      const next = prev.map((line) => {
+        if (line.paymentAccountId) return line;
+        const free = accounts.find((a) => !used.has(a.id));
+        if (!free) return line;
+        used.add(free.id);
+        mutated = true;
+        return {
+          ...line,
+          paymentAccountId: free.id,
+          method: API_METHOD_TO_PAYMENT_METHOD[free.paymentMethod],
+        };
+      });
+      return mutated ? next : prev;
     });
-    if (mutated) handleChangePaymentLines(next);
-  }, [accounts, paymentLines, handleChangePaymentLines]);
+  }, [needsAssign, accounts, setPaymentLines]);
 
-  const amountDue = Math.max(0, total - deposit);
-  const isRefundFlow = total < 0;
+  // Dùng settlementGrandTotal (đã trừ đặt cọc + cộng phí đổi trả) để Còn phải thu /
+  // hoàn tiền + chiều refund tự đúng khi phí/đặt cọc lật dấu.
+  const amountDue = Math.max(0, settlementGrandTotal);
+  const isRefundFlow = settlementGrandTotal < 0;
   const netChangeDisplay = changeAmount - shortageAmount;
-  const refundDisplayAmount = Math.max(0, -total);
+  const refundDisplayAmount = Math.max(0, -settlementGrandTotal);
 
   const showKeepChange =
     !debt &&
@@ -84,7 +98,10 @@ export function PaymentSection({
   return (
     <>
       <div className="px-4">
-        <PaymentSummaryBlock onDepositClick={onDepositClick} />
+        <PaymentSummaryBlock
+          onDepositClick={onDepositClick}
+          onReturnFeeClick={onReturnFeeClick}
+        />
       </div>
       {!isRefundFlow ? (
         <>

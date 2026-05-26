@@ -8,7 +8,6 @@ import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/Po
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
-import { usePosCheckoutCatalogStore } from "@erp/pos/stores/page-stores/checkout/checkout-catalog.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface ProductSearchInputProps {
@@ -38,9 +37,8 @@ export function ProductSearchInput({
   minChars = 1,
   debounceMs = 150,
 }: ProductSearchInputProps) {
-  const { toolbar, productSearchAdapter } = useCheckoutCatalog();
+  const { toolbar, setToolbar, productSearchAdapter } = useCheckoutCatalog();
   const { addProductByItem, addProductByQuery } = useCheckoutCartActions();
-  const setToolbar = usePosCheckoutCatalogStore((s) => s.setToolbar);
   const focusSeq = usePosCheckoutUiStore((s) => s.productSearchFocusSeq);
 
   useEffect(() => {

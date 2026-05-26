@@ -21,6 +21,7 @@
     "schema:drop": "pnpm --filter @erp/api schema:drop",
     "seed:inventory": "pnpm --filter @erp/api seed:inventory",
     "seed:dev-admin": "pnpm --filter @erp/api seed:dev-admin",
+    "seed:sync-admin-permissions": "pnpm --filter @erp/api seed:sync-admin-permissions",
     "contract:check": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/contract-check.ts",
     "docs:entities:manifest": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/generate-entity-docs.ts",
     "docs:entities:markdown": "node scripts/generate-entity-markdown.js",

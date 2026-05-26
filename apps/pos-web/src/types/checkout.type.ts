@@ -6,7 +6,6 @@ export enum CheckoutVariantEnum {
 }
 
 /** Lý do build payload checkout thất bại — caller toast và abort. */
-export type ResolveCheckoutPayloadError =
-  | { code: "missing_revenue_account" }
-  | { code: "missing_receivable_account" }
-  | { code: "missing_cash_account"; cashAccountId: string | null };
+export type ResolveCheckoutPayloadError = {
+  code: "missing_payment_account";
+};

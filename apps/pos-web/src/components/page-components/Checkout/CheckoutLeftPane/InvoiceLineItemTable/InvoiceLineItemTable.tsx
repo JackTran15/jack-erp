@@ -1,10 +1,6 @@
 import { TooltipProvider } from "@erp/ui";
 import { InvoiceLineItemRow } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemRow";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
-import {
-  selectInvoiceTableCheckoutPane,
-  usePosCheckoutSessionStore,
-} from "@erp/pos/stores/common/checkout-session.store";
 
 const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
   { label: "STT", align: "center" },
@@ -19,14 +15,12 @@ const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
 ];
 
 /**
- * Invoice line items table. Đọc trực tiếp cart/selectedLineId từ session-cart
- * hook. Row component tự consume các handler từ cart-actions hook.
+ * Invoice line items table. Đọc `cart` (đã gộp hàng trả + mua thêm với
+ * QUICK_EXCHANGE) từ session-cart hook; mỗi dòng nhận `isReturnLine`/`locked`
+ * tính sẵn theo variant. Row tự consume handler từ cart-actions hook.
  */
 export function InvoiceLineItemTable() {
-  const { cart } = useCheckoutSessionCart();
-  const checkoutPane = usePosCheckoutSessionStore(
-    selectInvoiceTableCheckoutPane,
-  );
+  const { cart, isReturnLine, isLineLocked } = useCheckoutSessionCart();
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -67,7 +61,8 @@ export function InvoiceLineItemTable() {
                   key={line.lineId}
                   index={i + 1}
                   line={line}
-                  checkoutPane={checkoutPane}
+                  isReturnLine={isReturnLine(line)}
+                  locked={isLineLocked(line)}
                 />
               ))
             )}

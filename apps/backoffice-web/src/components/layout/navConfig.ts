@@ -141,6 +141,51 @@ export const navConfig: NavModule[] = [
     ],
   },
   {
+    id: "treasury",
+    label: "Quỹ tiền",
+    icon: Banknote,
+    defaultPath: "/treasury/cash/ledger",
+    flyout: {
+      enabled: true,
+      splitLeft: ["treasury-cash", "treasury-deposit"],
+      splitRight: ["treasury-offset", "treasury-compensation"],
+    },
+    sections: [
+      {
+        id: "treasury-cash",
+        label: "TIỀN MẶT",
+        children: [
+          { to: "/treasury/cash/receipts-expenses", label: "Thu, chi tiền mặt" },
+          { to: "/treasury/cash/count", label: "Kiểm kê tiền mặt" },
+          { to: "/treasury/cash/ledger", label: "Sổ chi tiết tiền mặt" },
+        ],
+      },
+      {
+        id: "treasury-deposit",
+        label: "TIỀN GỬI",
+        children: [
+          { to: "/treasury/wip/deposit-receipts-expenses", label: "Thu, chi tiền gửi" },
+          { to: "/treasury/wip/deposit-reconciliation", label: "Đối chiếu tiền gửi" },
+          { to: "/treasury/wip/deposit-ledger", label: "Sổ chi tiết tiền gửi" },
+        ],
+      },
+      {
+        id: "treasury-offset",
+        label: "ĐỐI TRỪ",
+        children: [
+          { to: "/treasury/wip/offset-debt", label: "Đối trừ công nợ" },
+        ],
+      },
+      {
+        id: "treasury-compensation",
+        label: "BÙ TRỪ",
+        children: [
+          { to: "/treasury/wip/compensation-debt", label: "Bù trừ công nợ" },
+        ],
+      },
+    ],
+  },
+  {
     id: "reports",
     label: "Báo cáo",
     icon: BarChart3,

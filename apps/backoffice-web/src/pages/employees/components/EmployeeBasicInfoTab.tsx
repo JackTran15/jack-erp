@@ -1,4 +1,5 @@
 import { DateTimeField, FormField, FormFieldProps, Input, cn } from "@erp/ui";
+import { RadioGroup } from "../../../components/forms/RadioGroup";
 import { Eye, EyeOff, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { formatEmploymentStatus } from "../employee.mappers";
@@ -57,34 +58,6 @@ function PasswordInput({
       >
         {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
-    </div>
-  );
-}
-
-function RadioGroup<T extends string>({
-  name,
-  value,
-  options,
-  onChange,
-}: {
-  name: string;
-  value: T;
-  options: readonly { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-4 pt-2 text-sm">
-      {options.map((opt) => (
-        <label key={opt.value} className="flex items-center gap-2">
-          <input
-            type="radio"
-            name={name}
-            checked={value === opt.value}
-            onChange={() => onChange(opt.value)}
-          />
-          {opt.label}
-        </label>
-      ))}
     </div>
   );
 }

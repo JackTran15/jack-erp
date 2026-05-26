@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
-import { usePosCheckoutLabelsStore } from "@erp/pos/stores/page-stores/checkout/checkout-labels.store";
+import { useCheckoutLabels } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-labels";
 import { LabelSearchBar } from "./LabelSearchBar/LabelSearchBar";
 import { LabelAddForm } from "./LabelAddForm/LabelAddForm";
 import { LabelListRow } from "./LabelListRow/LabelListRow";
@@ -11,16 +11,14 @@ export interface LabelTagDialogProps {
 }
 
 export function LabelTagDialog({ open, onClose }: LabelTagDialogProps) {
-  const labels = usePosCheckoutLabelsStore((s) => s.labels);
-  const storeSelectedIds = usePosCheckoutLabelsStore(
-    (s) => s.selectedLabelIds,
-  );
-  const setSelectedLabelIds = usePosCheckoutLabelsStore(
-    (s) => s.setSelectedLabelIds,
-  );
-  const addLabel = usePosCheckoutLabelsStore((s) => s.addLabel);
-  const updateLabel = usePosCheckoutLabelsStore((s) => s.updateLabel);
-  const deleteLabel = usePosCheckoutLabelsStore((s) => s.deleteLabel);
+  const {
+    labels,
+    selectedLabelIds: storeSelectedIds,
+    setSelectedLabelIds,
+    addLabel,
+    updateLabel,
+    deleteLabel,
+  } = useCheckoutLabels();
 
   const [query, setQuery] = useState("");
   const [addFormOpen, setAddFormOpen] = useState(false);

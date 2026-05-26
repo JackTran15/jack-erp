@@ -1,4 +1,7 @@
+import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 
 export interface InvoiceTabItem {
@@ -29,6 +32,12 @@ export interface CartLine {
    * monetary effect is negative (refund credit). UI shows negative qty / pink row.
    */
   isReturnCredit?: boolean;
+  /**
+   * Đơn trả `regular`: id của dòng hóa đơn bán gốc (`invoice_items.id`) mà dòng
+   * trả này tham chiếu. Bắt buộc để BE cộng `returned_quantity` đúng dòng. Bỏ
+   * trống ở đơn trả `quick` (không có hóa đơn gốc).
+   */
+  originalInvoiceItemId?: string;
 }
 
 export interface CatalogProduct {
@@ -118,4 +127,76 @@ export interface DraftInvoice {
   checkoutVariant?: CheckoutVariantEnum;
   quickExchangePurchase?: CartLine[];
   quickExchangeReturn?: CartLine[];
+}
+
+// ============================================================================
+// Per-tab checkout draft
+// ============================================================================
+// Tất cả trạng thái "đang soạn" của 1 tab hóa đơn (ngoài giỏ hàng) — khách,
+// thanh toán, khuyến mãi, nhãn đã chọn, NV bán/bảng giá, filter catalog. Được
+// nhúng vào `InvoiceSession.draft` để mỗi tab giữ riêng trạng thái khi chuyển
+// qua lại và khi reload (session store đã persist). Tách slice lồng nhau để
+// hook có thể subscribe từng slice (reference ổn định, tránh re-render thừa).
+
+export interface CheckoutCustomerDraft {
+  selectedCustomer: CustomerRow | null;
+  customerQuery: string;
+}
+
+export interface CheckoutPaymentDraft {
+  paymentLines: PaymentLine[];
+  keepChange: boolean;
+  debt: boolean;
+  note: string;
+  printInvoice: boolean;
+  preorder: boolean;
+  selectedSuggestionId: string | null;
+  deposit: number;
+  /**
+   * Phí đổi trả (chỉ dùng ở tab return / quick-exchange) — khách trả thêm, cộng
+   * vào số phải thu / trừ vào số hoàn. 0 ở tab bán thường.
+   */
+  returnFee: number;
+  /**
+   * `true` khi số tiền dòng đầu vẫn tự đồng bộ theo "số tiền cần thanh toán".
+   * Chuyển `false` khi nhân viên tự nhập số / chọn gợi ý.
+   */
+  firstAmountAuto: boolean;
+}
+
+export interface CheckoutPromotionDraft {
+  appliedPromotion: PromotionItem | null;
+}
+
+export interface CheckoutLabelsDraft {
+  /** Id nhãn đã gán cho đơn này (định nghĩa nhãn nằm ở store labels toàn cục). */
+  selectedLabelIds: string[];
+}
+
+export interface CheckoutMetaDraft {
+  selectedSalesperson: Salesperson | null;
+  selectedPriceBook: PriceBook | null;
+}
+
+export interface CheckoutCatalogToolbarDraft {
+  query: string;
+  qty: number;
+  splitLine: boolean;
+}
+
+export interface CheckoutCatalogDraft {
+  toolbar: CheckoutCatalogToolbarDraft;
+  catalogQuery: string;
+  catalogGroup: string | undefined;
+  catalogCollapsed: boolean;
+}
+
+/** Toàn bộ trạng thái soạn thảo per-tab, nhúng trong `InvoiceSession.draft`. */
+export interface CheckoutDraft {
+  customer: CheckoutCustomerDraft;
+  payment: CheckoutPaymentDraft;
+  promotion: CheckoutPromotionDraft;
+  labels: CheckoutLabelsDraft;
+  meta: CheckoutMetaDraft;
+  catalog: CheckoutCatalogDraft;
 }

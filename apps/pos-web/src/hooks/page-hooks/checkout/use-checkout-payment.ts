@@ -7,14 +7,21 @@ import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
 } from "@erp/pos/constants/checkout.constant";
+import { CHECKOUT_ERRORS } from "@erp/pos/constants/checkout-messages.constant";
 import { buildSuggestions } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import {
+  selectPaymentDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 type Updater<T> = T | ((prev: T) => T);
+
+const apply = <T>(prev: T, value: Updater<T>): T =>
+  typeof value === "function" ? (value as (p: T) => T)(prev) : value;
 
 interface UseCheckoutPaymentResult {
   paymentLines: PaymentLine[];
@@ -39,6 +46,11 @@ interface UseCheckoutPaymentResult {
   setSelectedSuggestionId: (value: Updater<string | null>) => void;
   deposit: number;
   setDeposit: (value: Updater<number>) => void;
+  /** Phí đổi trả (return/exchange) — cộng vào settlement. */
+  returnFee: number;
+  setReturnFee: (value: Updater<number>) => void;
+  /** Tự điền số tiền dòng đầu = `amount` khi còn ở chế độ auto (1 dòng). */
+  setFirstLineAmountAuto: (amount: number) => void;
   grandTotal: number;
   settlementGrandTotal: number;
   settlementAbs: number;
@@ -64,35 +76,109 @@ interface UseCheckoutPaymentResult {
 export function useCheckoutPayment(): UseCheckoutPaymentResult {
   const grandTotal = useCheckoutGrandTotal();
 
-  const paymentLines = usePosCheckoutPaymentStore((s) => s.paymentLines);
-  const keepChange = usePosCheckoutPaymentStore((s) => s.keepChange);
-  const debt = usePosCheckoutPaymentStore((s) => s.debt);
-  const note = usePosCheckoutPaymentStore((s) => s.note);
-  const printInvoice = usePosCheckoutPaymentStore((s) => s.printInvoice);
-  const preorder = usePosCheckoutPaymentStore((s) => s.preorder);
-  const selectedSuggestionId = usePosCheckoutPaymentStore(
-    (s) => s.selectedSuggestionId,
-  );
-  const deposit = usePosCheckoutPaymentStore((s) => s.deposit);
+  // Slice payment của tab đang active (reference ổn định theo session).
+  const payment = usePosCheckoutSessionStore(selectPaymentDraft);
+  const {
+    paymentLines,
+    keepChange,
+    debt,
+    note,
+    printInvoice,
+    preorder,
+    selectedSuggestionId,
+    deposit,
+    returnFee,
+  } = payment;
 
-  const setPaymentLines = usePosCheckoutPaymentStore((s) => s.setPaymentLines);
-  const setKeepChange = usePosCheckoutPaymentStore((s) => s.setKeepChange);
-  const clearKeepChange = usePosCheckoutPaymentStore(
-    (s) => s.clearKeepChange,
+  // Action generic + behavior action lấy từ session store (reference ổn định).
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
   );
-  const setDebt = usePosCheckoutPaymentStore((s) => s.setDebt);
-  const setNote = usePosCheckoutPaymentStore((s) => s.setNote);
-  const setPrintInvoice = usePosCheckoutPaymentStore((s) => s.setPrintInvoice);
-  const setPreorder = usePosCheckoutPaymentStore((s) => s.setPreorder);
-  const setSelectedSuggestionId = usePosCheckoutPaymentStore(
-    (s) => s.setSelectedSuggestionId,
-  );
-  const setDeposit = usePosCheckoutPaymentStore((s) => s.setDeposit);
-  const handleChangePaymentLines = usePosCheckoutPaymentStore(
+  const handleChangePaymentLines = usePosCheckoutSessionStore(
     (s) => s.handleChangePaymentLines,
   );
-  const handlePickSuggestion = usePosCheckoutPaymentStore(
+  const handlePickSuggestion = usePosCheckoutSessionStore(
     (s) => s.handlePickSuggestion,
+  );
+  const setFirstLineAmountAuto = usePosCheckoutSessionStore(
+    (s) => s.setFirstLineAmountAuto,
+  );
+
+  const setPaymentLines = useCallback(
+    (value: Updater<PaymentLine[]>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        paymentLines: apply(p.paymentLines, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setKeepChange = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        keepChange: apply(p.keepChange, value),
+      })),
+    [updateDraftSlice],
+  );
+  const clearKeepChange = useCallback(
+    () => updateDraftSlice("payment", (p) => ({ ...p, keepChange: false })),
+    [updateDraftSlice],
+  );
+  const setDebt = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        debt: apply(p.debt, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setNote = useCallback(
+    (value: Updater<string>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        note: apply(p.note, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setPrintInvoice = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        printInvoice: apply(p.printInvoice, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setPreorder = useCallback(
+    (value: Updater<boolean>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        preorder: apply(p.preorder, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setSelectedSuggestionId = useCallback(
+    (value: Updater<string | null>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        selectedSuggestionId: apply(p.selectedSuggestionId, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setDeposit = useCallback(
+    (value: Updater<number>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        deposit: apply(p.deposit, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setReturnFee = useCallback(
+    (value: Updater<number>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        returnFee: apply(p.returnFee, value),
+      })),
+    [updateDraftSlice],
   );
 
   const {
@@ -104,8 +190,15 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     debtAmount,
   } = useMemo(
     () =>
-      deriveSettlement({ grandTotal, deposit, paymentLines, keepChange, debt }),
-    [grandTotal, deposit, paymentLines, keepChange, debt],
+      deriveSettlement({
+        grandTotal,
+        deposit,
+        returnFee,
+        paymentLines,
+        keepChange,
+        debt,
+      }),
+    [grandTotal, deposit, returnFee, paymentLines, keepChange, debt],
   );
 
   const isRefundFlow = settlementGrandTotal < 0;
@@ -130,7 +223,7 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       if (next && !selectedCustomer) {
         usePosCheckoutUiStore
           .getState()
-          .setCartError("Hóa đơn chưa chọn khách hàng, vui lòng kiểm tra lại.");
+          .setCartError(CHECKOUT_ERRORS.CUSTOMER_REQUIRED);
         return;
       }
       if (next) {
@@ -167,6 +260,9 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     setSelectedSuggestionId,
     deposit,
     setDeposit,
+    returnFee,
+    setReturnFee,
+    setFirstLineAmountAuto,
     grandTotal,
     settlementGrandTotal,
     settlementAbs,

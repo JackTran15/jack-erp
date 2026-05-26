@@ -10,6 +10,7 @@ describe('CoaSeederService', () => {
     count: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    find: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -19,6 +20,10 @@ describe('CoaSeederService', () => {
       create: jest.fn((dto) => ({ ...dto })),
       save: jest.fn((entity) =>
         Promise.resolve({ ...entity, id: `acc-${++idCounter}` }),
+      ),
+      // Idempotent top-up reads existing codes; default: all root codes present.
+      find: jest.fn().mockResolvedValue(
+        DEFAULT_COA.filter((a) => !a.parent).map((a) => ({ code: a.code })),
       ),
     };
 

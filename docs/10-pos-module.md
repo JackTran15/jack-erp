@@ -92,3 +92,37 @@ flowchart LR
 - Every sale and return writes inventory and accounting effects.
 - Every exchange writes inventory and accounting effects with original sale linkage.
 - High-risk actions are permission-gated and audited.
+
+## Đổi trả hàng (Return / Exchange) — EPIC-011
+
+Chi tiết thiết kế + 4 sequence diagram: [docs/plan-return-exchange.md](./plan-return-exchange.md).
+
+`InvoiceEntity.type` mở rộng từ `SALE` sang `{ SALE | RETURN | EXCHANGE }`. Mọi luồng đổi trả share hạ tầng invoice/payment/promotion hiện hữu thay vì entity riêng.
+
+### Endpoints
+
+| Method | Path | Permission | Mục đích |
+|---|---|---|---|
+| GET  | `/invoices/:id/eligible-returns` | `pos.return.create` | Liệt kê lines còn trả được (maxReturnable = soldQty - returnedQty) |
+| POST | `/invoices/returns` | `pos.return.create` | Tạo draft RETURN — `mode=quick` (không invoice gốc) hoặc `mode=regular` (có invoice gốc) |
+| POST | `/invoices/exchanges` | `pos.exchange.create` | Tạo draft EXCHANGE — gồm returnLines (IN) + newLines (OUT) |
+| POST | `/invoices/:id/checkout-return` | `pos.return.create` | Finalize: validate refund matrix, atomic returned_qty guard, fan-out events |
+
+### Refund methods
+
+- `CASH` — `CashService.recordMovement(WITHDRAWAL)` qua `CashRefundConsumer`.
+- `STORE_CREDIT` — phát hành `customer_credits` row (`CustomerCreditService.issue`), reference code = `<RT-code>-CR`.
+- `OFFSET` — cấn trừ vào `invoice_debts` của SALE gốc khi original ở trạng thái DEBT/PARTIAL_DEBT.
+
+### Async event fan-out (sau commit transaction)
+
+- `STOCK_RETURN_IN` → `StockReturnInConsumer` ghi ledger `RETURN_IN` với referenceType=`RETURN_INVOICE`.
+- `STOCK_DEDUCTION` (chỉ EXCHANGE có newLines) → reuse `StockDeductionConsumer` hiện hữu.
+- `JOURNAL_POST_RETURN` → `JournalReturnConsumer` post entry source=`RETURN|EXCHANGE`, cân bằng theo refundMethod.
+- `CASH_REFUND` (chỉ refundMethod=CASH) → `CashRefundConsumer`.
+- `CASH_MOVEMENT_FROM_PAYMENT` (chỉ EXCHANGE net > 0, cash payments) → reuse hiện hữu.
+- `LOYALTY_POINTS_REVERSE` (net ≤ 0) → trừ `floor(refundedSubtotal/1000)` điểm, floor 0 nếu insufficient.
+  HOẶC `LOYALTY_POINTS_AWARD` (EXCHANGE net > 0) → reuse hiện hữu (KH earn thêm theo net delta).
+- `RETURN_POSTED` + WebSocket `POS_CHECKOUT_ACKNOWLEDGED` → audit / UI sync.
+
+Mỗi consumer **idempotent** (dedup theo unique reference key trước insert). Topic key = `returnInvoiceId` để partial return của cùng invoice gốc không bị nuốt như cancel flow.

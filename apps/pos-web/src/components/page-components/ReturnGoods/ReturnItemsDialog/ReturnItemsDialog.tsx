@@ -13,6 +13,10 @@ import type { ReturnInvoiceRow, ReturnableItem } from "@erp/pos/interfaces/retur
 export interface ReturnItemsDialogProps {
   open: boolean;
   invoice: ReturnInvoiceRow | null;
+  /** Returnable lines fetched from `GET /invoices/:id/eligible-returns`. */
+  items: ReadonlyArray<ReturnableItem>;
+  /** True while the eligible-returns request is in flight. */
+  loading?: boolean;
   selectedIds: ReadonlySet<string>;
   qtyById: Readonly<Record<string, number>>;
   onToggleItem: (id: string) => void;
@@ -29,6 +33,8 @@ export interface ReturnItemsDialogProps {
 export function ReturnItemsDialog({
   open,
   invoice,
+  items,
+  loading = false,
   selectedIds,
   qtyById,
   onToggleItem,
@@ -37,7 +43,6 @@ export function ReturnItemsDialog({
   onConfirm,
   onClose,
 }: ReturnItemsDialogProps) {
-  const items = invoice?.items ?? [];
   const allChecked = items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const anyChecked = items.some((i) => selectedIds.has(i.id));
 
@@ -137,7 +142,11 @@ export function ReturnItemsDialog({
           columns={columns}
           dataSource={items}
           rowKey={(row) => row.id}
-          emptyText="Hóa đơn này chưa có hàng hóa nào để trả."
+          emptyText={
+            loading
+              ? "Đang tải hàng hóa..."
+              : "Hóa đơn này không còn hàng hóa nào để trả."
+          }
           rowClassName={(row) =>
             cn(selectedIds.has(row.id) && "bg-[#EEF2FF]")
           }

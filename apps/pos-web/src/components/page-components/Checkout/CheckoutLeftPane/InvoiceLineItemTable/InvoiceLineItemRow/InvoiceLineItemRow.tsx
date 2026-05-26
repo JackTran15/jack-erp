@@ -11,45 +11,48 @@ import type { CartLine } from "@erp/pos/interfaces/checkout.interface";
 import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemWarningCell/InvoiceLineItemWarningCell";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
-import { CheckoutPane } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface InvoiceLineItemRowProps {
   index: number;
   line: CartLine;
-  checkoutPane?: CheckoutPane;
+  /** Dòng hàng trả → nền hồng + SL hiển thị âm. */
+  isReturnLine: boolean;
+  /** Khóa sửa SL/giá + ẩn nút xóa (dòng trả của hóa đơn trả `invoice_return`). */
+  locked: boolean;
 }
 
 /**
- * Single editable row inside the invoice line item table. Đọc selected /
- * warning / autofocus signals từ stores+hooks; handlers từ cart hook.
+ * Single editable row inside the invoice line item table. `isReturnLine`/`locked`
+ * do bảng tính sẵn theo variant + cart của dòng. Khi `locked`: SL/đơn giá
+ * read-only, không có nút xóa (hàng trả theo hóa đơn không được sửa).
  */
 export function InvoiceLineItemRow({
   index,
   line,
-  checkoutPane = CheckoutPane.PURCHASE,
+  isReturnLine,
+  locked,
 }: InvoiceLineItemRowProps) {
   const {
-    selectedLineId,
+    isLineSelected,
+    selectLine,
     isLineWarning,
     updateQty,
     bumpQty,
     updateUnitPrice,
     removeLine,
-    setSelectedLineId,
   } = useCheckoutSessionCart();
   const { commitQty, consumeQtyAutoFocus } = useCheckoutCartActions();
   const pendingQtyFocusLineId = usePosCheckoutUiStore(
     (s) => s.pendingQtyFocusLineId,
   );
 
-  const selected = selectedLineId === line.lineId;
+  const selected = isLineSelected(line);
   const hasWarning = isLineWarning(line);
   const autoFocusQty = pendingQtyFocusLineId === line.lineId;
 
   const rowTotal = lineTotal(line);
-  const isReturnQuantityUi =
-    Boolean(line.isReturnCredit) || checkoutPane === CheckoutPane.RETURN;
+  const isReturnQuantityUi = isReturnLine;
   const displayQty = isReturnQuantityUi ? -line.qty : line.qty;
   const oversell = !isReturnQuantityUi && lineExceedsOnHandSnapshot(line);
 
@@ -74,13 +77,15 @@ export function InvoiceLineItemRow({
 
   return (
     <tr
-      onClick={() => setSelectedLineId(line.lineId)}
+      onClick={() => selectLine(line)}
       className={cn(
         "h-12 cursor-pointer text-sm text-gray-900 transition-colors",
-        selected
-          ? "bg-indigo-50"
-          : isReturnQuantityUi
-            ? "bg-orange-50 hover:bg-orange-100/80"
+        isReturnQuantityUi
+          ? selected
+            ? "bg-[#f7d9dd]"
+            : "bg-[#fcf1f2] hover:bg-[#f8e4e6]"
+          : selected
+            ? "bg-indigo-50"
             : oversell
               ? "bg-red-50 hover:bg-red-100/60"
               : "bg-white hover:bg-gray-50",
@@ -104,10 +109,11 @@ export function InvoiceLineItemRow({
           onKeyDown={handleQtyKeyDown}
           displayValue={displayQty}
           onChangeRaw={(raw) => updateQty(line.lineId, raw)}
-          onBumpDown={() => bumpQty(line.lineId, -1)}
-          onBumpUp={() => bumpQty(line.lineId, 1)}
+          onBumpDown={locked ? undefined : () => bumpQty(line.lineId, -1)}
+          onBumpUp={locked ? undefined : () => bumpQty(line.lineId, 1)}
           bumpDownDisabled={line.qty <= 1}
           bumpUpDisabled={isReturnQuantityUi ? line.qty >= line.maxQty : false}
+          disabled={locked}
           min={isReturnQuantityUi ? -Math.max(line.maxQty, 1) : 1}
           max={isReturnQuantityUi ? -1 : undefined}
           itemLabel={line.name}
@@ -124,23 +130,26 @@ export function InvoiceLineItemRow({
           ariaLabel={`Đơn giá ${line.name}`}
           variant="underline"
           className="w-full"
+          readOnly={locked}
         />
       </td>
       <td className="w-28 px-2 text-right font-medium">
         {formatVnd(rowTotal)}
       </td>
       <td className="w-10 px-2 text-right">
-        <button
-          type="button"
-          aria-label={`Xóa ${line.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            removeLine(line.lineId);
-          }}
-          className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-        >
-          <CloseIcon size={16} />
-        </button>
+        {locked ? null : (
+          <button
+            type="button"
+            aria-label={`Xóa ${line.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              removeLine(line.lineId);
+            }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+          >
+            <CloseIcon size={16} />
+          </button>
+        )}
       </td>
     </tr>
   );

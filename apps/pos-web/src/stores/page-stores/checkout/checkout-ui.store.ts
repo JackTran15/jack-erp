@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
-import type {
-  PriceBook,
-  Salesperson,
-} from "@erp/pos/interfaces/checkout.interface";
+type Updater<T> = T | ((prev: T) => T);
+
+const apply = <T>(prev: T, value: Updater<T>): T =>
+  typeof value === "function" ? (value as (p: T) => T)(prev) : value;
 
 const DEFAULT_ANNOUNCEMENT_DURATION_MS = 3_000;
 
@@ -15,6 +15,15 @@ interface PosCheckoutUiState {
   oversellOpen: boolean;
   createCustomerSucceeded: boolean;
   cartError: string;
+  /**
+   * Cờ + state của các dialog khách hàng — transient theo "view hiện tại", KHÔNG
+   * theo tab (đổi tab thì mọi dialog đang mở phải đóng). Tách khỏi `selectedCustomer`
+   * (per-tab, nằm trong session draft).
+   */
+  customerFieldError: string;
+  createCustomerOpen: boolean;
+  createDefaultQuery: string;
+  customerDetailOpen: boolean;
   pendingQtyFocusLineId: string | null;
   /**
    * Tăng counter để yêu cầu ProductSearchInput focus + select. Component
@@ -22,8 +31,6 @@ interface PosCheckoutUiState {
    * "signal counter" tránh state boolean phải reset thủ công.
    */
   productSearchFocusSeq: number;
-  selectedSalesperson: Salesperson | null;
-  selectedPriceBook: PriceBook | null;
 
   setAnnouncement: (message: string, durationMs?: number) => void;
   clearAnnouncement: () => void;
@@ -36,6 +43,11 @@ interface PosCheckoutUiState {
 
   setCreateCustomerSucceeded: (next: boolean) => void;
 
+  setCustomerFieldError: (value: Updater<string>) => void;
+  setCreateCustomerOpen: (value: Updater<boolean>) => void;
+  setCreateDefaultQuery: (value: Updater<string>) => void;
+  setCustomerDetailOpen: (value: Updater<boolean>) => void;
+
   setCartError: (message: string) => void;
   clearCartError: () => void;
 
@@ -43,9 +55,6 @@ interface PosCheckoutUiState {
   clearPendingQtyFocusLineId: () => void;
 
   requestProductSearchFocus: () => void;
-
-  setSelectedSalesperson: (next: Salesperson | null) => void;
-  setSelectedPriceBook: (next: PriceBook | null) => void;
 
   resetCheckoutUiDraft: () => void;
 }
@@ -56,10 +65,12 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   oversellOpen: false,
   createCustomerSucceeded: false,
   cartError: "",
+  customerFieldError: "",
+  createCustomerOpen: false,
+  createDefaultQuery: "",
+  customerDetailOpen: false,
   pendingQtyFocusLineId: null,
   productSearchFocusSeq: 0,
-  selectedSalesperson: null,
-  selectedPriceBook: null,
 
   setAnnouncement: (message, durationMs = DEFAULT_ANNOUNCEMENT_DURATION_MS) => {
     if (announcementTimer !== null) {
@@ -89,6 +100,15 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
 
   setCreateCustomerSucceeded: (next) => set({ createCustomerSucceeded: next }),
 
+  setCustomerFieldError: (value) =>
+    set((s) => ({ customerFieldError: apply(s.customerFieldError, value) })),
+  setCreateCustomerOpen: (value) =>
+    set((s) => ({ createCustomerOpen: apply(s.createCustomerOpen, value) })),
+  setCreateDefaultQuery: (value) =>
+    set((s) => ({ createDefaultQuery: apply(s.createDefaultQuery, value) })),
+  setCustomerDetailOpen: (value) =>
+    set((s) => ({ customerDetailOpen: apply(s.customerDetailOpen, value) })),
+
   setCartError: (message) => set({ cartError: message }),
   clearCartError: () => set({ cartError: "" }),
 
@@ -98,13 +118,14 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   requestProductSearchFocus: () =>
     set((state) => ({ productSearchFocusSeq: state.productSearchFocusSeq + 1 })),
 
-  setSelectedSalesperson: (next) => set({ selectedSalesperson: next }),
-  setSelectedPriceBook: (next) => set({ selectedPriceBook: next }),
-
   resetCheckoutUiDraft: () =>
     set({
       cancelInvoiceOpen: false,
       oversellOpen: false,
       cartError: "",
+      customerFieldError: "",
+      createCustomerOpen: false,
+      createDefaultQuery: "",
+      customerDetailOpen: false,
     }),
 }));

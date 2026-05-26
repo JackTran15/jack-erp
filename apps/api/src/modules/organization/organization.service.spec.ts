@@ -7,6 +7,7 @@ import {
 } from './organization.entity';
 import { OrganizationService } from './organization.service';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
+import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -36,6 +37,7 @@ describe('OrganizationService', () => {
     update: jest.Mock;
   };
   let coaSeederService: { seedForOrganization: jest.Mock };
+  let cashVoucherCategorySeederService: { seedForOrganization: jest.Mock };
 
   beforeEach(async () => {
     orgRepo = {
@@ -46,12 +48,19 @@ describe('OrganizationService', () => {
       update: jest.fn(),
     };
     coaSeederService = { seedForOrganization: jest.fn().mockResolvedValue(15) };
+    cashVoucherCategorySeederService = {
+      seedForOrganization: jest.fn().mockResolvedValue(7),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationService,
         { provide: getRepositoryToken(OrganizationEntity), useValue: orgRepo },
         { provide: CoaSeederService, useValue: coaSeederService },
+        {
+          provide: CashVoucherCategorySeederService,
+          useValue: cashVoucherCategorySeederService,
+        },
       ],
     }).compile();
 

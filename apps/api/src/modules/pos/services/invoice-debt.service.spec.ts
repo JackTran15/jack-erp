@@ -7,6 +7,8 @@ import { InvoiceDebtEntity, DebtStatus, DebtDocumentType } from '../entities/inv
 import { DebtPaymentEntity, DebtPaymentMethod } from '../entities/debt-payment.entity';
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { CashService } from '../../accounting/cash/cash.service';
+import { OutboxService } from '../../events/outbox/outbox.service';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -60,6 +62,8 @@ describe('InvoiceDebtService', () => {
     save: jest.Mock;
   };
   let dataSource: { transaction: jest.Mock };
+  let cashService: { recordMovement: jest.Mock };
+  let outboxService: { enqueue: jest.Mock };
   let mockManager: {
     create: jest.Mock;
     save: jest.Mock;
@@ -67,6 +71,7 @@ describe('InvoiceDebtService', () => {
     insert: jest.Mock;
     increment: jest.Mock;
     getRepository: jest.Mock;
+    query: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -77,7 +82,14 @@ describe('InvoiceDebtService', () => {
       insert: jest.fn(),
       increment: jest.fn(),
       getRepository: jest.fn().mockReturnValue({ update: jest.fn(), increment: jest.fn() }),
+      query: jest.fn().mockResolvedValue([{ id: 'acc-131' }]),
     };
+    cashService = {
+      recordMovement: jest
+        .fn()
+        .mockResolvedValue({ movement: { id: 'mv-1' }, journalEntryId: 'je-1' }),
+    };
+    outboxService = { enqueue: jest.fn().mockResolvedValue(undefined) };
 
     debtRepo = {
       findOne: jest.fn(),
@@ -103,6 +115,8 @@ describe('InvoiceDebtService', () => {
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: getRepositoryToken(DebtPaymentEntity), useValue: paymentRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: CashService, useValue: cashService },
+        { provide: OutboxService, useValue: outboxService },
       ],
     }).compile();
 
@@ -221,7 +235,7 @@ describe('InvoiceDebtService', () => {
   describe('collectPayment', () => {
     const paymentDto = {
       amount: 100,
-      paymentMethod: DebtPaymentMethod.CASH,
+      paymentMethod: DebtPaymentMethod.BANK_TRANSFER,
       staffId: 'staff-1',
       note: 'first payment',
     };
@@ -322,6 +336,53 @@ describe('InvoiceDebtService', () => {
 
       expect(mockManager.save).toHaveBeenCalledTimes(2);
       expect(result).toEqual(updatedDebt);
+    });
+
+    it('CASH: records a DEPOSIT movement and enqueues the voucher event', async () => {
+      const debt = debtStub({ remainingAmount: 500, paidAmount: 0 });
+      const paymentEntity = { id: 'pay-1', debtId: 'debt-1' };
+      mockManager.findOne.mockResolvedValue(debt);
+      mockManager.create.mockReturnValue(paymentEntity);
+      mockManager.save.mockResolvedValue(debt);
+
+      await service.collectPayment(
+        'debt-1',
+        {
+          amount: 100,
+          paymentMethod: DebtPaymentMethod.CASH,
+          staffId: 'staff-1',
+          cashAccountId: 'cash-1',
+        },
+        actor,
+      );
+
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({ cashAccountId: 'cash-1', amount: 100 }),
+        actor,
+        mockManager,
+      );
+      expect(outboxService.enqueue).toHaveBeenCalledWith(
+        mockManager,
+        expect.stringContaining('debt_payment'),
+        expect.objectContaining({
+          payload: expect.objectContaining({ sourceType: 'DEBT_PAYMENT' }),
+        }),
+      );
+    });
+
+    it('CASH without cashAccountId throws BadRequestException', async () => {
+      const debt = debtStub({ remainingAmount: 500, paidAmount: 0 });
+      mockManager.findOne.mockResolvedValue(debt);
+      mockManager.create.mockReturnValue({ id: 'pay-1' });
+      mockManager.save.mockResolvedValue(debt);
+
+      await expect(
+        service.collectPayment(
+          'debt-1',
+          { amount: 100, paymentMethod: DebtPaymentMethod.CASH, staffId: 's-1' },
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

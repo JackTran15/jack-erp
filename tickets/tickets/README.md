@@ -58,3 +58,13 @@
 - [TKT-056 POS session cash account link](./TKT-056-pos-session-cash-account-link.md)
 - [TKT-057 Cash movement session link](./TKT-057-cash-movement-session-link.md)
 - [TKT-058 Checkout cash movement integration](./TKT-058-checkout-cash-movement-integration.md)
+
+## Payment Accounts & Revenue Auto-Resolve (EPIC2405)
+
+- [TKT-2405-01 Payment accounts & default-account schema](./TKT-2405-01-payment-accounts-schema.md)
+- [TKT-2405-02 Payment accounts service, API & line validation](./TKT-2405-02-payment-accounts-service-api.md)
+- [TKT-2405-03 Default revenue resolver & default-account config API](./TKT-2405-03-default-revenue-resolver.md)
+- [TKT-2405-04 Checkout auto-resolve revenue + payment validation + DTO change](./TKT-2405-04-checkout-autoresolve-validate.md)
+- [TKT-2405-05 Permissions & seed for payment accounts + default revenue](./TKT-2405-05-permissions-seed.md)
+- [TKT-2405-06 POS data layer for /payment-accounts](./TKT-2405-06-pos-data-layer.md)
+- [TKT-2405-07 POS checkout UI ("Tài khoản thu") + payload cleanup](./TKT-2405-07-pos-checkout-ui-payload.md)

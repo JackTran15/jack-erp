@@ -9,11 +9,6 @@ import { PromotionModule } from '../promotion/promotion.module';
 import { CustomerModule } from '../customer/customer.module';
 import {
   PosSessionEntity,
-  SaleEntity,
-  SaleLineEntity,
-  PaymentEntity,
-  ReturnEntity,
-  ReturnLineEntity,
   SessionReconciliationEntity,
   InvoiceEntity,
   InvoiceItemEntity,
@@ -26,28 +21,27 @@ import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
 import {
   PosSessionService,
-  CheckoutService,
-  ReturnService,
-  ExchangeService,
   PosCatalogService,
 } from './services';
 import { InvoiceService } from './services/invoice.service';
 import { CheckoutInvoiceService } from './services/checkout-invoice.service';
 import { CancelInvoiceService } from './services/cancel-invoice.service';
 import { InvoiceDebtService } from './services/invoice-debt.service';
+import { ReturnEligibilityService } from './services/return-eligibility.service';
+import { CreateReturnInvoiceService } from './services/create-return-invoice.service';
+import { CreateExchangeInvoiceService } from './services/create-exchange-invoice.service';
+import { CheckoutReturnService } from './services/checkout-return.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
+import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
+import { ReturnPostedPublisher } from './publishers/return-posted.publisher';
+import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       PosSessionEntity,
-      SaleEntity,
-      SaleLineEntity,
-      PaymentEntity,
-      ReturnEntity,
-      ReturnLineEntity,
       SessionReconciliationEntity,
       InvoiceEntity,
       InvoiceItemEntity,
@@ -69,23 +63,25 @@ import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publis
   controllers: [PosController, InvoiceController],
   providers: [
     PosSessionService,
-    CheckoutService,
-    ReturnService,
-    ExchangeService,
     PosCatalogService,
     InvoiceService,
     CheckoutInvoiceService,
     CancelInvoiceService,
     InvoiceDebtService,
     InvoiceCancelledPublisher,
+    DebtPaymentVoucherLinkConsumer,
+    ReturnPostedPublisher,
+    StockReturnInPublisher,
+    ReturnEligibilityService,
+    CreateReturnInvoiceService,
+    CreateExchangeInvoiceService,
+    CheckoutReturnService,
   ],
   exports: [
     PosSessionService,
-    CheckoutService,
-    ReturnService,
-    ExchangeService,
     InvoiceService,
     InvoiceDebtService,
+    ReturnEligibilityService,
   ],
 })
 export class PosModule {}

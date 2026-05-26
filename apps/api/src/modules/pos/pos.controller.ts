@@ -16,16 +16,10 @@ import { BranchScopeGuard } from '../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../crud/audit.interceptor';
 import {
   PosSessionService,
-  CheckoutService,
-  ReturnService,
-  ExchangeService,
   PosCatalogService,
 } from './services';
 import {
   OpenSessionDto,
-  CheckoutDto,
-  ProcessReturnDto,
-  ProcessExchangeDto,
   SubmitReconciliationDto,
   PosCatalogQueryDto,
 } from './dto';
@@ -37,9 +31,6 @@ import {
 export class PosController {
   constructor(
     private readonly sessionService: PosSessionService,
-    private readonly checkoutService: CheckoutService,
-    private readonly returnService: ReturnService,
-    private readonly exchangeService: ExchangeService,
     private readonly catalogService: PosCatalogService,
   ) {}
 
@@ -129,43 +120,5 @@ export class PosController {
     @Actor() actor: ActorContext,
   ) {
     return this.sessionService.finalizeClose(id, actor);
-  }
-
-  @Post('sales/checkout')
-  @RequirePermission('pos.sale.create')
-  checkout(
-    @Body() dto: CheckoutDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.checkoutService.checkout(dto, actor);
-  }
-
-  @Get('sales/:id')
-  @RequirePermission('pos.sale.create')
-  getSale(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.checkoutService.findSaleOrFail(id, actor);
-  }
-
-  @Post('sales/:id/return')
-  @RequirePermission('pos.return.create')
-  processReturn(
-    @Param('id', ParseUUIDPipe) saleId: string,
-    @Body() dto: ProcessReturnDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.returnService.processReturn(saleId, dto, actor);
-  }
-
-  @Post('sales/:id/exchange')
-  @RequirePermission('pos.exchange.create')
-  processExchange(
-    @Param('id', ParseUUIDPipe) saleId: string,
-    @Body() dto: ProcessExchangeDto,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.exchangeService.processExchange(saleId, dto, actor);
   }
 }

@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
+import { Repository, DataSource, SelectQueryBuilder, EntityManager } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   JournalStatus,
@@ -48,9 +48,16 @@ export class JournalService {
     private readonly documentNumberingService: DocumentNumberingService,
   ) {}
 
+  /**
+   * Post a balanced journal entry.
+   *
+   * When `manager` is provided, the DB writes run inside the caller's transaction
+   * (composable). When omitted, a dedicated transaction is opened (legacy behavior).
+   */
   async post(
     dto: PostJournalDto,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<JournalEntryEntity> {
     await this.validateAccounts(dto, actor);
     this.validateBalance(dto);
@@ -63,40 +70,11 @@ export class JournalService {
 
     const now = new Date();
 
-    const entry = await this.dataSource.transaction(async (manager) => {
-      const journalEntry = manager.create(JournalEntryEntity, {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-        documentNumber,
-        source: dto.source,
-        sourceReferenceId: dto.sourceReferenceId,
-        description: dto.description,
-        notes: dto.notes,
-        status: JournalStatus.POSTED,
-        postedAt: now,
-        postedBy: actor.userId,
-      });
-
-      const savedEntry = await manager.save(journalEntry);
-
-      const lines = dto.lines.map((line) =>
-        manager.create(JournalLineEntity, {
-          journalEntryId: savedEntry.id,
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          createdBy: actor.userId,
-          accountId: line.accountId,
-          debitAmount: line.debitAmount,
-          creditAmount: line.creditAmount,
-          description: line.description,
-          lineOrder: line.lineOrder,
-        }),
-      );
-
-      savedEntry.lines = await manager.save(lines);
-      return savedEntry;
-    });
+    const entry = manager
+      ? await this.postEntryInTx(manager, dto, actor, documentNumber, now)
+      : await this.dataSource.transaction((m) =>
+          this.postEntryInTx(m, dto, actor, documentNumber, now),
+        );
 
     await this.eventPublisher.publish(ERP_TOPICS.JOURNAL_POSTED, {
       eventId: uuid(),
@@ -121,10 +99,57 @@ export class JournalService {
     return entry;
   }
 
+  private async postEntryInTx(
+    manager: EntityManager,
+    dto: PostJournalDto,
+    actor: ActorContext,
+    documentNumber: string,
+    now: Date,
+  ): Promise<JournalEntryEntity> {
+    const journalEntry = manager.create(JournalEntryEntity, {
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
+      documentNumber,
+      source: dto.source,
+      sourceReferenceId: dto.sourceReferenceId,
+      description: dto.description,
+      notes: dto.notes,
+      status: JournalStatus.POSTED,
+      postedAt: now,
+      postedBy: actor.userId,
+    });
+
+    const savedEntry = await manager.save(journalEntry);
+
+    const lines = dto.lines.map((line) =>
+      manager.create(JournalLineEntity, {
+        journalEntryId: savedEntry.id,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+        accountId: line.accountId,
+        debitAmount: line.debitAmount,
+        creditAmount: line.creditAmount,
+        description: line.description,
+        lineOrder: line.lineOrder,
+      }),
+    );
+
+    savedEntry.lines = await manager.save(lines);
+    return savedEntry;
+  }
+
+  /**
+   * Reverse a posted journal entry by creating a mirror entry (DR↔CR swapped).
+   *
+   * When `manager` is provided, runs inside the caller's transaction (composable).
+   */
   async reverse(
     journalId: string,
     reason: string,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<JournalEntryEntity> {
     const original = await this.entryRepo.findOne({
       where: { id: journalId, organizationId: actor.organizationId },
@@ -155,48 +180,18 @@ export class JournalService {
 
     const now = new Date();
 
-    const reversal = await this.dataSource.transaction(async (manager) => {
-      const reversalEntry = manager.create(JournalEntryEntity, {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-        documentNumber,
-        source: original.source,
-        sourceReferenceId: original.sourceReferenceId,
-        description: `Reversal of ${original.documentNumber}: ${reason}`,
-        notes: reason,
-        status: JournalStatus.POSTED,
-        postedAt: now,
-        postedBy: actor.userId,
-        reversalOfJournalId: original.id,
-      });
-
-      const savedReversal = await manager.save(reversalEntry);
-
-      const reversedLines = original.lines.map((line, idx) =>
-        manager.create(JournalLineEntity, {
-          journalEntryId: savedReversal.id,
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          createdBy: actor.userId,
-          accountId: line.accountId,
-          debitAmount: line.creditAmount,
-          creditAmount: line.debitAmount,
-          description: line.description
-            ? `Reversal: ${line.description}`
-            : 'Reversal',
-          lineOrder: idx + 1,
-        }),
-      );
-
-      savedReversal.lines = await manager.save(reversedLines);
-
-      original.status = JournalStatus.REVERSED;
-      original.reversedByJournalId = savedReversal.id;
-      await manager.save(original);
-
-      return savedReversal;
-    });
+    const reversal = manager
+      ? await this.reverseEntryInTx(
+          manager,
+          original,
+          reason,
+          actor,
+          documentNumber,
+          now,
+        )
+      : await this.dataSource.transaction((m) =>
+          this.reverseEntryInTx(m, original, reason, actor, documentNumber, now),
+        );
 
     await this.eventPublisher.publish(ERP_TOPICS.JOURNAL_REVERSED, {
       eventId: uuid(),
@@ -218,6 +213,56 @@ export class JournalService {
     );
 
     return reversal;
+  }
+
+  private async reverseEntryInTx(
+    manager: EntityManager,
+    original: JournalEntryEntity,
+    reason: string,
+    actor: ActorContext,
+    documentNumber: string,
+    now: Date,
+  ): Promise<JournalEntryEntity> {
+    const reversalEntry = manager.create(JournalEntryEntity, {
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      createdBy: actor.userId,
+      documentNumber,
+      source: original.source,
+      sourceReferenceId: original.sourceReferenceId,
+      description: `Reversal of ${original.documentNumber}: ${reason}`,
+      notes: reason,
+      status: JournalStatus.POSTED,
+      postedAt: now,
+      postedBy: actor.userId,
+      reversalOfJournalId: original.id,
+    });
+
+    const savedReversal = await manager.save(reversalEntry);
+
+    const reversedLines = original.lines.map((line, idx) =>
+      manager.create(JournalLineEntity, {
+        journalEntryId: savedReversal.id,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+        accountId: line.accountId,
+        debitAmount: line.creditAmount,
+        creditAmount: line.debitAmount,
+        description: line.description
+          ? `Reversal: ${line.description}`
+          : 'Reversal',
+        lineOrder: idx + 1,
+      }),
+    );
+
+    savedReversal.lines = await manager.save(reversedLines);
+
+    original.status = JournalStatus.REVERSED;
+    original.reversedByJournalId = savedReversal.id;
+    await manager.save(original);
+
+    return savedReversal;
   }
 
   async list(

@@ -13,8 +13,13 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { JournalService } from '../journal/journal.service';
+import { CashService } from '../cash/cash.service';
+import { CashMovementType } from '../cash/cash-movement.entity';
+import { OutboxService } from '../../events/outbox/outbox.service';
+import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { BaseCrudService } from '../../crud/base-crud.service';
-import { ExpenseEntity, ExpenseStatus } from './expense.entity';
+import { ExpenseEntity, ExpenseStatus, ExpensePaymentMethod } from './expense.entity';
 import { CreateExpenseDto } from './dto';
 
 export const EXPENSE_SERVICE_TOKEN = 'ExpenseService';
@@ -35,6 +40,8 @@ export class ExpensesService extends BaseCrudService<
     protected readonly repository: Repository<ExpenseEntity>,
     protected readonly dataSource: DataSource,
     private readonly journalService: JournalService,
+    private readonly cashService: CashService,
+    private readonly outboxService: OutboxService,
   ) {
     super(dataSource);
   }
@@ -89,18 +96,66 @@ export class ExpensesService extends BaseCrudService<
     }
 
     const now = new Date();
+    const isCash = expense.paymentMethod === ExpensePaymentMethod.CASH;
+    if (isCash && !expense.cashAccountId) {
+      throw new BadRequestException(
+        `Expense ${id} has paymentMethod=CASH but no cashAccountId`,
+      );
+    }
 
     return this.dataSource.transaction(async (manager) => {
       expense.status = ExpenseStatus.POSTED;
       expense.postedAt = now;
       expense.postedBy = actor.userId;
 
-      const saved = await manager.save(expense);
+      if (isCash) {
+        // CASH (A-revised): recordMovement posts DR expense / CR cash, updates
+        // balance and creates the JE — all in this transaction. Insufficient
+        // balance throws 400 and rolls back (expense stays unposted).
+        const { movement, journalEntryId } =
+          await this.cashService.recordMovement(
+            {
+              cashAccountId: expense.cashAccountId!,
+              type: CashMovementType.WITHDRAWAL,
+              amount: Number(expense.amount),
+              contraAccountId: expense.accountId,
+              reference: `EXP-${expense.id}`,
+              notes: expense.description,
+            },
+            actor,
+            manager,
+          );
+        expense.journalEntryId = journalEntryId;
+        const saved = await manager.save(expense);
 
-      await this.journalService.post(
+        // Document layer is created async by the voucher consumer; enqueue in the
+        // same transaction so it can never be lost (outbox).
+        await this.outboxService.enqueue(
+          manager,
+          ERP_TOPICS.CASH_VOUCHER_NEEDED_EXPENSE,
+          buildCashVoucherNeededEvent({
+            sourceType: 'EXPENSE',
+            sourceId: saved.id,
+            amount: Number(expense.amount),
+            cashAccountId: expense.cashAccountId!,
+            contraAccountId: expense.accountId,
+            cashMovementId: movement.id,
+            journalEntryId,
+            description: expense.description,
+            categoryCode: 'CHI_KHAC',
+            organizationId: actor.organizationId,
+            branchId: actor.branchId ?? '',
+            actorId: actor.userId,
+          }),
+        );
+        return saved;
+      }
+
+      // Non-CASH (BANK / PAYABLE / unspecified): post a journal entry only.
+      const entry = await this.journalService.post(
         {
           source: JournalSource.EXPENSE,
-          sourceReferenceId: saved.id,
+          sourceReferenceId: expense.id,
           description: `Expense posted: ${expense.description}`,
           lines: [
             {
@@ -114,17 +169,16 @@ export class ExpensesService extends BaseCrudService<
               accountId: expense.accountId,
               debitAmount: 0,
               creditAmount: Number(expense.amount),
-              description: expense.payableId
-                ? 'Credit payable'
-                : 'Credit cash',
+              description: expense.payableId ? 'Credit payable' : 'Credit cash',
               lineOrder: 2,
             },
           ],
         },
         actor,
+        manager,
       );
-
-      return saved;
+      expense.journalEntryId = entry.id;
+      return manager.save(expense);
     });
   }
 }

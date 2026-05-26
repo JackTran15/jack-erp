@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import {
+  CHECKOUT_ANNOUNCEMENTS,
+  CHECKOUT_ERRORS,
+} from "@erp/pos/constants/checkout-messages.constant";
+import {
   formatCustomerDisplay,
   phoneDigitsOnly,
 } from "@erp/pos/lib/common/customerUtils";
@@ -10,54 +14,66 @@ import {
 } from "@erp/pos/hooks/react-query/use-query-customer";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { customerSearchErrorMessage } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import {
+  selectCustomerDraft,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
+
+type Updater<T> = T | ((prev: T) => T);
+
+const apply = <T>(prev: T, value: Updater<T>): T =>
+  typeof value === "function" ? (value as (p: T) => T)(prev) : value;
 
 /**
  * Zero-input adapter cho customer state + dialog handlers.
- * `announce` đọc từ ui store, `clearKeepChange` gọi từ payment store khi pick.
+ * `selectedCustomer`/`customerQuery` là per-tab (session draft); cờ dialog +
+ * `customerFieldError` là transient toàn cục (ui store). `announce` đọc ui store.
  */
 export function useCheckoutCustomer() {
-  const selectedCustomer = usePosCheckoutCustomerStore(
-    (s) => s.selectedCustomer,
+  // Per-tab: khách đã chọn + ô tìm khách (session draft).
+  const { selectedCustomer, customerQuery } = usePosCheckoutSessionStore(
+    selectCustomerDraft,
   );
-  const setSelectedCustomer = usePosCheckoutCustomerStore(
-    (s) => s.setSelectedCustomer,
+  const updateDraftSlice = usePosCheckoutSessionStore(
+    (s) => s.updateActiveDraftSlice,
   );
-  const customerQuery = usePosCheckoutCustomerStore((s) => s.customerQuery);
-  const setCustomerQuery = usePosCheckoutCustomerStore(
-    (s) => s.setCustomerQuery,
+  const pickCustomerAction = usePosCheckoutSessionStore((s) => s.pickCustomer);
+  const clearCustomerAction = usePosCheckoutSessionStore((s) => s.clearCustomer);
+
+  const setSelectedCustomer = useCallback(
+    (value: Updater<CustomerRow | null>) =>
+      updateDraftSlice("customer", (c) => ({
+        ...c,
+        selectedCustomer: apply(c.selectedCustomer, value),
+      })),
+    [updateDraftSlice],
   );
-  const customerFieldError = usePosCheckoutCustomerStore(
-    (s) => s.customerFieldError,
+  const setCustomerQuery = useCallback(
+    (value: Updater<string>) =>
+      updateDraftSlice("customer", (c) => ({
+        ...c,
+        customerQuery: apply(c.customerQuery, value),
+      })),
+    [updateDraftSlice],
   );
-  const setCustomerFieldError = usePosCheckoutCustomerStore(
+
+  // Transient (ui store): cờ dialog + lỗi field — không theo tab.
+  const customerFieldError = usePosCheckoutUiStore((s) => s.customerFieldError);
+  const setCustomerFieldError = usePosCheckoutUiStore(
     (s) => s.setCustomerFieldError,
   );
-  const createCustomerOpen = usePosCheckoutCustomerStore(
-    (s) => s.createCustomerOpen,
-  );
-  const setCreateCustomerOpen = usePosCheckoutCustomerStore(
+  const createCustomerOpen = usePosCheckoutUiStore((s) => s.createCustomerOpen);
+  const setCreateCustomerOpen = usePosCheckoutUiStore(
     (s) => s.setCreateCustomerOpen,
   );
-  const createDefaultQuery = usePosCheckoutCustomerStore(
-    (s) => s.createDefaultQuery,
-  );
-  const setCreateDefaultQuery = usePosCheckoutCustomerStore(
+  const createDefaultQuery = usePosCheckoutUiStore((s) => s.createDefaultQuery);
+  const setCreateDefaultQuery = usePosCheckoutUiStore(
     (s) => s.setCreateDefaultQuery,
   );
-  const customerDetailOpen = usePosCheckoutCustomerStore(
-    (s) => s.customerDetailOpen,
-  );
-  const setCustomerDetailOpen = usePosCheckoutCustomerStore(
+  const customerDetailOpen = usePosCheckoutUiStore((s) => s.customerDetailOpen);
+  const setCustomerDetailOpen = usePosCheckoutUiStore(
     (s) => s.setCustomerDetailOpen,
-  );
-  const pickCustomerAction = usePosCheckoutCustomerStore(
-    (s) => s.pickCustomer,
-  );
-  const clearCustomerAction = usePosCheckoutCustomerStore(
-    (s) => s.clearCustomer,
   );
 
   const { search } = useCustomerSearch();
@@ -96,20 +112,23 @@ export function useCheckoutCustomer() {
   const pickCustomer = useCallback(
     (c: CustomerRow, announceMessage?: string) => {
       pickCustomerAction(c);
-      usePosCheckoutPaymentStore.getState().clearKeepChange();
+      // Ngừng giữ tiền thừa + xóa lỗi field (giờ ở ui store) khi chọn khách.
+      updateDraftSlice("payment", (p) => ({ ...p, keepChange: false }));
+      usePosCheckoutUiStore.getState().setCustomerFieldError("");
       usePosCheckoutUiStore
         .getState()
         .setAnnouncement(
-          announceMessage ?? `Đã chọn khách ${formatCustomerDisplay(c)}.`,
+          announceMessage ??
+            CHECKOUT_ANNOUNCEMENTS.pickedCustomer(formatCustomerDisplay(c)),
         );
     },
-    [pickCustomerAction],
+    [pickCustomerAction, updateDraftSlice],
   );
 
   const handleCustomerSubmitQuery = useCallback(
     (raw: string): boolean => {
       if (raw.length < 2) {
-        setCustomerFieldError("Nhập ít nhất 2 ký tự.");
+        setCustomerFieldError(CHECKOUT_ERRORS.CUSTOMER_MIN_CHARS);
         return true;
       }
       setCustomerFieldError("");
@@ -122,7 +141,7 @@ export function useCheckoutCustomer() {
             return;
           }
           if (rows.length > 1) {
-            setCustomerFieldError("Nhiều kết quả — chọn từ gợi ý bên dưới.");
+            setCustomerFieldError(CHECKOUT_ERRORS.CUSTOMER_MULTIPLE_RESULTS);
             return;
           }
           setCreateDefaultQuery(raw);
@@ -144,7 +163,10 @@ export function useCheckoutCustomer() {
 
   const handleClearCustomer = useCallback(() => {
     clearCustomerAction();
-    usePosCheckoutUiStore.getState().setAnnouncement("Khách lẻ.");
+    usePosCheckoutUiStore.getState().setCustomerFieldError("");
+    usePosCheckoutUiStore
+      .getState()
+      .setAnnouncement(CHECKOUT_ANNOUNCEMENTS.RETAIL_CUSTOMER);
   }, [clearCustomerAction]);
 
   const handleAddCustomer = useCallback(() => {
@@ -170,14 +192,22 @@ export function useCheckoutCustomer() {
     (c: CustomerRow) => {
       usePosCheckoutUiStore.getState().setCreateCustomerSucceeded(true);
       setCreateCustomerOpen(false);
-      pickCustomer(c, `Đã tạo và chọn khách ${formatCustomerDisplay(c)}.`);
+      pickCustomer(
+        c,
+        CHECKOUT_ANNOUNCEMENTS.createdAndPickedCustomer(
+          formatCustomerDisplay(c),
+        ),
+      );
     },
     [pickCustomer, setCreateCustomerOpen],
   );
 
   const handleCustomerSubmitted = useCallback(
     (c: CustomerRow) => {
-      pickCustomer(c, `Đã cập nhật khách ${formatCustomerDisplay(c)}.`);
+      pickCustomer(
+        c,
+        CHECKOUT_ANNOUNCEMENTS.updatedCustomer(formatCustomerDisplay(c)),
+      );
     },
     [pickCustomer],
   );

@@ -23,16 +23,6 @@ import {
 import { clampReturnQty } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 
-function isSignedNegativeQtyCart(
-  variant: CheckoutVariantEnum,
-  activeCheckoutPane: CheckoutPane,
-): boolean {
-  return (
-    variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-    activeCheckoutPane === CheckoutPane.RETURN
-  );
-}
-
 export function useCheckoutSessionCart() {
   const announce = usePosCheckoutUiStore((s) => s.setAnnouncement);
   const cartError = usePosCheckoutUiStore((s) => s.cartError);
@@ -61,15 +51,40 @@ export function useCheckoutSessionCart() {
     (s) => s.setSelectedLineReturnId,
   );
 
+  // QUICK_EXCHANGE: hiển thị GỘP hàng trả + mua thêm cùng lúc (trả trước, mua sau).
+  // SALE / INVOICE_RETURN: 1 cart (IR đã gộp sẵn return-credit + mua thêm).
   const cart = useMemo(() => {
     if (!session) return [];
     if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
-      return activeCheckoutPane === CheckoutPane.RETURN
-        ? returnCart
-        : purchaseCart;
+      return [...returnCart, ...purchaseCart];
     }
     return purchaseCart;
-  }, [session, variant, activeCheckoutPane, returnCart, purchaseCart]);
+  }, [session, variant, returnCart, purchaseCart]);
+
+  // Id các dòng hàng trả của QUICK_EXCHANGE (nằm ở returnCart) — dùng để định
+  // tuyến sửa/chọn theo từng dòng khi hiển thị gộp.
+  const returnLineIds = useMemo(
+    () =>
+      variant === CheckoutVariantEnum.QUICK_EXCHANGE
+        ? new Set(returnCart.map((l) => l.lineId))
+        : new Set<string>(),
+    [variant, returnCart],
+  );
+
+  /** Dòng có style hàng trả (nền hồng + SL âm): QE → thuộc returnCart; IR → isReturnCredit. */
+  const isReturnLine = useCallback(
+    (line: CartLine) =>
+      Boolean(line.isReturnCredit) || returnLineIds.has(line.lineId),
+    [returnLineIds],
+  );
+
+  /** Khóa sửa/xóa: chỉ dòng return-credit của INVOICE_RETURN. */
+  const isLineLocked = useCallback(
+    (line: CartLine) =>
+      variant === CheckoutVariantEnum.INVOICE_RETURN &&
+      Boolean(line.isReturnCredit),
+    [variant],
+  );
 
   const selectedLineId = useMemo(() => {
     if (!session) return null;
@@ -125,6 +140,23 @@ export function useCheckoutSessionCart() {
       updateReturnCart,
       updatePurchaseCart,
     ],
+  );
+
+  // Định tuyến SỬA theo từng dòng (không theo pane) — cần khi QE hiển thị gộp:
+  // sửa 1 dòng hàng trả phải ghi vào returnCart dù pane đang là "Mua thêm".
+  const updateCartForLine = useCallback(
+    (lineId: string, updater: (prev: CartLine[]) => CartLine[]) => {
+      if (!session) return;
+      if (
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+        returnLineIds.has(lineId)
+      ) {
+        updateReturnCart(session.id, updater);
+        return;
+      }
+      updatePurchaseCart(session.id, updater);
+    },
+    [session, variant, returnLineIds, updateReturnCart, updatePurchaseCart],
   );
 
   const addProduct = useCallback(
@@ -214,21 +246,21 @@ export function useCheckoutSessionCart() {
   const updateUnitPrice = useCallback(
     (lineId: string, raw: string) => {
       const n = Math.max(0, Number.parseFloat(raw.replace(",", ".")) || 0);
-      targetCartUpdater((prev) =>
+      updateCartForLine(lineId, (prev) =>
         prev.map((l) => (l.lineId === lineId ? { ...l, unitPrice: n } : l)),
       );
     },
-    [targetCartUpdater],
+    [updateCartForLine],
   );
 
   const updateQty = useCallback(
     (lineId: string, raw: string) => {
-      targetCartUpdater((prev) => {
+      updateCartForLine(lineId, (prev) => {
         const line = prev.find((l) => l.lineId === lineId);
         if (!line) return prev;
-        const signedReturnUi =
-          Boolean(line.isReturnCredit) ||
-          isSignedNegativeQtyCart(variant, activeCheckoutPane);
+        // SL âm cho mọi dòng hàng trả (QE returnCart hoặc IR return-credit) —
+        // theo từng dòng, không theo pane (vì hiển thị gộp).
+        const signedReturnUi = isReturnLine(line);
         const safe = safePosCheckoutQtyFromRaw(raw, {
           treatAsSignedReturnMagnitude: signedReturnUi,
         });
@@ -242,12 +274,12 @@ export function useCheckoutSessionCart() {
         );
       });
     },
-    [targetCartUpdater, variant, activeCheckoutPane],
+    [updateCartForLine, isReturnLine],
   );
 
   const bumpQty = useCallback(
     (lineId: string, delta: number) => {
-      targetCartUpdater((prev) => {
+      updateCartForLine(lineId, (prev) => {
         const line = prev.find((x) => x.lineId === lineId);
         if (!line) return prev;
         let next = line.qty + delta;
@@ -258,33 +290,33 @@ export function useCheckoutSessionCart() {
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
     },
-    [targetCartUpdater],
+    [updateCartForLine],
   );
 
   const removeLine = useCallback(
     (lineId: string) => {
-      targetCartUpdater((prev) => {
+      const isReturnCartLine =
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+        returnLineIds.has(lineId);
+      updateCartForLine(lineId, (prev) => {
         const target = prev.find((l) => l.lineId === lineId);
         if (target) announce(`Đã xóa ${target.name} khỏi giỏ hàng.`);
         return prev.filter((l) => l.lineId !== lineId);
       });
-      if (selectedLineId === lineId) {
-        if (
-          variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
-          activeCheckoutPane === CheckoutPane.RETURN
-        ) {
+      if (isReturnCartLine) {
+        if (session?.selectedLineReturnId === lineId) {
           setSelectedLineReturnId(null);
-        } else {
-          setSelectedLinePurchaseId(null);
         }
+      } else if (session?.selectedLinePurchaseId === lineId) {
+        setSelectedLinePurchaseId(null);
       }
     },
     [
-      targetCartUpdater,
+      updateCartForLine,
       announce,
-      selectedLineId,
+      session,
       variant,
-      activeCheckoutPane,
+      returnLineIds,
       setSelectedLineReturnId,
       setSelectedLinePurchaseId,
     ],
@@ -292,12 +324,45 @@ export function useCheckoutSessionCart() {
 
   const isLineWarning = useCallback(
     (line: CartLine) => {
-      if (isSignedNegativeQtyCart(variant, activeCheckoutPane)) {
-        return false;
-      }
+      // Dòng hàng trả không cảnh báo vượt tồn.
+      if (isReturnLine(line)) return false;
       return isCartLineWarning(line);
     },
-    [variant, activeCheckoutPane],
+    [isReturnLine],
+  );
+
+  // Chọn / kiểm tra dòng đang chọn theo từng dòng (route theo cart của dòng).
+  const selectLine = useCallback(
+    (line: CartLine) => {
+      // Bảng QE hiển thị gộp 2 nhóm → chỉ tô sáng 1 dòng tại 1 thời điểm.
+      if (
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+        returnLineIds.has(line.lineId)
+      ) {
+        setSelectedLineReturnId(line.lineId);
+        setSelectedLinePurchaseId(null);
+        return;
+      }
+      setSelectedLinePurchaseId(line.lineId);
+      if (variant === CheckoutVariantEnum.QUICK_EXCHANGE) {
+        setSelectedLineReturnId(null);
+      }
+    },
+    [variant, returnLineIds, setSelectedLineReturnId, setSelectedLinePurchaseId],
+  );
+
+  const isLineSelected = useCallback(
+    (line: CartLine) => {
+      if (!session) return false;
+      if (
+        variant === CheckoutVariantEnum.QUICK_EXCHANGE &&
+        returnLineIds.has(line.lineId)
+      ) {
+        return session.selectedLineReturnId === line.lineId;
+      }
+      return session.selectedLinePurchaseId === line.lineId;
+    },
+    [session, variant, returnLineIds],
   );
 
   /** Combined line count for payment badge (sale / invoice_return). */
@@ -346,6 +411,10 @@ export function useCheckoutSessionCart() {
     bumpQty,
     removeLine,
     isLineWarning,
+    isReturnLine,
+    isLineLocked,
+    selectLine,
+    isLineSelected,
     itemCountForPayment,
     linesForDraftSingle,
   };

@@ -7,6 +7,11 @@ import {
   SALE_CHANNELS,
 } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+import {
+  selectIsReturnExchangeInvoice,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { cn } from "@erp/ui";
 
 /**
  * Mini topbar at the top of the payment panel: date/time on the left,
@@ -15,6 +20,10 @@ import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
  */
 export function PaymentSubTopBar() {
   const datetime = useMemo(() => formatViDateTime(new Date()), []);
+  // Ngày giờ chỉ hiện ở tab bán (sale); return/quick-return chỉ còn kênh bán.
+  const isReturnExchange = usePosCheckoutSessionStore(
+    selectIsReturnExchangeInvoice,
+  );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [selectedChannelId, setSelectedChannelId] = useState(
@@ -29,8 +38,13 @@ export function PaymentSubTopBar() {
   );
 
   return (
-    <div className="flex h-9 items-center justify-between gap-2 text-[13px] text-gray-500">
-      <span>{datetime}</span>
+    <div
+      className={cn(
+        "flex h-9 items-center gap-2 text-[13px] text-gray-500",
+        isReturnExchange ? "justify-end" : "justify-between",
+      )}
+    >
+      {isReturnExchange ? null : <span>{datetime}</span>}
       <DropdownButton
         ref={triggerRef}
         size="sm"

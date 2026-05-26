@@ -1,24 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-import { createPaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
-import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
-import { settlementAbsFromGrand } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
-import {
-  selectGrandTotal,
-  usePosCheckoutSessionStore,
-} from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
+import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 
 /**
- * Page bootstrap (gọi 1 lần ở CheckoutPage). Gồm 2 effect độc lập:
+ * Page bootstrap (gọi 1 lần ở CheckoutPage): đảm bảo session store có ít nhất 1
+ * invoice session sau khi hydrate từ localStorage.
  *
- *  1. **Hydrate** — đảm bảo session store có ít nhất 1 invoice session sau khi
- *     hydrate từ localStorage.
- *  2. **Active-session watcher** — khi `activeSessionId` đổi: reset toàn bộ
- *     draft UI (payment / customer / dialogs / cartError / appliedPromotion) qua
- *     `resetCheckoutDraftState()`, sau đó nạp lại `pendingDraftPaymentLines` nếu
- *     session mới mở từ một bản lưu tạm.
+ * Draft per-tab (khách / thanh toán / KM / nhãn / meta / catalog) nằm trong từng
+ * `InvoiceSession.draft`, nên KHÔNG cần reset khi đổi tab — trạng thái tự đi theo
+ * session đang active (trước đây có watcher `activeSessionId` gọi
+ * `resetCheckoutDraftState`, nay đã bỏ).
  *
  * (Catalog tự fetch qua React Query trong `useCheckoutCatalog`, không cần loader.)
  */
@@ -26,48 +17,8 @@ export function useCheckoutBootstrap(): void {
   const ensureHydratedShape = usePosCheckoutSessionStore(
     (s) => s.ensureHydratedShape,
   );
-  const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
-  const lastRef = useRef<string | null>(null);
 
   useEffect(() => {
     ensureHydratedShape();
   }, [ensureHydratedShape]);
-
-  useEffect(() => {
-    if (lastRef.current === null) {
-      lastRef.current = activeSessionId;
-      return;
-    }
-    if (lastRef.current === activeSessionId) return;
-    lastRef.current = activeSessionId;
-
-    resetCheckoutDraftState();
-
-    const pendingDraftPayments =
-      usePosCheckoutSessionStore.getState().pendingDraftPaymentLines;
-    usePosCheckoutSessionStore.getState().setPendingDraftPaymentLines(null);
-    if (pendingDraftPayments && pendingDraftPayments.length > 0) {
-      usePosCheckoutPaymentStore.getState().setPaymentLines(
-        pendingDraftPayments.map((row) =>
-          createPaymentLine(row.method, row.amount),
-        ),
-      );
-    } else {
-      // `resetCheckoutDraftState()` đưa số tiền về 0; settlementAbs không đổi sau
-      // reset nên effect auto-fill ở PaymentSection không re-fire. Seed lại tại
-      // đây = số tiền cần thanh toán của session vừa chuyển/restore (deposit = 0).
-      const grandTotal = selectGrandTotal(usePosCheckoutSessionStore.getState());
-      usePosCheckoutPaymentStore
-        .getState()
-        .setFirstLineAmountAuto(settlementAbsFromGrand(grandTotal));
-    }
-
-    // Restore khách của draft (nếu có) — chạy SAU resetCheckoutDraftState().
-    const pendingDraftCustomer =
-      usePosCheckoutSessionStore.getState().pendingDraftCustomer;
-    usePosCheckoutSessionStore.getState().setPendingDraftCustomer(null);
-    if (pendingDraftCustomer) {
-      usePosCheckoutCustomerStore.getState().pickCustomer(pendingDraftCustomer);
-    }
-  }, [activeSessionId]);
 }

@@ -9,6 +9,7 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  ValidateIf,
   ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -16,6 +17,7 @@ import {
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
 } from '@erp/shared-interfaces';
+import { GoodsReceiptPaymentMethod } from '../goods-receipt.entity';
 
 export type CashMethod = 'CASH' | 'BANK' | 'EWALLET';
 
@@ -118,6 +120,16 @@ export class CreateGoodsReceiptDto {
   @ValidateNested({ each: true })
   @Type(() => GoodsReceiptLineDto)
   lines: GoodsReceiptLineDto[];
+
+  /** Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE. */
+  @IsOptional()
+  @IsEnum(GoodsReceiptPaymentMethod)
+  paymentMethod?: GoodsReceiptPaymentMethod;
+
+  /** Cash account to pay from — required when paymentMethod=CASH. */
+  @ValidateIf((o) => o.paymentMethod === GoodsReceiptPaymentMethod.CASH)
+  @IsUUID()
+  cashAccountId?: string;
 
   @IsOptional()
   @ValidateNested()

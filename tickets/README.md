@@ -24,6 +24,9 @@ flowchart LR
   E6 --> E10
   E3 --> E13["EPIC-013 StockByLocationQueryApi"]
   E10 --> E13
+  E7["EPIC-007 PosInvoiceCustomerPromotions"] --> E11["EPIC-011 PosReturnExchange"]
+  E8["EPIC-008 PosEventDrivenRefactor"] --> E11
+  E9["EPIC-009 CashManagementEnhancement"] --> E11
 ```
 
 ## Ticket Dependency Graph
@@ -103,33 +106,33 @@ flowchart LR
 - ERD: [docs/pos-erd.md](../docs/pos-erd.md)
 - Tickets: [TKT-038](./tickets/TKT-038-invoice-entities-migration.md) – [TKT-046](./tickets/TKT-046-promotion-apply-service.md)
 
-| Ticket | Mô tả |
-|---|---|
-| [TKT-038](./tickets/TKT-038-invoice-entities-migration.md) | Invoice + InvoiceItem entities & migration |
-| [TKT-039](./tickets/TKT-039-invoice-crud-api.md) | Invoice CRUD API (draft lifecycle) |
-| [TKT-040](./tickets/TKT-040-invoice-checkout-service.md) | Invoice checkout service (draft → paid \| debt) |
-| [TKT-041](./tickets/TKT-041-customer-module-extensions.md) | Customer extensions + CustomerGroup |
-| [TKT-042](./tickets/TKT-042-membership-card-api.md) | MembershipCard + PointHistory API |
-| [TKT-043](./tickets/TKT-043-invoice-debt-service.md) | InvoiceDebt + DebtPayment & debt flow |
-| [TKT-044](./tickets/TKT-044-purchase-history-api.md) | Purchase history API |
-| [TKT-045](./tickets/TKT-045-promotion-entities.md) | Promotion module entities |
-| [TKT-046](./tickets/TKT-046-promotion-apply-service.md) | Promotion apply service + InvoicePromotion |
+| Ticket                                                     | Mô tả                                           |
+| ---------------------------------------------------------- | ----------------------------------------------- |
+| [TKT-038](./tickets/TKT-038-invoice-entities-migration.md) | Invoice + InvoiceItem entities & migration      |
+| [TKT-039](./tickets/TKT-039-invoice-crud-api.md)           | Invoice CRUD API (draft lifecycle)              |
+| [TKT-040](./tickets/TKT-040-invoice-checkout-service.md)   | Invoice checkout service (draft → paid \| debt) |
+| [TKT-041](./tickets/TKT-041-customer-module-extensions.md) | Customer extensions + CustomerGroup             |
+| [TKT-042](./tickets/TKT-042-membership-card-api.md)        | MembershipCard + PointHistory API               |
+| [TKT-043](./tickets/TKT-043-invoice-debt-service.md)       | InvoiceDebt + DebtPayment & debt flow           |
+| [TKT-044](./tickets/TKT-044-purchase-history-api.md)       | Purchase history API                            |
+| [TKT-045](./tickets/TKT-045-promotion-entities.md)         | Promotion module entities                       |
+| [TKT-046](./tickets/TKT-046-promotion-apply-service.md)    | Promotion apply service + InvoicePromotion      |
 
 ## EPIC-010 Item Management Enhancement (Phase 1)
 
 - [EPIC-010 Item Management Enhancement](./epics/EPIC-010-item-management-enhancement.md)
 - Tickets: [TKT-059](./tickets/TKT-059-item-management-schema.md) – [TKT-066](./tickets/TKT-066-item-management-test-plan.md)
 
-| Ticket | Mô tả |
-|---|---|
-| [TKT-059](./tickets/TKT-059-item-management-schema.md) | Schema migration: alter `items` + 3 bảng mới + data migration |
-| [TKT-060](./tickets/TKT-060-item-entity-enhancement.md) | `ItemEntity` / DTO / CrudConfig + filter POS catalog |
-| [TKT-061](./tickets/TKT-061-item-providers-m2m-api.md) | API M2M `item_providers` (CRUD + set-primary) |
-| [TKT-062](./tickets/TKT-062-provider-crud-endpoints.md) | Bổ sung `POST/PATCH/DELETE /inventory/providers` |
-| [TKT-063](./tickets/TKT-063-item-barcodes-api.md) | API `item_barcodes` (nhiều mã/item + lookup POS) |
-| [TKT-064](./tickets/TKT-064-item-stock-thresholds-api.md) | API định mức tồn min/max theo `(item, location)` |
-| [TKT-065](./tickets/TKT-065-backoffice-item-form-rebuild.md) | Backoffice UI form 3 tab (Cơ bản / Bổ sung / Kho) |
-| [TKT-066](./tickets/TKT-066-item-management-test-plan.md) | E2E + migration test + regression + docs |
+| Ticket                                                       | Mô tả                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------- |
+| [TKT-059](./tickets/TKT-059-item-management-schema.md)       | Schema migration: alter `items` + 3 bảng mới + data migration |
+| [TKT-060](./tickets/TKT-060-item-entity-enhancement.md)      | `ItemEntity` / DTO / CrudConfig + filter POS catalog          |
+| [TKT-061](./tickets/TKT-061-item-providers-m2m-api.md)       | API M2M `item_providers` (CRUD + set-primary)                 |
+| [TKT-062](./tickets/TKT-062-provider-crud-endpoints.md)      | Bổ sung `POST/PATCH/DELETE /inventory/providers`              |
+| [TKT-063](./tickets/TKT-063-item-barcodes-api.md)            | API `item_barcodes` (nhiều mã/item + lookup POS)              |
+| [TKT-064](./tickets/TKT-064-item-stock-thresholds-api.md)    | API định mức tồn min/max theo `(item, location)`              |
+| [TKT-065](./tickets/TKT-065-backoffice-item-form-rebuild.md) | Backoffice UI form 3 tab (Cơ bản / Bổ sung / Kho)             |
+| [TKT-066](./tickets/TKT-066-item-management-test-plan.md)    | E2E + migration test + regression + docs                      |
 
 ### Ticket dependency graph (EPIC-010)
 
@@ -156,11 +159,11 @@ flowchart LR
 - [EPIC-013 Stock-by-Location Query API](./epics/EPIC-013-stock-by-location-api.md)
 - Tickets: [TKT-067](./tickets/TKT-067-stock-by-location-service.md) – [TKT-069](./tickets/TKT-069-stock-by-location-test-plan.md)
 
-| Ticket | Mô tả |
-|---|---|
-| [TKT-067](./tickets/TKT-067-stock-by-location-service.md) | DTO + Service: query builder + filter mapping + computed `belowMin` |
+| Ticket                                                       | Mô tả                                                                                   |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [TKT-067](./tickets/TKT-067-stock-by-location-service.md)    | DTO + Service: query builder + filter mapping + computed `belowMin`                     |
 | [TKT-068](./tickets/TKT-068-stock-by-location-controller.md) | Controller `GET /inventory/locations/:locationId/stock-items` + Swagger + OpenAPI regen |
-| [TKT-069](./tickets/TKT-069-stock-by-location-test-plan.md) | Test plan (unit + e2e) + DoD gate |
+| [TKT-069](./tickets/TKT-069-stock-by-location-test-plan.md)  | Test plan (unit + e2e) + DoD gate                                                       |
 
 ### Ticket dependency graph (EPIC-013)
 
@@ -169,6 +172,36 @@ flowchart LR
   T67["TKT-067 DTO & Service"] --> T68["TKT-068 Controller + OpenAPI"]
   T68 --> T69["TKT-069 Test plan + DoD"]
   T67 --> T69
+## EPIC-011 POS Return & Exchange
+
+- [EPIC-011 POS Return & Exchange](./epics/EPIC-011-pos-return-exchange.md)
+- Plan: [docs/plan-return-exchange.md](../docs/plan-return-exchange.md)
+- Tickets: [TKT-067](./tickets/TKT-067-pos-legacy-scaffolding-cleanup.md) – [TKT-074](./tickets/TKT-074-return-exchange-test-plan.md)
+
+| Ticket                                                                | Mô tả                                                                                                 |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [TKT-067](./tickets/TKT-067-pos-legacy-scaffolding-cleanup.md)        | Xoá legacy `SaleEntity` / `ReturnService` / `ExchangeService` (zero behavior change)                  |
+| [TKT-068](./tickets/TKT-068-return-exchange-schema-migrations.md)     | 4 migration: invoice type/refund fields, item direction, `customer_credits` table                     |
+| [TKT-069](./tickets/TKT-069-return-entities-topics-and-enums.md)      | Entity updates + 5 Kafka topics + DomainEventType + shared enums                                      |
+| [TKT-070](./tickets/TKT-070-return-publishers-and-consumers.md)       | 5 publishers + 4 idempotent consumers (stock-return-in, cash-refund, loyalty-reverse, journal-return) |
+| [TKT-071](./tickets/TKT-071-customer-credit-service.md)               | `CustomerCreditEntity` + service (issue / redeem)                                                     |
+| [TKT-072](./tickets/TKT-072-return-eligibility-and-draft-services.md) | `checkout-shared.ts` + eligibility + draft creation services                                          |
+| [TKT-073](./tickets/TKT-073-checkout-return-service-and-api.md)       | `CheckoutReturnService` + DTOs + 4 endpoint + module wiring                                           |
+| [TKT-074](./tickets/TKT-074-return-exchange-test-plan.md)             | E2E (4 flow) + unit + manual verification + docs update                                               |
+
+### Ticket dependency graph (EPIC-011)
+
+```mermaid
+flowchart LR
+  T67["TKT-067 Legacy cleanup"] --> T68["TKT-068 Schema migrations"]
+  T68 --> T69["TKT-069 Entities + topics"]
+  T69 --> T70["TKT-070 Publishers + consumers"]
+  T69 --> T71["TKT-071 Customer credit service"]
+  T69 --> T72["TKT-072 Eligibility + draft services"]
+  T70 --> T73["TKT-073 Checkout-return + API"]
+  T71 --> T73
+  T72 --> T73
+  T73 --> T74["TKT-074 Test plan + DoD"]
 ```
 
 ## EPIC-20052026 Quản lý Nhân viên & Hồ sơ nhân sự (Employee HR Profile)
@@ -201,5 +234,81 @@ flowchart LR
   E6 --> E7
   E4 --> E8["TKT-EMP-08 E2E + docs"]
   E7 --> E8
+```
+
+## EPIC-18052026 Phiếu Thu, Phiếu Chi và Sổ Tiền Mặt (Backend-only)
+
+- [EPIC-18052026 Cash Vouchers (Backend-only)](./epics/EPIC-18052026-cash-vouchers.md)
+- **Scope: chỉ backend.** Toàn bộ frontend (backoffice pages, form, nav, badge) tách sang FE epic riêng — xem section "Deferred FE work" trong epic.
+- Tickets: [TKT-CV-00](./tickets/TKT-CV-00-cash-tx-jeid-refactor.md) (prerequisite), [TKT-CV-01](./tickets/TKT-CV-01-schema-migration.md) – [TKT-CV-23](./tickets/TKT-CV-23-openapi-e2e-auto.md) + [TKT-CV-OB1](./tickets/TKT-CV-OB1-outbox-schema.md) – [TKT-CV-OB3](./tickets/TKT-CV-OB3-wire-publish-outbox.md). Các số 08–11, 19–21 là ticket FE đã defer (không có file).
+- Follow-up: [EPIC-21052026 Cash Vouchers — Follow-up Refactor](./epics/EPIC-21052026-cash-vouchers-followup-refactor.md) (gom các scope item #7–#11 phát hiện khi review plan).
+
+### Phase 1 (manual flow + ledger + kiểm kê)
+
+| Ticket | Mô tả |
+|---|---|
+| [TKT-CV-00](./tickets/TKT-CV-00-cash-tx-jeid-refactor.md) | **Prerequisite** — refactor `recordMovement`/`JournalService.post` nhận `manager?` + `recordMovement` trả `journalEntryId` (vá atomic, deadlock cash-count, dual-write gap) |
+| [TKT-CV-01](./tickets/TKT-CV-01-schema-migration.md) | Migration 6 bảng + enums + reversal dedupe index (DocumentType cash đã có sẵn — chỉ verify) |
+| [TKT-CV-02](./tickets/TKT-CV-02-module-bootstrap-categories.md) | Entities + DTOs + module + register categories + seed mặc định |
+| [TKT-CV-03](./tickets/TKT-CV-03-cash-receipt-service.md) | CashReceiptService + Controller (CRUD/post/reverse + 2 internal method) |
+| [TKT-CV-04](./tickets/TKT-CV-04-cash-payment-service.md) | CashPaymentService + Controller (đối xứng) |
+| [TKT-CV-05](./tickets/TKT-CV-05-cash-ledger-service.md) | CashLedgerService + Controller (cursor pagination, running balance in-RAM) |
+| [TKT-CV-06](./tickets/TKT-CV-06-cash-count-service.md) | CashCountService + Controller (variance → voucher) |
+| [TKT-CV-07](./tickets/TKT-CV-07-permissions-coa-seed.md) | Permissions seed + COA TK 711/811 |
+| [TKT-CV-12](./tickets/TKT-CV-12-openapi-e2e-manual.md) | OpenAPI regen + E2E manual flow (gate Phase 1) |
+
+### Phase 2 (auto-create vouchers + Transactional Outbox)
+
+| Ticket | Mô tả |
+|---|---|
+| [TKT-CV-13](./tickets/TKT-CV-13-schema-extension.md) | Schema extension: unique reference + payment_method/cash/JE link |
+| [TKT-CV-14](./tickets/TKT-CV-14-event-topics-dtos.md) | Event topics + payload DTOs |
+| [TKT-CV-15](./tickets/TKT-CV-15-voucher-consumers.md) | 4 voucher consumers (POS createAndPost / 3 flow createVoucherForMovement) |
+| [TKT-CV-16](./tickets/TKT-CV-16-refactor-pos-consumer.md) | Refactor CashFromPaymentConsumer → pos-cash-sale consumer |
+| [TKT-CV-17](./tickets/TKT-CV-17-source-accounting-publish.md) | A-revised source accounting + publish needed (debt/GR/expense) |
+| [TKT-CV-18](./tickets/TKT-CV-18-link-back-consumers.md) | Link-back consumers (FK back-fill) |
+| [TKT-CV-22](./tickets/TKT-CV-22-voucher-source-api.md) | API delta: source filter + sourceLink (BE-only; UI defer) |
+| [TKT-CV-23](./tickets/TKT-CV-23-openapi-e2e-auto.md) | OpenAPI regen + E2E auto flow (gate Phase 2) |
+| [TKT-CV-OB1](./tickets/TKT-CV-OB1-outbox-schema.md) | Transactional Outbox — schema |
+| [TKT-CV-OB2](./tickets/TKT-CV-OB2-outbox-service-relay.md) | Transactional Outbox — service + relay |
+| [TKT-CV-OB3](./tickets/TKT-CV-OB3-wire-publish-outbox.md) | Wire publish qua outbox |
+
+### Ticket dependency graph (EPIC-18052026 — BE-only)
+
+```mermaid
+flowchart LR
+  CV0["TKT-CV-00 recordMovement TX+jeId"] --> CV3
+  CV0 --> CV4
+  CV1["TKT-CV-01 Schema"] --> CV2["TKT-CV-02 Bootstrap"]
+  CV2 --> CV3["TKT-CV-03 Receipt"]
+  CV2 --> CV4["TKT-CV-04 Payment"]
+  CV3 --> CV5["TKT-CV-05 Ledger"]
+  CV4 --> CV5
+  CV3 --> CV6["TKT-CV-06 Count"]
+  CV4 --> CV6
+  CV2 --> CV7["TKT-CV-07 Perms+COA"]
+  CV3 --> CV12["TKT-CV-12 OpenAPI+E2E P1"]
+  CV4 --> CV12
+  CV5 --> CV12
+  CV6 --> CV12
+  CV7 --> CV12
+  CV12 --> CV13["TKT-CV-13 Schema ext"]
+  CV13 --> CV14["TKT-CV-14 Topics"]
+  CV14 --> CV15["TKT-CV-15 Consumers"]
+  CV14 --> CV17["TKT-CV-17 Source publish"]
+  CV17 --> CV15
+  CV15 --> CV16["TKT-CV-16 POS refactor"]
+  CV15 --> CV18["TKT-CV-18 Link-back"]
+  CV15 --> CV22["TKT-CV-22 Source API"]
+  CV12 --> OB1["TKT-CV-OB1 Outbox schema"]
+  OB1 --> OB2["TKT-CV-OB2 Outbox svc+relay"]
+  OB2 --> OB3["TKT-CV-OB3 Wire outbox"]
+  CV15 --> OB3
+  CV16 --> OB3
+  CV17 --> OB3
+  CV16 --> CV23["TKT-CV-23 OpenAPI+E2E P2"]
+  CV18 --> CV23
+  CV22 --> CV23
+  OB3 --> CV23
 ```
 

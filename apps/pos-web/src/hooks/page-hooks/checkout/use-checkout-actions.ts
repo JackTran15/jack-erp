@@ -1,19 +1,19 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 
-import {
-  pickAccountByCodePrefix,
-  usePaymentAccountsQuery,
-  useReceivableAccountsQuery,
-  useRevenueAccountsQuery,
-} from "@erp/pos/hooks/react-query/use-query-account";
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
 import {
   useCheckoutInvoiceMutation,
+  useCheckoutReturnMutation,
+  useCreateExchangeInvoiceMutation,
   useCreateInvoiceMutation,
+  useCreateReturnInvoiceMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
-import type { AccountRow } from "@erp/pos/interfaces/account.interface";
+import {
+  pickAccountByCodePrefix,
+  useRevenueAccountsQuery,
+} from "@erp/pos/hooks/react-query/use-query-account";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
@@ -27,23 +27,35 @@ import {
   buildCreateInvoicePayload,
   buildUpdateInvoicePayload,
 } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
+import {
+  buildCheckoutReturnPayload,
+  buildCreateExchangePayload,
+  buildCreateReturnPayload,
+} from "@erp/pos/lib/page-libs/checkout/returnInvoicePayloadMapper";
+import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type { InvoicePayload } from "@erp/pos/dtos/invoice-printing.dto";
-import { resetCheckoutDraftState } from "@erp/pos/lib/page-libs/checkout/resetCheckoutDraftState";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
 } from "@erp/pos/constants/checkout.constant";
 import {
+  CHECKOUT_ANNOUNCEMENTS,
+  CHECKOUT_ERRORS,
+  CHECKOUT_RETURN_REASONS,
+  CHECKOUT_TOASTS,
+} from "@erp/pos/constants/checkout-messages.constant";
+import {
   computeReceiptLines,
   selectActiveSession,
+  selectCustomerDraft,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectPaymentDraft,
   selectPurchaseCart,
+  selectReturnCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosCheckoutCustomerStore } from "@erp/pos/stores/page-stores/checkout/checkout-customer.store";
-import { usePosCheckoutPaymentStore } from "@erp/pos/stores/page-stores/checkout/checkout-payment.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutActionsResult {
@@ -61,16 +73,10 @@ export interface UseCheckoutActionsResult {
 
 function describeResolveError(error: ResolveCheckoutPayloadError): string {
   switch (error.code) {
-    case "missing_revenue_account":
-      return "Chưa cấu hình tài khoản doanh thu. Vui lòng kiểm tra COA.";
-    case "missing_receivable_account":
-      return "Chưa cấu hình tài khoản công nợ phải thu (131).";
-    case "missing_cash_account":
-      return error.cashAccountId
-        ? "Tài khoản thanh toán không tồn tại trong danh sách. Vui lòng tải lại."
-        : "Vui lòng chọn tài khoản thanh toán cho mỗi dòng.";
+    case "missing_payment_account":
+      return CHECKOUT_ERRORS.MISSING_PAYMENT_ACCOUNT;
     default:
-      return "Không xác định được tài khoản kế toán.";
+      return CHECKOUT_ERRORS.UNKNOWN_PAYMENT_ACCOUNT;
   }
 }
 
@@ -85,26 +91,12 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createMutation = useCreateInvoiceMutation();
   const updateMutation = useUpdateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
-
-  const paymentAccountsQuery = usePaymentAccountsQuery();
-  const revenueAccountsQuery = useRevenueAccountsQuery();
-  const receivableAccountsQuery = useReceivableAccountsQuery();
-
-  const accountById = useMemo<Map<string, AccountRow>>(() => {
-    const map = new Map<string, AccountRow>();
-    for (const a of paymentAccountsQuery.accounts) map.set(a.id, a);
-    return map;
-  }, [paymentAccountsQuery.accounts]);
-
-  const revenueAccountId = useMemo(
-    () => revenueAccountsQuery.data?.data?.[0]?.id ?? "",
-    [revenueAccountsQuery.data],
-  );
-  const receivableAccountId = useMemo(
-    () =>
-      pickAccountByCodePrefix(receivableAccountsQuery.data?.data, "131")?.id,
-    [receivableAccountsQuery.data],
-  );
+  const createReturnMutation = useCreateReturnInvoiceMutation();
+  const createExchangeMutation = useCreateExchangeInvoiceMutation();
+  const checkoutReturnMutation = useCheckoutReturnMutation();
+  // Đơn trả/đổi bắt buộc gửi `revenueAccountId` (BE chưa tự resolve cho luồng
+  // này như SALE). Lấy tài khoản doanh thu đầu tiên (ưu tiên code "511…").
+  const revenueQuery = useRevenueAccountsQuery();
 
   const printReceiptIfNeeded = useCallback(
     async (payload: InvoicePayload | null) => {
@@ -122,11 +114,11 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const finalizeCheckoutAndPrint = useCallback(
     async (options?: { bypassOversellModal?: boolean }) => {
       const sessionState = usePosCheckoutSessionStore.getState();
-      const selectedCustomer =
-        usePosCheckoutCustomerStore.getState().selectedCustomer;
+      const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
       const purchaseCart = selectPurchaseCart(sessionState);
       const ui = usePosCheckoutUiStore.getState();
-      const p = usePosCheckoutPaymentStore.getState();
+      // Slice payment của tab đang active (snapshot tại thời điểm click F12).
+      const p = selectPaymentDraft(sessionState);
 
       const grandTotal = selectGrandTotal(sessionState);
       const {
@@ -138,6 +130,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       } = deriveSettlement({
         grandTotal,
         deposit: p.deposit,
+        returnFee: p.returnFee,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,
@@ -172,20 +165,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         return;
       }
 
-      const checkoutResolve = buildCheckoutInvoiceApiPayload({
-        paymentLines: p.paymentLines,
-        debt: p.debt,
-        amountDue: settlementGrandTotal,
-        revenueAccountId,
-        receivableAccountId,
-        accountById,
-      });
-
-      if (!checkoutResolve.ok) {
-        toast.error(describeResolveError(checkoutResolve.error));
-        return;
-      }
-
       const receiptPayload = buildCheckoutInvoicePayload({
         printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
@@ -199,63 +178,191 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       });
 
       const note = p.note || undefined;
-      // Tab mở từ một draft đã lưu → PATCH chính draft đó rồi checkout, để hóa
-      // đơn đó rời khỏi danh sách lưu tạm. Tab thường → tạo mới rồi checkout.
-      const sourceInvoiceId = selectActiveSession(sessionState)?.sourceInvoiceId;
+      const session = selectActiveSession(sessionState);
+      const variant = session?.checkoutVariant ?? CheckoutVariantEnum.SALE;
+      const isReturnFlow = variant !== CheckoutVariantEnum.SALE;
 
       try {
-        let invoiceId: string;
-        if (sourceInvoiceId) {
-          const updated = await updateMutation.mutateAsync({
-            id: sourceInvoiceId,
-            body: buildUpdateInvoicePayload({
-              cart: purchaseCart,
-              customer: selectedCustomer,
-              note,
-            }),
+        if (!isReturnFlow) {
+          // ── SALE ──────────────────────────────────────────────────────────
+          const checkoutResolve = buildCheckoutInvoiceApiPayload({
+            paymentLines: p.paymentLines,
+            debt: p.debt,
           });
-          invoiceId = updated.id;
+          if (!checkoutResolve.ok) {
+            toast.error(describeResolveError(checkoutResolve.error));
+            return;
+          }
+          // Tab mở từ một draft đã lưu → PATCH chính draft đó rồi checkout, để
+          // hóa đơn đó rời khỏi danh sách lưu tạm. Tab thường → tạo mới.
+          const sourceInvoiceId = session?.sourceInvoiceId;
+          let invoiceId: string;
+          if (sourceInvoiceId) {
+            const updated = await updateMutation.mutateAsync({
+              id: sourceInvoiceId,
+              body: buildUpdateInvoicePayload({
+                cart: purchaseCart,
+                customer: selectedCustomer,
+                note,
+              }),
+            });
+            invoiceId = updated.id;
+          } else {
+            const created = await createMutation.mutateAsync(
+              buildCreateInvoicePayload({
+                sessionId: sessionState.posSessionId,
+                cart: purchaseCart,
+                customer: selectedCustomer,
+                note,
+              }),
+            );
+            invoiceId = created.id;
+          }
+          await checkoutMutation.mutateAsync({
+            id: invoiceId,
+            body: checkoutResolve.body,
+          });
         } else {
-          const created = await createMutation.mutateAsync(
-            buildCreateInvoicePayload({
-              sessionId: sessionState.posSessionId,
-              cart: purchaseCart,
-              customer: selectedCustomer,
-              note,
-            }),
+          // ── RETURN / EXCHANGE ─────────────────────────────────────────────
+          // INVOICE_RETURN: credits + hàng mua mới cùng nằm trong purchaseCart.
+          // QUICK_EXCHANGE: hàng trả ở returnCart, hàng mua mới ở purchaseCart.
+          const returnLines =
+            variant === CheckoutVariantEnum.QUICK_EXCHANGE
+              ? selectReturnCart(sessionState)
+              : purchaseCart.filter((l) => l.isReturnCredit);
+          const newLines =
+            variant === CheckoutVariantEnum.QUICK_EXCHANGE
+              ? purchaseCart
+              : purchaseCart.filter((l) => !l.isReturnCredit);
+          const originalInvoiceId = session?.originalInvoiceId;
+
+          if (returnLines.length === 0) {
+            toast.error(CHECKOUT_TOASTS.NO_RETURN_LINES);
+            return;
+          }
+          // BE `ReturnInvoiceLineDto.locationId` là `@IsUUID()` bắt buộc — chặn
+          // sớm dòng trả thiếu vị trí kho (eligible-returns có thể trả locationId
+          // rỗng) để tránh 400 "locationId must be a UUID" khó hiểu cho thu ngân.
+          if (returnLines.some((l) => !l.locationId)) {
+            toast.error(CHECKOUT_TOASTS.RETURN_LINE_MISSING_LOCATION);
+            return;
+          }
+
+          const revenueAccountId = pickAccountByCodePrefix(
+            revenueQuery.data?.data,
+            "511",
+          )?.id;
+          if (!revenueAccountId) {
+            toast.error(CHECKOUT_TOASTS.REVENUE_ACCOUNT_UNAVAILABLE);
+            return;
+          }
+
+          const returnSubtotal = returnLines.reduce(
+            (s, l) => s + l.unitPrice * l.qty,
+            0,
           );
-          invoiceId = created.id;
+          const newSubtotal = newLines.reduce(
+            (s, l) => s + l.unitPrice * l.qty,
+            0,
+          );
+
+          const checkoutResolve = buildCheckoutReturnPayload({
+            revenueAccountId,
+            returnSubtotal,
+            newSubtotal,
+            paymentLines: p.paymentLines,
+            note,
+          });
+          if (!checkoutResolve.ok) {
+            toast.error(describeResolveError(checkoutResolve.error));
+            return;
+          }
+
+          let invoiceId: string;
+          if (newLines.length > 0) {
+            // Đổi hàng (trả + mua mới) → bắt buộc có hóa đơn gốc (BE exchange
+            // yêu cầu originalInvoiceId; không có endpoint exchange "nhanh").
+            if (!originalInvoiceId) {
+              toast.error(CHECKOUT_TOASTS.EXCHANGE_NEEDS_ORIGINAL);
+              return;
+            }
+            const created = await createExchangeMutation.mutateAsync(
+              buildCreateExchangePayload({
+                sessionId: sessionState.posSessionId,
+                originalInvoiceId,
+                customer: selectedCustomer,
+                reason: note ?? CHECKOUT_RETURN_REASONS.EXCHANGE,
+                returnLines,
+                newLines,
+              }),
+            );
+            invoiceId = created.id;
+          } else {
+            const created = await createReturnMutation.mutateAsync(
+              buildCreateReturnPayload({
+                mode: originalInvoiceId ? "regular" : "quick",
+                sessionId: sessionState.posSessionId,
+                originalInvoiceId,
+                customer: selectedCustomer,
+                reason: note ?? CHECKOUT_RETURN_REASONS.RETURN,
+                returnLines,
+              }),
+            );
+            invoiceId = created.id;
+          }
+          await checkoutReturnMutation.mutateAsync({
+            id: invoiceId,
+            body: checkoutResolve.body,
+          });
         }
-        await checkoutMutation.mutateAsync({
-          id: invoiceId,
-          body: checkoutResolve.body,
-        });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Không thu được tiền");
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : isReturnFlow
+              ? CHECKOUT_TOASTS.RETURN_FAILED
+              : CHECKOUT_TOASTS.PAYMENT_FAILED,
+        );
         return;
       }
 
-      const who = selectedCustomer
-        ? ` cho ${formatCustomerDisplay(selectedCustomer)}`
-        : " (khách lẻ)";
-      ui.setAnnouncement(
-        `Đã ghi nhận thanh toán${who}, ${new Intl.NumberFormat("vi-VN", {
+      const who = CHECKOUT_ANNOUNCEMENTS.customerSuffix(
+        selectedCustomer ? formatCustomerDisplay(selectedCustomer) : null,
+      );
+      const formatVndAmount = (value: number) =>
+        new Intl.NumberFormat("vi-VN", {
           style: "currency",
           currency: "VND",
           maximumFractionDigits: 0,
-        }).format(settlementGrandTotal)}, ${paymentLabel(primaryMethod)}.`,
-      );
+        }).format(value);
+      if (isReturnFlow) {
+        ui.setAnnouncement(
+          CHECKOUT_ANNOUNCEMENTS.returnRecorded(
+            who,
+            formatVndAmount(Math.abs(settlementGrandTotal)),
+          ),
+        );
+      } else {
+        ui.setAnnouncement(
+          CHECKOUT_ANNOUNCEMENTS.paymentRecorded(
+            who,
+            formatVndAmount(settlementGrandTotal),
+            paymentLabel(primaryMethod),
+          ),
+        );
+      }
       usePosCheckoutSessionStore.getState().resetActiveSessionAfterCheckout();
-      resetCheckoutDraftState();
+      usePosCheckoutUiStore.getState().resetCheckoutUiDraft();
       await printReceiptIfNeeded(receiptPayload);
     },
     [
-      revenueAccountId,
-      receivableAccountId,
-      accountById,
       createMutation,
       updateMutation,
       checkoutMutation,
+      createReturnMutation,
+      createExchangeMutation,
+      checkoutReturnMutation,
+      revenueQuery.data,
       printReceiptIfNeeded,
     ],
   );
@@ -267,14 +374,15 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const confirmCancelInvoice = useCallback(() => {
     const ui = usePosCheckoutUiStore.getState();
     const session = usePosCheckoutSessionStore.getState();
-    ui.closeCancelInvoice();
     if (session.sessions.length > 1) {
+      // Đóng tab hiện tại; draft per-tab của nó biến mất theo session.
       session.removeSession(session.activeSessionId);
     } else {
       session.resetActiveSessionAfterCheckout();
-      resetCheckoutDraftState();
     }
-    ui.setAnnouncement("Đã hủy hóa đơn.");
+    // Đóng mọi dialog + xóa cartError (transient toàn cục, không theo tab).
+    ui.resetCheckoutUiDraft();
+    ui.setAnnouncement(CHECKOUT_ANNOUNCEMENTS.invoiceCanceled);
   }, []);
 
   const confirmOversell = useCallback(async () => {
@@ -287,7 +395,10 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
     isFinalizing:
       createMutation.isPending ||
       updateMutation.isPending ||
-      checkoutMutation.isPending,
+      checkoutMutation.isPending ||
+      createReturnMutation.isPending ||
+      createExchangeMutation.isPending ||
+      checkoutReturnMutation.isPending,
     requestCancelInvoice,
     confirmCancelInvoice,
     confirmOversell,

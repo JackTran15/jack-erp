@@ -12,17 +12,19 @@ const initialLabels = (): LabelTag[] => [
   { id: "l-gap", name: "Gấp", color: DEFAULT_LABEL_COLOR },
 ];
 
+/**
+ * Định nghĩa nhãn dùng CHUNG cho mọi hóa đơn (toàn cục). Nhãn ĐÃ GÁN cho từng
+ * đơn (`selectedLabelIds`) là per-tab và nằm trong `InvoiceSession.draft.labels`
+ * (xem checkout-session.store) — hook `useCheckoutLabels` ghép 2 nguồn này.
+ */
 interface PosCheckoutLabelsState {
   labels: LabelTag[];
-  selectedLabelIds: string[];
   addLabel: (name: string) => LabelTag;
   updateLabel: (
     id: string,
     patch: Partial<Pick<LabelTag, "name" | "color">>,
   ) => void;
   deleteLabel: (id: string) => void;
-  setSelectedLabelIds: (ids: string[]) => void;
-  resetLabelsDraft: () => void;
 }
 
 function generateLabelId(): string {
@@ -33,9 +35,8 @@ function generateLabelId(): string {
 }
 
 export const usePosCheckoutLabelsStore = create<PosCheckoutLabelsState>()(
-  (set, get) => ({
+  (set) => ({
     labels: initialLabels(),
-    selectedLabelIds: [],
 
     addLabel: (name) => {
       const trimmed = name.trim();
@@ -58,14 +59,6 @@ export const usePosCheckoutLabelsStore = create<PosCheckoutLabelsState>()(
     deleteLabel: (id) =>
       set((state) => ({
         labels: state.labels.filter((l) => l.id !== id),
-        selectedLabelIds: state.selectedLabelIds.filter((sid) => sid !== id),
       })),
-
-    setSelectedLabelIds: (ids) => {
-      const known = new Set(get().labels.map((l) => l.id));
-      set({ selectedLabelIds: ids.filter((id) => known.has(id)) });
-    },
-
-    resetLabelsDraft: () => set({ selectedLabelIds: [] }),
   }),
 );

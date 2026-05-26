@@ -17,6 +17,11 @@ import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { ProviderEntity } from '../location/provider.entity';
 import { LocationEntity } from '../location/location.entity';
 
+export enum GoodsReceiptPaymentMethod {
+  CASH = 'CASH',
+  CREDIT = 'CREDIT',
+}
+
 /** Phiếu nhập kho — goods receipt. State: DRAFT → POSTED → (REVERSED) | CANCELLED. */
 @Entity('goods_receipts')
 @Index(['organizationId', 'status'])
@@ -65,6 +70,21 @@ export class GoodsReceiptEntity extends BaseEntity {
 
   @Column({ name: 'attachment_ids', type: 'jsonb', default: () => "'[]'::jsonb" })
   attachmentIds: string[];
+
+  @Column({
+    name: 'payment_method',
+    type: 'enum',
+    enum: GoodsReceiptPaymentMethod,
+    enumName: 'goods_receipt_payment_method_enum',
+    nullable: true,
+  })
+  paymentMethod?: GoodsReceiptPaymentMethod;
+
+  @Column({ name: 'cash_account_id', type: 'uuid', nullable: true })
+  cashAccountId?: string;
+
+  @Column({ name: 'journal_entry_id', type: 'uuid', nullable: true })
+  journalEntryId?: string;
 
   @Column({ name: 'cash_payment_id', type: 'uuid', nullable: true })
   cashPaymentId?: string;
