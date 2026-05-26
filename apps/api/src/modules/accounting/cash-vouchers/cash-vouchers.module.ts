@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { CashModule } from '../cash/cash.module';
+import { PaymentAccountsModule } from '../payment-accounts/payment-accounts.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { CashMovementEntity } from '../cash/cash-movement.entity';
 import { CashAccountEntity } from '../cash/cash-account.entity';
@@ -20,11 +21,13 @@ import { CashVoucherCategorySeederService } from './cash-voucher-categories/cash
 import { PartnerResolverService } from './shared/partner-resolver.service';
 import { PartnerLookupService } from './shared/partner-lookup.service';
 import { PartnerLookupController } from './shared/partner-lookup.controller';
+import { ReceivingAccountController } from './shared/receiving-account.controller';
 import { CashVoucherCategoryResolverService } from './shared/category-resolver.service';
 import { PosCashSaleConsumer } from './cash-voucher-consumers/pos-cash-sale.consumer';
 import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collection-cash.consumer';
 import { GoodsReceiptCashConsumer } from './cash-voucher-consumers/goods-receipt-cash.consumer';
 import { ExpenseCashConsumer } from './cash-voucher-consumers/expense-cash.consumer';
+import { RefundCashConsumer } from './cash-voucher-consumers/refund-cash.consumer';
 import { CashReceiptsService } from './cash-receipts/cash-receipts.service';
 import { CashReceiptsController } from './cash-receipts/cash-receipts.controller';
 import { CashPaymentsService } from './cash-payments/cash-payments.service';
@@ -33,6 +36,12 @@ import { CashLedgerService } from './cash-ledger/cash-ledger.service';
 import { CashLedgerController } from './cash-ledger/cash-ledger.controller';
 import { CashCountsService } from './cash-counts/cash-counts.service';
 import { CashCountsController } from './cash-counts/cash-counts.controller';
+import { DebtCollectionSagaEntity } from './debt-collection/debt-collection-saga.entity';
+import { DebtCollectionSagaService } from './debt-collection/debt-collection-saga.service';
+import { DebtCollectionController } from './debt-collection/debt-collection.controller';
+import { SupplierDebtPaymentSagaEntity } from './supplier-debt-payment/supplier-debt-payment-saga.entity';
+import { SupplierDebtPaymentSagaService } from './supplier-debt-payment/supplier-debt-payment-saga.service';
+import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-debt-payment.controller';
 
 @Module({
   imports: [
@@ -45,8 +54,11 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
       CashVoucherCategoryEntity,
       CashMovementEntity,
       CashAccountEntity,
+      DebtCollectionSagaEntity,
+      SupplierDebtPaymentSagaEntity,
     ]),
     CashModule,
+    PaymentAccountsModule,
     DocumentNumberingModule,
   ],
   controllers: [
@@ -55,6 +67,9 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashLedgerController,
     CashCountsController,
     PartnerLookupController,
+    ReceivingAccountController,
+    DebtCollectionController,
+    SupplierDebtPaymentController,
   ],
   providers: [
     CashVoucherCategoriesService,
@@ -70,10 +85,13 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashPaymentsService,
     CashLedgerService,
     CashCountsService,
+    DebtCollectionSagaService,
+    SupplierDebtPaymentSagaService,
     PosCashSaleConsumer,
     DebtCollectionCashConsumer,
     GoodsReceiptCashConsumer,
     ExpenseCashConsumer,
+    RefundCashConsumer,
   ],
   exports: [
     CashVoucherCategorySeederService,
@@ -81,6 +99,7 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
     CashPaymentsService,
     CashLedgerService,
     CashCountsService,
+    CashVoucherCategoryResolverService,
   ],
 })
 export class CashVouchersModule implements OnModuleInit {

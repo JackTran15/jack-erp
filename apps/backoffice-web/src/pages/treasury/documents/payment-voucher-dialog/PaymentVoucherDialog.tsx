@@ -39,9 +39,13 @@ import {
   PAYMENT_PURPOSE_LABEL,
   PAYMENT_VOUCHER_PURPOSE_RADIO_OPTIONS,
   emptyFormLine,
-  type PaymentPurposeRadio,
+  isTransferSubOption,
+  subOptionToApiPurpose,
+  PaymentOtherSubOption,
+  PaymentPurposeRadio,
   type VoucherFormLine,
 } from "../_shared/voucher-dialog.constants";
+import { usePaymentAccounts } from "../../../../hooks/treasury/use-payment-accounts";
 import { TreasuryVoucherDialogModeEnum } from "../_shared/voucher-dialog.types";
 import {
   buildPaymentDetailFromForm,
@@ -131,12 +135,20 @@ export function PaymentVoucherDialog({
   const [entitySearchTarget, setEntitySearchTarget] =
     useState<VoucherEntitySearchTarget | null>(null);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
+  const [paymentSubOption, setPaymentSubOption] = useState(
+    PaymentOtherSubOption.OTHER,
+  );
+  const [transferAccountId, setTransferAccountId] = useState("");
+
+  const { data: paymentAccounts = [] } = usePaymentAccounts();
 
   const isDebtRepayment =
     paymentPurpose === CashPaymentPurpose.SUPPLIER_PAYMENT;
   const purposeRadio: PaymentPurposeRadio = isDebtRepayment
-    ? "DEBT_GROUP"
-    : "OTHER_GROUP";
+    ? PaymentPurposeRadio.DEBT_GROUP
+    : PaymentPurposeRadio.OTHER_GROUP;
+  const showTransferAccount =
+    !isDebtRepayment && isTransferSubOption(paymentSubOption);
   const debtFieldsLocked = isDebtRepayment && !readOnly;
 
   const resetKey = `payment-${mode}-${initial?.voucherNo ?? "new"}-${initial?.partnerId ?? ""}`;
@@ -145,6 +157,8 @@ export function PaymentVoucherDialog({
     if (!open || isGoodsView) return;
     if (mode === TreasuryVoucherDialogModeEnum.CREATE) {
       setPaymentPurpose(CashPaymentPurpose.OTHER);
+      setPaymentSubOption(PaymentOtherSubOption.OTHER);
+      setTransferAccountId("");
       setPartnerKind(PartnerLookupType.SUPPLIER);
       setPartnerId("");
       setCounterpartyCode("");
@@ -166,6 +180,8 @@ export function PaymentVoucherDialog({
     }
     if (initial && !isGoodsReceiptPaymentVoucher(initial)) {
       setPaymentPurpose(initial.paymentPurpose ?? CashPaymentPurpose.OTHER);
+      setPaymentSubOption(PaymentOtherSubOption.OTHER);
+      setTransferAccountId("");
       setPartnerKind(
         initial.partnerKind ?? inferLookupType(initial.partnerType),
       );
@@ -187,6 +203,7 @@ export function PaymentVoucherDialog({
               description: l.description,
               amount: l.amount,
               category: l.category,
+              categoryId: l.categoryId,
             }))
           : [emptyFormLine()],
       );
@@ -231,8 +248,10 @@ export function PaymentVoucherDialog({
   }, []);
 
   const handleRadioChange = useCallback((next: PaymentPurposeRadio) => {
-    if (next === "DEBT_GROUP") {
+    if (next === PaymentPurposeRadio.DEBT_GROUP) {
       setPaymentPurpose(CashPaymentPurpose.SUPPLIER_PAYMENT);
+      setPaymentSubOption(PaymentOtherSubOption.OTHER);
+      setTransferAccountId("");
       setPartnerKind(PartnerLookupType.SUPPLIER);
       setPartnerId("");
       setCounterpartyCode("");
@@ -248,6 +267,8 @@ export function PaymentVoucherDialog({
       setDocumentLines([]);
     } else {
       setPaymentPurpose(CashPaymentPurpose.OTHER);
+      setPaymentSubOption(PaymentOtherSubOption.OTHER);
+      setTransferAccountId("");
       setDocumentLines([]);
     }
   }, []);
@@ -280,6 +301,7 @@ export function PaymentVoucherDialog({
           description: `Trả nợ ${d.documentNo}`,
           amount: d.collectAmount,
           category: "",
+          categoryId: undefined,
         })),
       );
     },
@@ -372,18 +394,22 @@ export function PaymentVoucherDialog({
         label: LABELS.category,
         width: 200,
         type: readOnly ? "readonly" : undefined,
-        getValue: (r) => r.category,
+        getValue: (r) =>
+          r.categoryId
+            ? (paymentCategories.find((c) => c.id === r.categoryId)?.name ??
+              r.category)
+            : r.category,
         renderEditor: readOnly
           ? undefined
           : (row, _idx, onChange) => (
               <select
                 className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={row.category}
+                value={row.categoryId ?? ""}
                 onChange={(e) => onChange(e.target.value)}
               >
                 <option value="">-- Chọn --</option>
                 {paymentCategories.map((c) => (
-                  <option key={c.id} value={c.name}>
+                  <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
@@ -421,7 +447,9 @@ export function PaymentVoucherDialog({
     }
     onSave(
       buildPaymentDetailFromForm({
-        purpose: LedgerCashVoucherPurposeEnum.OTHER,
+        purpose: isDebtRepayment
+          ? LedgerCashVoucherPurposeEnum.DEBT_REPAYMENT
+          : LedgerCashVoucherPurposeEnum.OTHER,
         paymentPurpose,
         partnerKind,
         partnerId,
@@ -437,6 +465,8 @@ export function PaymentVoucherDialog({
         voucherNo: voucherNo.trim(),
         voucherDate,
         lines: validLines,
+        documentLines,
+        transferAccountId: showTransferAccount ? transferAccountId : undefined,
       }),
     );
     toast.success(
@@ -449,6 +479,10 @@ export function PaymentVoucherDialog({
     lines,
     voucherNo,
     paymentPurpose,
+    isDebtRepayment,
+    documentLines,
+    showTransferAccount,
+    transferAccountId,
     partnerKind,
     partnerId,
     counterpartyCode,
@@ -546,15 +580,22 @@ export function PaymentVoucherDialog({
                 {!isDebtRepayment ? (
                   readOnly ? (
                     <span className="pt-2 text-sm">
-                      {PAYMENT_PURPOSE_LABEL[paymentPurpose] ?? "Chi khác"}
+                      {PAYMENT_OTHER_SUB_OPTIONS.find(
+                        (o) => o.value === paymentSubOption,
+                      )?.label ?? PAYMENT_OTHER_SUB_OPTIONS[0].label}
                     </span>
                   ) : (
                     <select
                       className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                      value={paymentPurpose}
-                      onChange={(e) =>
-                        setPaymentPurpose(e.target.value as CashPaymentPurpose)
-                      }
+                      value={paymentSubOption}
+                      onChange={(e) => {
+                        const sub = e.target.value as PaymentOtherSubOption;
+                        setPaymentSubOption(sub);
+                        setPaymentPurpose(subOptionToApiPurpose(sub));
+                        if (!isTransferSubOption(sub)) {
+                          setTransferAccountId("");
+                        }
+                      }}
                     >
                       {PAYMENT_OTHER_SUB_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>
@@ -669,6 +710,35 @@ export function PaymentVoucherDialog({
               }}
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
             />
+            {showTransferAccount ? (
+              <FormField
+                label="Tài khoản thu"
+                layout="horizontal"
+                labelWidth="8rem"
+              >
+                {readOnly ? (
+                  <span className="flex h-9 items-center text-sm">
+                    {paymentAccounts.find((a) => a.id === transferAccountId)
+                      ?.label ?? transferAccountId}
+                  </span>
+                ) : (
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={transferAccountId}
+                    onChange={(e) => setTransferAccountId(e.target.value)}
+                  >
+                    <option value="">-- Chọn tài khoản --</option>
+                    {paymentAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {[a.label, a.accountNumber, a.bankName]
+                          .filter(Boolean)
+                          .join(" — ") || a.id}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            ) : null}
             {reference ? (
               <FormField
                 label="Tham chiếu"
@@ -744,9 +814,20 @@ export function PaymentVoucherDialog({
                   ? undefined
                   : (idx, key, value) => {
                       setLines((prev) =>
-                        prev.map((l, i) =>
-                          i === idx ? { ...l, [key]: value } : l,
-                        ),
+                        prev.map((l, i) => {
+                          if (i !== idx) return l;
+                          if (key === "category") {
+                            const cat = paymentCategories.find(
+                              (c) => c.id === value,
+                            );
+                            return {
+                              ...l,
+                              categoryId: (value as string) || undefined,
+                              category: cat?.name ?? "",
+                            };
+                          }
+                          return { ...l, [key]: value };
+                        }),
                       );
                     }
               }

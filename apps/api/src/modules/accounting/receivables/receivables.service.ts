@@ -17,6 +17,16 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { JournalService } from '../journal/journal.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { CashService } from '../cash/cash.service';
+import { CashFundResolverService } from '../cash/cash-fund-resolver.service';
+import { CashMovementType } from '../cash/cash-movement.entity';
+import { CashReceiptsService } from '../cash-vouchers/cash-receipts/cash-receipts.service';
+import { CashVoucherCategoryResolverService } from '../cash-vouchers/shared/category-resolver.service';
+import {
+  CashReceiptPurpose,
+  CashReceiptReferenceType,
+  CashVoucherPartnerType,
+} from '../cash-vouchers/enums';
 import { ReceivableEntity } from './receivable.entity';
 import { ReceivableSettlementEntity } from './receivable-settlement.entity';
 import {
@@ -25,6 +35,9 @@ import {
   WriteOffReceivableDto,
 } from './dto';
 import { BaseCrudService } from '../../crud/base-crud.service';
+
+/** dto.method values treated as physical cash → route through the till + Phiếu Thu. */
+const CASH_METHOD = 'CASH';
 
 export const RECEIVABLE_SERVICE_TOKEN = 'ReceivableService';
 
@@ -46,6 +59,10 @@ export class ReceivablesService extends BaseCrudService<
     protected readonly dataSource: DataSource,
     private readonly journalService: JournalService,
     private readonly documentNumberingService: DocumentNumberingService,
+    private readonly cashService: CashService,
+    private readonly cashFundResolver: CashFundResolverService,
+    private readonly cashReceiptsService: CashReceiptsService,
+    private readonly categoryResolver: CashVoucherCategoryResolverService,
   ) {
     super(dataSource);
   }
@@ -173,30 +190,79 @@ export class ReceivablesService extends BaseCrudService<
 
       const saved = await manager.save(receivable);
 
-      await this.journalService.post(
-        {
-          source: JournalSource.SALE,
-          sourceReferenceId: receivable.id,
-          description: `Receivable collection: ${receivable.documentNumber} — ${dto.method}`,
-          lines: [
+      const isCash = (dto.method ?? '').trim().toUpperCase() === CASH_METHOD;
+      if (isCash) {
+        // Cash collection: credit the branch till + issue a Phiếu Thu.
+        // recordMovement posts DR cash / CR receivable account, updates the
+        // balance and creates the JE — replacing the standalone journal entry.
+        const cashAccountId = await this.cashFundResolver.resolveOrDefault(
+          actor.organizationId,
+          actor.branchId,
+          undefined,
+          manager,
+        );
+        const { movement, journalEntryId } =
+          await this.cashService.recordMovement(
             {
-              accountId: receivable.accountId,
-              debitAmount: Number(dto.amount),
-              creditAmount: 0,
-              description: 'Debit cash',
-              lineOrder: 1,
+              cashAccountId,
+              type: CashMovementType.DEPOSIT,
+              amount: Number(dto.amount),
+              contraAccountId: receivable.accountId,
+              reference: `RECV-${settlement.id}`,
+              notes: `Receivable collection ${receivable.documentNumber ?? receivable.id}`,
             },
-            {
-              accountId: receivable.accountId,
-              debitAmount: 0,
-              creditAmount: Number(dto.amount),
-              description: 'Credit receivable',
-              lineOrder: 2,
-            },
-          ],
-        },
-        actor,
-      );
+            actor,
+            manager,
+          );
+        const categoryId = await this.categoryResolver.resolveId(
+          actor.organizationId,
+          'THU_NO_KH',
+        );
+        await this.cashReceiptsService.createVoucherForMovement(
+          {
+            cashMovementId: movement.id,
+            journalEntryId,
+            purpose: CashReceiptPurpose.OTHER,
+            cashAccountId,
+            contraAccountId: receivable.accountId,
+            amount: Number(dto.amount),
+            referenceType: CashReceiptReferenceType.RECEIVABLE,
+            referenceId: settlement.id,
+            partnerType: CashVoucherPartnerType.CUSTOMER,
+            partnerId: receivable.customerId,
+            description: `Thu phải thu ${receivable.documentNumber ?? ''}`.trim(),
+            categoryId,
+            actor,
+          },
+          manager,
+        );
+      } else {
+        // Non-cash (bank transfer, cheque, …): journal entry only.
+        await this.journalService.post(
+          {
+            source: JournalSource.SALE,
+            sourceReferenceId: receivable.id,
+            description: `Receivable collection: ${receivable.documentNumber} — ${dto.method}`,
+            lines: [
+              {
+                accountId: receivable.accountId,
+                debitAmount: Number(dto.amount),
+                creditAmount: 0,
+                description: 'Debit cash/bank',
+                lineOrder: 1,
+              },
+              {
+                accountId: receivable.accountId,
+                debitAmount: 0,
+                creditAmount: Number(dto.amount),
+                description: 'Credit receivable',
+                lineOrder: 2,
+              },
+            ],
+          },
+          actor,
+        );
+      }
 
       return saved;
     });

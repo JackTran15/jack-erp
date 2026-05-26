@@ -33,6 +33,8 @@ import {
 import { CashCountDetailPanel } from "./CashCountDetailPanel";
 import { CashCountFormDialog } from "./CashCountFormDialog";
 import { CreateCashCountDialog } from "./CreateCashCountDialog";
+import { useCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
+import { CashAccountSelect } from "../../components/CashAccountSelect";
 import {
   cashCountToRecord,
   recordToCreateCashCountBody,
@@ -122,6 +124,9 @@ export function TreasuryCashCountPage() {
     }
     return null;
   }, [formRecord, selectedId, records, detailCount]);
+
+  const selectedAccount = useCashAccount(cashAccountId || undefined);
+  const accountBalance = Number(selectedAccount?.balance ?? 0);
 
   const mutations = useCashCountMutations();
 
@@ -381,6 +386,7 @@ export function TreasuryCashCountPage() {
         createDraft={
           createDraftDate ? { inventoryUntilDate: createDraftDate } : null
         }
+        accountBalance={accountBalance}
         onSaved={handleSaveFromForm}
         onProcess={async (id) => {
           try {

@@ -10,6 +10,11 @@ import {
   QueryCustomerDebtsDto,
 } from './dto/query-customer-debts.dto';
 import { QueryCustomersWithDebtDto } from './dto/query-customers-with-debt.dto';
+import {
+  QuerySupplierDebtsDto,
+  SupplierDebtStatusFilter,
+} from './dto/query-supplier-debts.dto';
+import { QuerySuppliersWithDebtDto } from './dto/query-suppliers-with-debt.dto';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -66,6 +71,52 @@ export interface CustomersWithDebtResult {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface SupplierDebtItem {
+  id: string;
+  referenceCode: string;
+  goodsReceiptId: string;
+  documentType: string;
+  originalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  issuedAt: string;
+  dueDate: string | null;
+  settledAt: Date | null;
+  status: string;
+  note: string | null;
+}
+
+export interface SupplierDebtsResult {
+  data: SupplierDebtItem[];
+  totalRemaining: number;
+  totalOriginal: number;
+  count: number;
+}
+
+export interface SupplierWithDebtItem {
+  supplierId: string;
+  supplierName: string;
+  supplierCode: string | null;
+  debtCount: number;
+  totalOriginal: number;
+  totalRemaining: number;
+  earliestDueDate: string | null;
+  hasOverdue: boolean;
+}
+
+export interface SuppliersWithDebtResult {
+  data: SupplierWithDebtItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ReceivingAccountItem {
+  id: string;
+  code: string;
+  name: string;
 }
 
 /**
@@ -256,6 +307,135 @@ export class PartnerLookupService {
     const data = all.slice(offset, offset + pageSize);
 
     return { data, total: all.length, page, pageSize };
+  }
+
+  /**
+   * A supplier's outstanding debts ("nợ NCC") from the supplier_debts ledger —
+   * the accounts-payable mirror of {@link customerDebts}.
+   */
+  async supplierDebts(
+    query: QuerySupplierDebtsDto,
+    actor: ActorContext,
+  ): Promise<SupplierDebtsResult> {
+    const status = query.status ?? SupplierDebtStatusFilter.OPEN;
+
+    const sql = `SELECT id, reference_code, goods_receipt_id, document_type,
+        original_amount, paid_amount, remaining_amount,
+        issued_at, due_date, settled_at, status, note
+      FROM supplier_debts
+      WHERE organization_id = $1 AND supplier_id = $2 AND status = $3
+      ORDER BY issued_at DESC, id DESC`;
+    const rows = await this.dataSource.query(sql, [
+      actor.organizationId,
+      query.supplierId,
+      status,
+    ]);
+
+    const data: SupplierDebtItem[] = rows.map((r: any) => ({
+      id: r.id,
+      referenceCode: r.reference_code,
+      goodsReceiptId: r.goods_receipt_id,
+      documentType: r.document_type,
+      originalAmount: Number(r.original_amount),
+      paidAmount: Number(r.paid_amount),
+      remainingAmount: Number(r.remaining_amount),
+      issuedAt: r.issued_at,
+      dueDate: r.due_date ?? null,
+      settledAt: r.settled_at ?? null,
+      status: r.status,
+      note: r.note ?? null,
+    }));
+
+    // In-memory aggregation over the fetched rows (bounded per supplier).
+    const totalRemaining = data.reduce((s, d) => s + d.remainingAmount, 0);
+    const totalOriginal = data.reduce((s, d) => s + d.originalAmount, 0);
+
+    return { data, totalRemaining, totalOriginal, count: data.length };
+  }
+
+  /**
+   * List suppliers that currently have outstanding debt (remaining_amount > 0),
+   * with a per-supplier rollup — the AP mirror of {@link customersWithDebt}.
+   * Fetches open debt rows joined to their supplier, then groups/aggregates in
+   * memory (no SQL GROUP BY) and paginates the resulting supplier list.
+   */
+  async suppliersWithDebt(
+    query: QuerySuppliersWithDebtDto,
+    actor: ActorContext,
+  ): Promise<SuppliersWithDebtResult> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+    const searchPattern = this.buildSearchPattern(query.search);
+
+    const sql = `SELECT d.supplier_id, d.original_amount, d.remaining_amount,
+        d.due_date, d.status, p.name AS supplier_name, p.code AS supplier_code
+      FROM supplier_debts d
+      JOIN inventory_providers p
+        ON p.id = d.supplier_id AND p.organization_id = $1
+      WHERE d.organization_id = $1
+        AND d.remaining_amount > 0
+        AND ($2::text IS NULL OR p.name ILIKE $2 OR p.code ILIKE $2)`;
+    const rows: Array<{
+      supplier_id: string;
+      original_amount: string;
+      remaining_amount: string;
+      due_date: string | null;
+      status: string;
+      supplier_name: string | null;
+      supplier_code: string | null;
+    }> = await this.dataSource.query(sql, [actor.organizationId, searchPattern]);
+
+    // Group + aggregate per supplier in memory.
+    const bySupplier = new Map<string, SupplierWithDebtItem>();
+    for (const r of rows) {
+      let acc = bySupplier.get(r.supplier_id);
+      if (!acc) {
+        acc = {
+          supplierId: r.supplier_id,
+          supplierName: r.supplier_name ?? '',
+          supplierCode: r.supplier_code ?? null,
+          debtCount: 0,
+          totalOriginal: 0,
+          totalRemaining: 0,
+          earliestDueDate: null,
+          hasOverdue: false,
+        };
+        bySupplier.set(r.supplier_id, acc);
+      }
+      acc.debtCount += 1;
+      acc.totalOriginal += Number(r.original_amount);
+      acc.totalRemaining += Number(r.remaining_amount);
+      if (r.status === SupplierDebtStatusFilter.OVERDUE) acc.hasOverdue = true;
+      if (r.due_date && (!acc.earliestDueDate || r.due_date < acc.earliestDueDate)) {
+        acc.earliestDueDate = r.due_date;
+      }
+    }
+
+    // Biggest debtors first, then by name for a stable order.
+    const all = Array.from(bySupplier.values()).sort(
+      (a, b) =>
+        b.totalRemaining - a.totalRemaining ||
+        a.supplierName.localeCompare(b.supplierName),
+    );
+
+    const offset = (page - 1) * pageSize;
+    const data = all.slice(offset, offset + pageSize);
+
+    return { data, total: all.length, page, pageSize };
+  }
+
+  /**
+   * Bank/deposit accounts ("tài khoản thu" — tiền gửi, COA code 112x), used as
+   * the destination of an internal-transfer Phiếu Chi (e.g. cash → bank).
+   * Excludes the physical cash account (111x). Org-wide.
+   */
+  async depositAccounts(actor: ActorContext): Promise<ReceivingAccountItem[]> {
+    const sql = `SELECT id, code, name
+      FROM accounts
+      WHERE organization_id = $1 AND is_active = true AND code LIKE '112%'
+      ORDER BY code ASC`;
+    const rows = await this.dataSource.query(sql, [actor.organizationId]);
+    return rows.map((r: any) => ({ id: r.id, code: r.code, name: r.name }));
   }
 
   /** SELECT fragments to UNION for a given lookup type. */

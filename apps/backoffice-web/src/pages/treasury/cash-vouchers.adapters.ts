@@ -110,6 +110,7 @@ function mapVoucherLines(
   return (lines ?? []).map((l) => ({
     description: l.description,
     amount: num(l.amount),
+    categoryId: l.categoryId,
     category: l.categoryId
       ? (categoryNames.get(l.categoryId) ?? l.categoryId)
       : "",

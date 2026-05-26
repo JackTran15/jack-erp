@@ -21,6 +21,7 @@ export function LedgerCashTable({
   loading = false,
   totalDebit,
   totalCredit,
+  closingBalance,
 }: Props) {
   const columns = useLedgerCashTableColumns(onDrillDown);
 
@@ -48,14 +49,22 @@ export function LedgerCashTable({
   );
 
   return (
-    <BaseDataTable
-      className="min-h-0 flex-1"
-      scrollContainerClassName="min-h-[280px] flex-1"
-      columns={effectiveColumns}
-      rows={rows}
-      loading={loading}
-      emptyLabel="Không có phát sinh trong kỳ."
-      getRowKey={(r) => r.id}
-    />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <BaseDataTable
+        className="min-h-0 flex-1"
+        scrollContainerClassName="min-h-[280px] flex-1"
+        columns={effectiveColumns}
+        rows={rows}
+        loading={loading}
+        emptyLabel="Không có phát sinh trong kỳ."
+        getRowKey={(r) => r.id}
+      />
+      {closingBalance != null && (
+        <div className="flex items-center justify-end border-t bg-muted/50 px-4 py-2 text-sm font-semibold">
+          <span className="mr-4">Số dư cuối kỳ:</span>
+          <span>{formatMoneyInteger(closingBalance)}</span>
+        </div>
+      )}
+    </div>
   );
 }

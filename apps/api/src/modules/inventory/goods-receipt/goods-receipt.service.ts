@@ -37,6 +37,11 @@ import {
   GoodsReceiptPaymentMethod,
 } from './goods-receipt.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
+import {
+  SupplierDebtEntity,
+  SupplierDebtDocumentType,
+  SupplierDebtStatus,
+} from '../supplier-debt/supplier-debt.entity';
 import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 
@@ -175,7 +180,7 @@ export class GoodsReceiptService {
           'Không xác định được chi nhánh để đảo bút tồn kho',
         );
       }
-      await this.dataSource.transaction(async () => {
+      await this.dataSource.transaction(async (manager) => {
         const reversals: RecordMovementParams[] = receipt.lines.map((line) => ({
           itemId: line.itemId,
           locationId: line.locationId,
@@ -189,6 +194,27 @@ export class GoodsReceiptService {
           actorContext: actor,
         }));
         await this.stockLedger.recordBatchMovements(reversals);
+
+        // Void the supplier-debt ledger row (nợ NCC) for a CREDIT receipt.
+        // Refuse if it has already received any payment (partially settled).
+        if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
+          const debtRows = await manager.query(
+            `SELECT id FROM supplier_debts WHERE goods_receipt_id = $1 AND organization_id = $2`,
+            [receipt.id, receipt.organizationId],
+          );
+          if (debtRows.length > 0) {
+            const paid = await manager.query(
+              `SELECT 1 FROM supplier_debt_payments WHERE debt_id = $1 LIMIT 1`,
+              [debtRows[0].id],
+            );
+            if (paid.length > 0) {
+              throw new ConflictException(
+                'Không thể huỷ phiếu nhập: công nợ NCC đã có thanh toán',
+              );
+            }
+            await manager.delete(SupplierDebtEntity, debtRows[0].id);
+          }
+        }
       });
     }
 
@@ -277,6 +303,11 @@ export class GoodsReceiptService {
         cashMovementId = res.movement.id;
       } else if (receipt.paymentMethod === GoodsReceiptPaymentMethod.CREDIT) {
         // CREDIT: DR inventory (156) / CR payable (331), no cash movement.
+        if (!receipt.providerId) {
+          throw new BadRequestException(
+            'Phiếu nhập kho công nợ phải có nhà cung cấp',
+          );
+        }
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
@@ -313,6 +344,27 @@ export class GoodsReceiptService {
           manager,
         );
         journalEntryId = entry.id;
+
+        // Track the amount owed to the supplier (nợ NCC). One ledger row per
+        // receipt (unique goods_receipt_id makes a re-post idempotent).
+        await manager.save(
+          manager.create(SupplierDebtEntity, {
+            organizationId: receipt.organizationId,
+            branchId,
+            createdBy: actor.userId,
+            referenceCode: documentNumber,
+            goodsReceiptId: receipt.id,
+            supplierId: receipt.providerId,
+            documentType: SupplierDebtDocumentType.GOODS_RECEIPT,
+            originalAmount: total,
+            paidAmount: 0,
+            remainingAmount: total,
+            issuedAt: new Date(receipt.receivedAt ?? Date.now())
+              .toISOString()
+              .slice(0, 10),
+            status: SupplierDebtStatus.OPEN,
+          }),
+        );
       }
 
       await manager.update(GoodsReceiptEntity, receipt.id, {

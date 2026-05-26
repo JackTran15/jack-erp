@@ -44,7 +44,9 @@ import {
   emptyDenominationLines,
   emptyParticipant,
   mockBookBalanceForDate,
+  nextKkqNumber,
   syncLineAmounts,
+  nowTimeHHmm,
   todayIsoDate,
 } from "./cash-count.utils";
 import { useCashCountParticipantColumns } from "./useCashCountParticipantColumns";
@@ -65,6 +67,8 @@ interface Props {
   mode: CashCountDialogModeEnum;
   initial: CashCountRecord | null;
   createDraft?: CashCountCreateDraft | null;
+  /** Live book balance of the selected cash fund (két) — "Số dư theo quỹ tiền mặt". */
+  accountBalance: number;
   onSaved: (record: CashCountRecord) => void;
   onProcess: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -78,6 +82,7 @@ export function CashCountFormDialog({
   mode,
   initial,
   createDraft,
+  accountBalance,
   onSaved,
   onProcess,
   onDelete,
@@ -92,7 +97,7 @@ export function CashCountFormDialog({
   const [purpose, setPurpose] = useState("");
   const [inventoryUntilDate, setInventoryUntilDate] = useState("");
   const [countDate, setCountDate] = useState(todayIsoDate());
-  const [countTime, setCountTime] = useState("12:00");
+  const [countTime, setCountTime] = useState(nowTimeHHmm);
   const [voucherNo, setVoucherNo] = useState("");
   const { mutateAsync: generateDocNumber } = useGenerateDocumentNumber();
   const [lines, setLines] = useState(() =>
@@ -113,7 +118,7 @@ export function CashCountFormDialog({
       setPurpose("");
       setInventoryUntilDate(createDraft?.inventoryUntilDate ?? "");
       setCountDate(todayIsoDate());
-      setCountTime("12:00");
+      setCountTime(nowTimeHHmm());
       setVoucherNo("");
       setLines(syncLineAmounts(emptyDenominationLines()));
       setParticipants([emptyParticipant()]);
@@ -125,7 +130,7 @@ export function CashCountFormDialog({
       setPurpose(initial.purpose ?? "");
       setInventoryUntilDate(initial.inventoryUntilDate ?? "");
       setCountDate(initial.countDate ?? todayIsoDate());
-      setCountTime(initial.countTime ?? "12:00");
+      setCountTime(initial.countTime ?? nowTimeHHmm());
       setVoucherNo(initial.documentNumber ?? "");
       setLines(
         syncLineAmounts(
@@ -146,13 +151,12 @@ export function CashCountFormDialog({
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // POSTED counts show the book balance snapshot frozen at post time
+  // (initial.bookBalance = expectedAmount). DRAFT/CREATE show the live cash
+  // fund balance, which is what the backend snapshots when "Xử lý" runs.
   const bookBalance = useMemo(
-    () =>
-      initial?.bookBalance ||
-      mockBookBalanceForDate(
-        inventoryUntilDate || createDraft?.inventoryUntilDate || "",
-      ),
-    [initial?.bookBalance, inventoryUntilDate, createDraft?.inventoryUntilDate],
+    () => (isProcessed ? (initial?.bookBalance ?? 0) : accountBalance),
+    [isProcessed, initial?.bookBalance, accountBalance],
   );
 
   const { actualAmount, variance } = useMemo(

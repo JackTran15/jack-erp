@@ -81,10 +81,12 @@ export function todayIsoDate(): string {
   return `${y}-${m}-${day}`;
 }
 
-export function nowTimeHm(): string {
+export function nowTimeHHmm(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+
+
 
 export function emptyParticipant(): CashCountParticipant {
   return { fullName: "", title: "", representative: "" };

@@ -2,6 +2,7 @@ import {
   LedgerCashVoucherKindEnum,
   LedgerCashVoucherPurposeEnum,
   type LedgerCashVoucherDetail,
+  type LedgerCashVoucherDocumentLine,
 } from "../../ledger-cash/ledger-cash.types";
 import type { VoucherFormLine } from "./voucher-dialog.constants";
 
@@ -64,6 +65,7 @@ export function buildReceiptDetailFromForm(state: {
       description: l.description,
       amount: Number(l.amount) || 0,
       category: l.category,
+      categoryId: l.categoryId,
     })),
     documentLines: state.documentLines,
   };
@@ -88,6 +90,8 @@ export function buildPaymentDetailFromForm(state: {
   voucherNo: string;
   voucherDate: string;
   lines: VoucherFormLine[];
+  documentLines?: LedgerCashVoucherDocumentLine[];
+  transferAccountId?: string;
 }): LedgerCashVoucherDetail {
   const partnerType: CashVoucherPartnerType | undefined = state.partnerId
     ? lookupTypeToPartnerType(state.partnerKind)
@@ -114,6 +118,9 @@ export function buildPaymentDetailFromForm(state: {
       description: l.description,
       amount: Number(l.amount) || 0,
       category: l.category,
+      categoryId: l.categoryId,
     })),
+    documentLines: state.documentLines,
+    transferAccountId: state.transferAccountId || undefined,
   };
 }

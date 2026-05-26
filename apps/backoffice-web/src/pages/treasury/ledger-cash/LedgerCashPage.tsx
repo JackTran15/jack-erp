@@ -7,7 +7,7 @@ import {
   resolvePeriodRange,
   type PeriodValue,
 } from "@erp/ui";
-import { CloudUpload } from "lucide-react";
+import { CloudUpload, Loader2 } from "lucide-react";
 import {
   TreasuryCashTabIdEnum,
   TreasuryTabBar,
@@ -74,22 +74,25 @@ export function LedgerCashPage() {
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
 
-  const { data: receiptDetail } = useCashReceipt(
-    selectedRow?.apiLedgerKind === "PT" ? selectedRow.apiVoucherId : undefined,
-  );
-  const { data: paymentDetail } = useCashPayment(
-    selectedRow?.apiLedgerKind === "PC" ? selectedRow.apiVoucherId : undefined,
-  );
+  const selectedReceiptId =
+    selectedRow?.apiLedgerKind === "PT" ? selectedRow.apiVoucherId : undefined;
+  const selectedPaymentId =
+    selectedRow?.apiLedgerKind === "PC" ? selectedRow.apiVoucherId : undefined;
+
+  const { data: receiptDetail, isFetching: isReceiptFetching } =
+    useCashReceipt(selectedReceiptId);
+  const { data: paymentDetail, isFetching: isPaymentFetching } =
+    useCashPayment(selectedPaymentId);
 
   const voucherDetail = useMemo(() => {
-    if (receiptDetail) {
+    if (selectedReceiptId && receiptDetail) {
       return cashReceiptToVoucherDetail(receiptDetail, categoryInMap);
     }
-    if (paymentDetail) {
+    if (selectedPaymentId && paymentDetail) {
       return cashPaymentToVoucherDetail(paymentDetail, categoryOutMap);
     }
     return null;
-  }, [receiptDetail, paymentDetail, categoryInMap, categoryOutMap, selectedRow]);
+  }, [selectedReceiptId, selectedPaymentId, receiptDetail, paymentDetail, categoryInMap, categoryOutMap]);
 
   const transactionRows = ledger.transactionRows;
   const openingRow = ledger.openingRow;
@@ -126,14 +129,16 @@ export function LedgerCashPage() {
     setLinkedInvoiceDetail(inv);
   }, []);
 
+  const isDetailLoading =
+    dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
+    (isReceiptFetching || isPaymentFetching);
+
   const receiptVoucherOpen =
     dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
-    (voucherDetail?.kind === LedgerCashVoucherKindEnum.RECEIPT ||
-      selectedRow?.apiLedgerKind === "PT");
+    voucherDetail?.kind === LedgerCashVoucherKindEnum.RECEIPT;
   const paymentVoucherOpen =
     dialogKind === LedgerCashDrillDownEnum.VOUCHER &&
-    (voucherDetail?.kind === LedgerCashVoucherKindEnum.PAYMENT ||
-      selectedRow?.apiLedgerKind === "PC");
+    voucherDetail?.kind === LedgerCashVoucherKindEnum.PAYMENT;
 
   return (
     <>
@@ -184,6 +189,15 @@ export function LedgerCashPage() {
           />
         </div>
       </DocumentListShell>
+
+      {isDetailLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-3 shadow-lg">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Đang tải dữ liệu...</span>
+          </div>
+        </div>
+      )}
 
       <InvoiceDetailDialog
         open={dialogKind === LedgerCashDrillDownEnum.INVOICE || !!linkedInvoiceDetail}

@@ -23,6 +23,7 @@ export enum LedgerCashVoucherKindEnum {
 export enum LedgerCashVoucherPurposeEnum {
   OTHER = "other",
   DEBT_COLLECTION = "debt_collection",
+  DEBT_REPAYMENT = "debt_repayment",
 }
 
 export enum LedgerCashVoucherPaymentModeEnum {
@@ -80,6 +81,7 @@ export interface LedgerCashVoucherLine {
   description: string;
   amount: number;
   category: string;
+  categoryId?: string;
 }
 
 export interface LedgerCashVoucherDocumentLine {
@@ -140,6 +142,7 @@ export interface LedgerCashVoucherDetail {
   paymentMode?: LedgerCashVoucherPaymentModeEnum;
   paymentMethod?: string;
   receiveWithInvoice?: boolean;
+  transferAccountId?: string;
 }
 
 export function isGoodsReceiptPaymentVoucher(

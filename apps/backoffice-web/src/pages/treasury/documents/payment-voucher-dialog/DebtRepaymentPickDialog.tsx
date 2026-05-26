@@ -22,12 +22,12 @@ import {
   TABLE_NUM_CLASS,
 } from "../../ledger-cash/ledger-cash.constants";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
+import type { VoucherPartnerOption } from "../_shared/voucher-partner-search";
 import {
-  mergePartnerSearchWithSelection,
-  usePartnerSearch,
-  type VoucherPartnerOption,
-} from "../_shared/voucher-partner-search";
-import { PartnerLookupType } from "../_shared/voucher-partner.constants";
+  useSupplierOpenDebts,
+  mapSupplierDebtsToPickRows,
+} from "./supplier-debt.api";
+import { useSupplierDebtSearch } from "./supplier-debt-search";
 
 const PARTNER_LOOKUP_COLUMNS = [
   {
@@ -91,14 +91,13 @@ export function DebtRepaymentPickDialog({
   initialPartner,
   onConfirm,
 }: Props) {
-  const searchPartners = usePartnerSearch();
+  const searchSuppliersWithDebt = useSupplierDebtSearch();
+  const fetchSupplierDebts = useSupplierOpenDebts();
   const [partner, setPartner] = useState<VoucherPartnerOption | null>(null);
   const [partnerCode, setPartnerCode] = useState("");
   const [repaymentDate, setRepaymentDate] = useState(defaultRepaymentDate);
   const [rows, setRows] = useState<PickRow[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const selectedPartner = partner ?? initialPartner ?? null;
 
   const prevPartnerId = useRef(partner?.id);
   useEffect(() => {
@@ -116,16 +115,9 @@ export function DebtRepaymentPickDialog({
   }, [open, initialPartner, partner]);
 
   const searchSuppliers = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      const raw = await searchPartners(
-        PartnerLookupType.SUPPLIER,
-        query,
-        page,
-        pageSize,
-      );
-      return mergePartnerSearchWithSelection(raw, selectedPartner, page);
-    },
-    [selectedPartner, searchPartners],
+    async (query: string, page: number, pageSize?: number) =>
+      searchSuppliersWithDebt(query, page, pageSize),
+    [searchSuppliersWithDebt],
   );
 
   const loadDebts = useCallback(async () => {
@@ -135,12 +127,18 @@ export function DebtRepaymentPickDialog({
     }
     setLoading(true);
     try {
-      toast.info("API trả nợ NCC chưa sẵn sàng.");
-      setRows([]);
+      const debts = await fetchSupplierDebts(partner.id);
+      const docLines = mapSupplierDebtsToPickRows(debts);
+      setRows(docLines.map((d) => ({ ...d, selected: true })));
+      if (docLines.length === 0) {
+        toast.info("Nhà cung cấp không có nợ mở.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi tải công nợ NCC.");
     } finally {
       setLoading(false);
     }
-  }, [partner]);
+  }, [partner, fetchSupplierDebts]);
 
   const updateRow = useCallback(
     (documentNo: string, patch: Partial<PickRow>) => {

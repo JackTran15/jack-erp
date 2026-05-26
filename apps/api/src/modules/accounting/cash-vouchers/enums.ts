@@ -65,3 +65,15 @@ export enum CashCountVarianceVoucherKind {
   CASH_RECEIPT = 'CASH_RECEIPT',
   CASH_PAYMENT = 'CASH_PAYMENT',
 }
+
+/**
+ * Lifecycle of a debt-collection saga (thu hồi nợ). The happy path settles the
+ * cash receipt + every allocated invoice debt inside one ACID transaction; the
+ * saga row is the control/observability handle and supports compensation.
+ */
+export enum DebtCollectionSagaStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  COMPENSATED = 'COMPENSATED',
+  FAILED = 'FAILED',
+}
