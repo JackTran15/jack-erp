@@ -10,6 +10,7 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { CashService } from '../../accounting/cash/cash.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { OutboxService } from '../../events/outbox/outbox.service';
+import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -66,6 +67,7 @@ describe('InvoiceDebtService', () => {
   let cashService: { recordMovement: jest.Mock };
   let cashFundResolver: { resolveOrDefault: jest.Mock };
   let outboxService: { enqueue: jest.Mock };
+  let accountResolver: { resolveDefaultAccount: jest.Mock };
   let mockManager: {
     create: jest.Mock;
     save: jest.Mock;
@@ -99,6 +101,9 @@ describe('InvoiceDebtService', () => {
         ),
     };
     outboxService = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    accountResolver = {
+      resolveDefaultAccount: jest.fn().mockResolvedValue('acc-131'),
+    };
 
     debtRepo = {
       findOne: jest.fn(),
@@ -127,6 +132,7 @@ describe('InvoiceDebtService', () => {
         { provide: CashService, useValue: cashService },
         { provide: CashFundResolverService, useValue: cashFundResolver },
         { provide: OutboxService, useValue: outboxService },
+        { provide: AccountResolverService, useValue: accountResolver },
       ],
     }).compile();
 

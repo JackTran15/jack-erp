@@ -20,6 +20,8 @@ export const DEFAULT_CASH_VOUCHER_CATEGORIES: DefaultCategory[] = [
   { code: 'CHI_NO_NCC', name: 'Chi trả nợ nhà cung cấp', direction: CashVoucherCategoryDirection.OUT, displayOrder: 5 },
   { code: 'CHI_LUONG', name: 'Chi lương', direction: CashVoucherCategoryDirection.OUT, displayOrder: 6 },
   { code: 'CHI_KHAC', name: 'Chi khác', direction: CashVoucherCategoryDirection.OUT, displayOrder: 7 },
+  { code: 'CHI_CHUYEN_TM_TIEN_GUI', name: 'Chuyển tiền mặt thành tiền gửi', direction: CashVoucherCategoryDirection.OUT, displayOrder: 8 },
+  { code: 'CHI_CHUYEN_CH_KHAC', name: 'Chuyển tiền đến cửa hàng khác', direction: CashVoucherCategoryDirection.OUT, displayOrder: 9 },
 ];
 
 @Injectable()

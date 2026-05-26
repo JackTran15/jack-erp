@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { CashModule } from '../cash/cash.module';
+import { PaymentAccountsModule } from '../payment-accounts/payment-accounts.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { CashMovementEntity } from '../cash/cash-movement.entity';
 import { CashAccountEntity } from '../cash/cash-account.entity';
@@ -20,6 +21,7 @@ import { CashVoucherCategorySeederService } from './cash-voucher-categories/cash
 import { PartnerResolverService } from './shared/partner-resolver.service';
 import { PartnerLookupService } from './shared/partner-lookup.service';
 import { PartnerLookupController } from './shared/partner-lookup.controller';
+import { ReceivingAccountController } from './shared/receiving-account.controller';
 import { CashVoucherCategoryResolverService } from './shared/category-resolver.service';
 import { PosCashSaleConsumer } from './cash-voucher-consumers/pos-cash-sale.consumer';
 import { DebtCollectionCashConsumer } from './cash-voucher-consumers/debt-collection-cash.consumer';
@@ -37,6 +39,9 @@ import { CashCountsController } from './cash-counts/cash-counts.controller';
 import { DebtCollectionSagaEntity } from './debt-collection/debt-collection-saga.entity';
 import { DebtCollectionSagaService } from './debt-collection/debt-collection-saga.service';
 import { DebtCollectionController } from './debt-collection/debt-collection.controller';
+import { SupplierDebtPaymentSagaEntity } from './supplier-debt-payment/supplier-debt-payment-saga.entity';
+import { SupplierDebtPaymentSagaService } from './supplier-debt-payment/supplier-debt-payment-saga.service';
+import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-debt-payment.controller';
 
 @Module({
   imports: [
@@ -50,8 +55,10 @@ import { DebtCollectionController } from './debt-collection/debt-collection.cont
       CashMovementEntity,
       CashAccountEntity,
       DebtCollectionSagaEntity,
+      SupplierDebtPaymentSagaEntity,
     ]),
     CashModule,
+    PaymentAccountsModule,
     DocumentNumberingModule,
   ],
   controllers: [
@@ -60,7 +67,9 @@ import { DebtCollectionController } from './debt-collection/debt-collection.cont
     CashLedgerController,
     CashCountsController,
     PartnerLookupController,
+    ReceivingAccountController,
     DebtCollectionController,
+    SupplierDebtPaymentController,
   ],
   providers: [
     CashVoucherCategoriesService,
@@ -77,6 +86,7 @@ import { DebtCollectionController } from './debt-collection/debt-collection.cont
     CashLedgerService,
     CashCountsService,
     DebtCollectionSagaService,
+    SupplierDebtPaymentSagaService,
     PosCashSaleConsumer,
     DebtCollectionCashConsumer,
     GoodsReceiptCashConsumer,

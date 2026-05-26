@@ -12,57 +12,58 @@ import { DocumentNumberingService } from '../../../document-numbering/document-n
 import { CashService } from '../../cash/cash.service';
 import { CashFundResolverService } from '../../cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
-import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
-import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import {
-  InvoiceDebtEntity,
-  DebtStatus,
-} from '../../../pos/entities/invoice-debt.entity';
+  SupplierDebtEntity,
+  SupplierDebtStatus,
+} from '../../../inventory/supplier-debt/supplier-debt.entity';
 import {
-  DebtPaymentEntity,
-  DebtPaymentMethod,
-} from '../../../pos/entities/debt-payment.entity';
-import { CashReceiptEntity } from '../cash-receipts/cash-receipt.entity';
-import { CashReceiptLineEntity } from '../cash-receipts/cash-receipt-line.entity';
+  SupplierDebtPaymentEntity,
+  SupplierDebtPaymentMethod,
+} from '../../../inventory/supplier-debt/supplier-debt-payment.entity';
+import { CashPaymentEntity } from '../cash-payments/cash-payment.entity';
+import { CashPaymentLineEntity } from '../cash-payments/cash-payment-line.entity';
 import {
-  CashReceiptPurpose,
-  CashReceiptReferenceType,
+  CashPaymentPurpose,
+  CashPaymentReferenceType,
   CashVoucherStatus,
   DebtCollectionSagaStatus,
 } from '../enums';
 import { CashVoucherCategoryResolverService } from '../shared/category-resolver.service';
 import {
-  CreateDebtCollectionReceiptDto,
-  DebtCollectionAllocationDto,
-} from './dto/create-debt-collection-receipt.dto';
+  CreateSupplierDebtPaymentDto,
+  SupplierDebtPaymentAllocationDto,
+} from './dto/create-supplier-debt-payment.dto';
 import {
-  DebtCollectionAllocation,
-  DebtCollectionSagaEntity,
-} from './debt-collection-saga.entity';
+  SupplierDebtPaymentAllocation,
+  SupplierDebtPaymentSagaEntity,
+} from './supplier-debt-payment-saga.entity';
 
-/** Default category code for debt-collection receipt lines (Thu nợ khách hàng). */
-const DEBT_COLLECTION_CATEGORY_CODE = 'THU_NO_KH';
+/** TK 331 "Phải trả người bán" — contra account when paying a supplier debt. */
+const PAYABLE_ACCOUNT_CODE = '331';
+/** Default category code for supplier-payment lines (Chi trả nợ nhà cung cấp). */
+const SUPPLIER_PAYMENT_CATEGORY_CODE = 'CHI_NO_NCC';
 
-export interface DebtCollectionResult {
+export interface SupplierDebtPaymentResult {
   sagaId: string;
-  receiptId: string;
+  paymentId: string;
   documentNumber: string;
   totalAmount: number;
   status: DebtCollectionSagaStatus;
-  allocations: DebtCollectionAllocation[];
+  allocations: SupplierDebtPaymentAllocation[];
 }
 
 const round = (v: number): number => Math.round(v * 100) / 100;
 
 /**
- * Orchestrates "thu hồi nợ" (debt collection) as a saga: in a single ACID
- * transaction it (1) credits the branch cash fund (két), (2) issues a POSTED
- * Phiếu Thu, and (3) settles each allocated invoice debt. The saga row records
- * the outcome for observability and enables compensation on reversal.
+ * Orchestrates "trả nợ NCC" (supplier-debt payment) as a saga — the
+ * accounts-payable mirror of DebtCollectionSagaService. In one ACID transaction
+ * it (1) withdraws from the branch cash fund (két), (2) issues a POSTED Phiếu
+ * Chi, and (3) settles each allocated supplier debt. The saga row records the
+ * outcome and enables compensation on reversal.
  */
 @Injectable()
-export class DebtCollectionSagaService {
-  private readonly logger = new Logger(DebtCollectionSagaService.name);
+export class SupplierDebtPaymentSagaService {
+  private readonly logger = new Logger(SupplierDebtPaymentSagaService.name);
 
   constructor(
     private readonly dataSource: DataSource,
@@ -70,38 +71,37 @@ export class DebtCollectionSagaService {
     private readonly cashFundResolver: CashFundResolverService,
     private readonly docNumbering: DocumentNumberingService,
     private readonly categoryResolver: CashVoucherCategoryResolverService,
-    private readonly accountResolver: AccountResolverService,
   ) {}
 
-  async collect(
-    dto: CreateDebtCollectionReceiptDto,
+  async pay(
+    dto: CreateSupplierDebtPaymentDto,
     idempotencyKey: string,
     actor: ActorContext,
-  ): Promise<DebtCollectionResult> {
+  ): Promise<SupplierDebtPaymentResult> {
     this.assertUniqueAllocations(dto.allocations);
     const total = round(
       dto.allocations.reduce((s, a) => s + Number(a.amount), 0),
     );
     if (total <= 0) {
-      throw new BadRequestException('Total collected amount must be positive');
+      throw new BadRequestException('Total paid amount must be positive');
     }
 
     return this.dataSource.transaction(async (manager) => {
       // Idempotency: a completed saga for this key replays its result.
-      const existing = await manager.findOne(DebtCollectionSagaEntity, {
+      const existing = await manager.findOne(SupplierDebtPaymentSagaEntity, {
         where: { organizationId: actor.organizationId, idempotencyKey },
       });
       if (existing) {
         if (existing.status === DebtCollectionSagaStatus.COMPLETED) {
-          const prior = existing.cashReceiptId
-            ? await manager.findOne(CashReceiptEntity, {
-                where: { id: existing.cashReceiptId },
+          const prior = existing.cashPaymentId
+            ? await manager.findOne(CashPaymentEntity, {
+                where: { id: existing.cashPaymentId },
               })
             : null;
           return this.toResult(existing, prior?.documentNumber ?? '');
         }
         throw new ConflictException(
-          'A debt-collection saga with this idempotency key is already in progress',
+          'A supplier-debt-payment saga with this idempotency key is already in progress',
         );
       }
 
@@ -111,14 +111,15 @@ export class DebtCollectionSagaService {
         dto.cashAccountId,
         manager,
       );
-      // Contra = the org's configured RECEIVABLE account (TK 131 family),
-      // resolved server-side like POS checkout — not a hardcoded code lookup.
-      const contraAccountId = await this.accountResolver.resolveDefaultAccount(
-        AccountingDefaultAccountRole.RECEIVABLE,
-        actor,
+      // Contra = payable (TK 331), resolved by code — same source as the goods
+      // receipt that created the debt. No default-account role exists for it.
+      const contraAccountId = await this.resolveAccountId(
+        manager,
+        actor.organizationId,
+        PAYABLE_ACCOUNT_CODE,
       );
 
-      const saga = manager.create(DebtCollectionSagaEntity, {
+      const saga = manager.create(SupplierDebtPaymentSagaEntity, {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
         createdBy: actor.userId,
@@ -130,51 +131,51 @@ export class DebtCollectionSagaService {
         partnerId: dto.partnerId,
         totalAmount: total,
         allocations: dto.allocations.map((a) => ({
-          invoiceDebtId: a.invoiceDebtId,
+          supplierDebtId: a.supplierDebtId,
           amount: round(Number(a.amount)),
           settled: false,
         })),
       });
       const savedSaga = await manager.save(saga);
 
-      // Step 1 — cash into két + journal entry (DR 1111 / CR 131).
+      // Step 1 — cash out of két + journal entry (DR 331 / CR 1111).
       const { movement, journalEntryId } = await this.cashService.recordMovement(
         {
           cashAccountId,
-          type: CashMovementType.DEPOSIT,
+          type: CashMovementType.WITHDRAWAL,
           amount: total,
           contraAccountId,
-          reference: `DEBTCOL-${savedSaga.id}`,
-          notes: dto.reason ?? 'Debt collection',
+          reference: `SUPDEBT-${savedSaga.id}`,
+          notes: dto.reason ?? 'Supplier debt payment',
         },
         actor,
         manager,
       );
 
-      // Step 2 — issue the POSTED Phiếu Thu, linking the movement + JE.
+      // Step 2 — issue the POSTED Phiếu Chi, linking the movement + JE.
       const documentNumber = await this.docNumbering.generate(
-        DocumentType.CASH_RECEIPT,
+        DocumentType.CASH_PAYMENT,
         actor.branchId,
         actor,
       );
       const categoryId = await this.categoryResolver.resolveId(
         actor.organizationId,
-        DEBT_COLLECTION_CATEGORY_CODE,
+        SUPPLIER_PAYMENT_CATEGORY_CODE,
       );
-      const receipt = manager.create(CashReceiptEntity, {
+      const payment = manager.create(CashPaymentEntity, {
         organizationId: actor.organizationId,
         branchId: actor.branchId,
         createdBy: actor.userId,
         documentNumber,
         voucherDate: dto.voucherDate,
         status: CashVoucherStatus.POSTED,
-        purpose: CashReceiptPurpose.DEBT_COLLECTION,
+        purpose: CashPaymentPurpose.SUPPLIER_PAYMENT,
         partnerType: dto.partnerType,
         partnerId: dto.partnerId,
-        payerName: dto.payerName,
+        payeeName: dto.payeeName,
         reason: dto.reason,
         staffId: dto.staffId,
-        referenceType: CashReceiptReferenceType.INVOICE_DEBT,
+        referenceType: CashPaymentReferenceType.GOODS_RECEIPT,
         referenceId: savedSaga.id,
         cashAccountId,
         contraAccountId,
@@ -184,38 +185,38 @@ export class DebtCollectionSagaService {
         postedAt: new Date(),
         postedBy: actor.userId,
       });
-      const savedReceipt = await manager.save(receipt);
+      const savedPayment = await manager.save(payment);
 
-      // Step 3 — settle each invoice debt + record the instalment, building one
-      // receipt line per allocation.
-      const lines: CashReceiptLineEntity[] = [];
+      // Step 3 — settle each supplier debt + record the instalment, building one
+      // payment line per allocation.
+      const lines: CashPaymentLineEntity[] = [];
       for (let i = 0; i < savedSaga.allocations.length; i++) {
         const alloc = savedSaga.allocations[i];
         const debt = await this.settleDebt(
           manager,
-          alloc.invoiceDebtId,
+          alloc.supplierDebtId,
           alloc.amount,
           actor,
         );
-        const debtPayment = await this.recordInstalment(
+        const instalment = await this.recordInstalment(
           manager,
           debt,
           alloc.amount,
-          savedReceipt.id,
+          savedPayment.id,
           journalEntryId,
           dto.staffId ?? actor.userId,
           actor,
         );
-        alloc.debtPaymentId = debtPayment.id;
+        alloc.supplierDebtPaymentId = instalment.id;
         alloc.settled = true;
         lines.push(
-          manager.create(CashReceiptLineEntity, {
+          manager.create(CashPaymentLineEntity, {
             organizationId: actor.organizationId,
             branchId: actor.branchId,
             createdBy: actor.userId,
-            cashReceiptId: savedReceipt.id,
+            cashPaymentId: savedPayment.id,
             lineOrder: i,
-            description: `Thu nợ ${debt.referenceCode ?? ''}`.trim(),
+            description: `Trả nợ NCC ${debt.referenceCode ?? ''}`.trim(),
             categoryId,
             amount: alloc.amount,
           }),
@@ -223,12 +224,12 @@ export class DebtCollectionSagaService {
       }
       await manager.save(lines);
 
-      savedSaga.cashReceiptId = savedReceipt.id;
+      savedSaga.cashPaymentId = savedPayment.id;
       savedSaga.status = DebtCollectionSagaStatus.COMPLETED;
       await manager.save(savedSaga);
 
       this.logger.log(
-        `Debt collection saga ${savedSaga.id} completed: receipt=${documentNumber} total=${total} debts=${savedSaga.allocations.length}`,
+        `Supplier-debt-payment saga ${savedSaga.id} completed: payment=${documentNumber} total=${total} debts=${savedSaga.allocations.length}`,
       );
 
       return this.toResult(savedSaga, documentNumber);
@@ -238,25 +239,25 @@ export class DebtCollectionSagaService {
   async getSaga(
     id: string,
     actor: ActorContext,
-  ): Promise<DebtCollectionSagaEntity> {
+  ): Promise<SupplierDebtPaymentSagaEntity> {
     const saga = await this.dataSource.manager.findOne(
-      DebtCollectionSagaEntity,
+      SupplierDebtPaymentSagaEntity,
       { where: { id, organizationId: actor.organizationId } },
     );
     if (!saga) {
-      throw new NotFoundException(`Debt collection saga ${id} not found`);
+      throw new NotFoundException(`Supplier debt payment saga ${id} not found`);
     }
     return saga;
   }
 
   /**
    * Compensating action: reopen every settled debt and remove its instalment.
-   * Called from CashReceiptsService.reverse within the reversal transaction —
-   * the cash withdrawal / reversing journal entry is handled there.
+   * Called from CashPaymentsService.reverse within the reversal transaction —
+   * the cash deposit / reversing journal entry is handled there.
    */
-  async compensate(receiptId: string, manager: EntityManager): Promise<void> {
-    const saga = await manager.findOne(DebtCollectionSagaEntity, {
-      where: { cashReceiptId: receiptId },
+  async compensate(paymentId: string, manager: EntityManager): Promise<void> {
+    const saga = await manager.findOne(SupplierDebtPaymentSagaEntity, {
+      where: { cashPaymentId: paymentId },
     });
     if (!saga || saga.status !== DebtCollectionSagaStatus.COMPLETED) {
       return;
@@ -265,55 +266,60 @@ export class DebtCollectionSagaService {
     for (const alloc of saga.allocations) {
       if (!alloc.settled) continue;
       const debt = await manager
-        .createQueryBuilder(InvoiceDebtEntity, 'd')
+        .createQueryBuilder(SupplierDebtEntity, 'd')
         .setLock('pessimistic_write')
-        .where('d.id = :id', { id: alloc.invoiceDebtId })
+        .where('d.id = :id', { id: alloc.supplierDebtId })
         .getOne();
       if (debt) {
         const paid = round(Number(debt.paidAmount) - alloc.amount);
         debt.paidAmount = paid < 0 ? 0 : paid;
-        debt.remainingAmount = round(Number(debt.originalAmount) - debt.paidAmount);
+        debt.remainingAmount = round(
+          Number(debt.originalAmount) - debt.paidAmount,
+        );
         if (debt.remainingAmount > 0) {
-          debt.status = DebtStatus.OPEN;
+          debt.status = SupplierDebtStatus.OPEN;
           (debt as { settledAt?: Date | null }).settledAt = null;
         }
         await manager.save(debt);
       }
-      if (alloc.debtPaymentId) {
-        await manager.delete(DebtPaymentEntity, alloc.debtPaymentId);
+      if (alloc.supplierDebtPaymentId) {
+        await manager.delete(
+          SupplierDebtPaymentEntity,
+          alloc.supplierDebtPaymentId,
+        );
       }
     }
 
     saga.status = DebtCollectionSagaStatus.COMPENSATED;
     await manager.save(saga);
-    this.logger.log(`Debt collection saga ${saga.id} compensated`);
+    this.logger.log(`Supplier-debt-payment saga ${saga.id} compensated`);
   }
 
   // ── internal ───────────────────────────────────────────────────────────────
 
   private async settleDebt(
     manager: EntityManager,
-    invoiceDebtId: string,
+    supplierDebtId: string,
     amount: number,
     actor: ActorContext,
-  ): Promise<InvoiceDebtEntity> {
+  ): Promise<SupplierDebtEntity> {
     const debt = await manager
-      .createQueryBuilder(InvoiceDebtEntity, 'd')
+      .createQueryBuilder(SupplierDebtEntity, 'd')
       .setLock('pessimistic_write')
-      .where('d.id = :id', { id: invoiceDebtId })
+      .where('d.id = :id', { id: supplierDebtId })
       .andWhere('d.organizationId = :org', { org: actor.organizationId })
       .getOne();
     if (!debt) {
-      throw new NotFoundException(`Invoice debt ${invoiceDebtId} not found`);
+      throw new NotFoundException(`Supplier debt ${supplierDebtId} not found`);
     }
-    if (debt.status === DebtStatus.PAID) {
+    if (debt.status === SupplierDebtStatus.PAID) {
       throw new BadRequestException(
-        `Invoice debt ${debt.referenceCode ?? invoiceDebtId} is already fully paid`,
+        `Supplier debt ${debt.referenceCode ?? supplierDebtId} is already fully paid`,
       );
     }
     if (amount > Number(debt.remainingAmount) + 0.001) {
       throw new BadRequestException(
-        `Collected amount (${amount}) exceeds remaining balance (${debt.remainingAmount}) for debt ${debt.referenceCode ?? invoiceDebtId}`,
+        `Paid amount (${amount}) exceeds remaining balance (${debt.remainingAmount}) for debt ${debt.referenceCode ?? supplierDebtId}`,
       );
     }
 
@@ -321,7 +327,7 @@ export class DebtCollectionSagaService {
     debt.remainingAmount = round(Number(debt.originalAmount) - debt.paidAmount);
     if (debt.remainingAmount <= 0) {
       debt.remainingAmount = 0;
-      debt.status = DebtStatus.PAID;
+      debt.status = SupplierDebtStatus.PAID;
       debt.settledAt = new Date();
     }
     return manager.save(debt);
@@ -329,49 +335,66 @@ export class DebtCollectionSagaService {
 
   private async recordInstalment(
     manager: EntityManager,
-    debt: InvoiceDebtEntity,
+    debt: SupplierDebtEntity,
     amount: number,
-    cashReceiptId: string,
+    cashPaymentId: string,
     journalEntryId: string,
     staffId: string,
     actor: ActorContext,
-  ): Promise<DebtPaymentEntity> {
-    const payment = manager.create(DebtPaymentEntity, {
+  ): Promise<SupplierDebtPaymentEntity> {
+    const instalment = manager.create(SupplierDebtPaymentEntity, {
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
       debtId: debt.id,
       amount,
-      paymentMethod: DebtPaymentMethod.CASH,
+      paymentMethod: SupplierDebtPaymentMethod.CASH,
       staffId,
       paidAt: new Date(),
-      cashReceiptId,
+      cashPaymentId,
       journalEntryId,
     });
-    return manager.save(payment);
+    return manager.save(instalment);
   }
 
   private assertUniqueAllocations(
-    allocations: DebtCollectionAllocationDto[],
+    allocations: SupplierDebtPaymentAllocationDto[],
   ): void {
     const ids = new Set<string>();
     for (const a of allocations) {
-      if (ids.has(a.invoiceDebtId)) {
+      if (ids.has(a.supplierDebtId)) {
         throw new BadRequestException(
-          `Duplicate invoice debt in allocations: ${a.invoiceDebtId}`,
+          `Duplicate supplier debt in allocations: ${a.supplierDebtId}`,
         );
       }
-      ids.add(a.invoiceDebtId);
+      ids.add(a.supplierDebtId);
     }
   }
 
+  private async resolveAccountId(
+    manager: EntityManager,
+    organizationId: string,
+    code: string,
+  ): Promise<string> {
+    const rows = await manager.query(
+      `SELECT "id" FROM "accounts" WHERE "organization_id" = $1 AND "code" = $2 AND "is_active" = true LIMIT 1`,
+      [organizationId, code],
+    );
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException(
+        `Account ${code} is not configured in the chart of accounts`,
+      );
+    }
+    return rows[0].id;
+  }
+
   private toResult(
-    saga: DebtCollectionSagaEntity,
+    saga: SupplierDebtPaymentSagaEntity,
     documentNumber: string,
-  ): DebtCollectionResult {
+  ): SupplierDebtPaymentResult {
     return {
       sagaId: saga.id,
-      receiptId: saga.cashReceiptId ?? '',
+      paymentId: saga.cashPaymentId ?? '',
       documentNumber,
       totalAmount: Number(saga.totalAmount),
       status: saga.status,

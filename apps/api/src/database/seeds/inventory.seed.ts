@@ -60,6 +60,10 @@ const IDS = {
   accountBank: 'B0000000-0000-4000-8000-000000000002',
   accountRevenue: 'B0000000-0000-4000-8000-000000000003',
   accountReceivable: 'B0000000-0000-4000-8000-000000000004',
+  accountInventory: 'B0000000-0000-4000-8000-000000000005',
+  accountPayable: 'B0000000-0000-4000-8000-000000000006',
+  accountOtherIncome: 'B0000000-0000-4000-8000-000000000007',
+  accountOtherExpense: 'B0000000-0000-4000-8000-000000000008',
   // Payment-account & default-account config (resolved server-side at checkout)
   defaultAccountRevenue:    'E0000000-0000-4000-8000-000000000001',
   defaultAccountReceivable: 'E0000000-0000-4000-8000-000000000002',
@@ -342,10 +346,24 @@ async function seedInventoryData() {
         ($1, $5, NULL, '1111', 'Tiền mặt',            'ASSET',   true, $5, NOW(), NOW()),
         ($2, $5, NULL, '1121', 'Tiền gửi ngân hàng',  'ASSET',   true, $5, NOW(), NOW()),
         ($3, $5, NULL, '5111', 'Doanh thu bán hàng',  'REVENUE', true, $5, NOW(), NOW()),
-        ($4, $5, NULL, '1311', 'Phải thu khách hàng', 'ASSET',   true, $5, NOW(), NOW())
+        ($4, $5, NULL, '1311', 'Phải thu khách hàng', 'ASSET',     true, $5, NOW(), NOW()),
+        ($6, $5, NULL, '156',  'Hàng hóa',             'ASSET',     true, $5, NOW(), NOW()),
+        ($7, $5, NULL, '331',  'Phải trả người bán',   'LIABILITY', true, $5, NOW(), NOW()),
+        ($8, $5, NULL, '711',  'Thu nhập khác',        'REVENUE',   true, $5, NOW(), NOW()),
+        ($9, $5, NULL, '811',  'Chi phí khác',         'EXPENSE',   true, $5, NOW(), NOW())
       ON CONFLICT (organization_id, code) DO NOTHING
       `,
-      [IDS.accountCash, IDS.accountBank, IDS.accountRevenue, IDS.accountReceivable, IDS.organization],
+      [
+        IDS.accountCash,
+        IDS.accountBank,
+        IDS.accountRevenue,
+        IDS.accountReceivable,
+        IDS.organization,
+        IDS.accountInventory,
+        IDS.accountPayable,
+        IDS.accountOtherIncome,
+        IDS.accountOtherExpense,
+      ],
     );
 
     // Cash account (REGISTER) tied to the main branch + 1111 ledger account
