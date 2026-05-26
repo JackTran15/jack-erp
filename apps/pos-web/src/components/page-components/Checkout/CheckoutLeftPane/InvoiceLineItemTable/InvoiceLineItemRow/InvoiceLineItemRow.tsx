@@ -80,10 +80,12 @@ export function InvoiceLineItemRow({
       onClick={() => selectLine(line)}
       className={cn(
         "h-12 cursor-pointer text-sm text-gray-900 transition-colors",
-        selected
-          ? "bg-indigo-50"
-          : isReturnQuantityUi
-            ? "bg-[#fcf1f2] hover:bg-[#f8e4e6]"
+        isReturnQuantityUi
+          ? selected
+            ? "bg-[#f7d9dd]"
+            : "bg-[#fcf1f2] hover:bg-[#f8e4e6]"
+          : selected
+            ? "bg-indigo-50"
             : oversell
               ? "bg-red-50 hover:bg-red-100/60"
               : "bg-white hover:bg-gray-50",
