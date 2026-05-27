@@ -54,6 +54,11 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.set("X-Idempotency-Key", crypto.randomUUID());
   }
 
+  // Let the runtime set multipart boundary; default application/json breaks FormData uploads.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
+
   return config;
 });
 

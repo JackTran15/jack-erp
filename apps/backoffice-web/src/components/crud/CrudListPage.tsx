@@ -9,15 +9,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  formatMoneyInteger,
 } from "@erp/ui";
-import { buildCrudEntityToolbarSpecs, buildListToolbar } from "../../lib/list-toolbar";
+import {
+  buildCrudEntityToolbarSpecs,
+  buildListToolbar,
+} from "../../lib/list-toolbar";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 import {
   applyColumnFilter,
+  type ColumnFormatKind,
   DEFAULT_COLUMN_FILTER_MODE,
-  resolveColumnWidthVariant,
-  TABLE_COLUMN_WIDTH_PX,
+  resolveColumnConfig,
   toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
@@ -31,7 +35,10 @@ import {
   useCrudDelete,
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
+import { ImportInventoryDialog } from "./inventory/import/ImportInventoryDialog";
+import { downloadInventoryExport } from "./inventory/import/import-inventory.api";
 import { formatCustomerStatus } from "../../lib/customer-display";
+import { toast } from "sonner";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
@@ -47,15 +54,25 @@ export function CrudListPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilter>>(
-    {},
+  const [columnFilters, setColumnFilters] = useState<
+    Record<string, ColumnFilter>
+  >({});
+
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
+    new Set(),
   );
-
-  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
-  const { data: config, isLoading: configLoading, error: configError } = useCrudConfig(entityKey!);
+  const {
+    data: config,
+    isLoading: configLoading,
+    error: configError,
+  } = useCrudConfig(entityKey!);
 
   const {
     data: records,
@@ -80,6 +97,7 @@ export function CrudListPage() {
     setColumnFilters({});
     setSelectedRecordIds(new Set());
     setDuplicateSnapshot(null);
+    setImportDialogOpen(false);
   }, [entityKey]);
 
   useEffect(() => {
@@ -88,7 +106,9 @@ export function CrudListPage() {
       return;
     }
     const idField = config?.idField ?? "id";
-    const availableIds = new Set(records.data.map((record) => String(record[idField])));
+    const availableIds = new Set(
+      records.data.map((record) => String(record[idField])),
+    );
     setSelectedRecordIds((prev) => {
       const next = new Set([...prev].filter((id) => availableIds.has(id)));
       return next.size === prev.size ? prev : next;
@@ -112,7 +132,9 @@ export function CrudListPage() {
   }, [records?.data, config?.fields, columnFilters]);
 
   useEffect(() => {
-    const visibleIds = new Set(filteredRecords.map((record) => String(record[config?.idField ?? "id"])));
+    const visibleIds = new Set(
+      filteredRecords.map((record) => String(record[config?.idField ?? "id"])),
+    );
     setSelectedRecordIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
       return next.size === prev.size ? prev : next;
@@ -131,8 +153,8 @@ export function CrudListPage() {
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
       (config?.fields ?? []).map((field) => {
-        const widthVariant = resolveColumnWidthVariant(entityKey!, field);
-        const widthPx = TABLE_COLUMN_WIDTH_PX[widthVariant];
+        const col = resolveColumnConfig(entityKey!, field);
+        const widthPx = col.widthPx;
         const filterDef = filterDefinitionByKey.get(field.key);
         // Pick filter UI per column. Boolean fields and any field whose
         // server-declared `filterDefinition.type === 'select'` get the dropdown
@@ -149,13 +171,16 @@ export function CrudListPage() {
                   { value: "false", label: "Không" },
                 ]
               : undefined;
+        const alignRight = col.align === "right";
         return {
           key: field.key,
           label: field.label,
           width: widthPx,
           headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
-          className: `max-w-[${widthPx}px]`,
-          render: (row) => formatCell(row[field.key], field),
+          className: alignRight
+            ? `max-w-[${widthPx}px] text-right tabular-nums`
+            : `max-w-[${widthPx}px]`,
+          render: (row) => formatCell(row[field.key], field, col.format),
           filterKind: useSelect ? "select" : "symbol",
           filterOptions: selectOptions,
         };
@@ -181,7 +206,10 @@ export function CrudListPage() {
     return (
       <AdminPageShell>
         <p className="text-destructive">
-          Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}
+          Lỗi:{" "}
+          {configError instanceof Error
+            ? configError.message
+            : "Không tải được"}
         </p>
       </AdminPageShell>
     );
@@ -213,7 +241,10 @@ export function CrudListPage() {
     navigate(`/admin/${entityKey}/new`);
   };
 
-  const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
+  const handleColumnFilterModeChange = (
+    fieldKey: string,
+    mode: ColumnFilterMode,
+  ) => {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
@@ -238,7 +269,8 @@ export function CrudListPage() {
   );
   const selectedRecord = selectedRows.length === 1 ? selectedRows[0] : null;
   const areAllVisibleSelected =
-    filteredRecords.length > 0 && selectedRows.length === filteredRecords.length;
+    filteredRecords.length > 0 &&
+    selectedRows.length === filteredRecords.length;
 
   const openDuplicateDialog = () => {
     if (!selectedRecord) return;
@@ -275,11 +307,29 @@ export function CrudListPage() {
         openDuplicateDialog,
         handleEdit: () => {
           if (!selectedRecord) return;
-          void navigate(`/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`);
+          void navigate(
+            `/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`,
+          );
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
         navigate: (to) => void navigate(to),
+        onImportInventory:
+          entityKey === "inventory-items"
+            ? () => setImportDialogOpen(true)
+            : undefined,
+        onExportInventory:
+          entityKey === "inventory-items"
+            ? () => {
+                void downloadInventoryExport()
+                  .then(() => toast.success("Đã tải tệp xuất khẩu"))
+                  .catch((err: unknown) =>
+                    toast.error(
+                      err instanceof Error ? err.message : "Xuất khẩu thất bại",
+                    ),
+                  );
+              }
+            : undefined,
       },
       {
         selectedRecord,
@@ -308,7 +358,9 @@ export function CrudListPage() {
         loading={loading}
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
-        onRowClick={(row) => navigate(`/admin/${entityKey}/${String(row[config.idField])}`)}
+        onRowClick={(row) =>
+          navigate(`/admin/${entityKey}/${String(row[config.idField])}`)
+        }
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
@@ -327,7 +379,11 @@ export function CrudListPage() {
               onChange={(event) => {
                 if (event.target.checked) {
                   setSelectedRecordIds(
-                    new Set(filteredRecords.map((record) => String(record[config.idField]))),
+                    new Set(
+                      filteredRecords.map((record) =>
+                        String(record[config.idField]),
+                      ),
+                    ),
                   );
                 } else {
                   setSelectedRecordIds(new Set());
@@ -383,16 +439,29 @@ export function CrudListPage() {
         />
       )}
 
+      {entityKey === "inventory-items" && importDialogOpen ? (
+        <ImportInventoryDialog
+          open
+          onOpenChange={setImportDialogOpen}
+          onCommitted={() => void refetchRecords()}
+        />
+      ) : null}
+
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xoá</DialogTitle>
             <DialogDescription>
-              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể hoàn tác.
+              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể
+              hoàn tác.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
               Huỷ
             </Button>
             <Button
@@ -410,7 +479,11 @@ export function CrudListPage() {
   );
 }
 
-function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
+function formatCell(
+  value: unknown,
+  field: FieldDefinition,
+  format: ColumnFormatKind | undefined,
+): React.ReactNode {
   if (value === null || value === undefined) return "—";
   if (field.type === "boolean") {
     return (
@@ -423,7 +496,20 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
       />
     );
   }
-  if (field.key === "status") return formatCustomerStatus(value);
+  if (format === "moneyVnd") {
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return formatMoneyInteger(n);
+  }
+  if (format === "numberVi" || field.type === "number") {
+    const n = typeof value === "number" ? value : Number(String(value).trim());
+    if (!Number.isFinite(n)) return String(value);
+    return new Intl.NumberFormat("vi-VN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+  if (format === "customerStatus") return formatCustomerStatus(value);
   if (field.type === "date") {
     try {
       return new Date(String(value)).toLocaleDateString("vi-VN");

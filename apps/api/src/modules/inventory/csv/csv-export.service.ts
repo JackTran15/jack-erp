@@ -1,11 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PaginationQuery } from '@erp/shared-interfaces';
+import {
+  InventoryImportExcelField,
+  PaginationQuery,
+} from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../location/item.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
+import { buildInventoryImportDelimitedCsv } from './inventory-import-delimited-export.utils';
+import {
+  formatInventoryImportGroupedNumber,
+  parseGroupedDecimal,
+} from './inventory-excel-parse.utils';
 
 interface ExportQuery extends PaginationQuery {
   branchId?: string;
@@ -27,17 +36,49 @@ export class CsvExportService {
     private readonly balanceRepo: Repository<StockBalanceEntity>,
     @InjectRepository(StockLedgerEntryEntity)
     private readonly ledgerRepo: Repository<StockLedgerEntryEntity>,
+    private readonly workbookService: InventoryImportWorkbookService,
   ) {}
 
   async exportItems(
     query: ExportQuery,
     actor: ActorContext,
   ): Promise<string> {
+    // Export ITEMS in the same 4-header grid layout used by the Excel import template.
+    // Delimiter: semicolon `;`.
     const qb = this.itemRepo
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.category', 'category')
-      .leftJoinAndSelect('item.providers', 'ip', 'ip.is_primary = true')
-      .leftJoinAndSelect('ip.provider', 'provider')
+      .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.barcodes', 'barcodes')
+      .leftJoinAndSelect('item.units', 'units')
+      .where('item.organizationId = :orgId', { orgId: actor.organizationId });
+
+    if (query.categoryId) {
+      qb.andWhere('item.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
+    }
+
+    qb.orderBy('item.code', 'ASC');
+
+    const items = await qb.getMany();
+    const dataRows = items.map((item) => ({
+      rawData: this.itemToExcelRow(item),
+    }));
+
+    return buildInventoryImportDelimitedCsv(dataRows);
+  }
+
+  async exportItemsExcelBuffer(
+    query: ExportQuery,
+    actor: ActorContext,
+  ): Promise<Buffer> {
+    const qb = this.itemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.category', 'category')
+      .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.barcodes', 'barcodes')
+      .leftJoinAndSelect('item.units', 'units')
       .where('item.organizationId = :orgId', { orgId: actor.organizationId });
 
     if (query.categoryId) {
@@ -48,22 +89,77 @@ export class CsvExportService {
     qb.orderBy('item.code', 'ASC');
 
     const items = await qb.getMany();
+    const dataRows = items.map((item) => this.itemToExcelRow(item));
 
-    const headers = ['itemCode', 'itemName', 'uom', 'category', 'isActive', 'providerCode', 'providerName'];
-    const rows = items.map((item) => {
-      const primary = item.providers?.find((p) => p.isPrimary);
-      return [
-        this.escapeCsv(item.code),
-        this.escapeCsv(item.name),
-        this.escapeCsv(item.unit),
-        this.escapeCsv(item.category?.name ?? ''),
-        item.isActive ? 'true' : 'false',
-        this.escapeCsv(primary?.provider?.code ?? ''),
-        this.escapeCsv(primary?.provider?.name ?? ''),
-      ].join(',');
-    });
+    return this.workbookService.buildItemsWorkbookBuffer(dataRows);
+  }
 
-    return [headers.join(','), ...rows].join('\n');
+  async exportItemsTemplateBuffer(_actor: ActorContext): Promise<Buffer> {
+    return this.workbookService.buildItemsWorkbookBuffer([]);
+  }
+
+  private itemToExcelRow(item: ItemEntity): Record<string, string | number> {
+    const primaryBarcode = item.barcodes?.[0]?.code ?? item.code;
+    const defaultSellUnit = item.units?.find((u) => u.isDefaultSell);
+    const defaultBuyUnit = item.units?.find((u) => u.isDefaultBuy);
+
+    return {
+      SKUCode: item.code,
+      Barcode: primaryBarcode,
+      ModelCode: '',
+      ModelName: item.product?.name ?? '',
+      InventoryItemName: item.name,
+      ItemCategoryCode: '',
+      ItemCategoryName: item.category?.name ?? '',
+      BrandName: item.brand ?? '',
+      UnitName: item.unit,
+      Color: '',
+      Size: '',
+      CostPrice: this.toExportNumber(item.purchasePrice),
+      UnitPrice: this.toExportNumber(item.sellingPrice),
+      TaxRate: '',
+      OpeningQuantity: '',
+      OpeningAmount: '',
+      OpeningStockName: '',
+      MinimumStock: '',
+      MaximumStock: '',
+      UnitConvertName: '',
+      UnitConvertRate: '',
+      UnitConvertCostPrice: '',
+      UnitConvertSalePrice: '',
+      IsSaleUnit: defaultSellUnit?.isDefaultSell ? 'Có' : '',
+      IsCostUnit: defaultBuyUnit?.isDefaultBuy ? 'Có' : '',
+      ImageUrl: '',
+      Height: this.toExportNumber(item.packageHeightCm),
+      Width: this.toExportNumber(item.packageWidthCm),
+      Length: this.toExportNumber(item.packageLengthCm),
+      Weight: this.toExportNumber(item.packageWeightGram),
+      ShowLocation: '',
+      StockLocation: '',
+      IsUseLotNo: '',
+      SellBeforeDay: '',
+      IsUseSerial: '',
+      ShowInMenu: item.isPosVisible ? 'Có' : 'Không',
+      Description: item.description ?? '',
+      Inactive: item.isActive ? '' : 'Có',
+      SizeRange: item.oddSize ?? '',
+      Ingredient: item.composition ?? '',
+      YearOfProduction: this.toExportNumber(item.manufactureYear),
+      UnitPriceBox: '',
+      UnitPriceWholeSale: '',
+    };
+  }
+
+  /** TypeORM `decimal` may arrive as string — normalize before export. */
+  private toExportNumber(
+    value: number | string | null | undefined,
+  ): number | '' {
+    if (value === undefined || value === null || value === '') return '';
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : '';
+    }
+    const parsed = parseGroupedDecimal(String(value));
+    return parsed ?? '';
   }
 
   async exportBalances(
@@ -175,3 +271,4 @@ export class CsvExportService {
     return value;
   }
 }
+

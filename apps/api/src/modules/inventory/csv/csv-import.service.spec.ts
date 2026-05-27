@@ -10,6 +10,9 @@ import { ItemProviderEntity } from '../location/item-provider.entity';
 import { InventoryLocationService } from '../location/inventory-location.service';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
+import { ExcelParserService } from './excel-parser.service';
+import { ExcelImportItemService } from './excel-import-item.service';
+import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 
 /**
  * These tests lock in the append-only behavior of commitItemRow():
@@ -76,6 +79,18 @@ describe('CsvImportService.commitItemRow', () => {
         { provide: InventoryLocationService, useValue: locationService },
         { provide: StockLedgerService, useValue: noopService },
         { provide: WebSocketEmitterService, useValue: noopService },
+        {
+          provide: ExcelParserService,
+          useValue: { parseInventoryItemsWorkbook: jest.fn() },
+        },
+        {
+          provide: ExcelImportItemService,
+          useValue: { commitRow: jest.fn(), resetCaches: jest.fn() },
+        },
+        {
+          provide: InventoryImportWorkbookService,
+          useValue: { buildItemsWorkbookBuffer: jest.fn() },
+        },
       ],
     }).compile();
 
