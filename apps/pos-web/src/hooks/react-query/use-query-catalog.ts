@@ -2,7 +2,11 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { CATALOG_KEYS } from "@erp/pos/constants/react-query-key.constant";
 import { catalogService } from "@erp/pos/services/catalog.service";
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type {
+  PosCatalogLine,
+  PosProductDetail,
+} from "@erp/pos/interfaces/catalog.interface";
+import type { PosProductKind } from "@erp/pos/types/catalog.type";
 
 /**
  * Tồn kho bán tại quầy theo chi nhánh — `GET /pos/branches/:id/catalog`.
@@ -18,6 +22,26 @@ export function useCatalogQuery(
     queryKey: CATALOG_KEYS.LIST(branchId),
     queryFn: () => catalogService.fetch(branchId),
     enabled: Boolean(branchId),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Chi tiết product (gom biến thể) cho dialog chọn variant —
+ * `GET /pos/branches/:id/catalog/products/:id`. Chỉ fetch khi dialog mở
+ * (`enabled`) và có đủ `branchId` + `id`.
+ */
+export function useCatalogProductDetailQuery(
+  branchId: string,
+  id: string | null,
+  kind: PosProductKind | undefined,
+  enabled: boolean,
+): UseQueryResult<PosProductDetail, Error> {
+  return useQuery<PosProductDetail, Error>({
+    queryKey: CATALOG_KEYS.PRODUCT_DETAIL(branchId, id ?? "", kind),
+    queryFn: () =>
+      catalogService.getProductDetail({ branchId, id: id as string, kind }),
+    enabled: enabled && Boolean(branchId) && Boolean(id),
     staleTime: 30_000,
   });
 }

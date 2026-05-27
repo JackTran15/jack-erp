@@ -4,6 +4,7 @@
  * ăn mọi `INVOICE_KEYS.DRAFTS(sessionId)` con) và tránh trùng key.
  */
 import type { TempWarehouseDirection } from "@erp/shared-interfaces";
+import type { PosProductKind } from "@erp/pos/types/catalog.type";
 
 export const ACCOUNT_KEYS = {
   ALL: ["accounts"] as const,
@@ -39,6 +40,8 @@ export const CUSTOMER_KEYS = {
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
+  PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
+    ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {

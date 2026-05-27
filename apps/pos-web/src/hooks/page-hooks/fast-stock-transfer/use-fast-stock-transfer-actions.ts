@@ -162,6 +162,7 @@ export function useFastStockTransferActions() {
         (line.item
           ? ({
               itemId: line.itemId,
+              productId: null,
               code: line.item.code,
               name: line.item.name,
               unit: line.item.unit,
