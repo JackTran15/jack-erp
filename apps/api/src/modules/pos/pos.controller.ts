@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { RequirePermission, RequireBranchScope } from '../auth/decorators';
 import { PermissionGuard } from '../rbac/permission.guard';
@@ -17,11 +18,16 @@ import { AuditInterceptor } from '../crud/audit.interceptor';
 import {
   PosSessionService,
   PosCatalogService,
+  PosCatalogProductService,
 } from './services';
 import {
   OpenSessionDto,
   SubmitReconciliationDto,
   PosCatalogQueryDto,
+  PosCatalogProductsQueryDto,
+  PosCatalogProductDetailQueryDto,
+  PosProductListResponseDto,
+  PosProductDetailDto,
 } from './dto';
 
 @Controller('pos')
@@ -32,6 +38,7 @@ export class PosController {
   constructor(
     private readonly sessionService: PosSessionService,
     private readonly catalogService: PosCatalogService,
+    private readonly catalogProductService: PosCatalogProductService,
   ) {}
 
   @Get('branches/:branchId/catalog')
@@ -46,6 +53,34 @@ export class PosController {
       actor,
       query.search,
       query.direction,
+    );
+  }
+
+  @Get('branches/:branchId/catalog/products')
+  @RequirePermission('pos.sale.create')
+  @ApiOkResponse({ type: PosProductListResponseDto })
+  listCatalogProducts(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @Query() query: PosCatalogProductsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.catalogProductService.listProducts(branchId, actor, query);
+  }
+
+  @Get('branches/:branchId/catalog/products/:id')
+  @RequirePermission('pos.sale.create')
+  @ApiOkResponse({ type: PosProductDetailDto })
+  getCatalogProductDetail(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PosCatalogProductDetailQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.catalogProductService.getProductDetail(
+      branchId,
+      id,
+      query.kind,
+      actor,
     );
   }
 

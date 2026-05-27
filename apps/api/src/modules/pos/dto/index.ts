@@ -1,6 +1,20 @@
 export { OpenSessionDto, StartSalesDto } from './session.dto';
 export { SubmitReconciliationDto } from './reconciliation.dto';
 export { PosCatalogQueryDto } from './pos-catalog.query.dto';
+export {
+  PosCatalogProductsQueryDto,
+  PosCatalogProductDetailQueryDto,
+} from './pos-catalog-products.query.dto';
+export type { PosProductKind } from './pos-catalog-products.query.dto';
+export {
+  PosProductCardDto,
+  PosProductListResponseDto,
+  PosVariantLocationDto,
+  PosVariantAttributeDto,
+  PosProductVariantDto,
+  PosProductAttributeDto,
+  PosProductDetailDto,
+} from './pos-catalog-product.response.dto';
 export { CreateInvoiceDto, CreateInvoiceItemDto } from './create-invoice.dto';
 export { UpdateInvoiceDto } from './update-invoice.dto';
 export { CheckoutInvoiceDto, InvoicePaymentLineDto } from './checkout-invoice.dto';
