@@ -134,6 +134,7 @@ export class InvoiceController {
 
   @Get(':id')
   @RequirePermission('pos.invoice.read')
+  @ApiOkResponse({ type: DraftInvoiceResponseDto })
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,

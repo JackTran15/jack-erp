@@ -5,6 +5,8 @@ import { DataSource } from 'typeorm';
 import { InvoiceService } from './invoice.service';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import { LocationEntity } from '../../inventory/location/location.entity';
+import { CustomerEntity } from '../../customer/customer.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 
@@ -63,6 +65,8 @@ describe('InvoiceService', () => {
   let service: InvoiceService;
   let invoiceRepo: Record<string, jest.Mock>;
   let itemRepo: Record<string, jest.Mock>;
+  let locationRepo: Record<string, jest.Mock>;
+  let customerRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let mockManager: Record<string, jest.Mock>;
 
@@ -87,6 +91,14 @@ describe('InvoiceService', () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
+    locationRepo = {
+      findBy: jest.fn().mockResolvedValue([]),
+    };
+
+    customerRepo = {
+      findBy: jest.fn().mockResolvedValue([]),
+    };
+
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
     };
@@ -96,6 +108,8 @@ describe('InvoiceService', () => {
         InvoiceService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
         { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },
+        { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
+        { provide: getRepositoryToken(CustomerEntity), useValue: customerRepo },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -230,6 +244,33 @@ describe('InvoiceService', () => {
 
       expect(result.items).toEqual(itemStubs);
       expect(result.id).toBe('inv-1');
+    });
+
+    it('inlines the resolved customer object', async () => {
+      const stub = invoiceStub({ customerId: 'cust-1' });
+      const customer = { id: 'cust-1', name: 'Nguyễn Văn A', phone: '0900000000' };
+      invoiceRepo.findOne.mockResolvedValue(stub);
+      itemRepo.find.mockResolvedValue([]);
+      customerRepo.findBy.mockResolvedValue([customer]);
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(customerRepo.findBy).toHaveBeenCalledWith({
+        id: expect.anything(),
+        organizationId: 'org-1',
+      });
+      expect(result.customer).toEqual(customer);
+    });
+
+    it('sets customer to null when the invoice has no customerId', async () => {
+      const stub = invoiceStub({ customerId: undefined });
+      invoiceRepo.findOne.mockResolvedValue(stub);
+      itemRepo.find.mockResolvedValue([]);
+
+      const result = await service.findOneWithItems('inv-1', actor);
+
+      expect(customerRepo.findBy).not.toHaveBeenCalled();
+      expect(result.customer).toBeNull();
     });
   });
 

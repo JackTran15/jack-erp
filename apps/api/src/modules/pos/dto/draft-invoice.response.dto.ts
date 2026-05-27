@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
+import { CustomerEntity } from '../../customer/customer.entity';
 
 /** Invoice line item enriched with its resolved storage location. */
 export class DraftInvoiceItemDto extends InvoiceItemEntity {
@@ -17,4 +18,11 @@ export class DraftInvoiceItemDto extends InvoiceItemEntity {
 export class DraftInvoiceResponseDto extends InvoiceEntity {
   @ApiProperty({ type: [DraftInvoiceItemDto], description: 'Line items belonging to this draft, ordered by sortOrder.' })
   items: DraftInvoiceItemDto[];
+
+  @ApiProperty({
+    type: () => CustomerEntity,
+    nullable: true,
+    description: 'Resolved customer for the invoice (null when no customer is attached).',
+  })
+  customer: CustomerEntity | null;
 }

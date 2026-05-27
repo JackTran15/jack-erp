@@ -9830,7 +9830,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/DraftInvoiceResponseDto"
                 }
               }
             }
@@ -19897,6 +19897,16 @@
               "$ref": "#/components/schemas/DraftInvoiceItemDto"
             }
           },
+          "customer": {
+            "nullable": true,
+            "description": "Resolved customer for the invoice (null when no customer is attached).",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerEntity"
+              }
+            ]
+          },
           "code": {
             "type": "string"
           },
@@ -20012,6 +20022,7 @@
         },
         "required": [
           "items",
+          "customer",
           "code",
           "status",
           "type",

@@ -11,6 +11,7 @@ import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
 import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
+import { CustomerEntity } from '../../customer/customer.entity';
 import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
@@ -27,6 +28,8 @@ export class InvoiceService {
     private readonly itemRepo: Repository<InvoiceItemEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(CustomerEntity)
+    private readonly customerRepo: Repository<CustomerEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -181,7 +184,12 @@ export class InvoiceService {
   async findOneWithItems(
     id: string,
     actor: ActorContext,
-  ): Promise<InvoiceEntity & { items: Array<InvoiceItemEntity & { location: LocationEntity | null }> }> {
+  ): Promise<
+    InvoiceEntity & {
+      customer: CustomerEntity | null;
+      items: Array<InvoiceItemEntity & { location: LocationEntity | null }>;
+    }
+  > {
     const invoice = await this.findOne(id, actor);
 
     const items = await this.itemRepo.find({
@@ -190,8 +198,9 @@ export class InvoiceService {
     });
 
     const itemsWithLocation = await this.attachLocations(items, actor);
+    const [invoiceWithCustomer] = await this.attachCustomers([invoice], actor);
 
-    return Object.assign(invoice, { items: itemsWithLocation });
+    return Object.assign(invoiceWithCustomer, { items: itemsWithLocation });
   }
 
   async update(
@@ -303,6 +312,7 @@ export class InvoiceService {
   ): Promise<
     Array<
       InvoiceEntity & {
+        customer: CustomerEntity | null;
         items: Array<InvoiceItemEntity & { location: LocationEntity | null }>;
       }
     >
@@ -335,8 +345,35 @@ export class InvoiceService {
       itemsByInvoice.set(item.invoiceId, bucket);
     }
 
-    return drafts.map((draft) =>
+    const draftsWithCustomer = await this.attachCustomers(drafts, actor);
+
+    return draftsWithCustomer.map((draft) =>
       Object.assign(draft, { items: itemsByInvoice.get(draft.id) ?? [] }),
+    );
+  }
+
+  /** Batch-resolve each invoice's customerId into an inlined `customer` object (null when unset/missing). */
+  private async attachCustomers<T extends InvoiceEntity>(
+    invoices: T[],
+    actor: ActorContext,
+  ): Promise<Array<T & { customer: CustomerEntity | null }>> {
+    const customerIds = [
+      ...new Set(invoices.map((i) => i.customerId).filter((id): id is string => !!id)),
+    ];
+
+    const customerMap = new Map<string, CustomerEntity>();
+    if (customerIds.length > 0) {
+      const customers = await this.customerRepo.findBy({
+        id: In(customerIds),
+        organizationId: actor.organizationId,
+      });
+      for (const c of customers) customerMap.set(c.id, c);
+    }
+
+    return invoices.map((inv) =>
+      Object.assign(inv, {
+        customer: inv.customerId ? customerMap.get(inv.customerId) ?? null : null,
+      }),
     );
   }
 
