@@ -25,7 +25,9 @@ export function cashCountToRecord(c: CashCount): CashCountRecord {
   // (expectedAmount); for a DRAFT it is the live cash fund balance
   // (currentBalance) returned by the API.
   const book = Number(
-    (c.expectedAmount != null ? c.expectedAmount : c.currentBalance) ?? 0,
+    c.status === CashCountStatus.POSTED
+      ? (c.expectedAmount ?? 0)
+      : (c.currentBalance ?? c.expectedAmount ?? 0),
   );
 
   return {

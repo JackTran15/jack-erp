@@ -33,8 +33,7 @@ import {
 import { CashCountDetailPanel } from "./CashCountDetailPanel";
 import { CashCountFormDialog } from "./CashCountFormDialog";
 import { CreateCashCountDialog } from "./CreateCashCountDialog";
-import { useCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
-import { CashAccountSelect } from "../../components/CashAccountSelect";
+import { useCashAccountDetail } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   cashCountToRecord,
   recordToCreateCashCountBody,
@@ -106,6 +105,28 @@ export function TreasuryCashCountPage() {
 
   const { data: detailCount } = useCashCount(selectedId ?? undefined);
 
+  const formCountId =
+    formOpen &&
+    formRecord?.id &&
+    formMode !== CashCountDialogModeEnum.CREATE
+      ? formRecord.id
+      : undefined;
+
+  const { data: formDetailCount, isLoading: isFormDetailLoading } =
+    useCashCount(formCountId);
+
+  const formInitial = useMemo((): CashCountRecord | null => {
+    if (!formRecord) return null;
+    const participants =
+      formRecord.participants.length > 0
+        ? formRecord.participants
+        : loadCashCountParticipants(formRecord.id);
+    if (formDetailCount) {
+      return { ...cashCountToRecord(formDetailCount), participants };
+    }
+    return { ...formRecord, participants };
+  }, [formRecord, formDetailCount]);
+
   const selected = useMemo(() => {
     if (formRecord) return formRecord;
     if (!selectedId) return null;
@@ -125,8 +146,16 @@ export function TreasuryCashCountPage() {
     return null;
   }, [formRecord, selectedId, records, detailCount]);
 
-  const selectedAccount = useCashAccount(cashAccountId || undefined);
-  const accountBalance = Number(selectedAccount?.balance ?? 0);
+  const needsLiveAccountBalance =
+    formOpen &&
+    formMode !== CashCountDialogModeEnum.VIEW &&
+    (formMode === CashCountDialogModeEnum.CREATE ||
+      formRecord?.status !== CashCountStatusEnum.PROCESSED);
+
+  const { data: cashAccountDetail, isLoading: isAccountBalanceLoading } =
+    useCashAccountDetail(cashAccountId || undefined, needsLiveAccountBalance);
+
+  const accountBalance = Number(cashAccountDetail?.balance ?? 0);
 
   const mutations = useCashCountMutations();
 
@@ -275,8 +304,11 @@ export function TreasuryCashCountPage() {
           saveCashCountParticipants(created.id, payload.participants);
           setSelectedId(created.id);
         } else if (payload.id) {
-          const { cashAccountId: _ca, documentNumber: _dn, ...updateBody } =
-            recordToCreateCashCountBody(payload, cashAccountId, countedAt);
+          const {
+            cashAccountId: _ca,
+            documentNumber: _dn,
+            ...updateBody
+          } = recordToCreateCashCountBody(payload, cashAccountId, countedAt);
           await mutations.update.mutateAsync({
             id: payload.id,
             body: updateBody,
@@ -381,12 +413,14 @@ export function TreasuryCashCountPage() {
         }}
         mode={formMode}
         initial={
-          formMode === CashCountDialogModeEnum.CREATE ? null : formRecord
+          formMode === CashCountDialogModeEnum.CREATE ? null : formInitial
         }
         createDraft={
           createDraftDate ? { inventoryUntilDate: createDraftDate } : null
         }
         accountBalance={accountBalance}
+        accountBalanceLoading={isAccountBalanceLoading}
+        initialDetailLoading={isFormDetailLoading}
         onSaved={handleSaveFromForm}
         onProcess={async (id) => {
           try {

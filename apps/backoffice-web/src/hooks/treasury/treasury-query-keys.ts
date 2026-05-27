@@ -1,6 +1,8 @@
 export const treasuryQueryKeys = {
   cashAccounts: (branchId?: string) =>
     ["cash-accounts", branchId] as const,
+  cashAccountDetail: (id: string | undefined) =>
+    ["cash-accounts", "detail", id] as const,
   cashVoucherCategories: (direction?: string) =>
     ["cash-voucher-categories", direction] as const,
   coaAccounts: () => ["coa-accounts"] as const,

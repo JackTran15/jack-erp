@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
-import type { CashAccountsListResponse } from "../../pages/treasury/cash-vouchers.types";
+import type {
+  CashAccount,
+  CashAccountsListResponse,
+} from "../../pages/treasury/cash-vouchers.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
 
 export function useCashAccounts(branchId?: string) {
@@ -27,4 +30,19 @@ export function useCashAccounts(branchId?: string) {
 export function useCashAccount(id: string | undefined) {
   const { data: accounts } = useCashAccounts();
   return accounts?.find((a) => a.id === id);
+}
+
+/** Fresh cash fund balance for forms (kiểm kê, phiếu thu/chi). */
+export function useCashAccountDetail(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: treasuryQueryKeys.cashAccountDetail(id),
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<CashAccount>("/cash/accounts/{id}", {
+          params: { path: { id: id! } },
+        }),
+      ),
+    enabled: enabled && Boolean(id),
+    staleTime: 0,
+  });
 }

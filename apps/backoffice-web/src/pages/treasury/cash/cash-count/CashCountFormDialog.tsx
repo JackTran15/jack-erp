@@ -13,7 +13,6 @@ import { DocumentType } from "@erp/shared-interfaces";
 import {
   CloudUpload,
   Pencil,
-  Plus,
   Save,
   Settings2,
   Trash2,
@@ -43,8 +42,6 @@ import {
   computeTotals,
   emptyDenominationLines,
   emptyParticipant,
-  mockBookBalanceForDate,
-  nextKkqNumber,
   syncLineAmounts,
   nowTimeHHmm,
   todayIsoDate,
@@ -69,6 +66,9 @@ interface Props {
   createDraft?: CashCountCreateDraft | null;
   /** Live book balance of the selected cash fund (két) — "Số dư theo quỹ tiền mặt". */
   accountBalance: number;
+  accountBalanceLoading?: boolean;
+  /** Đang tải GET /cash-counts/:id (số dư + chênh lệch khi Xem). */
+  initialDetailLoading?: boolean;
   onSaved: (record: CashCountRecord) => void;
   onProcess: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -83,6 +83,8 @@ export function CashCountFormDialog({
   initial,
   createDraft,
   accountBalance,
+  accountBalanceLoading = false,
+  initialDetailLoading = false,
   onSaved,
   onProcess,
   onDelete,
@@ -151,18 +153,28 @@ export function CashCountFormDialog({
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // POSTED counts show the book balance snapshot frozen at post time
-  // (initial.bookBalance = expectedAmount). DRAFT/CREATE show the live cash
-  // fund balance, which is what the backend snapshots when "Xử lý" runs.
+  // VIEW / POSTED: dùng snapshot trên phiếu (expectedAmount khi đã xử lý).
+  // CREATE / EDIT nháp: số dư live từ GET /cash/accounts/:id.
   const bookBalance = useMemo(
-    () => (isProcessed ? (initial?.bookBalance ?? 0) : accountBalance),
-    [isProcessed, initial?.bookBalance, accountBalance],
+    () =>
+      isView || isProcessed
+        ? (initial?.bookBalance ?? 0)
+        : accountBalance,
+    [isView, isProcessed, initial?.bookBalance, accountBalance],
   );
 
   const { actualAmount, variance } = useMemo(
     () => computeTotals(lines, bookBalance),
     [lines, bookBalance],
   );
+
+  const balanceLoading = isView ? initialDetailLoading : accountBalanceLoading;
+  const balanceDisplay = balanceLoading
+    ? "Đang tải…"
+    : formatMoneyInteger(bookBalance);
+  const varianceDisplay = balanceLoading
+    ? "Đang tải…"
+    : formatMoneyInteger(variance);
 
   const documentNumber = initial?.documentNumber || voucherNo || "";
 
@@ -488,7 +500,7 @@ export function CashCountFormDialog({
                   labelWidth={SUMMARY_LABEL_WIDTH}
                 >
                   <Input
-                    value={formatMoneyInteger(bookBalance)}
+                    value={balanceDisplay}
                     disabled
                     className={`h-8 ${READONLY_INPUT_CLASS}`}
                   />
@@ -499,7 +511,7 @@ export function CashCountFormDialog({
                   labelWidth={SUMMARY_LABEL_WIDTH}
                 >
                   <Input
-                    value={formatMoneyInteger(variance)}
+                    value={varianceDisplay}
                     disabled
                     className={`h-8 ${READONLY_INPUT_CLASS}`}
                   />
