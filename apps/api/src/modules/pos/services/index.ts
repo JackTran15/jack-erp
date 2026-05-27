@@ -1,5 +1,6 @@
 export { PosSessionService } from './pos-session.service';
 export { PosCatalogService } from './pos-catalog.service';
+export { PosCatalogProductService } from './pos-catalog-product.service';
 export { InvoiceService } from './invoice.service';
 export { CheckoutInvoiceService } from './checkout-invoice.service';
 export { CancelInvoiceService } from './cancel-invoice.service';

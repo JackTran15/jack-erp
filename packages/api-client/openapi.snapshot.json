@@ -2466,6 +2466,249 @@
         ]
       }
     },
+    "/cash-vouchers/partners/supplier-debts": {
+      "get": {
+        "operationId": "PartnerLookupController_supplierDebts",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Defaults to OPEN (outstanding debts) when omitted.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "paid",
+                "overdue"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PartnerLookup"
+        ]
+      }
+    },
+    "/cash-vouchers/partners/suppliers-with-debt": {
+      "get": {
+        "operationId": "PartnerLookupController_suppliersWithDebt",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match against the supplier name or code.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PartnerLookup"
+        ]
+      }
+    },
+    "/cash-vouchers/receiving-accounts": {
+      "get": {
+        "operationId": "ReceivingAccountController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ReceivingAccount"
+        ]
+      }
+    },
+    "/cash-receipts/debt-collection": {
+      "post": {
+        "operationId": "DebtCollectionController_collect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDebtCollectionReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create + post a debt-collection Phiếu Thu that settles the selected invoice\ndebts and credits the cash fund, atomically. Idempotent per\nX-Idempotency-Key (the frontend always sends one).",
+        "tags": [
+          "DebtCollection"
+        ]
+      }
+    },
+    "/cash-receipts/debt-collection/sagas/{id}": {
+      "get": {
+        "operationId": "DebtCollectionController_getSaga",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtCollectionSagaEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DebtCollection"
+        ]
+      }
+    },
+    "/cash-payments/supplier-debt-payment": {
+      "post": {
+        "operationId": "SupplierDebtPaymentController_pay",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierDebtPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create + post a supplier-payment Phiếu Chi that settles the selected\nsupplier debts and debits the cash fund, atomically. Idempotent per\nX-Idempotency-Key (the frontend always sends one).",
+        "tags": [
+          "SupplierDebtPayment"
+        ]
+      }
+    },
+    "/cash-payments/supplier-debt-payment/sagas/{id}": {
+      "get": {
+        "operationId": "SupplierDebtPaymentController_getSaga",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDebtPaymentSagaEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SupplierDebtPayment"
+        ]
+      }
+    },
     "/cash/accounts": {
       "post": {
         "operationId": "CashController_createAccount",
@@ -2999,6 +3242,36 @@
         },
         "tags": [
           "DocumentNumbering"
+        ]
+      }
+    },
+    "/payment-accounts": {
+      "get": {
+        "operationId": "PaymentAccountsController_list",
+        "parameters": [
+          {
+            "name": "method",
+            "required": false,
+            "in": "query",
+            "description": "Filter to a single payment method (cash/bank_transfer/card).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "bank_transfer",
+                "card"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active payment accounts for the current branch."
+          }
+        },
+        "summary": "List the active payment accounts for the actor's branch (POS checkout picker).",
+        "tags": [
+          "payment-accounts"
         ]
       }
     },
@@ -7365,36 +7638,6 @@
         ]
       }
     },
-    "/payment-accounts": {
-      "get": {
-        "operationId": "PaymentAccountsController_list",
-        "parameters": [
-          {
-            "name": "method",
-            "required": false,
-            "in": "query",
-            "description": "Filter to a single payment method (cash/bank_transfer/card).",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "bank_transfer",
-                "card"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Active payment accounts for the current branch."
-          }
-        },
-        "summary": "List the active payment accounts for the actor's branch (POS checkout picker).",
-        "tags": [
-          "payment-accounts"
-        ]
-      }
-    },
     "/inventory/stock/transfers": {
       "post": {
         "operationId": "StockTransferController_create",
@@ -8895,6 +9138,158 @@
                   "items": {
                     "type": "object"
                   }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/pos/branches/{branchId}/catalog/products": {
+      "get": {
+        "operationId": "PosController_listCatalogProducts",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "description": "Restrict the branch stock used for aggregation to warehouse or showroom locations.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "warehouse",
+                "showroom"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosProductListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
+    "/pos/branches/{branchId}/catalog/products/{id}": {
+      "get": {
+        "operationId": "PosController_getCatalogProductDetail",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "Hint from the list row to skip product/item resolution. Omit to auto-resolve.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCT",
+                "ITEM"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosProductDetailDto"
                 }
               }
             }
@@ -13657,6 +14052,11 @@
             "type": "number",
             "description": "Quantity of this denomination counted.",
             "minimum": 0
+          },
+          "description": {
+            "type": "string",
+            "description": "Per-line note (\"Diễn giải\") for this denomination row.",
+            "maxLength": 255
           }
         },
         "required": [
@@ -13678,6 +14078,10 @@
             "type": "number",
             "description": "Counted physical cash (nhập tay).",
             "minimum": 0
+          },
+          "purpose": {
+            "type": "string",
+            "description": "\"Mục đích\" — free-text purpose of the count."
           },
           "documentNumber": {
             "type": "string"
@@ -13709,6 +14113,10 @@
             "type": "number",
             "minimum": 0
           },
+          "purpose": {
+            "type": "string",
+            "description": "\"Mục đích\" — free-text purpose of the count."
+          },
           "notes": {
             "type": "string"
           },
@@ -13719,6 +14127,322 @@
             }
           }
         }
+      },
+      "DebtCollectionAllocationDto": {
+        "type": "object",
+        "properties": {
+          "invoiceDebtId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "invoiceDebtId",
+          "amount"
+        ]
+      },
+      "CreateDebtCollectionReceiptDto": {
+        "type": "object",
+        "properties": {
+          "voucherDate": {
+            "type": "string",
+            "description": "\"Ngày thu\" (YYYY-MM-DD)."
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payerName": {
+            "type": "string",
+            "description": "\"Người nộp\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do thu\"",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "description": "Cashier (thủ quỹ).",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Target cash fund (két). Defaults to the branch's single fund when omitted.",
+            "format": "uuid"
+          },
+          "allocations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebtCollectionAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "voucherDate",
+          "allocations"
+        ]
+      },
+      "DebtCollectionSagaEntity": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Client idempotency key (X-Idempotency-Key) — dedupes retries per org."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "COMPENSATED",
+              "FAILED"
+            ]
+          },
+          "cashReceiptId": {
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "partnerType": {
+            "type": "string",
+            "description": "Denormalized copy for observability — stored as text, not a pg enum.",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "status",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "allocations",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "SupplierDebtPaymentAllocationDto": {
+        "type": "object",
+        "properties": {
+          "supplierDebtId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "supplierDebtId",
+          "amount"
+        ]
+      },
+      "CreateSupplierDebtPaymentDto": {
+        "type": "object",
+        "properties": {
+          "voucherDate": {
+            "type": "string",
+            "description": "\"Ngày chi\" (YYYY-MM-DD)."
+          },
+          "partnerType": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payeeName": {
+            "type": "string",
+            "description": "\"Người nhận\"",
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "description": "\"Lý do chi\"",
+            "maxLength": 500
+          },
+          "staffId": {
+            "type": "string",
+            "description": "Cashier (thủ quỹ).",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "description": "Source cash fund (két). Defaults to the branch's single fund when omitted.",
+            "format": "uuid"
+          },
+          "allocations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierDebtPaymentAllocationDto"
+            }
+          }
+        },
+        "required": [
+          "voucherDate",
+          "allocations"
+        ]
+      },
+      "SupplierDebtPaymentSagaEntity": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Client idempotency key (X-Idempotency-Key) — dedupes retries per org."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "COMPENSATED",
+              "FAILED"
+            ]
+          },
+          "cashPaymentId": {
+            "type": "string"
+          },
+          "cashAccountId": {
+            "type": "string"
+          },
+          "contraAccountId": {
+            "type": "string"
+          },
+          "partnerType": {
+            "type": "string",
+            "description": "Denormalized copy for observability — stored as text, not a pg enum.",
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "EMPLOYEE",
+              "OTHER"
+            ]
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "status",
+          "cashAccountId",
+          "contraAccountId",
+          "totalAmount",
+          "allocations",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
       },
       "CreateCashAccountDto": {
         "type": "object",
@@ -18346,6 +19070,277 @@
           "status",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "PosProductCardDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PRODUCT",
+              "ITEM"
+            ],
+            "description": "PRODUCT = parent product grouping variants; ITEM = standalone item without a parent product."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Product id when kind=PRODUCT, otherwise the standalone item id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Image URL placeholder — always null until image storage is implemented."
+          },
+          "minPrice": {
+            "type": "number",
+            "description": "Lowest selling price among the visible variants."
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "Highest selling price among the visible variants."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit of measure of the representative variant."
+          },
+          "variantCount": {
+            "type": "number",
+            "description": "Number of visible variants (1 for a standalone item)."
+          },
+          "quantityOnHand": {
+            "type": "number",
+            "description": "Total on-hand quantity at the branch across all variants and locations."
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "minPrice",
+          "maxPrice",
+          "unit",
+          "variantCount",
+          "quantityOnHand"
+        ]
+      },
+      "PosProductListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosProductCardDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "PosProductAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "options"
+        ]
+      },
+      "PosVariantAttributeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      },
+      "PosVariantLocationDto": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "locationId",
+          "name",
+          "quantity"
+        ]
+      },
+      "PosProductVariantDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVariantAttributeDto"
+            }
+          },
+          "quantityOnHand": {
+            "type": "number",
+            "description": "Total on-hand quantity of this variant at the branch."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVariantLocationDto"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "sellingPrice",
+          "attributes",
+          "quantityOnHand",
+          "locations"
+        ]
+      },
+      "PosProductDetailDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PRODUCT",
+              "ITEM"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "minPrice": {
+            "type": "number"
+          },
+          "maxPrice": {
+            "type": "number"
+          },
+          "attributes": {
+            "description": "Variant dimensions of the product (empty for a standalone item).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosProductAttributeDto"
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosProductVariantDto"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "isActive",
+          "minPrice",
+          "maxPrice",
+          "attributes",
+          "variants"
         ]
       },
       "OpenSessionDto": {

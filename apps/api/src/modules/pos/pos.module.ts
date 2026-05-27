@@ -19,9 +19,16 @@ import {
 import { CashAccountEntity } from '../accounting/cash/cash-account.entity';
 import { CashMovementEntity } from '../accounting/cash/cash-movement.entity';
 import { LocationEntity } from '../inventory/location/location.entity';
+import { ItemEntity } from '../inventory/location/item.entity';
+import { ShowroomEntity } from '../inventory/location/showroom.entity';
+import { ProductEntity } from '../inventory/product/product.entity';
+import { ProductAttributeDefinitionEntity } from '../inventory/product/product-attribute-definition.entity';
+import { ItemAttributeValueEntity } from '../inventory/product/item-attribute-value.entity';
+import { StockBalanceEntity } from '../inventory/ledger/stock-balance.entity';
 import {
   PosSessionService,
   PosCatalogService,
+  PosCatalogProductService,
 } from './services';
 import { InvoiceService } from './services/invoice.service';
 import { CheckoutInvoiceService } from './services/checkout-invoice.service';
@@ -51,6 +58,12 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
       CashAccountEntity,
       CashMovementEntity,
       LocationEntity,
+      ItemEntity,
+      ShowroomEntity,
+      ProductEntity,
+      ProductAttributeDefinitionEntity,
+      ItemAttributeValueEntity,
+      StockBalanceEntity,
     ]),
     DocumentNumberingModule,
     StockLedgerModule,
@@ -64,6 +77,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
   providers: [
     PosSessionService,
     PosCatalogService,
+    PosCatalogProductService,
     InvoiceService,
     CheckoutInvoiceService,
     CancelInvoiceService,
