@@ -6100,6 +6100,8 @@ export interface components {
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
             items: components["schemas"]["DraftInvoiceItemDto"][];
+            /** @description Resolved customer for the invoice (null when no customer is attached). */
+            customer: components["schemas"]["CustomerEntity"] | null;
             code: string;
             /** Format: date-time */
             issuedAt?: string;
@@ -12723,7 +12725,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["DraftInvoiceResponseDto"];
                 };
             };
         };
