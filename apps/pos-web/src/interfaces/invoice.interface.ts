@@ -49,3 +49,31 @@ export interface InvoiceRow {
   cashTendered?: number | null;
   changeAmount?: number | null;
 }
+
+/**
+ * Dòng hiển thị trên trang "Danh sách hóa đơn" (`/invoices`). Dựng từ `InvoiceRow`
+ * (`GET /invoices`) + enrich thông tin khách (mã/tên/SĐT) qua `customerService.get`
+ * vì endpoint danh sách chỉ trả `customerId`.
+ */
+export interface InvoiceListRow {
+  id: string;
+  /** "Số hóa đơn". */
+  code: string;
+  type?: InvoiceType;
+  status: InvoiceStatus;
+  /** "Ngày hóa đơn" — thời điểm phát hành (null khi chưa phát hành). */
+  issuedAt: string | null;
+  /** "Ngày tạo đơn". */
+  createdAt: string;
+  customerId: string | null;
+  /** "Mã khách hàng" — empty khi khách lẻ / chưa lấy được. */
+  customerCode: string;
+  /** "Khách hàng". */
+  customerName: string;
+  /** "Số điện thoại". */
+  customerPhone: string;
+  /** "Tổng thanh toán" — VND, âm cho đơn trả (quy ước hiển thị). */
+  amount: number;
+  /** "Ghi chú". */
+  note: string;
+}

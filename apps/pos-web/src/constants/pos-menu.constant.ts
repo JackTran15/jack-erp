@@ -39,6 +39,8 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "DS hóa đơn",
     iconBgColor: "#E879A8",
     Icon: FileTextIcon,
+    route: "/invoices",
+    pinnable: true,
   },
   {
     id: "don-hang-online",
