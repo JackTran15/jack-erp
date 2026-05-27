@@ -8,6 +8,7 @@ import { PosLayout } from "./components/layout/PosLayout/PosLayout";
 import { BranchSelectPage } from "./pages/BranchSelectPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
+import { InvoiceListPage } from "./pages/InvoiceListPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 import { UiCatalogPage } from "./pages/UiCatalogPage";
@@ -53,6 +54,7 @@ export function App() {
                     element={<FastStockTransferPage />}
                   />
                   <Route path="/return-goods" element={<ReturnGoodsPage />} />
+                  <Route path="/invoices" element={<InvoiceListPage />} />
                 </Route>
               </Route>
             </Route>

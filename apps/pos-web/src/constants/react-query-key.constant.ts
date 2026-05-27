@@ -15,6 +15,9 @@ export const ACCOUNT_KEYS = {
 
 export const INVOICE_KEYS = {
   ALL: ["invoices"] as const,
+  /** Danh sách hóa đơn (trang `/invoices`) — gồm cả bán/trả/đổi. */
+  LIST: (filters: Record<string, unknown>) =>
+    ["invoices", "list", filters] as const,
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
   DRAFTS: (sessionId: string) =>
     ["invoices", "drafts", sessionId] as const,
