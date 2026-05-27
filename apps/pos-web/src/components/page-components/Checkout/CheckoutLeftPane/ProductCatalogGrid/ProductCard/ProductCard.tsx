@@ -1,6 +1,6 @@
 import { ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PriceBadge } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/ProductCatalogGrid/ProductCard/PriceBadge/PriceBadge";
-import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
+import { useCheckoutVariantSelection } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-variant-selection";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 
 export interface ProductCardProps {
@@ -9,15 +9,15 @@ export interface ProductCardProps {
 
 /**
  * Single product tile: square-ish image area with a placeholder bag icon,
- * price pill in the bottom-left corner, name underneath. Click → cart-actions
- * hook thêm sản phẩm vào hóa đơn (focus signal vào qty input của row mới).
+ * price pill in the bottom-left corner, name underneath. Click → mở dialog
+ * chọn biến thể của sản phẩm trước khi thêm vào hóa đơn.
  */
 export function ProductCard({ product }: ProductCardProps) {
-  const { addProductByCatalogCard } = useCheckoutCartActions();
+  const { openForCatalogCard } = useCheckoutVariantSelection();
   return (
     <button
       type="button"
-      onClick={() => addProductByCatalogCard(product)}
+      onClick={() => openForCatalogCard(product)}
       className="group w-full flex h-[120px] flex-col overflow-hidden rounded-md border border-transparent bg-white text-left transition-all hover:border-indigo-500 hover:shadow-sm focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30"
     >
       <div className="relative flex flex-1 items-center justify-center bg-gray-300">

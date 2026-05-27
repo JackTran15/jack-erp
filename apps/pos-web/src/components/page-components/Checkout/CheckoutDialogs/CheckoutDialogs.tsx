@@ -5,8 +5,10 @@ import { CancelInvoiceConfirmDialog } from "@erp/pos/components/page-components/
 import { CustomerCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerCreateDialog";
 import { CustomerDetailDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailDialog";
 import { OversellCheckoutConfirmDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/OversellCheckoutConfirmDialog/OversellCheckoutConfirmDialog";
+import { ProductVariantSelectionModal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/ProductVariantSelectionModal/ProductVariantSelectionModal";
 import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutCustomer } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-customer";
+import { useCheckoutVariantSelection } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-variant-selection";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import {
   computeOversellLines,
@@ -52,6 +54,12 @@ export const CheckoutDialogs = ({
   const createCustomerSucceeded = usePosCheckoutUiStore(
     (s) => s.createCustomerSucceeded,
   );
+  const variantDialogOpen = usePosCheckoutUiStore((s) => s.variantDialogOpen);
+  const variantDialogTarget = usePosCheckoutUiStore(
+    (s) => s.variantDialogTarget,
+  );
+  const closeVariantDialog = usePosCheckoutUiStore((s) => s.closeVariantDialog);
+  const { confirmVariants } = useCheckoutVariantSelection();
 
   const sessionState = usePosCheckoutSessionStore();
   const oversellLines = useMemo(
@@ -95,6 +103,13 @@ export const CheckoutDialogs = ({
         onClose={closeOversell}
         lines={oversellLines}
         onConfirm={confirmOversell}
+      />
+
+      <ProductVariantSelectionModal
+        open={variantDialogOpen}
+        target={variantDialogTarget}
+        onClose={closeVariantDialog}
+        onConfirm={confirmVariants}
       />
 
       <PosErrorDialog

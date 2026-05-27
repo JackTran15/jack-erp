@@ -1,6 +1,15 @@
 import { create } from "zustand";
+import type { PosProductKind } from "@erp/pos/types/catalog.type";
 
 type Updater<T> = T | ((prev: T) => T);
+
+/** Mục tiêu mở dialog chọn biến thể: product id (kind=PRODUCT) hoặc item id (kind=ITEM). */
+export interface VariantDialogTarget {
+  id: string;
+  kind: PosProductKind;
+  /** Tên hiển thị tạm trên header trong lúc fetch chi tiết. */
+  title: string;
+}
 
 const apply = <T>(prev: T, value: Updater<T>): T =>
   typeof value === "function" ? (value as (p: T) => T)(prev) : value;
@@ -24,6 +33,13 @@ interface PosCheckoutUiState {
   createCustomerOpen: boolean;
   createDefaultQuery: string;
   customerDetailOpen: boolean;
+  /**
+   * Dialog chọn biến thể (mở khi click product card / chọn từ search). Transient
+   * theo view hiện tại như các dialog khác. `variantDialogTarget` giữ lại sau khi
+   * đóng để animation thoát mượt; chỉ `variantDialogOpen` điều khiển hiển thị.
+   */
+  variantDialogOpen: boolean;
+  variantDialogTarget: VariantDialogTarget | null;
   pendingQtyFocusLineId: string | null;
   /**
    * Tăng counter để yêu cầu ProductSearchInput focus + select. Component
@@ -48,6 +64,9 @@ interface PosCheckoutUiState {
   setCreateDefaultQuery: (value: Updater<string>) => void;
   setCustomerDetailOpen: (value: Updater<boolean>) => void;
 
+  openVariantDialog: (target: VariantDialogTarget) => void;
+  closeVariantDialog: () => void;
+
   setCartError: (message: string) => void;
   clearCartError: () => void;
 
@@ -69,6 +88,8 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   createCustomerOpen: false,
   createDefaultQuery: "",
   customerDetailOpen: false,
+  variantDialogOpen: false,
+  variantDialogTarget: null,
   pendingQtyFocusLineId: null,
   productSearchFocusSeq: 0,
 
@@ -109,6 +130,10 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   setCustomerDetailOpen: (value) =>
     set((s) => ({ customerDetailOpen: apply(s.customerDetailOpen, value) })),
 
+  openVariantDialog: (target) =>
+    set({ variantDialogOpen: true, variantDialogTarget: target }),
+  closeVariantDialog: () => set({ variantDialogOpen: false }),
+
   setCartError: (message) => set({ cartError: message }),
   clearCartError: () => set({ cartError: "" }),
 
@@ -127,5 +152,7 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
       createCustomerOpen: false,
       createDefaultQuery: "",
       customerDetailOpen: false,
+      variantDialogOpen: false,
+      variantDialogTarget: null,
     }),
 }));

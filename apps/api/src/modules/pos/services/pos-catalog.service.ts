@@ -5,6 +5,8 @@ import { PosCatalogDirection } from '../dto/pos-catalog.query.dto';
 
 export type PosCatalogLineDto = {
   itemId: string;
+  /** Product cha (gom biến thể) — null với hàng lẻ không thuộc product nào. */
+  productId: string | null;
   code: string;
   name: string;
   unit: string;
@@ -40,6 +42,7 @@ export class PosCatalogService {
 
     const rows: Array<{
       itemId: string;
+      productId: string | null;
       locationId: string;
       locationName: string | null;
       quantity: string;
@@ -50,6 +53,7 @@ export class PosCatalogService {
       sellingPrice: string;
     }> = await this.dataSource.query(
       `SELECT sb.item_id        AS "itemId",
+              i.product_id      AS "productId",
               sb.location_id    AS "locationId",
               sb.quantity::text AS "quantity",
               l.name            AS "locationName",
@@ -88,6 +92,7 @@ export class PosCatalogService {
       string,
       {
         itemId: string;
+        productId: string | null;
         code: string;
         name: string;
         unit: string;
@@ -102,6 +107,7 @@ export class PosCatalogService {
       if (!byItem.has(r.itemId)) {
         byItem.set(r.itemId, {
           itemId: r.itemId,
+          productId: r.productId ?? null,
           code: r.code,
           name: r.name,
           unit: r.unit,
@@ -128,6 +134,7 @@ export class PosCatalogService {
       const defaultLocationId = locs[0]!.locationId;
       result.push({
         itemId: a.itemId,
+        productId: a.productId,
         code: a.code,
         name: a.name,
         unit: a.unit,
