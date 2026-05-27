@@ -38,6 +38,8 @@ import { PosSessionEntity } from '../entities/pos-session.entity';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
 import { InvoiceDebtService } from './invoice-debt.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
+import { computeAmountDue } from './invoice-amount.util';
 
 /** POS payment method → payment-account config method. Values are identical
  * strings; this map keeps the two enums decoupled at the type level. */
@@ -73,6 +75,7 @@ export class CheckoutInvoiceService {
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
+    private readonly membershipCardService: MembershipCardService,
   ) {}
 
   async checkout(
@@ -114,8 +117,14 @@ export class CheckoutInvoiceService {
 
     const subtotal = items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
     const discountAmount = Number(invoice.discountAmount ?? 0);
+    const pointsDiscountAmount = Number(invoice.pointsDiscountAmount ?? 0);
     const depositAmount = Number(invoice.depositAmount ?? 0);
-    const amountDue = subtotal - discountAmount - depositAmount;
+    const amountDue = computeAmountDue({
+      subtotal,
+      discountAmount,
+      pointsDiscountAmount,
+      depositAmount,
+    });
 
     const round = (v: number) => Math.round(v * 100) / 100;
     const totalPaid = round(dto.payments.reduce((sum, p) => sum + p.amount, 0));
@@ -216,6 +225,22 @@ export class CheckoutInvoiceService {
 
         if (remainder > 0) {
           await this.invoiceDebtService.createFromInvoice(saved, remainder, manager);
+        }
+
+        // Redeem loyalty points synchronously: locks the card, re-checks the
+        // balance and deducts within this transaction. Throwing here rolls back
+        // the whole checkout, so the discount can never be granted without the
+        // points being taken.
+        if (saved.pointsRedeemed > 0 && saved.customerId) {
+          await this.membershipCardService.redeemPointsForInvoice(
+            {
+              customerId: saved.customerId,
+              points: saved.pointsRedeemed,
+              invoiceId: saved.id,
+            },
+            manager,
+            actor,
+          );
         }
 
         await this.promotionApplyService.commitPromotions(saved, manager);

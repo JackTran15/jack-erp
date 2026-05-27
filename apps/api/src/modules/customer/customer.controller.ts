@@ -23,6 +23,7 @@ import { PaginationQueryDto, FilterQueryDto } from '../crud/dto';
 import { CustomerService } from './customer.service';
 import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
+import { CustomerSummaryService } from './services/customer-summary.service';
 import { CreateCustomerDto, UpdateCustomerDto, MergeCustomerDto } from './dto';
 import { CreateCustomerGroupDto } from './dto/create-customer-group.dto';
 import { IssueMembershipCardDto } from './dto/issue-membership-card.dto';
@@ -37,6 +38,7 @@ export class CustomerController {
     private readonly customerService: CustomerService,
     private readonly customerGroupService: CustomerGroupService,
     private readonly membershipCardService: MembershipCardService,
+    private readonly customerSummaryService: CustomerSummaryService,
   ) {}
 
   @Post()
@@ -131,6 +133,15 @@ export class CustomerController {
     @Actor() actor: ActorContext,
   ) {
     return this.membershipCardService.adjustPoints(cardId, dto, actor);
+  }
+
+  @Get(':id/summary')
+  @RequirePermission('customer.read')
+  getSummary(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.customerSummaryService.getSummary(id, actor);
   }
 
   @Get(':id')

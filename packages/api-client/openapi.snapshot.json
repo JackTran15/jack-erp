@@ -4244,6 +4244,36 @@
         ]
       }
     },
+    "/customers/{id}/summary": {
+      "get": {
+        "operationId": "CustomerController_getSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSummaryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Customer"
+        ]
+      }
+    },
     "/customers/{id}": {
       "get": {
         "operationId": "CustomerController_findById",
@@ -9925,6 +9955,74 @@
         },
         "responses": {
           "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
+    "/invoices/{id}/redeem-points": {
+      "post": {
+        "operationId": "InvoiceController_redeemPoints",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemPointsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Invoice"
+        ]
+      },
+      "delete": {
+        "operationId": "InvoiceController_removeRedeemPoints",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
@@ -15899,6 +15997,102 @@
           "createdBy"
         ]
       },
+      "CustomerPurchasesSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalSpending": {
+            "type": "number",
+            "description": "Total amount of finalised sale invoices (sum of amountDue)"
+          },
+          "invoiceCount": {
+            "type": "number",
+            "description": "Number of finalised sale invoices"
+          }
+        },
+        "required": [
+          "totalSpending",
+          "invoiceCount"
+        ]
+      },
+      "CustomerDebtSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalOutstanding": {
+            "type": "number",
+            "description": "Total remaining balance across open/overdue debts"
+          },
+          "documentCount": {
+            "type": "number",
+            "description": "Number of outstanding debt documents"
+          }
+        },
+        "required": [
+          "totalOutstanding",
+          "documentCount"
+        ]
+      },
+      "CustomerMembershipSummaryDto": {
+        "type": "object",
+        "properties": {
+          "cardNumber": {
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "none",
+              "silver",
+              "gold",
+              "diamond"
+            ],
+            "type": "string"
+          },
+          "points": {
+            "type": "number",
+            "description": "Current point balance on the card"
+          },
+          "pointsUsed": {
+            "type": "number",
+            "description": "Total points ever redeemed (sum of |delta| of REDEEM entries)"
+          }
+        },
+        "required": [
+          "cardNumber",
+          "tier",
+          "points",
+          "pointsUsed"
+        ]
+      },
+      "CustomerSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purchases": {
+            "$ref": "#/components/schemas/CustomerPurchasesSummaryDto"
+          },
+          "debt": {
+            "$ref": "#/components/schemas/CustomerDebtSummaryDto"
+          },
+          "membership": {
+            "nullable": true,
+            "description": "Membership card summary, or null when the customer has no card",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerMembershipSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId",
+          "purchases",
+          "debt",
+          "membership"
+        ]
+      },
       "UpdateCustomerDto": {
         "type": "object",
         "properties": {
@@ -19580,6 +19774,12 @@
           "discountAmount": {
             "type": "number"
           },
+          "pointsRedeemed": {
+            "type": "number"
+          },
+          "pointsDiscountAmount": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -19649,6 +19849,8 @@
           "netAmount",
           "subtotal",
           "discountAmount",
+          "pointsRedeemed",
+          "pointsDiscountAmount",
           "depositAmount",
           "amountDue",
           "totalPaid",
@@ -19959,6 +20161,12 @@
           "discountAmount": {
             "type": "number"
           },
+          "pointsRedeemed": {
+            "type": "number"
+          },
+          "pointsDiscountAmount": {
+            "type": "number"
+          },
           "depositAmount": {
             "type": "number"
           },
@@ -20030,6 +20238,8 @@
           "netAmount",
           "subtotal",
           "discountAmount",
+          "pointsRedeemed",
+          "pointsDiscountAmount",
           "depositAmount",
           "amountDue",
           "totalPaid",
@@ -20318,6 +20528,19 @@
         },
         "required": [
           "payments"
+        ]
+      },
+      "RedeemPointsDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Number of loyalty points to redeem against this invoice"
+          }
+        },
+        "required": [
+          "points"
         ]
       },
       "CancelInvoiceDto": {

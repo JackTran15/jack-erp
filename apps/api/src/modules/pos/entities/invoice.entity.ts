@@ -70,10 +70,16 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'discount_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Total discount applied to the invoice' })
   discountAmount: number;
 
+  @Column({ name: 'points_redeemed', type: 'int', default: 0, comment: 'Loyalty points redeemed against this invoice' })
+  pointsRedeemed: number;
+
+  @Column({ name: 'points_discount_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Discount granted by loyalty point redemption (pointsRedeemed * POINT_REDEMPTION_VALUE_VND)' })
+  pointsDiscountAmount: number;
+
   @Column({ name: 'deposit_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Deposit collected upfront (e.g. on layaway)' })
   depositAmount: number;
 
-  @Column({ name: 'amount_due', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Final amount the customer owes (subtotal - discountAmount)' })
+  @Column({ name: 'amount_due', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Final amount the customer owes (subtotal - discountAmount - pointsDiscountAmount - depositAmount)' })
   amountDue: number;
 
   @Column({ name: 'total_paid', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Total amount collected across all payment lines' })

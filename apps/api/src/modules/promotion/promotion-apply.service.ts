@@ -14,6 +14,7 @@ import { DiscountCodeService } from './discount-code.service';
 import { VoucherService } from './voucher.service';
 import { PromotionService } from './promotion.service';
 import { ApplyPromotionDto } from './dto/apply-promotion.dto';
+import { computeAmountDue } from '../pos/services/invoice-amount.util';
 
 @Injectable()
 export class PromotionApplyService {
@@ -131,10 +132,7 @@ export class PromotionApplyService {
       );
 
       invoice.discountAmount = totalDiscount;
-      invoice.amountDue = Math.max(
-        0,
-        Number(invoice.subtotal) - totalDiscount - Number(invoice.depositAmount),
-      );
+      invoice.amountDue = computeAmountDue(invoice);
 
       await invRepo.save(invoice);
     });
@@ -171,10 +169,7 @@ export class PromotionApplyService {
       );
 
       invoice.discountAmount = totalDiscount;
-      invoice.amountDue = Math.max(
-        0,
-        Number(invoice.subtotal) - totalDiscount - Number(invoice.depositAmount),
-      );
+      invoice.amountDue = computeAmountDue(invoice);
 
       await invRepo.save(invoice);
     });

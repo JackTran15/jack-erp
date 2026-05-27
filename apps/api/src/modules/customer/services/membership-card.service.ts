@@ -5,12 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { MembershipCardEntity, MembershipTier } from '../membership-card.entity';
 import { PointHistoryEntity, PointType } from '../point-history.entity';
 import { IssueMembershipCardDto } from '../dto/issue-membership-card.dto';
 import { AdjustPointsDto } from '../dto/adjust-points.dto';
+import { POINT_EARN_VND_PER_POINT } from '../loyalty.constants';
 
 @Injectable()
 export class MembershipCardService {
@@ -132,7 +133,7 @@ export class MembershipCardService {
     });
     if (!card) return;
 
-    const points = Math.floor(invoice.subtotal / 1000);
+    const points = Math.floor(invoice.subtotal / POINT_EARN_VND_PER_POINT);
     if (points <= 0) return;
 
     await this.dataSource.transaction(async (manager) => {
@@ -146,6 +147,103 @@ export class MembershipCardService {
         organizationId: actor.organizationId,
         createdBy: actor.userId,
       });
+    });
+  }
+
+  /** Active card for a customer, or null. Non-throwing — for redemption flows. */
+  async findActiveCard(
+    customerId: string,
+    actor: ActorContext,
+  ): Promise<MembershipCardEntity | null> {
+    return this.cardRepo.findOne({
+      where: { customerId, organizationId: actor.organizationId, isActive: true },
+    });
+  }
+
+  /**
+   * Deducts redeemed points within an existing transaction (the checkout
+   * transaction). Locks the card row, re-validates the balance, decrements and
+   * records a REDEEM ledger entry. Throws if the balance is insufficient so the
+   * surrounding checkout transaction rolls back.
+   */
+  async redeemPointsForInvoice(
+    input: { customerId: string; points: number; invoiceId: string },
+    manager: EntityManager,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (input.points <= 0) return;
+
+    const card = await manager.findOne(MembershipCardEntity, {
+      where: {
+        customerId: input.customerId,
+        organizationId: actor.organizationId,
+        isActive: true,
+      },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!card) {
+      throw new BadRequestException(
+        `Customer ${input.customerId} has no active membership card to redeem points`,
+      );
+    }
+    if (card.points < input.points) {
+      throw new BadRequestException(
+        `Insufficient points: balance=${card.points}, requested=${input.points}`,
+      );
+    }
+
+    await manager.decrement(
+      MembershipCardEntity,
+      { id: card.id },
+      'points',
+      input.points,
+    );
+    await manager.insert(PointHistoryEntity, {
+      cardId: card.id,
+      invoiceId: input.invoiceId,
+      type: PointType.REDEEM,
+      delta: -input.points,
+      note: 'Redeem points on invoice',
+      organizationId: actor.organizationId,
+      createdBy: actor.userId,
+    });
+  }
+
+  /**
+   * Re-credits previously redeemed points when a sale is returned, within the
+   * caller's transaction. Used by the return flow to give points back.
+   */
+  async refundRedeemedPoints(
+    input: { customerId: string; points: number; invoiceId: string; note?: string },
+    manager: EntityManager,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (input.points <= 0) return;
+
+    const card = await manager.findOne(MembershipCardEntity, {
+      where: {
+        customerId: input.customerId,
+        organizationId: actor.organizationId,
+        isActive: true,
+      },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!card) return;
+
+    await manager.increment(
+      MembershipCardEntity,
+      { id: card.id },
+      'points',
+      input.points,
+    );
+    await manager.insert(PointHistoryEntity, {
+      cardId: card.id,
+      invoiceId: input.invoiceId,
+      type: PointType.ADJUST,
+      delta: input.points,
+      note: input.note ?? 'Refund redeemed points on return',
+      organizationId: actor.organizationId,
+      createdBy: actor.userId,
     });
   }
 
