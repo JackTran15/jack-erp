@@ -25,6 +25,7 @@ import { ReturnEligibilityService } from '../services/return-eligibility.service
 import { CreateReturnInvoiceService } from '../services/create-return-invoice.service';
 import { CreateExchangeInvoiceService } from '../services/create-exchange-invoice.service';
 import { CheckoutReturnService } from '../services/checkout-return.service';
+import { PointsRedemptionService } from '../services/points-redemption.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { CheckoutInvoiceDto } from '../dto/checkout-invoice.dto';
@@ -34,6 +35,7 @@ import { DraftInvoiceResponseDto } from '../dto/draft-invoice.response.dto';
 import { CreateReturnInvoiceDto } from '../dto/create-return-invoice.dto';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
+import { RedeemPointsDto } from '../dto/redeem-points.dto';
 import { DebtStatus } from '../entities/invoice-debt.entity';
 import { DebtPaymentMethod } from '../entities/debt-payment.entity';
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
@@ -73,6 +75,7 @@ export class InvoiceController {
     private readonly createReturnInvoiceService: CreateReturnInvoiceService,
     private readonly createExchangeInvoiceService: CreateExchangeInvoiceService,
     private readonly checkoutReturnService: CheckoutReturnService,
+    private readonly pointsRedemptionService: PointsRedemptionService,
   ) {}
 
   @Post()
@@ -169,6 +172,25 @@ export class InvoiceController {
     @Actor() actor: ActorContext,
   ) {
     return this.checkoutService.checkout(id, dto, actor);
+  }
+
+  @Post(':id/redeem-points')
+  @RequirePermission('pos.invoice.write')
+  redeemPoints(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RedeemPointsDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.pointsRedemptionService.applyRedemption(id, dto.points, actor);
+  }
+
+  @Delete(':id/redeem-points')
+  @RequirePermission('pos.invoice.write')
+  removeRedeemPoints(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.pointsRedemptionService.removeRedemption(id, actor);
   }
 
   @Post(':id/cancel')

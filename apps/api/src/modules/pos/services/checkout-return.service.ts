@@ -23,6 +23,7 @@ import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
 import { CustomerCreditService } from '../../customer/services/customer-credit.service';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { PaymentAccountMethod } from '../../accounting/payment-accounts/enums';
@@ -95,6 +96,7 @@ export class CheckoutReturnService {
     private readonly journalReturnPublisher: JournalReturnPublisher,
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
     private readonly loyaltyPointsReversePublisher: LoyaltyPointsReversePublisher,
+    private readonly membershipCardService: MembershipCardService,
   ) {}
 
   async checkout(
@@ -269,6 +271,34 @@ export class CheckoutReturnService {
           totals.refundedAmount,
           now,
         );
+      }
+
+      // Re-credit loyalty points that were redeemed on the original sale,
+      // proportional to the returned value (floored, so multiple partial returns
+      // never re-credit more than was redeemed). Additive and safe, so it runs
+      // in-transaction — distinct from the earn-reversal fanned out as an event.
+      if (
+        originalInvoice &&
+        invoice.customerId &&
+        Number(originalInvoice.pointsRedeemed) > 0 &&
+        Number(originalInvoice.subtotal) > 0 &&
+        totals.returnSubtotal > 0
+      ) {
+        const creditBack = Math.floor(
+          (Number(originalInvoice.pointsRedeemed) * totals.returnSubtotal) /
+            Number(originalInvoice.subtotal),
+        );
+        if (creditBack > 0) {
+          await this.membershipCardService.refundRedeemedPoints(
+            {
+              customerId: invoice.customerId,
+              points: creditBack,
+              invoiceId: savedInvoice.id,
+            },
+            manager,
+            actor,
+          );
+        }
       }
 
       return { invoice: savedInvoice, payments: savedPayments };

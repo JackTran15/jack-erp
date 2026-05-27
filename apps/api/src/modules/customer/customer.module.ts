@@ -6,6 +6,8 @@ import { CustomerGroupEntity } from './customer-group.entity';
 import { MembershipCardEntity } from './membership-card.entity';
 import { PointHistoryEntity } from './point-history.entity';
 import { CustomerCreditEntity } from './customer-credit.entity';
+import { InvoiceEntity } from '../pos/entities/invoice.entity';
+import { InvoiceDebtEntity } from '../pos/entities/invoice-debt.entity';
 import {
   CustomerService,
   CUSTOMER_SERVICE_TOKEN,
@@ -14,6 +16,7 @@ import {
 import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
 import { CustomerCreditService } from './services/customer-credit.service';
+import { CustomerSummaryService } from './services/customer-summary.service';
 import { CustomerController } from './customer.controller';
 import { LoyaltyPointsPublisher } from './publishers/loyalty-points.publisher';
 import { LoyaltyPointsConsumer } from './consumers/loyalty-points.consumer';
@@ -28,6 +31,8 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
       MembershipCardEntity,
       PointHistoryEntity,
       CustomerCreditEntity,
+      InvoiceEntity,
+      InvoiceDebtEntity,
     ]),
   ],
   controllers: [CustomerController],
@@ -41,6 +46,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
     LoyaltyPointsReversePublisher,
     LoyaltyPointsReverseConsumer,
     CustomerCreditService,
+    CustomerSummaryService,
   ],
   exports: [
     CustomerService,

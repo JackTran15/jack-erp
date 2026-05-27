@@ -16,6 +16,7 @@ import { ProductStorageLocationEntity } from '../../inventory/product/product-st
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
+import { computeAmountDue } from './invoice-amount.util';
 
 @Injectable()
 export class InvoiceService {
@@ -56,6 +57,8 @@ export class InvoiceService {
         status: InvoiceStatus.DRAFT,
         subtotal,
         discountAmount: 0,
+        pointsRedeemed: 0,
+        pointsDiscountAmount: 0,
         depositAmount: 0,
         amountDue: subtotal,
         staffId: actor.userId,
@@ -259,7 +262,7 @@ export class InvoiceService {
         );
         const subtotal = lineTotals.reduce((sum, t) => sum + t, 0);
         invoice.subtotal = subtotal;
-        invoice.amountDue = subtotal - (invoice.discountAmount ?? 0) - (invoice.depositAmount ?? 0);
+        invoice.amountDue = computeAmountDue(invoice);
       }
 
       if (dto.customerId !== undefined) invoice.customerId = dto.customerId;

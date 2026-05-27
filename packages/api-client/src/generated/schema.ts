@@ -1383,6 +1383,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/{id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}": {
         parameters: {
             query?: never;
@@ -3039,6 +3055,22 @@ export interface paths {
         put?: never;
         post: operations["InvoiceController_checkout"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}/redeem-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceController_redeemPoints"];
+        delete: operations["InvoiceController_removeRedeemPoints"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4868,6 +4900,35 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        CustomerPurchasesSummaryDto: {
+            /** @description Total amount of finalised sale invoices (sum of amountDue) */
+            totalSpending: number;
+            /** @description Number of finalised sale invoices */
+            invoiceCount: number;
+        };
+        CustomerDebtSummaryDto: {
+            /** @description Total remaining balance across open/overdue debts */
+            totalOutstanding: number;
+            /** @description Number of outstanding debt documents */
+            documentCount: number;
+        };
+        CustomerMembershipSummaryDto: {
+            cardNumber: string;
+            /** @enum {string} */
+            tier: "none" | "silver" | "gold" | "diamond";
+            /** @description Current point balance on the card */
+            points: number;
+            /** @description Total points ever redeemed (sum of |delta| of REDEEM entries) */
+            pointsUsed: number;
+        };
+        CustomerSummaryResponseDto: {
+            /** Format: uuid */
+            customerId: string;
+            purchases: components["schemas"]["CustomerPurchasesSummaryDto"];
+            debt: components["schemas"]["CustomerDebtSummaryDto"];
+            /** @description Membership card summary, or null when the customer has no card */
+            membership: components["schemas"]["CustomerMembershipSummaryDto"] | null;
+        };
         UpdateCustomerDto: {
             code?: string;
             name?: string;
@@ -6006,6 +6067,8 @@ export interface components {
             netAmount: number;
             subtotal: number;
             discountAmount: number;
+            pointsRedeemed: number;
+            pointsDiscountAmount: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -6117,6 +6180,8 @@ export interface components {
             netAmount: number;
             subtotal: number;
             discountAmount: number;
+            pointsRedeemed: number;
+            pointsDiscountAmount: number;
             depositAmount: number;
             amountDue: number;
             totalPaid: number;
@@ -6235,6 +6300,10 @@ export interface components {
         CheckoutInvoiceDto: {
             /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
             payments: components["schemas"]["InvoicePaymentLineDto"][];
+        };
+        RedeemPointsDto: {
+            /** @description Number of loyalty points to redeem against this invoice */
+            points: number;
         };
         CancelInvoiceDto: {
             reason: string;
@@ -9559,6 +9628,27 @@ export interface operations {
             };
         };
     };
+    CustomerController_getSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSummaryResponseDto"];
+                };
+            };
+        };
+    };
     CustomerController_findById: {
         parameters: {
             query?: never;
@@ -12790,6 +12880,52 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_redeemPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedeemPointsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_removeRedeemPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

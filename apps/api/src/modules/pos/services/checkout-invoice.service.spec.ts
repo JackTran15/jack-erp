@@ -17,6 +17,7 @@ import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.p
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
 import { AccountResolverService } from '../../accounting/payment-accounts/account-resolver.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
+import { MembershipCardService } from '../../customer/services/membership-card.service';
 import {
   AccountingDefaultAccountRole,
   PaymentAccountMethod,
@@ -104,6 +105,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
   let cashFundResolver: { resolveBranchCashFund: jest.Mock };
+  let membershipCardService: { redeemPointsForInvoice: jest.Mock };
   let accountResolver: {
     resolveDefaultAccount: jest.Mock;
     resolvePaymentAccount: jest.Mock;
@@ -154,6 +156,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       ),
     };
     sessionRepo              = { findOne: jest.fn().mockResolvedValue(null) };
+    membershipCardService    = { redeemPointsForInvoice: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -173,6 +176,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
         { provide: AccountResolverService,                useValue: accountResolver },
         { provide: CashFundResolverService,               useValue: cashFundResolver },
+        { provide: MembershipCardService,                 useValue: membershipCardService },
       ],
     }).compile();
 
@@ -463,6 +467,42 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         'branch-1',
         expect.objectContaining({ eventType: 'POS_CHECKOUT_ACKNOWLEDGED' }),
       );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Loyalty point redemption (synchronous, in-transaction)
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('loyalty point redemption', () => {
+    it('deducts redeemed points in-transaction and reduces amountDue', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ pointsRedeemed: 30, pointsDiscountAmount: 30 }),
+      );
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 170 }] },
+        actor,
+      );
+
+      // 200 subtotal − 30 point discount = 170 due.
+      expect(result.amountDue).toBe(170);
+      expect(result.status).toBe(InvoiceStatus.PAID);
+      expect(membershipCardService.redeemPointsForInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-1', points: 30, invoiceId: 'inv-1' }),
+        mockManager,
+        actor,
+      );
+      // Revenue posts the net (discounted) amount — no separate discount GL line.
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amountDue: 170 }),
+        actor,
+      );
+    });
+
+    it('does not redeem points when pointsRedeemed = 0', async () => {
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(membershipCardService.redeemPointsForInvoice).not.toHaveBeenCalled();
     });
   });
 

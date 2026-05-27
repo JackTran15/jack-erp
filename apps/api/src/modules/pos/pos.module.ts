@@ -39,6 +39,7 @@ import { ReturnEligibilityService } from './services/return-eligibility.service'
 import { CreateReturnInvoiceService } from './services/create-return-invoice.service';
 import { CreateExchangeInvoiceService } from './services/create-exchange-invoice.service';
 import { CheckoutReturnService } from './services/checkout-return.service';
+import { PointsRedemptionService } from './services/points-redemption.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
@@ -92,6 +93,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     CreateReturnInvoiceService,
     CreateExchangeInvoiceService,
     CheckoutReturnService,
+    PointsRedemptionService,
   ],
   exports: [
     PosSessionService,

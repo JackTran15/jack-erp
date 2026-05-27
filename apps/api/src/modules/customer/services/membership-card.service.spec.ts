@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { MembershipCardService } from './membership-card.service';
 import { MembershipCardEntity, MembershipTier } from '../membership-card.entity';
 import { PointHistoryEntity, PointType } from '../point-history.entity';
@@ -67,6 +67,7 @@ describe('MembershipCardService', () => {
     findOne: jest.Mock;
     insert: jest.Mock;
     increment: jest.Mock;
+    decrement: jest.Mock;
     getRepository: jest.Mock;
   };
 
@@ -77,6 +78,7 @@ describe('MembershipCardService', () => {
       findOne: jest.fn(),
       insert: jest.fn(),
       increment: jest.fn(),
+      decrement: jest.fn(),
       getRepository: jest.fn().mockReturnValue({ update: jest.fn(), increment: jest.fn() }),
     };
 
@@ -424,6 +426,122 @@ describe('MembershipCardService', () => {
           order: { createdAt: 'DESC' },
         }),
       );
+    });
+  });
+
+  // =========================================================================
+  // redeemPointsForInvoice — synchronous deduction within checkout transaction
+  // =========================================================================
+  describe('redeemPointsForInvoice', () => {
+    const mgr = () => mockManager as unknown as EntityManager;
+
+    it('locks the card, decrements points and records a REDEEM entry', async () => {
+      mockManager.findOne.mockResolvedValue(cardStub({ points: 100 }));
+
+      await service.redeemPointsForInvoice(
+        { customerId: 'cust-1', points: 30, invoiceId: 'invoice-1' },
+        mgr(),
+        actor,
+      );
+
+      expect(mockManager.findOne).toHaveBeenCalledWith(
+        MembershipCardEntity,
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
+      );
+      expect(mockManager.decrement).toHaveBeenCalledWith(
+        MembershipCardEntity,
+        { id: 'card-1' },
+        'points',
+        30,
+      );
+      expect(mockManager.insert).toHaveBeenCalledWith(
+        PointHistoryEntity,
+        expect.objectContaining({
+          cardId: 'card-1',
+          invoiceId: 'invoice-1',
+          type: PointType.REDEEM,
+          delta: -30,
+        }),
+      );
+    });
+
+    it('throws when no active card exists', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.redeemPointsForInvoice(
+          { customerId: 'cust-1', points: 30, invoiceId: 'invoice-1' },
+          mgr(),
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockManager.decrement).not.toHaveBeenCalled();
+    });
+
+    it('throws when the balance is insufficient', async () => {
+      mockManager.findOne.mockResolvedValue(cardStub({ points: 10 }));
+
+      await expect(
+        service.redeemPointsForInvoice(
+          { customerId: 'cust-1', points: 30, invoiceId: 'invoice-1' },
+          mgr(),
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockManager.decrement).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op for non-positive points', async () => {
+      await service.redeemPointsForInvoice(
+        { customerId: 'cust-1', points: 0, invoiceId: 'invoice-1' },
+        mgr(),
+        actor,
+      );
+      expect(mockManager.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // refundRedeemedPoints — re-credit on return
+  // =========================================================================
+  describe('refundRedeemedPoints', () => {
+    const mgr = () => mockManager as unknown as EntityManager;
+
+    it('increments points and records an ADJUST entry', async () => {
+      mockManager.findOne.mockResolvedValue(cardStub({ points: 70 }));
+
+      await service.refundRedeemedPoints(
+        { customerId: 'cust-1', points: 30, invoiceId: 'return-1' },
+        mgr(),
+        actor,
+      );
+
+      expect(mockManager.increment).toHaveBeenCalledWith(
+        MembershipCardEntity,
+        { id: 'card-1' },
+        'points',
+        30,
+      );
+      expect(mockManager.insert).toHaveBeenCalledWith(
+        PointHistoryEntity,
+        expect.objectContaining({
+          cardId: 'card-1',
+          invoiceId: 'return-1',
+          type: PointType.ADJUST,
+          delta: 30,
+        }),
+      );
+    });
+
+    it('silently skips when the customer has no active card', async () => {
+      mockManager.findOne.mockResolvedValue(null);
+
+      await service.refundRedeemedPoints(
+        { customerId: 'cust-1', points: 30, invoiceId: 'return-1' },
+        mgr(),
+        actor,
+      );
+      expect(mockManager.increment).not.toHaveBeenCalled();
     });
   });
 });
