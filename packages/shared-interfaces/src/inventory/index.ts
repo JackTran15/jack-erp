@@ -88,6 +88,8 @@ export type {
   StockByLocationResponse,
 } from "./stock-by-location";
 
+export * from "./import-excel";
+
 export enum ImportJobStatus {
   PENDING = "PENDING",
   VALIDATING = "VALIDATING",

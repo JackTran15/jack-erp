@@ -96,6 +96,7 @@ import {
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
+    InventoryItemCrudService,
   ],
 })
 export class InventoryLocationModule implements OnModuleInit {

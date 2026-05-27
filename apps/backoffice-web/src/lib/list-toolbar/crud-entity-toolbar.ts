@@ -9,6 +9,8 @@ export interface CrudListToolbarContext {
   handleDeleteSelected: () => void;
   refetchRecords: () => void;
   navigate: (to: string) => void;
+  onImportInventory?: () => void;
+  onExportInventory?: () => void;
 }
 
 export interface CrudListToolbarSelection {
@@ -42,14 +44,16 @@ const refresh = (ctx: CrudListToolbarContext): ListToolbarSpec => ({
   onClick: () => void ctx.refetchRecords(),
 });
 
-const importExport = (): ListToolbarSpec[] => [
+const importExport = (ctx: CrudListToolbarContext): ListToolbarSpec[] => [
   {
     action: TOOLBAR_ACTION.import,
-    onClick: soon("Tính năng nhập khẩu đang được triển khai."),
+    onClick:
+      ctx.onImportInventory ?? soon("Tính năng nhập khẩu đang được triển khai."),
   },
   {
     action: TOOLBAR_ACTION.export,
-    onClick: soon("Tính năng xuất khẩu đang được triển khai."),
+    onClick:
+      ctx.onExportInventory ?? soon("Tính năng xuất khẩu đang được triển khai."),
   },
 ];
 
@@ -73,7 +77,7 @@ export function buildCrudEntityToolbarSpecs(
           action: TOOLBAR_ACTION.utilities,
           onClick: soon("Tiện ích đang được triển khai."),
         },
-        ...importExport(),
+        ...importExport(ctx),
         {
           action: TOOLBAR_ACTION.stockoutStatus,
           onClick: soon("Trạng thái hết hàng đang được triển khai."),
@@ -88,14 +92,14 @@ export function buildCrudEntityToolbarSpecs(
           action: TOOLBAR_ACTION.transactionHistory,
           onClick: soon("Xem lịch sử giao dịch đang được triển khai."),
         },
-        ...importExport(),
+        ...importExport(ctx),
       ];
 
     case "inventory-stock-balances":
       return [...baseCrud(ctx, sel), refresh(ctx)];
 
     case "customers":
-      return [...baseCrud(ctx, sel), refresh(ctx), ...importExport()];
+      return [...baseCrud(ctx, sel), refresh(ctx), ...importExport(ctx)];
 
     default:
       return baseCrud(ctx, sel);
