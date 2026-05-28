@@ -1,7 +1,7 @@
 # Inventory Import Field Mapping (Final)
 
 **Phạm vi:** `apps/api/src/modules/inventory/csv`  
-**Cập nhật:** 2026-05-27
+**Cập nhật:** 2026-05-28
 
 ## Mục tiêu hiện tại
 
@@ -22,7 +22,6 @@
 
 ### Còn lại (ngoài MVP)
 
-- P2: `ModelCode`, `ItemCategoryCode`, `Color`, `Size`.
 - P3: opening stock, unit convert đầy đủ, thresholds, `Description`.
 - P4: thuế, ảnh, lô/serial, vị trí, bảng giá.
 
@@ -42,15 +41,15 @@
 | --- | --- | --- | --- | --- |
 | 1 | `SKUCode` | Mã SKU | MAP | `items.code` (bắt buộc) |
 | 2 | `Barcode` | Mã vạch | MAP | `item_barcodes` |
-| 3 | `ModelCode` | Mã SKU mẫu mã | DEFER | P2 |
-| 4 | `ModelName` | Tên mẫu mã | MAP | `products.name` (upsert theo tên) |
+| 3 | `ModelCode` | Mã SKU mẫu mã | MAP | `products.code` (lookup by code trước, fallback tạo mới với ModelName) |
+| 4 | `ModelName` | Tên mẫu mã | MAP | `products.name` (upsert theo tên hoặc theo ModelCode) |
 | 5 | `InventoryItemName` | Tên hàng hóa | MAP | `items.name` (bắt buộc) |
-| 6 | `ItemCategoryCode` | Mã nhóm hàng hóa | DEFER | P2 |
+| 6 | `ItemCategoryCode` | Mã nhóm hàng hóa | MAP | `inventory_item_categories.code` (lookup by code, fallback tạo mới) |
 | 7 | `ItemCategoryName` | Tên nhóm hàng hóa | MAP | resolve/create category theo tên |
 | 8 | `BrandName` | Tên thương hiệu | MAP | `items.brand` |
 | 9 | `UnitName` | ĐVT | MAP | `items.unit` |
-| 10 | `Color` | Màu | DEFER | P2 |
-| 11 | `Size` | Size | DEFER | P2 |
+| 10 | `Color` | Màu | MAP | `item_attribute_values` via `product_attribute_definitions(name=Color)` + options (yêu cầu productId) |
+| 11 | `Size` | Size | MAP | `item_attribute_values` via `product_attribute_definitions(name=Size)` + options (yêu cầu productId) |
 | 12 | `CostPrice` | Giá mua | MAP | `items.purchasePrice` |
 | 13 | `UnitPrice` | Giá bán | MAP | `items.sellingPrice` |
 | 14 | `TaxRate` | Thuế suất | DEFER | P4 |

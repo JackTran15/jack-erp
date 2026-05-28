@@ -166,6 +166,35 @@ export class InventoryLocationService {
     );
   }
 
+  /**
+   * Resolve a category by its code, or create it if not found.
+   * Falls back to `nameHint` as the display name when creating; if nameHint is
+   * absent, the code itself is used as the name.
+   */
+  async resolveOrCreateCategoryByCode(
+    rawCode: string,
+    nameHint: string | undefined,
+    actor: ActorContext,
+  ): Promise<ItemCategoryEntity> {
+    const code = rawCode.trim();
+    if (!code) {
+      throw new BadRequestException('Mã nhóm hàng hóa không được để trống');
+    }
+    const existing = await this.itemCategoryRepo.findOne({
+      where: { code, organizationId: actor.organizationId },
+    });
+    if (existing) return existing;
+    const name = nameHint?.trim() || code;
+    return this.itemCategoryRepo.save(
+      this.itemCategoryRepo.create({
+        code,
+        name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
   /** Resolve a provider by code within the actor's organization. */
   async resolveProviderByCode(
     code: string,

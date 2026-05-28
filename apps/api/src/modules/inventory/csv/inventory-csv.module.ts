@@ -18,6 +18,9 @@ import { ItemProviderEntity } from '../location/item-provider.entity';
 import { ItemBarcodeEntity } from '../location/item-barcode.entity';
 import { ItemUnitEntity } from '../location/item-unit.entity';
 import { ProductEntity } from '../product/product.entity';
+import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
+import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
+import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
 
@@ -31,6 +34,9 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
       ItemBarcodeEntity,
       ItemUnitEntity,
       ProductEntity,
+      ProductAttributeDefinitionEntity,
+      ProductAttributeOptionEntity,
+      ItemAttributeValueEntity,
       StockBalanceEntity,
       StockLedgerEntryEntity,
     ]),
