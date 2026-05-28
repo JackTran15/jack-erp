@@ -5,17 +5,12 @@ import { toast } from "sonner";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
 import { useTempWarehouseSessionDetail } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
-/**
- * Mount-only side effects for Fast Stock Transfer. Gọi một lần từ {@link FastStockTransferPage}.
- */
+
 export function useFastStockTransferMount() {
   const data = useFastStockTransferData();
   const { refetchAll, setPollSessionId, setPageError } =
     useFastStockTransferActions();
 
-  const refreshToolbarProductFromCatalog = usePosFastStockTransferWorkflowStore(
-    (s) => s.refreshToolbarProductFromCatalog,
-  );
   const setFilters = usePosFastStockTransferWorkflowStore((s) => s.setFilters);
   const pruneHiddenLineIds = usePosFastStockTransferWorkflowStore(
     (s) => s.pruneHiddenLineIds,
@@ -30,16 +25,9 @@ export function useFastStockTransferMount() {
   );
 
   useEffect(() => {
-    const activeIds = new Set([
-      ...data.outboundLineIds,
-      ...data.returnLineIds,
-    ]);
+    const activeIds = new Set([...data.outboundLineIds, ...data.returnLineIds]);
     pruneHiddenLineIds(activeIds);
   }, [data.outboundLineIds, data.returnLineIds, pruneHiddenLineIds]);
-
-  useEffect(() => {
-    refreshToolbarProductFromCatalog(data.catalogLines);
-  }, [data.catalogLines, data.catalogDirection, refreshToolbarProductFromCatalog]);
 
   useEffect(() => {
     if (data.locationsLoading) return;
@@ -108,5 +96,11 @@ export function useFastStockTransferMount() {
         polled.transferFailureReason ?? "Tạo phiếu chuyển kho thất bại.",
       );
     }
-  }, [pollQuery.data, pollSessionId, refetchAll, setPageError, setPollSessionId]);
+  }, [
+    pollQuery.data,
+    pollSessionId,
+    refetchAll,
+    setPageError,
+    setPollSessionId,
+  ]);
 }

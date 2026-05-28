@@ -3,6 +3,7 @@
  * dễ invalidate by prefix (e.g. invalidate `INVOICE_KEYS.DRAFTS_PREFIX` sẽ
  * ăn mọi `INVOICE_KEYS.DRAFTS(sessionId)` con) và tránh trùng key.
  */
+import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
 import type { TempWarehouseDirection } from "@erp/shared-interfaces";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 
@@ -19,8 +20,7 @@ export const INVOICE_KEYS = {
   LIST: (filters: Record<string, unknown>) =>
     ["invoices", "list", filters] as const,
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
-  DRAFTS: (sessionId: string) =>
-    ["invoices", "drafts", sessionId] as const,
+  DRAFTS: (sessionId: string) => ["invoices", "drafts", sessionId] as const,
   DETAIL: (id: string) => ["invoices", "detail", id] as const,
   /** Hóa đơn đã bán có thể đổi/trả (trang return-goods). */
   RETURNABLE: (filters: Record<string, unknown>) =>
@@ -54,6 +54,13 @@ export const CUSTOMER_GROUP_KEYS = {
 export const INVENTORY_KEYS = {
   SHOWROOMS: (branchId: string) => ["inventory-showrooms", branchId] as const,
   STORAGES: (branchId: string) => ["inventory-storages", branchId] as const,
+} as const;
+
+export const POS_BRANCH_CATALOG_KEYS = {
+  PREFIX: (branchId: string, direction: PosCatalogDirection) =>
+    ["pos-branch-catalog", branchId, direction] as const,
+  LIST: (branchId: string, direction: PosCatalogDirection, search: string) =>
+    ["pos-branch-catalog", branchId, direction, search] as const,
 } as const;
 
 export const TEMP_WAREHOUSE_KEYS = {

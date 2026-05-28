@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -11,8 +12,10 @@ import {
   CloseSessionResult,
   ListLinesNettedResult,
   ListLinesRawResult,
+  PaginatedResponse,
   TempWarehouseCloseMode,
   TempWarehouseDirection,
+  TempWarehousePublicUser,
   TempWarehouseSession,
   TransferLinesResult,
   TransferTempWarehouseLinesBody,
@@ -88,6 +91,69 @@ export function useTempWarehouseActiveSession(
   });
 }
 
+export const TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE = 50;
+
+export function fetchTempWarehouseCarriers(
+  branchId: string,
+  search = "",
+  page = 1,
+  pageSize = TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
+): Promise<PaginatedResponse<TempWarehousePublicUser>> {
+  return tempWarehouseService.listCarriers({
+    branchId,
+    search: search.trim() || undefined,
+    pagination: { page, pageSize },
+  });
+}
+
+export function useSearchTempWarehouseCarriers() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string, search: string) => {
+      const normalizedSearch = search.trim();
+      return queryClient.fetchQuery({
+        queryKey: TEMP_WAREHOUSE_KEYS.CARRIERS(
+          branchId,
+          normalizedSearch,
+          1,
+          TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
+        ),
+        queryFn: () => fetchTempWarehouseCarriers(branchId, normalizedSearch),
+        staleTime: 30_000,
+      });
+    },
+    [queryClient],
+  );
+}
+
+export function usePreloadTempWarehouseCarriers(
+  branchId: string | null,
+): UseQueryResult<PaginatedResponse<TempWarehousePublicUser>> {
+  const keyBranchId = branchId ?? "";
+  return useQuery({
+    queryKey: TEMP_WAREHOUSE_KEYS.CARRIERS(
+      keyBranchId,
+      "",
+      1,
+      TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
+    ),
+    queryFn: () => fetchTempWarehouseCarriers(keyBranchId, ""),
+    enabled: Boolean(branchId),
+    staleTime: 30_000,
+  });
+}
+
+export function useInvalidateTempWarehouseCarriers() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string) =>
+      queryClient.invalidateQueries({
+        queryKey: ["temp-wh", "carriers", branchId] as const,
+      }),
+    [queryClient],
+  );
+}
+
 interface UpdateLineVars {
   lineId: string;
   body: UpdateTempWarehouseLineBody;
@@ -109,7 +175,11 @@ export interface UseTempWarehouseMutationsResult {
     Error,
     AddTempWarehouseLineBody
   >;
-  updateLineMutation: UseMutationResult<UpdateLineResult, Error, UpdateLineVars>;
+  updateLineMutation: UseMutationResult<
+    UpdateLineResult,
+    Error,
+    UpdateLineVars
+  >;
   closeSessionMutation: UseMutationResult<
     CloseSessionResult,
     Error,
@@ -146,7 +216,11 @@ export function useTempWarehouseMutations(
     onSuccess: revalidateTempWarehouse,
   });
 
-  const updateLineMutation = useMutation<UpdateLineResult, Error, UpdateLineVars>({
+  const updateLineMutation = useMutation<
+    UpdateLineResult,
+    Error,
+    UpdateLineVars
+  >({
     mutationFn: ({ lineId, body }) =>
       tempWarehouseService.updateLine(lineId, body),
     onSuccess: revalidateTempWarehouse,

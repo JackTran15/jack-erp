@@ -1,14 +1,12 @@
 import { useBranchShowrooms } from "@erp/pos/hooks/react-query/use-query-inventory";
 import { useBranchStorages } from "@erp/pos/hooks/react-query/use-query-inventory";
-import { useFastStockTransferCarriers } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-carriers";
-import { useFastStockTransferCatalog } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-catalog";
 import {
+  usePreloadTempWarehouseCarriers,
   useTempWarehouseLines,
   useTempWarehouseNettedLines,
 } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { useTempWarehouseActiveSession } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
-import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
 import type { FastStockTransferData } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import type { FastStockTransferConfirmRow } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import {
@@ -27,6 +25,7 @@ import {
   lineQuantityDisplay,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-picker.store";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
 import {
   TempWarehouseDirection,
@@ -86,20 +85,16 @@ export function useFastStockTransferData(): FastStockTransferData {
     transferLinesMutation,
   } = useTempWarehouseMutations(branchId);
 
-  const catalogDirection = useMemo((): PosCatalogDirection => {
-    return direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
-      ? "warehouse"
-      : "showroom";
-  }, [direction]);
-
-  const {
-    searchCatalogProducts,
-    handleCatalogQueryChange,
-    findCatalogProduct,
-    catalogLoading,
-    reloadCatalog,
-    catalogLines,
-  } = useFastStockTransferCatalog(branchId, catalogDirection);
+  const { isLoading: carriersLoading } = usePreloadTempWarehouseCarriers(branchId);
+  const catalogDirection = usePosFastStockTransferPickerStore(
+    (s) => s.catalogDirection,
+  );
+  const findCatalogProduct = usePosFastStockTransferPickerStore(
+    (s) => s.findProduct,
+  );
+  const resolveCarrierById = usePosFastStockTransferPickerStore(
+    (s) => s.getCarrierById,
+  );
 
   const {
     data: storagesData,
@@ -133,27 +128,10 @@ export function useFastStockTransferData(): FastStockTransferData {
     [visibleLinesFromQueries],
   );
 
-  const pinnedCarriers = useMemo(
-    () => [
-      toolbarDraft.carrier,
-      editableDraft?.carrier,
-      ...allLinesForBalance.map((line) => line.carrier),
-    ],
-    [toolbarDraft.carrier, editableDraft?.carrier, allLinesForBalance],
-  );
-
-  const {
-    searchFastStockCarriers,
-    handleCarrierQueryChange,
-    carriersLoading,
-    resolveCarrierById,
-  } = useFastStockTransferCarriers(branchId, pinnedCarriers);
-
   const isLoading =
     sessionLoading ||
     outboundQuery.isLoading ||
     returnQuery.isLoading ||
-    catalogLoading ||
     carriersLoading ||
     locationsLoading;
 
@@ -324,16 +302,9 @@ export function useFastStockTransferData(): FastStockTransferData {
     storages,
     showrooms,
     locationsLoading,
-    searchCatalogProducts,
-    handleCatalogQueryChange,
-    catalogLoading,
-    catalogLines,
     catalogDirection,
-    searchFastStockCarriers,
-    handleCarrierQueryChange,
     findCatalogProduct,
     resolveCarrierById,
-    reloadCatalog,
     refetchStorages: async () => {
       await refetchStoragesQuery();
     },
