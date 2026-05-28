@@ -6,8 +6,12 @@ import {
   useCustomer,
   useCustomerPurchaseHistory,
   useCustomerSummary,
+  useIssueMembershipCard,
   useMembershipCard,
+  useUpdateMembershipCard,
 } from "@erp/pos/hooks/react-query/use-query-customer";
+import { IssueMembershipCardDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/IssueMembershipCardDialog/IssueMembershipCardDialog";
+import { MembershipTierEnum } from "@erp/pos/types/customer.type";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
@@ -72,6 +76,13 @@ interface FooterConfig {
  * On save the customer cache is invalidated by `useUpdateCustomer`, so this
  * dialog's preview refreshes automatically.
  */
+const TIER_LABELS: Record<string, string> = {
+  none: "Không hạng",
+  silver: "Bạc",
+  gold: "Vàng",
+  diamond: "Kim Cương",
+};
+
 export function CustomerDetailDialog({
   open,
   onClose,
@@ -87,12 +98,14 @@ export function CustomerDetailDialog({
   const [activeTab, setActiveTab] = useState<CustomerDetailTabKey>(initialTab);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [infoSubmitting, setInfoSubmitting] = useState(false);
+  const [isIssuingCard, setIsIssuingCard] = useState(false);
   const infoFormId = useId();
 
   const handleOpenReset = useCallback(() => {
     setActiveTab(initialTab);
     setIsEditingInfo(false);
     setInfoSubmitting(false);
+    setIsIssuingCard(false);
   }, [initialTab]);
   useDialogReset(open, handleOpenReset);
 
@@ -146,6 +159,31 @@ export function CustomerDetailDialog({
     [invoicesPage, branchName],
   );
 
+  const { mutate: issueCard, isPending: isIssuingCardPending } =
+    useIssueMembershipCard();
+  const { mutate: updateCard, isPending: isUpdatingCardPending } =
+    useUpdateMembershipCard();
+
+  const isMembershipPending = isIssuingCardPending || isUpdatingCardPending;
+
+  const handleMembershipConfirm = useCallback(
+    (tier: string) => {
+      if (data.cardCode) {
+        updateCard(
+          { customerId, body: { tier: tier as MembershipTierEnum } },
+          { onSuccess: () => setIsIssuingCard(false) },
+        );
+      } else {
+        const today = new Date().toISOString().slice(0, 10);
+        issueCard(
+          { customerId, body: { tier: tier as MembershipTierEnum, issuedAt: today } },
+          { onSuccess: () => setIsIssuingCard(false) },
+        );
+      }
+    },
+    [customerId, data.cardCode, issueCard, updateCard],
+  );
+
   const editSeed: CustomerFormValues = useMemo(
     () => ({
       id: customerId,
@@ -197,8 +235,9 @@ export function CustomerDetailDialog({
           {activeTab === CustomerDetailTabKeyEnum.OVERVIEW ? (
             <OverviewTab
               data={data}
-              onChangeCard={onChangeCard}
+              onChangeCard={() => setIsIssuingCard(true)}
               onRefreshPoints={onRefreshPoints}
+              onIssueCard={() => setIsIssuingCard(true)}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.INFO ? (
@@ -233,6 +272,18 @@ export function CustomerDetailDialog({
         saveDisabled={footer.primaryDisabled}
         cancelLabel={footer.cancelLabel}
         onCancel={footer.onCancel ?? onClose}
+      />
+
+      <IssueMembershipCardDialog
+        open={isIssuingCard}
+        onClose={() => setIsIssuingCard(false)}
+        customerName={data.name}
+        customerPhone={data.phone}
+        currentTierLabel={
+          data.tier ? TIER_LABELS[data.tier] ?? data.tier : null
+        }
+        onConfirm={handleMembershipConfirm}
+        submitting={isMembershipPending}
       />
     </PosDialog>
   );

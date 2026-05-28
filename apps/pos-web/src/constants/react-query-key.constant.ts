@@ -43,6 +43,8 @@ export const CUSTOMER_KEYS = {
   /** `GET /customers/:id/membership-card`. */
   MEMBERSHIP_CARD: (id: string) =>
     ["customers", id, "membership-card"] as const,
+  /** `GET /customers/membership-card-types` — danh sách loại thẻ trong org. */
+  MEMBERSHIP_CARD_TYPES: ["customers", "membership-card-types"] as const,
 } as const;
 
 export const CATALOG_KEYS = {

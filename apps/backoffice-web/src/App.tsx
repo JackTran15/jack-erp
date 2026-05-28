@@ -48,6 +48,7 @@ import { ProductsPage } from "./pages/products/ProductsPage";
 import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
 import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
+import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +82,7 @@ export function App() {
                 <Route path="/admin/employees" element={<EmployeesPage />} />
                 <Route path="/admin/:entityKey/new" element={<CrudCreatePage />} />
                 <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
+                <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />
                 <Route path="/admin/:entityKey/:id" element={<CrudDetailPage />} />
                 <Route path="/admin/:entityKey" element={<CrudListPage />} />
                 <Route

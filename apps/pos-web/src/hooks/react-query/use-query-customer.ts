@@ -14,13 +14,16 @@ import { invoiceService } from "@erp/pos/services/invoice.service";
 import type { CustomerDetail, CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import type { CustomerSummary } from "@erp/pos/interfaces/customer-summary.interface";
 import type { MembershipCard } from "@erp/pos/interfaces/membership-card.interface";
+import type { MembershipCardType } from "@erp/pos/interfaces/membership-card-type.interface";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type {
   CreateCustomerBody,
+  IssueMembershipCardBody,
   ListCustomersParams,
   PaginatedCustomers,
   UpdateCustomerBody,
+  UpdateMembershipCardBody,
 } from "@erp/pos/dtos/customer.dto";
 
 export interface UseCustomerSearchResult {
@@ -203,5 +206,71 @@ export function useMembershipCard(
     queryFn: () => customerService.getMembershipCard(id as string),
     enabled: Boolean(id),
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Danh sách loại thẻ thành viên — `GET /customers/membership-card-types`.
+ * Dùng cho dialog cấp thẻ để hiển thị danh sách chọn.
+ */
+export function useMembershipCardTypes(): UseQueryResult<MembershipCardType[], Error> {
+  return useQuery<MembershipCardType[], Error>({
+    queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD_TYPES,
+    queryFn: () => customerService.getMembershipCardTypes(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+interface IssueMembershipCardVars {
+  customerId: string;
+  body: IssueMembershipCardBody;
+}
+
+/**
+ * `POST /customers/:id/membership-card` — cấp thẻ thành viên mới.
+ * On success: invalidate summary + membership-card cache của khách đó.
+ */
+export function useIssueMembershipCard(): UseMutationResult<
+  MembershipCard,
+  Error,
+  IssueMembershipCardVars
+> {
+  const qc = useQueryClient();
+  return useMutation<MembershipCard, Error, IssueMembershipCardVars>({
+    mutationFn: ({ customerId, body }) =>
+      customerService.issueMembershipCard(customerId, body),
+    onSuccess: (_data, { customerId }) => {
+      void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.SUMMARY(customerId) });
+      void qc.invalidateQueries({
+        queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD(customerId),
+      });
+    },
+  });
+}
+
+interface UpdateMembershipCardVars {
+  customerId: string;
+  body: UpdateMembershipCardBody;
+}
+
+/**
+ * `PATCH /customers/:id/membership-card` — đổi hạng thẻ hiện tại.
+ * On success: invalidate summary + membership-card cache của khách đó.
+ */
+export function useUpdateMembershipCard(): UseMutationResult<
+  MembershipCard,
+  Error,
+  UpdateMembershipCardVars
+> {
+  const qc = useQueryClient();
+  return useMutation<MembershipCard, Error, UpdateMembershipCardVars>({
+    mutationFn: ({ customerId, body }) =>
+      customerService.updateMembershipCard(customerId, body),
+    onSuccess: (_data, { customerId }) => {
+      void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.SUMMARY(customerId) });
+      void qc.invalidateQueries({
+        queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD(customerId),
+      });
+    },
   });
 }
