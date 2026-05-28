@@ -34,6 +34,7 @@ import { TransferSummaryReportPage } from "./pages/reports/storage/TransferSumma
 import { TransferByBranchReportPage } from "./pages/reports/storage/TransferByBranchReportPage";
 import { TemporaryIssuesReportPage } from "./pages/reports/storage/TemporaryIssuesReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
+import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
 import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
 import { TransferOrdersPage } from "./pages/transfer-orders/TransferOrdersPage";
@@ -84,6 +85,7 @@ export function App() {
                 <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
                 <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />
                 <Route path="/admin/:entityKey/:id" element={<CrudDetailPage />} />
+                <Route path="/admin/inventory-items" element={<InventoryItemsPage />} />
                 <Route path="/admin/:entityKey" element={<CrudListPage />} />
                 <Route
                   path="/branch-management/sales-hierarchy"

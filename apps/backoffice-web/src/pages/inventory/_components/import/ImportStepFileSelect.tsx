@@ -3,9 +3,9 @@ import {
   IMPORT_DUPLICATE_MODE_LABELS,
   INVENTORY_IMPORT_PREVIEW_ROWS_LIMIT,
 } from "@erp/shared-interfaces";
-import { RadioGroup } from "../../../forms/RadioGroup";
 import { downloadInventoryTemplate } from "./import-inventory.api";
 import { ImportFilePicker } from "./ImportFilePicker";
+import { RadioGroup } from "../../../../components/forms/RadioGroup";
 
 interface Props {
   duplicateMode: ImportDuplicateMode;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
@@ -9,6 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  type ToolbarActionOption,
   formatMoneyInteger,
 } from "@erp/ui";
 import {
@@ -35,16 +36,41 @@ import {
   useCrudDelete,
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
-import { ImportInventoryDialog } from "./inventory/import/ImportInventoryDialog";
-import { downloadInventoryExport } from "./inventory/import/import-inventory.api";
 import { formatCustomerStatus } from "../../lib/customer-display";
-import { toast } from "sonner";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 
-export function CrudListPage() {
-  const { entityKey } = useParams<{ entityKey: string }>();
+export interface CrudListInventoryActionContext {
+  entityKey: string;
+  idField: string;
+  filteredRecords: Record<string, unknown>[];
+  selectedRows: Record<string, unknown>[];
+  selectedRecordIds: string[];
+  refetchRecords: () => void;
+}
+
+interface CrudListPageProps {
+  entityKey?: string;
+  inventoryConfig?: {
+    exportOptions?: Array<{
+      id: string;
+      label: string;
+      action: "export-all" | "export-selected";
+    }>;
+    onImportInventory?: (context: CrudListInventoryActionContext) => void;
+    onExportInventoryAll?: (context: CrudListInventoryActionContext) => void;
+    onExportInventorySelected?: (context: CrudListInventoryActionContext) => void;
+    renderDialogs?: (context: CrudListInventoryActionContext) => ReactNode;
+  };
+}
+
+export function CrudListPage({
+  entityKey: entityKeyProp,
+  inventoryConfig,
+}: CrudListPageProps) {
+  const params = useParams<{ entityKey: string }>();
+  const entityKey = entityKeyProp ?? params.entityKey;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,26 +92,25 @@ export function CrudListPage() {
     string,
     unknown
   > | null>(null);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const {
     data: config,
     isLoading: configLoading,
     error: configError,
-  } = useCrudConfig(entityKey!);
+  } = useCrudConfig(entityKey ?? "");
 
   const {
     data: records,
     isLoading: loading,
     refetch: refetchRecords,
   } = useCrudRecords(
-    entityKey!,
+    entityKey ?? "",
     { page, pageSize, sortBy, sortOrder, search, filters: {} },
-    !!config,
+    Boolean(config && entityKey),
   );
 
-  const createMutation = useCrudCreate(entityKey!);
-  const deleteMutation = useCrudDelete(entityKey!);
+  const createMutation = useCrudCreate(entityKey ?? "");
+  const deleteMutation = useCrudDelete(entityKey ?? "");
 
   useEffect(() => {
     setPage(1);
@@ -97,7 +122,6 @@ export function CrudListPage() {
     setColumnFilters({});
     setSelectedRecordIds(new Set());
     setDuplicateSnapshot(null);
-    setImportDialogOpen(false);
   }, [entityKey]);
 
   useEffect(() => {
@@ -153,7 +177,7 @@ export function CrudListPage() {
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
       (config?.fields ?? []).map((field) => {
-        const col = resolveColumnConfig(entityKey!, field);
+        const col = resolveColumnConfig(entityKey ?? "", field);
         const widthPx = col.widthPx;
         const filterDef = filterDefinitionByKey.get(field.key);
         // Pick filter UI per column. Boolean fields and any field whose
@@ -188,6 +212,46 @@ export function CrudListPage() {
     [config?.fields, entityKey, filterDefinitionByKey],
   );
 
+  // ─── Hooks that previously sat AFTER early-returns (Rules-of-Hooks fix) ──
+  const idField = config?.idField ?? "id";
+
+  const selectedRows = useMemo(
+    () =>
+      filteredRecords.filter((record) =>
+        selectedRecordIds.has(String(record[idField])),
+      ),
+    [filteredRecords, selectedRecordIds, idField],
+  );
+
+  const inventoryActionContext = useMemo<CrudListInventoryActionContext>(
+    () => ({
+      entityKey: entityKey ?? "",
+      idField,
+      filteredRecords,
+      selectedRows,
+      selectedRecordIds: selectedRows.map((record) => String(record[idField])),
+      refetchRecords: () => void refetchRecords(),
+    }),
+    [idField, entityKey, filteredRecords, selectedRows, refetchRecords],
+  );
+
+  const exportInventoryOptions = useMemo<ToolbarActionOption[] | undefined>(() => {
+    if (!inventoryConfig?.exportOptions?.length) return undefined;
+    return inventoryConfig.exportOptions.map((option) => ({
+      id: option.id,
+      label: option.label,
+      onClick:
+        option.action === "export-selected"
+          ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
+          : () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext),
+    }));
+  }, [
+    inventoryActionContext,
+    inventoryConfig?.exportOptions,
+    inventoryConfig?.onExportInventoryAll,
+    inventoryConfig?.onExportInventorySelected,
+  ]);
+
   if (configLoading) {
     return (
       <AdminPageShell>
@@ -214,7 +278,7 @@ export function CrudListPage() {
       </AdminPageShell>
     );
   }
-  if (!config) {
+  if (!entityKey || !config) {
     return (
       <AdminPageShell>
         <p>Không tìm thấy thực thể.</p>
@@ -264,9 +328,6 @@ export function CrudListPage() {
     }));
   };
 
-  const selectedRows = filteredRecords.filter((record) =>
-    selectedRecordIds.has(String(record[config.idField])),
-  );
   const selectedRecord = selectedRows.length === 1 ? selectedRows[0] : null;
   const areAllVisibleSelected =
     filteredRecords.length > 0 &&
@@ -301,7 +362,7 @@ export function CrudListPage() {
 
   const toolbarItems = buildListToolbar(
     buildCrudEntityToolbarSpecs(
-      entityKey!,
+      entityKey,
       {
         handleCreate,
         openDuplicateDialog,
@@ -315,21 +376,22 @@ export function CrudListPage() {
         refetchRecords,
         navigate: (to) => void navigate(to),
         onImportInventory:
-          entityKey === "inventory-items"
-            ? () => setImportDialogOpen(true)
+          inventoryConfig?.onImportInventory
+            ? () => inventoryConfig.onImportInventory?.(inventoryActionContext)
             : undefined,
         onExportInventory:
-          entityKey === "inventory-items"
-            ? () => {
-                void downloadInventoryExport()
-                  .then(() => toast.success("Đã tải tệp xuất khẩu"))
-                  .catch((err: unknown) =>
-                    toast.error(
-                      err instanceof Error ? err.message : "Xuất khẩu thất bại",
-                    ),
-                  );
-              }
+          inventoryConfig
+            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
             : undefined,
+        onExportInventoryAll:
+          inventoryConfig
+            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
+            : undefined,
+        onExportInventorySelected:
+          inventoryConfig?.onExportInventorySelected
+            ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
+            : undefined,
+        exportInventoryOptions,
       },
       {
         selectedRecord,
@@ -439,13 +501,7 @@ export function CrudListPage() {
         />
       )}
 
-      {entityKey === "inventory-items" && importDialogOpen ? (
-        <ImportInventoryDialog
-          open
-          onOpenChange={setImportDialogOpen}
-          onCommitted={() => void refetchRecords()}
-        />
-      ) : null}
+      {inventoryConfig?.renderDialogs?.(inventoryActionContext)}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-md">

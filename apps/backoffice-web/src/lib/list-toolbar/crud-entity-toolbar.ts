@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import type { ToolbarActionOption } from "@erp/ui";
 import { TOOLBAR_ACTION } from "../../constants";
 import type { ListToolbarSpec } from "./build-toolbar";
 
@@ -11,6 +12,9 @@ export interface CrudListToolbarContext {
   navigate: (to: string) => void;
   onImportInventory?: () => void;
   onExportInventory?: () => void;
+  onExportInventoryAll?: () => void;
+  onExportInventorySelected?: () => void;
+  exportInventoryOptions?: ToolbarActionOption[];
 }
 
 export interface CrudListToolbarSelection {
@@ -53,7 +57,10 @@ const importExport = (ctx: CrudListToolbarContext): ListToolbarSpec[] => [
   {
     action: TOOLBAR_ACTION.export,
     onClick:
-      ctx.onExportInventory ?? soon("Tính năng xuất khẩu đang được triển khai."),
+      ctx.onExportInventoryAll ??
+      ctx.onExportInventory ??
+      soon("Tính năng xuất khẩu đang được triển khai."),
+    options: ctx.exportInventoryOptions,
   },
 ];
 
