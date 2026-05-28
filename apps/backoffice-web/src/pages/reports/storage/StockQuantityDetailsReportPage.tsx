@@ -1,11 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { resolvePeriodRange, type PeriodValue } from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
-import { generateMockStock, type MockStockSku } from "./_shared/mock";
+import { useStockQuantityDetailsReport } from "../../../hooks/use-inventory-reports";
+import type { StockPeriodRow } from "../../../api/inventory-reports";
 
 const WAREHOUSE_OPTIONS = [
   { value: "__all__", label: "Tất cả kho" },
@@ -29,7 +33,20 @@ const UNIT_OPTIONS = [
   { value: "Đôi", label: "Đôi" },
 ];
 
-interface ExpandedRow extends MockStockSku {
+interface ViewRow {
+  itemId: string;
+  sku: string;
+  name: string;
+  parentSku: string;
+  parentName: string;
+  color: string;
+  size: string;
+  unit: string;
+  group: string;
+  brand: string;
+  openingQty: number;
+  inQty: number;
+  outQty: number;
   inPurchase: number;
   inTransfer: number;
   inReturn: number;
@@ -45,6 +62,37 @@ interface ExpandedRow extends MockStockSku {
   outOther: number;
 }
 
+function mapApiRow(row: StockPeriodRow): ViewRow {
+  return {
+    itemId: row.itemId,
+    sku: row.sku,
+    name: row.itemName,
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    color: "",
+    size: "",
+    unit: row.unit,
+    group: row.categoryName ?? "",
+    brand: "",
+    openingQty: row.openingQty,
+    inQty: row.inQty,
+    outQty: row.outQty,
+    inPurchase: row.inQtyPurchase ?? 0,
+    inTransfer: row.inQtyTransferIn ?? 0,
+    inReturn: row.inQtyReturn ?? 0,
+    inWh: 0,
+    inAdjust: row.inQtyAdjustIn ?? 0,
+    inOther: 0,
+    outSale: row.outQtySale ?? 0,
+    outTransfer: row.outQtyTransferOut ?? 0,
+    outPurchaseReturn: 0,
+    outWh: 0,
+    outAdjust: row.outQtyAdjustOut ?? 0,
+    outVoid: 0,
+    outOther: 0,
+  };
+}
+
 export function StockQuantityDetailsReportPage() {
   const filterFields: FilterField[] = [
     { key: "warehouse", label: "Kho", type: "select", options: WAREHOUSE_OPTIONS },
@@ -54,31 +102,30 @@ export function StockQuantityDetailsReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
-  const rows = useMemo<ExpandedRow[]>(
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
     () =>
-      generateMockStock().map((r, i) => ({
-        ...r,
-        inPurchase: i % 3 === 0 ? r.inQty : 0,
-        inTransfer: i % 5 === 0 ? r.inQty : 0,
-        inReturn: 0,
-        inWh: 0,
-        inAdjust: 0,
-        inOther: 0,
-        outSale: r.outQty,
-        outTransfer: 0,
-        outPurchaseReturn: 0,
-        outWh: 0,
-        outAdjust: 0,
-        outVoid: 0,
-        outOther: 0,
-      })),
-    [],
+      buildApiFilters(filterValues, period, {
+        categoryFieldKey: "group",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useStockQuantityDetailsReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
   );
 
   const num = "text-right tabular-nums";
   const inGrp = "Nhập trong kỳ";
   const outGrp = "Xuất trong kỳ";
-  const columns: TableColumn<ExpandedRow>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
     { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
     { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
@@ -108,7 +155,7 @@ export function StockQuantityDetailsReportPage() {
   ];
 
   return (
-    <StorageReportShell<ExpandedRow>
+    <StorageReportShell<ViewRow>
       title="Chi tiết số lượng nhập xuất tồn kho"
       storageKey="reports/storage/stock-quantity-details"
       filterFields={filterFields}
@@ -120,8 +167,14 @@ export function StockQuantityDetailsReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có dữ liệu chi tiết."
-      getRowKey={(r, i) => `${r.sku}-${r.warehouseCode}-${i}`}
+      getRowKey={(r, i) => `${r.itemId}-${i}`}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

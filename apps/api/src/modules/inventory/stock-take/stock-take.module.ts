@@ -8,6 +8,7 @@ import { GoodsReceiptLineEntity } from '../goods-receipt/goods-receipt-line.enti
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
 import { GoodsIssueLineEntity } from '../goods-issue/goods-issue-line.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemCostSnapshotModule } from '../location/item-cost-snapshot.module';
 import { StockTakeEntity } from './stock-take.entity';
 import { StockTakeLineEntity } from './stock-take-line.entity';
 import { StockTakeService } from './stock-take.service';
@@ -27,6 +28,7 @@ import { StockTakeController } from './stock-take.controller';
     ]),
     StockLedgerModule,
     DocumentNumberingModule,
+    ItemCostSnapshotModule,
   ],
   controllers: [StockTakeController],
   providers: [StockTakeService],

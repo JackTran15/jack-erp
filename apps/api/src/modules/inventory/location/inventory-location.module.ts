@@ -44,6 +44,7 @@ import {
   INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG,
   INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
 } from './item-category-crud.service';
+import { ItemCostSnapshotModule } from './item-cost-snapshot.module';
 
 @Module({
   imports: [

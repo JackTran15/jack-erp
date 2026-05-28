@@ -3844,6 +3844,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/inventory/stock-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp nhập xuất tồn kho */
+        get: operations["InventoryReportsController_stockSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-document-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng kê chi tiết phiếu nhập xuất */
+        get: operations["InventoryReportsController_stockDocumentDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-quantity-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết số lượng nhập xuất tồn */
+        get: operations["InventoryReportsController_stockQuantityDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-summary-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp nhập xuất tồn theo cửa hàng */
+        get: operations["InventoryReportsController_stockSummaryByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số lượng tồn theo cửa hàng (pivot) */
+        get: operations["InventoryReportsController_stockByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/transfer-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp nhập xuất điều chuyển */
+        get: operations["InventoryReportsController_transferSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/transfer-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hóa điều chuyển theo cửa hàng */
+        get: operations["InventoryReportsController_transferByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -14444,6 +14563,218 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TransferOrderEntity"];
                 };
+            };
+        };
+    };
+    InventoryReportsController_stockSummary: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_stockDocumentDetails: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_stockQuantityDetails: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_stockSummaryByBranch: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_stockByBranch: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_transferSummary: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_transferByBranch: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+                /** @description Cửa hàng xuất (UUID). Bắt buộc gián tiếp — nếu bỏ trống sẽ dùng X-Branch-Id của request. */
+                sourceBranchId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

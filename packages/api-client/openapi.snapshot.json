@@ -12509,6 +12509,772 @@
           "TransferOrder"
         ]
       }
+    },
+    "/reports/inventory/stock-summary": {
+      "get": {
+        "operationId": "InventoryReportsController_stockSummary",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Tổng hợp nhập xuất tồn kho",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/stock-document-details": {
+      "get": {
+        "operationId": "InventoryReportsController_stockDocumentDetails",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Bảng kê chi tiết phiếu nhập xuất",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/stock-quantity-details": {
+      "get": {
+        "operationId": "InventoryReportsController_stockQuantityDetails",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Chi tiết số lượng nhập xuất tồn",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/stock-summary-by-branch": {
+      "get": {
+        "operationId": "InventoryReportsController_stockSummaryByBranch",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Tổng hợp nhập xuất tồn theo cửa hàng",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/stock-by-branch": {
+      "get": {
+        "operationId": "InventoryReportsController_stockByBranch",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Số lượng tồn theo cửa hàng (pivot)",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/transfer-summary": {
+      "get": {
+        "operationId": "InventoryReportsController_transferSummary",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Tổng hợp nhập xuất điều chuyển",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/transfer-by-branch": {
+      "get": {
+        "operationId": "InventoryReportsController_transferByBranch",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sourceBranchId",
+            "required": false,
+            "in": "query",
+            "description": "Cửa hàng xuất (UUID). Bắt buộc gián tiếp — nếu bỏ trống sẽ dùng X-Branch-Id của request.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Hàng hóa điều chuyển theo cửa hàng",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
     }
   },
   "info": {

@@ -6,6 +6,7 @@ import { TransferStatus, StockMovementType, DocumentType } from '@erp/shared-int
 import { StockTransferService, CreateTransferDto } from './stock-transfer.service';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 
@@ -13,6 +14,7 @@ describe('StockTransferService', () => {
   let service: StockTransferService;
   let transferRepo: Record<string, jest.Mock>;
   let locationRepo: Record<string, jest.Mock>;
+  let itemCostSnapshotService: Record<string, jest.Mock>;
   let ledgerService: Record<string, jest.Mock>;
   let docNumbering: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
@@ -45,6 +47,12 @@ describe('StockTransferService', () => {
       findOne: jest.fn(),
     };
 
+    itemCostSnapshotService = {
+      snapshotCosts: jest
+        .fn()
+        .mockResolvedValue(new Map<string, number>([['item-1', 8]])),
+    };
+
     ledgerService = {
       recordBatchMovements: jest.fn().mockResolvedValue([]),
     };
@@ -69,6 +77,7 @@ describe('StockTransferService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: ledgerService },
         { provide: DocumentNumberingService, useValue: docNumbering },
+        { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
       ],
     }).compile();
 
@@ -157,11 +166,15 @@ describe('StockTransferService', () => {
             movementType: StockMovementType.TRANSFER_OUT,
             quantity: -5,
             locationId: 'loc-src',
+            // Snapshot of items.purchase_price (8.00). Both legs share the
+            // same unit_cost so signed line_value sums to zero across the move.
+            unitCost: 8,
           }),
           expect.objectContaining({
             movementType: StockMovementType.TRANSFER_IN,
             quantity: 5,
             locationId: 'loc-dst',
+            unitCost: 8,
           }),
         ]),
       );

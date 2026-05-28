@@ -163,6 +163,7 @@ export class GoodsIssueService {
         referenceId: gi.id,
         notes: `Xuất hàng: ${documentNumber}`,
         actorContext: actor,
+        unitCost: Number(line.unitPrice ?? 0),
       }));
 
       await this.ledgerService.recordBatchMovements(movements);
@@ -205,6 +206,7 @@ export class GoodsIssueService {
           referenceId: gi.id,
           notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
           actorContext: actor,
+          unitCost: Number(line.unitPrice ?? 0),
         }));
         await this.ledgerService.recordBatchMovements(reversals);
       });

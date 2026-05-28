@@ -34,6 +34,14 @@ export interface RecordMovementParams {
   referenceId: string;
   notes?: string;
   actorContext: ActorContext;
+  /**
+   * Cost snapshot at posting time (positive number). When provided, the ledger
+   * entry will persist both `unit_cost` and a signed `line_value = quantity *
+   * unit_cost` (positive=in, negative=out). Callers should derive this from
+   * the source document's unit price (e.g. goods_receipt_lines.unitPrice) or
+   * fall back to items.purchasePrice when the source has no price column.
+   */
+  unitCost?: number;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -131,6 +139,8 @@ export class StockLedgerService {
       params.actorContext,
     );
 
+    const { unitCost, lineValue } = this.deriveCostFields(params);
+
     const entry = await this.dataSource.transaction(async (manager) => {
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
@@ -144,6 +154,8 @@ export class StockLedgerService {
         notes: params.notes,
         postedAt: new Date(),
         createdBy: params.actorContext.userId,
+        unitCost,
+        lineValue,
       });
       const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
 
@@ -175,6 +187,7 @@ export class StockLedgerService {
       const now = new Date();
 
       for (const params of movements) {
+        const { unitCost, lineValue } = this.deriveCostFields(params);
         const ledgerEntry = manager.create(StockLedgerEntryEntity, {
           itemId: params.itemId,
           locationId: params.locationId,
@@ -187,6 +200,8 @@ export class StockLedgerService {
           notes: params.notes,
           postedAt: now,
           createdBy: params.actorContext.userId,
+          unitCost,
+          lineValue,
         });
         const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
         savedEntries.push(savedEntry);
@@ -464,6 +479,32 @@ export class StockLedgerService {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────
+
+  /**
+   * Derive the `unit_cost` and `line_value` ledger columns from a movement.
+   *
+   * `unit_cost` is stored as a positive snapshot (we coerce `Math.abs` for
+   * safety against accidentally-negative inputs). `line_value` is signed and
+   * follows `quantity`'s sign so the sum across a date range gives a usable
+   * movement value (positive = stock-in value, negative = stock-out value).
+   *
+   * When the caller does not supply `unitCost` we leave both columns null —
+   * existing rows backfilled by migration use that policy already.
+   */
+  private deriveCostFields(
+    params: RecordMovementParams,
+  ): { unitCost?: number; lineValue?: number } {
+    if (params.unitCost === undefined || params.unitCost === null) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const cost = Math.abs(Number(params.unitCost));
+    if (!Number.isFinite(cost)) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const signedQty = Number(params.quantity);
+    const lineValue = Number((signedQty * cost).toFixed(2));
+    return { unitCost: cost, lineValue };
+  }
 
   private async upsertBalance(
     manager: EntityManager,
