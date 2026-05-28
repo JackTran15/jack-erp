@@ -23,7 +23,10 @@ export function applyFieldSheetStyles(
   for (let c = 1; c <= colCount; c++) {
     let maxLen = 8;
     for (const row of grid) {
-      maxLen = Math.max(maxLen, cellText(row[c - 1]).length + 2);
+      const maxLineLen = cellText(row[c - 1])
+        .split('\n')
+        .reduce((m, l) => Math.max(m, l.length), 0);
+      maxLen = Math.max(maxLen, maxLineLen + 2);
     }
     worksheet.getColumn(c).width = Math.min(60, Math.max(10, maxLen));
   }
@@ -50,7 +53,7 @@ export function applyFieldSheetStyles(
     for (let c = 1; c <= colCount; c++) {
       const cell = worksheet.getCell(excelRow, c);
       setThinBorder(cell);
-      cell.alignment = { vertical: 'top', wrapText: false };
+      cell.alignment = { vertical: 'top', wrapText: true };
       if (isLinkRow) {
         setCellFill(cell, LINK_IMAGE_FILL);
       }
