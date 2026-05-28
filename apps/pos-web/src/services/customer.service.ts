@@ -5,11 +5,14 @@ import type {
 } from "@erp/pos/interfaces/customer.interface";
 import type { CustomerSummary } from "@erp/pos/interfaces/customer-summary.interface";
 import type { MembershipCard } from "@erp/pos/interfaces/membership-card.interface";
+import type { MembershipCardType } from "@erp/pos/interfaces/membership-card-type.interface";
 import type {
   CreateCustomerBody,
+  IssueMembershipCardBody,
   ListCustomersParams,
   PaginatedCustomers,
   UpdateCustomerBody,
+  UpdateMembershipCardBody,
 } from "@erp/pos/dtos/customer.dto";
 
 export const customerService = {
@@ -64,4 +67,28 @@ export const customerService = {
         }
         throw err;
       }),
+
+  /** `GET /customers/membership-card-types` — danh sách loại thẻ active trong org. */
+  getMembershipCardTypes: (): Promise<MembershipCardType[]> =>
+    http.get<MembershipCardType[]>("/customers/membership-card-types"),
+
+  /** `POST /customers/:id/membership-card` — cấp thẻ thành viên mới cho khách. */
+  issueMembershipCard: (
+    customerId: string,
+    body: IssueMembershipCardBody,
+  ): Promise<MembershipCard> =>
+    http.post<MembershipCard>(
+      `/customers/${encodeURIComponent(customerId)}/membership-card`,
+      body,
+    ),
+
+  /** `PATCH /customers/:id/membership-card` — cập nhật hạng thẻ hiện tại. */
+  updateMembershipCard: (
+    customerId: string,
+    body: UpdateMembershipCardBody,
+  ): Promise<MembershipCard> =>
+    http.patch<MembershipCard>(
+      `/customers/${encodeURIComponent(customerId)}/membership-card`,
+      body,
+    ),
 };

@@ -820,6 +820,19 @@ async function seedInventoryData() {
       ],
     );
 
+    // Membership card types (default tiers per org)
+    await AppDataSource.query(
+      `
+      INSERT INTO membership_card_types (id, organization_id, branch_id, created_at, updated_at, created_by, name, tier, is_active, sort_order)
+      VALUES
+        (gen_random_uuid(), $1, NULL, NOW(), NOW(), $2, 'Thẻ Bạc',       'silver',  true, 1),
+        (gen_random_uuid(), $1, NULL, NOW(), NOW(), $2, 'Thẻ Vàng',       'gold',    true, 2),
+        (gen_random_uuid(), $1, NULL, NOW(), NOW(), $2, 'Thẻ Kim Cương',  'diamond', true, 3)
+      ON CONFLICT (organization_id, tier) DO NOTHING
+      `,
+      [IDS.organization, IDS.user],
+    );
+
     // eslint-disable-next-line no-console
     console.log(
       'Inventory seed completed (inventory.admin@erp.local → Quản trị hệ thống + 3 vai trò mẫu).',
