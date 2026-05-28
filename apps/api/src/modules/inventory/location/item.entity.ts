@@ -1,4 +1,4 @@
-import { Entity, Column, Unique, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, Column, Unique, Index, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { ItemCategoryEntity } from './item-category.entity';
 import { ProductEntity } from '../product/product.entity';
@@ -10,6 +10,13 @@ import { ItemUnitEntity } from './item-unit.entity';
 /** A stockable product or material tracked in inventory. Identified by unique code per organization. */
 @Entity('items')
 @Unique(['organizationId', 'code'])
+@Index('IDX_items_org_pos_catalog', ['organizationId'], {
+  where: '"is_active" = true AND "is_pos_visible" = true',
+})
+@Index('IDX_items_org_product', ['organizationId', 'productId'], {
+  where: '"product_id" IS NOT NULL',
+})
+@Index('IDX_items_org_active_category', ['organizationId', 'isActive', 'categoryId'])
 export class ItemEntity extends BaseEntity {
   @Column({ comment: 'Short alphanumeric identifier (SKU) for the item' })
   code: string;

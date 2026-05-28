@@ -6,6 +6,7 @@ import { StockTransferLineEntity } from './stock-transfer-line.entity';
 /** Document authorizing movement of inventory between locations/branches. Workflow: DRAFT → APPROVED → POSTED. */
 @Entity('stock_transfers')
 @Index(['organizationId', 'status'])
+@Index('IDX_stock_transfers_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class StockTransferEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated document number via DocumentNumberRule' })
   documentNumber?: string;

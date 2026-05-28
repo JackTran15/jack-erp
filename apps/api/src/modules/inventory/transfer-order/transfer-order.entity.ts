@@ -11,6 +11,7 @@ import { TransferOrderLineEntity } from './transfer-order-line.entity';
 
 @Entity('transfer_orders')
 @Index(['organizationId', 'status'])
+@Index('IDX_transfer_orders_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class TransferOrderEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true })
   documentNumber?: string;

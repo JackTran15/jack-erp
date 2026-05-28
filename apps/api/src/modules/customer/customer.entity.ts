@@ -11,6 +11,7 @@ export enum Gender { MALE = 'male', FEMALE = 'female', UNSPECIFIED = 'unspecifie
   where: '"email" IS NOT NULL',
 })
 @Index('idx_customer_org_status', ['organizationId', 'status'])
+@Index('IDX_customers_org_branch_status', ['organizationId', 'branchId', 'status'])
 @Index('uq_customer_org_phone', ['organizationId', 'phone'], {
   unique: true,
   where: '"phone" IS NOT NULL',

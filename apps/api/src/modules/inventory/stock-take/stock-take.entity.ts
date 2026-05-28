@@ -11,6 +11,7 @@ import { StockTakeLineEntity } from './stock-take-line.entity';
 
 @Entity('stock_takes')
 @Index(['organizationId', 'status'])
+@Index('IDX_stock_takes_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class StockTakeEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true })
   documentNumber?: string;

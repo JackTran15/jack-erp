@@ -18,6 +18,7 @@ export enum ExpensePaymentMethod {
 @Index('idx_expense_org_status', ['organizationId', 'status'])
 @Index('idx_expense_org_branch', ['organizationId', 'branchId'])
 @Index('idx_expense_account', ['accountId'])
+@Index('IDX_expenses_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class ExpenseEntity extends BaseEntity {
   @Column({ type: 'text', comment: 'What the expense is for (e.g. Office rent for April 2026)' })
   description: string;

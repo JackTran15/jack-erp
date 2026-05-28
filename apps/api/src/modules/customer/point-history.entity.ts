@@ -6,6 +6,7 @@ export enum PointType { EARN = 'earn', REDEEM = 'redeem', ADJUST = 'adjust' }
 /** Immutable ledger of all point transactions against a membership card. */
 @Entity('point_history')
 @Index(['cardId'])
+@Index('IDX_point_history_card_type', ['cardId', 'type'])
 export class PointHistoryEntity extends BaseEntity {
   @Column({ name: 'card_id', type: 'uuid' })
   cardId: string;

@@ -20,6 +20,9 @@ import { CashPaymentLineEntity } from './cash-payment-line.entity';
 @Index('IDX_cash_payments_org_status', ['organizationId', 'status'])
 @Index('IDX_cash_payments_org_voucher_date', ['organizationId', 'voucherDate'])
 @Index('IDX_cash_payments_account_voucher_date', ['cashAccountId', 'voucherDate'])
+@Index('IDX_cash_payments_org_branch_list', ['organizationId', 'branchId', 'status', 'voucherDate'], {
+  where: '"deleted_at" IS NULL',
+})
 export class CashPaymentEntity extends BaseEntity {
   @Column({ name: 'document_number', type: 'varchar', length: 64, nullable: true })
   documentNumber?: string;

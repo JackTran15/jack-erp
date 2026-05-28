@@ -6,6 +6,7 @@ import { BaseEntity } from '../../../database/entities/base.entity';
 @Entity('stock_ledger_entries')
 @Index(['organizationId', 'itemId', 'locationId'])
 @Index(['organizationId', 'branchId', 'createdAt'])
+@Index('IDX_stock_ledger_org_branch_posted', ['organizationId', 'branchId', 'postedAt'])
 export class StockLedgerEntryEntity extends BaseEntity {
   @Column({ name: 'item_id', type: 'uuid', comment: 'The item affected by this movement' })
   itemId: string;
