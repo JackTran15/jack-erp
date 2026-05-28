@@ -17,6 +17,14 @@ export interface UseCheckoutPromotionResult {
   pickPromoOption: (option: PromoMenuOption) => void;
   searchVoucher: (code: string) => void;
   applyVoucher: (result: VoucherFormResult) => void;
+  /**
+   * Ghi `pointsRedeemed` vào draft local. Hằng nội bộ — không gọi BE
+   * `/invoices/:id/redeem-points` ở đây; BE chỉ được gọi ở bước finalize
+   * (`useCheckoutActions.finalizeCheckoutAndPrint`) sau khi đã có invoiceId.
+   */
+  setRedeemedPoints: (points: number) => void;
+  /** Reset `pointsRedeemed` về 0 (đồng nghĩa bỏ áp dụng điểm). */
+  clearRedeemedPoints: () => void;
 }
 
 /**
@@ -33,7 +41,10 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
 
   const applyPromotion = useCallback(
     (promotion: PromotionItem | null) => {
-      updateDraftSlice("promotion", () => ({ appliedPromotion: promotion }));
+      updateDraftSlice("promotion", (p) => ({
+        ...p,
+        appliedPromotion: promotion,
+      }));
       usePosCheckoutUiStore
         .getState()
         .setAnnouncement(
@@ -59,16 +70,45 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
       .setAnnouncement(CHECKOUT_ANNOUNCEMENTS.searchingVoucher(code));
   }, []);
 
-  const applyVoucher = useCallback((result: VoucherFormResult) => {
-    const code = result.voucherCode || result.voucherId;
+  const applyVoucher = useCallback(
+    (result: VoucherFormResult) => {
+      // Lưu voucher vào draft local — BE chưa có endpoint apply-voucher, nên
+      // số liệu trên grand total không đổi; chip hiển thị ở right pane lấy
+      // từ slice này.
+      updateDraftSlice("promotion", (p) => ({ ...p, appliedVoucher: result }));
+      const code = result.voucherCode || result.voucherId;
+      usePosCheckoutUiStore
+        .getState()
+        .setAnnouncement(
+          code
+            ? CHECKOUT_ANNOUNCEMENTS.voucherAppliedCode(code)
+            : CHECKOUT_ANNOUNCEMENTS.VOUCHER_APPLIED,
+        );
+    },
+    [updateDraftSlice],
+  );
+
+  const setRedeemedPoints = useCallback(
+    (points: number) => {
+      const next = Math.max(0, Math.floor(points));
+      updateDraftSlice("promotion", (p) => ({ ...p, pointsRedeemed: next }));
+      usePosCheckoutUiStore
+        .getState()
+        .setAnnouncement(
+          next > 0
+            ? CHECKOUT_ANNOUNCEMENTS.pointsApplied(next)
+            : CHECKOUT_ANNOUNCEMENTS.POINTS_CLEARED,
+        );
+    },
+    [updateDraftSlice],
+  );
+
+  const clearRedeemedPoints = useCallback(() => {
+    updateDraftSlice("promotion", (p) => ({ ...p, pointsRedeemed: 0 }));
     usePosCheckoutUiStore
       .getState()
-      .setAnnouncement(
-        code
-          ? CHECKOUT_ANNOUNCEMENTS.voucherAppliedCode(code)
-          : CHECKOUT_ANNOUNCEMENTS.VOUCHER_APPLIED,
-      );
-  }, []);
+      .setAnnouncement(CHECKOUT_ANNOUNCEMENTS.POINTS_CLEARED);
+  }, [updateDraftSlice]);
 
   return {
     appliedPromotion,
@@ -76,5 +116,7 @@ export function useCheckoutPromotion(): UseCheckoutPromotionResult {
     pickPromoOption,
     searchVoucher,
     applyVoucher,
+    setRedeemedPoints,
+    clearRedeemedPoints,
   };
 }

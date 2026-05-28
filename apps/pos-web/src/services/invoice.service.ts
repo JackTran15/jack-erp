@@ -6,6 +6,7 @@ import type {
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
   ListInvoicesParams,
+  RedeemInvoicePointsBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
@@ -72,5 +73,25 @@ export const invoiceService = {
     http.post<InvoiceRow>(
       `/invoices/${encodeURIComponent(id)}/checkout-return`,
       body,
+    ),
+
+  /**
+   * `POST /invoices/:id/redeem-points` — áp dụng đổi điểm vào draft. BE ghi
+   * `pointsRedeemed`, `pointsDiscountAmount` (=points × 1.000), tính lại
+   * `amountDue`. Điểm thực sự bị trừ trên thẻ ở bước `checkout` (transaction).
+   */
+  redeemPoints: (
+    id: string,
+    body: RedeemInvoicePointsBody,
+  ): Promise<InvoiceRow> =>
+    http.post<InvoiceRow>(
+      `/invoices/${encodeURIComponent(id)}/redeem-points`,
+      body,
+    ),
+
+  /** `DELETE /invoices/:id/redeem-points` — gỡ đổi điểm khỏi draft. */
+  clearRedeemPoints: (id: string): Promise<InvoiceRow> =>
+    http.delete<InvoiceRow>(
+      `/invoices/${encodeURIComponent(id)}/redeem-points`,
     ),
 };

@@ -80,12 +80,20 @@ export function deriveSettlement(input: {
   deposit: number;
   /** Phí đổi trả (return/exchange) — khách trả thêm → tăng số phải thu. */
   returnFee?: number;
+  /**
+   * Tiền giảm từ đổi điểm (loyalty redeem). Chỉ > 0 ở luồng SALE; các luồng
+   * khác để 0 (xem `selectEffectivePointsRedeemed`).
+   */
+  pointsDiscountAmount?: number;
   paymentLines: ReadonlyArray<{ amount: number }>;
   keepChange: boolean;
   debt: boolean;
 }): SettlementSnapshot {
   const settlementGrandTotal =
-    input.grandTotal - input.deposit + (input.returnFee ?? 0);
+    input.grandTotal -
+    input.deposit +
+    (input.returnFee ?? 0) -
+    (input.pointsDiscountAmount ?? 0);
   const settlementAbs = settlementAbsFromGrand(settlementGrandTotal);
   const totalPaid = input.paymentLines.reduce((sum, l) => sum + l.amount, 0);
   const { changeAmount, shortageAmount, debtAmount } = derivePaymentDisplay({

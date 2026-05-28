@@ -42,6 +42,15 @@ export interface UpdateInvoiceBody {
   items?: CreateInvoiceItemBody[];
 }
 
+/**
+ * Body cho `POST /invoices/:id/redeem-points` — áp dụng đổi điểm tích lũy vào
+ * draft. BE validate (thẻ active, balance ≥ points, points × 1.000 ≤ giá trị
+ * đơn còn lại); FE chỉ clamp `≥ 1` cho UX.
+ */
+export interface RedeemInvoicePointsBody {
+  points: number;
+}
+
 export interface InvoicePaymentLineBody {
   paymentMethod: ApiPaymentMethod;
   amount: number;

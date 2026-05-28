@@ -5,6 +5,8 @@ import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import {
   useCustomer,
   useCustomerPurchaseHistory,
+  useCustomerSummary,
+  useMembershipCard,
 } from "@erp/pos/hooks/react-query/use-query-customer";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
@@ -103,6 +105,17 @@ export function CustomerDetailDialog({
   // checkout page re-renders. TanStack Query dedups across consumers anyway.
   const { data: customerRaw } = useCustomer(open ? customerId : undefined);
   const { data: customerGroupsData } = useCustomerGroups();
+  // Summary (totals + membership snapshot) + thẻ chi tiết — chỉ cần khi tab
+  // "Tổng quan" hiển thị, nhưng fetch ngay từ lúc mở dialog để UX mượt khi
+  // chuyển tab (cache 30s, không tốn fetch lại).
+  const summaryEnabled =
+    open && activeTab === CustomerDetailTabKeyEnum.OVERVIEW;
+  const { data: summary } = useCustomerSummary(
+    summaryEnabled ? customerId : undefined,
+  );
+  const { data: card } = useMembershipCard(
+    summaryEnabled ? customerId : undefined,
+  );
 
   const groupNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -112,10 +125,14 @@ export function CustomerDetailDialog({
 
   const data: CustomerDetailData = useMemo(() => {
     if (customerRaw) {
-      return mapCustomerToDetailData(customerRaw, { groupNameById });
+      return mapCustomerToDetailData(customerRaw, {
+        groupNameById,
+        summary,
+        card,
+      });
     }
     return { name: fallbackName ?? "" };
-  }, [customerRaw, groupNameById, fallbackName]);
+  }, [customerRaw, groupNameById, summary, card, fallbackName]);
 
   // Lịch sử mua hàng — fetch lười, chỉ khi dialog mở và đang ở tab "Lịch sử
   // mua hàng" để tránh gọi API thừa khi mở các tab khác.

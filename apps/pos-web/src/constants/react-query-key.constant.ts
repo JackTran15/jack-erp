@@ -38,6 +38,11 @@ export const CUSTOMER_KEYS = {
   SEARCH: (query: string) => ["customers", "search", query] as const,
   PURCHASE_HISTORY: (customerId: string) =>
     ["customers", "purchase-history", customerId] as const,
+  /** `GET /customers/:id/summary` — tổng chi tiêu + công nợ + thẻ thành viên. */
+  SUMMARY: (id: string) => ["customers", id, "summary"] as const,
+  /** `GET /customers/:id/membership-card`. */
+  MEMBERSHIP_CARD: (id: string) =>
+    ["customers", id, "membership-card"] as const,
 } as const;
 
 export const CATALOG_KEYS = {

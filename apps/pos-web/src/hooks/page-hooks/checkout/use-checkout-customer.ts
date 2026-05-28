@@ -114,6 +114,10 @@ export function useCheckoutCustomer() {
       pickCustomerAction(c);
       // Ngừng giữ tiền thừa + xóa lỗi field (giờ ở ui store) khi chọn khách.
       updateDraftSlice("payment", (p) => ({ ...p, keepChange: false }));
+      // Đổi khách → reset điểm áp dụng (điểm thuộc về khách cũ, không xài
+      // được cho khách mới). BE cũng kiểm tra `customerId` của draft khi
+      // redeem-points; clear local để UX khớp.
+      updateDraftSlice("promotion", (p) => ({ ...p, pointsRedeemed: 0 }));
       usePosCheckoutUiStore.getState().setCustomerFieldError("");
       usePosCheckoutUiStore
         .getState()
@@ -163,11 +167,14 @@ export function useCheckoutCustomer() {
 
   const handleClearCustomer = useCallback(() => {
     clearCustomerAction();
+    // Khách bị xóa → không còn ai để dùng điểm; reset để right pane không
+    // hiện row "Giảm giá (điểm)" mồ côi.
+    updateDraftSlice("promotion", (p) => ({ ...p, pointsRedeemed: 0 }));
     usePosCheckoutUiStore.getState().setCustomerFieldError("");
     usePosCheckoutUiStore
       .getState()
       .setAnnouncement(CHECKOUT_ANNOUNCEMENTS.RETAIL_CUSTOMER);
-  }, [clearCustomerAction]);
+  }, [clearCustomerAction, updateDraftSlice]);
 
   const handleAddCustomer = useCallback(() => {
     setCreateDefaultQuery(customerQuery.trim());

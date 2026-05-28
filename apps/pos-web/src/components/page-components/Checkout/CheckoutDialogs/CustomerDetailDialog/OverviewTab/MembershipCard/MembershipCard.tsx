@@ -1,4 +1,5 @@
 import { RefreshIcon, ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import { LOYALTY_TEXT } from "@erp/pos/constants/checkout-messages.constant";
 import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface MembershipCardProps {
@@ -10,7 +11,9 @@ export interface MembershipCardProps {
 /**
  * Teal gradient card displayed in the "Tổng quan" tab (spec 4.4 / 4.5).
  * Renders avatar circle, customer name, "Đổi thẻ" outline button, and three
- * info rows (mã thẻ, điểm tích lũy, sử dụng điểm).
+ * info rows (mã thẻ, điểm tích lũy, sử dụng điểm). Khi khách chưa có thẻ
+ * (cardCode == null) → hiển thị nhãn empty state "Khách chưa có thẻ thành viên"
+ * thay cho mã thẻ; điểm/used vẫn render = 0 (không ẩn — giữ layout ổn định).
  */
 export function MembershipCard({
   data,
@@ -18,7 +21,8 @@ export function MembershipCard({
   onChangeCard,
 }: MembershipCardProps) {
   const { name } = data;
-  const cardCode = data.cardCode ?? "—";
+  const hasCard = Boolean(data.cardCode);
+  const cardCode = data.cardCode ?? LOYALTY_TEXT.NO_CARD;
   const points = data.loyaltyPoints ?? 0;
   const used = data.pointsUsed ?? 0;
   const cap = data.pointsCap ?? Math.max(used, points, 100);
@@ -56,7 +60,15 @@ export function MembershipCard({
 
       <div className="mt-4 flex items-center justify-between text-[13px]">
         <span className="text-white/75">Mã thẻ thành viên</span>
-        <span className="font-semibold text-white">{cardCode}</span>
+        <span
+          className={
+            hasCard
+              ? "font-semibold text-white"
+              : "text-[12px] italic text-white/80"
+          }
+        >
+          {cardCode}
+        </span>
       </div>
 
       <div className="flex items-center justify-between text-[13px]">

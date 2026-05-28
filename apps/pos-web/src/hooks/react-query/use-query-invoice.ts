@@ -6,7 +6,10 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import { INVOICE_KEYS } from "@erp/pos/constants/react-query-key.constant";
+import {
+  CUSTOMER_KEYS,
+  INVOICE_KEYS,
+} from "@erp/pos/constants/react-query-key.constant";
 import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { INVOICE_LIST_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/invoice-list.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
@@ -324,6 +327,51 @@ export function useCheckoutReturnMutation(): UseMutationResult<
     mutationFn: ({ id, body }) => invoiceService.checkoutReturn(id, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+    },
+  });
+}
+
+// ─── Loyalty redeem (TKT-039 / loyalty-pos-fe-api-integration) ──────────────
+
+interface RedeemPointsVars {
+  id: string;
+  points: number;
+}
+
+/**
+ * `POST /invoices/:id/redeem-points` — ghi `pointsRedeemed` vào draft. Chỉ
+ * gọi ở bước finalize (sau khi đã có invoiceId từ create/update), không gọi
+ * khi user nhấn "Áp dụng" trong dialog.
+ */
+export function useRedeemPointsMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  RedeemPointsVars
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, RedeemPointsVars>({
+    mutationFn: ({ id, points }) =>
+      invoiceService.redeemPoints(id, { points }),
+    onSuccess: (_inv, { id }) => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DETAIL(id) });
+      // Điểm trên card chỉ giảm thực sự khi checkout commit, nhưng vẫn bust
+      // cache `customers/:id/summary` để lần mở dialog kế tiếp đọc số mới.
+      void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.ALL });
+    },
+  });
+}
+
+/** `DELETE /invoices/:id/redeem-points` — gỡ đổi điểm khỏi draft. */
+export function useClearRedeemPointsMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  { id: string }
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, { id: string }>({
+    mutationFn: ({ id }) => invoiceService.clearRedeemPoints(id),
+    onSuccess: (_inv, { id }) => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DETAIL(id) });
     },
   });
 }
