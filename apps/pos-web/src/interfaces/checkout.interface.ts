@@ -3,6 +3,7 @@ import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
+import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
 
 export interface InvoiceTabItem {
   id: string;
@@ -166,6 +167,19 @@ export interface CheckoutPaymentDraft {
 
 export interface CheckoutPromotionDraft {
   appliedPromotion: PromotionItem | null;
+  /**
+   * Số điểm khách dùng để giảm giá (1 điểm = 1.000đ, hằng số khớp BE
+   * `POINT_REDEMPTION_VALUE_VND`). Lưu trong draft local, chỉ thực sự áp lên
+   * BE ở bước finalize (`POST /invoices/:id/redeem-points` ngay trước
+   * `/checkout`). 0 = không dùng điểm.
+   */
+  pointsRedeemed: number;
+  /**
+   * Voucher khách đã chọn trong `VoucherDialog`. BE chưa có endpoint
+   * apply-voucher → giữ ở local để hiển thị chip "Voucher: {code}" trên right
+   * pane, không gửi lên `/checkout`.
+   */
+  appliedVoucher: VoucherFormResult | null;
 }
 
 export interface CheckoutLabelsDraft {

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
 import {
   createPaymentLine,
   type PaymentLine,
@@ -795,6 +796,26 @@ export function selectCatalogDraft(
   state: PosCheckoutSessionState,
 ): CheckoutCatalogDraft {
   return selectActiveDraft(state).catalog;
+}
+
+/**
+ * Số điểm khách dùng — chỉ có hiệu lực ở luồng SALE. RETURN/EXCHANGE force 0
+ * (BE không cho redeem trên non-SALE; cũng đúng nghiệp vụ).
+ */
+export function selectEffectivePointsRedeemed(
+  state: PosCheckoutSessionState,
+): number {
+  const session = selectActiveSession(state);
+  if (!session) return 0;
+  if (session.checkoutVariant !== CheckoutVariantEnum.SALE) return 0;
+  return selectActiveDraft(state).promotion.pointsRedeemed ?? 0;
+}
+
+/** Tiền giảm từ điểm (VND) = `pointsRedeemed × 1.000`, chỉ ở SALE. */
+export function selectPointsDiscountAmount(
+  state: PosCheckoutSessionState,
+): number {
+  return selectEffectivePointsRedeemed(state) * POINT_REDEMPTION_VALUE_VND;
 }
 
 export function selectSelectedLabelIds(

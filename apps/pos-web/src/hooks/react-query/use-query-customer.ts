@@ -12,6 +12,8 @@ import { CUSTOMER_KEYS } from "@erp/pos/constants/react-query-key.constant";
 import { customerService } from "@erp/pos/services/customer.service";
 import { invoiceService } from "@erp/pos/services/invoice.service";
 import type { CustomerDetail, CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { CustomerSummary } from "@erp/pos/interfaces/customer-summary.interface";
+import type { MembershipCard } from "@erp/pos/interfaces/membership-card.interface";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 import type {
@@ -169,5 +171,37 @@ export function useUpdateCustomer(): UseMutationResult<
     onSuccess: (_data, { id }) => {
       void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.DETAIL(id) });
     },
+  });
+}
+
+/**
+ * Tổng chi tiêu / công nợ / thẻ thành viên — `GET /customers/:id/summary`.
+ * Dùng cho tab "Tổng quan" của `CustomerDetailDialog` và panel member trong
+ * `DiscountPointDialog`. Truyền `undefined` để tắt query khi dialog chưa mở.
+ */
+export function useCustomerSummary(
+  id: string | undefined,
+): UseQueryResult<CustomerSummary, Error> {
+  return useQuery<CustomerSummary, Error>({
+    queryKey: CUSTOMER_KEYS.SUMMARY(id ?? ""),
+    queryFn: () => customerService.getSummary(id as string),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Chi tiết thẻ thành viên — `GET /customers/:id/membership-card`. Trả về `null`
+ * khi khách chưa có thẻ (service đã map từ 404). Hữu ích khi cần `expiresAt` /
+ * `isActive` mà `summary.membership` không có.
+ */
+export function useMembershipCard(
+  id: string | undefined,
+): UseQueryResult<MembershipCard | null, Error> {
+  return useQuery<MembershipCard | null, Error>({
+    queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD(id ?? ""),
+    queryFn: () => customerService.getMembershipCard(id as string),
+    enabled: Boolean(id),
+    staleTime: 30_000,
   });
 }

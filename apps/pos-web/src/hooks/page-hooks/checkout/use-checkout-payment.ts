@@ -14,6 +14,7 @@ import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import {
   selectPaymentDraft,
+  selectPointsDiscountAmount,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -75,6 +76,9 @@ interface UseCheckoutPaymentResult {
  */
 export function useCheckoutPayment(): UseCheckoutPaymentResult {
   const grandTotal = useCheckoutGrandTotal();
+  const pointsDiscountAmount = usePosCheckoutSessionStore(
+    selectPointsDiscountAmount,
+  );
 
   // Slice payment của tab đang active (reference ổn định theo session).
   const payment = usePosCheckoutSessionStore(selectPaymentDraft);
@@ -194,11 +198,20 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
         grandTotal,
         deposit,
         returnFee,
+        pointsDiscountAmount,
         paymentLines,
         keepChange,
         debt,
       }),
-    [grandTotal, deposit, returnFee, paymentLines, keepChange, debt],
+    [
+      grandTotal,
+      deposit,
+      returnFee,
+      pointsDiscountAmount,
+      paymentLines,
+      keepChange,
+      debt,
+    ],
   );
 
   const isRefundFlow = settlementGrandTotal < 0;

@@ -8,6 +8,7 @@ import {
   useCreateExchangeInvoiceMutation,
   useCreateInvoiceMutation,
   useCreateReturnInvoiceMutation,
+  useRedeemPointsMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import {
@@ -49,9 +50,11 @@ import {
   computeReceiptLines,
   selectActiveSession,
   selectCustomerDraft,
+  selectEffectivePointsRedeemed,
   selectGrandTotal,
   selectHasAnyCartLines,
   selectPaymentDraft,
+  selectPointsDiscountAmount,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -91,6 +94,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createMutation = useCreateInvoiceMutation();
   const updateMutation = useUpdateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
+  const redeemPointsMutation = useRedeemPointsMutation();
   const createReturnMutation = useCreateReturnInvoiceMutation();
   const createExchangeMutation = useCreateExchangeInvoiceMutation();
   const checkoutReturnMutation = useCheckoutReturnMutation();
@@ -121,6 +125,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       const p = selectPaymentDraft(sessionState);
 
       const grandTotal = selectGrandTotal(sessionState);
+      const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+      const pointsToRedeem = selectEffectivePointsRedeemed(sessionState);
       const {
         settlementGrandTotal,
         settlementAbs,
@@ -131,6 +137,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         grandTotal,
         deposit: p.deposit,
         returnFee: p.returnFee,
+        pointsDiscountAmount,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,
@@ -217,6 +224,15 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               }),
             );
             invoiceId = created.id;
+          }
+          // Áp đổi điểm trên draft TRƯỚC khi checkout — BE validate (thẻ active /
+          // balance / giá trị đơn) tại bước này; lỗi 400 bắt ngay để không vào
+          // /checkout với số tiền sai. Điểm thực sự bị trừ khi /checkout commit.
+          if (pointsToRedeem > 0) {
+            await redeemPointsMutation.mutateAsync({
+              id: invoiceId,
+              points: pointsToRedeem,
+            });
           }
           await checkoutMutation.mutateAsync({
             id: invoiceId,
@@ -359,6 +375,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createMutation,
       updateMutation,
       checkoutMutation,
+      redeemPointsMutation,
       createReturnMutation,
       createExchangeMutation,
       checkoutReturnMutation,
@@ -396,6 +413,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createMutation.isPending ||
       updateMutation.isPending ||
       checkoutMutation.isPending ||
+      redeemPointsMutation.isPending ||
       createReturnMutation.isPending ||
       createExchangeMutation.isPending ||
       checkoutReturnMutation.isPending,
