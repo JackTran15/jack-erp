@@ -92,16 +92,22 @@ export function InvoiceListTable({
       [InvoiceListColumnKey.IssuedAt]: {
         key: InvoiceListColumnKey.IssuedAt,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.IssuedAt],
+        headerClassName: "min-w-[160px] whitespace-nowrap",
+        cellClassName: "min-w-[160px] whitespace-nowrap",
         render: (row) => dateCell(row.issuedAt),
       },
       [InvoiceListColumnKey.CreatedAt]: {
         key: InvoiceListColumnKey.CreatedAt,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.CreatedAt],
+        headerClassName: "min-w-[160px] whitespace-nowrap",
+        cellClassName: "min-w-[160px] whitespace-nowrap",
         render: (row) => dateCell(row.createdAt),
       },
       [InvoiceListColumnKey.Status]: {
         key: InvoiceListColumnKey.Status,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.Status],
+        headerClassName: "min-w-[140px] whitespace-nowrap",
+        cellClassName: "min-w-[140px] whitespace-nowrap",
         render: (row) => <InvoiceStatusBadge status={row.status} />,
         filterRender: (
           <PosSelect<StatusOption>

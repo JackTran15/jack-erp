@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@erp/ui";
 
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
@@ -63,14 +63,17 @@ export function ProductVariantSelectionModal({
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
   // Toggle "trừ tồn" — render đúng UI, chưa nối logic (xem plan §4 quyết định 4).
   const [deductStock, setDeductStock] = useState(false);
+  // Track rows the user manually unchecked so filter-driven auto-check skips them.
+  const manuallyUncheckedRef = useRef<Set<string>>(new Set());
 
   // Khởi tạo lựa chọn khi mở dialog / khi chi tiết về: 1 biến thể → tick sẵn.
   useEffect(() => {
     if (!open || !detail) return;
+    manuallyUncheckedRef.current.clear();
     const init: Record<string, VariantSelectState> = {};
     const single = detail.variants.length === 1;
     for (const v of detail.variants) {
-      init[v.itemId] = { checked: single, qty: 1 };
+      init[v.itemId] = { checked: single, qty: single ? 1 : 0 };
     }
     setSelected(init);
     setFilters({});
@@ -95,24 +98,54 @@ export function ProductVariantSelectionModal({
       .map((v) => ({ variant: v, qty: selected[v.itemId]!.qty }));
   }, [detail, selected]);
 
-  const toggleRow = (itemId: string, checked: boolean) =>
-    setSelected((s) => ({
-      ...s,
-      [itemId]: { checked, qty: s[itemId]?.qty ?? 1 },
-    }));
+  const toggleRow = (itemId: string, checked: boolean) => {
+    if (checked) manuallyUncheckedRef.current.delete(itemId);
+    else manuallyUncheckedRef.current.add(itemId);
+    setSelected((s) => {
+      const curQty = s[itemId]?.qty ?? 0;
+      const qty = checked ? Math.max(curQty, 1) : 0;
+      return { ...s, [itemId]: { checked, qty } };
+    });
+  };
 
   const toggleAll = (checked: boolean) =>
     setSelected((s) => {
       const next = { ...s };
       for (const v of visibleVariants) {
-        next[v.itemId] = { checked, qty: next[v.itemId]?.qty ?? 1 };
+        if (checked) manuallyUncheckedRef.current.delete(v.itemId);
+        else manuallyUncheckedRef.current.add(v.itemId);
+        const curQty = next[v.itemId]?.qty ?? 0;
+        const qty = checked ? Math.max(curQty, 1) : 0;
+        next[v.itemId] = { checked, qty };
       }
       return next;
     });
 
   const changeQty = (itemId: string, raw: string) => {
-    const n = Math.max(1, Math.floor(Number(raw) || 1));
+    const n = Math.max(0, Math.floor(Number(raw) || 0));
     setSelected((s) => ({ ...s, [itemId]: { checked: true, qty: n } }));
+  };
+
+  const bumpQty = (itemId: string, delta: number) => {
+    setSelected((s) => {
+      const cur = s[itemId];
+      const nextQty = Math.max(0, (cur?.qty ?? 0) + delta);
+      return { ...s, [itemId]: { checked: true, qty: nextQty } };
+    });
+  };
+
+  const copyQtyDown = (itemId: string) => {
+    const idx = visibleVariants.findIndex((v) => v.itemId === itemId);
+    if (idx < 0) return;
+    const sourceQty = selected[itemId]?.qty ?? 0;
+    setSelected((s) => {
+      const next = { ...s };
+      for (const v of visibleVariants.slice(idx + 1)) {
+        manuallyUncheckedRef.current.delete(v.itemId);
+        next[v.itemId] = { checked: true, qty: sourceQty };
+      }
+      return next;
+    });
   };
 
   const toggleFilter = (dimension: string, value: string | null) =>
@@ -120,13 +153,41 @@ export function ProductVariantSelectionModal({
       const next = { ...f };
       if (value === null) {
         delete next[dimension];
-        return next;
+      } else {
+        const set = new Set(next[dimension] ?? []);
+        if (set.has(value)) set.delete(value);
+        else set.add(value);
+        if (set.size === 0) delete next[dimension];
+        else next[dimension] = set;
       }
-      const set = new Set(next[dimension] ?? []);
-      if (set.has(value)) set.delete(value);
-      else set.add(value);
-      if (set.size === 0) delete next[dimension];
-      else next[dimension] = set;
+
+      // Auto-check rows visible under the new filter set, qty mặc định = 1.
+      // Bỏ qua rows user đã chủ động uncheck (giữ ý đồ của user).
+      if (detail) {
+        const dims = Object.entries(next).filter(([, s]) => s.size > 0);
+        const newVisible =
+          dims.length === 0
+            ? detail.variants
+            : detail.variants.filter((v) =>
+                dims.every(([dim, s]) =>
+                  v.attributes.some((a) => a.name === dim && s.has(a.value)),
+                ),
+              );
+        setSelected((sel) => {
+          let changed = false;
+          const out = { ...sel };
+          for (const v of newVisible) {
+            if (manuallyUncheckedRef.current.has(v.itemId)) continue;
+            const cur = out[v.itemId];
+            if (!cur?.checked) {
+              out[v.itemId] = { checked: true, qty: cur?.qty || 1 };
+              changed = true;
+            }
+          }
+          return changed ? out : sel;
+        });
+      }
+
       return next;
     });
 
@@ -166,6 +227,8 @@ export function ProductVariantSelectionModal({
                 onToggleRow={toggleRow}
                 onToggleAll={toggleAll}
                 onQtyChange={changeQty}
+                onBump={bumpQty}
+                onCopyDown={copyQtyDown}
               />
             </div>
           </>

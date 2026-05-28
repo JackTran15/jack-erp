@@ -3,6 +3,7 @@ import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   CheckoutPane,
   selectActiveSession,
+  selectCatalogDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
@@ -177,11 +178,18 @@ export function useCheckoutSessionCart() {
         activeCheckoutPane === CheckoutPane.RETURN
           ? (latest?.returnCart ?? [])
           : (latest?.purchaseCart ?? []);
-      const existing = targetList.find((l) => l.itemId === product.itemId);
+      const splitLine =
+        selectCatalogDraft(usePosCheckoutSessionStore.getState()).toolbar
+          .splitLine === true;
+      const existing = splitLine
+        ? undefined
+        : targetList.find((l) => l.itemId === product.itemId);
       const affectedLineId = existing ? existing.lineId : crypto.randomUUID();
 
       const apply = (prev: CartLine[]) => {
-        const existingInPrev = prev.find((l) => l.itemId === product.itemId);
+        const existingInPrev = splitLine
+          ? undefined
+          : prev.find((l) => l.itemId === product.itemId);
         if (existingInPrev) {
           setCartError("");
           return prev.map((l) =>

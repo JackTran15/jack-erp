@@ -5,8 +5,8 @@ import {
 } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
+import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
-import { useCheckoutVariantSelection } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-variant-selection";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
@@ -38,7 +38,7 @@ export function ProductSearchInput({
   debounceMs = 150,
 }: ProductSearchInputProps) {
   const { toolbar, setToolbar, productSearchAdapter } = useCheckoutCatalog();
-  const { openForItem, openForQuery } = useCheckoutVariantSelection();
+  const { addProductByItem, addProductByQuery } = useCheckoutCartActions();
   const focusSeq = usePosCheckoutUiStore((s) => s.productSearchFocusSeq);
 
   useEffect(() => {
@@ -53,12 +53,12 @@ export function ProductSearchInput({
       value={toolbar.query}
       onValueChange={(q) => setToolbar((s) => ({ ...s, query: q }))}
       search={productSearchAdapter}
-      onSelect={(item) => openForItem(item)}
+      onSelect={(item) => addProductByItem(item)}
       itemKey={(item) => item.itemId}
       renderItem={(item) => item.name}
       renderMeta={(item) => `${item.code} · ${item.unit}`}
       onSubmitQuery={() => {
-        openForQuery();
+        addProductByQuery();
         return true;
       }}
       placeholder={placeholder}
