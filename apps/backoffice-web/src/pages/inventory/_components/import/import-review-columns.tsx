@@ -5,8 +5,8 @@ import {
   INVENTORY_IMPORT_MVP_FIELDS,
   ImportRowStatus,
 } from "@erp/shared-interfaces";
-import type { TableColumn } from "../../../table/BaseDataTable";
 import type { ImportJobRow, ImportReviewRow } from "./import-inventory.types";
+import { TableColumn } from "../../../../components/table/BaseDataTable";
 
 const RIGHT_ALIGN_FIELDS = new Set<InventoryImportExcelField>([
   InventoryImportExcelField.COST_PRICE,
@@ -44,7 +44,10 @@ const COLUMN_WIDTHS: Partial<Record<InventoryImportExcelField, number>> = {
   [InventoryImportExcelField.SHOW_IN_MENU]: 180,
 };
 
-function cellValue(raw: Record<string, unknown>, excelKey: InventoryImportExcelField): string {
+function cellValue(
+  raw: Record<string, unknown>,
+  excelKey: InventoryImportExcelField,
+): string {
   const v = raw[excelKey];
   if (v === null || v === undefined || v === "") return "";
   return String(v);
@@ -82,8 +85,12 @@ function buildColumnsForFields(
     key: excelKey,
     label: INVENTORY_IMPORT_EXCEL_FIELD_LABELS[excelKey],
     width: COLUMN_WIDTHS[excelKey] ?? 120,
-    className: RIGHT_ALIGN_FIELDS.has(excelKey) ? "text-right tabular-nums" : undefined,
-    headerClassName: RIGHT_ALIGN_FIELDS.has(excelKey) ? "text-right" : undefined,
+    className: RIGHT_ALIGN_FIELDS.has(excelKey)
+      ? "text-right tabular-nums"
+      : undefined,
+    headerClassName: RIGHT_ALIGN_FIELDS.has(excelKey)
+      ? "text-right"
+      : undefined,
     render: (row) => {
       const text = formatDisplayValue(row.rawData, excelKey);
       if (
@@ -116,7 +123,10 @@ function buildStatusColumn(): TableColumn<ImportReviewRow> {
 
 /** MVP field columns + Tình trạng for the import review step. */
 export function buildImportReviewPreviewColumns(): TableColumn<ImportReviewRow>[] {
-  return [...buildColumnsForFields(IMPORT_REVIEW_PREVIEW_FIELDS), buildStatusColumn()];
+  return [
+    ...buildColumnsForFields(IMPORT_REVIEW_PREVIEW_FIELDS),
+    buildStatusColumn(),
+  ];
 }
 
 export function buildImportReviewColumns(): TableColumn<ImportReviewRow>[] {
@@ -125,12 +135,15 @@ export function buildImportReviewColumns(): TableColumn<ImportReviewRow>[] {
       key: excelKey,
       label: INVENTORY_IMPORT_EXCEL_FIELD_LABELS[excelKey],
       width: COLUMN_WIDTHS[excelKey] ?? 120,
-      className: RIGHT_ALIGN_FIELDS.has(excelKey) ? "text-right tabular-nums" : undefined,
-      headerClassName: RIGHT_ALIGN_FIELDS.has(excelKey) ? "text-right" : undefined,
+      className: RIGHT_ALIGN_FIELDS.has(excelKey)
+        ? "text-right tabular-nums"
+        : undefined,
+      headerClassName: RIGHT_ALIGN_FIELDS.has(excelKey)
+        ? "text-right"
+        : undefined,
       render: (row) => formatDisplayValue(row.rawData, excelKey),
     }),
   );
 
   return [...dataCols, buildStatusColumn()];
 }
-

@@ -1,4 +1,4 @@
-import type { ToolbarAction, ToolbarItem } from "@erp/ui";
+import type { ToolbarAction, ToolbarActionOption, ToolbarItem } from "@erp/ui";
 import { TOOLBAR_REGISTRY, type ToolbarActionId } from "../../constants";
 
 export type ListToolbarSpec =
@@ -10,6 +10,7 @@ export type ListToolbarSpec =
       /** Override default label (e.g. "Thêm dòng" instead of "Thêm mới"). */
       label?: string;
       variant?: ToolbarAction["variant"];
+      options?: ToolbarActionOption[];
     };
 
 function isHiddenSpec(spec: ListToolbarSpec): spec is { action: ToolbarActionId; hidden: true } {
@@ -32,6 +33,7 @@ export function buildListToolbar(specs: ListToolbarSpec[]): ToolbarItem[] {
       onClick: spec.onClick,
       disabled: spec.disabled,
       variant: spec.variant ?? ("variant" in base ? base.variant : undefined),
+      options: spec.options,
     });
   }
   return items;

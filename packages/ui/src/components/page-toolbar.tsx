@@ -1,4 +1,11 @@
 import type { ComponentType, ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
 import { cn } from "../lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -8,11 +15,19 @@ export interface ToolbarAction {
   label: string;
   icon?: ComponentType<{ className?: string }>;
   onClick: () => void;
+  options?: ToolbarActionOption[];
   disabled?: boolean;
   /** Hover hint shown via native title attribute. Useful for disabled buttons. */
   tooltip?: string;
   /** "danger" renders the button in destructive color */
   variant?: "default" | "danger";
+}
+
+export interface ToolbarActionOption {
+  id: string;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
 }
 
 export interface ToolbarSeparator {
@@ -105,6 +120,51 @@ interface ToolbarButtonProps {
 
 function ToolbarButton({ action, tone }: ToolbarButtonProps) {
   const Icon = action.icon;
+  const hasOptions = Boolean(action.options?.length);
+  const buttonClassName = cn(
+    "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium transition-colors",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    tone === "primary"
+      ? "disabled:pointer-events-none disabled:opacity-40"
+      : "disabled:pointer-events-none disabled:opacity-40",
+    tone === "primary"
+      ? action.variant === "danger"
+        ? "text-[#ffd6d6] hover:bg-white/10 hover:text-white"
+        : "text-white hover:bg-white/10"
+      : action.variant === "danger"
+        ? "text-destructive hover:bg-destructive/10"
+        : "text-foreground hover:bg-accent",
+  );
+
+  if (hasOptions) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={action.disabled}
+            title={action.tooltip}
+            className={buttonClassName}
+          >
+            {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+            <span>{action.label}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {action.options?.map((option) => (
+            <DropdownMenuItem
+              key={option.id}
+              disabled={option.disabled}
+              onClick={option.onClick}
+            >
+              {option.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <button
@@ -112,20 +172,7 @@ function ToolbarButton({ action, tone }: ToolbarButtonProps) {
       onClick={action.onClick}
       disabled={action.disabled}
       title={action.tooltip}
-      className={cn(
-        "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        tone === "primary"
-          ? "disabled:pointer-events-none disabled:opacity-40"
-          : "disabled:pointer-events-none disabled:opacity-40",
-        tone === "primary"
-          ? action.variant === "danger"
-            ? "text-[#ffd6d6] hover:bg-white/10 hover:text-white"
-            : "text-white hover:bg-white/10"
-          : action.variant === "danger"
-            ? "text-destructive hover:bg-destructive/10"
-            : "text-foreground hover:bg-accent",
-      )}
+      className={buttonClassName}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
       <span>{action.label}</span>

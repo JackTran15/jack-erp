@@ -217,7 +217,7 @@ export function ImportInventoryDialog({
       onOpenChange={handleClose}
       title="Nhập khẩu hàng hóa"
       defaultWidth={920}
-      defaultHeight={620}
+      defaultHeight={650}
       bodyClassName="flex flex-col overflow-hidden"
       showFooter
       footer={
