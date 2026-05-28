@@ -1,10 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { useInvoiceListQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
-import {
-  isInDateRange,
-  type PosDateRangeFilterOption,
-} from "@erp/pos/lib/common/dateRangeFilter";
+import { useInvoiceListV2Query } from "@erp/pos/hooks/react-query/use-query-invoice";
+import { dateRangeToISO, type PosDateRangeFilterOption } from "@erp/pos/lib/common/dateRangeFilter";
+import { useDebounce } from "@erp/pos/hooks/common/use-debounce";
 import {
   EMPTY_INVOICE_LIST_FILTERS,
   INVOICE_LIST_COLUMN_ORDER,
@@ -12,33 +10,85 @@ import {
   InvoiceListColumnKey,
   type InvoiceListDateField,
 } from "@erp/pos/constants/invoice-list.constant";
+import { FilterOperatorEnum } from "@erp/pos/constants/checkout.constant";
+import type { SearchInvoicesV2Body } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceListRow } from "@erp/pos/interfaces/invoice.interface";
 
 export type InvoiceListFilters = {
   -readonly [K in keyof typeof EMPTY_INVOICE_LIST_FILTERS]: string;
 };
 
+/** Keys that carry a per-column operator selector (text + amount). */
+export type InvoiceListOperatorKey =
+  | "code"
+  | "customerCode"
+  | "customerName"
+  | "customerPhone"
+  | "note"
+  | "amount";
+
+export type InvoiceListFilterOperators = Record<
+  InvoiceListOperatorKey,
+  FilterOperatorEnum
+>;
+
+export const DEFAULT_INVOICE_LIST_OPERATORS: InvoiceListFilterOperators = {
+  code:          FilterOperatorEnum.CONTAINS,
+  customerCode:  FilterOperatorEnum.CONTAINS,
+  customerName:  FilterOperatorEnum.CONTAINS,
+  customerPhone: FilterOperatorEnum.CONTAINS,
+  note:          FilterOperatorEnum.CONTAINS,
+  amount:        FilterOperatorEnum.LESS_THAN_OR_EQUAL,
+};
+
+// ─── Operator mappings ───────────────────────────────────────────────────────
+
+type StringOp  = "*" | "=" | "+" | "-" | "!";
+type CompareOp = "=" | "<" | "<=" | ">" | ">=";
+
+const TEXT_OP_MAP: Record<FilterOperatorEnum, StringOp> = {
+  [FilterOperatorEnum.CONTAINS]:              "*",
+  [FilterOperatorEnum.EQUALS]:                "=",
+  [FilterOperatorEnum.STARTS_WITH]:           "+",
+  [FilterOperatorEnum.ENDS_WITH]:             "-",
+  [FilterOperatorEnum.NOT_CONTAINS]:          "!",
+  [FilterOperatorEnum.LESS_THAN]:             "*",
+  [FilterOperatorEnum.LESS_THAN_OR_EQUAL]:    "*",
+  [FilterOperatorEnum.GREATER_THAN]:          "*",
+  [FilterOperatorEnum.GREATER_THAN_OR_EQUAL]: "*",
+};
+
+const NUM_OP_MAP: Record<FilterOperatorEnum, CompareOp> = {
+  [FilterOperatorEnum.EQUALS]:               "=",
+  [FilterOperatorEnum.LESS_THAN]:            "<",
+  [FilterOperatorEnum.LESS_THAN_OR_EQUAL]:   "<=",
+  [FilterOperatorEnum.GREATER_THAN]:         ">",
+  [FilterOperatorEnum.GREATER_THAN_OR_EQUAL]: ">=",
+  [FilterOperatorEnum.CONTAINS]:             "=",
+  [FilterOperatorEnum.STARTS_WITH]:          "=",
+  [FilterOperatorEnum.ENDS_WITH]:            "=",
+  [FilterOperatorEnum.NOT_CONTAINS]:         "=",
+};
+
+// ─── Hook interface ──────────────────────────────────────────────────────────
+
 export interface UseInvoiceListResult {
-  /** Pill khoảng thời gian ở filter bar. */
   dateRange: PosDateRangeFilterOption;
   setDateRange: (next: PosDateRangeFilterOption) => void;
-  /** Lọc theo "Ngày tạo" hay "Ngày hóa đơn". */
   dateType: InvoiceListDateField;
   setDateType: (next: InvoiceListDateField) => void;
-  /** Filter từng cột (text/number/status). */
   filters: InvoiceListFilters;
   setFilter: (key: keyof InvoiceListFilters, value: string) => void;
-  /** Cột đang hiển thị + thao tác bật/tắt (qua modal). */
+  filterOperators: InvoiceListFilterOperators;
+  setFilterOperator: (key: InvoiceListOperatorKey, op: FilterOperatorEnum) => void;
   visibleColumns: ReadonlySet<InvoiceListColumnKey>;
   columnSettingsOpen: boolean;
   openColumnSettings: () => void;
   closeColumnSettings: () => void;
   applyVisibleColumns: (next: ReadonlySet<InvoiceListColumnKey>) => void;
-  /** Dữ liệu bảng (đã lọc + phân trang). */
   rows: ReadonlyArray<InvoiceListRow>;
   isLoading: boolean;
   grandTotal: number;
-  /** Phân trang. */
   page: number;
   pageSize: number;
   total: number;
@@ -46,35 +96,17 @@ export interface UseInvoiceListResult {
   setPage: (next: number) => void;
   setPageSize: (next: number) => void;
   refetch: () => void;
-  /** Hóa đơn đang xem biên lai (mở khi click số hóa đơn). */
   selectedInvoice: InvoiceListRow | null;
   openInvoice: (row: InvoiceListRow) => void;
   closeInvoice: () => void;
 }
 
-function matchesText(haystack: string, needle: string): boolean {
-  if (!needle.trim()) return true;
-  return haystack.toLowerCase().includes(needle.trim().toLowerCase());
-}
-
-function matchesNumberInput(value: number, raw: string): boolean {
-  const trimmed = raw.trim();
-  if (!trimmed) return true;
-  const target = Number.parseFloat(trimmed.replace(/[.,\s]/g, ""));
-  if (!Number.isFinite(target)) return true;
-  return value <= target;
-}
-
 /**
- * State machine cho trang `/invoices`. Sở hữu pill ngày + loại ngày, filter
- * từng cột, cột hiển thị (modal), phân trang, và hóa đơn đang xem biên lai.
- * Listing đến từ `GET /invoices` (`useInvoiceListQuery`); lọc + phân trang
- * làm client-side cho nhất quán với trang đổi trả.
+ * State machine cho trang `/invoices`. Lọc và phân trang được thực hiện
+ * server-side qua POST /v2/invoices/search. Text filter được debounce 300 ms
+ * để giảm số lần gọi API khi gõ.
  */
 export function useInvoiceList(): UseInvoiceListResult {
-  const query = useInvoiceListQuery();
-  const data = useMemo(() => query.data ?? [], [query.data]);
-
   const [dateRange, setDateRangeState] =
     useState<PosDateRangeFilterOption>("TODAY");
   const [dateType, setDateTypeState] =
@@ -82,43 +114,65 @@ export function useInvoiceList(): UseInvoiceListResult {
   const [filters, setFilters] = useState<InvoiceListFilters>(() => ({
     ...EMPTY_INVOICE_LIST_FILTERS,
   }));
+  const [filterOperators, setFilterOperators] =
+    useState<InvoiceListFilterOperators>(() => ({ ...DEFAULT_INVOICE_LIST_OPERATORS }));
   const [visibleColumns, setVisibleColumns] = useState<Set<InvoiceListColumnKey>>(
     () => new Set(INVOICE_LIST_COLUMN_ORDER),
   );
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
   const [page, setPageState] = useState(1);
   const [pageSize, setPageSizeState] = useState(INVOICE_LIST_DEFAULT_PAGE_SIZE);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListRow | null>(
-    null,
-  );
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListRow | null>(null);
 
-  const filteredRows = useMemo(() => {
-    return data.filter((row) => {
-      const dateStr =
-        dateType === "issuedAt" ? row.issuedAt ?? row.createdAt : row.createdAt;
-      if (!isInDateRange(new Date(dateStr), dateRange)) return false;
-      if (filters.status && row.status !== filters.status) return false;
-      if (!matchesText(row.code, filters.code)) return false;
-      if (!matchesText(row.customerCode, filters.customerCode)) return false;
-      if (!matchesText(row.customerName, filters.customerName)) return false;
-      if (!matchesText(row.customerPhone, filters.customerPhone)) return false;
-      if (!matchesText(row.note, filters.note)) return false;
-      if (!matchesNumberInput(row.amount, filters.amount)) return false;
-      return true;
-    });
-  }, [data, dateType, dateRange, filters]);
+  // Debounce only text values to avoid a server query on every keystroke.
+  const debouncedText = useDebounce({
+    code:          filters.code,
+    customerCode:  filters.customerCode,
+    customerName:  filters.customerName,
+    customerPhone: filters.customerPhone,
+    note:          filters.note,
+  });
+
+  const searchBody = useMemo<SearchInvoicesV2Body>(() => {
+    const dateFilter = dateRangeToISO(dateRange);
+    const hasDate = Boolean(dateFilter.from ?? dateFilter.to);
+
+    const strFilter = (val: string, opKey: keyof typeof filterOperators) => {
+      if (!val.trim()) return undefined;
+      return { operator: TEXT_OP_MAP[filterOperators[opKey]], value: val.trim() };
+    };
+
+    const rawAmount = filters.amount.trim();
+    const numericAmount = rawAmount
+      ? parseFloat(rawAmount.replace(/[.,\s]/g, ""))
+      : NaN;
+
+    return {
+      page,
+      limit: pageSize,
+      code:          strFilter(debouncedText.code,          "code"),
+      customerCode:  strFilter(debouncedText.customerCode,  "customerCode"),
+      customerName:  strFilter(debouncedText.customerName,  "customerName"),
+      customerPhone: strFilter(debouncedText.customerPhone, "customerPhone"),
+      note:          strFilter(debouncedText.note,          "note"),
+      status:  filters.status ? { value: filters.status } : undefined,
+      amountDue:
+        Number.isFinite(numericAmount)
+          ? { operator: NUM_OP_MAP[filterOperators.amount], value: numericAmount }
+          : undefined,
+      ...(hasDate ? { [dateType]: dateFilter } : {}),
+    };
+  }, [page, pageSize, filters.status, filters.amount, filterOperators, debouncedText, dateRange, dateType]);
+
+  const query = useInvoiceListV2Query(searchBody);
+
+  const rows       = query.data?.rows  ?? [];
+  const total      = query.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const grandTotal = useMemo(
-    () => filteredRows.reduce((sum, row) => sum + row.amount, 0),
-    [filteredRows],
-  );
-
-  const total = filteredRows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const rows = useMemo(
-    () => filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredRows, safePage, pageSize],
+    () => rows.reduce((sum, row) => sum + row.amount, 0),
+    [rows],
   );
 
   const setDateRange = useCallback((next: PosDateRangeFilterOption) => {
@@ -134,6 +188,14 @@ export function useInvoiceList(): UseInvoiceListResult {
   const setFilter = useCallback<UseInvoiceListResult["setFilter"]>(
     (key, value) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
+      setPageState(1);
+    },
+    [],
+  );
+
+  const setFilterOperator = useCallback(
+    (key: InvoiceListOperatorKey, op: FilterOperatorEnum) => {
+      setFilterOperators((prev) => ({ ...prev, [key]: op }));
       setPageState(1);
     },
     [],
@@ -159,6 +221,8 @@ export function useInvoiceList(): UseInvoiceListResult {
     setDateType,
     filters,
     setFilter,
+    filterOperators,
+    setFilterOperator,
     visibleColumns,
     columnSettingsOpen,
     openColumnSettings: useCallback(() => setColumnSettingsOpen(true), []),
@@ -167,7 +231,7 @@ export function useInvoiceList(): UseInvoiceListResult {
     rows,
     isLoading: query.isLoading,
     grandTotal,
-    page: safePage,
+    page: Math.min(page, totalPages),
     pageSize,
     total,
     totalPages,
