@@ -22,6 +22,9 @@ export const INVOICE_KEYS = {
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
   DRAFTS: (sessionId: string) => ["invoices", "drafts", sessionId] as const,
   DETAIL: (id: string) => ["invoices", "detail", id] as const,
+  /** Tìm kiếm hóa đơn server-side qua POST /v2/invoices/search. */
+  SEARCH_V2: (body: Record<string, unknown>) =>
+    ["invoices", "search-v2", body] as const,
   /** Hóa đơn đã bán có thể đổi/trả (trang return-goods). */
   RETURNABLE: (filters: Record<string, unknown>) =>
     ["invoices", "returnable", filters] as const,

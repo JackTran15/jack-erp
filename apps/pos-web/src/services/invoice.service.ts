@@ -5,8 +5,10 @@ import type {
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
+  InvoiceSearchV2Response,
   ListInvoicesParams,
   RedeemInvoicePointsBody,
+  SearchInvoicesV2Body,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
@@ -14,6 +16,9 @@ import type { EligibleReturnLine } from "@erp/pos/interfaces/return-goods.interf
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 
 export const invoiceService = {
+  searchV2: (body: SearchInvoicesV2Body): Promise<InvoiceSearchV2Response> =>
+    http.post<InvoiceSearchV2Response>("/v2/invoices/search", body),
+
   create: (body: CreateInvoiceBody): Promise<InvoiceRow> =>
     http.post<InvoiceRow>("/invoices", body),
 
