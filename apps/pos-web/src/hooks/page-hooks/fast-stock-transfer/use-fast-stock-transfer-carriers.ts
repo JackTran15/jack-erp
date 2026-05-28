@@ -1,128 +1,102 @@
+import { useCallback, useMemo } from "react";
+
 import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
-import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
+import {
+  usePreloadTempWarehouseCarriers,
+  useSearchTempWarehouseCarriers,
+} from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { formatCarrierName } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
+import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-picker.store";
 import type { TempWarehousePublicUser } from "@erp/shared-interfaces";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const CARRIERS_PAGE_SIZE = 50;
-const SEARCH_DEBOUNCE_MS = 280;
+type Updater<T> = T | ((prev: T) => T);
 
-function mergeCarriers(
-  fetched: ReadonlyArray<TempWarehousePublicUser>,
-  pinned: ReadonlyArray<TempWarehousePublicUser | null | undefined>,
-): TempWarehousePublicUser[] {
-  const byId = new Map<string, TempWarehousePublicUser>();
-  for (const user of pinned) {
-    if (user) byId.set(user.id, user);
-  }
-  for (const user of fetched) {
-    byId.set(user.id, user);
-  }
-  return [...byId.values()].sort((a, b) =>
-    formatCarrierName(a).localeCompare(formatCarrierName(b), "vi"),
-  );
+interface CarrierToolbarState {
+  query: string;
 }
 
-export function useFastStockTransferCarriers(
-  branchId: string | null,
-  pinnedCarriers: ReadonlyArray<TempWarehousePublicUser | null | undefined>,
-) {
-  const [carrierRows, setCarrierRows] = useState<TempWarehousePublicUser[]>([]);
-  const [carriersLoading, setCarriersLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const requestIdRef = useRef(0);
+interface UseFastStockTransferCarriersResult {
+  carriersLoading: boolean;
+  carrierToolbar: CarrierToolbarState;
+  setCarrierToolbar: (value: Updater<CarrierToolbarState>) => void;
+  carrierSearchAdapter: (
+    q: string,
+  ) => Promise<SearchSuggestion<TempWarehousePublicUser>[]>;
+  resolveCarrierById: (userId: string) => TempWarehousePublicUser | null;
+}
 
-  const loadCarriers = useCallback(
-    async (search?: string): Promise<TempWarehousePublicUser[]> => {
-      if (!branchId) {
-        setCarrierRows([]);
-        return [];
-      }
-      const reqId = ++requestIdRef.current;
-      setCarriersLoading(true);
-      try {
-        const result = await tempWarehouseService.listCarriers({
-          branchId,
-          search,
-          pagination: { page: 1, pageSize: CARRIERS_PAGE_SIZE },
-        });
-        if (reqId === requestIdRef.current) setCarrierRows(result.data);
-        return result.data;
-      } catch {
-        if (reqId === requestIdRef.current) setCarrierRows([]);
-        return [];
-      } finally {
-        if (reqId === requestIdRef.current) setCarriersLoading(false);
-      }
-    },
-    [branchId],
+export function useFastStockTransferCarriers(): UseFastStockTransferCarriersResult {
+  const branchId = usePosBranchStore((s) => s.branchId);
+  const searchCarriers = useSearchTempWarehouseCarriers();
+
+  const { isLoading: carriersLoading } =
+    usePreloadTempWarehouseCarriers(branchId);
+  const carrierToolbar = usePosFastStockTransferPickerStore(
+    (s) => s.carrierToolbar,
+  );
+  const setCarrierToolbar = usePosFastStockTransferPickerStore(
+    (s) => s.setCarrierToolbar,
+  );
+  const listCarriers = usePosFastStockTransferPickerStore(
+    (s) => s.listCarriers,
+  );
+  const upsertCarriers = usePosFastStockTransferPickerStore(
+    (s) => s.upsertCarriers,
+  );
+  const getCarrierById = usePosFastStockTransferPickerStore(
+    (s) => s.getCarrierById,
   );
 
-  useEffect(() => {
-    void loadCarriers();
-  }, [loadCarriers]);
-
-  const handleCarrierQueryChange = useCallback(
-    (query: string) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        void loadCarriers(query.trim() || undefined);
-      }, SEARCH_DEBOUNCE_MS);
-    },
-    [loadCarriers],
-  );
-
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+  const filterCarriers = useCallback(
+    (merged: TempWarehousePublicUser[], query: string) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return merged;
+      return merged.filter((c) => {
+        const label = formatCarrierName(c).toLowerCase();
+        return label.includes(q) || c.email.toLowerCase().includes(q);
+      });
     },
     [],
   );
 
-  const carriersForSearch = useMemo(
-    () => mergeCarriers(carrierRows, pinnedCarriers),
-    [carrierRows, pinnedCarriers],
-  );
-
-  const searchFastStockCarriers = useCallback(
+  const carrierSearchAdapter = useCallback(
     async (
       query: string,
     ): Promise<SearchSuggestion<TempWarehousePublicUser>[]> => {
       const trimmed = query.trim();
-      const rows = await loadCarriers(trimmed || undefined);
-      const merged = mergeCarriers(rows, pinnedCarriers);
-      const q = trimmed.toLowerCase();
-      const source = q
-        ? merged.filter((c) => {
-            const label = formatCarrierName(c).toLowerCase();
-            return label.includes(q) || c.email.toLowerCase().includes(q);
-          })
-        : merged;
-      return source.map((item) => ({ item }));
+      let rows = listCarriers();
+
+      if (trimmed && branchId) {
+        const result = await searchCarriers(branchId, trimmed);
+        upsertCarriers(result.data);
+        rows = listCarriers();
+      }
+
+      return filterCarriers(rows, trimmed).map((item) => ({ item }));
     },
-    [loadCarriers, pinnedCarriers],
+    [branchId, filterCarriers, listCarriers, searchCarriers, upsertCarriers],
   );
 
   const resolveCarrierById = useCallback(
-    (userId: string): TempWarehousePublicUser | null =>
-      carriersForSearch.find((c) => c.id === userId) ?? null,
-    [carriersForSearch],
+    (userId: string) => getCarrierById(userId),
+    [getCarrierById],
   );
 
   return useMemo(
     () => ({
       carriersLoading,
-      searchFastStockCarriers,
-      handleCarrierQueryChange,
+      carrierToolbar,
+      setCarrierToolbar,
+      carrierSearchAdapter,
       resolveCarrierById,
-      reloadCarriers: () => loadCarriers(),
     }),
     [
       carriersLoading,
-      searchFastStockCarriers,
-      handleCarrierQueryChange,
+      carrierToolbar,
+      setCarrierToolbar,
+      carrierSearchAdapter,
       resolveCarrierById,
-      loadCarriers,
     ],
   );
 }

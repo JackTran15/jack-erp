@@ -18,13 +18,21 @@ import {
 } from "@erp/shared-interfaces";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { useInvalidatePosBranchCatalog } from "@erp/pos/hooks/react-query/use-query-catalog";
+import { useInvalidateTempWarehouseCarriers } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-picker.store";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
 import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 
 export function useFastStockTransferActions() {
   const branchId = usePosBranchStore((s) => s.branchId);
+  const invalidatePosBranchCatalog = useInvalidatePosBranchCatalog();
+  const invalidateTempWarehouseCarriers = useInvalidateTempWarehouseCarriers();
   const data = useFastStockTransferData();
+  const clearProductCache = usePosFastStockTransferPickerStore(
+    (s) => s.clearProductCache,
+  );
   const {
     addLineMutation,
     updateLineMutation,
@@ -104,11 +112,21 @@ export function useFastStockTransferActions() {
   const refetchAll = useCallback(async () => {
     await Promise.all([
       data.refetchTempWarehouse(),
-      data.reloadCatalog(),
+      branchId ? invalidateTempWarehouseCarriers(branchId) : Promise.resolve(),
+      branchId
+        ? invalidatePosBranchCatalog(branchId, data.catalogDirection)
+        : Promise.resolve(),
+      clearProductCache(),
       data.refetchStorages(),
       data.refetchShowrooms(),
     ]);
-  }, [data]);
+  }, [
+    branchId,
+    clearProductCache,
+    data,
+    invalidatePosBranchCatalog,
+    invalidateTempWarehouseCarriers,
+  ]);
 
   const handleResetData = useCallback(() => {
     void refetchLinesData();
@@ -220,7 +238,13 @@ export function useFastStockTransferActions() {
         },
       );
     },
-    [clearEditingRow, data, remapTransferSelection, setPageError, updateLineMutation],
+    [
+      clearEditingRow,
+      data,
+      remapTransferSelection,
+      setPageError,
+      updateLineMutation,
+    ],
   );
 
   const handleToggleTransfer = useCallback(

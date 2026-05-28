@@ -25,7 +25,9 @@ import {
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
 import { useEffect, useMemo, useState } from "react";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
+import { useFastStockTransferCarriers } from "./use-fast-stock-transfer-carriers";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
+import { useFastStockTransferProductPicker } from "./use-fast-stock-transfer-product-picker";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import type { TempWarehousePublicUser } from "@erp/shared-interfaces";
 
@@ -105,6 +107,8 @@ function SkuEditCell({ value, onSelect, search }: SkuEditCellProps) {
 export function useFastStockTransferTableColumns() {
   const data = useFastStockTransferData();
   const actions = useFastStockTransferActions();
+  const { carrierSearchAdapter } = useFastStockTransferCarriers();
+  const { productSearchAdapter } = useFastStockTransferProductPicker();
 
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
   const editingRowId = usePosFastStockTransferWorkflowStore(
@@ -129,7 +133,7 @@ export function useFastStockTransferTableColumns() {
             <TransporterEditCell
               value={editableDraft.carrier}
               onSelect={actions.handleEditDraftCarrier}
-              search={data.searchFastStockCarriers}
+              search={carrierSearchAdapter}
             />
           ) : (
             formatCarrierName(row.carrier)
@@ -151,7 +155,7 @@ export function useFastStockTransferTableColumns() {
             <SkuEditCell
               value={editableDraft.product}
               onSelect={actions.handleEditDraftProduct}
-              search={data.searchCatalogProducts}
+              search={productSearchAdapter}
             />
           ) : (
             lineSku(row)
@@ -256,6 +260,7 @@ export function useFastStockTransferTableColumns() {
     ],
     [
       actions,
+      carrierSearchAdapter,
       data,
       editableDraft,
       editingRowId,
@@ -264,6 +269,7 @@ export function useFastStockTransferTableColumns() {
       filters.sku,
       filters.transporter,
       filters.unit,
+      productSearchAdapter,
     ],
   );
 }

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 
-import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   EMPTY_FAST_STOCK_TRANSFER_FILTERS,
   EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT,
@@ -40,7 +39,6 @@ interface PosFastStockTransferWorkflowState {
     location: FastStockTransferToolbarDraft["location"],
   ) => void;
   resetToolbarAfterAdd: (keepCarrier: FastStockTransferToolbarDraft["carrier"]) => void;
-  refreshToolbarProductFromCatalog: (catalogLines: ReadonlyArray<PosCatalogLine>) => void;
 
   setEditDraftCarrier: (carrier: FastStockTransferToolbarDraft["carrier"]) => void;
   setEditDraftProduct: (product: FastStockTransferToolbarDraft["product"]) => void;
@@ -126,32 +124,6 @@ export const usePosFastStockTransferWorkflowStore =
           ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT,
           carrier: keepCarrier,
         },
-      }),
-
-    refreshToolbarProductFromCatalog: (catalogLines) =>
-      set((state) => {
-        const { product } = state.toolbarDraft;
-        if (!product) return state;
-        const refreshed = catalogLines.find((p) => p.itemId === product.itemId);
-        if (!refreshed) {
-          return {
-            toolbarDraft: {
-              ...state.toolbarDraft,
-              product: null,
-              location: null,
-            },
-          };
-        }
-        return {
-          toolbarDraft: {
-            ...state.toolbarDraft,
-            product: refreshed,
-            location: reconcileLocationOnProductChange(
-              refreshed,
-              state.toolbarDraft.location,
-            ),
-          },
-        };
       }),
 
     setEditDraftCarrier: (carrier) =>
