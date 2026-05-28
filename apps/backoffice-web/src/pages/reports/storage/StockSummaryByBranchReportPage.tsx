@@ -1,12 +1,19 @@
-import { useMemo } from "react";
-import { formatMoneyInteger } from "@erp/ui";
+import { useMemo, useState } from "react";
+import {
+  formatMoneyInteger,
+  resolvePeriodRange,
+  type PeriodValue,
+} from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
-import { generateMockStock, type MockStockSku } from "./_shared/mock";
+import { useStockSummaryByBranchReport } from "../../../hooks/use-inventory-reports";
+import type { StockPeriodRow } from "../../../api/inventory-reports";
 
 const STORE_OPTIONS = [
   { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
@@ -20,6 +27,52 @@ const GROUP_OPTIONS = [
   { value: "Dép nữ", label: "Dép nữ" },
   { value: "Dép nam", label: "Dép nam" },
 ];
+
+interface ViewRow {
+  itemId: string;
+  branchId: string;
+  sku: string;
+  name: string;
+  parentSku: string;
+  parentName: string;
+  color: string;
+  size: string;
+  unit: string;
+  group: string;
+  brand: string;
+  branchCode: string;
+  branch: string;
+  openingQty: number;
+  openingValue: number;
+  inQty: number;
+  inValue: number;
+  outQty: number;
+  outValue: number;
+}
+
+function mapApiRow(row: StockPeriodRow): ViewRow {
+  return {
+    itemId: row.itemId,
+    branchId: row.branchId ?? "",
+    sku: row.sku,
+    name: row.itemName,
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    color: "",
+    size: "",
+    unit: row.unit,
+    group: row.categoryName ?? "",
+    brand: "",
+    branchCode: row.branchCode ?? "",
+    branch: row.branchName ?? "",
+    openingQty: row.openingQty,
+    openingValue: row.openingValue,
+    inQty: row.inQty,
+    inValue: row.inValue,
+    outQty: row.outQty,
+    outValue: row.outValue,
+  };
+}
 
 export function StockSummaryByBranchReportPage() {
   const filterFields: FilterField[] = [
@@ -35,10 +88,29 @@ export function StockSummaryByBranchReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
-  const rows = useMemo(() => generateMockStock(), []);
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
+    () =>
+      buildApiFilters(filterValues, period, {
+        storeFieldKey: "store",
+        categoryFieldKey: "group",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useStockSummaryByBranchReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
-  const columns: TableColumn<MockStockSku>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
     { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
     { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
@@ -61,7 +133,7 @@ export function StockSummaryByBranchReportPage() {
   ];
 
   return (
-    <StorageReportShell<MockStockSku>
+    <StorageReportShell<ViewRow>
       title="Tổng hợp nhập xuất tồn kho theo cửa hàng"
       storageKey="reports/storage/stock-summary-by-branch"
       filterFields={filterFields}
@@ -71,8 +143,14 @@ export function StockSummaryByBranchReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có dữ liệu."
-      getRowKey={(r, i) => `${r.sku}-${r.branchCode}-${i}`}
+      getRowKey={(r, i) => `${r.itemId}-${r.branchId}-${i}`}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

@@ -20,6 +20,7 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { StockTransferEntity } from './stock-transfer.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 export interface CreateTransferDto {
@@ -62,6 +63,7 @@ export class StockTransferService {
     private readonly dataSource: DataSource,
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
   async create(
@@ -142,12 +144,22 @@ export class StockTransferService {
       actor,
     );
 
+    // Snapshot `purchase_price` per item once at posting time so both legs of
+    // the transfer (TRANSFER_OUT + TRANSFER_IN) carry the same unit_cost and
+    // line_value sums net to zero across the move.
+    const itemIds = Array.from(new Set(transfer.lines.map((l) => l.itemId)));
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      transfer.organizationId,
+      itemIds,
+    );
+
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = [];
 
       for (const line of transfer.lines) {
         const sourceLoc = line.sourceLocationId ?? transfer.sourceLocationId;
         const destLoc = line.destinationLocationId ?? transfer.destinationLocationId;
+        const unitCost = itemCostByItemId.get(line.itemId) ?? 0;
         movements.push({
           itemId: line.itemId,
           locationId: sourceLoc,
@@ -159,6 +171,7 @@ export class StockTransferService {
           referenceId: transfer.id,
           notes: `Transfer out: ${documentNumber}`,
           actorContext: actor,
+          unitCost,
         });
 
         movements.push({
@@ -172,6 +185,7 @@ export class StockTransferService {
           referenceId: transfer.id,
           notes: `Transfer in: ${documentNumber}`,
           actorContext: actor,
+          unitCost,
         });
       }
 

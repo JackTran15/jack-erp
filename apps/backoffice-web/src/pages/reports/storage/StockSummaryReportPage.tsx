@@ -1,12 +1,19 @@
-import { useMemo } from "react";
-import { formatMoneyInteger } from "@erp/ui";
+import { useMemo, useState } from "react";
+import {
+  formatMoneyInteger,
+  resolvePeriodRange,
+  type PeriodValue,
+} from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
-import { generateMockStock, type MockStockSku } from "./_shared/mock";
+import { useStockSummaryReport } from "../../../hooks/use-inventory-reports";
+import type { StockPeriodRow } from "../../../api/inventory-reports";
 
 const STORE_OPTIONS = [
   { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
@@ -35,6 +42,69 @@ const UNIT_OPTIONS = [
   { value: "Đôi", label: "Đôi" },
 ];
 
+/** Row shape consumed by the existing column definitions. */
+interface ViewRow {
+  itemId: string;
+  sku: string;
+  name: string;
+  unit: string;
+  group: string;
+  parentSku: string;
+  parentName: string;
+  brand: string;
+  color: string;
+  size: string;
+  positionCode: string;
+  positionName: string;
+  branchCode: string;
+  branch: string;
+  supplier: string;
+  warehouseCode: string;
+  openingQty: number;
+  openingValue: number;
+  inQty: number;
+  inValue: number;
+  outQty: number;
+  outValue: number;
+  transferOutQty: number;
+  transferOutValue: number;
+  incomingQty: number;
+  incomingValue: number;
+}
+
+function mapApiRow(row: StockPeriodRow): ViewRow {
+  return {
+    itemId: row.itemId,
+    sku: row.sku,
+    name: row.itemName,
+    unit: row.unit,
+    group: row.categoryName ?? "",
+    // Parent SKU / brand / color / size / supplier are not denormalized into
+    // the period-snapshot rows yet — leave empty until the backend joins them.
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    brand: "",
+    color: "",
+    size: "",
+    positionCode: row.locationCode ?? "",
+    positionName: row.locationName ?? "",
+    branchCode: row.branchCode ?? "",
+    branch: row.branchName ?? "",
+    supplier: "",
+    warehouseCode: row.locationCode ?? row.branchCode ?? "",
+    openingQty: row.openingQty,
+    openingValue: row.openingValue,
+    inQty: row.inQty,
+    inValue: row.inValue,
+    outQty: row.outQty,
+    outValue: row.outValue,
+    transferOutQty: 0,
+    transferOutValue: 0,
+    incomingQty: 0,
+    incomingValue: 0,
+  };
+}
+
 export function StockSummaryReportPage() {
   const filterFields: FilterField[] = [
     {
@@ -53,10 +123,29 @@ export function StockSummaryReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
-  const rows = useMemo(() => generateMockStock(), []);
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
+    () =>
+      buildApiFilters(filterValues, period, {
+        storeFieldKey: "store",
+        categoryFieldKey: "group",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useStockSummaryReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
-  const columns: TableColumn<MockStockSku>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "image", label: "Ảnh hàng hóa", width: 110, filterKind: "none", render: () => (
         <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">📦</div>
       ) },
@@ -87,7 +176,7 @@ export function StockSummaryReportPage() {
   ];
 
   return (
-    <StorageReportShell<MockStockSku>
+    <StorageReportShell<ViewRow>
       title="Tổng hợp nhập xuất tồn kho"
       storageKey="reports/storage/stock-summary"
       filterFields={filterFields}
@@ -99,8 +188,14 @@ export function StockSummaryReportPage() {
       ]}
       columns={columns}
       rows={rows}
-      emptyLabel="Không có dữ liệu tồn kho."
-      getRowKey={(r, i) => `${r.sku}-${r.warehouseCode}-${i}`}
+      loading={isLoading}
+      emptyLabel="Không có dữ liệu cho khoảng thời gian này."
+      getRowKey={(r, i) => `${r.itemId}-${r.warehouseCode}-${i}`}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

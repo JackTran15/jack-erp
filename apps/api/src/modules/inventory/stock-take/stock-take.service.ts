@@ -25,6 +25,7 @@ import { GoodsIssueLineEntity } from '../goods-issue/goods-issue-line.entity';
 import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { GoodsReceiptLineEntity } from '../goods-receipt/goods-receipt-line.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import {
   RecordMovementParams,
@@ -107,6 +108,7 @@ export class StockTakeService {
     private readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
     private readonly documentNumbering: DocumentNumberingService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
   /**
@@ -409,6 +411,14 @@ export class StockTakeService {
         generatedIssueId,
       });
 
+      // Snapshot purchase price per item so over-/under-count adjustments
+      // carry a consistent unit_cost for downstream reporting.
+      const itemIds = Array.from(new Set(variances.map((v) => v.itemId)));
+      const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+        st.organizationId,
+        itemIds,
+      );
+
       // Post stock movements LAST so any failure rolls back the receipt/issue
       // headers above as well.
       const movements: RecordMovementParams[] = variances.map((v) => ({
@@ -425,6 +435,7 @@ export class StockTakeService {
         referenceId: st.id,
         notes: `Kiểm kê ${stockTakeRef}`,
         actorContext: actor,
+        unitCost: itemCostByItemId.get(v.itemId) ?? 0,
       }));
       await this.stockLedger.recordBatchMovements(movements);
     });
@@ -619,4 +630,5 @@ export class StockTakeService {
     if (!st) throw new NotFoundException(`Phiếu kiểm kê ${id} không tìm thấy`);
     return st;
   }
+
 }

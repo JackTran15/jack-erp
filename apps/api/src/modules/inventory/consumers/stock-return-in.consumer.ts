@@ -6,6 +6,7 @@ import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockReturnInPayload } from '../../pos/publishers/stock-return-in.publisher';
 
 const RETURN_INVOICE_REFERENCE_TYPE = 'RETURN_INVOICE';
@@ -18,6 +19,7 @@ export class StockReturnInConsumer {
     @InjectRepository(StockLedgerEntryEntity)
     private readonly ledgerRepo: Repository<StockLedgerEntryEntity>,
     private readonly stockLedgerService: StockLedgerService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.STOCK_RETURN_IN, {
@@ -56,6 +58,15 @@ export class StockReturnInConsumer {
     if (toApply.length === 0) return;
 
     const actor = { userId: actorId, organizationId, branchId, roles: [] };
+
+    // Snapshot purchase_price for each returning item — return-in payload has
+    // no unit price column, so we use items.purchase_price as the cost basis.
+    const itemIds = Array.from(new Set(toApply.map((l) => l.itemId)));
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      organizationId,
+      itemIds,
+    );
+
     const movements = toApply.map((line) => ({
       itemId: line.itemId,
       locationId: line.locationId,
@@ -66,6 +77,7 @@ export class StockReturnInConsumer {
       referenceType: RETURN_INVOICE_REFERENCE_TYPE,
       referenceId: returnInvoiceId,
       actorContext: actor,
+      unitCost: itemCostByItemId.get(line.itemId) ?? 0,
     }));
 
     await this.stockLedgerService.recordBatchMovements(movements);
@@ -74,4 +86,5 @@ export class StockReturnInConsumer {
       `Recorded ${movements.length} stock return-in movement(s) for ${returnInvoiceCode}`,
     );
   }
+
 }

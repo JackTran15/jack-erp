@@ -12,6 +12,7 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
 import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockTakeEntity } from './stock-take.entity';
@@ -44,6 +45,7 @@ describe('StockTakeService', () => {
     createQueryBuilder: jest.Mock;
   };
   let locationRepo: { findOne: jest.Mock };
+  let itemCostSnapshotService: { snapshotCosts: jest.Mock };
   let receiptRepo: object;
   let issueRepo: object;
   let documentNumbering: { generate: jest.Mock };
@@ -85,6 +87,14 @@ describe('StockTakeService', () => {
       createQueryBuilder: jest.fn(),
     };
     locationRepo = { findOne: jest.fn() };
+    itemCostSnapshotService = {
+      snapshotCosts: jest.fn().mockResolvedValue(
+        new Map<string, number>([
+          ['item-1', 3],
+          ['item-3', 6],
+        ]),
+      ),
+    };
     receiptRepo = {};
     issueRepo = {};
     documentNumbering = { generate: jest.fn().mockResolvedValue('KK000001') };
@@ -103,6 +113,7 @@ describe('StockTakeService', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: stockLedger },
         { provide: DocumentNumberingService, useValue: documentNumbering },
+        { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
       ],
     }).compile();
 
@@ -324,6 +335,19 @@ describe('StockTakeService', () => {
       expect(movementsArg).toHaveLength(2);
       const variances = movementsArg.map((m: { quantity: number }) => m.quantity);
       expect(variances).toEqual(expect.arrayContaining([2, -5]));
+
+      // Each variance carries a unit_cost snapshot from items.purchase_price
+      // (item-1 → 3.00, item-3 → 6.00). item-2 has zero variance and is
+      // filtered out before the ledger call.
+      const movementByItem = new Map<string, { quantity: number; unitCost?: number }>(
+        movementsArg.map((m: { itemId: string; quantity: number; unitCost?: number }) => [m.itemId, m]),
+      );
+      expect(movementByItem.get('item-1')).toEqual(
+        expect.objectContaining({ quantity: 2, unitCost: 3 }),
+      );
+      expect(movementByItem.get('item-3')).toEqual(
+        expect.objectContaining({ quantity: -5, unitCost: 6 }),
+      );
 
       // Status must flip to POSTED via manager.update (not a separate save call).
       expect(managerUpdate).toHaveBeenCalledWith(
