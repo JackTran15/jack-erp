@@ -3,8 +3,15 @@ import type { GetCatalogProductDetailParams } from "@erp/pos/dtos/catalog.dto";
 import type {
   PosCatalogLine,
   PosProductDetail,
+  PosProductListResponse,
 } from "@erp/pos/interfaces/catalog.interface";
 import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
+
+export interface ListCatalogProductsParams {
+  direction?: PosCatalogDirection;
+  page?: number;
+  pageSize?: number;
+}
 
 export const catalogService = {
   fetch: (
@@ -18,6 +25,24 @@ export const catalogService = {
     const q = params.toString();
     const path = `/pos/branches/${encodeURIComponent(branchId)}/catalog${q ? `?${q}` : ""}`;
     return http.get<PosCatalogLine[]>(path);
+  },
+
+  /**
+   * Danh sách catalog mức PRODUCT (gom biến thể) — `GET /pos/branches/:id/
+   * catalog/products`. Phân trang (pageSize ≤ 100), không có tham số search.
+   */
+  listProducts: (
+    branchId: string,
+    params: ListCatalogProductsParams = {},
+  ): Promise<PosProductListResponse> => {
+    const qs = new URLSearchParams();
+    if (params.direction) qs.set("direction", params.direction);
+    if (params.page !== undefined) qs.set("page", String(params.page));
+    if (params.pageSize !== undefined) qs.set("pageSize", String(params.pageSize));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return http.get<PosProductListResponse>(
+      `/pos/branches/${encodeURIComponent(branchId)}/catalog/products${suffix}`,
+    );
   },
 
   /** Chi tiết product (gom biến thể) — `GET /pos/branches/:id/catalog/products/:id`. */

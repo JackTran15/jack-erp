@@ -7,6 +7,7 @@ import {
 import type {
   PosCatalogLine,
   PosProductDetail,
+  PosProductListResponse,
 } from "@erp/pos/interfaces/catalog.interface";
 import { catalogService } from "@erp/pos/services/catalog.service";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
@@ -27,6 +28,29 @@ export function useCatalogQuery(
   return useQuery<PosCatalogLine[], Error>({
     queryKey: CATALOG_KEYS.LIST(branchId),
     queryFn: () => catalogService.fetch(branchId),
+    enabled: Boolean(branchId),
+    staleTime: 30_000,
+  });
+}
+
+/** Số product tải tối đa cho grid (1 trang, không phân trang thêm). */
+export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 100;
+
+/**
+ * Danh sách catalog mức PRODUCT cho grid — `GET /pos/branches/:id/catalog/products`.
+ * Tải 1 trang (pageSize=100); ô tìm header lọc client-side trên kết quả này.
+ * Dedupe theo `CATALOG_KEYS.PRODUCTS(branchId)`. Tắt khi chưa có branch.
+ */
+export function useCatalogProductsQuery(
+  branchId: string,
+): UseQueryResult<PosProductListResponse, Error> {
+  return useQuery<PosProductListResponse, Error>({
+    queryKey: CATALOG_KEYS.PRODUCTS(branchId),
+    queryFn: () =>
+      catalogService.listProducts(branchId, {
+        page: 1,
+        pageSize: POS_CATALOG_PRODUCTS_PAGE_SIZE,
+      }),
     enabled: Boolean(branchId),
     staleTime: 30_000,
   });
