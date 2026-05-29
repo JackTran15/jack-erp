@@ -52,6 +52,7 @@ export interface CrudListInventoryActionContext {
 
 interface CrudListPageProps {
   entityKey?: string;
+  initialSort?: { sortBy: string; sortOrder: 'asc' | 'desc' };
   inventoryConfig?: {
     exportOptions?: Array<{
       id: string;
@@ -67,6 +68,7 @@ interface CrudListPageProps {
 
 export function CrudListPage({
   entityKey: entityKeyProp,
+  initialSort,
   inventoryConfig,
 }: CrudListPageProps) {
   const params = useParams<{ entityKey: string }>();
@@ -76,8 +78,8 @@ export function CrudListPage({
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [sortBy, setSortBy] = useState<string | undefined>();
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSort?.sortBy);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialSort?.sortOrder ?? "desc");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [columnFilters, setColumnFilters] = useState<
@@ -115,14 +117,14 @@ export function CrudListPage({
   useEffect(() => {
     setPage(1);
     setPageSize(20);
-    setSortBy(undefined);
-    setSortOrder("desc");
+    setSortBy(initialSort?.sortBy);
+    setSortOrder(initialSort?.sortOrder ?? "desc");
     setSearch("");
     setSearchInput("");
     setColumnFilters({});
     setSelectedRecordIds(new Set());
     setDuplicateSnapshot(null);
-  }, [entityKey]);
+  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!records) {
@@ -176,7 +178,7 @@ export function CrudListPage({
 
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
-      (config?.fields ?? []).map((field) => {
+      (config?.fields ?? []).filter((field) => !field.hideInList).map((field) => {
         const col = resolveColumnConfig(entityKey ?? "", field);
         const widthPx = col.widthPx;
         const filterDef = filterDefinitionByKey.get(field.key);
@@ -368,9 +370,8 @@ export function CrudListPage({
         openDuplicateDialog,
         handleEdit: () => {
           if (!selectedRecord) return;
-          void navigate(
-            `/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`,
-          );
+          const id = String(selectedRecord[config.idField]);
+          void navigate(`/admin/${entityKey}/${id}/edit`);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
@@ -420,9 +421,10 @@ export function CrudListPage({
         loading={loading}
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
-        onRowClick={(row) =>
-          navigate(`/admin/${entityKey}/${String(row[config.idField])}`)
-        }
+        onRowClick={(row) => {
+          const id = String(row[config.idField]);
+          navigate(`/admin/${entityKey}/${id}`);
+        }}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}

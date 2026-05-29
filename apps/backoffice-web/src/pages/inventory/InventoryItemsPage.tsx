@@ -3,18 +3,19 @@ import { toast } from "sonner";
 import { CrudListPage } from "../../components/crud/CrudListPage";
 import { InventoryExportSelectDialog } from "./_components/InventoryExportSelectDialog";
 import { ImportInventoryDialog } from "./_components/import/ImportInventoryDialog";
-import { downloadInventoryExport } from "./_components/import/import-inventory.api";
+import {
+  downloadInventoryExport,
+  downloadInventoryExportSelected,
+} from "./_components/import/import-inventory.api";
 
 export function InventoryItemsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [exportSelectOpen, setExportSelectOpen] = useState(false);
-  const [exportInitialIds, setExportInitialIds] = useState<Set<string>>(
-    new Set(),
-  );
 
   return (
     <CrudListPage
       entityKey="inventory-items"
+      initialSort={{ sortBy: "code", sortOrder: "asc" }}
       inventoryConfig={{
         onImportInventory: () => setImportDialogOpen(true),
         onExportInventoryAll: () => {
@@ -26,10 +27,7 @@ export function InventoryItemsPage() {
               ),
             );
         },
-        onExportInventorySelected: (context) => {
-          setExportInitialIds(new Set(context.selectedRecordIds));
-          setExportSelectOpen(true);
-        },
+        onExportInventorySelected: () => setExportSelectOpen(true),
         exportOptions: [
           {
             id: "inventory-export-all",
@@ -51,14 +49,20 @@ export function InventoryItemsPage() {
                 onCommitted={() => context.refetchRecords()}
               />
             ) : null}
-
             {exportSelectOpen ? (
               <InventoryExportSelectDialog
                 open
                 onOpenChange={setExportSelectOpen}
-                initialSelectedIds={exportInitialIds}
-                onConfirm={(ids) => {
-                  toast.info(`Đã chọn ${ids.size} hàng hóa để xuất khẩu.`);
+                onConfirm={(_allIds, productIds, standaloneItemIds) => {
+                  downloadInventoryExportSelected(standaloneItemIds, productIds)
+                    .then(() => toast.success("Đã tải tệp xuất khẩu"))
+                    .catch((err: unknown) =>
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : "Xuất khẩu thất bại",
+                      ),
+                    );
                 }}
               />
             ) : null}

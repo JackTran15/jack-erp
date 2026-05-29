@@ -8,6 +8,9 @@ import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
 import { ProviderEntity } from './provider.entity';
+import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
+import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
+import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
@@ -60,6 +63,9 @@ import {
       LocationEntity,
       StorageManagerAssignmentEntity,
       StockBalanceEntity,
+      ProductAttributeDefinitionEntity,
+      ProductAttributeOptionEntity,
+      ItemAttributeValueEntity,
     ]),
     BranchModule,
     StockLedgerModule,

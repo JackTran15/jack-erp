@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { FieldDefinition } from "@erp/shared-interfaces";
-import { FormField, Input, MoneyInput } from "@erp/ui";
+import { FormField, Input, MoneyInput, TagsInput } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
 
 function ControlRow({
@@ -127,6 +127,19 @@ export function CrudFieldInput({
             }
           />
         </ControlRow>
+      </FormField>
+    );
+  }
+
+  if (field.type === "tags") {
+    const tags = Array.isArray(value) ? (value as string[]) : [];
+    return (
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+        <TagsInput
+          value={tags}
+          onValueChange={(next) => onChange(next)}
+          placeholder={`Thêm ${field.label.toLowerCase()}… (Enter)`}
+        />
       </FormField>
     );
   }

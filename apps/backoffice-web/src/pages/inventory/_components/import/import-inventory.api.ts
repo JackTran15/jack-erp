@@ -96,3 +96,15 @@ export async function downloadInventoryExport(): Promise<void> {
     "danh-sach-hang-hoa.xlsx",
   );
 }
+
+export async function downloadInventoryExportSelected(
+  itemIds: string[],
+  productIds: string[],
+): Promise<void> {
+  const { data } = await apiClient.post<Blob>(
+    "/inventory/exports/items/excel",
+    { itemIds, productIds, isGetAll: false },
+    { responseType: "blob" },
+  );
+  triggerBlobDownload(data, "danh-sach-hang-hoa.xlsx");
+}

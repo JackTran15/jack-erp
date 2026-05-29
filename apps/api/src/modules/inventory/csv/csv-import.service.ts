@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository, In } from "typeorm";
+import { DataSource, Repository, In, Not } from "typeorm";
 import { createHash } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -116,22 +116,21 @@ export class CsvImportService {
         type,
         idempotencyKey,
       },
-      relations: ["rows"],
     });
-    if (existing && existing.status === ImportJobStatus.COMMITTED) {
-      const { rows, rowsTruncated } = await this.loadJobRowsPreview(
-        existing.id,
-      );
-      return { job: existing, rows, rowsTruncated };
-    }
-    if (existing && existing.status !== ImportJobStatus.FAILED) {
-      const { rows, rowsTruncated } = await this.loadJobRowsPreview(
-        existing.id,
-      );
-      return { job: existing, rows, rowsTruncated };
-    }
-    if (existing?.status === ImportJobStatus.FAILED) {
-      await this.removeImportJob(existing.id);
+    if (existing) {
+      if (
+        existing.status === ImportJobStatus.COMMITTED ||
+        existing.status === ImportJobStatus.FAILED
+      ) {
+        // Allow re-import: discard the old job so the same file can be validated fresh.
+        await this.removeImportJob(existing.id);
+      } else {
+        // VALIDATING / VALIDATED — return the in-progress job as-is.
+        const { rows, rowsTruncated } = await this.loadJobRowsPreview(
+          existing.id,
+        );
+        return { job: existing, rows, rowsTruncated };
+      }
     }
 
     const parsed = await this.parseUploadFile(type, file);
@@ -320,12 +319,9 @@ export class CsvImportService {
       throw new NotFoundException(`Import job ${jobId} not found`);
     }
 
-    if (
-      job.status === ImportJobStatus.COMMITTED ||
-      job.status === ImportJobStatus.COMMITTING
-    ) {
+    if (job.status === ImportJobStatus.COMMITTING) {
       throw new BadRequestException(
-        "Không thể hủy phiên nhập khẩu đã hoặc đang được ghi vào hệ thống.",
+        "Không thể hủy phiên nhập khẩu đang được ghi vào hệ thống.",
       );
     }
 
@@ -489,7 +485,7 @@ export class CsvImportService {
     }
 
     const validRows = await this.rowRepo.find({
-      where: { jobId, status: ImportRowStatus.VALID },
+      where: { jobId, status: Not(ImportRowStatus.ERROR) },
       order: { rowNumber: "ASC" },
       take: limit - errorRows.length,
     });

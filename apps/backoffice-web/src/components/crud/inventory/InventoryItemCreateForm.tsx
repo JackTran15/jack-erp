@@ -10,6 +10,7 @@ import {
   FormField,
   Input,
   MoneyInput,
+  TagsInput,
   Textarea,
 } from "@erp/ui";
 import {
@@ -589,6 +590,9 @@ export function InventoryItemCreateForm({
       "isPosVisible",
       // Has an explicit slot in the right column of the basic tab.
       "providerId",
+      // Rendered in the "Thông tin thuộc tính" section below.
+      "colors",
+      "sizes",
     ]);
     return editableFields
       .filter(
@@ -851,20 +855,18 @@ export function InventoryItemCreateForm({
           Thông tin thuộc tính
         </h3>
         <div className="grid gap-3 md:grid-cols-2">
-          <FormField label="Màu sắc" htmlFor="extra-attr-color">
-            <Input
-              id="extra-attr-color"
-              value={extras.attrColor}
-              onChange={(e) => updateExtras("attrColor", e.target.value)}
-              placeholder="VD: Xanh, Đỏ, Vàng…"
+          <FormField label="Màu sắc">
+            <TagsInput
+              value={Array.isArray(values.colors) ? (values.colors as string[]) : []}
+              onValueChange={(tags) => setValues((prev) => ({ ...prev, colors: tags }))}
+              placeholder="Nhập màu rồi Enter (VD: Đen, Trắng…)"
             />
           </FormField>
-          <FormField label="Size" htmlFor="extra-attr-size">
-            <Input
-              id="extra-attr-size"
-              value={extras.attrSize}
-              onChange={(e) => updateExtras("attrSize", e.target.value)}
-              placeholder="VD: S, M, L, XL…"
+          <FormField label="Size">
+            <TagsInput
+              value={Array.isArray(values.sizes) ? (values.sizes as string[]) : []}
+              onValueChange={(tags) => setValues((prev) => ({ ...prev, sizes: tags }))}
+              placeholder="Nhập size rồi Enter (VD: 38, 39, 40…)"
             />
           </FormField>
         </div>
