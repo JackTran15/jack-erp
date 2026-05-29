@@ -29,6 +29,12 @@ export interface CreateInvoiceBody {
   draftLabel?: string;
   note?: string;
   items?: CreateInvoiceItemBody[];
+  /**
+   * Nhân viên bán hàng được chọn (= userId). ⚠️ Backend hiện CHƯA whitelist
+   * trường này trên `CreateInvoiceDto` (ValidationPipe `forbidNonWhitelisted`),
+   * cần phối hợp BE bổ sung trước khi gửi thật, nếu không request sẽ 400.
+   */
+  salespersonId?: string;
 }
 
 /**
@@ -40,6 +46,8 @@ export interface UpdateInvoiceBody {
   draftLabel?: string;
   note?: string;
   items?: CreateInvoiceItemBody[];
+  /** Nhân viên bán hàng (= userId). Xem cảnh báo backend ở `CreateInvoiceBody`. */
+  salespersonId?: string;
 }
 
 /**

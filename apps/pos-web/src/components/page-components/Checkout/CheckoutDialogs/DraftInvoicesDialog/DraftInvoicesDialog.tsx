@@ -7,7 +7,6 @@ import {
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
-import { useCustomersByIds } from "@erp/pos/hooks/react-query/use-query-customer";
 import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/FilterBar/FilterBar";
@@ -67,26 +66,14 @@ export function DraftInvoicesDialog({
 }: DraftInvoicesDialogProps) {
   const draftsQuery = useDraftInvoicesQuery({ sessionId, enabled: open });
 
-  // API drafts chỉ trả `customerId` → resolve tên/SĐT khách qua `GET /customers/:id`
-  // (mỗi id 1 request, cache chung) để hiển thị + filter trong dialog.
-  const customerIds = useMemo(
-    () =>
-      (draftsQuery.data ?? [])
-        .map((row) => row.customerId)
-        .filter((id): id is string => Boolean(id)),
-    [draftsQuery.data],
-  );
-  const customerMap = useCustomersByIds(customerIds);
-
+  // API drafts trả kèm object `customer` nhúng (name/phone) → dùng thẳng để hiển
+  // thị + filter, không cần resolve qua `GET /customers/:id` từng id nữa.
   const drafts = useMemo<DraftInvoice[]>(
     () =>
       (draftsQuery.data ?? []).map((row) =>
-        mapInvoiceRowToDraftInvoice(
-          row,
-          row.customerId ? (customerMap.get(row.customerId) ?? null) : null,
-        ),
+        mapInvoiceRowToDraftInvoice(row, row.customer ?? null),
       ),
-    [draftsQuery.data, customerMap],
+    [draftsQuery.data],
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(

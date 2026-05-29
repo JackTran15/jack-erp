@@ -20,6 +20,7 @@ import {
   selectCustomerDraft,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
   selectPurchaseCart,
@@ -53,6 +54,8 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
     }
 
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
+    const selectedSalesperson =
+      selectMetaDraft(sessionState).selectedSalesperson;
     const purchaseCart = selectPurchaseCart(sessionState);
     const p = selectPaymentDraft(sessionState);
     const grandTotal = selectGrandTotal(sessionState);
@@ -94,6 +97,7 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
           cart: purchaseCart,
           customer: selectedCustomer,
           note,
+          salesperson: selectedSalesperson,
         }),
       );
     } catch (err) {
