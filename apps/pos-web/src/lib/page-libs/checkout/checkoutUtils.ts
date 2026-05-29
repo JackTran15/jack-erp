@@ -9,6 +9,7 @@ import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import { PaymentMethodEnum } from "@erp/pos/constants/checkout.constant";
 import { PromoMenuOptionEnum } from "@erp/pos/constants/checkout.constant";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import { formatVnd } from "@erp/ui";
 
 /** Normalize persisted / loose string into {@link CheckoutVariantEnum}. */
 export function coerceCheckoutVariant(raw: unknown): CheckoutVariantEnum {
@@ -55,6 +56,19 @@ export function lineTotal(line: CartLine): number {
   const base = line.unitPrice * line.qty;
   const net = Math.max(0, base - lineDiscountAmount(line));
   return line.isReturnCredit ? -net : net;
+}
+
+/**
+ * Nhãn KM dòng hiển thị/in: `percent` → "KM {value} % ({tiền giảm}) - {lý do}";
+ * `amount` → "KM {value} - {lý do}". Trả "" nếu dòng không có KM.
+ */
+export function formatLineDiscountLabel(line: CartLine): string {
+  const d = line.lineDiscount;
+  if (!d) return "";
+  if (d.type === "percent") {
+    return `KM ${d.value} % (${formatVnd(lineDiscountAmount(line))}) - ${d.reason}`;
+  }
+  return `KM ${formatVnd(d.value)} - ${d.reason}`;
 }
 
 /** Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống. */

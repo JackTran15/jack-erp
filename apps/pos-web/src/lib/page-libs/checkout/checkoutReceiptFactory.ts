@@ -5,7 +5,11 @@ import type {
   PaymentMethodOption,
 } from "@erp/pos/interfaces/checkout.interface";
 import { deriveInvoiceTotals } from "./checkoutSettlement";
-import { lineTotal, resolvePaymentMethodLabel } from "./checkoutUtils";
+import {
+  formatLineDiscountLabel,
+  lineTotal,
+  resolvePaymentMethodLabel,
+} from "./checkoutUtils";
 
 /** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
 function generateInvoiceNumber(d: Date): string {
@@ -81,6 +85,9 @@ export function buildCheckoutInvoicePayload({
       name: l.name,
       qty: l.isReturnCredit ? -l.qty : l.qty,
       unitPrice: l.unitPrice,
+      lineTotal: lineTotal(l),
+      discountLabel: l.lineDiscount ? formatLineDiscountLabel(l) : undefined,
+      note: l.note?.trim() ? l.note.trim() : undefined,
     })),
     totals: {
       totalQty,

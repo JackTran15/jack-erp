@@ -3,7 +3,7 @@ import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosNumberInput } from "@erp/pos/components/common/PosNumberInput/PosNumberInput";
 import { PosQuantityInput } from "@erp/pos/components/common/PosQuantityInput/PosQuantityInput";
 import {
-  lineDiscountAmount,
+  formatLineDiscountLabel,
   lineExceedsOnHandSnapshot,
   lineTotal,
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
@@ -22,16 +22,6 @@ export interface InvoiceLineItemRowProps {
   isReturnLine: boolean;
   /** Khóa sửa SL/giá + ẩn nút xóa (dòng trả của hóa đơn trả `invoice_return`). */
   locked: boolean;
-}
-
-function formatDiscountLine(line: CartLine): string {
-  const d = line.lineDiscount;
-  if (!d) return "";
-  const amount = lineDiscountAmount(line);
-  if (d.type === "percent") {
-    return `KM ${d.value} % (${formatVnd(amount)}) - ${d.reason}`;
-  }
-  return `KM ${formatVnd(d.value)} - ${d.reason}`;
 }
 
 /**
@@ -132,7 +122,7 @@ export function InvoiceLineItemRow({
           <span>{line.name}</span>
           {hasDiscount ? (
             <span className="text-[12px] italic text-[#E5403A]">
-              {formatDiscountLine(line)}
+              {formatLineDiscountLabel(line)}
             </span>
           ) : null}
           {editingNote ? (
