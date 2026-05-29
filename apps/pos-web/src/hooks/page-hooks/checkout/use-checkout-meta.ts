@@ -1,10 +1,11 @@
 import { useCallback, useMemo } from "react";
 
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
+import { mapSalesmanToSalesperson } from "@erp/pos/lib/page-libs/checkout/mapSalesman";
+import { useSalesmenQuery } from "@erp/pos/hooks/react-query/use-query-sales-hierarchy";
 import {
   CATALOG_GROUP_OPTIONS,
   PRICE_BOOK_OPTIONS,
-  SALESPERSON_OPTIONS,
 } from "@erp/pos/constants/checkout.constant";
 import type {
   PriceBook,
@@ -41,7 +42,11 @@ export interface CheckoutMeta {
  * `productGroups` (option tĩnh từ constants).
  */
 export const useCheckoutMeta = (): CheckoutMeta => {
-  const salespersons = SALESPERSON_OPTIONS;
+  const { salesmen } = useSalesmenQuery();
+  const salespersons = useMemo(
+    () => salesmen.map(mapSalesmanToSalesperson),
+    [salesmen],
+  );
   const priceBooks = PRICE_BOOK_OPTIONS;
   const productGroups = CATALOG_GROUP_OPTIONS;
 

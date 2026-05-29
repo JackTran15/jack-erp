@@ -50,7 +50,7 @@ function variantToCatalogLine(variant: PosProductVariant): PosCatalogLine {
  * `addProduct` hiện có (giữ nguyên guard tồn kho + focus flow MISA).
  */
 export function useCheckoutVariantSelection(): UseCheckoutVariantSelectionResult {
-  const { catalog, filteredProducts } = useCheckoutCatalog();
+  const { filteredProducts } = useCheckoutCatalog();
   const { addProduct } = useCheckoutSessionCart();
   const openVariantDialog = usePosCheckoutUiStore((s) => s.openVariantDialog);
 
@@ -67,11 +67,14 @@ export function useCheckoutVariantSelection(): UseCheckoutVariantSelectionResult
 
   const openForCatalogCard = useCallback(
     (product: CatalogProduct) => {
-      const found = catalog.find((l) => l.itemId === product.id);
-      if (!found) return;
-      openForItem(found);
+      // Card đã ở mức product → mở dialog trực tiếp theo kind + id của card.
+      openVariantDialog({
+        id: product.id,
+        kind: product.kind,
+        title: product.name,
+      });
     },
-    [catalog, openForItem],
+    [openVariantDialog],
   );
 
   const openForQuery = useCallback(() => {

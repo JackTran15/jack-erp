@@ -134,35 +134,39 @@ export function useFastStockTransferActions() {
     resetDialogs();
   }, [refetchLinesData, resetDialogs, resetWorkflow]);
 
-  const handleAddRow = useCallback(() => {
-    if (!data.branchId) {
-      setPageError("Chưa chọn chi nhánh.");
-      return;
-    }
-    if (data.isSessionClosed) {
-      setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
-      return;
-    }
-    if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
-      setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
-      return;
-    }
-    const body = mapDraftToAddBody(
-      data.toolbarDraft,
-      data.branchId,
-      data.direction,
-    );
-    if (data.toolbarDraft.carrier?.id) {
-      body.carrierUserId = data.toolbarDraft.carrier.id;
-    }
+  const handleAddRow = useCallback(
+    (onSuccess?: () => void) => {
+      if (!data.branchId) {
+        setPageError("Chưa chọn chi nhánh.");
+        return;
+      }
+      if (data.isSessionClosed) {
+        setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
+        return;
+      }
+      if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
+        setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
+        return;
+      }
+      const body = mapDraftToAddBody(
+        data.toolbarDraft,
+        data.branchId,
+        data.direction,
+      );
+      if (data.toolbarDraft.carrier?.id) {
+        body.carrierUserId = data.toolbarDraft.carrier.id;
+      }
 
-    addLineMutation.mutate(body, {
-      onSuccess: () => {
-        resetToolbarAfterAdd(data.toolbarDraft.carrier);
-      },
-      onError: (err) => setPageError(getErrorMessage(err)),
-    });
-  }, [addLineMutation, data, resetToolbarAfterAdd, setPageError]);
+      addLineMutation.mutate(body, {
+        onSuccess: () => {
+          resetToolbarAfterAdd(null);
+          onSuccess?.();
+        },
+        onError: (err) => setPageError(getErrorMessage(err)),
+      });
+    },
+    [addLineMutation, data, resetToolbarAfterAdd, setPageError],
+  );
 
   const handleStartEdit = useCallback(
     (rowId: string) => {

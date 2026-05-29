@@ -48,6 +48,18 @@ interface PosCheckoutUiState {
    */
   productSearchFocusSeq: number;
 
+  /**
+   * Right-click context menu cho dòng trong InvoiceLineItemTable. Lưu lineId
+   * + toạ độ viewport (clientX/clientY). null = đóng. Mỗi lúc chỉ 1 menu open.
+   */
+  lineContextMenu: { lineId: string; x: number; y: number } | null;
+  /** lineId của dòng đang mở modal "Giá bán gần nhất". */
+  recentPriceDialogLineId: string | null;
+  /** lineId của dòng đang mở modal "Khuyến mại khác". */
+  lineDiscountDialogLineId: string | null;
+  /** lineId của dòng đang bật inline note editor. */
+  editingNoteLineId: string | null;
+
   setAnnouncement: (message: string, durationMs?: number) => void;
   clearAnnouncement: () => void;
 
@@ -75,6 +87,15 @@ interface PosCheckoutUiState {
 
   requestProductSearchFocus: () => void;
 
+  openLineContextMenu: (lineId: string, x: number, y: number) => void;
+  closeLineContextMenu: () => void;
+  openRecentPriceDialog: (lineId: string) => void;
+  closeRecentPriceDialog: () => void;
+  openLineDiscountDialog: (lineId: string) => void;
+  closeLineDiscountDialog: () => void;
+  startEditLineNote: (lineId: string) => void;
+  stopEditLineNote: () => void;
+
   resetCheckoutUiDraft: () => void;
 }
 
@@ -92,6 +113,10 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   variantDialogTarget: null,
   pendingQtyFocusLineId: null,
   productSearchFocusSeq: 0,
+  lineContextMenu: null,
+  recentPriceDialogLineId: null,
+  lineDiscountDialogLineId: null,
+  editingNoteLineId: null,
 
   setAnnouncement: (message, durationMs = DEFAULT_ANNOUNCEMENT_DURATION_MS) => {
     if (announcementTimer !== null) {
@@ -143,6 +168,19 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
   requestProductSearchFocus: () =>
     set((state) => ({ productSearchFocusSeq: state.productSearchFocusSeq + 1 })),
 
+  openLineContextMenu: (lineId, x, y) =>
+    set({ lineContextMenu: { lineId, x, y } }),
+  closeLineContextMenu: () => set({ lineContextMenu: null }),
+  openRecentPriceDialog: (lineId) =>
+    set({ recentPriceDialogLineId: lineId, lineContextMenu: null }),
+  closeRecentPriceDialog: () => set({ recentPriceDialogLineId: null }),
+  openLineDiscountDialog: (lineId) =>
+    set({ lineDiscountDialogLineId: lineId, lineContextMenu: null }),
+  closeLineDiscountDialog: () => set({ lineDiscountDialogLineId: null }),
+  startEditLineNote: (lineId) =>
+    set({ editingNoteLineId: lineId, lineContextMenu: null }),
+  stopEditLineNote: () => set({ editingNoteLineId: null }),
+
   resetCheckoutUiDraft: () =>
     set({
       cancelInvoiceOpen: false,
@@ -154,5 +192,9 @@ export const usePosCheckoutUiStore = create<PosCheckoutUiState>()((set) => ({
       customerDetailOpen: false,
       variantDialogOpen: false,
       variantDialogTarget: null,
+      lineContextMenu: null,
+      recentPriceDialogLineId: null,
+      lineDiscountDialogLineId: null,
+      editingNoteLineId: null,
     }),
 }));

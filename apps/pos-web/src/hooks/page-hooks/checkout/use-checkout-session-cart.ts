@@ -9,6 +9,7 @@ import {
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import type {
   CartLine,
+  CartLineDiscount,
   CatalogProduct,
 } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
@@ -290,6 +291,33 @@ export function useCheckoutSessionCart() {
     [updateCartForLine],
   );
 
+  const updateLineDiscount = useCallback(
+    (lineId: string, next: CartLineDiscount | null) => {
+      updateCartForLine(lineId, (prev) =>
+        prev.map((l) =>
+          l.lineId === lineId
+            ? { ...l, lineDiscount: next ?? undefined }
+            : l,
+        ),
+      );
+    },
+    [updateCartForLine],
+  );
+
+  const updateLineNote = useCallback(
+    (lineId: string, raw: string) => {
+      const trimmed = raw.trim();
+      updateCartForLine(lineId, (prev) =>
+        prev.map((l) =>
+          l.lineId === lineId
+            ? { ...l, note: trimmed.length > 0 ? trimmed : undefined }
+            : l,
+        ),
+      );
+    },
+    [updateCartForLine],
+  );
+
   const removeLine = useCallback(
     (lineId: string) => {
       const isReturnCartLine =
@@ -406,6 +434,8 @@ export function useCheckoutSessionCart() {
     updateUnitPrice,
     updateQty,
     bumpQty,
+    updateLineDiscount,
+    updateLineNote,
     removeLine,
     isLineWarning,
     isReturnLine,

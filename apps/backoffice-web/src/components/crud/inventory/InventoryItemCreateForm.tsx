@@ -45,6 +45,11 @@ import {
   type ConversionUnitRow,
 } from "./item-create/ConversionUnitsTable";
 import { ProvidersPlaceholderTable } from "./item-create/ProvidersPlaceholderTable";
+import {
+  ProductVariantsTable,
+  VARIANT_DEFAULT_UNIT,
+  type ProductVariantRow,
+} from "./item-create/ProductVariantsTable";
 import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
 import { InventoryItemCreateDialogs } from "./item-create/InventoryItemCreateDialogs";
 import { InventoryItemTabsHeader } from "./item-create/InventoryItemTabsHeader";
@@ -97,6 +102,9 @@ export function InventoryItemCreateForm({
   const [unitRows, setUnitRows] = useState<ConversionUnitRow[]>([
     createBlankConversionUnitRow(),
   ]);
+
+  const [variantRows, setVariantRows] = useState<ProductVariantRow[]>([]);
+  const removedVariantKeys = useRef<Set<string>>(new Set());
 
   const editableFieldsByKey = useMemo(
     () => new Map(editableFields.map((f) => [f.key, f])),
@@ -152,6 +160,104 @@ export function InventoryItemCreateForm({
     // We intentionally re-sync whenever extras or unitRows change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extras, unitRows]);
+
+  // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ──────
+  // Cartesian product of Màu sắc × Size. User edits (price/name/barcode) are kept
+  // by merging on a stable combo key, but unit & SKU always track the product;
+  // manually deleted combos are remembered so they don't reappear.
+  useEffect(() => {
+    const colors = splitAttributeValues(extras.attrColor);
+    const sizes = splitAttributeValues(extras.attrSize);
+
+    const combos: Array<{ color: string; size: string }> = [];
+    if (colors.length && sizes.length) {
+      for (const color of colors) for (const size of sizes) combos.push({ color, size });
+    } else if (colors.length) {
+      for (const color of colors) combos.push({ color, size: "" });
+    } else if (sizes.length) {
+      for (const size of sizes) combos.push({ color: "", size });
+    }
+
+    // The product SKU is stored in the `code` field (config key "code").
+    const baseSku = String(values.code ?? "");
+    const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
+
+    setVariantRows((prev) => {
+      const byKey = new Map(prev.map((r) => [variantComboKey(r.color, r.size), r]));
+      const next: ProductVariantRow[] = [];
+      for (const { color, size } of combos) {
+        const key = variantComboKey(color, size);
+        if (removedVariantKeys.current.has(key)) continue;
+        const existing = byKey.get(key);
+        if (existing) {
+          // Unit & SKU are always derived from the product (unit + sku), never
+          // kept per-row — they re-sync whenever the product values change.
+          next.push({
+            ...existing,
+            unit: baseUnit,
+            sku: autoVariantSku(baseSku, color, size),
+          });
+        } else {
+          next.push({
+            id: `variant-${key}`,
+            color,
+            size,
+            name: `(${[color, size].filter(Boolean).join("/")})`,
+            unit: baseUnit,
+            sku: autoVariantSku(baseSku, color, size),
+            barcode: "",
+            purchasePrice: "0",
+            sellPrice: "0",
+            initialStock: "0",
+          });
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extras.attrColor, extras.attrSize, values.code, values.unit]);
+
+  // Sync variant rows into the submitted payload under `variants`.
+  useEffect(() => {
+    const toNumberOrUndef = (raw: string): number | undefined => {
+      if (raw === "" || raw === null || raw === undefined) return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    setValues((prev) => ({
+      ...prev,
+      variants:
+        variantRows.length > 0
+          ? variantRows.map((r) => ({
+              name: r.name,
+              color: r.color || undefined,
+              size: r.size || undefined,
+              unit: r.unit,
+              sku: r.sku,
+              barcode: r.barcode || undefined,
+              purchasePrice: toNumberOrUndef(r.purchasePrice) ?? 0,
+              sellPrice: toNumberOrUndef(r.sellPrice) ?? 0,
+              initialStock: toNumberOrUndef(r.initialStock) ?? 0,
+            }))
+          : undefined,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantRows]);
+
+  const removeVariant = (row: ProductVariantRow) => {
+    removedVariantKeys.current.add(variantComboKey(row.color, row.size));
+    setVariantRows((prev) => prev.filter((r) => r.id !== row.id));
+  };
+
+  // Copy the current row's prices down onto every row below it.
+  const copyPriceDown = (row: ProductVariantRow) => {
+    setVariantRows((prev) => {
+      const idx = prev.findIndex((r) => r.id === row.id);
+      if (idx < 0) return prev;
+      const { purchasePrice, sellPrice } = prev[idx];
+      return prev.map((r, i) => (i > idx ? { ...r, purchasePrice, sellPrice } : r));
+    });
+  };
 
   const renderedDynamicKeys = useRef(new Set<string>());
 
@@ -771,6 +877,20 @@ export function InventoryItemCreateForm({
           />
           Quản lý mã vạch theo từng đơn vị tính
         </label>
+
+        {variantRows.length > 0 && (
+          <div className="mt-4 border-t pt-4">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Danh sách phiên bản
+            </h4>
+            <ProductVariantsTable
+              rows={variantRows}
+              setRows={setVariantRows}
+              onRemove={removeVariant}
+              onCopyPriceDown={copyPriceDown}
+            />
+          </div>
+        )}
       </section>
     </>
   );
@@ -1065,4 +1185,32 @@ export function InventoryItemCreateForm({
       />
     </>
   );
+}
+
+/** Split a comma-separated attribute field into trimmed, non-empty values. */
+function splitAttributeValues(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
+
+/** Stable key for a (color, size) combo, used to merge edits across regenerations. */
+function variantComboKey(color: string, size: string): string {
+  return `${color}__${size}`;
+}
+
+/** Uppercase, accent-stripped slug for SKU suffixes. */
+function variantSlug(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[đĐ]/g, (c) => (c === "đ" ? "d" : "D"))
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "");
+}
+
+/** Auto SKU = base SKU + accent-stripped color/size suffixes (e.g. "AO-DO-S"). */
+function autoVariantSku(base: string, color: string, size: string): string {
+  return [base, variantSlug(color), variantSlug(size)].filter(Boolean).join("-");
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type Ref } from "react";
 import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { useFastStockTransferActions } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-actions";
 import { useFastStockTransferProductPicker } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-product-picker";
@@ -11,6 +11,8 @@ export interface FastStockTransferProductSearchInputProps {
   placeholder?: string;
   minChars?: number;
   debounceMs?: number;
+  inputRef?: Ref<HTMLInputElement>;
+  onAfterSelect?: () => void;
 }
 
 export function FastStockTransferProductSearchInput({
@@ -18,6 +20,8 @@ export function FastStockTransferProductSearchInput({
   placeholder = "SKU, tên, mã vạch",
   minChars = 1,
   debounceMs = 150,
+  inputRef,
+  onAfterSelect,
 }: FastStockTransferProductSearchInputProps) {
   const toolbarDraft = usePosFastStockTransferWorkflowStore(
     (s) => s.toolbarDraft,
@@ -42,6 +46,18 @@ export function FastStockTransferProductSearchInput({
       onSelect={(p) => {
         handleToolbarDraftProduct(p);
         setProductToolbar({ query: `${p.code} — ${p.name}` });
+        onAfterSelect?.();
+      }}
+      onSubmitQuery={() => {
+        if (toolbarDraft.product) {
+          onAfterSelect?.();
+          return true;
+        }
+        return false;
+      }}
+      onClear={() => {
+        handleToolbarDraftProduct(null);
+        setProductToolbar({ query: "" });
       }}
       itemKey={(p) => p.itemId}
       renderItem={(p) => <span className="font-medium">{p.name}</span>}
@@ -55,6 +71,7 @@ export function FastStockTransferProductSearchInput({
       minChars={minChars}
       debounceMs={debounceMs}
       containerClassName="w-full min-w-0"
+      inputRef={inputRef}
     />
   );
 }

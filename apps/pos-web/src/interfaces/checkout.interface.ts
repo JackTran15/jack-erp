@@ -3,6 +3,7 @@ import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
+import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
 
 export interface InvoiceTabItem {
@@ -15,6 +16,19 @@ export interface InvoiceTabItem {
    * of saved drafts; reusable for any future per-tab counters.
    */
   badgeCount?: number;
+}
+
+/**
+ * Khuyến mại dòng (line-level discount). 3 field đi cùng nhau — `lineDiscount`
+ * undefined = không khuyến mại. Lưu local trong session draft; chưa wire BE
+ * (mapper invoice vẫn gửi `lineDiscount: 0`).
+ */
+export interface CartLineDiscount {
+  type: "percent" | "amount";
+  /** % (0-100) khi `type=percent` hoặc số VNĐ khi `type=amount`. */
+  value: number;
+  /** Lý do bắt buộc, hiển thị trong dòng KM đỏ trên row. */
+  reason: string;
 }
 
 /** Single line in the active invoice cart. Identical to legacy CheckoutPage. */
@@ -39,12 +53,20 @@ export interface CartLine {
    * trống ở đơn trả `quick` (không có hóa đơn gốc).
    */
   originalInvoiceItemId?: string;
+  /** KM dòng — undefined = không KM. */
+  lineDiscount?: CartLineDiscount;
+  /** Ghi chú nội bộ cho dòng — undefined = không ghi chú. */
+  note?: string;
 }
 
 export interface CatalogProduct {
+  /** Product id (kind=PRODUCT) hoặc item id (kind=ITEM). */
   id: string;
   name: string;
+  /** Giá thấp nhất trong các biến thể (minPrice). */
   price: number;
+  /** Loại card → dùng mở dialog chọn biến thể đúng kind. */
+  kind: PosProductKind;
 }
 
 export interface PaymentMethodOption {

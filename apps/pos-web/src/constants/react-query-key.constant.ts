@@ -50,9 +50,17 @@ export const CUSTOMER_KEYS = {
   MEMBERSHIP_CARD_TYPES: ["customers", "membership-card-types"] as const,
 } as const;
 
+export const SALES_HIERARCHY_KEYS = {
+  ALL: ["sales-hierarchy"] as const,
+  /** `GET /branches/:id/salesmen` — nhân viên bán hàng được gán cho chi nhánh. */
+  SALESMEN: (branchId: string) =>
+    ["sales-hierarchy", "salesmen", branchId] as const,
+} as const;
+
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
+  PRODUCTS: (branchId: string) => ["catalog", "products", branchId] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
 } as const;

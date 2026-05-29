@@ -35,10 +35,16 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       (l) => `
         <tr>
           <td class="col-idx">${l.index}</td>
-          <td class="col-name">${escapeHtml(l.name)}</td>
+          <td class="col-name">${escapeHtml(l.name)}${
+            l.discountLabel
+              ? `<div class="line-sub">${escapeHtml(l.discountLabel)}</div>`
+              : ""
+          }${
+            l.note ? `<div class="line-sub">Ghi chú: ${escapeHtml(l.note)}</div>` : ""
+          }</td>
           <td class="col-qty">${formatVnd(l.qty)}</td>
           <td class="col-price">${formatVnd(l.unitPrice)}</td>
-          <td class="col-total">${formatVnd(l.qty * l.unitPrice)}</td>
+          <td class="col-total">${formatVnd(l.lineTotal ?? l.qty * l.unitPrice)}</td>
         </tr>`,
     )
     .join("");
@@ -117,6 +123,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       }
       .product-table .col-idx { text-align: center; width: 32px; color: #000; }
       .product-table .col-name { text-align: left; color: #000; }
+      .product-table .col-name .line-sub { font-size: 11px; font-style: italic; }
       .product-table .col-qty { text-align: center; width: 48px; color: #000; }
       .product-table .col-price { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
       .product-table .col-total { text-align: right; width: 96px; font-variant-numeric: tabular-nums; color: #000; }
@@ -191,7 +198,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       </header>
 
       <section class="doc-title">
-        <h1>HÓA ĐƠN</h1>
+        <h1>${invoice.provisional ? "HÓA ĐƠN TẠM TÍNH" : "HÓA ĐƠN"}</h1>
         <div class="doc-number">Số: ${escapeHtml(invoiceNumber)}</div>
       </section>
 

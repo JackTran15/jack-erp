@@ -14,6 +14,7 @@ import type { ResolveCheckoutPayloadError } from "@erp/pos/types/checkout.type";
 import type {
   CartLine,
   DraftInvoice,
+  Salesperson,
 } from "@erp/pos/interfaces/checkout.interface";
 
 interface BuildCreateInvoicePayloadInput {
@@ -22,6 +23,7 @@ interface BuildCreateInvoicePayloadInput {
   customer: CustomerRow | null;
   note?: string;
   draftLabel?: string;
+  salesperson?: Salesperson | null;
 }
 
 /**
@@ -52,6 +54,7 @@ export function buildCreateInvoicePayload(
     draftLabel: input.draftLabel,
     note: input.note,
     items: mapCartToInvoiceItems(input.cart),
+    salespersonId: input.salesperson?.id,
   };
 }
 
@@ -60,6 +63,7 @@ interface BuildUpdateInvoicePayloadInput {
   customer: CustomerRow | null;
   note?: string;
   draftLabel?: string;
+  salesperson?: Salesperson | null;
 }
 
 /**
@@ -74,6 +78,7 @@ export function buildUpdateInvoicePayload(
     draftLabel: input.draftLabel,
     note: input.note,
     items: mapCartToInvoiceItems(input.cart),
+    salespersonId: input.salesperson?.id,
   };
 }
 

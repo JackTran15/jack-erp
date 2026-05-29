@@ -3,6 +3,7 @@ import { POS_HOTKEYS } from "@erp/pos/constants/hotkeys.constant";
 import { usePosHotkey } from "@erp/pos/hooks/common/use-pos-hotkey";
 import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutDraft } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-draft";
+import { useCheckoutEstimate } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-estimate";
 import {
   selectHasAnyCartLines,
   selectIsReturnExchangeInvoice,
@@ -27,6 +28,7 @@ export interface CheckoutHotkeyRefs {
 export function useCheckoutHotkeys({ refs }: { refs: CheckoutHotkeyRefs }): void {
   const { finalizeCheckoutAndPrint } = useCheckoutActions();
   const { saveDraft } = useCheckoutDraft();
+  const { printEstimate } = useCheckoutEstimate();
 
   const addSession = usePosCheckoutSessionStore((s) => s.addSession);
   const hasCartItems = usePosCheckoutSessionStore(selectHasAnyCartLines);
@@ -71,7 +73,11 @@ export function useCheckoutHotkeys({ refs }: { refs: CheckoutHotkeyRefs }): void
   );
 
   usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => saveDraft(), {
-    enabled: !isReturnExchange,
+    enabled: !isReturnExchange && hasCartItems,
+  });
+
+  usePosHotkey(POS_HOTKEYS.checkout.printEstimate, () => void printEstimate(), {
+    enabled: !isReturnExchange && hasCartItems,
   });
 
   usePosHotkey(POS_HOTKEYS.checkout.addSession, () => addSession());

@@ -33,7 +33,7 @@ export function CheckoutLeftPane({
   catalogSearchRef,
 }: CheckoutLeftPaneProps) {
   const checkoutVariant = usePosCheckoutSessionStore(selectCheckoutVariant);
-  const { catalogCollapsed, catalogLoading, catalogProducts } =
+  const { catalogCollapsed, catalogProductsLoading, catalogProducts } =
     useCheckoutCatalog();
 
   return (
@@ -57,7 +57,7 @@ export function CheckoutLeftPane({
       {!catalogCollapsed && (
         <>
           <ProductCatalogHeader inputRef={catalogSearchRef} />
-          {catalogLoading ? (
+          {catalogProductsLoading ? (
             <p className="px-3 py-6 text-[13px] text-gray-500">Đang tải…</p>
           ) : catalogProducts.length === 0 ? (
             <p className="px-3 py-6 text-[13px] text-gray-500">

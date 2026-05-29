@@ -32,6 +32,7 @@ export const CHECKOUT_ANNOUNCEMENTS = {
   pointsApplied: (points: number) => `Đã áp dụng ${points} điểm.`,
   POINTS_CLEARED: "Đã bỏ áp dụng điểm.",
   invoiceCanceled: "Đã hủy hóa đơn.",
+  estimatePrinted: "Đã in hóa đơn tạm tính.",
   draftSaved: (code: string) => `Đã lưu tạm hóa đơn ${code}`,
   draftUpdated: (code: string) => `Đã cập nhật hóa đơn lưu tạm ${code}`,
   /** Hậu tố " cho <khách>" hoặc " (khách lẻ)" cho announce thanh toán/đổi trả. */
@@ -55,6 +56,7 @@ export const CHECKOUT_TOASTS = {
   PAYMENT_FAILED: "Không thu được tiền",
   RETURN_FAILED: "Không ghi nhận được đổi trả",
   DRAFT_SAVE_FAILED: "Không lưu được hóa đơn lưu tạm",
+  ESTIMATE_FAILED: "Không in được hóa đơn tạm tính",
   /** BE 400 khi POST /invoices/:id/redeem-points (thẻ/balance/giá trị đơn). */
   REDEEM_FAILED: "Áp dụng điểm thất bại",
 } as const;
