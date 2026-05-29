@@ -64,7 +64,7 @@ export function PaymentCTAButtons() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={isSaving}
+            disabled={isSaving || !hasCartItems}
             className="inline-flex flex-1 flex-col items-center justify-center rounded-l-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span>Lưu tạm</span>
@@ -76,7 +76,7 @@ export function PaymentCTAButtons() {
           <button
             type="button"
             onClick={() => setEstimateOpen((v) => !v)}
-            disabled={busy}
+            disabled={busy || !hasCartItems}
             aria-label="In tạm tính"
             aria-haspopup="menu"
             aria-expanded={estimateOpen}

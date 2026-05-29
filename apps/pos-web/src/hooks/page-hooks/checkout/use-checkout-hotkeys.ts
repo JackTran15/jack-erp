@@ -73,7 +73,7 @@ export function useCheckoutHotkeys({ refs }: { refs: CheckoutHotkeyRefs }): void
   );
 
   usePosHotkey(POS_HOTKEYS.checkout.saveDraft, () => saveDraft(), {
-    enabled: !isReturnExchange,
+    enabled: !isReturnExchange && hasCartItems,
   });
 
   usePosHotkey(POS_HOTKEYS.checkout.printEstimate, () => void printEstimate(), {
