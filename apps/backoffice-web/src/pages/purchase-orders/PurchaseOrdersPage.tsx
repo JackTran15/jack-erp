@@ -917,6 +917,10 @@ function PurchaseOrderFormDialog({
       toast.error("Vui lòng chọn kho nhập.");
       return false;
     }
+    if (lines.length === 0) {
+      toast.error("Vui lòng thêm ít nhất một dòng hàng hóa.");
+      return false;
+    }
     if (lines.some((l) => !l.itemId)) {
       toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
       return false;
@@ -1469,7 +1473,7 @@ function PurchaseOrderFormDialog({
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+              setLines((prev) => prev.filter((_, i) => i !== idx));
               markDirty();
             }}
             showAddRow={!isView}

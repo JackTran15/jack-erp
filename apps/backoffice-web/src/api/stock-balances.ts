@@ -1,4 +1,5 @@
 import { apiClient } from "../lib/api-axios";
+import type { StockByLocationResponse } from "@erp/shared-interfaces";
 
 export type StringFilterMode =
   | "contains"
@@ -76,6 +77,29 @@ export async function listStockBalances(
   }
   const { data } = await apiClient.get<PaginatedResponse<StockBalanceRow>>(
     "/inventory/stock/balances",
+    { params },
+  );
+  return data;
+}
+
+export interface LocationStockItemsQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+}
+
+export async function listLocationStockItems(
+  locationId: string,
+  query: LocationStockItemsQuery,
+): Promise<StockByLocationResponse> {
+  const params: Record<string, string | number> = {
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+  if (query.search?.trim()) params.search = query.search.trim();
+
+  const { data } = await apiClient.get<StockByLocationResponse>(
+    `/inventory/locations/${locationId}/stock-items`,
     { params },
   );
   return data;

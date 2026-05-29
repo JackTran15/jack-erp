@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AppModal,
   Button,
@@ -10,6 +11,7 @@ import {
 import { LocationType } from "@erp/shared-interfaces";
 import {
   Copy,
+  Eye,
   HelpCircle,
   Pencil,
   Plus,
@@ -91,6 +93,7 @@ function getActiveBranchId(): string | null {
 }
 
 export function ItemLocationsPage() {
+  const navigate = useNavigate();
   const [locations, setLocations] = useState<PaginatedResponse<InventoryLocation> | null>(null);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,9 +117,20 @@ export function ItemLocationsPage() {
   const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
 
   const loadStorages = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      setStorages([]);
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      return;
+    }
     try {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "200",
+        branchId,
+      });
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch (err) {
@@ -125,11 +139,18 @@ export function ItemLocationsPage() {
   }, []);
 
   const loadLocations = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
+        branchId,
       });
       if (storageFilter) params.set("storageId", storageFilter);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
@@ -259,6 +280,17 @@ export function ItemLocationsPage() {
     [loadLocations, selectedId],
   );
 
+  const openStockDialog = useCallback((loc: InventoryLocation) => {
+    setStockDialogLoc(loc);
+  }, []);
+
+  const openLocationDetail = useCallback(
+    (loc: InventoryLocation) => {
+      navigate(`/inventory/item-location-details?locationId=${encodeURIComponent(loc.id)}`);
+    },
+    [navigate],
+  );
+
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -287,6 +319,16 @@ export function ItemLocationsPage() {
       onClick: () => selected && setDialogState({ mode: "edit", initial: selected }),
     },
     {
+      id: "detail",
+      label: "Chi tiết",
+      icon: Eye,
+      disabled: !selected,
+      onClick: () => {
+        if (!selected) return;
+        openLocationDetail(selected);
+      },
+    },
+    {
       id: "delete",
       label: "Ngừng hoạt động",
       icon: Trash2,
@@ -311,7 +353,7 @@ export function ItemLocationsPage() {
         <button
           type="button"
           className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.code}
@@ -326,7 +368,7 @@ export function ItemLocationsPage() {
         <button
           type="button"
           className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.name}
