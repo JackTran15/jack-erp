@@ -435,7 +435,7 @@ export function GoodsIssuePage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
@@ -1548,13 +1548,13 @@ function GoodsIssueFormDialog({
             </label>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
             >
               Chọn kho
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
             >
               Nhập khẩu
             </button>

@@ -75,6 +75,23 @@ const STATUS_LABEL = {
 const FILTER_KEYS = ["code", "name"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
+const naturalCollator = new Intl.Collator("vi-VN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  return naturalCollator.compare(a ?? "", b ?? "");
+}
+
+function sortLocationsByCode(rows: InventoryLocation[]) {
+  return [...rows].sort(
+    (a, b) =>
+      compareText(a.code, b.code) ||
+      compareText(a.name, b.name),
+  );
+}
+
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
     (acc, k) => {
@@ -151,6 +168,8 @@ export function ItemLocationsPage() {
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
         branchId,
+        sortBy: "code",
+        sortOrder: "asc",
       });
       if (storageFilter) params.set("storageId", storageFilter);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
@@ -186,7 +205,7 @@ export function ItemLocationsPage() {
 
   const filteredRows = useMemo(() => {
     const rows = locations?.data ?? [];
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       if (statusFilter === "active" && !row.isActive) return false;
       if (statusFilter === "inactive" && row.isActive) return false;
       for (const key of FILTER_KEYS) {
@@ -208,6 +227,7 @@ export function ItemLocationsPage() {
       }
       return true;
     });
+    return sortLocationsByCode(filtered);
   }, [locations, columnFilters, statusFilter]);
 
   const handleCreate = useCallback(
@@ -352,7 +372,7 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
           onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
@@ -367,7 +387,7 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
           onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
@@ -581,7 +601,7 @@ function ItemLocationFormDialog({
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            className="flex items-center gap-1.5 text-sm text-primary-blue transition-colors hover:text-primary-blue-hover"
           >
             <HelpCircle className="h-4 w-4" />
             Trợ giúp

@@ -23,6 +23,34 @@ import { buildQuery } from "./ItemLocationDetailsQuery";
 import { ArrangeLocationDialog } from "./ArrangeLocationDialog";
 import { TransferLocationDialog } from "./TransferLocationDialog";
 
+const naturalCollator = new Intl.Collator("vi-VN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  return naturalCollator.compare(a ?? "", b ?? "");
+}
+
+function sortStockRowsByLocation(rows: StockBalanceRow[]) {
+  return [...rows].sort(
+    (a, b) =>
+      compareText(a.location.code, b.location.code) ||
+      compareText(a.location.name, b.location.name) ||
+      compareText(a.item.code, b.item.code) ||
+      compareText(a.item.name, b.item.name),
+  );
+}
+
+function sortLocationRowsBySku(rows: StockByLocationItem[]) {
+  return [...rows].sort(
+    (a, b) =>
+      compareText(a.code, b.code) ||
+      compareText(a.name, b.name) ||
+      compareText(a.variantLabel, b.variantLabel),
+  );
+}
+
 export function ItemLocationDetailsPage() {
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -56,12 +84,22 @@ export function ItemLocationDetailsPage() {
   });
 
   const locationQuery = useQuery({
-    queryKey: ["location-stock-items", locationId, page, pageSize, locationSearch],
+    queryKey: [
+      "location-stock-items",
+      locationId,
+      page,
+      pageSize,
+      locationSearch,
+      "code",
+      "asc",
+    ],
     queryFn: () =>
       listLocationStockItems(locationId, {
         page,
         pageSize,
         search: locationSearch,
+        sortBy: "code",
+        sortOrder: "asc",
       }),
     enabled: isLocationDetail,
   });
@@ -78,8 +116,14 @@ export function ItemLocationDetailsPage() {
     }
   }, [isError, activeError]);
 
-  const stockRows = stockQuery.data?.data ?? [];
-  const locationRows = locationQuery.data?.data ?? [];
+  const stockRows = useMemo(
+    () => sortStockRowsByLocation(stockQuery.data?.data ?? []),
+    [stockQuery.data?.data],
+  );
+  const locationRows = useMemo(
+    () => sortLocationRowsBySku(locationQuery.data?.data ?? []),
+    [locationQuery.data?.data],
+  );
   const total = isLocationDetail
     ? (locationQuery.data?.meta.total ?? 0)
     : (stockQuery.data?.total ?? 0);

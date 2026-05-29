@@ -30,8 +30,6 @@ export interface StockBalanceRow {
     storageId: string;
     storageName: string;
   };
-  threshold: { minQty: number | null; maxQty: number | null };
-  belowMin: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -44,6 +42,14 @@ export interface PaginatedResponse<T> {
 export interface StockBalancesQuery {
   page: number;
   pageSize: number;
+  sortBy?:
+    | "itemCode"
+    | "itemName"
+    | "quantity"
+    | "lastMovementAt"
+    | "locationName"
+    | "storageName";
+  sortOrder?: "asc" | "desc";
   // Direct ID filters (backend pre-existing, not per-column)
   itemId?: string;
   locationId?: string;
@@ -86,6 +92,8 @@ export interface LocationStockItemsQuery {
   page: number;
   pageSize: number;
   search?: string;
+  sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
+  sortOrder?: "asc" | "desc";
 }
 
 export async function listLocationStockItems(
@@ -97,6 +105,8 @@ export async function listLocationStockItems(
     pageSize: query.pageSize,
   };
   if (query.search?.trim()) params.search = query.search.trim();
+  if (query.sortBy) params.sortBy = query.sortBy;
+  if (query.sortOrder) params.sortOrder = query.sortOrder;
 
   const { data } = await apiClient.get<StockByLocationResponse>(
     `/inventory/locations/${locationId}/stock-items`,

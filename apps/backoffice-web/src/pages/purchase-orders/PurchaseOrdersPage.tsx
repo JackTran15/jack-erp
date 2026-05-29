@@ -398,7 +398,7 @@ export function PurchaseOrdersPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
@@ -493,7 +493,7 @@ export function PurchaseOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title="Nhập kho"
+        title={<span className="text-lg">Nhập kho</span>}
         tabs={<InventoryTabBar activeId="purchase-orders" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={
@@ -1448,10 +1448,10 @@ function PurchaseOrderFormDialog({
               <input type="checkbox" disabled />
               <span>Quét mã vạch</span>
             </label>
-            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+            <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
               Chọn kho
             </button>
-            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+            <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
               Nhập khẩu
             </button>
           </>

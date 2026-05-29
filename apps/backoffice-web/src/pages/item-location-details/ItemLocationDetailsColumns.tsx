@@ -51,13 +51,7 @@ export function buildItemLocationColumns(
       filterKind: "symbol",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      render: (r) => (
-        <span
-          className={r.belowMin ? "text-destructive font-medium" : undefined}
-        >
-          {Number(r.quantity).toLocaleString("vi-VN")}
-        </span>
-      ),
+      render: (r) => Number(r.quantity).toLocaleString("vi-VN"),
     },
     {
       key: "categoryName",
@@ -79,25 +73,6 @@ export function buildItemLocationColumns(
       width: 180,
       filterKind: "symbol",
       render: (r) => r.location.storageName,
-    },
-    {
-      key: "minMax",
-      label: "Min / Max",
-      width: 110,
-      filterKind: "none",
-      headerClassName: "text-right",
-      className: "text-right tabular-nums text-muted-foreground",
-      render: (r) => {
-        const min =
-          r.threshold.minQty == null
-            ? "—"
-            : Number(r.threshold.minQty).toLocaleString("vi-VN");
-        const max =
-          r.threshold.maxQty == null
-            ? "—"
-            : Number(r.threshold.maxQty).toLocaleString("vi-VN");
-        return `${min} / ${max}`;
-      },
     },
   ];
 }
@@ -146,13 +121,7 @@ export function buildLocationStockItemColumns(
       filterKind: "none",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      render: (r) => (
-        <span
-          className={r.belowMin ? "text-destructive font-medium" : undefined}
-        >
-          {Number(r.quantity).toLocaleString("vi-VN")}
-        </span>
-      ),
+      render: (r) => Number(r.quantity).toLocaleString("vi-VN"),
     },
     {
       key: "categoryName",
@@ -167,21 +136,6 @@ export function buildLocationStockItemColumns(
       width: 80,
       filterKind: "none",
       render: (r) => r.unit,
-    },
-    {
-      key: "minMax",
-      label: "Min / Max",
-      width: 110,
-      filterKind: "none",
-      headerClassName: "text-right",
-      className: "text-right tabular-nums text-muted-foreground",
-      render: (r) => {
-        const min =
-          r.minQty == null ? "—" : Number(r.minQty).toLocaleString("vi-VN");
-        const max =
-          r.maxQty == null ? "—" : Number(r.maxQty).toLocaleString("vi-VN");
-        return `${min} / ${max}`;
-      },
     },
   ];
 }

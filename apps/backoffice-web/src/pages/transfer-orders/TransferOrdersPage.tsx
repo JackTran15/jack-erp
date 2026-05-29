@@ -317,7 +317,7 @@ export function TransferOrdersPage() {
         row.documentNumber ? (
           <button
             type="button"
-            className="text-primary hover:underline"
+            className="text-primary-blue transition-colors hover:text-primary-blue-hover"
             onClick={(e) => {
               e.stopPropagation();
               setSelectedId(row.id);
@@ -1041,14 +1041,14 @@ function TransferOrderFormDialog({
             </label>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
               disabled
             >
               Chọn kho
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
               disabled
             >
               Nhập khẩu

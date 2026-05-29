@@ -31,19 +31,22 @@ export const INVENTORY_TABS: (PageTabItem & {
 ];
 
 export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
+  const linkClassName =
+    "font-medium text-primary-blue transition-colors hover:text-primary-blue-hover";
+
   return (
     <PageTabBar
       activeId={activeId}
       items={INVENTORY_TABS}
       renderItem={(item, isActive) => {
         if (isActive) {
-          return <span className="font-semibold text-black">{item.label}</span>;
+          return <span className={linkClassName}>{item.label}</span>;
         }
         const tab = item as (typeof INVENTORY_TABS)[number];
         if (tab.comingSoon) {
           return (
             <span
-              className="cursor-not-allowed text-blue-600/60"
+              className="cursor-not-allowed font-medium text-primary-blue/60"
               title="Sắp triển khai"
             >
               {item.label}
@@ -51,7 +54,7 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
           );
         }
         return (
-          <Link to={item.href ?? "#"} className="text-blue-600 hover:underline">
+          <Link to={item.href ?? "#"} className={linkClassName}>
             {item.label}
           </Link>
         );

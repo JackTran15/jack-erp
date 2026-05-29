@@ -66,7 +66,7 @@ export function PageToolbar({
       className={cn(
         "flex items-center gap-0.5 border-b px-2 py-1",
         tone === "primary"
-          ? "rounded-md border-[#1f2d8a] bg-[#1f2d8a] text-white"
+          ? "rounded-md border-primary-blue bg-primary-blue text-white"
           : "bg-white",
         className,
       )}
