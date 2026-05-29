@@ -179,7 +179,8 @@ export function InventoryItemCreateForm({
       for (const size of sizes) combos.push({ color: "", size });
     }
 
-    const baseSku = String(values.sku ?? "");
+    // The product SKU is stored in the `code` field (config key "code").
+    const baseSku = String(values.code ?? "");
     const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
 
     setVariantRows((prev) => {
@@ -215,7 +216,7 @@ export function InventoryItemCreateForm({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extras.attrColor, extras.attrSize, values.sku, values.unit]);
+  }, [extras.attrColor, extras.attrSize, values.code, values.unit]);
 
   // Sync variant rows into the submitted payload under `variants`.
   useEffect(() => {
