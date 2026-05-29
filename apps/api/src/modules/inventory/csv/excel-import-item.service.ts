@@ -37,6 +37,7 @@ export class ExcelImportItemService {
   private readonly logger = new Logger(ExcelImportItemService.name);
 
   private readonly productCache = new Map<string, string>();
+  private readonly categoryCache = new Map<string, string>(); // "${orgId}:name:${lower}" | "${orgId}:code:${lower}" → categoryId
   private readonly attrDefCache = new Map<string, string>(); // "${productId}:${attrName.lower}" → defId
   private readonly attrOptCache = new Map<string, string>(); // "${defId}:${valueLabel.lower}" → optionId
 
@@ -61,6 +62,7 @@ export class ExcelImportItemService {
 
   resetCaches(): void {
     this.productCache.clear();
+    this.categoryCache.clear();
     this.attrDefCache.clear();
     this.attrOptCache.clear();
   }
@@ -350,14 +352,23 @@ export class ExcelImportItemService {
     actor: ActorContext,
   ): Promise<string | undefined> {
     const code = getExcelField(raw, InventoryImportExcelField.ITEM_CATEGORY_CODE)?.trim();
-    const name = getExcelField(raw, InventoryImportExcelField.ITEM_CATEGORY_NAME);
+    const name = getExcelField(raw, InventoryImportExcelField.ITEM_CATEGORY_NAME)?.trim();
 
     if (code) {
+      const cacheKey = `${actor.organizationId}:code:${code.toLowerCase()}`;
+      const cached = this.categoryCache.get(cacheKey);
+      if (cached) return cached;
       const cat = await this.locationService.resolveOrCreateCategoryByCode(code, name, actor);
+      this.categoryCache.set(cacheKey, cat.id);
+      this.categoryCache.set(`${actor.organizationId}:name:${cat.name.toLowerCase()}`, cat.id);
       return cat.id;
     }
     if (name) {
+      const cacheKey = `${actor.organizationId}:name:${name.toLowerCase()}`;
+      const cached = this.categoryCache.get(cacheKey);
+      if (cached) return cached;
       const cat = await this.locationService.resolveOrCreateCategoryByName(name, actor);
+      this.categoryCache.set(cacheKey, cat.id);
       return cat.id;
     }
     return undefined;

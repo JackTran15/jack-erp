@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Brackets,
@@ -7,6 +7,10 @@ import {
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
+import { ProductEntity } from '../product/product.entity';
+import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
+import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
+import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import {
   CrudEntityConfig,
   DeletionPolicy,
@@ -15,6 +19,8 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BaseCrudService } from '../../crud/base-crud.service';
+import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
+import type { PaginatedResponse } from '@erp/shared-interfaces';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
@@ -29,6 +35,12 @@ import {
   CreateItemThresholdInput,
   CreateItemUnitInput,
 } from './dto/create-item.dto';
+import type {
+  ProductGroupRow,
+  ProductGroupsQueryDto,
+  ProductItemsQueryDto,
+  ProductVariantRow,
+} from './dto/product-group-query.dto';
 
 export const INVENTORY_ITEM_SERVICE_TOKEN = 'InventoryItemCrudService';
 
@@ -41,6 +53,13 @@ interface NestedPayload {
   initialStockUnitPrice?: number;
   initialLocationId?: string;
   providerId?: string;
+  colors?: string[];
+  sizes?: string[];
+}
+
+interface ItemAttrSnapshot {
+  colors: string[];
+  sizes: string[];
 }
 
 @Injectable()
@@ -58,6 +77,12 @@ export class InventoryItemCrudService extends BaseCrudService<
     private readonly categoryRepo: Repository<ItemCategoryEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(ProductAttributeDefinitionEntity)
+    private readonly attrDefRepo: Repository<ProductAttributeDefinitionEntity>,
+    @InjectRepository(ProductAttributeOptionEntity)
+    private readonly attrOptRepo: Repository<ProductAttributeOptionEntity>,
+    @InjectRepository(ItemAttributeValueEntity)
+    private readonly attrValRepo: Repository<ItemAttributeValueEntity>,
     protected readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
   ) {
@@ -107,6 +132,45 @@ export class InventoryItemCrudService extends BaseCrudService<
     });
   }
 
+  // ─── Override list/getById to show product groups ────────────────────
+
+  override async list(
+    query: PaginationQueryDto,
+    filters: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<PaginatedResponse<any>> {
+    const categoryId = filters?.categoryId as string | undefined;
+    const result = await this.listProductGroups(actor, {
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      categoryId,
+      sortOrder: query.sortOrder,
+    });
+    return { ...result, page: query.page, pageSize: query.pageSize };
+  }
+
+  override async getById(id: string, actor: ActorContext): Promise<any> {
+    // Try as a real item ID first
+    const item = await this.repository.findOne({
+      where: { id, organizationId: actor.organizationId },
+      relations: ['category', 'product'],
+    });
+    if (item) {
+      const transformed = (this.transformListResults([item]) as any[])[0];
+      const attrs = item.productId
+        ? await this.loadProductAttributes(item.productId)
+        : await this.loadItemAttributes(item.id);
+      return { ...transformed, ...attrs };
+    }
+
+    // Fall back: treat id as a product ID → return representative item
+    const rep = await this.getRepresentativeItemForProduct(actor, id);
+    if (rep) return rep;
+
+    throw new NotFoundException(`Record ${id} not found`);
+  }
+
   /**
    * Full create: split nested arrays from the item payload, save the item,
    * then upsert providers / barcodes / units / threshold / initial stock —
@@ -115,8 +179,14 @@ export class InventoryItemCrudService extends BaseCrudService<
   override async create(
     payload: Record<string, any>,
     actor: ActorContext,
-  ): Promise<ItemEntity> {
+  ): Promise<any> {
     const normalized = normalizePayload(payload);
+
+    // When colors/sizes arrays are present → create product with variant matrix
+    if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
+      return this.createProductWithVariants(normalized, actor);
+    }
+
     const { nested, itemPayload } = this.splitNested(normalized);
     const cleaned = stripDerivedFields(itemPayload);
 
@@ -175,6 +245,23 @@ export class InventoryItemCrudService extends BaseCrudService<
     return saved;
   }
 
+  override async update(
+    id: string,
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<any> {
+    const normalized = normalizePayload(payload);
+
+    // Product-level update: add any new variant combos
+    if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
+      return this.updateProductWithVariants(id, normalized, actor);
+    }
+
+    const { colors: _c, sizes: _s, ...rest } = normalized;
+    const saved = (await super.update(id, rest as any, actor)) as ItemEntity;
+    return saved;
+  }
+
   protected override async beforeUpdate(
     id: string,
     payload: Record<string, any>,
@@ -204,6 +291,8 @@ export class InventoryItemCrudService extends BaseCrudService<
       initialStockUnitPrice,
       initialLocationId,
       providerId,
+      colors,
+      sizes,
       ...itemPayload
     } = payload;
     return {
@@ -216,6 +305,8 @@ export class InventoryItemCrudService extends BaseCrudService<
         initialStockUnitPrice,
         initialLocationId,
         providerId,
+        colors: Array.isArray(colors) ? colors : undefined,
+        sizes: Array.isArray(sizes) ? sizes : undefined,
       },
       itemPayload,
     };
@@ -381,6 +472,570 @@ export class InventoryItemCrudService extends BaseCrudService<
       );
     }
   }
+
+  // ─── Product + Variant creation ──────────────────────────────────────
+
+  private async createProductWithVariants(
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<{ productId: string; itemsCreated: number }> {
+    const {
+      name: productName,
+      code: productCode,
+      brand,
+      categoryId,
+      purchasePrice = 0,
+      sellingPrice = 0,
+      unit = 'Đôi',
+      isPosVisible = true,
+      isActive = true,
+      colors = [],
+      sizes = [],
+    } = payload;
+
+    if (!productName) throw new BadRequestException('Tên hàng hóa là bắt buộc');
+
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+    const product = await productRepo.save(
+      productRepo.create({
+        code: productCode || undefined,
+        name: productName,
+        isActive: isActive !== false,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+
+    const colorDef = (colors as string[]).length > 0
+      ? await this.resolveOrCreateAttrDef(product.id, 'Color', actor)
+      : null;
+    const sizeDef = (sizes as string[]).length > 0
+      ? await this.resolveOrCreateAttrDef(product.id, 'Size', actor)
+      : null;
+
+    const colorOptions: Array<{ id: string; label: string }> = colorDef
+      ? await Promise.all(
+          (colors as string[]).map(async (c) => ({
+            id: await this.resolveOrCreateAttrOption(colorDef, c, actor),
+            label: c,
+          })),
+        )
+      : [];
+    const sizeOptions: Array<{ id: string; label: string }> = sizeDef
+      ? await Promise.all(
+          (sizes as string[]).map(async (s) => ({
+            id: await this.resolveOrCreateAttrOption(sizeDef, s, actor),
+            label: s,
+          })),
+        )
+      : [];
+
+    const combos = this.buildCombos(colorOptions, sizeOptions);
+    let itemsCreated = 0;
+
+    for (const combo of combos) {
+      const variantLabel = [combo.size?.label, combo.color?.label]
+        .filter(Boolean)
+        .join(' · ');
+      const code = this.buildVariantCode(productCode || productName, combo);
+      const itemName = variantLabel ? `${productName} ${variantLabel}` : productName;
+
+      const item = await this.repository.save(
+        this.repository.create({
+          code,
+          name: itemName,
+          unit,
+          isActive: isActive !== false,
+          isPosVisible: isPosVisible !== false,
+          purchasePrice: Number(purchasePrice) || 0,
+          sellingPrice: Number(sellingPrice) || 0,
+          productId: product.id,
+          categoryId: categoryId || undefined,
+          brand: brand || undefined,
+          variantLabel: variantLabel || undefined,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+        }),
+      );
+
+      if (combo.color && colorDef) {
+        await this.upsertAttrValue(item.id, colorDef, combo.color.id, actor);
+      }
+      if (combo.size && sizeDef) {
+        await this.upsertAttrValue(item.id, sizeDef, combo.size.id, actor);
+      }
+      itemsCreated++;
+    }
+
+    return { productId: product.id, itemsCreated };
+  }
+
+  private async updateProductWithVariants(
+    productId: string,
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<{ productId: string; itemsAdded: number }> {
+    const { colors = [], sizes = [], name, code, isActive } = payload;
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+
+    const product = await productRepo.findOne({
+      where: { id: productId, organizationId: actor.organizationId },
+    });
+    if (!product) throw new NotFoundException(`Product ${productId} not found`);
+
+    const patch: Partial<ProductEntity> = {};
+    if (name) patch.name = name;
+    if (code !== undefined) patch.code = code || undefined;
+    if (isActive !== undefined) patch.isActive = Boolean(isActive);
+    if (Object.keys(patch).length > 0) {
+      await productRepo.update({ id: productId }, patch as any);
+    }
+
+    const colorDef = (colors as string[]).length > 0
+      ? await this.resolveOrCreateAttrDef(productId, 'Color', actor)
+      : null;
+    const sizeDef = (sizes as string[]).length > 0
+      ? await this.resolveOrCreateAttrDef(productId, 'Size', actor)
+      : null;
+
+    const colorOptions: Array<{ id: string; label: string }> = colorDef
+      ? await Promise.all(
+          (colors as string[]).map(async (c) => ({
+            id: await this.resolveOrCreateAttrOption(colorDef, c, actor),
+            label: c,
+          })),
+        )
+      : [];
+    const sizeOptions: Array<{ id: string; label: string }> = sizeDef
+      ? await Promise.all(
+          (sizes as string[]).map(async (s) => ({
+            id: await this.resolveOrCreateAttrOption(sizeDef, s, actor),
+            label: s,
+          })),
+        )
+      : [];
+
+    const combos = this.buildCombos(colorOptions, sizeOptions);
+    let itemsAdded = 0;
+
+    for (const combo of combos) {
+      const alreadyExists = await this.variantExists(productId, combo, actor);
+      if (alreadyExists) continue;
+
+      const variantLabel = [combo.size?.label, combo.color?.label]
+        .filter(Boolean)
+        .join(' · ');
+      const code = this.buildVariantCode(product.code || product.name, combo);
+
+      const item = await this.repository.save(
+        this.repository.create({
+          code,
+          name: variantLabel ? `${product.name} ${variantLabel}` : product.name,
+          unit: payload.unit || 'Đôi',
+          isActive: product.isActive,
+          isPosVisible: payload.isPosVisible !== false,
+          purchasePrice: Number(payload.purchasePrice) || 0,
+          sellingPrice: Number(payload.sellingPrice) || 0,
+          productId,
+          variantLabel: variantLabel || undefined,
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+        }),
+      );
+
+      if (combo.color && colorDef) {
+        await this.upsertAttrValue(item.id, colorDef, combo.color.id, actor);
+      }
+      if (combo.size && sizeDef) {
+        await this.upsertAttrValue(item.id, sizeDef, combo.size.id, actor);
+      }
+      itemsAdded++;
+    }
+
+    const attrs = await this.loadProductAttributes(productId);
+    return { productId, itemsAdded, ...attrs } as any;
+  }
+
+  private buildCombos(
+    colors: Array<{ id: string; label: string }>,
+    sizes: Array<{ id: string; label: string }>,
+  ): Array<{ color?: { id: string; label: string }; size?: { id: string; label: string } }> {
+    if (colors.length === 0 && sizes.length === 0) return [{}];
+    if (colors.length === 0) return sizes.map((s) => ({ size: s }));
+    if (sizes.length === 0) return colors.map((c) => ({ color: c }));
+    return colors.flatMap((c) => sizes.map((s) => ({ color: c, size: s })));
+  }
+
+  private buildVariantCode(
+    base: string,
+    combo: { color?: { label: string }; size?: { label: string } },
+  ): string {
+    const prefix = base
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 6)
+      .toUpperCase() || 'ITEM';
+    const parts = [combo.size?.label, combo.color?.label].filter(Boolean);
+    return parts.length > 0 ? `${prefix}-${parts.join('-')}` : prefix;
+  }
+
+  private async variantExists(
+    productId: string,
+    combo: { color?: { id: string }; size?: { id: string } },
+    actor: ActorContext,
+  ): Promise<boolean> {
+    const optionIds = [combo.color?.id, combo.size?.id].filter(Boolean) as string[];
+    if (optionIds.length === 0) return false;
+
+    const count = await this.repository
+      .createQueryBuilder('i')
+      .innerJoin(
+        'item_attribute_values',
+        'av',
+        'av.item_id = i.id AND av.option_id IN (:...optionIds)',
+        { optionIds },
+      )
+      .where('i.productId = :productId', { productId })
+      .andWhere('i.organizationId = :orgId', { orgId: actor.organizationId })
+      .groupBy('i.id')
+      .having('COUNT(DISTINCT av.option_id) = :cnt', { cnt: optionIds.length })
+      .getCount();
+
+    return count > 0;
+  }
+
+  // ─── Attribute helpers (Color / Size) ────────────────────────────────
+
+  private async loadProductAttributes(productId: string): Promise<ItemAttrSnapshot> {
+    const rows = await this.attrValRepo
+      .createQueryBuilder('av')
+      .innerJoin(ItemEntity, 'i', 'i.id = av.itemId AND i.productId = :productId', { productId })
+      .innerJoin('av.attributeDefinition', 'def')
+      .innerJoin('av.option', 'opt')
+      .andWhere("LOWER(def.name) IN ('color', 'size')")
+      .select(['def.name AS def_name', 'opt.valueLabel AS opt_value_label'])
+      .distinct(true)
+      .getRawMany<{ def_name: string; opt_value_label: string }>();
+
+    return rows.reduce(
+      (acc, r) => {
+        const lower = r.def_name?.toLowerCase();
+        if (lower === 'color' && !acc.colors.includes(r.opt_value_label)) {
+          acc.colors.push(r.opt_value_label);
+        } else if (lower === 'size' && !acc.sizes.includes(r.opt_value_label)) {
+          acc.sizes.push(r.opt_value_label);
+        }
+        return acc;
+      },
+      { colors: [] as string[], sizes: [] as string[] } as ItemAttrSnapshot,
+    );
+  }
+
+  private async loadItemAttributes(itemId: string): Promise<ItemAttrSnapshot> {
+    const rows = await this.attrValRepo
+      .createQueryBuilder('av')
+      .innerJoin('av.attributeDefinition', 'def')
+      .innerJoin('av.option', 'opt')
+      .where('av.itemId = :itemId', { itemId })
+      .andWhere("LOWER(def.name) IN ('color', 'size')")
+      .select(['def.name AS def_name', 'opt.valueLabel AS opt_value_label'])
+      .getRawMany<{ def_name: string; opt_value_label: string }>();
+
+    return rows.reduce(
+      (acc, r) => {
+        const lower = r.def_name?.toLowerCase();
+        if (lower === 'color') acc.colors = [r.opt_value_label ?? ''];
+        else if (lower === 'size') acc.sizes = [r.opt_value_label ?? ''];
+        return acc;
+      },
+      { colors: [] as string[], sizes: [] as string[] } as ItemAttrSnapshot,
+    );
+  }
+
+  private async resolveOrCreateAttrDef(
+    productId: string,
+    name: string,
+    actor: ActorContext,
+  ): Promise<string> {
+    const existing = await this.attrDefRepo
+      .createQueryBuilder('d')
+      .where('d.productId = :productId', { productId })
+      .andWhere('d.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(d.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing.id;
+
+    const created = await this.attrDefRepo.save(
+      this.attrDefRepo.create({
+        productId,
+        name,
+        sortOrder: 0,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+    return created.id;
+  }
+
+  private async resolveOrCreateAttrOption(
+    defId: string,
+    valueLabel: string,
+    actor: ActorContext,
+  ): Promise<string> {
+    const existing = await this.attrOptRepo
+      .createQueryBuilder('o')
+      .where('o.attributeDefinitionId = :defId', { defId })
+      .andWhere('o.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(o.value_label) = LOWER(:valueLabel)', { valueLabel })
+      .getOne();
+    if (existing) return existing.id;
+
+    const created = await this.attrOptRepo.save(
+      this.attrOptRepo.create({
+        attributeDefinitionId: defId,
+        valueLabel,
+        sortOrder: 0,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+    return created.id;
+  }
+
+  private async upsertAttrValue(
+    itemId: string,
+    defId: string,
+    optionId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const existing = await this.attrValRepo.findOne({
+      where: { itemId, attributeDefinitionId: defId },
+    });
+    if (existing) {
+      if (existing.optionId !== optionId) {
+        existing.optionId = optionId;
+        await this.attrValRepo.save(existing);
+      }
+      return;
+    }
+    await this.attrValRepo.save(
+      this.attrValRepo.create({
+        itemId,
+        attributeDefinitionId: defId,
+        optionId,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  // ─── Product-grouped item queries ────────────────────────────────────
+
+  async listProductGroups(
+    actor: ActorContext,
+    query: ProductGroupsQueryDto,
+  ): Promise<{ data: ProductGroupRow[]; total: number }> {
+    const { page = 1, pageSize = 20, search, categoryId } = query;
+    const orgId = actor.organizationId;
+    const offset = (page - 1) * pageSize;
+    const searchParam = search?.trim() ? `%${search.trim()}%` : null;
+    const catParam = categoryId ?? null;
+
+    const dataSql = `
+      WITH combined AS (
+        SELECT
+          'product'                                   AS type,
+          p.id                                        AS id,
+          COALESCE(p.code, p.name)                    AS code,
+          p.name                                      AS name,
+          ic.id                                       AS "categoryId",
+          ic.name                                     AS "categoryName",
+          MIN(i.unit)                                 AS unit,
+          AVG(i.purchase_price::numeric)::float       AS "purchasePrice",
+          AVG(i.selling_price::numeric)::float        AS "sellingPrice",
+          MIN(i.brand)                                AS brand,
+          MIN(i.item_type)                            AS "itemType",
+          bool_and(i.is_pos_visible)                  AS "isPosVisible",
+          bool_and(i.is_active)                       AS "isActive",
+          COUNT(i.id)::int                            AS "itemCount"
+        FROM products p
+        INNER JOIN items i
+          ON i.product_id = p.id
+          AND i.organization_id = $1
+        LEFT JOIN inventory_item_categories ic
+          ON ic.id = i.category_id
+        WHERE p.organization_id = $1
+          AND ($2::text IS NULL OR p.code ILIKE $2 OR p.name ILIKE $2 OR ic.name ILIKE $2)
+          AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+        GROUP BY p.id, p.code, p.name, ic.id, ic.name
+
+        UNION ALL
+
+        SELECT
+          'orphan'                                    AS type,
+          i.id                                        AS id,
+          i.code                                      AS code,
+          i.name                                      AS name,
+          ic.id                                       AS "categoryId",
+          ic.name                                     AS "categoryName",
+          i.unit                                      AS unit,
+          i.purchase_price::float                     AS "purchasePrice",
+          i.selling_price::float                      AS "sellingPrice",
+          i.brand                                     AS brand,
+          i.item_type                                 AS "itemType",
+          i.is_pos_visible                            AS "isPosVisible",
+          i.is_active                                 AS "isActive",
+          0                                           AS "itemCount"
+        FROM items i
+        LEFT JOIN inventory_item_categories ic
+          ON ic.id = i.category_id
+        WHERE i.organization_id = $1
+          AND i.product_id IS NULL
+          AND ($2::text IS NULL OR i.code ILIKE $2 OR i.name ILIKE $2 OR ic.name ILIKE $2)
+          AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+      )
+      SELECT * FROM combined ORDER BY code ASC
+      LIMIT $4 OFFSET $5
+    `;
+
+    const countSql = `
+      WITH combined AS (
+        SELECT p.id
+        FROM products p
+        INNER JOIN items i ON i.product_id = p.id AND i.organization_id = $1
+        LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+        WHERE p.organization_id = $1
+          AND ($2::text IS NULL OR p.code ILIKE $2 OR p.name ILIKE $2 OR ic.name ILIKE $2)
+          AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+        GROUP BY p.id
+
+        UNION ALL
+
+        SELECT i.id
+        FROM items i
+        LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+        WHERE i.organization_id = $1 AND i.product_id IS NULL
+          AND ($2::text IS NULL OR i.code ILIKE $2 OR i.name ILIKE $2 OR ic.name ILIKE $2)
+          AND ($3::uuid IS NULL OR ic.id = $3::uuid)
+      )
+      SELECT COUNT(*)::int AS total FROM combined
+    `;
+
+    const baseParams = [orgId, searchParam, catParam];
+    const [countResult, data] = await Promise.all([
+      this.dataSource.query<{ total: number }[]>(countSql, baseParams),
+      this.dataSource.query<ProductGroupRow[]>(dataSql, [...baseParams, pageSize, offset]),
+    ]);
+
+    return { data, total: countResult[0]?.total ?? 0 };
+  }
+
+  /** Returns a single representative ItemEntity for a product (the first item by code ASC),
+   *  merged with product-level fields (code, name). Used to pre-populate the item edit form. */
+  async getRepresentativeItemForProduct(
+    actor: ActorContext,
+    productId: string,
+  ): Promise<Record<string, unknown> | null> {
+    const item = await this.repository
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.category', 'category')
+      .leftJoinAndSelect('i.product', 'product')
+      .where('i.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('i.productId = :productId', { productId })
+      .orderBy('i.code', 'ASC')
+      .getOne();
+
+    if (!item) return null;
+
+    const { category, product, ...rest } = item as ItemEntity & {
+      category?: { id: string; name: string };
+      product?: { id: string; code?: string; name: string };
+    };
+
+    const attrs = await this.loadProductAttributes(productId);
+
+    return {
+      ...rest,
+      ...attrs,
+      categoryName: category?.name ?? '',
+      productName: product?.name ?? '',
+      // Override code/name with the PRODUCT values so the form shows product-level fields
+      code: product?.code ?? rest.code,
+      name: product?.name ?? rest.name,
+      _productId: productId,
+    };
+  }
+
+  async getProductGroup(
+    actor: ActorContext,
+    productId: string,
+  ): Promise<ProductGroupRow | null> {
+    const sql = `
+      SELECT
+        'product'                          AS type,
+        p.id                               AS id,
+        COALESCE(p.code, p.name)           AS code,
+        p.name                             AS name,
+        ic.id                              AS "categoryId",
+        ic.name                            AS "categoryName",
+        MIN(i.unit)                        AS unit,
+        AVG(i.selling_price::numeric)::float AS "sellingPrice",
+        COUNT(i.id)::int                   AS "itemCount"
+      FROM products p
+      INNER JOIN items i
+        ON i.product_id = p.id
+        AND i.organization_id = $1
+      LEFT JOIN inventory_item_categories ic
+        ON ic.id = i.category_id
+      WHERE p.organization_id = $1
+        AND p.id = $2
+      GROUP BY p.id, p.code, p.name, ic.id, ic.name
+      LIMIT 1
+    `;
+    const rows = await this.dataSource.query<ProductGroupRow[]>(sql, [actor.organizationId, productId]);
+    return rows[0] ?? null;
+  }
+
+  async listProductItems(
+    actor: ActorContext,
+    productId: string,
+    query: ProductItemsQueryDto,
+  ): Promise<{ data: ProductVariantRow[]; total: number }> {
+    const { page = 1, pageSize = 20 } = query;
+    const offset = (page - 1) * pageSize;
+
+    const qb = this.repository
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.category', 'category')
+      .where('i.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('i.productId = :productId', { productId })
+      .orderBy('i.code', 'ASC')
+      .skip(offset)
+      .take(pageSize);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    const data: ProductVariantRow[] = items.map((i) => ({
+      id: i.id,
+      code: i.code,
+      name: i.name,
+      variantLabel: i.variantLabel ?? null,
+      categoryId: i.categoryId ?? null,
+      categoryName: i.category?.name ?? null,
+      unit: i.unit,
+      purchasePrice: Number(i.purchasePrice),
+      sellingPrice: Number(i.sellingPrice),
+      brand: i.brand ?? null,
+      itemType: i.itemType ?? null,
+      isPosVisible: i.isPosVisible,
+      isActive: i.isActive,
+    }));
+
+    return { data, total };
+  }
 }
 
 function stripDerivedFields<T extends Record<string, any>>(payload: T): T {
@@ -396,6 +1051,9 @@ function stripDerivedFields<T extends Record<string, any>>(payload: T): T {
   // Frontend-only display fields leaked from picker state
   delete next.providerName;
   delete next.providerCode;
+  // Attribute virtual fields — stored in attribute tables, not item columns
+  delete next.colors;
+  delete next.sizes;
   return next;
 }
 
@@ -421,48 +1079,40 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'inventory/items',
   idField: 'id',
   fields: [
-    { key: 'code', label: 'Mã', type: 'string', required: true },
-    { key: 'name', label: 'Tên', type: 'string', required: true },
-    { key: 'description', label: 'Mô tả', type: 'string' },
-    { key: 'unit', label: 'Đơn vị', type: 'string', required: true },
-    { key: 'categoryId', label: 'ID Danh mục', type: 'string' },
-    { key: 'categoryName', label: 'Danh mục', type: 'string', readOnly: true },
+    // ── List-visible fields (shown in table) ──────────────────────────────
+    { key: 'code', label: 'Mã SKU', type: 'string', required: true },
+    { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
+    { key: 'categoryName', label: 'Nhóm hàng hóa', type: 'string', readOnly: true },
+    { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
-    { key: 'itemType', label: 'Nhóm hàng', type: 'string' },
-    {
-      key: 'purchasePrice',
-      label: 'Giá mua',
-      type: 'number',
-      numberFormat: 'money',
-      required: true,
-    },
-    {
-      key: 'sellingPrice',
-      label: 'Giá bán',
-      type: 'number',
-      numberFormat: 'money',
-      required: true,
-    },
-    { key: 'isPosVisible', label: 'Hiển thị POS', type: 'boolean' },
-    { key: 'weightGram', label: 'Trọng lượng (g)', type: 'number' },
-    { key: 'lengthCm', label: 'Dài (cm)', type: 'number' },
-    { key: 'widthCm', label: 'Rộng (cm)', type: 'number' },
-    { key: 'heightCm', label: 'Cao (cm)', type: 'number' },
-    { key: 'packageWeightGram', label: 'Trọng lượng gói hàng (g)', type: 'number' },
-    { key: 'packageLengthCm', label: 'Dài đóng gói (cm)', type: 'number' },
-    { key: 'packageWidthCm', label: 'Rộng đóng gói (cm)', type: 'number' },
-    { key: 'packageHeightCm', label: 'Cao đóng gói (cm)', type: 'number' },
-    { key: 'manufactureYear', label: 'Năm sản xuất', type: 'number' },
-    { key: 'composition', label: 'Thành phần', type: 'string' },
-    { key: 'oddSize', label: 'Đầy size', type: 'string' },
-    { key: 'isGoldSilver', label: 'Mặt hàng vàng bạc', type: 'boolean' },
-    { key: 'manageBarcodePerUnit', label: 'Mã vạch theo đơn vị', type: 'boolean' },
-    { key: 'providerId', label: 'Nhà cung cấp', type: 'string' },
-    { key: 'productId', label: 'ID Sản phẩm', type: 'string' },
-    { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true },
-    { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true },
-    { key: 'isActive', label: 'Đang hoạt động', type: 'boolean' },
-    { key: 'createdAt', label: 'Ngày tạo', type: 'date' },
+    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money', required: true },
+    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money', required: true },
+    { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
+    { key: 'itemType', label: 'Loại hàng hóa', type: 'string' },
+    { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
+    // ── Form-only fields (hidden from list table) ─────────────────────────
+    { key: 'categoryId', label: 'ID Danh mục', type: 'string', hideInList: true },
+    { key: 'description', label: 'Mô tả', type: 'string', hideInList: true },
+    { key: 'productId', label: 'ID Sản phẩm', type: 'string', hideInList: true },
+    { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true, hideInList: true },
+    { key: 'colors', label: 'Màu sắc', type: 'tags', hideInList: true },
+    { key: 'sizes', label: 'Size', type: 'tags', hideInList: true },
+    { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true, hideInList: true },
+    { key: 'providerId', label: 'Nhà cung cấp', type: 'string', hideInList: true },
+    { key: 'weightGram', label: 'Trọng lượng (g)', type: 'number', hideInList: true },
+    { key: 'lengthCm', label: 'Dài (cm)', type: 'number', hideInList: true },
+    { key: 'widthCm', label: 'Rộng (cm)', type: 'number', hideInList: true },
+    { key: 'heightCm', label: 'Cao (cm)', type: 'number', hideInList: true },
+    { key: 'packageWeightGram', label: 'Trọng lượng gói hàng (g)', type: 'number', hideInList: true },
+    { key: 'packageLengthCm', label: 'Dài đóng gói (cm)', type: 'number', hideInList: true },
+    { key: 'packageWidthCm', label: 'Rộng đóng gói (cm)', type: 'number', hideInList: true },
+    { key: 'packageHeightCm', label: 'Cao đóng gói (cm)', type: 'number', hideInList: true },
+    { key: 'manufactureYear', label: 'Năm sản xuất', type: 'number', hideInList: true },
+    { key: 'composition', label: 'Thành phần', type: 'string', hideInList: true },
+    { key: 'oddSize', label: 'Đầy size', type: 'string', hideInList: true },
+    { key: 'isGoldSilver', label: 'Mặt hàng vàng bạc', type: 'boolean', hideInList: true },
+    { key: 'manageBarcodePerUnit', label: 'Mã vạch theo đơn vị', type: 'boolean', hideInList: true },
+    { key: 'createdAt', label: 'Ngày tạo', type: 'date', hideInList: true },
   ],
   searchableFields: ['code', 'name', 'categoryName', 'productName'],
   filterDefinitions: [

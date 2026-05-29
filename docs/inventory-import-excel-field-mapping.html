@@ -18,7 +18,7 @@
 </head>
 <body>
   <h1>Inventory Import Field Mapping (Final)</h1>
-  <p class="note">Phạm vi: <code>apps/api/src/modules/inventory/csv</code>. Cập nhật: 2026-05-27.</p>
+  <p class="note">Phạm vi: <code>apps/api/src/modules/inventory/csv</code>. Cập nhật: 2026-05-28.</p>
 
   <h2>Mục tiêu hiện tại</h2>
   <ul>
@@ -39,7 +39,6 @@
 
   <h3>Còn lại (ngoài MVP)</h3>
   <ul>
-    <li>P2: <code>ModelCode</code>, <code>ItemCategoryCode</code>, <code>Color</code>, <code>Size</code>.</li>
     <li>P3: opening stock, unit convert đầy đủ, thresholds, <code>Description</code>.</li>
     <li>P4: thuế, ảnh, lô/serial, vị trí, bảng giá.</li>
   </ul>
@@ -67,15 +66,15 @@
     <tbody>
       <tr><td>1</td><td><code>SKUCode</code></td><td>Mã SKU</td><td class="map">MAP</td><td><code>items.code</code> (bắt buộc)</td></tr>
       <tr><td>2</td><td><code>Barcode</code></td><td>Mã vạch</td><td class="map">MAP</td><td><code>item_barcodes</code></td></tr>
-      <tr><td>3</td><td><code>ModelCode</code></td><td>Mã SKU mẫu mã</td><td class="defer">DEFER</td><td>P2</td></tr>
-      <tr><td>4</td><td><code>ModelName</code></td><td>Tên mẫu mã</td><td class="map">MAP</td><td><code>products.name</code> (upsert theo tên)</td></tr>
+      <tr><td>3</td><td><code>ModelCode</code></td><td>Mã SKU mẫu mã</td><td class="map">MAP</td><td><code>products.code</code> (lookup by code trước, fallback tạo mới với ModelName)</td></tr>
+      <tr><td>4</td><td><code>ModelName</code></td><td>Tên mẫu mã</td><td class="map">MAP</td><td><code>products.name</code> (upsert theo tên hoặc theo ModelCode)</td></tr>
       <tr><td>5</td><td><code>InventoryItemName</code></td><td>Tên hàng hóa</td><td class="map">MAP</td><td><code>items.name</code> (bắt buộc)</td></tr>
-      <tr><td>6</td><td><code>ItemCategoryCode</code></td><td>Mã nhóm hàng hóa</td><td class="defer">DEFER</td><td>P2</td></tr>
+      <tr><td>6</td><td><code>ItemCategoryCode</code></td><td>Mã nhóm hàng hóa</td><td class="map">MAP</td><td><code>inventory_item_categories.code</code> (lookup by code, fallback tạo mới)</td></tr>
       <tr><td>7</td><td><code>ItemCategoryName</code></td><td>Tên nhóm hàng hóa</td><td class="map">MAP</td><td>resolve/create category theo tên</td></tr>
       <tr><td>8</td><td><code>BrandName</code></td><td>Tên thương hiệu</td><td class="map">MAP</td><td><code>items.brand</code></td></tr>
       <tr><td>9</td><td><code>UnitName</code></td><td>ĐVT</td><td class="map">MAP</td><td><code>items.unit</code></td></tr>
-      <tr><td>10</td><td><code>Color</code></td><td>Màu</td><td class="defer">DEFER</td><td>P2</td></tr>
-      <tr><td>11</td><td><code>Size</code></td><td>Size</td><td class="defer">DEFER</td><td>P2</td></tr>
+      <tr><td>10</td><td><code>Color</code></td><td>Màu</td><td class="map">MAP</td><td><code>item_attribute_values</code> qua <code>product_attribute_definitions(name=Color)</code> + options (yêu cầu productId)</td></tr>
+      <tr><td>11</td><td><code>Size</code></td><td>Size</td><td class="map">MAP</td><td><code>item_attribute_values</code> qua <code>product_attribute_definitions(name=Size)</code> + options (yêu cầu productId)</td></tr>
       <tr><td>12</td><td><code>CostPrice</code></td><td>Giá mua</td><td class="map">MAP</td><td><code>items.purchasePrice</code></td></tr>
       <tr><td>13</td><td><code>UnitPrice</code></td><td>Giá bán</td><td class="map">MAP</td><td><code>items.sellingPrice</code></td></tr>
       <tr><td>14</td><td><code>TaxRate</code></td><td>Thuế suất</td><td class="defer">DEFER</td><td>P4</td></tr>

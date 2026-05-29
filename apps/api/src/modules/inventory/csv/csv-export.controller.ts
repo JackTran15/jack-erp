@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   Res,
   UseInterceptors,
@@ -16,7 +18,15 @@ import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { AuditInterceptor } from "../../crud/audit.interceptor";
 import { PaginationQueryDto } from "../../crud/dto";
-import { IsOptional, IsString, IsDateString, IsUUID } from "class-validator";
+import {
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsUUID,
+  IsArray,
+  IsBoolean,
+} from "class-validator";
+import { Type } from "class-transformer";
 import { CsvExportService } from "./csv-export.service";
 
 class ExportQueryDto extends PaginationQueryDto {
@@ -45,6 +55,22 @@ class ExportQueryDto extends PaginationQueryDto {
   toDate?: string;
 }
 
+class ExportItemsBodyDto {
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  itemIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  productIds?: string[];
+
+  @IsBoolean()
+  @Type(() => Boolean)
+  isGetAll: boolean = false;
+}
+
 @Controller("inventory/exports")
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
@@ -70,7 +96,21 @@ export class CsvExportController {
     @Actor() actor: ActorContext,
   ) {
     const buffer = await this.csvExportService.exportItemsExcelBuffer(
-      query,
+      { ...query, isGetAll: true },
+      actor,
+    );
+    this.sendExcel(res, buffer, "danh-sach-hang-hoa.xlsx");
+  }
+
+  @Post("items/excel")
+  @RequirePermission("inventory.read")
+  async exportItemsExcelSelected(
+    @Body() body: ExportItemsBodyDto,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvExportService.exportItemsExcelBuffer(
+      { page: 1, pageSize: 0, itemIds: body.itemIds, productIds: body.productIds, isGetAll: body.isGetAll },
       actor,
     );
     this.sendExcel(res, buffer, "danh-sach-hang-hoa.xlsx");

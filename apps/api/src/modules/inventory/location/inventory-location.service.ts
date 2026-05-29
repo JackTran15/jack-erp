@@ -180,11 +180,31 @@ export class InventoryLocationService {
     if (!code) {
       throw new BadRequestException('Mã nhóm hàng hóa không được để trống');
     }
-    const existing = await this.itemCategoryRepo.findOne({
+    // 1. Find by code
+    const byCode = await this.itemCategoryRepo.findOne({
       where: { code, organizationId: actor.organizationId },
     });
-    if (existing) return existing;
+    if (byCode) return byCode;
+
     const name = nameHint?.trim() || code;
+
+    // 2. Find by name — avoids duplicate when the category was already created without a code
+    const byName = await this.itemCategoryRepo
+      .createQueryBuilder('c')
+      .where('c.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(c.name) = LOWER(:name)', { name })
+      .getOne();
+
+    if (byName) {
+      // Back-fill the code so future lookups by code work
+      if (!byName.code) {
+        byName.code = code;
+        await this.itemCategoryRepo.save(byName);
+      }
+      return byName;
+    }
+
+    // 3. Create new
     return this.itemCategoryRepo.save(
       this.itemCategoryRepo.create({
         code,
