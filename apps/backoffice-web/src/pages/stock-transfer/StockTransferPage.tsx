@@ -39,7 +39,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -300,7 +300,7 @@ export function StockTransferPage() {
   return (
     <>
       <DocumentListShell
-        title="Chuyển kho"
+        title={<InventoryPageTitle>Chuyển kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="stock-transfer" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={

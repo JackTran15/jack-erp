@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { PageTabBar, type PageTabItem } from "@erp/ui";
+import type { ReactNode } from "react";
 
 export type InventoryTabId =
   | "storages"
@@ -40,7 +41,7 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
       items={INVENTORY_TABS}
       renderItem={(item, isActive) => {
         if (isActive) {
-          return <span className={linkClassName}>{item.label}</span>;
+          return <span className="font-bold text-primary-blue">{item.label}</span>;
         }
         const tab = item as (typeof INVENTORY_TABS)[number];
         if (tab.comingSoon) {
@@ -61,4 +62,8 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
       }}
     />
   );
+}
+
+export function InventoryPageTitle({ children }: { children: ReactNode }) {
+  return <span className="text-xl">{children}</span>;
 }

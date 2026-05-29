@@ -8,7 +8,7 @@ import { buildItemLocationToolbarItems } from "./ItemLocationDetailsToolbar";
 import { BaseDataTable } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import type { ColumnFilter, ColumnFilterMode } from "../../components/table/pagination.dto";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   listLocationStockItems,
   listStockBalances,
@@ -273,9 +273,11 @@ export function ItemLocationDetailsPage() {
     <>
       <DocumentListShell
         title={
-          locationTitle
-            ? `Chi tiết vị trí hàng hóa: ${locationTitle}`
-            : "Chi tiết vị trí hàng hóa"
+          <InventoryPageTitle>
+            {locationTitle
+              ? `Chi tiết vị trí hàng hóa: ${locationTitle}`
+              : "Chi tiết vị trí hàng hóa"}
+          </InventoryPageTitle>
         }
         tabs={<InventoryTabBar activeId="item-location-details" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}

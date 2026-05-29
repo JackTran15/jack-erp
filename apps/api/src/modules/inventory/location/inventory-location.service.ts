@@ -582,7 +582,9 @@ export class InventoryLocationService {
       take: query.pageSize,
       order: query.sortBy
         ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
+        : query.sortOrder
+          ? { createdAt: query.sortOrder }
+          : { code: 'ASC', name: 'ASC' },
     });
     return { data, total, page: query.page, pageSize: query.pageSize };
   }

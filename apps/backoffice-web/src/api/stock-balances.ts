@@ -43,10 +43,12 @@ export interface StockBalancesQuery {
   page: number;
   pageSize: number;
   sortBy?:
+    | "createdAt"
     | "itemCode"
     | "itemName"
     | "quantity"
     | "lastMovementAt"
+    | "locationCode"
     | "locationName"
     | "storageName";
   sortOrder?: "asc" | "desc";

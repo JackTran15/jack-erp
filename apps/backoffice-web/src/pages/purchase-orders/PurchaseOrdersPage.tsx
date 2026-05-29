@@ -49,7 +49,7 @@ import {
   type QuickLocation,
   type QuickProvider,
 } from "../../components/forms/QuickCreateDialogs";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -493,7 +493,7 @@ export function PurchaseOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title={<span className="text-lg">Nhập kho</span>}
+        title={<InventoryPageTitle>Nhập kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="purchase-orders" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={

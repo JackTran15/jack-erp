@@ -34,5 +34,5 @@ export function buildQuery(
       extra.quantityOp = "eq";
     }
   }
-  return { page, pageSize, sortBy: "locationName", sortOrder: "asc", ...extra };
+  return { page, pageSize, ...extra };
 }

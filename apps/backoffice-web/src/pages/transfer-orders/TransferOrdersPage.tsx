@@ -37,7 +37,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -386,7 +386,7 @@ export function TransferOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title="Lệnh điều chuyển"
+        title={<InventoryPageTitle>Lệnh điều chuyển</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="transfer-order" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={

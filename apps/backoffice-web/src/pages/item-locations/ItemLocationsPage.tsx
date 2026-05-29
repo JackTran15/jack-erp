@@ -27,7 +27,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -168,8 +168,6 @@ export function ItemLocationsPage() {
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
         branchId,
-        sortBy: "code",
-        sortOrder: "asc",
       });
       if (storageFilter) params.set("storageId", storageFilter);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
@@ -372,7 +370,7 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
+          className="text-foreground"
           onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
@@ -387,7 +385,7 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
@@ -452,7 +450,7 @@ export function ItemLocationsPage() {
   return (
     <>
       <DocumentListShell
-        title="Vị trí hàng hóa"
+        title={<InventoryPageTitle>Vị trí hàng hóa</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="item-locations" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         pagination={
