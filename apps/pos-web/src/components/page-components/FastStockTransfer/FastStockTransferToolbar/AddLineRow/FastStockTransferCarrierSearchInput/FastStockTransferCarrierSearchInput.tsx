@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type Ref } from "react";
 import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
 import { useFastStockTransferActions } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-actions";
 import { useFastStockTransferCarriers } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-carriers";
@@ -11,6 +11,8 @@ export interface FastStockTransferCarrierSearchInputProps {
   placeholder?: string;
   minChars?: number;
   debounceMs?: number;
+  inputRef?: Ref<HTMLInputElement>;
+  onAfterSelect?: () => void;
 }
 
 export function FastStockTransferCarrierSearchInput({
@@ -18,6 +20,8 @@ export function FastStockTransferCarrierSearchInput({
   placeholder = "Chọn người vận chuyển",
   minChars = 0,
   debounceMs = 150,
+  inputRef,
+  onAfterSelect,
 }: FastStockTransferCarrierSearchInputProps) {
   const toolbarDraft = usePosFastStockTransferWorkflowStore(
     (s) => s.toolbarDraft,
@@ -44,6 +48,18 @@ export function FastStockTransferCarrierSearchInput({
       onSelect={(c) => {
         handleToolbarDraftCarrier(c);
         setCarrierToolbar({ query: formatCarrierName(c) });
+        onAfterSelect?.();
+      }}
+      onSubmitQuery={() => {
+        if (toolbarDraft.carrier) {
+          onAfterSelect?.();
+          return true;
+        }
+        return false;
+      }}
+      onClear={() => {
+        handleToolbarDraftCarrier(null);
+        setCarrierToolbar({ query: "" });
       }}
       itemKey={(c) => c.id}
       renderItem={(c) => formatCarrierName(c)}
@@ -54,6 +70,7 @@ export function FastStockTransferCarrierSearchInput({
       minChars={minChars}
       debounceMs={debounceMs}
       containerClassName="w-full min-w-0"
+      inputRef={inputRef}
     />
   );
 }
