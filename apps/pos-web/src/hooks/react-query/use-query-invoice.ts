@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -23,6 +24,7 @@ import type {
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
+  SearchInvoicesV2Body,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type {
@@ -225,6 +227,53 @@ export function useReturnableInvoicesQuery(
     },
     enabled: input.enabled ?? true,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Danh sách hóa đơn v2 — POST /v2/invoices/search, server-side filter + pagination.
+ * Enrich mã/tên/SĐT khách qua `customerService.get` giống hook cũ.
+ * `placeholderData: keepPreviousData` giữ dữ liệu cũ trong khi load trang/filter mới.
+ */
+export function useInvoiceListV2Query(
+  body: SearchInvoicesV2Body,
+): UseQueryResult<{ rows: InvoiceListRow[]; total: number }, Error> {
+  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  return useQuery<{ rows: InvoiceListRow[]; total: number }, Error>({
+    queryKey: INVOICE_KEYS.SEARCH_V2({ ...body, branchId } as Record<string, unknown>),
+    queryFn: async () => {
+      const res = await invoiceService.searchV2(body);
+      const ids = Array.from(
+        new Set(
+          res.data
+            .map((inv) => inv.customerId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const customer = await customerService.get(id);
+            return [
+              id,
+              { code: customer.code, name: customer.name, phone: customer.phone },
+            ] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      const byId = new Map(entries);
+      const rows = res.data.map((inv) =>
+        mapInvoiceToListRow(
+          inv,
+          inv.customerId ? byId.get(inv.customerId) ?? null : null,
+        ),
+      );
+      return { rows, total: res.total };
+    },
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
