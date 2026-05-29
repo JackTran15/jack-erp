@@ -28,7 +28,7 @@ export function InlineNoteEditor({ lineId, initial }: InlineNoteEditorProps) {
 
   const handleSave = () => {
     if (cancelledRef.current) return;
-    updateLineNote(lineId, value);
+    updateLineNote(lineId, value.trim());
     stopEditLineNote();
   };
 

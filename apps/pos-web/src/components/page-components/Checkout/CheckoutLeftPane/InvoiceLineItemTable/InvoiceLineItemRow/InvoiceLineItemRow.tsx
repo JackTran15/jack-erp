@@ -66,6 +66,7 @@ export function InvoiceLineItemRow({
   const editingNoteLineId = usePosCheckoutUiStore(
     (s) => s.editingNoteLineId,
   );
+  const startEditLineNote = usePosCheckoutUiStore((s) => s.startEditLineNote);
 
   const selected = isLineSelected(line);
   const hasWarning = isLineWarning(line);
@@ -137,10 +138,22 @@ export function InvoiceLineItemRow({
           {editingNote ? (
             <InlineNoteEditor lineId={line.lineId} initial={line.note ?? ""} />
           ) : line.note ? (
-            <span className="text-[12px] italic text-gray-500">
-              Ghi chú:{" "}
-              <span className="text-gray-400">{line.note}</span>
-            </span>
+            locked ? (
+              <span className="text-[12px] italic text-gray-500">
+                Ghi chú: <span className="text-gray-400">{line.note}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startEditLineNote(line.lineId);
+                }}
+                className="w-fit text-left text-[12px] italic text-gray-500 transition-colors hover:text-gray-700"
+              >
+                Ghi chú: <span className="text-gray-400">{line.note}</span>
+              </button>
+            )
           ) : null}
         </div>
       </td>
