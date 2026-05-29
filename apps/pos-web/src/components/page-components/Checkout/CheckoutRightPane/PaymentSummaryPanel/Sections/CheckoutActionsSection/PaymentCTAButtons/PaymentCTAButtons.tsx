@@ -1,9 +1,16 @@
-import { ArrowLeftIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import { useState } from "react";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+} from "@erp/pos/components/common/PosIcons/PosIcons";
 import { KeyboardHint } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/PaymentCTAButtons/KeyboardHint/KeyboardHint";
+import { PrintEstimatePopover } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/CheckoutActionsSection/PaymentCTAButtons/PrintEstimatePopover/PrintEstimatePopover";
 import { useCheckoutActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-actions";
 import { useCheckoutCollectState } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-collect-state";
 import { useCheckoutDraft } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-draft";
+import { useCheckoutEstimate } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-estimate";
 import {
+  selectHasAnyCartLines,
   selectIsReturnExchangeInvoice,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
@@ -19,9 +26,13 @@ export function PaymentCTAButtons() {
   const { saveDraft, isSaving } = useCheckoutDraft();
   const { finalizeCheckoutAndPrint, isFinalizing, requestCancelInvoice } =
     useCheckoutActions();
+  const { printEstimate, isPrinting } = useCheckoutEstimate();
   const { collectDisabled } = useCheckoutCollectState();
+  const hasCartItems = usePosCheckoutSessionStore(selectHasAnyCartLines);
 
-  const busy = isSaving || isFinalizing;
+  const [estimateOpen, setEstimateOpen] = useState(false);
+
+  const busy = isSaving || isFinalizing || isPrinting;
 
   const handleSaveDraft = () => {
     void saveDraft();
@@ -29,6 +40,11 @@ export function PaymentCTAButtons() {
 
   const handleCollect = () => {
     void finalizeCheckoutAndPrint();
+  };
+
+  const handlePrintEstimate = () => {
+    setEstimateOpen(false);
+    void printEstimate();
   };
 
   return (
@@ -44,15 +60,37 @@ export function PaymentCTAButtons() {
           <ArrowLeftIcon size={20} aria-hidden />
         </button>
       ) : (
-        <button
-          type="button"
-          onClick={handleSaveDraft}
-          disabled={isSaving}
-          className="inline-flex basis-[35%] flex-col items-center justify-center rounded-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <span>Lưu tạm</span>
-          <KeyboardHint className="text-[11px] text-white/80">(F10)</KeyboardHint>
-        </button>
+        <div className="relative flex basis-[35%] items-stretch">
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={isSaving}
+            className="inline-flex flex-1 flex-col items-center justify-center rounded-l-lg bg-[#4F46E5] text-[13px] font-semibold leading-tight text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span>Lưu tạm</span>
+            <KeyboardHint className="text-[11px] text-white/80">
+              (F10)
+            </KeyboardHint>
+          </button>
+          <span className="w-px bg-white/35" />
+          <button
+            type="button"
+            onClick={() => setEstimateOpen((v) => !v)}
+            disabled={busy}
+            aria-label="In tạm tính"
+            aria-haspopup="menu"
+            aria-expanded={estimateOpen}
+            className="inline-flex w-8 items-center justify-center rounded-r-lg bg-[#4F46E5] text-white transition-colors hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <ChevronDownIcon size={16} className="rotate-180" aria-hidden />
+          </button>
+          <PrintEstimatePopover
+            open={estimateOpen}
+            onClose={() => setEstimateOpen(false)}
+            onPick={handlePrintEstimate}
+            disabled={busy || !hasCartItems}
+          />
+        </div>
       )}
       <button
         type="button"

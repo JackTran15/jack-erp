@@ -198,7 +198,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       </header>
 
       <section class="doc-title">
-        <h1>HÓA ĐƠN</h1>
+        <h1>${invoice.provisional ? "HÓA ĐƠN TẠM TÍNH" : "HÓA ĐƠN"}</h1>
         <div class="doc-number">Số: ${escapeHtml(invoiceNumber)}</div>
       </section>
 
