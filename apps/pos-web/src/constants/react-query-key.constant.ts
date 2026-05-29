@@ -50,6 +50,7 @@ export const CUSTOMER_KEYS = {
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
+  PRODUCTS: (branchId: string) => ["catalog", "products", branchId] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
 } as const;

@@ -3,6 +3,7 @@ import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 import type { PromotionItem } from "@erp/pos/interfaces/promotion.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
+import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
 
 export interface InvoiceTabItem {
@@ -59,9 +60,13 @@ export interface CartLine {
 }
 
 export interface CatalogProduct {
+  /** Product id (kind=PRODUCT) hoặc item id (kind=ITEM). */
   id: string;
   name: string;
+  /** Giá thấp nhất trong các biến thể (minPrice). */
   price: number;
+  /** Loại card → dùng mở dialog chọn biến thể đúng kind. */
+  kind: PosProductKind;
 }
 
 export interface PaymentMethodOption {
