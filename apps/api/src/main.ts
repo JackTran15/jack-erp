@@ -1,5 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import {
+  ValidationPipe,
+  Logger,
+  VERSION_NEUTRAL,
+  VersioningType,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -12,6 +17,11 @@ async function bootstrap() {
   // Silently short-circuit favicon probes so they don't trip the global
   // HttpExceptionFilter (and drop a 404 stack into the logs on every page load).
   app.use('/favicon.ico', (_req: any, res: any) => res.status(204).end());
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: VERSION_NEUTRAL,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -132,6 +132,36 @@ export interface CheckoutReturnBody {
   note?: string;
 }
 
+// ─── v2 search (POST /v2/invoices/search) ─────────────────────────────────
+
+interface StringFilter { operator: "*" | "=" | "+" | "-" | "!"; value: string; }
+interface CompareFilter { operator: "=" | "<" | "<=" | ">" | ">="; value: string | number; }
+interface DateRangeFilter { from?: string; to?: string; }
+interface EnumFilter { value: string | null; }
+
+export interface SearchInvoicesV2Body {
+  page?:          number;
+  limit?:         number;
+  code?:          StringFilter;
+  status?:        EnumFilter;
+  type?:          EnumFilter;
+  issuedAt?:      DateRangeFilter;
+  createdAt?:     DateRangeFilter;
+  customerId?:    string;
+  customerCode?:  StringFilter;
+  customerName?:  StringFilter;
+  customerPhone?: StringFilter;
+  amountDue?:     CompareFilter;
+  note?:          StringFilter;
+}
+
+export interface InvoiceSearchV2Response {
+  data:  import("@erp/pos/interfaces/invoice.interface").InvoiceRow[];
+  total: number;
+  page:  number;
+  limit: number;
+}
+
 /** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */
 export interface ListInvoicesParams {
   customerId?: string;

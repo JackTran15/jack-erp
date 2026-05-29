@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DomainEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
@@ -13,6 +13,21 @@ import { BranchEntity } from '../branch/branch.entity';
 import { UserEntity } from '../auth/user.entity';
 import { SalesmanAssignmentEntity } from './salesman-assignment.entity';
 import { SalesManagerAssignmentEntity } from './sales-manager-assignment.entity';
+
+/** Public-safe projection of a user, inlined onto assignment rows (never exposes passwordHash). */
+export interface PublicUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export type SalesmanAssignmentView = SalesmanAssignmentEntity & {
+  user: PublicUser | null;
+};
+export type SalesManagerAssignmentView = SalesManagerAssignmentEntity & {
+  user: PublicUser | null;
+};
 
 @Injectable()
 export class SalesHierarchyService {
@@ -35,12 +50,13 @@ export class SalesHierarchyService {
   async listSalesmen(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesmanAssignmentEntity[]> {
+  ): Promise<SalesmanAssignmentView[]> {
     await this.validateBranch(branchId, actor);
-    return this.salesmanRepo.find({
+    const rows = await this.salesmanRepo.find({
       where: { branchId, organizationId: actor.organizationId },
       order: { assignedAt: 'DESC' },
     });
+    return this.attachUsers(rows, actor.organizationId);
   }
 
   async assignSalesman(
@@ -97,12 +113,13 @@ export class SalesHierarchyService {
   async listSalesManagers(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesManagerAssignmentEntity[]> {
+  ): Promise<SalesManagerAssignmentView[]> {
     await this.validateBranch(branchId, actor);
-    return this.managerRepo.find({
+    const rows = await this.managerRepo.find({
       where: { branchId, organizationId: actor.organizationId },
       order: { assignedAt: 'DESC' },
     });
+    return this.attachUsers(rows, actor.organizationId);
   }
 
   async assignSalesManager(
@@ -155,6 +172,30 @@ export class SalesHierarchyService {
   }
 
   // ── Helpers ───────────────────────────────────────────────
+
+  /** Batch-resolve each row's userId into an inlined public-safe `user` object (null when the user is missing). */
+  private async attachUsers<T extends { userId: string }>(
+    rows: T[],
+    organizationId: string,
+  ): Promise<Array<T & { user: PublicUser | null }>> {
+    if (rows.length === 0) return [];
+
+    const userIds = [...new Set(rows.map((r) => r.userId))];
+    const users = await this.userRepo.find({
+      where: { id: In(userIds), organizationId },
+      select: ['id', 'firstName', 'lastName', 'email'],
+    });
+    const userMap = new Map<string, PublicUser>(
+      users.map((u) => [
+        u.id,
+        { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email },
+      ]),
+    );
+
+    return rows.map((r) =>
+      Object.assign(r, { user: userMap.get(r.userId) ?? null }),
+    );
+  }
 
   private async validateBranch(
     branchId: string,
