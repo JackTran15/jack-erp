@@ -44,6 +44,8 @@ interface BuildCheckoutInvoicePayloadInput {
   keepChange: boolean;
   /** Matches UI "Tính vào công nợ" (purchase and refund). */
   debt: boolean;
+  /** Bản tạm tính (chưa checkout) → renderer in tiêu đề "HÓA ĐƠN TẠM TÍNH". */
+  provisional?: boolean;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -56,6 +58,7 @@ export function buildCheckoutInvoicePayload({
   methods,
   keepChange,
   debt,
+  provisional,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -101,6 +104,7 @@ export function buildCheckoutInvoicePayload({
       customerDebtIssued: t.customerDebtIssued,
     },
     payments,
+    provisional,
     policy: RETURN_POLICY,
     closingMessage: CLOSING_MESSAGE,
   };
