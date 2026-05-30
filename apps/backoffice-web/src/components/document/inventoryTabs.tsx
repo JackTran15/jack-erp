@@ -40,8 +40,9 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
       activeId={activeId}
       items={INVENTORY_TABS}
       renderItem={(item, isActive) => {
+        // Ẩn tab đang active khỏi thanh nav — chỉ hiện các trang khác.
         if (isActive) {
-          return <span className="font-bold text-primary-blue">{item.label}</span>;
+          return null;
         }
         const tab = item as (typeof INVENTORY_TABS)[number];
         if (tab.comingSoon) {

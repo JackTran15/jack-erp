@@ -227,7 +227,7 @@ export function StockTakesPage() {
       render: (r) => (
         <button
           type="button"
-          className="font-mono text-primary-blue transition-colors hover:text-primary-blue-hover"
+          className="font-mono text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             void openForEdit(r.id);

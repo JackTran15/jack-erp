@@ -435,7 +435,7 @@ export function GoodsIssuePage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary-blue transition-colors hover:text-primary-blue-hover"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
