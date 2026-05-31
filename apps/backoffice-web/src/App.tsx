@@ -9,6 +9,7 @@ import { TenantSetupPage } from "./pages/setup/TenantSetupPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CrudListPage } from "./components/crud/CrudListPage";
 import { CrudCreatePage } from "./components/crud/CrudCreatePage";
+import { ProviderGroupListPage } from "./pages/inventory/ProviderGroupListPage";
 import { CrudDetailPage } from "./components/crud/CrudDetailPage";
 import { CrudEditPage } from "./components/crud/CrudEditPage";
 import { SalesHierarchyPage } from "./pages/branch-management/SalesHierarchyPage";
@@ -81,6 +82,7 @@ export function App() {
               <Route element={<BackofficeLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/admin/employees" element={<EmployeesPage />} />
+                <Route path="/admin/provider-groups" element={<ProviderGroupListPage />} />
                 <Route path="/admin/:entityKey/new" element={<CrudCreatePage />} />
                 <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
                 <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />

@@ -36,7 +36,15 @@ import {
   useCrudDelete,
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
+import { CrudRecordDialog } from "./CrudRecordDialog";
 import { formatCustomerStatus } from "../../lib/customer-display";
+
+/** Entity keys that open create/edit as a dialog instead of navigating to a new page. */
+const DIALOG_MODE_ENTITIES = new Set([
+  "inventory-item-units",
+  "inventory-providers",
+  "provider-groups",
+]);
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
@@ -94,6 +102,13 @@ export function CrudListPage({
     string,
     unknown
   > | null>(null);
+
+  // Dialog-mode create/edit (for entities in DIALOG_MODE_ENTITIES)
+  const [crudDialogOpen, setCrudDialogOpen] = useState(false);
+  const [crudDialogRecordId, setCrudDialogRecordId] = useState<string | null>(null);
+  const openCreateDialog = () => { setCrudDialogRecordId(null); setCrudDialogOpen(true); };
+  const openEditDialog = (id: string) => { setCrudDialogRecordId(id); setCrudDialogOpen(true); };
+  const useDialogMode = entityKey ? DIALOG_MODE_ENTITIES.has(entityKey) : false;
 
   const {
     data: config,
@@ -304,6 +319,7 @@ export function CrudListPage({
   };
 
   const handleCreate = () => {
+    if (useDialogMode) { openCreateDialog(); return; }
     navigate(`/admin/${entityKey}/new`);
   };
 
@@ -371,6 +387,7 @@ export function CrudListPage({
         handleEdit: () => {
           if (!selectedRecord) return;
           const id = String(selectedRecord[config.idField]);
+          if (useDialogMode) { openEditDialog(id); return; }
           void navigate(`/admin/${entityKey}/${id}/edit`);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
@@ -504,6 +521,16 @@ export function CrudListPage({
       )}
 
       {inventoryConfig?.renderDialogs?.(inventoryActionContext)}
+
+      {useDialogMode && entityKey && (
+        <CrudRecordDialog
+          entityKey={entityKey}
+          recordId={crudDialogRecordId}
+          open={crudDialogOpen}
+          onClose={() => setCrudDialogOpen(false)}
+          onSuccess={() => { void refetchRecords(); }}
+        />
+      )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-md">

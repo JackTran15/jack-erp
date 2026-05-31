@@ -9,6 +9,7 @@ import {
   SelectQueryBuilder,
   FindOptionsWhere,
   DataSource,
+  QueryFailedError,
 } from 'typeorm';
 import { BaseEntity } from '../../database/entities/base.entity';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
@@ -87,7 +88,16 @@ export abstract class BaseCrudService<
       createdBy: actor.userId,
     } as any);
 
-    const saved = await this.repository.save(entity) as unknown as TEntity;
+    const saved = await this.repository.save(entity).catch((err) => {
+      if (err instanceof QueryFailedError &&
+        (((err as QueryFailedError & { code?: string }).code) ??
+          (err as any).driverError?.code) === '23505') {
+        throw new ConflictException(
+          'A record with the same unique code already exists in this organization',
+        );
+      }
+      throw err;
+    }) as unknown as TEntity;
     this.logger.log(`Created ${this.entityConfig.entityKey} id=${(saved as any).id}`);
     await this.afterCreate(saved, actor);
     return saved;
@@ -116,7 +126,16 @@ export abstract class BaseCrudService<
     }
 
     const merged = this.repository.merge(existing, prepared as any);
-    const saved = await this.repository.save(merged);
+    const saved = await this.repository.save(merged).catch((err) => {
+      if (err instanceof QueryFailedError &&
+        (((err as QueryFailedError & { code?: string }).code) ??
+          (err as any).driverError?.code) === '23505') {
+        throw new ConflictException(
+          'A record with the same unique code already exists in this organization',
+        );
+      }
+      throw err;
+    });
     this.logger.log(`Updated ${this.entityConfig.entityKey} id=${id}`);
     await this.afterUpdate(saved, actor);
     return saved;

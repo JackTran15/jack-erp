@@ -30,8 +30,8 @@ make dev-pos           # POS on :3001
 
 # Build / test / lint (workspace-wide)
 pnpm build             # pnpm -r build
-pnpm test              # pnpm -r test
-pnpm lint              # pnpm -r lint (most workspaces echo "lint" — no real linter wired)
+pnpm test              # pnpm -r test (only @erp/api has real tests; the web apps echo "test")
+pnpm lint              # pnpm -r lint (no real linter wired — every workspace echoes "lint")
 
 # API-only
 pnpm --filter @erp/api test                   # Jest unit tests (rootDir = apps/api/src)
@@ -57,6 +57,8 @@ Local infra (Postgres :5433, Redis :6380, Redpanda :19092, Adminer :18088, Redpa
 ```bash
 docker compose up -d
 ```
+
+E2E (`test:e2e`) runs against a separate DB: `apps/api/test/e2e/setup/global-setup.ts` loads `apps/api/.env`, auto-creates the `erp_test` database, and applies migrations before the suite. It runs serially (`maxWorkers: 1`) with `forceExit: true` — kafkajs consumers leave handles open, so a hung teardown can masquerade as a suite failure; check actual test output, not just the exit message.
 
 ## Architecture
 
@@ -94,6 +96,10 @@ The API exposes a generic admin surface at `/admin/entities/:entityKey/records`.
 ### Events
 
 Kafka/Redpanda is the event bus. Inject `EventPublisher` (global provider) and call `await events.publish("inventory.item.created", payload)`. Topics are created on app start by `TopicInitializer`. Dead-letter handling lives under `modules/events/`.
+
+### Idempotency (load-bearing)
+
+A global `IdempotencyInterceptor` (`common/interceptors/`, registered as `APP_INTERCEPTOR` in `common.module.ts`) dedupes mutations keyed on the `X-Idempotency-Key` header, backed by `IdempotencyStore` (Redis) in `modules/redis/`. Same key + same body replays the stored response (`X-Idempotency-Status: REPLAYED`); same key + different body returns 409 (`CONFLICT`). New mutation endpoints inherit this automatically — do not re-implement it. Event consumers dedupe separately via the `processed_events` table; emit deterministic `eventId`s so replays are no-ops.
 
 ### Frontend data fetching
 

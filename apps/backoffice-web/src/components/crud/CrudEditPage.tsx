@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
+import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
@@ -42,9 +43,17 @@ export function CrudEditPage() {
     editableFields.forEach((field) => {
       next[field.key] = record[field.key];
     });
+    // For the supplier custom form, also pull in fields that aren't in editableFields
+    // (readOnly/hideInList) so the form can display the current code and groupName.
+    if (entityKey === "inventory-providers") {
+      const extras = ["code", "type", "groupId", "groupName"] as const;
+      for (const key of extras) {
+        if (record[key] !== undefined) next[key] = record[key];
+      }
+    }
     setValues(next);
     setErrors({});
-  }, [record, editableFields]);
+  }, [record, editableFields, entityKey]);
 
   if (configLoading || recordLoading) {
     return (
@@ -110,10 +119,17 @@ export function CrudEditPage() {
     event.preventDefault();
     if (!validate() || !id) return;
 
-    const payload: Record<string, unknown> = {};
-    editableFields.forEach((field) => {
-      payload[field.key] = values[field.key];
-    });
+    // For inventory-providers the custom form manages conditional/extra fields;
+    // send the whole values map (generic CRUD backend accepts Record<string,any>).
+    let payload: Record<string, unknown>;
+    if (entityKey === "inventory-providers") {
+      payload = { ...values };
+    } else {
+      payload = {};
+      editableFields.forEach((field) => {
+        payload[field.key] = values[field.key];
+      });
+    }
 
     await updateMutation.mutateAsync({ id, body: payload });
     navigate(`/admin/${entityKey}/${id}`, { replace: true });
@@ -158,24 +174,40 @@ export function CrudEditPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
-        <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)} className="grid gap-4 md:grid-cols-2">
-          {editableFields.map((field) => (
-            <CrudFieldInput
-              key={field.key}
-              inputIdPrefix="edit"
-              field={field}
-              value={values[field.key]}
-              error={errors[field.key]}
-              onChange={(nextValue) => {
-                setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next[field.key];
-                  return next;
-                });
-              }}
+        <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)}>
+          {entityKey === "inventory-providers" ? (
+            <SupplierCreateForm
+              editableFields={editableFields}
+              values={values}
+              setValues={setValues}
+              errors={errors}
+              setErrors={setErrors}
+              entityKey={entityKey!}
+              isSaving={updateMutation.isPending}
             />
-          ))}
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {editableFields.map((field) => (
+                <CrudFieldInput
+                  key={field.key}
+                  inputIdPrefix="edit"
+                  field={field}
+                  value={values[field.key]}
+                  error={errors[field.key]}
+                  entityKey={entityKey}
+                  currentRecordId={id}
+                  onChange={(nextValue) => {
+                    setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next[field.key];
+                      return next;
+                    });
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </form>
       </div>
     </AdminPageShell>
