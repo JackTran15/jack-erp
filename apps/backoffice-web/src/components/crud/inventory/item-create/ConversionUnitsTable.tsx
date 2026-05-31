@@ -1,5 +1,8 @@
+import { useMemo } from "react";
 import { Button, Input, MoneyInput } from "@erp/ui";
 import { Plus, Trash2 } from "lucide-react";
+import { LookupField } from "../../../forms/LookupField";
+import { useItemUnits } from "./hooks";
 
 export interface ConversionUnitRow {
   id: string;
@@ -31,6 +34,17 @@ export function createBlankConversionUnitRow(): ConversionUnitRow {
 }
 
 export function ConversionUnitsTable({ rows, setRows }: Props) {
+  const unitsQuery = useItemUnits("", true);
+
+  const unitOptions = useMemo(() => {
+    const data = (unitsQuery.data?.data ?? []) as Record<string, unknown>[];
+    const set = new Set(data.map((r) => String(r.name ?? "")).filter(Boolean));
+    rows.forEach((r) => {
+      if (r.unitName) set.add(r.unitName);
+    });
+    return [...set];
+  }, [unitsQuery.data, rows]);
+
   const updateRow = (id: string, patch: Partial<ConversionUnitRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
@@ -63,9 +77,21 @@ export function ConversionUnitsTable({ rows, setRows }: Props) {
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-border">
                 <td className="px-2 py-1.5">
-                  <Input
+                  <LookupField<string>
+                    portalToBody
                     value={row.unitName}
-                    onChange={(e) => updateRow(row.id, { unitName: e.target.value })}
+                    onValueChange={(v) => updateRow(row.id, { unitName: v })}
+                    onSelect={(u) => updateRow(row.id, { unitName: u })}
+                    search={(q) =>
+                      Promise.resolve(
+                        unitOptions.filter((u) =>
+                          u.toLowerCase().includes(q.trim().toLowerCase()),
+                        ),
+                      )
+                    }
+                    itemKey={(u) => u}
+                    renderItem={(u) => u}
+                    placeholder="Chọn đơn vị"
                   />
                 </td>
                 <td className="px-2 py-1.5">

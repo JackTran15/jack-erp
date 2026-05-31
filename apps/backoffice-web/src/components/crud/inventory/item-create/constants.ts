@@ -1,9 +1,5 @@
 import type { FormExtras } from "./types";
 
-export const UNIT_PRESETS = ["Cái", "Hộp", "Thùng", "Chai", "Kg", "Lốc", "Tờ", "Bộ"];
-export const GROUP_SUGGESTIONS = ["Điện tử", "Văn phòng phẩm", "Thực phẩm", "Gia dụng", "Thời trang"];
-export const BRAND_SUGGESTIONS = ["Samsung", "LG", "Sony", "Deli", "Stabilo", "3M"];
-
 export const COMMISSION_METHOD_OPTIONS = [
   { value: "percent_revenue", label: "% Doanh thu" },
   { value: "percent_profit", label: "% Lợi nhuận" },
@@ -31,8 +27,6 @@ export const DEFAULT_EXTRAS: FormExtras = {
   initialStockUnitPrice: "0",
   showOnPos: true,
   manageBarcodePerUnit: false,
-  attrColor: "",
-  attrSize: "",
   weightG: "",
   pkgLength: "",
   pkgWidth: "",

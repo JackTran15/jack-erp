@@ -68,8 +68,11 @@ export class ItemEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true, comment: 'Material composition / fabric / ingredients' })
   composition?: string;
 
-  @Column({ length: 100, nullable: true, comment: 'Brand name (e.g. Samsung, Nike)' })
+  @Column({ length: 100, nullable: true, comment: 'Denormalized brand name (kept in sync with brand_id; e.g. Samsung, Nike)' })
   brand?: string;
+
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true, comment: 'FK to inventory_brands — null for items without a brand' })
+  brandId?: string;
 
   @Column({ name: 'item_type', length: 100, nullable: true, comment: 'Free-text grouping label (Nhóm hàng)' })
   itemType?: string;
