@@ -172,6 +172,10 @@ export class CreateItemDto {
   brand?: string;
 
   @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(100)
   itemType?: string;

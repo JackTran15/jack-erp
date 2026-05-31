@@ -15,8 +15,6 @@ export interface FormExtras {
   initialStockUnitPrice: string;
   showOnPos: boolean;
   manageBarcodePerUnit: boolean;
-  attrColor: string;
-  attrSize: string;
   weightG: string;
   pkgLength: string;
   pkgWidth: string;
@@ -39,4 +37,8 @@ export interface InventoryItemCreateFormProps {
   setErrors: Dispatch<SetStateAction<Record<string, string>>>;
   entityKey: string;
   isSaving?: boolean;
+  /** "create" (default) or "edit". Edit disables opening-balance fields and hydrates nested rows. */
+  mode?: "create" | "edit";
+  /** Raw record used to hydrate extras / conversion units / providers in edit mode. */
+  initialRecord?: Record<string, unknown>;
 }

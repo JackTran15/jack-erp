@@ -1,8 +1,11 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@erp/ui";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
+import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
@@ -39,6 +42,14 @@ export function CrudEditPage() {
 
   useEffect(() => {
     if (!record) return;
+    // The inventory-item form manages many keys outside editableFields (nested
+    // providers/units, denormalized brand/category, package specs) — hydrate from
+    // the full record.
+    if (entityKey === "inventory-items") {
+      setValues({ ...record });
+      setErrors({});
+      return;
+    }
     const next: Record<string, unknown> = {};
     editableFields.forEach((field) => {
       next[field.key] = record[field.key];
@@ -122,7 +133,7 @@ export function CrudEditPage() {
     // For inventory-providers the custom form manages conditional/extra fields;
     // send the whole values map (generic CRUD backend accepts Record<string,any>).
     let payload: Record<string, unknown>;
-    if (entityKey === "inventory-providers") {
+    if (entityKey === "inventory-providers" || entityKey === "inventory-items") {
       payload = { ...values };
     } else {
       payload = {};
@@ -131,8 +142,12 @@ export function CrudEditPage() {
       });
     }
 
-    await updateMutation.mutateAsync({ id, body: payload });
-    navigate(`/admin/${entityKey}/${id}`, { replace: true });
+    try {
+      await updateMutation.mutateAsync({ id, body: payload });
+      navigate(`/admin/${entityKey}/${id}`, { replace: true });
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   return (
@@ -184,6 +199,18 @@ export function CrudEditPage() {
               setErrors={setErrors}
               entityKey={entityKey!}
               isSaving={updateMutation.isPending}
+            />
+          ) : entityKey === "inventory-items" ? (
+            <InventoryItemCreateForm
+              editableFields={editableFields}
+              values={values}
+              setValues={setValues}
+              errors={errors}
+              setErrors={setErrors}
+              entityKey={entityKey!}
+              isSaving={updateMutation.isPending}
+              mode="edit"
+              initialRecord={record}
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

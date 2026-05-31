@@ -8,6 +8,7 @@ import { DocumentNumberingModule } from '../../document-numbering/document-numbe
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
+import { ItemCategoryCommissionEntity } from './item-category-commission.entity';
 import { ProviderEntity } from './provider.entity';
 import { SupplierGroupEntity } from './supplier-group.entity';
 import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
@@ -60,15 +61,23 @@ import {
   UNIT_OF_MEASURE_SERVICE_TOKEN,
 } from './unit-of-measure-crud.service';
 import { UnitOfMeasureEntity } from './unit-of-measure.entity';
+import {
+  BrandCrudService,
+  BRAND_ENTITY_CONFIG,
+  BRAND_SERVICE_TOKEN,
+} from './brand-crud.service';
+import { BrandEntity } from './brand.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       ItemEntity,
       ItemCategoryEntity,
+      ItemCategoryCommissionEntity,
       ProviderEntity,
       SupplierGroupEntity,
       UnitOfMeasureEntity,
+      BrandEntity,
       ItemProviderEntity,
       ItemBarcodeEntity,
       ItemStockThresholdEntity,
@@ -100,6 +109,7 @@ import { UnitOfMeasureEntity } from './unit-of-measure.entity';
     InventoryProviderCrudService,
     ProviderGroupCrudService,
     UnitOfMeasureCrudService,
+    BrandCrudService,
     { provide: INVENTORY_ITEM_SERVICE_TOKEN, useExisting: InventoryItemCrudService },
     {
       provide: INVENTORY_STORAGE_SERVICE_TOKEN,
@@ -120,6 +130,10 @@ import { UnitOfMeasureEntity } from './unit-of-measure.entity';
     {
       provide: UNIT_OF_MEASURE_SERVICE_TOKEN,
       useExisting: UnitOfMeasureCrudService,
+    },
+    {
+      provide: BRAND_SERVICE_TOKEN,
+      useExisting: BrandCrudService,
     },
   ],
   exports: [
@@ -145,6 +159,10 @@ export class InventoryLocationModule implements OnModuleInit {
     this.entityRegistry.registerEntity(
       UNIT_OF_MEASURE_ENTITY_CONFIG,
       UNIT_OF_MEASURE_SERVICE_TOKEN,
+    );
+    this.entityRegistry.registerEntity(
+      BRAND_ENTITY_CONFIG,
+      BRAND_SERVICE_TOKEN,
     );
     this.entityRegistry.registerEntity(
       INVENTORY_PROVIDER_ENTITY_CONFIG,

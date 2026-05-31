@@ -1,9 +1,15 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Brackets,
   DataSource,
   EntityManager,
+  QueryFailedError,
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
@@ -24,6 +30,7 @@ import type { PaginatedResponse } from '@erp/shared-interfaces';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
+import { BrandEntity } from './brand.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
@@ -75,6 +82,8 @@ export class InventoryItemCrudService extends BaseCrudService<
     protected readonly repository: Repository<ItemEntity>,
     @InjectRepository(ItemCategoryEntity)
     private readonly categoryRepo: Repository<ItemCategoryEntity>,
+    @InjectRepository(BrandEntity)
+    private readonly brandRepo: Repository<BrandEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
     @InjectRepository(ProductAttributeDefinitionEntity)
@@ -154,7 +163,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     // Try as a real item ID first
     const item = await this.repository.findOne({
       where: { id, organizationId: actor.organizationId },
-      relations: ['category', 'product'],
+      relations: ['category', 'product', 'units', 'providers', 'providers.provider'],
     });
     if (item) {
       const transformed = (this.transformListResults([item]) as any[])[0];
@@ -181,6 +190,11 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<any> {
     const normalized = normalizePayload(payload);
+
+    // Resolve brand FK → denormalize the brand name onto the item.
+    if (normalized.brandId) {
+      normalized.brand = await this.resolveBrandName(normalized.brandId, actor);
+    }
 
     // When colors/sizes arrays are present → create product with variant matrix
     if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
@@ -210,7 +224,13 @@ export class InventoryItemCrudService extends BaseCrudService<
         nested.providers,
         nested.providerId,
       );
-      await this.saveBarcodes(manager, savedItem.id, actor, nested.barcodes);
+      await this.saveBarcodes(
+        manager,
+        savedItem.id,
+        actor,
+        nested.barcodes,
+        savedItem.code,
+      );
       await this.saveUnits(manager, savedItem.id, actor, nested.units);
       await this.saveThreshold(manager, savedItem.id, actor, nested.threshold);
 
@@ -257,8 +277,47 @@ export class InventoryItemCrudService extends BaseCrudService<
       return this.updateProductWithVariants(id, normalized, actor);
     }
 
+    // Resolve / clear brand FK and keep the denormalized name in sync.
+    if ('brandId' in normalized) {
+      if (normalized.brandId) {
+        normalized.brand = await this.resolveBrandName(normalized.brandId, actor);
+      } else {
+        normalized.brandId = null;
+        normalized.brand = null;
+      }
+    }
+
+    // Only reconcile nested collections that were explicitly provided — a patch
+    // that omits them must leave the existing rows untouched.
+    const hasProviders = 'providers' in normalized;
+    const hasUnits = 'units' in normalized;
+    const providers = Array.isArray(normalized.providers)
+      ? normalized.providers
+      : undefined;
+    const units = Array.isArray(normalized.units) ? normalized.units : undefined;
+
     const { colors: _c, sizes: _s, ...rest } = normalized;
     const saved = (await super.update(id, rest as any, actor)) as ItemEntity;
+
+    if (hasProviders || hasUnits) {
+      await this.dataSource.transaction(async (manager) => {
+        if (hasProviders) {
+          await manager.delete(ItemProviderEntity, {
+            itemId: id,
+            organizationId: actor.organizationId,
+          });
+          await this.saveProviders(manager, id, actor, providers);
+        }
+        if (hasUnits) {
+          await manager.delete(ItemUnitEntity, {
+            itemId: id,
+            organizationId: actor.organizationId,
+          });
+          await this.saveUnits(manager, id, actor, units);
+        }
+      });
+    }
+
     return saved;
   }
 
@@ -355,21 +414,30 @@ export class InventoryItemCrudService extends BaseCrudService<
     itemId: string,
     actor: ActorContext,
     barcodes?: CreateItemBarcodeInput[],
+    fallbackCode?: string,
   ): Promise<void> {
-    if (!barcodes?.length) return;
-    const entities = barcodes
+    const provided = (barcodes ?? [])
       .filter((b) => b.code && b.code.trim().length > 0)
-      .map((b) =>
-        manager.create(ItemBarcodeEntity, {
-          itemId,
-          code: b.code.trim(),
-          notes: b.notes,
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          createdBy: actor.userId,
-        }),
-      );
-    if (entities.length === 0) return;
+      .map((b) => ({ code: b.code.trim(), notes: b.notes }));
+    // No barcode supplied → default it to the item's SKU (code).
+    const fallback = fallbackCode?.trim();
+    const rows =
+      provided.length > 0
+        ? provided
+        : fallback
+          ? [{ code: fallback, notes: undefined as string | undefined }]
+          : [];
+    if (rows.length === 0) return;
+    const entities = rows.map((b) =>
+      manager.create(ItemBarcodeEntity, {
+        itemId,
+        code: b.code,
+        notes: b.notes,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+      }),
+    );
     await manager.save(ItemBarcodeEntity, entities);
   }
 
@@ -473,6 +541,37 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
   }
 
+  /** Re-throw a Postgres unique-violation (23505) as a user-facing 409, matching
+   *  BaseCrudService's behaviour; pass other errors through unchanged. */
+  private toConflictIfDuplicate(err: unknown): never {
+    const code =
+      err instanceof QueryFailedError
+        ? ((err as QueryFailedError & { code?: string }).code ??
+          (err as { driverError?: { code?: string } }).driverError?.code)
+        : undefined;
+    if (code === '23505') {
+      throw new ConflictException(
+        'A record with the same unique code already exists in this organization',
+      );
+    }
+    throw err;
+  }
+
+  /** Resolve a brand FK to its name (org-scoped). Throws when the brand is
+   *  missing or belongs to another organization. */
+  private async resolveBrandName(
+    brandId: string,
+    actor: ActorContext,
+  ): Promise<string> {
+    const brand = await this.brandRepo.findOne({
+      where: { id: brandId, organizationId: actor.organizationId },
+    });
+    if (!brand) {
+      throw new BadRequestException(`Brand ${brandId} not found in organization`);
+    }
+    return brand.name;
+  }
+
   // ─── Product + Variant creation ──────────────────────────────────────
 
   private async createProductWithVariants(
@@ -483,6 +582,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       name: productName,
       code: productCode,
       brand,
+      brandId,
       categoryId,
       purchasePrice = 0,
       sellingPrice = 0,
@@ -491,20 +591,23 @@ export class InventoryItemCrudService extends BaseCrudService<
       isActive = true,
       colors = [],
       sizes = [],
+      variants = [],
     } = payload;
 
     if (!productName) throw new BadRequestException('Tên hàng hóa là bắt buộc');
 
     const productRepo = this.dataSource.getRepository(ProductEntity);
-    const product = await productRepo.save(
-      productRepo.create({
-        code: productCode || undefined,
-        name: productName,
-        isActive: isActive !== false,
-        organizationId: actor.organizationId,
-        createdBy: actor.userId,
-      }),
-    );
+    const product = await productRepo
+      .save(
+        productRepo.create({
+          code: productCode || undefined,
+          name: productName,
+          isActive: isActive !== false,
+          organizationId: actor.organizationId,
+          createdBy: actor.userId,
+        }),
+      )
+      .catch((err) => this.toConflictIfDuplicate(err));
 
     const colorDef = (colors as string[]).length > 0
       ? await this.resolveOrCreateAttrDef(product.id, 'Color', actor)
@@ -531,33 +634,70 @@ export class InventoryItemCrudService extends BaseCrudService<
       : [];
 
     const combos = this.buildCombos(colorOptions, sizeOptions);
+
+    // Per-variant overrides (price / SKU / name / unit / barcode) sent by the
+    // FE variant table, keyed by the same "color__size" combo the table uses.
+    const variantByKey = new Map<string, Record<string, any>>();
+    for (const v of (Array.isArray(variants) ? variants : []) as Record<
+      string,
+      any
+    >[]) {
+      variantByKey.set(`${v?.color ?? ''}__${v?.size ?? ''}`, v);
+    }
+    const barcodeRepo = this.dataSource.getRepository(ItemBarcodeEntity);
+    const str = (val: unknown): string | undefined =>
+      typeof val === 'string' && val.trim() ? val.trim() : undefined;
+
     let itemsCreated = 0;
 
     for (const combo of combos) {
       const variantLabel = [combo.size?.label, combo.color?.label]
         .filter(Boolean)
         .join(' · ');
-      const code = this.buildVariantCode(productCode || productName, combo);
-      const itemName = variantLabel ? `${productName} ${variantLabel}` : productName;
-
-      const item = await this.repository.save(
-        this.repository.create({
-          code,
-          name: itemName,
-          unit,
-          isActive: isActive !== false,
-          isPosVisible: isPosVisible !== false,
-          purchasePrice: Number(purchasePrice) || 0,
-          sellingPrice: Number(sellingPrice) || 0,
-          productId: product.id,
-          categoryId: categoryId || undefined,
-          brand: brand || undefined,
-          variantLabel: variantLabel || undefined,
-          organizationId: actor.organizationId,
-          branchId: actor.branchId,
-          createdBy: actor.userId,
-        }),
+      const v = variantByKey.get(
+        `${combo.color?.label ?? ''}__${combo.size?.label ?? ''}`,
       );
+      const code =
+        str(v?.sku) ?? this.buildVariantCode(productCode || productName, combo);
+      const itemName =
+        str(v?.name) ??
+        (variantLabel ? `${productName} ${variantLabel}` : productName);
+
+      const item = await this.repository
+        .save(
+          this.repository.create({
+            code,
+            name: itemName,
+            unit: str(v?.unit) ?? unit,
+            isActive: isActive !== false,
+            isPosVisible: isPosVisible !== false,
+            purchasePrice: Number(v?.purchasePrice ?? purchasePrice) || 0,
+            sellingPrice: Number(v?.sellPrice ?? sellingPrice) || 0,
+            productId: product.id,
+            categoryId: categoryId || undefined,
+            brand: brand || undefined,
+            brandId: brandId || undefined,
+            variantLabel: variantLabel || undefined,
+            organizationId: actor.organizationId,
+            branchId: actor.branchId,
+            createdBy: actor.userId,
+          }),
+        )
+        .catch((err) => this.toConflictIfDuplicate(err));
+
+      // Barcode: the variant's own barcode, otherwise clone its SKU (code).
+      const barcodeCode = str(v?.barcode) ?? code;
+      await barcodeRepo
+        .save(
+          barcodeRepo.create({
+            itemId: item.id,
+            code: barcodeCode,
+            organizationId: actor.organizationId,
+            branchId: actor.branchId,
+            createdBy: actor.userId,
+          }),
+        )
+        .catch((err) => this.toConflictIfDuplicate(err));
 
       if (combo.color && colorDef) {
         await this.upsertAttrValue(item.id, colorDef, combo.color.id, actor);
@@ -956,10 +1096,12 @@ export class InventoryItemCrudService extends BaseCrudService<
     };
 
     const attrs = await this.loadProductAttributes(productId);
+    const variants = await this.loadProductVariants(actor, productId);
 
     return {
       ...rest,
       ...attrs,
+      variants,
       categoryName: category?.name ?? '',
       productName: product?.name ?? '',
       // Override code/name with the PRODUCT values so the form shows product-level fields
@@ -967,6 +1109,42 @@ export class InventoryItemCrudService extends BaseCrudService<
       name: product?.name ?? rest.name,
       _productId: productId,
     };
+  }
+
+  /** Per-variant rows for a product (price / SKU / barcode + the color/size
+   *  labels), used to hydrate the variant table on edit. */
+  private async loadProductVariants(
+    actor: ActorContext,
+    productId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const sql = `
+      SELECT
+        i.id,
+        i.code,
+        i.name,
+        i.unit,
+        i.purchase_price::float AS "purchasePrice",
+        i.selling_price::float  AS "sellPrice",
+        MAX(CASE WHEN LOWER(def.name) = 'color' THEN opt.value_label END) AS color,
+        MAX(CASE WHEN LOWER(def.name) = 'size'  THEN opt.value_label END) AS size,
+        (
+          SELECT b.code FROM item_barcodes b
+          WHERE b.item_id = i.id
+          ORDER BY b.created_at ASC
+          LIMIT 1
+        ) AS barcode
+      FROM items i
+      LEFT JOIN item_attribute_values av ON av.item_id = i.id
+      LEFT JOIN product_attribute_definitions def ON def.id = av.attribute_definition_id
+      LEFT JOIN product_attribute_options opt ON opt.id = av.option_id
+      WHERE i.product_id = $1 AND i.organization_id = $2
+      GROUP BY i.id, i.code, i.name, i.unit, i.purchase_price, i.selling_price
+      ORDER BY i.code ASC
+    `;
+    return this.dataSource.query<Record<string, unknown>[]>(sql, [
+      productId,
+      actor.organizationId,
+    ]);
   }
 
   async getProductGroup(

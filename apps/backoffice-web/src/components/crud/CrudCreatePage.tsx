@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@erp/ui";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudCreate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
@@ -105,8 +107,12 @@ export function CrudCreatePage() {
       });
     }
 
-    await createMutation.mutateAsync(payload);
-    navigate(`/admin/${entityKey}`, { replace: true });
+    try {
+      await createMutation.mutateAsync(payload);
+      navigate(`/admin/${entityKey}`, { replace: true });
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   return (

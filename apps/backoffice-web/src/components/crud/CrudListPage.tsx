@@ -213,6 +213,11 @@ export function CrudListPage({
                 ]
               : undefined;
         const alignRight = col.align === "right";
+        // For inventory items, the primary identifier cells (Mã SKU / Tên hàng hóa)
+        // open the edit screen directly instead of the row's detail view.
+        const opensEdit =
+          entityKey === "inventory-items" &&
+          (field.key === "code" || field.key === "name");
         return {
           key: field.key,
           label: field.label,
@@ -221,12 +226,29 @@ export function CrudListPage({
           className: alignRight
             ? `max-w-[${widthPx}px] text-right tabular-nums`
             : `max-w-[${widthPx}px]`,
-          render: (row) => formatCell(row[field.key], field, col.format),
+          render: (row) => {
+            const content = formatCell(row[field.key], field, col.format);
+            if (!opensEdit) return content;
+            return (
+              <button
+                type="button"
+                className="text-left font-medium text-primary hover:underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(
+                    `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
+                  );
+                }}
+              >
+                {content}
+              </button>
+            );
+          },
           filterKind: useSelect ? "select" : "symbol",
           filterOptions: selectOptions,
         };
       }),
-    [config?.fields, entityKey, filterDefinitionByKey],
+    [config?.fields, config?.idField, entityKey, filterDefinitionByKey, navigate],
   );
 
   // ─── Hooks that previously sat AFTER early-returns (Rules-of-Hooks fix) ──

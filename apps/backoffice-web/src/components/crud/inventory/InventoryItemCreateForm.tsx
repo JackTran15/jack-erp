@@ -1,64 +1,69 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   FormField,
   Input,
   MoneyInput,
   TagsInput,
   Textarea,
 } from "@erp/ui";
-import {
-  Calculator,
-  ChevronDown,
-  ImagePlus,
-  Plus,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
+import { ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { CrudFieldInput } from "../CrudFieldInput";
-import { useCrudCreate, useCrudRecords } from "../useCrudApi";
-import { getUserFacingApiErrorMessage } from "../../../lib/user-facing-api-error";
+import { LookupField } from "../../forms/LookupField";
 
 import {
-  BRAND_SUGGESTIONS,
   COMMISSION_METHOD_OPTIONS,
   COMMISSION_POSITION_OPTIONS,
   DEFAULT_EXTRAS,
-  GROUP_SUGGESTIONS,
   IMAGE_ACCEPT,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_COUNT,
-  TABS,
   type TabId,
-  UNIT_PRESETS,
 } from "./item-create/constants";
 import {
   ConversionUnitsTable,
   createBlankConversionUnitRow,
   type ConversionUnitRow,
 } from "./item-create/ConversionUnitsTable";
-import { ProvidersPlaceholderTable } from "./item-create/ProvidersPlaceholderTable";
+import {
+  ItemProvidersTable,
+  type ItemProviderRow,
+} from "./item-create/ItemProvidersTable";
 import {
   ProductVariantsTable,
   VARIANT_DEFAULT_UNIT,
   type ProductVariantRow,
 } from "./item-create/ProductVariantsTable";
 import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
-import { InventoryItemCreateDialogs } from "./item-create/InventoryItemCreateDialogs";
 import { InventoryItemTabsHeader } from "./item-create/InventoryItemTabsHeader";
+import { useBrands, useItemCategories, useItemUnits } from "./item-create/hooks";
+import { BrandCreateDialog, type BrandPick } from "./item-create/dialogs/BrandCreateDialog";
+import { BrandListDialog } from "./item-create/dialogs/BrandListDialog";
+import {
+  ItemCategoryCreateDialog,
+  type CategoryPick,
+} from "./item-create/dialogs/ItemCategoryCreateDialog";
+import { UnitCreateDialog, type UnitPick } from "./item-create/dialogs/UnitCreateDialog";
 import type {
   CommissionRow,
   FormExtras,
   InventoryItemCreateFormProps as Props,
 } from "./item-create/types";
+
+interface Option {
+  id: string;
+  name: string;
+}
+
+const toNumberOrUndef = (raw: string): number | undefined => {
+  if (raw === "" || raw === null || raw === undefined) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const numToStr = (v: unknown): string =>
+  v === null || v === undefined || v === "" ? "" : String(v);
 
 export function InventoryItemCreateForm({
   editableFields,
@@ -68,32 +73,28 @@ export function InventoryItemCreateForm({
   setErrors,
   entityKey,
   isSaving = false,
+  mode = "create",
+  initialRecord,
 }: Props) {
   const navigate = useNavigate();
+  const isEdit = mode === "edit";
 
   const [activeTab, setActiveTab] = useState<TabId>("basic");
   const [extras, setExtras] = useState<FormExtras>(DEFAULT_EXTRAS);
   const [activeSubTab, setActiveSubTab] = useState<"conversion" | "providers">("conversion");
 
-  const [categoryPickOpen, setCategoryPickOpen] = useState(false);
-  const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
-  const [quickCategoryDraft, setQuickCategoryDraft] = useState("");
+  const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
+  const [brandCreateOpen, setBrandCreateOpen] = useState(false);
+  const [brandListOpen, setBrandListOpen] = useState(false);
+  const [unitCreateOpen, setUnitCreateOpen] = useState(false);
 
-  const [providerPickOpen, setProviderPickOpen] = useState(false);
-  const [quickProviderOpen, setQuickProviderOpen] = useState(false);
-  const [providerSearch, setProviderSearch] = useState("");
-  const [providerSummary, setProviderSummary] = useState<{ name: string; code: string } | null>(
-    null,
-  );
-  const [quickProviderCode, setQuickProviderCode] = useState("");
-  const [quickProviderName, setQuickProviderName] = useState("");
+  // Locally-created master rows, merged into the select options so a just-created
+  // value is selectable immediately (before the list query refetches).
+  const [addedCategories, setAddedCategories] = useState<Option[]>([]);
+  const [addedBrands, setAddedBrands] = useState<Option[]>([]);
+  const [addedUnits, setAddedUnits] = useState<string[]>([]);
 
-  const [groupPickOpen, setGroupPickOpen] = useState(false);
-  const [quickGroupOpen, setQuickGroupOpen] = useState(false);
-  const [quickGroupDraft, setQuickGroupDraft] = useState("");
-  const [brandPickOpen, setBrandPickOpen] = useState(false);
-  const [quickBrandOpen, setQuickBrandOpen] = useState(false);
-  const [quickBrandDraft, setQuickBrandDraft] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
 
   const [productImages, setProductImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -103,6 +104,7 @@ export function InventoryItemCreateForm({
   const [unitRows, setUnitRows] = useState<ConversionUnitRow[]>([
     createBlankConversionUnitRow(),
   ]);
+  const [providerRows, setProviderRows] = useState<ItemProviderRow[]>([]);
 
   const [variantRows, setVariantRows] = useState<ProductVariantRow[]>([]);
   const removedVariantKeys = useRef<Set<string>>(new Set());
@@ -112,16 +114,96 @@ export function InventoryItemCreateForm({
     [editableFields],
   );
 
-  // ─── Sync local "extras" + unitRows into the parent `values` payload ────
-  // The keys below MUST match the API DTO (CreateItemDto). CrudCreatePage
-  // forwards the whole `values` object for entityKey === "inventory-items".
-  useEffect(() => {
-    const toNumberOrUndef = (raw: string): number | undefined => {
-      if (raw === "" || raw === null || raw === undefined) return undefined;
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : undefined;
-    };
+  // ─── Master-data option lists (Nhóm hàng hóa / Thương hiệu / Đơn vị tính) ──
+  const categoriesQuery = useItemCategories("", true);
+  const brandsQuery = useBrands("", true);
+  const unitsQuery = useItemUnits("", true);
 
+  const categoryOptions = useMemo<Option[]>(() => {
+    const data = (categoriesQuery.data?.data ?? []) as Record<string, unknown>[];
+    const base = data.map((r) => ({ id: String(r.id ?? ""), name: String(r.name ?? "") }));
+    const seen = new Set(base.map((o) => o.id));
+    return [...base, ...addedCategories.filter((o) => !seen.has(o.id))];
+  }, [categoriesQuery.data, addedCategories]);
+
+  const brandOptions = useMemo<Option[]>(() => {
+    const data = (brandsQuery.data?.data ?? []) as Record<string, unknown>[];
+    const base = data.map((r) => ({ id: String(r.id ?? ""), name: String(r.name ?? "") }));
+    const seen = new Set(base.map((o) => o.id));
+    return [...base, ...addedBrands.filter((o) => !seen.has(o.id))];
+  }, [brandsQuery.data, addedBrands]);
+
+  const unitOptions = useMemo<string[]>(() => {
+    const data = (unitsQuery.data?.data ?? []) as Record<string, unknown>[];
+    const base = data.map((r) => String(r.name ?? "")).filter(Boolean);
+    const merged = new Set([...base, ...addedUnits]);
+    const current = String(values.unit ?? "");
+    if (current) merged.add(current);
+    return [...merged];
+  }, [unitsQuery.data, addedUnits, values.unit]);
+
+  // Saved per-variant rows (edit mode), keyed by "color__size", to hydrate the
+  // variant table with persisted prices / SKU / barcode.
+  const savedVariantsByKey = useMemo(() => {
+    const m = new Map<string, Record<string, unknown>>();
+    if (isEdit && initialRecord && Array.isArray(initialRecord.variants)) {
+      for (const v of initialRecord.variants as Record<string, unknown>[]) {
+        m.set(`${String(v.color ?? "")}__${String(v.size ?? "")}`, v);
+      }
+    }
+    return m;
+  }, [isEdit, initialRecord]);
+
+  // ─── Hydrate extras / conversion units / providers in edit mode (once) ─────
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!isEdit || hydratedRef.current || !initialRecord) return;
+    hydratedRef.current = true;
+    const rec = initialRecord;
+    setExtras((prev) => ({
+      ...prev,
+      initialStock: "0",
+      initialStockUnitPrice: "0",
+      showOnPos: rec.isPosVisible !== false,
+      manageBarcodePerUnit: Boolean(rec.manageBarcodePerUnit),
+      isGoldSilver: Boolean(rec.isGoldSilver),
+      oddSize: numToStr(rec.oddSize),
+      weightG: numToStr(rec.packageWeightGram),
+      pkgLength: numToStr(rec.packageLengthCm),
+      pkgWidth: numToStr(rec.packageWidthCm),
+      pkgHeight: numToStr(rec.packageHeightCm),
+    }));
+    if (Array.isArray(rec.units)) {
+      const rows = (rec.units as Record<string, unknown>[]).map((u, i) => ({
+        id: `unit-${i}-${String(u.id ?? i)}`,
+        unitName: String(u.unitName ?? ""),
+        ratio: numToStr(u.ratio) || "1",
+        description: String(u.description ?? ""),
+        buyPrice: numToStr(u.purchasePrice) || "0",
+        sellPrice: numToStr(u.sellPrice) || "0",
+        defaultSell: Boolean(u.isDefaultSell),
+        defaultBuy: Boolean(u.isDefaultBuy),
+      }));
+      if (rows.length) setUnitRows(rows);
+    }
+    if (Array.isArray(rec.providers)) {
+      const rows = (rec.providers as Record<string, unknown>[]).map((p, i) => {
+        const prov = (p.provider ?? {}) as Record<string, unknown>;
+        return {
+          rowId: `prov-${i}-${String(p.id ?? i)}`,
+          providerId: String(p.providerId ?? prov.id ?? ""),
+          code: String(prov.code ?? ""),
+          name: String(prov.name ?? ""),
+          address: String(prov.address ?? ""),
+          isPrimary: Boolean(p.isPrimary),
+        };
+      });
+      if (rows.length) setProviderRows(rows);
+    }
+  }, [isEdit, initialRecord]);
+
+  // ─── Sync local state into the parent `values` payload (DTO keys) ──────────
+  useEffect(() => {
     const units = unitRows
       .filter((r) => r.unitName.trim().length > 0)
       .map((r) => ({
@@ -137,13 +219,12 @@ export function InventoryItemCreateForm({
     const minQty = toNumberOrUndef(extras.minStock);
     const maxQty = toNumberOrUndef(extras.maxStock);
     const threshold =
-      minQty !== undefined || maxQty !== undefined
-        ? { minQty, maxQty }
-        : undefined;
+      minQty !== undefined || maxQty !== undefined ? { minQty, maxQty } : undefined;
+
+    const trimmedBarcode = barcodeInput.trim();
 
     setValues((prev) => ({
       ...prev,
-      // Top-level primitives mapped to DTO keys
       isPosVisible: extras.showOnPos,
       manageBarcodePerUnit: extras.manageBarcodePerUnit,
       isGoldSilver: extras.isGoldSilver,
@@ -152,23 +233,30 @@ export function InventoryItemCreateForm({
       packageLengthCm: toNumberOrUndef(extras.pkgLength),
       packageWidthCm: toNumberOrUndef(extras.pkgWidth),
       packageHeightCm: toNumberOrUndef(extras.pkgHeight),
-      // Nested
-      units: units.length > 0 ? units : undefined,
+      units: units.length > 0 ? units : isEdit ? [] : undefined,
+      barcodes: trimmedBarcode ? [{ code: trimmedBarcode }] : undefined,
       threshold,
-      initialStock: toNumberOrUndef(extras.initialStock),
-      initialStockUnitPrice: toNumberOrUndef(extras.initialStockUnitPrice),
+      initialStock: isEdit ? undefined : toNumberOrUndef(extras.initialStock),
+      initialStockUnitPrice: isEdit ? undefined : toNumberOrUndef(extras.initialStockUnitPrice),
     }));
-    // We intentionally re-sync whenever extras or unitRows change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extras, unitRows]);
+  }, [extras, unitRows, barcodeInput]);
 
-  // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ──────
-  // Cartesian product of Màu sắc × Size. User edits (price/name/barcode) are kept
-  // by merging on a stable combo key, but unit & SKU always track the product;
-  // manually deleted combos are remembered so they don't reappear.
+  // ─── Sync the multi-provider table into `providers[]` ──────────────────────
   useEffect(() => {
-    const colors = splitAttributeValues(extras.attrColor);
-    const sizes = splitAttributeValues(extras.attrSize);
+    const providers = providerRows
+      .filter((r) => r.providerId)
+      .map((r) => ({ providerId: r.providerId, isPrimary: r.isPrimary }));
+    setValues((prev) => ({ ...prev, providers }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerRows]);
+
+  // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ─────
+  useEffect(() => {
+    const toList = (v: unknown): string[] =>
+      Array.isArray(v) ? (v as string[]).map((s) => s.trim()).filter(Boolean) : [];
+    const colors = toList(values.colors);
+    const sizes = toList(values.sizes);
 
     const combos: Array<{ color: string; size: string }> = [];
     if (colors.length && sizes.length) {
@@ -179,8 +267,8 @@ export function InventoryItemCreateForm({
       for (const size of sizes) combos.push({ color: "", size });
     }
 
-    // The product SKU is stored in the `code` field (config key "code").
     const baseSku = String(values.code ?? "");
+    const baseName = String(values.name ?? "").trim();
     const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
 
     setVariantRows((prev) => {
@@ -189,26 +277,47 @@ export function InventoryItemCreateForm({
       for (const { color, size } of combos) {
         const key = variantComboKey(color, size);
         if (removedVariantKeys.current.has(key)) continue;
+        // Name, unit and SKU always track the product (name/unit/code) — they
+        // re-derive on every change rather than being kept per-row.
+        const label = [color, size].filter(Boolean).join("/");
+        const variantName = baseName ? `${baseName} (${label})` : `(${label})`;
+        const sku = autoVariantSku(baseSku, color, size);
         const existing = byKey.get(key);
         if (existing) {
-          // Unit & SKU are always derived from the product (unit + sku), never
-          // kept per-row — they re-sync whenever the product values change.
+          // Mã vạch defaults to (clones) the SKU; keep it if the user customized it.
+          const keepBarcode =
+            existing.barcode && existing.barcode !== existing.sku
+              ? existing.barcode
+              : sku;
           next.push({
             ...existing,
+            name: variantName,
             unit: baseUnit,
-            sku: autoVariantSku(baseSku, color, size),
+            sku,
+            barcode: keepBarcode,
           });
         } else {
+          // Edit mode: seed the row from the saved variant (price/SKU/barcode).
+          const saved = savedVariantsByKey.get(key);
+          const savedSku =
+            saved && typeof saved.code === "string" && saved.code
+              ? String(saved.code)
+              : sku;
           next.push({
             id: `variant-${key}`,
             color,
             size,
-            name: `(${[color, size].filter(Boolean).join("/")})`,
+            name: variantName,
             unit: baseUnit,
-            sku: autoVariantSku(baseSku, color, size),
-            barcode: "",
-            purchasePrice: "0",
-            sellPrice: "0",
+            sku: savedSku,
+            barcode:
+              saved && saved.barcode ? String(saved.barcode) : savedSku,
+            purchasePrice:
+              saved && saved.purchasePrice != null
+                ? String(saved.purchasePrice)
+                : "0",
+            sellPrice:
+              saved && saved.sellPrice != null ? String(saved.sellPrice) : "0",
             initialStock: "0",
           });
         }
@@ -216,15 +325,9 @@ export function InventoryItemCreateForm({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extras.attrColor, extras.attrSize, values.code, values.unit]);
+  }, [values.colors, values.sizes, values.code, values.unit, values.name, savedVariantsByKey]);
 
-  // Sync variant rows into the submitted payload under `variants`.
   useEffect(() => {
-    const toNumberOrUndef = (raw: string): number | undefined => {
-      if (raw === "" || raw === null || raw === undefined) return undefined;
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : undefined;
-    };
     setValues((prev) => ({
       ...prev,
       variants:
@@ -250,7 +353,6 @@ export function InventoryItemCreateForm({
     setVariantRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
-  // Copy the current row's prices down onto every row below it.
   const copyPriceDown = (row: ProductVariantRow) => {
     setVariantRows((prev) => {
       const idx = prev.findIndex((r) => r.id === row.id);
@@ -260,63 +362,9 @@ export function InventoryItemCreateForm({
     });
   };
 
-  const renderedDynamicKeys = useRef(new Set<string>());
-
-  const categoryDialogsOpen = categoryPickOpen || quickCategoryOpen;
-
-  const { data: categoryFetch } = useCrudRecords(
-    "inventory-items",
-    { page: 1, pageSize: 100, sortBy: undefined, sortOrder: "desc", search: "", filters: {} },
-    categoryPickOpen,
-  );
-
-  const { data: categoryRegistryFetch } = useCrudRecords(
-    "inventory-item-categories",
-    {
-      page: 1,
-      pageSize: 100,
-      sortBy: "name",
-      sortOrder: "asc",
-      search: "",
-      filters: {},
-    },
-    categoryDialogsOpen,
-  );
-
-  const createCategoryMutation = useCrudCreate("inventory-item-categories");
-
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const row of categoryRegistryFetch?.data ?? []) {
-      const n = row.name;
-      if (typeof n === "string" && n.trim()) set.add(n.trim());
-    }
-    for (const row of categoryFetch?.data ?? []) {
-      const c = row.category;
-      if (typeof c === "string" && c.trim()) set.add(c.trim());
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, "vi"));
-  }, [categoryRegistryFetch?.data, categoryFetch?.data]);
-
-  const { data: providerFetch, isLoading: providersLoading } = useCrudRecords(
-    "inventory-providers",
-    {
-      page: 1,
-      pageSize: 100,
-      sortBy: undefined,
-      sortOrder: "desc",
-      search: providerSearch,
-      filters: {},
-    },
-    providerPickOpen,
-  );
-
-  const createProviderMutation = useCrudCreate("inventory-providers");
-
   useEffect(() => {
     previewsRef.current = previews;
   }, [previews]);
-
   useEffect(() => {
     return () => {
       previewsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -327,50 +375,28 @@ export function InventoryItemCreateForm({
     setExtras((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handlePickCategory = (label: string) => {
-    setValues((prev) => ({ ...prev, category: label }));
+  // ─── Master-data selection handlers ────────────────────────────────────────
+  const onCategoryCreated = (cat: CategoryPick) => {
+    setAddedCategories((prev) => [...prev, { id: cat.id, name: cat.name }]);
+    setValues((prev) => ({ ...prev, categoryId: cat.id, categoryName: cat.name }));
+  };
+
+  const onBrandResolved = (brand: BrandPick) => {
+    setAddedBrands((prev) => [...prev, { id: brand.id, name: brand.name }]);
+    setValues((prev) => ({ ...prev, brandId: brand.id, brand: brand.name }));
+  };
+
+  const selectUnit = (name: string) => {
+    setValues((prev) => ({ ...prev, unit: name }));
     setErrors((prev) => {
       const next = { ...prev };
-      delete next.category;
+      delete next.unit;
       return next;
     });
-    setCategoryPickOpen(false);
   };
-
-  const applyQuickCategory = async () => {
-    const name = quickCategoryDraft.trim();
-    if (!name) {
-      toast.warning("Vui lòng nhập tên danh mục.");
-      return;
-    }
-    try {
-      await createCategoryMutation.mutateAsync({ name });
-      handlePickCategory(name);
-      setQuickCategoryOpen(false);
-      setQuickCategoryDraft("");
-      toast.success("Đã tạo danh mục và áp dụng cho biểu mẫu.");
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    }
-  };
-
-  const handlePickProvider = (row: Record<string, unknown>) => {
-    const id = String(row.id ?? "");
-    const name = String(row.name ?? "");
-    const code = String(row.code ?? "");
-    setValues((prev) => ({ ...prev, providerId: id }));
-    setProviderSummary({ name, code });
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next.providerId;
-      return next;
-    });
-    setProviderPickOpen(false);
-  };
-
-  const clearProvider = () => {
-    setValues((prev) => ({ ...prev, providerId: "" }));
-    setProviderSummary(null);
+  const onUnitCreated = (unit: UnitPick) => {
+    setAddedUnits((prev) => [...prev, unit.name]);
+    selectUnit(unit.name);
   };
 
   const addImages = (files: FileList | null) => {
@@ -396,9 +422,7 @@ export function InventoryItemCreateForm({
         next.push(file);
         newPreviewUrls.push(URL.createObjectURL(file));
       }
-      if (newPreviewUrls.length) {
-        setPreviews((p) => [...p, ...newPreviewUrls]);
-      }
+      if (newPreviewUrls.length) setPreviews((p) => [...p, ...newPreviewUrls]);
       return next;
     });
   };
@@ -426,130 +450,22 @@ export function InventoryItemCreateForm({
       ],
     }));
   };
-
   const removeCommissionRow = (id: string) => {
     setExtras((prev) => ({
       ...prev,
       commissions: prev.commissions.filter((c) => c.id !== id),
     }));
   };
-
-  const updateCommissionRow = (
-    id: string,
-    patch: Partial<Omit<CommissionRow, "id">>,
-  ) => {
+  const updateCommissionRow = (id: string, patch: Partial<Omit<CommissionRow, "id">>) => {
     setExtras((prev) => ({
       ...prev,
       commissions: prev.commissions.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     }));
   };
 
-  const iconBtn =
-    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground hover:bg-accent";
+  const renderedDynamicKeys = useRef(new Set<string>());
 
-  const trailingCategory = (
-    <>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Tìm danh mục"
-        onClick={() => setCategoryPickOpen(true)}
-      >
-        <Search className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Thêm nhanh danh mục"
-        onClick={() => {
-          setQuickCategoryDraft(String(values.category ?? ""));
-          setQuickCategoryOpen(true);
-        }}
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </>
-  );
-
-  const trailingUnit = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" className={iconBtn} aria-label="Chọn đơn vị gợi ý">
-          <ChevronDown className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
-        {UNIT_PRESETS.map((u) => (
-          <DropdownMenuItem
-            key={u}
-            onClick={() => {
-              setValues((prev) => ({ ...prev, unit: u }));
-              setErrors((prev) => {
-                const next = { ...prev };
-                delete next.unit;
-                return next;
-              });
-            }}
-          >
-            {u}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const trailingGroup = (
-    <>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Gợi ý nhóm hàng"
-        onClick={() => setGroupPickOpen(true)}
-      >
-        <Search className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Nhập nhanh nhóm hàng"
-        onClick={() => {
-          setQuickGroupDraft(String(values.itemType ?? ""));
-          setQuickGroupOpen(true);
-        }}
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </>
-  );
-
-  const trailingBrand = (
-    <>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Gợi ý thương hiệu"
-        onClick={() => setBrandPickOpen(true)}
-      >
-        <Search className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className={iconBtn}
-        aria-label="Nhập nhanh thương hiệu"
-        onClick={() => {
-          setQuickBrandDraft(String(values.brand ?? ""));
-          setQuickBrandOpen(true);
-        }}
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </>
-  );
-
-  // ─── Helpers render dynamic fields (left column of "Basic Information" tab) ─────
-
-  /** Render field theo `editableFields` nếu key tồn tại; fallback null. */
-  const renderDynamicField = (key: string, trailing?: ReactNode) => {
+  const renderDynamicField = (key: string) => {
     const field = editableFieldsByKey.get(key);
     if (!field) return null;
     renderedDynamicKeys.current.add(key);
@@ -560,7 +476,6 @@ export function InventoryItemCreateForm({
         field={field}
         value={values[field.key]}
         error={errors[field.key]}
-        trailing={trailing}
         onChange={(nextValue) => {
           setValues((prev) => ({ ...prev, [field.key]: nextValue }));
           setErrors((prev) => {
@@ -573,11 +488,8 @@ export function InventoryItemCreateForm({
     );
   };
 
-  /** Renders any editable field NOT already shown by an explicit slot (placeholder fields). */
   const renderRemainingFields = () => {
     const skip = renderedDynamicKeys.current;
-    // Keys whose value is synced from local `extras`/unitRows in another tab —
-    // skip rendering them as plain inputs in the basic tab's remainder grid.
     const managedElsewhere = new Set([
       "description",
       "packageWeightGram",
@@ -588,19 +500,27 @@ export function InventoryItemCreateForm({
       "isGoldSilver",
       "manageBarcodePerUnit",
       "isPosVisible",
-      // Has an explicit slot in the right column of the basic tab.
+      "manufactureYear",
+      "composition",
+      "weightGram",
+      "lengthCm",
+      "widthCm",
+      "heightCm",
       "providerId",
-      // Rendered in the "Thông tin thuộc tính" section below.
+      "categoryId",
+      "categoryName",
+      "brand",
+      "brandId",
+      "itemType",
+      "unit",
+      "productId",
+      "productName",
+      "variantLabel",
       "colors",
       "sizes",
     ]);
     return editableFields
-      .filter(
-        (f) =>
-          !skip.has(f.key) &&
-          f.key !== "isActive" &&
-          !managedElsewhere.has(f.key),
-      )
+      .filter((f) => !skip.has(f.key) && f.key !== "isActive" && !managedElsewhere.has(f.key))
       .map((field) => (
         <CrudFieldInput
           key={field.key}
@@ -620,10 +540,10 @@ export function InventoryItemCreateForm({
       ));
   };
 
-  // ─── Tab contents ──────────────────────────────────────────────────────────
-
-  // Reset rendered keys each render-pass before computing tab basic.
   renderedDynamicKeys.current = new Set();
+
+  const selectClass =
+    "h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
 
   const basicTab = (
     <>
@@ -634,23 +554,104 @@ export function InventoryItemCreateForm({
         <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
           <div className="flex flex-col gap-3">
             {renderDynamicField("name")}
-            {renderDynamicField("category", trailingCategory)}
-            {renderDynamicField("itemType", trailingGroup)}
-            {renderDynamicField("brand", trailingBrand)}
-            {renderDynamicField("sku")}
-            {renderDynamicField("barcode")}
+
+            {/* Nhóm hàng hóa — searchable categoryId picker + quick-create */}
+            <FormField label="Nhóm hàng hóa" htmlFor="create-category">
+              <LookupField<Option>
+                inputId="create-category"
+                placeholder="Nhập để tìm kiếm"
+                value={String(values.categoryName ?? "")}
+                onValueChange={(text) =>
+                  setValues((prev) => ({ ...prev, categoryName: text, categoryId: "" }))
+                }
+                onSelect={(opt) => {
+                  setValues((prev) => ({
+                    ...prev,
+                    categoryId: opt.id,
+                    categoryName: opt.name,
+                  }));
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.categoryId;
+                    return next;
+                  });
+                }}
+                search={(q) =>
+                  Promise.resolve(
+                    categoryOptions.filter((o) =>
+                      o.name.toLowerCase().includes(q.trim().toLowerCase()),
+                    ),
+                  )
+                }
+                itemKey={(o) => o.id}
+                renderItem={(o) => o.name}
+                onCreateNew={() => setCategoryCreateOpen(true)}
+              />
+            </FormField>
+
+            {/* Thương hiệu — searchable brandId picker; search icon = list, + = create */}
+            <FormField label="Thương hiệu" htmlFor="create-brand">
+              <LookupField<Option>
+                inputId="create-brand"
+                placeholder="Chọn thương hiệu"
+                value={String(values.brand ?? "")}
+                onValueChange={(text) =>
+                  setValues((prev) => ({ ...prev, brand: text, brandId: "" }))
+                }
+                onSelect={(opt) =>
+                  setValues((prev) => ({ ...prev, brandId: opt.id, brand: opt.name }))
+                }
+                search={(q) =>
+                  Promise.resolve(
+                    brandOptions.filter((o) =>
+                      o.name.toLowerCase().includes(q.trim().toLowerCase()),
+                    ),
+                  )
+                }
+                itemKey={(o) => o.id}
+                renderItem={(o) => o.name}
+                onSearchButtonClick={() => setBrandListOpen(true)}
+                onCreateNew={() => setBrandCreateOpen(true)}
+              />
+            </FormField>
+
+            {renderDynamicField("code")}
+
+            <FormField label="Mã vạch" htmlFor="create-barcode">
+              <Input
+                id="create-barcode"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                placeholder="Hệ thống tự sinh khi bỏ trống"
+              />
+            </FormField>
+
             {renderDynamicField("purchasePrice")}
-            {renderDynamicField("sellPrice", (
-              <button
-                type="button"
-                className={iconBtn}
-                aria-label="Tính giá bán"
-                title="Trợ lý tính giá (sắp ra mắt)"
-              >
-                <Calculator className="h-4 w-4" />
-              </button>
-            ))}
-            {renderDynamicField("unit", trailingUnit)}
+            {renderDynamicField("sellingPrice")}
+
+            {/* Đơn vị tính cơ bản — searchable unit picker + quick-create */}
+            <FormField label="Đơn vị tính cơ bản" htmlFor="create-unit" required error={errors.unit}>
+              <LookupField<string>
+                inputId="create-unit"
+                placeholder="Chọn đơn vị tính"
+                value={String(values.unit ?? "")}
+                onValueChange={(text) => selectUnit(text)}
+                onSelect={(u) => selectUnit(u)}
+                search={(q) =>
+                  Promise.resolve(
+                    unitOptions.filter((u) =>
+                      u.toLowerCase().includes(q.trim().toLowerCase()),
+                    ),
+                  )
+                }
+                itemKey={(u) => u}
+                renderItem={(u) => u}
+                onCreateNew={() => setUnitCreateOpen(true)}
+              />
+              <p className="mt-1 text-xs italic text-muted-foreground">
+                (Nên để đơn vị tính nhỏ nhất. VD: Vải bán theo Cuộn và Mét thì để ĐVT là Mét.)
+              </p>
+            </FormField>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -661,7 +662,13 @@ export function InventoryItemCreateForm({
                 value={extras.initialStock}
                 onChange={(e) => updateExtras("initialStock", e.target.value)}
                 inputMode="decimal"
+                disabled={isEdit}
               />
+              {isEdit ? (
+                <p className="mt-1 text-xs italic text-muted-foreground">
+                  (Tồn kho ban đầu chỉ được nhập khi thêm mới hàng hóa.)
+                </p>
+              ) : null}
             </FormField>
             <FormField label="Đơn giá nhập đầu kỳ" htmlFor="extra-initial-stock-price">
               <MoneyInput
@@ -674,69 +681,9 @@ export function InventoryItemCreateForm({
                 onChange={(v) =>
                   updateExtras("initialStockUnitPrice", v === "" ? "" : String(v))
                 }
+                disabled={isEdit}
               />
             </FormField>
-
-            {/* Nhà cung cấp + checkbox "Đang hoạt động" */}
-            {editableFieldsByKey.has("providerId") && (
-              <FormField
-                label={editableFieldsByKey.get("providerId")!.label}
-                htmlFor="create-provider-id"
-                error={errors.providerId}
-                required={editableFieldsByKey.get("providerId")!.required}
-              >
-                <div className="flex items-start gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      id="create-provider-id"
-                      readOnly
-                      value={
-                        providerSummary
-                          ? `${providerSummary.name} (${providerSummary.code})`
-                          : values.providerId
-                            ? String(values.providerId)
-                            : ""
-                      }
-                      placeholder="Chọn nhà cung cấp…"
-                      className="bg-muted/30"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={iconBtn}
-                    aria-label="Tìm nhà cung cấp"
-                    onClick={() => {
-                      setProviderSearch("");
-                      setProviderPickOpen(true);
-                    }}
-                  >
-                    <Search className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className={iconBtn}
-                    aria-label="Thêm nhà cung cấp mới"
-                    onClick={() => {
-                      setQuickProviderCode("");
-                      setQuickProviderName("");
-                      setQuickProviderOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                  {(providerSummary || String(values.providerId ?? "").length > 0) && (
-                    <button
-                      type="button"
-                      className={iconBtn}
-                      aria-label="Bỏ chọn NCC"
-                      onClick={clearProvider}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </FormField>
-            )}
 
             {editableFieldsByKey.has("isActive") && (
               <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -754,14 +701,11 @@ export function InventoryItemCreateForm({
           </div>
         </div>
 
-        {/* Trường động còn lại (placeholder để không mất dữ liệu nếu config thay đổi) */}
         {(() => {
           const rest = renderRemainingFields();
           if (rest.length === 0) return null;
           return (
-            <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2">
-              {rest}
-            </div>
+            <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2">{rest}</div>
           );
         })()}
       </section>
@@ -769,10 +713,12 @@ export function InventoryItemCreateForm({
       {/* Sub-tabs: Đơn vị chuyển đổi / Nhà cung cấp */}
       <section className="rounded-md border border-border bg-background">
         <div className="flex items-center gap-1 border-b px-2 pt-2">
-          {([
-            { id: "conversion", label: "Đơn vị chuyển đổi" },
-            { id: "providers", label: "Nhà cung cấp" },
-          ] as const).map((sub) => (
+          {(
+            [
+              { id: "conversion", label: "Đơn vị chuyển đổi" },
+              { id: "providers", label: "Nhà cung cấp" },
+            ] as const
+          ).map((sub) => (
             <button
               key={sub.id}
               type="button"
@@ -787,12 +733,11 @@ export function InventoryItemCreateForm({
             </button>
           ))}
         </div>
-
         <div className="p-3">
           {activeSubTab === "conversion" ? (
             <ConversionUnitsTable rows={unitRows} setRows={setUnitRows} />
           ) : (
-            <ProvidersPlaceholderTable />
+            <ItemProvidersTable rows={providerRows} setRows={setProviderRows} />
           )}
         </div>
       </section>
@@ -897,9 +842,44 @@ export function InventoryItemCreateForm({
     </>
   );
 
+  const numberFieldHandler = (key: string) => (e: { target: { value: string } }) => {
+    const raw = e.target.value;
+    setValues((prev) => ({ ...prev, [key]: raw === "" ? "" : Number(raw) }));
+  };
+
   const additionalTab = (
     <section className="rounded-md border border-border bg-background p-4">
       <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+          <FormField label="Dài (cm)" htmlFor="extra-net-length">
+            <Input
+              id="extra-net-length"
+              type="number"
+              inputMode="decimal"
+              value={String(values.lengthCm ?? "")}
+              onChange={numberFieldHandler("lengthCm")}
+            />
+          </FormField>
+          <FormField label="Rộng (cm)" htmlFor="extra-net-width">
+            <Input
+              id="extra-net-width"
+              type="number"
+              inputMode="decimal"
+              value={String(values.widthCm ?? "")}
+              onChange={numberFieldHandler("widthCm")}
+            />
+          </FormField>
+          <FormField label="Cao (cm)" htmlFor="extra-net-height">
+            <Input
+              id="extra-net-height"
+              type="number"
+              inputMode="decimal"
+              value={String(values.heightCm ?? "")}
+              onChange={numberFieldHandler("heightCm")}
+            />
+          </FormField>
+        </div>
+
         <FormField label="Trọng lượng gói hàng (g)" htmlFor="extra-weight">
           <Input
             id="extra-weight"
@@ -955,10 +935,7 @@ export function InventoryItemCreateForm({
             value={String(values.manufactureYear ?? "")}
             onChange={(e) => {
               const raw = e.target.value;
-              setValues((prev) => ({
-                ...prev,
-                manufactureYear: raw === "" ? "" : Number(raw),
-              }));
+              setValues((prev) => ({ ...prev, manufactureYear: raw === "" ? "" : Number(raw) }));
             }}
             placeholder="VD: 2024"
           />
@@ -969,9 +946,7 @@ export function InventoryItemCreateForm({
             id="extra-composition"
             rows={3}
             value={String(values.composition ?? "")}
-            onChange={(e) =>
-              setValues((prev) => ({ ...prev, composition: e.target.value }))
-            }
+            onChange={(e) => setValues((prev) => ({ ...prev, composition: e.target.value }))}
           />
         </FormField>
 
@@ -990,9 +965,7 @@ export function InventoryItemCreateForm({
             id="extra-long-desc"
             rows={4}
             value={String(values.description ?? "")}
-            onChange={(e) =>
-              setValues((prev) => ({ ...prev, description: e.target.value }))
-            }
+            onChange={(e) => setValues((prev) => ({ ...prev, description: e.target.value }))}
             placeholder="Mô tả chi tiết về mặt hàng…"
           />
         </FormField>
@@ -1005,7 +978,7 @@ export function InventoryItemCreateForm({
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Định mức tồn kho
       </h3>
-      <div className="grid gap-3 md:grid-cols-2 md:max-w-xl">
+      <div className="grid gap-3 md:max-w-xl md:grid-cols-2">
         <FormField label="Tối thiểu" htmlFor="extra-min-stock">
           <Input
             id="extra-min-stock"
@@ -1040,9 +1013,7 @@ export function InventoryItemCreateForm({
               <th className="px-3 py-2 text-left">Vị trí công việc</th>
               <th className="px-3 py-2 text-left">Cách tính hoa hồng</th>
               <th className="px-3 py-2 text-right">Mức tính</th>
-              <th className="px-3 py-2 text-right">
-                Giới hạn giảm giá được tính hoa hồng (%)
-              </th>
+              <th className="px-3 py-2 text-right">Giới hạn giảm giá được tính hoa hồng (%)</th>
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
@@ -1051,11 +1022,9 @@ export function InventoryItemCreateForm({
               <tr key={row.id} className="border-t border-border">
                 <td className="px-3 py-2">
                   <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    className={selectClass}
                     value={row.position}
-                    onChange={(e) =>
-                      updateCommissionRow(row.id, { position: e.target.value })
-                    }
+                    onChange={(e) => updateCommissionRow(row.id, { position: e.target.value })}
                   >
                     {COMMISSION_POSITION_OPTIONS.map((p) => (
                       <option key={p} value={p}>
@@ -1066,11 +1035,9 @@ export function InventoryItemCreateForm({
                 </td>
                 <td className="px-3 py-2">
                   <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    className={selectClass}
                     value={row.method}
-                    onChange={(e) =>
-                      updateCommissionRow(row.id, { method: e.target.value })
-                    }
+                    onChange={(e) => updateCommissionRow(row.id, { method: e.target.value })}
                   >
                     {COMMISSION_METHOD_OPTIONS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -1085,9 +1052,7 @@ export function InventoryItemCreateForm({
                     inputMode="decimal"
                     className="text-right"
                     value={row.amount}
-                    onChange={(e) =>
-                      updateCommissionRow(row.id, { amount: e.target.value })
-                    }
+                    onChange={(e) => updateCommissionRow(row.id, { amount: e.target.value })}
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -1096,9 +1061,7 @@ export function InventoryItemCreateForm({
                     inputMode="decimal"
                     className="text-right"
                     value={row.discountLimit}
-                    onChange={(e) =>
-                      updateCommissionRow(row.id, { discountLimit: e.target.value })
-                    }
+                    onChange={(e) => updateCommissionRow(row.id, { discountLimit: e.target.value })}
                   />
                 </td>
                 <td className="px-2 py-2 text-right">
@@ -1131,8 +1094,6 @@ export function InventoryItemCreateForm({
     </section>
   );
 
-  // ─── JSX ───────────────────────────────────────────────────────────────────
-
   return (
     <>
       <InventoryItemTabsHeader activeTab={activeTab} onChangeTab={setActiveTab} />
@@ -1146,55 +1107,26 @@ export function InventoryItemCreateForm({
 
       <InventoryItemActionBar isSaving={isSaving} onCancel={() => navigate(`/admin/${entityKey}`)} />
 
-      <InventoryItemCreateDialogs
-        categoryPickOpen={categoryPickOpen}
-        setCategoryPickOpen={setCategoryPickOpen}
-        categoryOptions={categoryOptions}
-        handlePickCategory={handlePickCategory}
-        quickCategoryOpen={quickCategoryOpen}
-        setQuickCategoryOpen={setQuickCategoryOpen}
-        quickCategoryDraft={quickCategoryDraft}
-        setQuickCategoryDraft={setQuickCategoryDraft}
-        providerPickOpen={providerPickOpen}
-        setProviderPickOpen={setProviderPickOpen}
-        providerSearch={providerSearch}
-        setProviderSearch={setProviderSearch}
-        providersLoading={providersLoading}
-        providerFetch={providerFetch}
-        handlePickProvider={handlePickProvider}
-        quickProviderOpen={quickProviderOpen}
-        setQuickProviderOpen={setQuickProviderOpen}
-        quickProviderCode={quickProviderCode}
-        setQuickProviderCode={setQuickProviderCode}
-        quickProviderName={quickProviderName}
-        setQuickProviderName={setQuickProviderName}
-        createProviderMutation={createProviderMutation}
-        groupPickOpen={groupPickOpen}
-        setGroupPickOpen={setGroupPickOpen}
-        quickGroupOpen={quickGroupOpen}
-        setQuickGroupOpen={setQuickGroupOpen}
-        quickGroupDraft={quickGroupDraft}
-        setQuickGroupDraft={setQuickGroupDraft}
-        brandPickOpen={brandPickOpen}
-        setBrandPickOpen={setBrandPickOpen}
-        quickBrandOpen={quickBrandOpen}
-        setQuickBrandOpen={setQuickBrandOpen}
-        quickBrandDraft={quickBrandDraft}
-        setQuickBrandDraft={setQuickBrandDraft}
-        setValues={setValues}
-        onApplyQuickCategory={applyQuickCategory}
-        isApplyingQuickCategory={createCategoryMutation.isPending}
+      <ItemCategoryCreateDialog
+        open={categoryCreateOpen}
+        onOpenChange={setCategoryCreateOpen}
+        onCreated={onCategoryCreated}
+      />
+      <BrandCreateDialog
+        open={brandCreateOpen}
+        onOpenChange={setBrandCreateOpen}
+        initialName={String(values.brand ?? "")}
+        onCreated={onBrandResolved}
+      />
+      <BrandListDialog open={brandListOpen} onOpenChange={setBrandListOpen} onPick={onBrandResolved} />
+      <UnitCreateDialog
+        open={unitCreateOpen}
+        onOpenChange={setUnitCreateOpen}
+        initialName={String(values.unit ?? "")}
+        onCreated={onUnitCreated}
       />
     </>
   );
-}
-
-/** Split a comma-separated attribute field into trimmed, non-empty values. */
-function splitAttributeValues(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
 }
 
 /** Stable key for a (color, size) combo, used to merge edits across regenerations. */
