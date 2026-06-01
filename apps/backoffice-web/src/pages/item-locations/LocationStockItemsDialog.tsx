@@ -191,10 +191,20 @@ export function LocationStockItemsDialog({
 
   const columns: TableColumn<StockByLocationItem>[] = useMemo(
     () => [
-      { key: "code", label: "Mã SKU", width: 140, render: (r) => r.code },
+      {
+        key: "code",
+        label: "Mã SKU",
+        width: 170,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
+        render: (r) => r.code,
+      },
       {
         key: "name",
         label: "Tên hàng hóa",
+        width: 360,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
         render: (r) => (
           <span>
             {r.name}
@@ -210,27 +220,33 @@ export function LocationStockItemsDialog({
       {
         key: "categoryName",
         label: "Nhóm hàng hóa",
-        width: 180,
+        width: 220,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
         render: (r) => r.categoryName ?? "—",
       },
       {
         key: "locationCode",
         label: "Mã vị trí",
-        width: 140,
+        width: 160,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
         render: () => meta?.location.code ?? "—",
       },
       {
         key: "locationName",
         label: "Tên vị trí",
-        width: 160,
+        width: 220,
+        className: "whitespace-nowrap",
+        headerClassName: "whitespace-nowrap",
         render: () => meta?.location.name ?? "—",
       },
       {
         key: "quantity",
         label: "Số lượng",
-        width: 100,
-        className: "text-right tabular-nums",
-        headerClassName: "text-right",
+        width: 120,
+        className: "whitespace-nowrap text-right tabular-nums",
+        headerClassName: "whitespace-nowrap text-right",
         render: (r) => (
           <span className={r.belowMin ? "text-destructive font-medium" : undefined}>
             {Number(r.quantity).toLocaleString("vi-VN")}
@@ -240,7 +256,7 @@ export function LocationStockItemsDialog({
       {
         key: "_actions",
         label: "",
-        width: 50,
+        width: 60,
         render: (r) => (
           <button
             type="button"
@@ -320,7 +336,7 @@ export function LocationStockItemsDialog({
         </form>
 
         <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full min-w-[1400px] border-collapse text-sm">
             <thead className="bg-muted/40">
               <tr>
                 {columns.map((c) => (
@@ -372,18 +388,18 @@ export function LocationStockItemsDialog({
 
               {pending.map((row) => (
                 <tr key={row.rowKey} className="border-b bg-amber-50/60">
-                  <td className="border-r px-3 py-1.5">{row.code}</td>
-                  <td className="border-r px-3 py-1.5">
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.code}</td>
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">
                     {row.name}
                     <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-900">
                       Mới
                     </span>
                   </td>
-                  <td className="border-r px-3 py-1.5">{row.unit}</td>
-                  <td className="border-r px-3 py-1.5">{row.categoryName ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5">{meta?.location.code ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5">{meta?.location.name ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.unit}</td>
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.categoryName ?? "—"}</td>
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{meta?.location.code ?? "—"}</td>
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{meta?.location.name ?? "—"}</td>
+                  <td className="border-r px-3 py-1.5 whitespace-nowrap text-right tabular-nums text-muted-foreground">
                     0
                   </td>
                   <td className="border-r px-3 py-1.5">

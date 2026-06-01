@@ -163,7 +163,24 @@ export function CrudListPage() {
           width: widthPx,
           headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
           className: `max-w-[${widthPx}px]`,
-          render: (row) => formatCell(row[field.key], field),
+          render: (row) => {
+            if (entityKey === "inventory-item-categories" && field.key === "name") {
+              return (
+                <button
+                  type="button"
+                  className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setEditSnapshot({ ...row });
+                    setSelectedRecordIds(new Set([String(row[config?.idField ?? "id"])]));
+                  }}
+                >
+                  {formatCell(row[field.key], field)}
+                </button>
+              );
+            }
+            return formatCell(row[field.key], field);
+          },
           filterKind: useSelect ? "select" : "symbol",
           filterOptions: selectOptions,
         };
@@ -274,6 +291,14 @@ export function CrudListPage() {
     setEditSnapshot({ ...selectedRecord });
   };
 
+  const handleRowClick = (row: Record<string, unknown>) => {
+    if (entityKey === "inventory-item-categories") {
+      setSelectedRecordIds(new Set([String(row[config.idField])]));
+      return;
+    }
+    navigate(`/admin/${entityKey}/${String(row[config.idField])}`);
+  };
+
   const handleDuplicateSubmit = async (data: Record<string, unknown>) => {
     try {
       await createMutation.mutateAsync(data);
@@ -370,7 +395,7 @@ export function CrudListPage() {
         loading={loading}
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
-        onRowClick={(row) => navigate(`/admin/${entityKey}/${String(row[config.idField])}`)}
+        onRowClick={handleRowClick}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
