@@ -312,3 +312,42 @@ flowchart LR
   OB3 --> CV23
 ```
 
+## EPIC-31052026 Inventory Item Form Refactor (KiotViet-style)
+
+- [EPIC-31052026 Inventory Item Form Refactor](./epics/EPIC-31052026-inventory-item-form-refactor.md)
+- Mở rộng [EPIC-010 Item Management Enhancement](./epics/EPIC-010-item-management-enhancement.md): refactor form tạo/sửa hàng hóa (`backoffice-web`) cho khớp ảnh tham chiếu + Brand master-data + Item Category (nhóm cha/mô tả/hoa hồng) + multi-provider + đơn vị chuyển đổi + edit mode.
+
+| Ticket                                                                  | Mô tả                                                              |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [TKT-IIF-01](./tickets/TKT-IIF-01-brand-master-entity.md)               | BE: `BrandEntity` (`inventory-brands`) + `item.brandId`           |
+| [TKT-IIF-02](./tickets/TKT-IIF-02-item-category-extension.md)           | BE: Item Category + nhóm cha + mô tả + bảng hoa hồng              |
+| [TKT-IIF-03](./tickets/TKT-IIF-03-item-update-nested.md)                | BE: Item update reconcile providers/units + brandId               |
+| [TKT-IIF-04](./tickets/TKT-IIF-04-fe-data-hooks.md)                     | FE: hooks brand/category/unit/provider (bỏ data hardcode)        |
+| [TKT-IIF-05](./tickets/TKT-IIF-05-fe-dialogs.md)                        | FE: 4 dialog quick-create + danh sách thương hiệu (#3/#4/#5/#6/#7) |
+| [TKT-IIF-06](./tickets/TKT-IIF-06-fe-form-layout.md)                    | FE: refactor layout tab cơ bản (#2) + wire dropdown + #9          |
+| [TKT-IIF-07](./tickets/TKT-IIF-07-fe-multi-provider-table.md)           | FE: bảng nhiều nhà cung cấp (#8)                                  |
+| [TKT-IIF-08](./tickets/TKT-IIF-08-fe-edit-mode.md)                      | FE: edit mode dùng lại form giàu                                  |
+| [TKT-IIF-09](./tickets/TKT-IIF-09-test-plan.md)                         | E2E + test plan + DoD gate                                         |
+
+### Ticket dependency graph (EPIC-31052026)
+
+```mermaid
+flowchart LR
+  T1["TKT-IIF-01 Brand BE"] --> T3["TKT-IIF-03 Item update BE"]
+  T1 --> T4["TKT-IIF-04 FE hooks"]
+  T2["TKT-IIF-02 Category BE"] --> T4
+  T3 --> T7["TKT-IIF-07 Provider table"]
+  T3 --> T8["TKT-IIF-08 Edit mode"]
+  T4 --> T5["TKT-IIF-05 Dialogs"]
+  T5 --> T6["TKT-IIF-06 Form layout"]
+  T4 --> T6
+  T6 --> T7
+  T6 --> T8
+  T7 --> T8
+  T6 --> T9["TKT-IIF-09 E2E + DoD"]
+  T8 --> T9
+  T1 --> T9
+  T2 --> T9
+  T3 --> T9
+```
+

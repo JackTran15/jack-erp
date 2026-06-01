@@ -3,6 +3,7 @@ import type {
   InvoiceStatus,
   InvoiceType,
 } from "@erp/pos/types/invoice.type";
+import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
 export interface InvoiceItemRow {
   id: string;
@@ -33,6 +34,8 @@ export interface InvoiceRow {
   draftLabel?: string;
   sessionId: string;
   customerId?: string;
+  /** Customer nhúng ở `GET /invoices/drafts`. Các endpoint khác có thể bỏ trống. */
+  customer?: CustomerRow | null;
   staffId: string;
   subtotal: number;
   discountAmount: number;

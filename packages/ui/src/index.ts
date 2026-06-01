@@ -80,6 +80,7 @@ export {
   type PageToolbarProps,
   type ToolbarItem,
   type ToolbarAction,
+  type ToolbarActionOption,
   type ToolbarSeparator,
 } from "./components/page-toolbar";
 

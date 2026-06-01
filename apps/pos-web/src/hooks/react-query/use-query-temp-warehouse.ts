@@ -25,6 +25,8 @@ import {
 
 import { TEMP_WAREHOUSE_KEYS } from "@erp/pos/constants/react-query-key.constant";
 import { tempWarehouseService } from "@erp/pos/services/temp-warehouse.service";
+import { salesHierarchyService } from "@erp/pos/services/sales-hierarchy.service";
+import { userToCarrierUser } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-pickers";
 
 export function useTempWarehouseLines(
   branchId: string | null,
@@ -93,17 +95,37 @@ export function useTempWarehouseActiveSession(
 
 export const TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE = 50;
 
-export function fetchTempWarehouseCarriers(
+/**
+ * Carrier options for the fast-stock-transfer picker are sourced from the
+ * organization's salesmen (`GET /branches/:id/salesmen`), not branch-assigned
+ * users. Each row's `id` is the user account id so the line's `carrierUserId`
+ * resolves back to the same user when lines are listed. Search/pagination are
+ * applied in memory since the salesmen endpoint returns the full list.
+ */
+export async function fetchTempWarehouseCarriers(
   branchId: string,
   search = "",
   page = 1,
   pageSize = TEMP_WAREHOUSE_CARRIERS_PAGE_SIZE,
 ): Promise<PaginatedResponse<TempWarehousePublicUser>> {
-  return tempWarehouseService.listCarriers({
-    branchId,
-    search: search.trim() || undefined,
-    pagination: { page, pageSize },
-  });
+  const rows = await salesHierarchyService.listSalesmen(branchId);
+  const carriers = rows.map((r) =>
+    userToCarrierUser({
+      userId: r.userId,
+      displayName: r.fullName || r.code || r.userId,
+    }),
+  );
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? carriers.filter((c) => c.firstName.toLowerCase().includes(q))
+    : carriers;
+  const start = (page - 1) * pageSize;
+  return {
+    data: filtered.slice(start, start + pageSize),
+    total: filtered.length,
+    page,
+    pageSize,
+  };
 }
 
 export function useSearchTempWarehouseCarriers() {

@@ -1,5 +1,5 @@
 import { Entity, Column, Unique, Index, OneToMany } from 'typeorm';
-import { ImportJobStatus } from '@erp/shared-interfaces';
+import { ImportDuplicateMode, ImportJobStatus } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { InventoryImportJobRowEntity } from './inventory-import-job-row.entity';
 
@@ -37,6 +37,15 @@ export class InventoryImportJobEntity extends BaseEntity {
 
   @Column({ name: 'error_rows', type: 'int', default: 0, comment: 'Count of rows that failed validation' })
   errorRows: number;
+
+  @Column({
+    name: 'duplicate_mode',
+    type: 'enum',
+    enum: ImportDuplicateMode,
+    default: ImportDuplicateMode.UPDATE,
+    comment: 'UPDATE = upsert SKU; SKIP = reject duplicate SKU',
+  })
+  duplicateMode: ImportDuplicateMode;
 
   @OneToMany(() => InventoryImportJobRowEntity, (row) => row.job)
   rows?: InventoryImportJobRowEntity[];

@@ -1,14 +1,16 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Button } from "@erp/ui";
 import { toast } from "sonner";
+import { Button } from "@erp/ui";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
+import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
+import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
-import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 
 export function CrudEditPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
@@ -40,13 +42,29 @@ export function CrudEditPage() {
 
   useEffect(() => {
     if (!record) return;
+    // The inventory-item form manages many keys outside editableFields (nested
+    // providers/units, denormalized brand/category, package specs) — hydrate from
+    // the full record.
+    if (entityKey === "inventory-items") {
+      setValues({ ...record });
+      setErrors({});
+      return;
+    }
     const next: Record<string, unknown> = {};
     editableFields.forEach((field) => {
       next[field.key] = record[field.key];
     });
+    // For the supplier custom form, also pull in fields that aren't in editableFields
+    // (readOnly/hideInList) so the form can display the current code and groupName.
+    if (entityKey === "inventory-providers") {
+      const extras = ["code", "type", "groupId", "groupName"] as const;
+      for (const key of extras) {
+        if (record[key] !== undefined) next[key] = record[key];
+      }
+    }
     setValues(next);
     setErrors({});
-  }, [record, editableFields]);
+  }, [record, editableFields, entityKey]);
 
   if (configLoading || recordLoading) {
     return (
@@ -112,15 +130,29 @@ export function CrudEditPage() {
     event.preventDefault();
     if (!validate() || !id) return;
 
-    const payload: Record<string, unknown> = {};
-    editableFields.forEach((field) => {
-      payload[field.key] = values[field.key];
-    });
+    // For inventory-providers the custom form manages conditional/extra fields;
+    // send the whole values map (generic CRUD backend accepts Record<string,any>).
+    let payload: Record<string, unknown>;
+    if (entityKey === "inventory-providers" || entityKey === "inventory-items") {
+      payload = { ...values };
+    } else {
+      payload = {};
+      editableFields.forEach((field) => {
+        payload[field.key] = values[field.key];
+      });
+    }
 
     try {
       await updateMutation.mutateAsync({ id, body: payload });
       toast.success(`Đã cập nhật ${config.displayName}.`);
       navigate(`/admin/${entityKey}/${id}`, { replace: true });
+
+      // inventory-items has no standalone detail page — go back to the list.
+      if (entityKey === "inventory-items") {
+        navigate(`/admin/${entityKey}`, { replace: true });
+      } else {
+        navigate(`/admin/${entityKey}/${id}`, { replace: true });
+      }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     }
@@ -154,36 +186,66 @@ export function CrudEditPage() {
           </nav>
           <h1 className="mt-1 text-2xl font-semibold">Sửa {config.displayName}</h1>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate(`/admin/${entityKey}/${id}`)}>
-            Huỷ
-          </Button>
-          <Button type="submit" form="crud-edit-form" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Đang lưu…" : "Lưu"}
-          </Button>
-        </div>
+        {entityKey !== "inventory-items" && (
+          <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" onClick={() => navigate(`/admin/${entityKey}/${id}`)}>
+              Huỷ
+            </Button>
+            <Button type="submit" form="crud-edit-form" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
-        <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)} className="grid gap-4 md:grid-cols-2">
-          {editableFields.map((field) => (
-            <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
-              <CrudFieldInput
-                inputIdPrefix="edit"
-                field={field}
-                value={values[field.key]}
-                error={errors[field.key]}
-                onChange={(nextValue) => {
-                  setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                  setErrors((prev) => {
-                    const next = { ...prev };
-                    delete next[field.key];
-                    return next;
-                  });
-                }}
-              />
+        <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)}>
+          {entityKey === "inventory-providers" ? (
+            <SupplierCreateForm
+              editableFields={editableFields}
+              values={values}
+              setValues={setValues}
+              errors={errors}
+              setErrors={setErrors}
+              entityKey={entityKey!}
+              isSaving={updateMutation.isPending}
+            />
+          ) : entityKey === "inventory-items" ? (
+            <InventoryItemCreateForm
+              editableFields={editableFields}
+              values={values}
+              setValues={setValues}
+              errors={errors}
+              setErrors={setErrors}
+              entityKey={entityKey!}
+              isSaving={updateMutation.isPending}
+              mode="edit"
+              initialRecord={record}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {editableFields.map((field) => (
+                <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+                  <CrudFieldInput
+                    inputIdPrefix="edit"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    entityKey={entityKey}
+                    currentRecordId={id}
+                    onChange={(nextValue) => {
+                      setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[field.key];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </form>
       </div>
     </AdminPageShell>

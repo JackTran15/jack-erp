@@ -5,14 +5,25 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DomainEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
 import { BranchEntity } from '../branch/branch.entity';
 import { UserEntity } from '../auth/user.entity';
+import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
 import { SalesmanAssignmentEntity } from './salesman-assignment.entity';
 import { SalesManagerAssignmentEntity } from './sales-manager-assignment.entity';
+
+/** Public-safe projection of an employee (never exposes salary or ID-card data). */
+export interface PublicEmployee {
+  id: string;
+  userId: string;
+  code: string;
+  fullName: string;
+  jobPosition: string | null;
+  mobile: string | null;
+}
 
 @Injectable()
 export class SalesHierarchyService {
@@ -27,20 +38,20 @@ export class SalesHierarchyService {
     private readonly branchRepo: Repository<BranchEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(EmployeeProfileEntity)
+    private readonly employeeRepo: Repository<EmployeeProfileEntity>,
     private readonly eventPublisher: EventPublisher,
   ) {}
 
   // ── Salesmen ──────────────────────────────────────────────
 
+  /** Salesmen = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
   async listSalesmen(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesmanAssignmentEntity[]> {
+  ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    return this.salesmanRepo.find({
-      where: { branchId, organizationId: actor.organizationId },
-      order: { assignedAt: 'DESC' },
-    });
+    return this.listOrganizationEmployees(actor.organizationId);
   }
 
   async assignSalesman(
@@ -94,15 +105,13 @@ export class SalesHierarchyService {
 
   // ── Sales Managers ────────────────────────────────────────
 
+  /** Sales managers = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
   async listSalesManagers(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesManagerAssignmentEntity[]> {
+  ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    return this.managerRepo.find({
-      where: { branchId, organizationId: actor.organizationId },
-      order: { assignedAt: 'DESC' },
-    });
+    return this.listOrganizationEmployees(actor.organizationId);
   }
 
   async assignSalesManager(
@@ -155,6 +164,40 @@ export class SalesHierarchyService {
   }
 
   // ── Helpers ───────────────────────────────────────────────
+
+  /**
+   * All employees in the organization, projected to public-safe fields. The display
+   * name is taken from each employee's linked user account; salary/ID-card fields are
+   * never exposed.
+   */
+  private async listOrganizationEmployees(
+    organizationId: string,
+  ): Promise<PublicEmployee[]> {
+    const profiles = await this.employeeRepo.find({
+      where: { organizationId },
+      relations: { jobPosition: true },
+      order: { code: 'ASC' },
+    });
+    if (profiles.length === 0) return [];
+
+    const userIds = [...new Set(profiles.map((p) => p.userId))];
+    const users = await this.userRepo.find({
+      where: { id: In(userIds), organizationId },
+      select: ['id', 'firstName', 'lastName'],
+    });
+    const nameMap = new Map<string, string>(
+      users.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()]),
+    );
+
+    return profiles.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      code: p.code,
+      fullName: nameMap.get(p.userId) ?? '',
+      jobPosition: p.jobPosition?.name ?? null,
+      mobile: p.mobile ?? null,
+    }));
+  }
 
   private async validateBranch(
     branchId: string,

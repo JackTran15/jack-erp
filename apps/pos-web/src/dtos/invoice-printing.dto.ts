@@ -18,6 +18,8 @@ export interface InvoicePayload {
   payments: InvoicePaymentEntry[];
   /** Discount note text after totals (empty = "HĐ đã được KM:" with no value). */
   discountNote?: string;
+  /** Bản tạm tính (chưa checkout) → tiêu đề "HÓA ĐƠN TẠM TÍNH". */
+  provisional?: boolean;
   policy: InvoicePolicy;
   /** Last centered line, e.g. "Giày MT hân hạnh phục vụ quý khách!". */
   closingMessage: string;

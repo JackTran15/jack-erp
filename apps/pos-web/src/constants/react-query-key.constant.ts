@@ -22,6 +22,9 @@ export const INVOICE_KEYS = {
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
   DRAFTS: (sessionId: string) => ["invoices", "drafts", sessionId] as const,
   DETAIL: (id: string) => ["invoices", "detail", id] as const,
+  /** Tìm kiếm hóa đơn server-side qua POST /v2/invoices/search. */
+  SEARCH_V2: (body: Record<string, unknown>) =>
+    ["invoices", "search-v2", body] as const,
   /** Hóa đơn đã bán có thể đổi/trả (trang return-goods). */
   RETURNABLE: (filters: Record<string, unknown>) =>
     ["invoices", "returnable", filters] as const,
@@ -47,9 +50,17 @@ export const CUSTOMER_KEYS = {
   MEMBERSHIP_CARD_TYPES: ["customers", "membership-card-types"] as const,
 } as const;
 
+export const SALES_HIERARCHY_KEYS = {
+  ALL: ["sales-hierarchy"] as const,
+  /** `GET /branches/:id/salesmen` — nhân viên bán hàng được gán cho chi nhánh. */
+  SALESMEN: (branchId: string) =>
+    ["sales-hierarchy", "salesmen", branchId] as const,
+} as const;
+
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
+  PRODUCTS: (branchId: string) => ["catalog", "products", branchId] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
 } as const;

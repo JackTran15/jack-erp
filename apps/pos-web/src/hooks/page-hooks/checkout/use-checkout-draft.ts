@@ -17,6 +17,7 @@ import {
   selectActiveSession,
   selectCustomerDraft,
   selectHasAnyCartLines,
+  selectMetaDraft,
   selectPaymentDraft,
   selectPurchaseCart,
   usePosCheckoutSessionStore,
@@ -43,6 +44,8 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
     const purchaseCart = selectPurchaseCart(sessionState);
     const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
     const note = selectPaymentDraft(sessionState).note || undefined;
+    const selectedSalesperson =
+      selectMetaDraft(sessionState).selectedSalesperson;
     // Tab mở từ một draft đã lưu → PATCH chính draft đó thay vì tạo bản mới.
     const sourceInvoiceId = selectActiveSession(sessionState)?.sourceInvoiceId;
 
@@ -54,6 +57,7 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
               cart: purchaseCart,
               customer: selectedCustomer,
               note,
+              salesperson: selectedSalesperson,
             }),
           })
         : await createMutation.mutateAsync(
@@ -62,6 +66,7 @@ export const useCheckoutDraft = (): UseCheckoutDraftResult => {
               cart: purchaseCart,
               customer: selectedCustomer,
               note,
+              salesperson: selectedSalesperson,
             }),
           );
       const message = sourceInvoiceId

@@ -4,10 +4,16 @@ import type { DataSource } from 'typeorm';
 import { BranchModule } from '../../branch/branch.module';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { ProductModule } from '../product/product.module';
+import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
+import { ItemCategoryCommissionEntity } from './item-category-commission.entity';
 import { ProviderEntity } from './provider.entity';
+import { SupplierGroupEntity } from './supplier-group.entity';
+import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
+import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
+import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
@@ -44,13 +50,34 @@ import {
   INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG,
   INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
 } from './item-category-crud.service';
+import {
+  ProviderGroupCrudService,
+  PROVIDER_GROUP_ENTITY_CONFIG,
+  PROVIDER_GROUP_SERVICE_TOKEN,
+} from './supplier-group-crud.service';
+import {
+  UnitOfMeasureCrudService,
+  UNIT_OF_MEASURE_ENTITY_CONFIG,
+  UNIT_OF_MEASURE_SERVICE_TOKEN,
+} from './unit-of-measure-crud.service';
+import { UnitOfMeasureEntity } from './unit-of-measure.entity';
+import {
+  BrandCrudService,
+  BRAND_ENTITY_CONFIG,
+  BRAND_SERVICE_TOKEN,
+} from './brand-crud.service';
+import { BrandEntity } from './brand.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       ItemEntity,
       ItemCategoryEntity,
+      ItemCategoryCommissionEntity,
       ProviderEntity,
+      SupplierGroupEntity,
+      UnitOfMeasureEntity,
+      BrandEntity,
       ItemProviderEntity,
       ItemBarcodeEntity,
       ItemStockThresholdEntity,
@@ -60,10 +87,14 @@ import {
       LocationEntity,
       StorageManagerAssignmentEntity,
       StockBalanceEntity,
+      ProductAttributeDefinitionEntity,
+      ProductAttributeOptionEntity,
+      ItemAttributeValueEntity,
     ]),
     BranchModule,
     StockLedgerModule,
     ProductModule,
+    DocumentNumberingModule,
   ],
   controllers: [InventoryLocationController, InventoryLocationStockController],
   providers: [
@@ -76,6 +107,9 @@ import {
     InventoryItemCategoryCrudService,
     InventoryStorageCrudService,
     InventoryProviderCrudService,
+    ProviderGroupCrudService,
+    UnitOfMeasureCrudService,
+    BrandCrudService,
     { provide: INVENTORY_ITEM_SERVICE_TOKEN, useExisting: InventoryItemCrudService },
     {
       provide: INVENTORY_STORAGE_SERVICE_TOKEN,
@@ -89,6 +123,18 @@ import {
       provide: INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
       useExisting: InventoryItemCategoryCrudService,
     },
+    {
+      provide: PROVIDER_GROUP_SERVICE_TOKEN,
+      useExisting: ProviderGroupCrudService,
+    },
+    {
+      provide: UNIT_OF_MEASURE_SERVICE_TOKEN,
+      useExisting: UnitOfMeasureCrudService,
+    },
+    {
+      provide: BRAND_SERVICE_TOKEN,
+      useExisting: BrandCrudService,
+    },
   ],
   exports: [
     InventoryLocationService,
@@ -96,6 +142,7 @@ import {
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
+    InventoryItemCrudService,
   ],
 })
 export class InventoryLocationModule implements OnModuleInit {
@@ -105,6 +152,18 @@ export class InventoryLocationModule implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    this.entityRegistry.registerEntity(
+      PROVIDER_GROUP_ENTITY_CONFIG,
+      PROVIDER_GROUP_SERVICE_TOKEN,
+    );
+    this.entityRegistry.registerEntity(
+      UNIT_OF_MEASURE_ENTITY_CONFIG,
+      UNIT_OF_MEASURE_SERVICE_TOKEN,
+    );
+    this.entityRegistry.registerEntity(
+      BRAND_ENTITY_CONFIG,
+      BRAND_SERVICE_TOKEN,
+    );
     this.entityRegistry.registerEntity(
       INVENTORY_PROVIDER_ENTITY_CONFIG,
       INVENTORY_PROVIDER_SERVICE_TOKEN,

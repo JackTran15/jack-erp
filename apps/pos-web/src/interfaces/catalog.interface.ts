@@ -13,6 +13,34 @@ export interface PosCatalogLine {
   defaultLocationId: string;
 }
 
+/**
+ * Một card catalog ở mức PRODUCT — `GET /pos/branches/:id/catalog/products`.
+ * `kind=PRODUCT` gom các biến thể dưới 1 product; `kind=ITEM` là hàng lẻ standalone.
+ * `id` là product id (PRODUCT) hoặc item id (ITEM). Mirror `PosProductCardDto` (BE).
+ */
+export interface PosProductCard {
+  kind: PosProductKind;
+  id: string;
+  name: string;
+  description: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  imageUrl: string | null;
+  minPrice: number;
+  maxPrice: number;
+  unit: string;
+  variantCount: number;
+  quantityOnHand: number;
+}
+
+/** Trang danh sách catalog mức product (mirror `PosProductListResponseDto`). */
+export interface PosProductListResponse {
+  data: PosProductCard[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /** Một vị trí lưu giữ tồn của biến thể tại chi nhánh. */
 export interface PosVariantLocation {
   locationId: string;

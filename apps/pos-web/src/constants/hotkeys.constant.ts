@@ -48,6 +48,10 @@ export const POS_HOTKEYS = {
       key: "F10",
       description: "Lưu hóa đơn tạm",
     },
+    printEstimate: {
+      key: "Alt+P",
+      description: "In hóa đơn tạm tính",
+    },
     focusPayment: {
       key: "F12",
       description: "Nhập tiền khách đưa",

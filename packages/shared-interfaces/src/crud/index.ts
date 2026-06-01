@@ -13,12 +13,14 @@ export enum DeletionPolicy {
 export interface FieldDefinition {
   key: string;
   label: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'enum' | 'relation';
+  type: 'string' | 'number' | 'boolean' | 'date' | 'enum' | 'relation' | 'tags';
   /** Với `type: 'number'`: hiển thị/nhập theo nhóm hàng nghìn (tiền VND). */
   numberFormat?: 'default' | 'money';
   required?: boolean;
   /** When true, value is shown in tables but omitted from create/edit forms. */
   readOnly?: boolean;
+  /** When true, field is hidden from the list/table view but still shown in create/edit forms. */
+  hideInList?: boolean;
   enumValues?: string[];
   relationEntity?: string;
 }

@@ -13,6 +13,8 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { BranchService } from '../../branch/branch.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
+import { BrandEntity } from './brand.entity';
+import { UnitOfMeasureEntity } from './unit-of-measure.entity';
 import { ProviderEntity } from './provider.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
@@ -42,6 +44,10 @@ export class InventoryLocationService {
     private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(ItemCategoryEntity)
     private readonly itemCategoryRepo: Repository<ItemCategoryEntity>,
+    @InjectRepository(BrandEntity)
+    private readonly brandRepo: Repository<BrandEntity>,
+    @InjectRepository(UnitOfMeasureEntity)
+    private readonly unitRepo: Repository<UnitOfMeasureEntity>,
     @InjectRepository(ProviderEntity)
     private readonly providerRepo: Repository<ProviderEntity>,
     @InjectRepository(StorageEntity)
@@ -160,6 +166,100 @@ export class InventoryLocationService {
     return this.itemCategoryRepo.save(
       this.itemCategoryRepo.create({
         name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  /**
+   * Resolve a category by its code, or create it if not found.
+   * Falls back to `nameHint` as the display name when creating; if nameHint is
+   * absent, the code itself is used as the name.
+   */
+  async resolveOrCreateCategoryByCode(
+    rawCode: string,
+    nameHint: string | undefined,
+    actor: ActorContext,
+  ): Promise<ItemCategoryEntity> {
+    const code = rawCode.trim();
+    if (!code) {
+      throw new BadRequestException('Mã nhóm hàng hóa không được để trống');
+    }
+    // 1. Find by code
+    const byCode = await this.itemCategoryRepo.findOne({
+      where: { code, organizationId: actor.organizationId },
+    });
+    if (byCode) return byCode;
+
+    const name = nameHint?.trim() || code;
+
+    // 2. Find by name — avoids duplicate when the category was already created without a code
+    const byName = await this.itemCategoryRepo
+      .createQueryBuilder('c')
+      .where('c.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(c.name) = LOWER(:name)', { name })
+      .getOne();
+
+    if (byName) {
+      // Back-fill the code so future lookups by code work
+      if (!byName.code) {
+        byName.code = code;
+        await this.itemCategoryRepo.save(byName);
+      }
+      return byName;
+    }
+
+    // 3. Create new
+    return this.itemCategoryRepo.save(
+      this.itemCategoryRepo.create({
+        code,
+        name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  /** Resolve an existing brand by trimmed name, or create it if missing. Case-insensitive match. */
+  async resolveOrCreateBrandByName(
+    rawName: string,
+    actor: ActorContext,
+  ): Promise<BrandEntity | null> {
+    const name = rawName.trim();
+    if (!name) return null;
+    const existing = await this.brandRepo
+      .createQueryBuilder('b')
+      .where('b.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(b.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    return this.brandRepo.save(
+      this.brandRepo.create({
+        name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  /** Resolve an existing unit by trimmed name, or create it if missing. Case-insensitive match. */
+  async resolveOrCreateUnitByName(
+    rawName: string,
+    actor: ActorContext,
+  ): Promise<UnitOfMeasureEntity | null> {
+    const name = rawName.trim();
+    if (!name) return null;
+    const existing = await this.unitRepo
+      .createQueryBuilder('u')
+      .where('u.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(u.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    return this.unitRepo.save(
+      this.unitRepo.create({
+        name,
+        isActive: true,
         organizationId: actor.organizationId,
         createdBy: actor.userId,
       }),

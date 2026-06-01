@@ -53,6 +53,7 @@ import {
   selectEffectivePointsRedeemed,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
   selectPurchaseCart,
@@ -119,6 +120,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
     async (options?: { bypassOversellModal?: boolean }) => {
       const sessionState = usePosCheckoutSessionStore.getState();
       const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
+      const selectedSalesperson =
+        selectMetaDraft(sessionState).selectedSalesperson;
       const purchaseCart = selectPurchaseCart(sessionState);
       const ui = usePosCheckoutUiStore.getState();
       // Slice payment của tab đang active (snapshot tại thời điểm click F12).
@@ -211,6 +214,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 cart: purchaseCart,
                 customer: selectedCustomer,
                 note,
+                salesperson: selectedSalesperson,
               }),
             });
             invoiceId = updated.id;
@@ -221,6 +225,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 cart: purchaseCart,
                 customer: selectedCustomer,
                 note,
+                salesperson: selectedSalesperson,
               }),
             );
             invoiceId = created.id;

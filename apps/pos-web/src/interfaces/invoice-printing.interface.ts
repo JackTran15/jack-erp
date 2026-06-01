@@ -20,6 +20,15 @@ export interface InvoiceLineData {
   name: string;
   qty: number;
   unitPrice: number;
+  /**
+   * Net total dòng (đã trừ KM, đã xử lý dấu âm cho hàng trả). Renderer ưu tiên
+   * dùng giá trị này; bỏ trống → fallback `qty * unitPrice`.
+   */
+  lineTotal?: number;
+  /** Nhãn KM in dưới tên hàng, vd "KM 10 % (10.000) - Khách quen". */
+  discountLabel?: string;
+  /** Ghi chú dòng in dưới tên hàng. */
+  note?: string;
 }
 
 export interface InvoiceTotals {

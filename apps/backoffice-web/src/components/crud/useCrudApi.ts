@@ -79,6 +79,21 @@ export function useCrudRecord(entityKey: string, id: string | undefined, enabled
   });
 }
 
+/** Fetch a single record from any custom endpoint. */
+export function useCrudRecordFromEndpoint(
+  endpoint: string | undefined,
+  enabled: boolean,
+): ReturnType<typeof useCrudRecord> {
+  return useQuery({
+    queryKey: ["custom-record", endpoint],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<Record<string, unknown>>(endpoint as string, {}),
+      ),
+    enabled: enabled && Boolean(endpoint),
+  });
+}
+
 export function useCrudCreate(entityKey: string) {
   const qc = useQueryClient();
   return useMutation({

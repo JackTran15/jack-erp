@@ -89,6 +89,8 @@ export interface AppModalProps {
   defaultHeight?: number;
   minWidth?: number;
   minHeight?: number;
+  /** Prevent the dialog from closing when the user clicks outside it. */
+  preventOutsideClose?: boolean;
 }
 
 function AppModal({
@@ -110,6 +112,7 @@ function AppModal({
   defaultHeight = 440,
   minWidth = DEFAULT_MIN_W,
   minHeight = DEFAULT_MIN_H,
+  preventOutsideClose = false,
 }: AppModalProps) {
   const [bounds, setBounds] = React.useState<Bounds>(() =>
     computeCentered(defaultWidth, defaultHeight, minWidth, minHeight),
@@ -352,6 +355,7 @@ function AppModal({
         className={cn("gap-0 p-0 [contain:layout_paint]", className)}
         style={frameStyle}
         onPointerDownOutside={(event) => {
+          if (preventOutsideClose) { event.preventDefault(); return; }
           const target = event.target as Element | null;
           if (
             target &&
@@ -362,6 +366,7 @@ function AppModal({
           }
         }}
         onInteractOutside={(event) => {
+          if (preventOutsideClose) { event.preventDefault(); return; }
           const target = event.target as Element | null;
           if (
             target &&

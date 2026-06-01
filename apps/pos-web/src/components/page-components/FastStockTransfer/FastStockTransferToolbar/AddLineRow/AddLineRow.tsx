@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from "react";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { FastStockTransferCarrierSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferCarrierSearchInput/FastStockTransferCarrierSearchInput";
 import { FastStockTransferProductSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferProductSearchInput/FastStockTransferProductSearchInput";
@@ -8,14 +9,38 @@ import {
   catalogLocationsForLine,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-pickers";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
+import { TempWarehouseDirection } from "@erp/shared-interfaces";
 
 export function AddLineRow() {
   const toolbarDraft = usePosFastStockTransferWorkflowStore(
     (s) => s.toolbarDraft,
   );
-  const { isSessionClosed, isMutating } = useFastStockTransferData();
+  const direction = usePosFastStockTransferWorkflowStore((s) => s.direction);
+  const { isSessionClosed, isMutating, isLoading } = useFastStockTransferData();
   const { handleToolbarDraftLocation, handleAddRow } =
     useFastStockTransferActions();
+
+  const carrierInputRef = useRef<HTMLInputElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const focusedForDirectionRef = useRef<TempWarehouseDirection | null>(null);
+
+  const focusCarrier = useCallback(() => {
+    const el = carrierInputRef.current;
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
+  }, []);
+
+  useEffect(() => {
+    if (focusedForDirectionRef.current === direction) return;
+    if (isLoading || isSessionClosed || isMutating) return;
+    const el = carrierInputRef.current;
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
+    focusedForDirectionRef.current = direction;
+  }, [direction, isLoading, isSessionClosed, isMutating]);
 
   const locationItems = toolbarDraft.product
     ? catalogLocationsForLine(toolbarDraft.product)
@@ -28,6 +53,8 @@ export function AddLineRow() {
         <div className="min-w-0 flex-1">
           <FastStockTransferCarrierSearchInput
             disabled={isSessionClosed || isMutating}
+            inputRef={carrierInputRef}
+            onAfterSelect={() => productInputRef.current?.focus()}
           />
         </div>
       </div>
@@ -36,6 +63,8 @@ export function AddLineRow() {
         <div className="min-w-0 flex-1">
           <FastStockTransferProductSearchInput
             disabled={isSessionClosed || isMutating}
+            inputRef={productInputRef}
+            onAfterSelect={() => addButtonRef.current?.focus()}
           />
         </div>
       </div>
@@ -54,8 +83,9 @@ export function AddLineRow() {
         </div>
       </div>
       <button
+        ref={addButtonRef}
         type="button"
-        onClick={handleAddRow}
+        onClick={() => handleAddRow(focusCarrier)}
         disabled={isSessionClosed || isMutating}
         className="inline-flex h-9 shrink-0 items-center rounded-md border border-[#4F46E5] px-6 text-[13px] font-semibold text-[#4F46E5] hover:bg-[#EEF2FF] disabled:opacity-50"
       >

@@ -5,7 +5,11 @@ import type {
   PaymentMethodOption,
 } from "@erp/pos/interfaces/checkout.interface";
 import { deriveInvoiceTotals } from "./checkoutSettlement";
-import { lineTotal, resolvePaymentMethodLabel } from "./checkoutUtils";
+import {
+  formatLineDiscountLabel,
+  lineTotal,
+  resolvePaymentMethodLabel,
+} from "./checkoutUtils";
 
 /** Receipt number generator: YYMMDD + 4 random digits — e.g. "2605050007". */
 function generateInvoiceNumber(d: Date): string {
@@ -40,6 +44,8 @@ interface BuildCheckoutInvoicePayloadInput {
   keepChange: boolean;
   /** Matches UI "Tính vào công nợ" (purchase and refund). */
   debt: boolean;
+  /** Bản tạm tính (chưa checkout) → renderer in tiêu đề "HÓA ĐƠN TẠM TÍNH". */
+  provisional?: boolean;
 }
 
 export function buildCheckoutInvoicePayload({
@@ -52,6 +58,7 @@ export function buildCheckoutInvoicePayload({
   methods,
   keepChange,
   debt,
+  provisional,
 }: BuildCheckoutInvoicePayloadInput): InvoicePayload | null {
   if (!printInvoice || cart.length === 0) return null;
 
@@ -81,6 +88,9 @@ export function buildCheckoutInvoicePayload({
       name: l.name,
       qty: l.isReturnCredit ? -l.qty : l.qty,
       unitPrice: l.unitPrice,
+      lineTotal: lineTotal(l),
+      discountLabel: l.lineDiscount ? formatLineDiscountLabel(l) : undefined,
+      note: l.note?.trim() ? l.note.trim() : undefined,
     })),
     totals: {
       totalQty,
@@ -94,6 +104,7 @@ export function buildCheckoutInvoicePayload({
       customerDebtIssued: t.customerDebtIssued,
     },
     payments,
+    provisional,
     policy: RETURN_POLICY,
     closingMessage: CLOSING_MESSAGE,
   };
