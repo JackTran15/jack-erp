@@ -61,6 +61,7 @@ export interface CrudListInventoryActionContext {
 interface CrudListPageProps {
   entityKey?: string;
   initialSort?: { sortBy: string; sortOrder: 'asc' | 'desc' };
+  disableRowClick?: boolean;
   inventoryConfig?: {
     exportOptions?: Array<{
       id: string;
@@ -77,6 +78,7 @@ interface CrudListPageProps {
 export function CrudListPage({
   entityKey: entityKeyProp,
   initialSort,
+  disableRowClick,
   inventoryConfig,
 }: CrudListPageProps) {
   const params = useParams<{ entityKey: string }>();
@@ -461,7 +463,7 @@ export function CrudListPage({
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
         onRowClick={(row) => {
-          if (entityKey === "inventory-items") return;
+          if (disableRowClick) return;
           const id = String(row[config.idField]);
           navigate(`/admin/${entityKey}/${id}`);
         }}

@@ -19,7 +19,10 @@ import {
   IMAGE_ACCEPT,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_COUNT,
-  type TabId,
+  SUB_TABS,
+  SubTab,
+  Tab,
+  TABS,
 } from "./item-create/constants";
 import {
   ConversionUnitsTable,
@@ -36,15 +39,25 @@ import {
   type ProductVariantRow,
 } from "./item-create/ProductVariantsTable";
 import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
-import { InventoryItemTabsHeader } from "./item-create/InventoryItemTabsHeader";
-import { useBrands, useItemCategories, useItemUnits } from "./item-create/hooks";
-import { BrandCreateDialog, type BrandPick } from "./item-create/dialogs/BrandCreateDialog";
+import { Tabs } from "../../tabs/Tabs";
+import {
+  useBrands,
+  useItemCategories,
+  useItemUnits,
+} from "./item-create/hooks";
+import {
+  BrandCreateDialog,
+  type BrandPick,
+} from "./item-create/dialogs/BrandCreateDialog";
 import { BrandListDialog } from "./item-create/dialogs/BrandListDialog";
 import {
   ItemCategoryCreateDialog,
   type CategoryPick,
 } from "./item-create/dialogs/ItemCategoryCreateDialog";
-import { UnitCreateDialog, type UnitPick } from "./item-create/dialogs/UnitCreateDialog";
+import {
+  UnitCreateDialog,
+  type UnitPick,
+} from "./item-create/dialogs/UnitCreateDialog";
 import type {
   CommissionRow,
   FormExtras,
@@ -79,9 +92,9 @@ export function InventoryItemCreateForm({
   const navigate = useNavigate();
   const isEdit = mode === "edit";
 
-  const [activeTab, setActiveTab] = useState<TabId>("basic");
+  const [activeTab, setActiveTab] = useState<Tab>(Tab.BASIC);
   const [extras, setExtras] = useState<FormExtras>(DEFAULT_EXTRAS);
-  const [activeSubTab, setActiveSubTab] = useState<"conversion" | "providers">("conversion");
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>(SubTab.CONVERSION);
 
   const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
   const [brandCreateOpen, setBrandCreateOpen] = useState(false);
@@ -120,15 +133,24 @@ export function InventoryItemCreateForm({
   const unitsQuery = useItemUnits("", true);
 
   const categoryOptions = useMemo<Option[]>(() => {
-    const data = (categoriesQuery.data?.data ?? []) as Record<string, unknown>[];
-    const base = data.map((r) => ({ id: String(r.id ?? ""), name: String(r.name ?? "") }));
+    const data = (categoriesQuery.data?.data ?? []) as Record<
+      string,
+      unknown
+    >[];
+    const base = data.map((r) => ({
+      id: String(r.id ?? ""),
+      name: String(r.name ?? ""),
+    }));
     const seen = new Set(base.map((o) => o.id));
     return [...base, ...addedCategories.filter((o) => !seen.has(o.id))];
   }, [categoriesQuery.data, addedCategories]);
 
   const brandOptions = useMemo<Option[]>(() => {
     const data = (brandsQuery.data?.data ?? []) as Record<string, unknown>[];
-    const base = data.map((r) => ({ id: String(r.id ?? ""), name: String(r.name ?? "") }));
+    const base = data.map((r) => ({
+      id: String(r.id ?? ""),
+      name: String(r.name ?? ""),
+    }));
     const seen = new Set(base.map((o) => o.id));
     return [...base, ...addedBrands.filter((o) => !seen.has(o.id))];
   }, [brandsQuery.data, addedBrands]);
@@ -219,7 +241,9 @@ export function InventoryItemCreateForm({
     const minQty = toNumberOrUndef(extras.minStock);
     const maxQty = toNumberOrUndef(extras.maxStock);
     const threshold =
-      minQty !== undefined || maxQty !== undefined ? { minQty, maxQty } : undefined;
+      minQty !== undefined || maxQty !== undefined
+        ? { minQty, maxQty }
+        : undefined;
 
     const trimmedBarcode = barcodeInput.trim();
 
@@ -237,7 +261,9 @@ export function InventoryItemCreateForm({
       barcodes: trimmedBarcode ? [{ code: trimmedBarcode }] : undefined,
       threshold,
       initialStock: isEdit ? undefined : toNumberOrUndef(extras.initialStock),
-      initialStockUnitPrice: isEdit ? undefined : toNumberOrUndef(extras.initialStockUnitPrice),
+      initialStockUnitPrice: isEdit
+        ? undefined
+        : toNumberOrUndef(extras.initialStockUnitPrice),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extras, unitRows, barcodeInput]);
@@ -254,13 +280,16 @@ export function InventoryItemCreateForm({
   // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ─────
   useEffect(() => {
     const toList = (v: unknown): string[] =>
-      Array.isArray(v) ? (v as string[]).map((s) => s.trim()).filter(Boolean) : [];
+      Array.isArray(v)
+        ? (v as string[]).map((s) => s.trim()).filter(Boolean)
+        : [];
     const colors = toList(values.colors);
     const sizes = toList(values.sizes);
 
     const combos: Array<{ color: string; size: string }> = [];
     if (colors.length && sizes.length) {
-      for (const color of colors) for (const size of sizes) combos.push({ color, size });
+      for (const color of colors)
+        for (const size of sizes) combos.push({ color, size });
     } else if (colors.length) {
       for (const color of colors) combos.push({ color, size: "" });
     } else if (sizes.length) {
@@ -272,7 +301,9 @@ export function InventoryItemCreateForm({
     const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
 
     setVariantRows((prev) => {
-      const byKey = new Map(prev.map((r) => [variantComboKey(r.color, r.size), r]));
+      const byKey = new Map(
+        prev.map((r) => [variantComboKey(r.color, r.size), r]),
+      );
       const next: ProductVariantRow[] = [];
       for (const { color, size } of combos) {
         const key = variantComboKey(color, size);
@@ -310,8 +341,7 @@ export function InventoryItemCreateForm({
             name: variantName,
             unit: baseUnit,
             sku: savedSku,
-            barcode:
-              saved && saved.barcode ? String(saved.barcode) : savedSku,
+            barcode: saved && saved.barcode ? String(saved.barcode) : savedSku,
             purchasePrice:
               saved && saved.purchasePrice != null
                 ? String(saved.purchasePrice)
@@ -325,7 +355,14 @@ export function InventoryItemCreateForm({
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values.colors, values.sizes, values.code, values.unit, values.name, savedVariantsByKey]);
+  }, [
+    values.colors,
+    values.sizes,
+    values.code,
+    values.unit,
+    values.name,
+    savedVariantsByKey,
+  ]);
 
   useEffect(() => {
     setValues((prev) => ({
@@ -358,7 +395,9 @@ export function InventoryItemCreateForm({
       const idx = prev.findIndex((r) => r.id === row.id);
       if (idx < 0) return prev;
       const { purchasePrice, sellPrice } = prev[idx];
-      return prev.map((r, i) => (i > idx ? { ...r, purchasePrice, sellPrice } : r));
+      return prev.map((r, i) =>
+        i > idx ? { ...r, purchasePrice, sellPrice } : r,
+      );
     });
   };
 
@@ -371,14 +410,21 @@ export function InventoryItemCreateForm({
     };
   }, []);
 
-  const updateExtras = <K extends keyof FormExtras>(key: K, value: FormExtras[K]) => {
+  const updateExtras = <K extends keyof FormExtras>(
+    key: K,
+    value: FormExtras[K],
+  ) => {
     setExtras((prev) => ({ ...prev, [key]: value }));
   };
 
   // ─── Master-data selection handlers ────────────────────────────────────────
   const onCategoryCreated = (cat: CategoryPick) => {
     setAddedCategories((prev) => [...prev, { id: cat.id, name: cat.name }]);
-    setValues((prev) => ({ ...prev, categoryId: cat.id, categoryName: cat.name }));
+    setValues((prev) => ({
+      ...prev,
+      categoryId: cat.id,
+      categoryName: cat.name,
+    }));
   };
 
   const onBrandResolved = (brand: BrandPick) => {
@@ -456,10 +502,15 @@ export function InventoryItemCreateForm({
       commissions: prev.commissions.filter((c) => c.id !== id),
     }));
   };
-  const updateCommissionRow = (id: string, patch: Partial<Omit<CommissionRow, "id">>) => {
+  const updateCommissionRow = (
+    id: string,
+    patch: Partial<Omit<CommissionRow, "id">>,
+  ) => {
     setExtras((prev) => ({
       ...prev,
-      commissions: prev.commissions.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      commissions: prev.commissions.map((c) =>
+        c.id === id ? { ...c, ...patch } : c,
+      ),
     }));
   };
 
@@ -476,6 +527,8 @@ export function InventoryItemCreateForm({
         field={field}
         value={values[field.key]}
         error={errors[field.key]}
+        layout="horizontal"
+        labelWidth="10rem"
         onChange={(nextValue) => {
           setValues((prev) => ({ ...prev, [field.key]: nextValue }));
           setErrors((prev) => {
@@ -520,7 +573,12 @@ export function InventoryItemCreateForm({
       "sizes",
     ]);
     return editableFields
-      .filter((f) => !skip.has(f.key) && f.key !== "isActive" && !managedElsewhere.has(f.key))
+      .filter(
+        (f) =>
+          !skip.has(f.key) &&
+          f.key !== "isActive" &&
+          !managedElsewhere.has(f.key),
+      )
       .map((field) => (
         <CrudFieldInput
           key={field.key}
@@ -556,13 +614,22 @@ export function InventoryItemCreateForm({
             {renderDynamicField("name")}
 
             {/* Nhóm hàng hóa — searchable categoryId picker + quick-create */}
-            <FormField label="Nhóm hàng hóa" htmlFor="create-category">
+            <FormField
+              label="Nhóm hàng hóa"
+              htmlFor="create-category"
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <LookupField<Option>
                 inputId="create-category"
                 placeholder="Nhập để tìm kiếm"
                 value={String(values.categoryName ?? "")}
                 onValueChange={(text) =>
-                  setValues((prev) => ({ ...prev, categoryName: text, categoryId: "" }))
+                  setValues((prev) => ({
+                    ...prev,
+                    categoryName: text,
+                    categoryId: "",
+                  }))
                 }
                 onSelect={(opt) => {
                   setValues((prev) => ({
@@ -590,7 +657,12 @@ export function InventoryItemCreateForm({
             </FormField>
 
             {/* Thương hiệu — searchable brandId picker; search icon = list, + = create */}
-            <FormField label="Thương hiệu" htmlFor="create-brand">
+            <FormField
+              label="Thương hiệu"
+              htmlFor="create-brand"
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <LookupField<Option>
                 inputId="create-brand"
                 placeholder="Chọn thương hiệu"
@@ -599,7 +671,11 @@ export function InventoryItemCreateForm({
                   setValues((prev) => ({ ...prev, brand: text, brandId: "" }))
                 }
                 onSelect={(opt) =>
-                  setValues((prev) => ({ ...prev, brandId: opt.id, brand: opt.name }))
+                  setValues((prev) => ({
+                    ...prev,
+                    brandId: opt.id,
+                    brand: opt.name,
+                  }))
                 }
                 search={(q) =>
                   Promise.resolve(
@@ -617,7 +693,12 @@ export function InventoryItemCreateForm({
 
             {renderDynamicField("code")}
 
-            <FormField label="Mã vạch" htmlFor="create-barcode">
+            <FormField
+              label="Mã vạch"
+              htmlFor="create-barcode"
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <Input
                 id="create-barcode"
                 value={barcodeInput}
@@ -630,7 +711,14 @@ export function InventoryItemCreateForm({
             {renderDynamicField("sellingPrice")}
 
             {/* Đơn vị tính cơ bản — searchable unit picker + quick-create */}
-            <FormField label="Đơn vị tính cơ bản" htmlFor="create-unit" required error={errors.unit}>
+            <FormField
+              label="Đơn vị tính cơ bản"
+              htmlFor="create-unit"
+              required
+              error={errors.unit}
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <LookupField<string>
                 inputId="create-unit"
                 placeholder="Chọn đơn vị tính"
@@ -649,13 +737,19 @@ export function InventoryItemCreateForm({
                 onCreateNew={() => setUnitCreateOpen(true)}
               />
               <p className="mt-1 text-xs italic text-muted-foreground">
-                (Nên để đơn vị tính nhỏ nhất. VD: Vải bán theo Cuộn và Mét thì để ĐVT là Mét.)
+                (Nên để đơn vị tính nhỏ nhất. VD: Vải bán theo Cuộn và Mét thì
+                để ĐVT là Mét.)
               </p>
             </FormField>
           </div>
 
           <div className="flex flex-col gap-3">
-            <FormField label="Tồn kho ban đầu" htmlFor="extra-initial-stock">
+            <FormField
+              label="Tồn kho ban đầu"
+              htmlFor="extra-initial-stock"
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <Input
                 id="extra-initial-stock"
                 type="number"
@@ -670,16 +764,25 @@ export function InventoryItemCreateForm({
                 </p>
               ) : null}
             </FormField>
-            <FormField label="Đơn giá nhập đầu kỳ" htmlFor="extra-initial-stock-price">
+            <FormField
+              label="Đơn giá nhập đầu kỳ"
+              htmlFor="extra-initial-stock-price"
+              layout="horizontal"
+              labelWidth="10rem"
+            >
               <MoneyInput
                 id="extra-initial-stock-price"
                 value={
-                  extras.initialStockUnitPrice === "" || extras.initialStockUnitPrice == null
+                  extras.initialStockUnitPrice === "" ||
+                  extras.initialStockUnitPrice == null
                     ? ""
                     : Number(extras.initialStockUnitPrice)
                 }
                 onChange={(v) =>
-                  updateExtras("initialStockUnitPrice", v === "" ? "" : String(v))
+                  updateExtras(
+                    "initialStockUnitPrice",
+                    v === "" ? "" : String(v),
+                  )
                 }
                 disabled={isEdit}
               />
@@ -691,7 +794,10 @@ export function InventoryItemCreateForm({
                   type="checkbox"
                   checked={Boolean(values.isActive)}
                   onChange={(event) =>
-                    setValues((prev) => ({ ...prev, isActive: event.target.checked }))
+                    setValues((prev) => ({
+                      ...prev,
+                      isActive: event.target.checked,
+                    }))
                   }
                   className="h-4 w-4 rounded border border-input accent-primary"
                 />
@@ -705,36 +811,22 @@ export function InventoryItemCreateForm({
           const rest = renderRemainingFields();
           if (rest.length === 0) return null;
           return (
-            <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2">{rest}</div>
+            <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-2">
+              {rest}
+            </div>
           );
         })()}
       </section>
 
       {/* Sub-tabs: Đơn vị chuyển đổi / Nhà cung cấp */}
-      <section className="rounded-md border border-border bg-background">
-        <div className="flex items-center gap-1 border-b px-2 pt-2">
-          {(
-            [
-              { id: "conversion", label: "Đơn vị chuyển đổi" },
-              { id: "providers", label: "Nhà cung cấp" },
-            ] as const
-          ).map((sub) => (
-            <button
-              key={sub.id}
-              type="button"
-              onClick={() => setActiveSubTab(sub.id)}
-              className={
-                activeSubTab === sub.id
-                  ? "rounded-t border border-b-0 border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground"
-                  : "px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-              }
-            >
-              {sub.label}
-            </button>
-          ))}
-        </div>
+      <section className="rounded-md border">
+        <Tabs
+          tabs={SUB_TABS}
+          activeTab={activeSubTab}
+          onTabChange={setActiveSubTab}
+        />
         <div className="p-3">
-          {activeSubTab === "conversion" ? (
+          {activeSubTab === SubTab.CONVERSION ? (
             <ConversionUnitsTable rows={unitRows} setRows={setUnitRows} />
           ) : (
             <ItemProvidersTable rows={providerRows} setRows={setProviderRows} />
@@ -746,10 +838,13 @@ export function InventoryItemCreateForm({
       <section className="rounded-md border border-border bg-background p-4">
         <h3 className="mb-1 text-sm font-semibold">Ảnh hàng hóa</h3>
         <p className="mb-3 text-xs text-muted-foreground">
-          Định dạng .jpg, .jpeg, .png, .gif, .webp — tối đa 2MB mỗi ảnh, tối đa {MAX_IMAGE_COUNT}{" "}
-          ảnh. Ảnh chỉ lưu trên trình duyệt cho đến khi máy chủ hỗ trợ tải lên.
+          Định dạng .jpg, .jpeg, .png, .gif, .webp — tối đa 2MB mỗi ảnh, tối đa{" "}
+          {MAX_IMAGE_COUNT} ảnh. Ảnh chỉ lưu trên trình duyệt cho đến khi máy
+          chủ hỗ trợ tải lên.
         </p>
-        {imageError ? <p className="mb-2 text-sm text-destructive">{imageError}</p> : null}
+        {imageError ? (
+          <p className="mb-2 text-sm text-destructive">{imageError}</p>
+        ) : null}
         <div className="flex flex-wrap gap-3">
           <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/40 bg-muted/20 text-center text-xs text-muted-foreground hover:bg-muted/40">
             <ImagePlus className="mb-1 h-7 w-7 text-primary" />
@@ -800,17 +895,25 @@ export function InventoryItemCreateForm({
           Thông tin thuộc tính
         </h3>
         <div className="grid gap-3 md:grid-cols-2">
-          <FormField label="Màu sắc">
+          <FormField label="Màu sắc" layout="horizontal" labelWidth="7rem">
             <TagsInput
-              value={Array.isArray(values.colors) ? (values.colors as string[]) : []}
-              onValueChange={(tags) => setValues((prev) => ({ ...prev, colors: tags }))}
+              value={
+                Array.isArray(values.colors) ? (values.colors as string[]) : []
+              }
+              onValueChange={(tags) =>
+                setValues((prev) => ({ ...prev, colors: tags }))
+              }
               placeholder="Nhập màu rồi Enter (VD: Đen, Trắng…)"
             />
           </FormField>
-          <FormField label="Size">
+          <FormField label="Size" layout="horizontal" labelWidth="7rem">
             <TagsInput
-              value={Array.isArray(values.sizes) ? (values.sizes as string[]) : []}
-              onValueChange={(tags) => setValues((prev) => ({ ...prev, sizes: tags }))}
+              value={
+                Array.isArray(values.sizes) ? (values.sizes as string[]) : []
+              }
+              onValueChange={(tags) =>
+                setValues((prev) => ({ ...prev, sizes: tags }))
+              }
               placeholder="Nhập size rồi Enter (VD: 38, 39, 40…)"
             />
           </FormField>
@@ -819,7 +922,9 @@ export function InventoryItemCreateForm({
           <input
             type="checkbox"
             checked={extras.manageBarcodePerUnit}
-            onChange={(e) => updateExtras("manageBarcodePerUnit", e.target.checked)}
+            onChange={(e) =>
+              updateExtras("manageBarcodePerUnit", e.target.checked)
+            }
             className="h-4 w-4 rounded border border-input accent-primary"
           />
           Quản lý mã vạch theo từng đơn vị tính
@@ -842,16 +947,22 @@ export function InventoryItemCreateForm({
     </>
   );
 
-  const numberFieldHandler = (key: string) => (e: { target: { value: string } }) => {
-    const raw = e.target.value;
-    setValues((prev) => ({ ...prev, [key]: raw === "" ? "" : Number(raw) }));
-  };
+  const numberFieldHandler =
+    (key: string) => (e: { target: { value: string } }) => {
+      const raw = e.target.value;
+      setValues((prev) => ({ ...prev, [key]: raw === "" ? "" : Number(raw) }));
+    };
 
   const additionalTab = (
     <section className="rounded-md border border-border bg-background p-4">
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
-          <FormField label="Dài (cm)" htmlFor="extra-net-length">
+          <FormField
+            label="Dài (cm)"
+            htmlFor="extra-net-length"
+            layout="horizontal"
+            labelWidth="6rem"
+          >
             <Input
               id="extra-net-length"
               type="number"
@@ -860,7 +971,12 @@ export function InventoryItemCreateForm({
               onChange={numberFieldHandler("lengthCm")}
             />
           </FormField>
-          <FormField label="Rộng (cm)" htmlFor="extra-net-width">
+          <FormField
+            label="Rộng (cm)"
+            htmlFor="extra-net-width"
+            layout="horizontal"
+            labelWidth="6rem"
+          >
             <Input
               id="extra-net-width"
               type="number"
@@ -869,7 +985,12 @@ export function InventoryItemCreateForm({
               onChange={numberFieldHandler("widthCm")}
             />
           </FormField>
-          <FormField label="Cao (cm)" htmlFor="extra-net-height">
+          <FormField
+            label="Cao (cm)"
+            htmlFor="extra-net-height"
+            layout="horizontal"
+            labelWidth="6rem"
+          >
             <Input
               id="extra-net-height"
               type="number"
@@ -880,7 +1001,12 @@ export function InventoryItemCreateForm({
           </FormField>
         </div>
 
-        <FormField label="Trọng lượng gói hàng (g)" htmlFor="extra-weight">
+        <FormField
+          label="Trọng lượng gói hàng (g)"
+          htmlFor="extra-weight"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <Input
             id="extra-weight"
             type="number"
@@ -890,7 +1016,11 @@ export function InventoryItemCreateForm({
           />
         </FormField>
 
-        <FormField label="Kích thước đóng gói (cm)">
+        <FormField
+          label="Kích thước đóng gói (cm)"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <div className="grid grid-cols-3 gap-2">
             <Input
               aria-label="Chiều dài"
@@ -919,7 +1049,12 @@ export function InventoryItemCreateForm({
           </div>
         </FormField>
 
-        <FormField label="Đầy size" htmlFor="extra-odd-size">
+        <FormField
+          label="Đầy size"
+          htmlFor="extra-odd-size"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <Input
             id="extra-odd-size"
             value={extras.oddSize}
@@ -927,7 +1062,12 @@ export function InventoryItemCreateForm({
           />
         </FormField>
 
-        <FormField label="Năm sản xuất" htmlFor="extra-year-made">
+        <FormField
+          label="Năm sản xuất"
+          htmlFor="extra-year-made"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <Input
             id="extra-year-made"
             type="number"
@@ -935,18 +1075,29 @@ export function InventoryItemCreateForm({
             value={String(values.manufactureYear ?? "")}
             onChange={(e) => {
               const raw = e.target.value;
-              setValues((prev) => ({ ...prev, manufactureYear: raw === "" ? "" : Number(raw) }));
+              setValues((prev) => ({
+                ...prev,
+                manufactureYear: raw === "" ? "" : Number(raw),
+              }));
             }}
             placeholder="VD: 2024"
           />
         </FormField>
 
-        <FormField label="Thành phần" htmlFor="extra-composition" className="md:col-span-2">
+        <FormField
+          label="Thành phần"
+          htmlFor="extra-composition"
+          className="md:col-span-2"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <Textarea
             id="extra-composition"
             rows={3}
             value={String(values.composition ?? "")}
-            onChange={(e) => setValues((prev) => ({ ...prev, composition: e.target.value }))}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, composition: e.target.value }))
+            }
           />
         </FormField>
 
@@ -960,12 +1111,20 @@ export function InventoryItemCreateForm({
           Là mặt hàng vàng bạc
         </label>
 
-        <FormField label="Mô tả" htmlFor="extra-long-desc" className="md:col-span-2">
+        <FormField
+          label="Mô tả"
+          htmlFor="extra-long-desc"
+          className="md:col-span-2"
+          layout="horizontal"
+          labelWidth="11rem"
+        >
           <Textarea
             id="extra-long-desc"
             rows={4}
             value={String(values.description ?? "")}
-            onChange={(e) => setValues((prev) => ({ ...prev, description: e.target.value }))}
+            onChange={(e) =>
+              setValues((prev) => ({ ...prev, description: e.target.value }))
+            }
             placeholder="Mô tả chi tiết về mặt hàng…"
           />
         </FormField>
@@ -979,7 +1138,13 @@ export function InventoryItemCreateForm({
         Định mức tồn kho
       </h3>
       <div className="grid gap-3 md:max-w-xl md:grid-cols-2">
-        <FormField label="Tối thiểu" htmlFor="extra-min-stock">
+        <FormField
+          label="Tối thiểu"
+          htmlFor="extra-min-stock"
+          layout="horizontal"
+          labelWidth="7rem"
+          className="col-span-2"
+        >
           <Input
             id="extra-min-stock"
             type="number"
@@ -988,7 +1153,13 @@ export function InventoryItemCreateForm({
             onChange={(e) => updateExtras("minStock", e.target.value)}
           />
         </FormField>
-        <FormField label="Tối đa" htmlFor="extra-max-stock">
+        <FormField
+          label="Tối đa"
+          htmlFor="extra-max-stock"
+          layout="horizontal"
+          labelWidth="7rem"
+          className="col-span-2"
+        >
           <Input
             id="extra-max-stock"
             type="number"
@@ -1013,7 +1184,9 @@ export function InventoryItemCreateForm({
               <th className="px-3 py-2 text-left">Vị trí công việc</th>
               <th className="px-3 py-2 text-left">Cách tính hoa hồng</th>
               <th className="px-3 py-2 text-right">Mức tính</th>
-              <th className="px-3 py-2 text-right">Giới hạn giảm giá được tính hoa hồng (%)</th>
+              <th className="px-3 py-2 text-right">
+                Giới hạn giảm giá được tính hoa hồng (%)
+              </th>
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
@@ -1024,7 +1197,9 @@ export function InventoryItemCreateForm({
                   <select
                     className={selectClass}
                     value={row.position}
-                    onChange={(e) => updateCommissionRow(row.id, { position: e.target.value })}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { position: e.target.value })
+                    }
                   >
                     {COMMISSION_POSITION_OPTIONS.map((p) => (
                       <option key={p} value={p}>
@@ -1037,7 +1212,9 @@ export function InventoryItemCreateForm({
                   <select
                     className={selectClass}
                     value={row.method}
-                    onChange={(e) => updateCommissionRow(row.id, { method: e.target.value })}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { method: e.target.value })
+                    }
                   >
                     {COMMISSION_METHOD_OPTIONS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -1052,7 +1229,9 @@ export function InventoryItemCreateForm({
                     inputMode="decimal"
                     className="text-right"
                     value={row.amount}
-                    onChange={(e) => updateCommissionRow(row.id, { amount: e.target.value })}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, { amount: e.target.value })
+                    }
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -1061,7 +1240,11 @@ export function InventoryItemCreateForm({
                     inputMode="decimal"
                     className="text-right"
                     value={row.discountLimit}
-                    onChange={(e) => updateCommissionRow(row.id, { discountLimit: e.target.value })}
+                    onChange={(e) =>
+                      updateCommissionRow(row.id, {
+                        discountLimit: e.target.value,
+                      })
+                    }
                   />
                 </td>
                 <td className="px-2 py-2 text-right">
@@ -1078,7 +1261,10 @@ export function InventoryItemCreateForm({
             ))}
             {extras.commissions.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={5}
+                  className="px-3 py-6 text-center text-sm text-muted-foreground"
+                >
                   Chưa có cấu hình hoa hồng.
                 </td>
               </tr>
@@ -1087,7 +1273,12 @@ export function InventoryItemCreateForm({
         </table>
       </div>
       <div className="mt-3">
-        <Button type="button" variant="outline" size="sm" onClick={addCommissionRow}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addCommissionRow}
+        >
           <Plus className="mr-1 h-4 w-4" /> Thêm dòng
         </Button>
       </div>
@@ -1096,16 +1287,24 @@ export function InventoryItemCreateForm({
 
   return (
     <>
-      <InventoryItemTabsHeader activeTab={activeTab} onChangeTab={setActiveTab} />
+      <Tabs
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        className="mb-4"
+      />
 
       <div className="flex flex-col gap-4 pb-28">
-        {activeTab === "basic" && basicTab}
-        {activeTab === "additional" && additionalTab}
-        {activeTab === "warehouse" && warehouseTab}
-        {activeTab === "commission" && commissionTab}
+        {activeTab === Tab.BASIC && basicTab}
+        {activeTab === Tab.ADDITIONAL && additionalTab}
+        {activeTab === Tab.WAREHOUSE && warehouseTab}
+        {activeTab === Tab.COMMISSION && commissionTab}
       </div>
 
-      <InventoryItemActionBar isSaving={isSaving} onCancel={() => navigate(`/admin/${entityKey}`)} />
+      <InventoryItemActionBar
+        isSaving={isSaving}
+        onCancel={() => navigate(`/admin/${entityKey}`)}
+      />
 
       <ItemCategoryCreateDialog
         open={categoryCreateOpen}
@@ -1118,7 +1317,11 @@ export function InventoryItemCreateForm({
         initialName={String(values.brand ?? "")}
         onCreated={onBrandResolved}
       />
-      <BrandListDialog open={brandListOpen} onOpenChange={setBrandListOpen} onPick={onBrandResolved} />
+      <BrandListDialog
+        open={brandListOpen}
+        onOpenChange={setBrandListOpen}
+        onPick={onBrandResolved}
+      />
       <UnitCreateDialog
         open={unitCreateOpen}
         onOpenChange={setUnitCreateOpen}
@@ -1146,5 +1349,7 @@ function variantSlug(value: string): string {
 
 /** Auto SKU = base SKU + accent-stripped color/size suffixes (e.g. "AO-DO-S"). */
 function autoVariantSku(base: string, color: string, size: string): string {
-  return [base, variantSlug(color), variantSlug(size)].filter(Boolean).join("-");
+  return [base, variantSlug(color), variantSlug(size)]
+    .filter(Boolean)
+    .join("-");
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { FieldDefinition } from "@erp/shared-interfaces";
-import { FormField, Input, MoneyInput, TagsInput } from "@erp/ui";
+import { FormField, type FormFieldLayout, Input, MoneyInput, TagsInput } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
 import { TreeSelectInput } from "../forms/TreeSelectInput";
 
@@ -40,6 +40,8 @@ export function CrudFieldInput({
   trailing,
   entityKey,
   currentRecordId,
+  layout,
+  labelWidth,
 }: {
   field: FieldDefinition;
   value: unknown;
@@ -51,8 +53,11 @@ export function CrudFieldInput({
   entityKey?: string;
   /** Current record's id — used to exclude self from tree pickers (edit page). */
   currentRecordId?: string;
+  layout?: FormFieldLayout;
+  labelWidth?: string;
 }) {
   const inputId = `${inputIdPrefix}-${field.key}`;
+  const fieldProps = { layout, labelWidth } as const;
 
   if (field.type === "boolean") {
     return (
@@ -95,7 +100,7 @@ export function CrudFieldInput({
 
   if (field.type === "enum" && field.enumValues) {
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <select
             id={inputId}
@@ -122,7 +127,7 @@ export function CrudFieldInput({
           ? ""
           : Number(value);
       return (
-        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
           <ControlRow trailing={trailing}>
             <MoneyInput
               id={inputId}
@@ -134,7 +139,7 @@ export function CrudFieldInput({
       );
     }
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <Input
             id={inputId}
@@ -152,7 +157,7 @@ export function CrudFieldInput({
   if (field.type === "tags") {
     const tags = Array.isArray(value) ? (value as string[]) : [];
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <TagsInput
           value={tags}
           onValueChange={(next) => onChange(next)}
@@ -168,7 +173,7 @@ export function CrudFieldInput({
 
     if (treeCfg) {
       return (
-        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
           <TreeSelectInput
             inputId={inputId}
             value={typeof value === "string" ? value : ""}
@@ -183,7 +188,7 @@ export function CrudFieldInput({
 
     // Fallback: plain text input (e.g. accounts.parentAccountId stays as-is)
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <Input
             id={inputId}
@@ -198,7 +203,7 @@ export function CrudFieldInput({
 
   if (field.type === "date") {
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <Input
             id={inputId}
@@ -212,7 +217,7 @@ export function CrudFieldInput({
   }
 
   return (
-    <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+    <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
       <ControlRow trailing={trailing}>
         <Input
           id={inputId}

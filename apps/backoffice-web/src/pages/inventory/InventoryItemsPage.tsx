@@ -16,6 +16,7 @@ export function InventoryItemsPage() {
     <CrudListPage
       entityKey="inventory-items"
       initialSort={{ sortBy: "code", sortOrder: "asc" }}
+      disableRowClick
       inventoryConfig={{
         onImportInventory: () => setImportDialogOpen(true),
         onExportInventoryAll: () => {
