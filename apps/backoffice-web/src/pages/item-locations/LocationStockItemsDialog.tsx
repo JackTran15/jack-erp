@@ -8,7 +8,7 @@ import type {
 } from "@erp/shared-interfaces";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import { type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
@@ -214,8 +214,20 @@ export function LocationStockItemsDialog({
         render: (r) => r.categoryName ?? "—",
       },
       {
+        key: "locationCode",
+        label: "Mã vị trí",
+        width: 140,
+        render: () => meta?.location.code ?? "—",
+      },
+      {
+        key: "locationName",
+        label: "Tên vị trí",
+        width: 160,
+        render: () => meta?.location.name ?? "—",
+      },
+      {
         key: "quantity",
-        label: "Tồn",
+        label: "Số lượng",
         width: 100,
         className: "text-right tabular-nums",
         headerClassName: "text-right",
@@ -250,7 +262,7 @@ export function LocationStockItemsDialog({
         ),
       },
     ],
-    [],
+    [meta?.location.code, meta?.location.name],
   );
 
   const title = meta?.location
@@ -269,7 +281,7 @@ export function LocationStockItemsDialog({
       showFooter={false}
     >
       <div className="flex h-full flex-col gap-3">
-        <div className="text-center text-sm font-medium text-muted-foreground">
+        <div className="py-1 text-center text-lg font-semibold uppercase text-foreground">
           {title}
         </div>
 
@@ -369,6 +381,8 @@ export function LocationStockItemsDialog({
                   </td>
                   <td className="border-r px-3 py-1.5">{row.unit}</td>
                   <td className="border-r px-3 py-1.5">{row.categoryName ?? "—"}</td>
+                  <td className="border-r px-3 py-1.5">{meta?.location.code ?? "—"}</td>
+                  <td className="border-r px-3 py-1.5">{meta?.location.name ?? "—"}</td>
                   <td className="border-r px-3 py-1.5 text-right tabular-nums text-muted-foreground">
                     0
                   </td>

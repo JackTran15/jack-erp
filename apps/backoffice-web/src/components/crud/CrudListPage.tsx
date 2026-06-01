@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
+import { toast } from "sonner";
 import {
   Button,
   Dialog,
@@ -29,9 +30,11 @@ import {
   useCrudRecords,
   useCrudCreate,
   useCrudDelete,
+  useCrudUpdate,
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
-import { formatCustomerStatus } from "../../lib/customer-display";
+import { formatCrudFieldValue } from "../../lib/crud-display";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
@@ -52,6 +55,8 @@ export function CrudListPage() {
   );
 
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editSnapshot, setEditSnapshot] = useState<Record<string, unknown> | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<string, unknown> | null>(null);
 
@@ -68,6 +73,7 @@ export function CrudListPage() {
   );
 
   const createMutation = useCrudCreate(entityKey!);
+  const updateMutation = useCrudUpdate(entityKey!);
   const deleteMutation = useCrudDelete(entityKey!);
 
   useEffect(() => {
@@ -79,6 +85,8 @@ export function CrudListPage() {
     setSearchInput("");
     setColumnFilters({});
     setSelectedRecordIds(new Set());
+    setCreateDialogOpen(false);
+    setEditSnapshot(null);
     setDuplicateSnapshot(null);
   }, [entityKey]);
 
@@ -210,7 +218,23 @@ export function CrudListPage() {
   };
 
   const handleCreate = () => {
+    if (entityKey === "inventory-item-categories") {
+      setCreateDialogOpen(true);
+      return;
+    }
     navigate(`/admin/${entityKey}/new`);
+  };
+
+  const handleCreateSubmit = async (data: Record<string, unknown>) => {
+    try {
+      await createMutation.mutateAsync(data);
+      setCreateDialogOpen(false);
+      toast.success(`Đã tạo ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
   };
 
   const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
@@ -245,10 +269,38 @@ export function CrudListPage() {
     setDuplicateSnapshot({ ...selectedRecord });
   };
 
+  const openEditDialog = () => {
+    if (!selectedRecord) return;
+    setEditSnapshot({ ...selectedRecord });
+  };
+
   const handleDuplicateSubmit = async (data: Record<string, unknown>) => {
-    await createMutation.mutateAsync(data);
-    setDuplicateSnapshot(null);
-    void refetchRecords();
+    try {
+      await createMutation.mutateAsync(data);
+      setDuplicateSnapshot(null);
+      toast.success(`Đã nhân bản ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleEditSubmit = async (data: Record<string, unknown>) => {
+    if (!editSnapshot) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: String(editSnapshot[config.idField]),
+        body: data,
+      });
+      setEditSnapshot(null);
+      setSelectedRecordIds(new Set());
+      toast.success(`Đã cập nhật ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -258,13 +310,19 @@ export function CrudListPage() {
 
   const confirmBulkDelete = async () => {
     if (selectedRows.length === 0) return;
-    await Promise.all(
-      selectedRows.map((record) =>
-        deleteMutation.mutateAsync(String(record[config.idField])),
-      ),
-    );
-    setSelectedRecordIds(new Set());
-    setDeleteDialogOpen(false);
+    try {
+      await Promise.all(
+        selectedRows.map((record) =>
+          deleteMutation.mutateAsync(String(record[config.idField])),
+        ),
+      );
+      setSelectedRecordIds(new Set());
+      setDeleteDialogOpen(false);
+      toast.success(`Đã xoá ${selectedRows.length} bản ghi.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   const toolbarItems = buildListToolbar(
@@ -275,6 +333,10 @@ export function CrudListPage() {
         openDuplicateDialog,
         handleEdit: () => {
           if (!selectedRecord) return;
+          if (entityKey === "inventory-item-categories") {
+            openEditDialog();
+            return;
+          }
           void navigate(`/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
@@ -372,6 +434,15 @@ export function CrudListPage() {
         }
       />
 
+      {createDialogOpen && (
+        <CrudFormDialog
+          config={config}
+          record={null}
+          onSubmit={handleCreateSubmit}
+          onClose={() => setCreateDialogOpen(false)}
+        />
+      )}
+
       {duplicateSnapshot && (
         <CrudFormDialog
           key={String(duplicateSnapshot[config.idField] ?? "dup")}
@@ -380,6 +451,16 @@ export function CrudListPage() {
           duplicateSource={duplicateSnapshot}
           onSubmit={handleDuplicateSubmit}
           onClose={() => setDuplicateSnapshot(null)}
+        />
+      )}
+
+      {editSnapshot && (
+        <CrudFormDialog
+          key={String(editSnapshot[config.idField] ?? "edit")}
+          config={config}
+          record={editSnapshot}
+          onSubmit={handleEditSubmit}
+          onClose={() => setEditSnapshot(null)}
         />
       )}
 
@@ -423,7 +504,7 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
       />
     );
   }
-  if (field.key === "status") return formatCustomerStatus(value);
+  if (field.type === "enum") return formatCrudFieldValue(value, field);
   if (field.type === "date") {
     try {
       return new Date(String(value)).toLocaleDateString("vi-VN");

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { FieldDefinition } from "@erp/shared-interfaces";
-import { FormField, Input, MoneyInput } from "@erp/ui";
-import { formatCustomerStatus } from "../../lib/customer-display";
+import { FormField, Input, MoneyInput, Textarea } from "@erp/ui";
+import { formatCrudEnumOption } from "../../lib/crud-display";
 
 function ControlRow({
   children,
@@ -88,7 +88,7 @@ export function CrudFieldInput({
             <option value="">-- Chọn --</option>
             {field.enumValues.map((enumValue) => (
               <option key={enumValue} value={enumValue}>
-                {field.key === "status" ? formatCustomerStatus(enumValue) : enumValue}
+                {formatCrudEnumOption(field, enumValue)}
               </option>
             ))}
           </select>
@@ -140,6 +140,22 @@ export function CrudFieldInput({
             type="date"
             value={value ? String(value).slice(0, 10) : ""}
             onChange={(event) => onChange(event.target.value)}
+          />
+        </ControlRow>
+      </FormField>
+    );
+  }
+
+  if (field.key === "description") {
+    return (
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+        <ControlRow trailing={trailing}>
+          <Textarea
+            id={inputId}
+            className="min-h-[96px] resize-y leading-relaxed"
+            value={String(value ?? "")}
+            onChange={(event) => onChange(event.target.value)}
+            rows={4}
           />
         </ControlRow>
       </FormField>

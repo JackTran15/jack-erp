@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
+import { toast } from "sonner";
 import { useCrudConfig, useCrudCreate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
@@ -8,6 +9,7 @@ import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 
 export function CrudCreatePage() {
   const navigate = useNavigate();
@@ -104,8 +106,13 @@ export function CrudCreatePage() {
       });
     }
 
-    await createMutation.mutateAsync(payload);
-    navigate(`/admin/${entityKey}`, { replace: true });
+    try {
+      await createMutation.mutateAsync(payload);
+      toast.success(`Đã tạo ${config.displayName}.`);
+      navigate(`/admin/${entityKey}`, { replace: true });
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   return (
@@ -150,21 +157,22 @@ export function CrudCreatePage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {editableFields.map((field) => (
-                <CrudFieldInput
-                  key={field.key}
-                  inputIdPrefix="create"
-                  field={field}
-                  value={values[field.key]}
-                  error={errors[field.key]}
-                  onChange={(nextValue) => {
-                    setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next[field.key];
-                      return next;
-                    });
-                  }}
-                />
+                <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+                  <CrudFieldInput
+                    inputIdPrefix="create"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    onChange={(nextValue) => {
+                      setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[field.key];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -177,4 +185,3 @@ export function CrudCreatePage() {
 function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
-

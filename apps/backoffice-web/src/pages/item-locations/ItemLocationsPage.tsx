@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   AppModal,
   Button,
@@ -11,8 +10,8 @@ import {
 import { LocationType } from "@erp/shared-interfaces";
 import {
   Copy,
-  Eye,
   HelpCircle,
+  PackageOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -27,6 +26,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
+import { ArrangeLocationDialog } from "../item-location-details/ArrangeLocationDialog";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -92,6 +92,43 @@ function sortLocationsByCode(rows: InventoryLocation[]) {
   );
 }
 
+function buildNextDuplicateText(base: string, existingValues: Iterable<string>) {
+  const normalizedExisting = new Set(
+    Array.from(existingValues, (v) => v.trim().toLowerCase()).filter(Boolean),
+  );
+  const trimmed = base.trim();
+  const match = trimmed.match(/^(.*?)(?:\.(\d+))?$/);
+  const root = match?.[1]?.trim() || "COPY";
+  const start = match?.[2] ? Number(match[2]) + 1 : 2;
+
+  for (let n = start; n < start + 1000; n += 1) {
+    const candidate = `${root}.${n}`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) return candidate;
+  }
+
+  return `${root}.${Date.now()}`;
+}
+
+function buildDuplicateLocationDraft(
+  selected: InventoryLocation,
+  rows: InventoryLocation[],
+): Partial<InventoryLocation> {
+  return {
+    ...selected,
+    id: undefined,
+    code: buildNextDuplicateText(
+      selected.code,
+      rows
+        .filter((row) => row.storageId === selected.storageId)
+        .map((row) => row.code),
+    ),
+    name: buildNextDuplicateText(
+      selected.name || selected.code,
+      rows.map((row) => row.name),
+    ),
+  };
+}
+
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
     (acc, k) => {
@@ -110,7 +147,6 @@ function getActiveBranchId(): string | null {
 }
 
 export function ItemLocationsPage() {
-  const navigate = useNavigate();
   const [locations, setLocations] = useState<PaginatedResponse<InventoryLocation> | null>(null);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -132,6 +168,7 @@ export function ItemLocationsPage() {
   const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(null);
   const [saving, setSaving] = useState(false);
   const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
 
   const loadStorages = useCallback(async () => {
     const branchId = getActiveBranchId();
@@ -302,13 +339,6 @@ export function ItemLocationsPage() {
     setStockDialogLoc(loc);
   }, []);
 
-  const openLocationDetail = useCallback(
-    (loc: InventoryLocation) => {
-      navigate(`/inventory/item-location-details?locationId=${encodeURIComponent(loc.id)}`);
-    },
-    [navigate],
-  );
-
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -325,7 +355,7 @@ export function ItemLocationsPage() {
         if (!selected) return;
         setDialogState({
           mode: "create",
-          initial: { ...selected, id: undefined, code: "", name: "" },
+          initial: buildDuplicateLocationDraft(selected, locations?.data ?? []),
         });
       },
     },
@@ -337,18 +367,8 @@ export function ItemLocationsPage() {
       onClick: () => selected && setDialogState({ mode: "edit", initial: selected }),
     },
     {
-      id: "detail",
-      label: "Chi tiết",
-      icon: Eye,
-      disabled: !selected,
-      onClick: () => {
-        if (!selected) return;
-        openLocationDetail(selected);
-      },
-    },
-    {
       id: "delete",
-      label: "Ngừng hoạt động",
+      label: "Xóa",
       icon: Trash2,
       variant: "danger",
       disabled: !selected || !selected.isActive,
@@ -359,6 +379,12 @@ export function ItemLocationsPage() {
       label: "Nạp",
       icon: RefreshCw,
       onClick: () => void loadLocations(),
+    },
+    {
+      id: "arrange",
+      label: "Xếp vị trí hàng hóa",
+      icon: PackageOpen,
+      onClick: () => setArrangeOpen(true),
     },
   ];
 
@@ -531,6 +557,12 @@ export function ItemLocationsPage() {
           onClose={() => setStockDialogLoc(null)}
         />
       )}
+
+      <ArrangeLocationDialog
+        open={arrangeOpen}
+        onOpenChange={setArrangeOpen}
+        onSaved={() => void loadLocations()}
+      />
     </>
   );
 }

@@ -1,12 +1,14 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@erp/ui";
+import { toast } from "sonner";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 
 export function CrudEditPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
@@ -115,8 +117,13 @@ export function CrudEditPage() {
       payload[field.key] = values[field.key];
     });
 
-    await updateMutation.mutateAsync({ id, body: payload });
-    navigate(`/admin/${entityKey}/${id}`, { replace: true });
+    try {
+      await updateMutation.mutateAsync({ id, body: payload });
+      toast.success(`Đã cập nhật ${config.displayName}.`);
+      navigate(`/admin/${entityKey}/${id}`, { replace: true });
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   return (
@@ -160,21 +167,22 @@ export function CrudEditPage() {
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
         <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)} className="grid gap-4 md:grid-cols-2">
           {editableFields.map((field) => (
-            <CrudFieldInput
-              key={field.key}
-              inputIdPrefix="edit"
-              field={field}
-              value={values[field.key]}
-              error={errors[field.key]}
-              onChange={(nextValue) => {
-                setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next[field.key];
-                  return next;
-                });
-              }}
-            />
+            <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+              <CrudFieldInput
+                inputIdPrefix="edit"
+                field={field}
+                value={values[field.key]}
+                error={errors[field.key]}
+                onChange={(nextValue) => {
+                  setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next[field.key];
+                    return next;
+                  });
+                }}
+              />
+            </div>
           ))}
         </form>
       </div>
@@ -185,4 +193,3 @@ export function CrudEditPage() {
 function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
-

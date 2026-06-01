@@ -8,7 +8,10 @@ import {
 } from '@erp/shared-interfaces';
 import { BaseCrudService } from '../../crud/base-crud.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { ItemCategoryEntity } from './item-category.entity';
+import {
+  ItemCategoryEntity,
+  ItemCategoryStatus,
+} from './item-category.entity';
 
 export const INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN =
   'InventoryItemCategoryCrudService';
@@ -37,9 +40,9 @@ export class InventoryItemCategoryCrudService extends BaseCrudService<
     const raw = payload.name;
     const name = typeof raw === 'string' ? raw.trim() : '';
     if (!name) {
-      throw new BadRequestException('Tên danh mục không được để trống');
+      throw new BadRequestException('Tên nhóm hàng không được để trống');
     }
-    return { ...payload, name };
+    return cleanCategoryPayload({ ...payload, name });
   }
 
   protected override async beforeUpdate(
@@ -51,25 +54,59 @@ export class InventoryItemCategoryCrudService extends BaseCrudService<
       const name =
         typeof payload.name === 'string' ? payload.name.trim() : '';
       if (!name) {
-        throw new BadRequestException('Tên danh mục không được để trống');
+        throw new BadRequestException('Tên nhóm hàng không được để trống');
       }
-      return { ...payload, name };
+      return cleanCategoryPayload({ ...payload, name });
     }
-    return payload;
+    return cleanCategoryPayload(payload);
   }
+}
+
+function cleanCategoryPayload(payload: Record<string, any>): Record<string, any> {
+  const next = { ...payload };
+  if (next.code !== undefined) {
+    const code = typeof next.code === 'string' ? next.code.trim() : '';
+    next.code = code || null;
+  }
+  if (next.description !== undefined) {
+    const description =
+      typeof next.description === 'string' ? next.description.trim() : '';
+    next.description = description || null;
+  }
+  if (next.status === undefined || next.status === null || next.status === '') {
+    next.status = ItemCategoryStatus.ACTIVE;
+  }
+  return next;
 }
 
 export const INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'inventory-item-categories',
-  displayName: 'Danh mục hàng',
+  displayName: 'Nhóm hàng hoá',
   apiResource: 'inventory/item-categories',
   idField: 'id',
   fields: [
-    { key: 'name', label: 'Tên danh mục', type: 'string', required: true },
-    { key: 'createdAt', label: 'Ngày tạo', type: 'date' },
+    { key: 'code', label: 'Mã nhóm hàng', type: 'string' },
+    { key: 'name', label: 'Tên nhóm hàng', type: 'string', required: true },
+    { key: 'description', label: 'Mô tả', type: 'string' },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      type: 'enum',
+      enumValues: [ItemCategoryStatus.ACTIVE, ItemCategoryStatus.INACTIVE],
+    },
   ],
-  searchableFields: ['name'],
-  filterDefinitions: [],
+  searchableFields: ['code', 'name', 'description'],
+  filterDefinitions: [
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      type: 'select',
+      options: [
+        { label: 'Đang kinh doanh', value: ItemCategoryStatus.ACTIVE },
+        { label: 'Ngừng kinh doanh', value: ItemCategoryStatus.INACTIVE },
+      ],
+    },
+  ],
   permissions: {
     create: 'inventory.write',
     read: 'inventory.read',
