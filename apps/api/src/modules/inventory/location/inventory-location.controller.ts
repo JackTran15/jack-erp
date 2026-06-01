@@ -26,6 +26,8 @@ import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { LinkItemProviderDto } from './dto/link-item-provider.dto';
 import { CreateItemBarcodeDto } from './dto/create-item-barcode.dto';
 import { SetStockThresholdDto } from './dto/set-stock-threshold.dto';
+import { ProductGroupsQueryDto, ProductItemsQueryDto } from './dto/product-group-query.dto';
+import { InventoryItemCrudService } from './item-crud.service';
 import {
   CreateItemDto,
   UpdateItemDto,
@@ -47,6 +49,7 @@ import {
 export class InventoryLocationController {
   constructor(
     private readonly service: InventoryLocationService,
+    private readonly itemCrudService: InventoryItemCrudService,
     private readonly itemProviderService: ItemProviderService,
     private readonly itemBarcodeService: ItemBarcodeService,
     private readonly itemThresholdService: ItemStockThresholdService,
@@ -70,6 +73,43 @@ export class InventoryLocationController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.listItems(query, actor);
+  }
+
+  @Get('items/by-product/:productId')
+  @RequirePermission('inventory.read')
+  getRepresentativeItemForProduct(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemCrudService.getRepresentativeItemForProduct(actor, productId);
+  }
+
+  @Get('items/products')
+  @RequirePermission('inventory.read')
+  listProductGroups(
+    @Query() query: ProductGroupsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemCrudService.listProductGroups(actor, query);
+  }
+
+  @Get('items/products/:productId')
+  @RequirePermission('inventory.read')
+  getProductGroup(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemCrudService.getProductGroup(actor, productId);
+  }
+
+  @Get('items/products/:productId/items')
+  @RequirePermission('inventory.read')
+  listProductItems(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Query() query: ProductItemsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.itemCrudService.listProductItems(actor, productId, query);
   }
 
   @Get('items/:id')

@@ -57,6 +57,7 @@ export const PRODUCT_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'products',
   idField: 'id',
   fields: [
+    { key: 'code', label: 'Mã sản phẩm', type: 'string' },
     { key: 'name', label: 'Tên sản phẩm', type: 'string', required: true },
     { key: 'description', label: 'Mô tả', type: 'string' },
     { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
@@ -64,7 +65,7 @@ export const PRODUCT_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'autoMigrated', label: 'Tự động nhập', type: 'boolean', readOnly: true },
     { key: 'createdAt', label: 'Ngày tạo', type: 'date', readOnly: true },
   ],
-  searchableFields: ['name', 'description'],
+  searchableFields: ['code', 'name', 'description'],
   filterDefinitions: [
     { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
   ],

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventory Import Field Mapping (Final)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 16px; line-height: 1.5; color: #18181b; }
+    h1, h2, h3 { margin-top: 1.4em; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+    th, td { border: 1px solid #d4d4d8; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f4f4f5; }
+    code { background: #f4f4f5; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .map { color: #166534; font-weight: 600; }
+    .defer { color: #b45309; font-weight: 600; }
+    .note { color: #52525b; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Inventory Import Field Mapping (Final)</h1>
+  <p class="note">Phạm vi: <code>apps/api/src/modules/inventory/csv</code>. Cập nhật: 2026-05-28.</p>
+
+  <h2>Mục tiêu hiện tại</h2>
+  <ul>
+    <li>Dùng 1 template workbook dùng chung toàn hệ thống (không per-org).</li>
+    <li>Import runtime chỉ đọc sheet <code>Danh sách hàng hóa</code>.</li>
+    <li>Workbook xuất mẫu gồm 3 sheet: data + guide + field.</li>
+  </ul>
+
+  <h2>Trạng thái triển khai</h2>
+  <h3>Đã triển khai</h3>
+  <ul>
+    <li>Validate/import theo job, commit theo <code>duplicateMode</code> (<code>UPDATE</code>/<code>SKIP</code>).</li>
+    <li>Hủy job khi quay lại bước chọn file.</li>
+    <li>Export lỗi dạng <code>.xlsx</code> có cột <code>Tình trạng</code>.</li>
+    <li>Refactor workbook theo cấu trúc <code>import-workbook/sheets/{data,guide,field}</code>.</li>
+    <li>Bỏ flow template sheet theo org (DB + API upload/download), dùng static template trong code.</li>
+  </ul>
+
+  <h3>Còn lại (ngoài MVP)</h3>
+  <ul>
+    <li>P3: opening stock, unit convert đầy đủ, thresholds, <code>Description</code>.</li>
+    <li>P4: thuế, ảnh, lô/serial, vị trí, bảng giá.</li>
+  </ul>
+
+  <h3>Next steps</h3>
+  <ol>
+    <li>Chốt nội dung cuối cho <code>STATIC_GUIDE_GRID</code> và <code>STATIC_FIELD_GRID</code>.</li>
+    <li>Tăng golden tests cho guide/field (merge, màu, border).</li>
+    <li>Mở ticket P2 theo scope nhỏ để mở rộng an toàn.</li>
+  </ol>
+
+  <h2>Mapping 43 fields</h2>
+  <p class="note">Chú thích: <span class="map">MAP</span> = đã map trong MVP, <span class="defer">DEFER</span> = để phase sau.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Excel Key</th>
+        <th>Nhãn</th>
+        <th>Trạng thái</th>
+        <th>Đích hiện tại / Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td><code>SKUCode</code></td><td>Mã SKU</td><td class="map">MAP</td><td><code>items.code</code> (bắt buộc)</td></tr>
+      <tr><td>2</td><td><code>Barcode</code></td><td>Mã vạch</td><td class="map">MAP</td><td><code>item_barcodes</code></td></tr>
+      <tr><td>3</td><td><code>ModelCode</code></td><td>Mã SKU mẫu mã</td><td class="map">MAP</td><td><code>products.code</code> (lookup by code trước, fallback tạo mới với ModelName)</td></tr>
+      <tr><td>4</td><td><code>ModelName</code></td><td>Tên mẫu mã</td><td class="map">MAP</td><td><code>products.name</code> (upsert theo tên hoặc theo ModelCode)</td></tr>
+      <tr><td>5</td><td><code>InventoryItemName</code></td><td>Tên hàng hóa</td><td class="map">MAP</td><td><code>items.name</code> (bắt buộc)</td></tr>
+      <tr><td>6</td><td><code>ItemCategoryCode</code></td><td>Mã nhóm hàng hóa</td><td class="map">MAP</td><td><code>inventory_item_categories.code</code> (lookup by code, fallback tạo mới)</td></tr>
+      <tr><td>7</td><td><code>ItemCategoryName</code></td><td>Tên nhóm hàng hóa</td><td class="map">MAP</td><td>resolve/create category theo tên</td></tr>
+      <tr><td>8</td><td><code>BrandName</code></td><td>Tên thương hiệu</td><td class="map">MAP</td><td><code>items.brand</code></td></tr>
+      <tr><td>9</td><td><code>UnitName</code></td><td>ĐVT</td><td class="map">MAP</td><td><code>items.unit</code></td></tr>
+      <tr><td>10</td><td><code>Color</code></td><td>Màu</td><td class="map">MAP</td><td><code>item_attribute_values</code> qua <code>product_attribute_definitions(name=Color)</code> + options (yêu cầu productId)</td></tr>
+      <tr><td>11</td><td><code>Size</code></td><td>Size</td><td class="map">MAP</td><td><code>item_attribute_values</code> qua <code>product_attribute_definitions(name=Size)</code> + options (yêu cầu productId)</td></tr>
+      <tr><td>12</td><td><code>CostPrice</code></td><td>Giá mua</td><td class="map">MAP</td><td><code>items.purchasePrice</code></td></tr>
+      <tr><td>13</td><td><code>UnitPrice</code></td><td>Giá bán</td><td class="map">MAP</td><td><code>items.sellingPrice</code></td></tr>
+      <tr><td>14</td><td><code>TaxRate</code></td><td>Thuế suất</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>15</td><td><code>OpeningQuantity</code></td><td>SL tồn đầu</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>16</td><td><code>OpeningAmount</code></td><td>Giá trị tồn đầu</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>17</td><td><code>OpeningStockName</code></td><td>Kho tồn</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>18</td><td><code>MinimumStock</code></td><td>SL tồn tối thiểu</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>19</td><td><code>MaximumStock</code></td><td>SL tồn tối đa</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>20</td><td><code>UnitConvertName</code></td><td>Đơn vị chuyển đổi</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>21</td><td><code>UnitConvertRate</code></td><td>Tỷ lệ quy đổi</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>22</td><td><code>UnitConvertCostPrice</code></td><td>Giá mua theo ĐVT CĐ</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>23</td><td><code>UnitConvertSalePrice</code></td><td>Giá bán theo ĐVT CĐ</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>24</td><td><code>IsSaleUnit</code></td><td>Đơn vị bán mặc định</td><td class="map">MAP</td><td><code>item_units.isDefaultSell</code> (MVP: ĐVT chính)</td></tr>
+      <tr><td>25</td><td><code>IsCostUnit</code></td><td>Đơn vị nhập mặc định</td><td class="map">MAP</td><td><code>item_units.isDefaultBuy</code> (MVP: ĐVT chính)</td></tr>
+      <tr><td>26</td><td><code>ImageUrl</code></td><td>Link ảnh</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>27</td><td><code>Height</code></td><td>Chiều cao</td><td class="map">MAP</td><td><code>items.packageHeightCm</code></td></tr>
+      <tr><td>28</td><td><code>Width</code></td><td>Chiều rộng</td><td class="map">MAP</td><td><code>items.packageWidthCm</code></td></tr>
+      <tr><td>29</td><td><code>Length</code></td><td>Chiều dài</td><td class="map">MAP</td><td><code>items.packageLengthCm</code></td></tr>
+      <tr><td>30</td><td><code>Weight</code></td><td>Cân nặng</td><td class="map">MAP</td><td><code>items.packageWeightGram</code></td></tr>
+      <tr><td>31</td><td><code>ShowLocation</code></td><td>Vị trí trưng bày</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>32</td><td><code>StockLocation</code></td><td>Vị trí lưu kho</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>33</td><td><code>IsUseLotNo</code></td><td>Quản lý lô/HSD</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>34</td><td><code>SellBeforeDay</code></td><td>Cận date</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>35</td><td><code>IsUseSerial</code></td><td>Quản lý Serial/IMEI</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>36</td><td><code>ShowInMenu</code></td><td>Hiển thị POS</td><td class="map">MAP</td><td><code>items.isPosVisible</code></td></tr>
+      <tr><td>37</td><td><code>Description</code></td><td>Mô tả</td><td class="defer">DEFER</td><td>P3</td></tr>
+      <tr><td>38</td><td><code>Inactive</code></td><td>Ngừng kinh doanh</td><td class="map">MAP</td><td><code>items.isActive</code></td></tr>
+      <tr><td>39</td><td><code>SizeRange</code></td><td>Dãy size</td><td class="map">MAP</td><td><code>items.oddSize</code></td></tr>
+      <tr><td>40</td><td><code>Ingredient</code></td><td>Thành phần</td><td class="map">MAP</td><td><code>items.composition</code></td></tr>
+      <tr><td>41</td><td><code>YearOfProduction</code></td><td>Năm sản xuất</td><td class="map">MAP</td><td><code>items.manufactureYear</code></td></tr>
+      <tr><td>42</td><td><code>UnitPriceBox</code></td><td>Giá thùng</td><td class="defer">DEFER</td><td>P4</td></tr>
+      <tr><td>43</td><td><code>UnitPriceWholeSale</code></td><td>Giá sỉ</td><td class="defer">DEFER</td><td>P4</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Ghi chú runtime</h2>
+  <ul>
+    <li>Cột <code>Tình trạng</code> là cột hệ thống khi review/export lỗi, không thuộc 43 cột gốc.</li>
+    <li>CSV semicolon chỉ phục vụ sheet dữ liệu (<code>Danh sách hàng hóa</code>).</li>
+  </ul>
+</body>
+</html>

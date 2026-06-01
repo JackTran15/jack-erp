@@ -1,7 +1,19 @@
 import type { ReactNode } from "react";
 import type { FieldDefinition } from "@erp/shared-interfaces";
-import { FormField, Input, MoneyInput } from "@erp/ui";
+import { FormField, type FormFieldLayout, Input, MoneyInput, TagsInput } from "@erp/ui";
 import { formatCustomerStatus } from "../../lib/customer-display";
+import { TreeSelectInput } from "../forms/TreeSelectInput";
+
+/**
+ * Config for `type: 'relation'` fields that get a tree-select picker.
+ * Keyed by "{entityKey}.{fieldKey}". Unlisted fields fall back to plain text.
+ */
+const TREE_PICKER_CONFIG: Record<string, { entityKey: string; placeholder: string }> = {
+  "provider-groups.parentGroupId": {
+    entityKey: "provider-groups",
+    placeholder: "Tìm theo mã hoặc tên nhóm NCC…",
+  },
+};
 
 function ControlRow({
   children,
@@ -26,6 +38,10 @@ export function CrudFieldInput({
   onChange,
   inputIdPrefix,
   trailing,
+  entityKey,
+  currentRecordId,
+  layout,
+  labelWidth,
 }: {
   field: FieldDefinition;
   value: unknown;
@@ -33,8 +49,15 @@ export function CrudFieldInput({
   onChange: (value: unknown) => void;
   inputIdPrefix: string;
   trailing?: ReactNode;
+  /** Enables guarded tree pickers keyed by entityKey.fieldKey. */
+  entityKey?: string;
+  /** Current record's id — used to exclude self from tree pickers (edit page). */
+  currentRecordId?: string;
+  layout?: FormFieldLayout;
+  labelWidth?: string;
 }) {
   const inputId = `${inputIdPrefix}-${field.key}`;
+  const fieldProps = { layout, labelWidth } as const;
 
   if (field.type === "boolean") {
     return (
@@ -77,7 +100,7 @@ export function CrudFieldInput({
 
   if (field.type === "enum" && field.enumValues) {
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <select
             id={inputId}
@@ -104,7 +127,7 @@ export function CrudFieldInput({
           ? ""
           : Number(value);
       return (
-        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
           <ControlRow trailing={trailing}>
             <MoneyInput
               id={inputId}
@@ -116,7 +139,7 @@ export function CrudFieldInput({
       );
     }
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <Input
             id={inputId}
@@ -131,9 +154,56 @@ export function CrudFieldInput({
     );
   }
 
+  if (field.type === "tags") {
+    const tags = Array.isArray(value) ? (value as string[]) : [];
+    return (
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
+        <TagsInput
+          value={tags}
+          onValueChange={(next) => onChange(next)}
+          placeholder={`Thêm ${field.label.toLowerCase()}… (Enter)`}
+        />
+      </FormField>
+    );
+  }
+
+  if (field.type === "relation") {
+    const configKey = entityKey ? `${entityKey}.${field.key}` : "";
+    const treeCfg = TREE_PICKER_CONFIG[configKey];
+
+    if (treeCfg) {
+      return (
+        <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
+          <TreeSelectInput
+            inputId={inputId}
+            value={typeof value === "string" ? value : ""}
+            onChange={(id) => onChange(id || undefined)}
+            entityKey={treeCfg.entityKey}
+            excludeId={currentRecordId}
+            placeholder={treeCfg.placeholder}
+          />
+        </FormField>
+      );
+    }
+
+    // Fallback: plain text input (e.g. accounts.parentAccountId stays as-is)
+    return (
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
+        <ControlRow trailing={trailing}>
+          <Input
+            id={inputId}
+            type="text"
+            value={String(value ?? "")}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </ControlRow>
+      </FormField>
+    );
+  }
+
   if (field.type === "date") {
     return (
-      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+      <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
         <ControlRow trailing={trailing}>
           <Input
             id={inputId}
@@ -147,7 +217,7 @@ export function CrudFieldInput({
   }
 
   return (
-    <FormField label={field.label} htmlFor={inputId} error={error} required={field.required}>
+    <FormField label={field.label} htmlFor={inputId} error={error} required={field.required} {...fieldProps}>
       <ControlRow trailing={trailing}>
         <Input
           id={inputId}

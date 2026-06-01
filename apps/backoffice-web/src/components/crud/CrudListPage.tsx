@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
@@ -9,15 +9,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  type ToolbarActionOption,
+  formatMoneyInteger,
 } from "@erp/ui";
-import { buildCrudEntityToolbarSpecs, buildListToolbar } from "../../lib/list-toolbar";
+import {
+  buildCrudEntityToolbarSpecs,
+  buildListToolbar,
+} from "../../lib/list-toolbar";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 import {
   applyColumnFilter,
+  type ColumnFormatKind,
   DEFAULT_COLUMN_FILTER_MODE,
-  resolveColumnWidthVariant,
-  TABLE_COLUMN_WIDTH_PX,
+  resolveColumnConfig,
   toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
@@ -31,56 +36,112 @@ import {
   useCrudDelete,
 } from "./useCrudApi";
 import { CrudFormDialog } from "./CrudFormDialog";
+import { CrudRecordDialog } from "./CrudRecordDialog";
 import { formatCustomerStatus } from "../../lib/customer-display";
+
+/** Entity keys that open create/edit as a dialog instead of navigating to a new page. */
+const DIALOG_MODE_ENTITIES = new Set([
+  "inventory-item-units",
+  "inventory-providers",
+  "provider-groups",
+]);
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 
-export function CrudListPage() {
-  const { entityKey } = useParams<{ entityKey: string }>();
+export interface CrudListInventoryActionContext {
+  entityKey: string;
+  idField: string;
+  filteredRecords: Record<string, unknown>[];
+  selectedRows: Record<string, unknown>[];
+  selectedRecordIds: string[];
+  refetchRecords: () => void;
+}
+
+interface CrudListPageProps {
+  entityKey?: string;
+  initialSort?: { sortBy: string; sortOrder: 'asc' | 'desc' };
+  disableRowClick?: boolean;
+  inventoryConfig?: {
+    exportOptions?: Array<{
+      id: string;
+      label: string;
+      action: "export-all" | "export-selected";
+    }>;
+    onImportInventory?: (context: CrudListInventoryActionContext) => void;
+    onExportInventoryAll?: (context: CrudListInventoryActionContext) => void;
+    onExportInventorySelected?: (context: CrudListInventoryActionContext) => void;
+    renderDialogs?: (context: CrudListInventoryActionContext) => ReactNode;
+  };
+}
+
+export function CrudListPage({
+  entityKey: entityKeyProp,
+  initialSort,
+  disableRowClick,
+  inventoryConfig,
+}: CrudListPageProps) {
+  const params = useParams<{ entityKey: string }>();
+  const entityKey = entityKeyProp ?? params.entityKey;
   const navigate = useNavigate();
   const location = useLocation();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [sortBy, setSortBy] = useState<string | undefined>();
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSort?.sortBy);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialSort?.sortOrder ?? "desc");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilter>>(
-    {},
+  const [columnFilters, setColumnFilters] = useState<
+    Record<string, ColumnFilter>
+  >({});
+
+  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
+    new Set(),
   );
-
-  const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
-  const { data: config, isLoading: configLoading, error: configError } = useCrudConfig(entityKey!);
+  // Dialog-mode create/edit (for entities in DIALOG_MODE_ENTITIES)
+  const [crudDialogOpen, setCrudDialogOpen] = useState(false);
+  const [crudDialogRecordId, setCrudDialogRecordId] = useState<string | null>(null);
+  const openCreateDialog = () => { setCrudDialogRecordId(null); setCrudDialogOpen(true); };
+  const openEditDialog = (id: string) => { setCrudDialogRecordId(id); setCrudDialogOpen(true); };
+  const useDialogMode = entityKey ? DIALOG_MODE_ENTITIES.has(entityKey) : false;
+
+  const {
+    data: config,
+    isLoading: configLoading,
+    error: configError,
+  } = useCrudConfig(entityKey ?? "");
 
   const {
     data: records,
     isLoading: loading,
     refetch: refetchRecords,
   } = useCrudRecords(
-    entityKey!,
+    entityKey ?? "",
     { page, pageSize, sortBy, sortOrder, search, filters: {} },
-    !!config,
+    Boolean(config && entityKey),
   );
 
-  const createMutation = useCrudCreate(entityKey!);
-  const deleteMutation = useCrudDelete(entityKey!);
+  const createMutation = useCrudCreate(entityKey ?? "");
+  const deleteMutation = useCrudDelete(entityKey ?? "");
 
   useEffect(() => {
     setPage(1);
     setPageSize(20);
-    setSortBy(undefined);
-    setSortOrder("desc");
+    setSortBy(initialSort?.sortBy);
+    setSortOrder(initialSort?.sortOrder ?? "desc");
     setSearch("");
     setSearchInput("");
     setColumnFilters({});
     setSelectedRecordIds(new Set());
     setDuplicateSnapshot(null);
-  }, [entityKey]);
+  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!records) {
@@ -88,7 +149,9 @@ export function CrudListPage() {
       return;
     }
     const idField = config?.idField ?? "id";
-    const availableIds = new Set(records.data.map((record) => String(record[idField])));
+    const availableIds = new Set(
+      records.data.map((record) => String(record[idField])),
+    );
     setSelectedRecordIds((prev) => {
       const next = new Set([...prev].filter((id) => availableIds.has(id)));
       return next.size === prev.size ? prev : next;
@@ -112,7 +175,9 @@ export function CrudListPage() {
   }, [records?.data, config?.fields, columnFilters]);
 
   useEffect(() => {
-    const visibleIds = new Set(filteredRecords.map((record) => String(record[config?.idField ?? "id"])));
+    const visibleIds = new Set(
+      filteredRecords.map((record) => String(record[config?.idField ?? "id"])),
+    );
     setSelectedRecordIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
       return next.size === prev.size ? prev : next;
@@ -130,9 +195,9 @@ export function CrudListPage() {
 
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
-      (config?.fields ?? []).map((field) => {
-        const widthVariant = resolveColumnWidthVariant(entityKey!, field);
-        const widthPx = TABLE_COLUMN_WIDTH_PX[widthVariant];
+      (config?.fields ?? []).filter((field) => !field.hideInList).map((field) => {
+        const col = resolveColumnConfig(entityKey ?? "", field);
+        const widthPx = col.widthPx;
         const filterDef = filterDefinitionByKey.get(field.key);
         // Pick filter UI per column. Boolean fields and any field whose
         // server-declared `filterDefinition.type === 'select'` get the dropdown
@@ -149,19 +214,84 @@ export function CrudListPage() {
                   { value: "false", label: "Không" },
                 ]
               : undefined;
+        const alignRight = col.align === "right";
+        // For inventory items, the primary identifier cells (Mã SKU / Tên hàng hóa)
+        // open the edit screen directly instead of the row's detail view.
+        const opensEdit =
+          entityKey === "inventory-items" &&
+          (field.key === "code" || field.key === "name");
         return {
           key: field.key,
           label: field.label,
           width: widthPx,
           headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
-          className: `max-w-[${widthPx}px]`,
-          render: (row) => formatCell(row[field.key], field),
+          className: alignRight
+            ? `max-w-[${widthPx}px] text-right tabular-nums`
+            : `max-w-[${widthPx}px]`,
+          render: (row) => {
+            const content = formatCell(row[field.key], field, col.format);
+            if (!opensEdit) return content;
+            return (
+              <button
+                type="button"
+                className="text-left font-medium text-primary hover:underline"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(
+                    `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
+                  );
+                }}
+              >
+                {content}
+              </button>
+            );
+          },
           filterKind: useSelect ? "select" : "symbol",
           filterOptions: selectOptions,
         };
       }),
-    [config?.fields, entityKey, filterDefinitionByKey],
+    [config?.fields, config?.idField, entityKey, filterDefinitionByKey, navigate],
   );
+
+  // ─── Hooks that previously sat AFTER early-returns (Rules-of-Hooks fix) ──
+  const idField = config?.idField ?? "id";
+
+  const selectedRows = useMemo(
+    () =>
+      filteredRecords.filter((record) =>
+        selectedRecordIds.has(String(record[idField])),
+      ),
+    [filteredRecords, selectedRecordIds, idField],
+  );
+
+  const inventoryActionContext = useMemo<CrudListInventoryActionContext>(
+    () => ({
+      entityKey: entityKey ?? "",
+      idField,
+      filteredRecords,
+      selectedRows,
+      selectedRecordIds: selectedRows.map((record) => String(record[idField])),
+      refetchRecords: () => void refetchRecords(),
+    }),
+    [idField, entityKey, filteredRecords, selectedRows, refetchRecords],
+  );
+
+  const exportInventoryOptions = useMemo<ToolbarActionOption[] | undefined>(() => {
+    if (!inventoryConfig?.exportOptions?.length) return undefined;
+    return inventoryConfig.exportOptions.map((option) => ({
+      id: option.id,
+      label: option.label,
+      onClick:
+        option.action === "export-selected"
+          ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
+          : () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext),
+    }));
+  }, [
+    inventoryActionContext,
+    inventoryConfig?.exportOptions,
+    inventoryConfig?.onExportInventoryAll,
+    inventoryConfig?.onExportInventorySelected,
+  ]);
 
   if (configLoading) {
     return (
@@ -181,12 +311,15 @@ export function CrudListPage() {
     return (
       <AdminPageShell>
         <p className="text-destructive">
-          Lỗi: {configError instanceof Error ? configError.message : "Không tải được"}
+          Lỗi:{" "}
+          {configError instanceof Error
+            ? configError.message
+            : "Không tải được"}
         </p>
       </AdminPageShell>
     );
   }
-  if (!config) {
+  if (!entityKey || !config) {
     return (
       <AdminPageShell>
         <p>Không tìm thấy thực thể.</p>
@@ -210,10 +343,14 @@ export function CrudListPage() {
   };
 
   const handleCreate = () => {
+    if (useDialogMode) { openCreateDialog(); return; }
     navigate(`/admin/${entityKey}/new`);
   };
 
-  const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
+  const handleColumnFilterModeChange = (
+    fieldKey: string,
+    mode: ColumnFilterMode,
+  ) => {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
@@ -233,12 +370,10 @@ export function CrudListPage() {
     }));
   };
 
-  const selectedRows = filteredRecords.filter((record) =>
-    selectedRecordIds.has(String(record[config.idField])),
-  );
   const selectedRecord = selectedRows.length === 1 ? selectedRows[0] : null;
   const areAllVisibleSelected =
-    filteredRecords.length > 0 && selectedRows.length === filteredRecords.length;
+    filteredRecords.length > 0 &&
+    selectedRows.length === filteredRecords.length;
 
   const openDuplicateDialog = () => {
     if (!selectedRecord) return;
@@ -269,17 +404,36 @@ export function CrudListPage() {
 
   const toolbarItems = buildListToolbar(
     buildCrudEntityToolbarSpecs(
-      entityKey!,
+      entityKey,
       {
         handleCreate,
         openDuplicateDialog,
         handleEdit: () => {
           if (!selectedRecord) return;
-          void navigate(`/admin/${entityKey}/${String(selectedRecord[config.idField])}/edit`);
+          const id = String(selectedRecord[config.idField]);
+          if (useDialogMode) { openEditDialog(id); return; }
+          void navigate(`/admin/${entityKey}/${id}/edit`);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
         navigate: (to) => void navigate(to),
+        onImportInventory:
+          inventoryConfig?.onImportInventory
+            ? () => inventoryConfig.onImportInventory?.(inventoryActionContext)
+            : undefined,
+        onExportInventory:
+          inventoryConfig
+            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
+            : undefined,
+        onExportInventoryAll:
+          inventoryConfig
+            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
+            : undefined,
+        onExportInventorySelected:
+          inventoryConfig?.onExportInventorySelected
+            ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
+            : undefined,
+        exportInventoryOptions,
       },
       {
         selectedRecord,
@@ -308,7 +462,11 @@ export function CrudListPage() {
         loading={loading}
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
-        onRowClick={(row) => navigate(`/admin/${entityKey}/${String(row[config.idField])}`)}
+        onRowClick={(row) => {
+          if (disableRowClick) return;
+          const id = String(row[config.idField]);
+          navigate(`/admin/${entityKey}/${id}`);
+        }}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
@@ -327,7 +485,11 @@ export function CrudListPage() {
               onChange={(event) => {
                 if (event.target.checked) {
                   setSelectedRecordIds(
-                    new Set(filteredRecords.map((record) => String(record[config.idField]))),
+                    new Set(
+                      filteredRecords.map((record) =>
+                        String(record[config.idField]),
+                      ),
+                    ),
                   );
                 } else {
                   setSelectedRecordIds(new Set());
@@ -383,16 +545,33 @@ export function CrudListPage() {
         />
       )}
 
+      {inventoryConfig?.renderDialogs?.(inventoryActionContext)}
+
+      {useDialogMode && entityKey && (
+        <CrudRecordDialog
+          entityKey={entityKey}
+          recordId={crudDialogRecordId}
+          open={crudDialogOpen}
+          onClose={() => setCrudDialogOpen(false)}
+          onSuccess={() => { void refetchRecords(); }}
+        />
+      )}
+
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xoá</DialogTitle>
             <DialogDescription>
-              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể hoàn tác.
+              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể
+              hoàn tác.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
               Huỷ
             </Button>
             <Button
@@ -410,7 +589,11 @@ export function CrudListPage() {
   );
 }
 
-function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
+function formatCell(
+  value: unknown,
+  field: FieldDefinition,
+  format: ColumnFormatKind | undefined,
+): React.ReactNode {
   if (value === null || value === undefined) return "—";
   if (field.type === "boolean") {
     return (
@@ -423,7 +606,20 @@ function formatCell(value: unknown, field: FieldDefinition): React.ReactNode {
       />
     );
   }
-  if (field.key === "status") return formatCustomerStatus(value);
+  if (format === "moneyVnd") {
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return formatMoneyInteger(n);
+  }
+  if (format === "numberVi" || field.type === "number") {
+    const n = typeof value === "number" ? value : Number(String(value).trim());
+    if (!Number.isFinite(n)) return String(value);
+    return new Intl.NumberFormat("vi-VN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+  if (format === "customerStatus") return formatCustomerStatus(value);
   if (field.type === "date") {
     try {
       return new Date(String(value)).toLocaleDateString("vi-VN");

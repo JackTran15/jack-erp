@@ -6,6 +6,9 @@ import { ProviderEntity } from '../location/provider.entity';
 @Entity('products')
 @Index(['organizationId', 'isActive'])
 export class ProductEntity extends BaseEntity {
+  @Column({ nullable: true, comment: 'Short alphanumeric product code (ModelCode) — unique per org when set' })
+  code?: string;
+
   @Column({ comment: 'Human-readable product name' })
   name: string;
 

@@ -1,9 +1,12 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@erp/ui";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudCreate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
+import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
@@ -91,11 +94,11 @@ export function CrudCreatePage() {
     event.preventDefault();
     if (!validate()) return;
 
-    // For inventory-items the form maintains extra keys (barcodes/units/providers/
-    // threshold/initialStock/...) in `values` that aren't part of `editableFields`.
-    // Send the whole values map; the API DTO's whitelist rejects unknown keys.
+    // For inventory-items and inventory-providers the custom form manages extra keys
+    // not in editableFields (nested data, type-conditional fields). Send the whole
+    // values map for those; the generic CRUD backend accepts Record<string,any>.
     let payload: Record<string, unknown>;
-    if (entityKey === "inventory-items") {
+    if (entityKey === "inventory-items" || entityKey === "inventory-providers") {
       payload = { ...values };
     } else {
       payload = {};
@@ -104,13 +107,17 @@ export function CrudCreatePage() {
       });
     }
 
-    await createMutation.mutateAsync(payload);
-    navigate(`/admin/${entityKey}`, { replace: true });
+    try {
+      await createMutation.mutateAsync(payload);
+      navigate(`/admin/${entityKey}`, { replace: true });
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   return (
     <AdminPageShell>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <nav
             aria-label="Điều hướng trang"
@@ -133,12 +140,36 @@ export function CrudCreatePage() {
           </nav>
           <h1 className="mt-1 text-2xl font-semibold">Thêm mới {config.displayName}</h1>
         </div>
+        {entityKey !== "inventory-items" && (
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(`/admin/${entityKey}`)}
+            >
+              Huỷ
+            </Button>
+            <Button type="submit" form="crud-create-form" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
         <form id="crud-create-form" onSubmit={handleSubmit}>
           {entityKey === "inventory-items" ? (
             <InventoryItemCreateForm
+              editableFields={editableFields}
+              values={values}
+              setValues={setValues}
+              errors={errors}
+              setErrors={setErrors}
+              entityKey={entityKey!}
+              isSaving={createMutation.isPending}
+            />
+          ) : entityKey === "inventory-providers" ? (
+            <SupplierCreateForm
               editableFields={editableFields}
               values={values}
               setValues={setValues}
@@ -156,6 +187,7 @@ export function CrudCreatePage() {
                   field={field}
                   value={values[field.key]}
                   error={errors[field.key]}
+                  entityKey={entityKey}
                   onChange={(nextValue) => {
                     setValues((prev) => ({ ...prev, [field.key]: nextValue }));
                     setErrors((prev) => {
