@@ -8,6 +8,7 @@ import {
 import { OrganizationService } from './organization.service';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
 import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
+import { MembershipCardTypeSeederService } from '../customer/services/membership-card-type.seeder';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 
 const actor: ActorContext = {
@@ -38,6 +39,7 @@ describe('OrganizationService', () => {
   };
   let coaSeederService: { seedForOrganization: jest.Mock };
   let cashVoucherCategorySeederService: { seedForOrganization: jest.Mock };
+  let membershipCardTypeSeederService: { seedForOrganization: jest.Mock };
 
   beforeEach(async () => {
     orgRepo = {
@@ -51,6 +53,9 @@ describe('OrganizationService', () => {
     cashVoucherCategorySeederService = {
       seedForOrganization: jest.fn().mockResolvedValue(7),
     };
+    membershipCardTypeSeederService = {
+      seedForOrganization: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +65,10 @@ describe('OrganizationService', () => {
         {
           provide: CashVoucherCategorySeederService,
           useValue: cashVoucherCategorySeederService,
+        },
+        {
+          provide: MembershipCardTypeSeederService,
+          useValue: membershipCardTypeSeederService,
         },
       ],
     }).compile();

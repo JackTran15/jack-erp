@@ -319,7 +319,10 @@ export class CsvImportService {
       throw new NotFoundException(`Import job ${jobId} not found`);
     }
 
-    if (job.status === ImportJobStatus.COMMITTING) {
+    if (
+      job.status === ImportJobStatus.COMMITTING ||
+      job.status === ImportJobStatus.COMMITTED
+    ) {
       throw new BadRequestException(
         "Không thể hủy phiên nhập khẩu đang được ghi vào hệ thống.",
       );
