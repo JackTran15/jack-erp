@@ -1,5 +1,5 @@
 import { http } from "@erp/pos/lib/common/http";
-import type { SalesmanAssignmentRow } from "@erp/pos/interfaces/sales-hierarchy.interface";
+import type { PublicEmployeeRow } from "@erp/pos/interfaces/sales-hierarchy.interface";
 
 /**
  * Gọi module sales-hierarchy của API. `http` đã tự gắn `Authorization` +
@@ -8,6 +8,6 @@ import type { SalesmanAssignmentRow } from "@erp/pos/interfaces/sales-hierarchy.
  * đang active vào path.
  */
 export const salesHierarchyService = {
-  listSalesmen: (branchId: string): Promise<SalesmanAssignmentRow[]> =>
-    http.get<SalesmanAssignmentRow[]>(`/branches/${branchId}/salesmen`),
+  listSalesmen: (branchId: string): Promise<PublicEmployeeRow[]> =>
+    http.get<PublicEmployeeRow[]>(`/branches/${branchId}/salesmen`),
 };

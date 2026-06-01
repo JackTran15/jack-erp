@@ -11,23 +11,19 @@ import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
 import { BranchEntity } from '../branch/branch.entity';
 import { UserEntity } from '../auth/user.entity';
+import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
 import { SalesmanAssignmentEntity } from './salesman-assignment.entity';
 import { SalesManagerAssignmentEntity } from './sales-manager-assignment.entity';
 
-/** Public-safe projection of a user, inlined onto assignment rows (never exposes passwordHash). */
-export interface PublicUser {
+/** Public-safe projection of an employee (never exposes salary or ID-card data). */
+export interface PublicEmployee {
   id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
+  userId: string;
+  code: string;
+  fullName: string;
+  jobPosition: string | null;
+  mobile: string | null;
 }
-
-export type SalesmanAssignmentView = SalesmanAssignmentEntity & {
-  user: PublicUser | null;
-};
-export type SalesManagerAssignmentView = SalesManagerAssignmentEntity & {
-  user: PublicUser | null;
-};
 
 @Injectable()
 export class SalesHierarchyService {
@@ -42,21 +38,20 @@ export class SalesHierarchyService {
     private readonly branchRepo: Repository<BranchEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(EmployeeProfileEntity)
+    private readonly employeeRepo: Repository<EmployeeProfileEntity>,
     private readonly eventPublisher: EventPublisher,
   ) {}
 
   // ── Salesmen ──────────────────────────────────────────────
 
+  /** Salesmen = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
   async listSalesmen(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesmanAssignmentView[]> {
+  ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    const rows = await this.salesmanRepo.find({
-      where: { branchId, organizationId: actor.organizationId },
-      order: { assignedAt: 'DESC' },
-    });
-    return this.attachUsers(rows, actor.organizationId);
+    return this.listOrganizationEmployees(actor.organizationId);
   }
 
   async assignSalesman(
@@ -110,16 +105,13 @@ export class SalesHierarchyService {
 
   // ── Sales Managers ────────────────────────────────────────
 
+  /** Sales managers = all employees in the organization; `branchId` only gates branch-scope access, not the result set. */
   async listSalesManagers(
     branchId: string,
     actor: ActorContext,
-  ): Promise<SalesManagerAssignmentView[]> {
+  ): Promise<PublicEmployee[]> {
     await this.validateBranch(branchId, actor);
-    const rows = await this.managerRepo.find({
-      where: { branchId, organizationId: actor.organizationId },
-      order: { assignedAt: 'DESC' },
-    });
-    return this.attachUsers(rows, actor.organizationId);
+    return this.listOrganizationEmployees(actor.organizationId);
   }
 
   async assignSalesManager(
@@ -173,28 +165,38 @@ export class SalesHierarchyService {
 
   // ── Helpers ───────────────────────────────────────────────
 
-  /** Batch-resolve each row's userId into an inlined public-safe `user` object (null when the user is missing). */
-  private async attachUsers<T extends { userId: string }>(
-    rows: T[],
+  /**
+   * All employees in the organization, projected to public-safe fields. The display
+   * name is taken from each employee's linked user account; salary/ID-card fields are
+   * never exposed.
+   */
+  private async listOrganizationEmployees(
     organizationId: string,
-  ): Promise<Array<T & { user: PublicUser | null }>> {
-    if (rows.length === 0) return [];
+  ): Promise<PublicEmployee[]> {
+    const profiles = await this.employeeRepo.find({
+      where: { organizationId },
+      relations: { jobPosition: true },
+      order: { code: 'ASC' },
+    });
+    if (profiles.length === 0) return [];
 
-    const userIds = [...new Set(rows.map((r) => r.userId))];
+    const userIds = [...new Set(profiles.map((p) => p.userId))];
     const users = await this.userRepo.find({
       where: { id: In(userIds), organizationId },
-      select: ['id', 'firstName', 'lastName', 'email'],
+      select: ['id', 'firstName', 'lastName'],
     });
-    const userMap = new Map<string, PublicUser>(
-      users.map((u) => [
-        u.id,
-        { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email },
-      ]),
+    const nameMap = new Map<string, string>(
+      users.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()]),
     );
 
-    return rows.map((r) =>
-      Object.assign(r, { user: userMap.get(r.userId) ?? null }),
-    );
+    return profiles.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      code: p.code,
+      fullName: nameMap.get(p.userId) ?? '',
+      jobPosition: p.jobPosition?.name ?? null,
+      mobile: p.mobile ?? null,
+    }));
   }
 
   private async validateBranch(
