@@ -38,6 +38,8 @@ export class ExcelImportItemService {
 
   private readonly productCache = new Map<string, string>();
   private readonly categoryCache = new Map<string, string>(); // "${orgId}:name:${lower}" | "${orgId}:code:${lower}" → categoryId
+  private readonly brandCache = new Map<string, string>(); // "${orgId}:${name.lower}" → brandId
+  private readonly unitCache = new Set<string>(); // "${orgId}:${name.lower}" — dedup unit creation
   private readonly attrDefCache = new Map<string, string>(); // "${productId}:${attrName.lower}" → defId
   private readonly attrOptCache = new Map<string, string>(); // "${defId}:${valueLabel.lower}" → optionId
 
@@ -63,6 +65,8 @@ export class ExcelImportItemService {
   resetCaches(): void {
     this.productCache.clear();
     this.categoryCache.clear();
+    this.brandCache.clear();
+    this.unitCache.clear();
     this.attrDefCache.clear();
     this.attrOptCache.clear();
   }
@@ -87,6 +91,7 @@ export class ExcelImportItemService {
     const categoryId = await this.resolveCategoryId(raw, actor);
 
     const unitName = getExcelField(raw, InventoryImportExcelField.UNIT_NAME) || 'Đôi';
+    await this.ensureUnitExists(unitName, actor);
     const variantLabel = this.buildVariantLabel(raw);
 
     const payload: Record<string, unknown> = {
@@ -95,7 +100,7 @@ export class ExcelImportItemService {
       unit: unitName,
       categoryId,
       productId,
-      brand: getExcelField(raw, InventoryImportExcelField.BRAND_NAME) || undefined,
+      brandId: await this.resolveBrandId(raw, actor),
       purchasePrice:
         parseGroupedDecimal(getExcelField(raw, InventoryImportExcelField.COST_PRICE)) ?? 0,
       sellingPrice:
@@ -372,6 +377,31 @@ export class ExcelImportItemService {
       return cat.id;
     }
     return undefined;
+  }
+
+  private async ensureUnitExists(
+    unitName: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const key = `${actor.organizationId}:${unitName.toLowerCase()}`;
+    if (this.unitCache.has(key)) return;
+    await this.locationService.resolveOrCreateUnitByName(unitName, actor);
+    this.unitCache.add(key);
+  }
+
+  private async resolveBrandId(
+    raw: InventoryImportExcelRow,
+    actor: ActorContext,
+  ): Promise<string | undefined> {
+    const name = getExcelField(raw, InventoryImportExcelField.BRAND_NAME)?.trim();
+    if (!name) return undefined;
+    const cacheKey = `${actor.organizationId}:${name.toLowerCase()}`;
+    const cached = this.brandCache.get(cacheKey);
+    if (cached) return cached;
+    const brand = await this.locationService.resolveOrCreateBrandByName(name, actor);
+    if (!brand) return undefined;
+    this.brandCache.set(cacheKey, brand.id);
+    return brand.id;
   }
 
   private async resolveProductId(

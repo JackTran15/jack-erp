@@ -144,7 +144,12 @@ export function CrudEditPage() {
 
     try {
       await updateMutation.mutateAsync({ id, body: payload });
-      navigate(`/admin/${entityKey}/${id}`, { replace: true });
+      // inventory-items has no standalone detail page — go back to the list.
+      if (entityKey === "inventory-items") {
+        navigate(`/admin/${entityKey}`, { replace: true });
+      } else {
+        navigate(`/admin/${entityKey}/${id}`, { replace: true });
+      }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     }
@@ -178,14 +183,16 @@ export function CrudEditPage() {
           </nav>
           <h1 className="mt-1 text-2xl font-semibold">Sửa {config.displayName}</h1>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate(`/admin/${entityKey}/${id}`)}>
-            Huỷ
-          </Button>
-          <Button type="submit" form="crud-edit-form" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Đang lưu…" : "Lưu"}
-          </Button>
-        </div>
+        {entityKey !== "inventory-items" && (
+          <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="outline" onClick={() => navigate(`/admin/${entityKey}/${id}`)}>
+              Huỷ
+            </Button>
+            <Button type="submit" form="crud-edit-form" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">

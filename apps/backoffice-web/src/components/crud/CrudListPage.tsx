@@ -461,6 +461,7 @@ export function CrudListPage({
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
         onRowClick={(row) => {
+          if (entityKey === "inventory-items") return;
           const id = String(row[config.idField]);
           navigate(`/admin/${entityKey}/${id}`);
         }}

@@ -13,6 +13,8 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { BranchService } from '../../branch/branch.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
+import { BrandEntity } from './brand.entity';
+import { UnitOfMeasureEntity } from './unit-of-measure.entity';
 import { ProviderEntity } from './provider.entity';
 import { StorageEntity } from './storage.entity';
 import { ShowroomEntity } from './showroom.entity';
@@ -42,6 +44,10 @@ export class InventoryLocationService {
     private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(ItemCategoryEntity)
     private readonly itemCategoryRepo: Repository<ItemCategoryEntity>,
+    @InjectRepository(BrandEntity)
+    private readonly brandRepo: Repository<BrandEntity>,
+    @InjectRepository(UnitOfMeasureEntity)
+    private readonly unitRepo: Repository<UnitOfMeasureEntity>,
     @InjectRepository(ProviderEntity)
     private readonly providerRepo: Repository<ProviderEntity>,
     @InjectRepository(StorageEntity)
@@ -209,6 +215,51 @@ export class InventoryLocationService {
       this.itemCategoryRepo.create({
         code,
         name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  /** Resolve an existing brand by trimmed name, or create it if missing. Case-insensitive match. */
+  async resolveOrCreateBrandByName(
+    rawName: string,
+    actor: ActorContext,
+  ): Promise<BrandEntity | null> {
+    const name = rawName.trim();
+    if (!name) return null;
+    const existing = await this.brandRepo
+      .createQueryBuilder('b')
+      .where('b.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(b.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    return this.brandRepo.save(
+      this.brandRepo.create({
+        name,
+        organizationId: actor.organizationId,
+        createdBy: actor.userId,
+      }),
+    );
+  }
+
+  /** Resolve an existing unit by trimmed name, or create it if missing. Case-insensitive match. */
+  async resolveOrCreateUnitByName(
+    rawName: string,
+    actor: ActorContext,
+  ): Promise<UnitOfMeasureEntity | null> {
+    const name = rawName.trim();
+    if (!name) return null;
+    const existing = await this.unitRepo
+      .createQueryBuilder('u')
+      .where('u.organizationId = :orgId', { orgId: actor.organizationId })
+      .andWhere('LOWER(u.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    return this.unitRepo.save(
+      this.unitRepo.create({
+        name,
+        isActive: true,
         organizationId: actor.organizationId,
         createdBy: actor.userId,
       }),
