@@ -66,7 +66,7 @@ function extractImportedSharedTypes(filePath: string): string[] {
   const importRegex = /import\s+(?:type\s+)?{([^}]+)}\s+from\s+['"]@erp\/shared-interfaces['"]/g;
   let match: RegExpExecArray | null;
   while ((match = importRegex.exec(content)) !== null) {
-    const items = match[1].split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim());
+    const items = match[1].split(',').map((s) => s.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim());
     names.push(...items.filter(Boolean));
   }
   return names;
