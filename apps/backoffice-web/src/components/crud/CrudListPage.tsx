@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
 import {
@@ -46,6 +52,7 @@ const DIALOG_MODE_ENTITIES = new Set([
   "provider-groups",
 ]);
 import { AdminPageShell } from "../layout/AdminPageShell";
+import { PageHeader } from "../layout/PageHeader";
 import { TableActionHeader } from "../layout/TableActionHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 
@@ -60,7 +67,7 @@ export interface CrudListInventoryActionContext {
 
 interface CrudListPageProps {
   entityKey?: string;
-  initialSort?: { sortBy: string; sortOrder: 'asc' | 'desc' };
+  initialSort?: { sortBy: string; sortOrder: "asc" | "desc" };
   disableRowClick?: boolean;
   inventoryConfig?: {
     exportOptions?: Array<{
@@ -70,7 +77,9 @@ interface CrudListPageProps {
     }>;
     onImportInventory?: (context: CrudListInventoryActionContext) => void;
     onExportInventoryAll?: (context: CrudListInventoryActionContext) => void;
-    onExportInventorySelected?: (context: CrudListInventoryActionContext) => void;
+    onExportInventorySelected?: (
+      context: CrudListInventoryActionContext,
+    ) => void;
     renderDialogs?: (context: CrudListInventoryActionContext) => ReactNode;
   };
 }
@@ -89,7 +98,9 @@ export function CrudListPage({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSort?.sortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialSort?.sortOrder ?? "desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    initialSort?.sortOrder ?? "desc",
+  );
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [columnFilters, setColumnFilters] = useState<
@@ -107,9 +118,17 @@ export function CrudListPage({
 
   // Dialog-mode create/edit (for entities in DIALOG_MODE_ENTITIES)
   const [crudDialogOpen, setCrudDialogOpen] = useState(false);
-  const [crudDialogRecordId, setCrudDialogRecordId] = useState<string | null>(null);
-  const openCreateDialog = () => { setCrudDialogRecordId(null); setCrudDialogOpen(true); };
-  const openEditDialog = (id: string) => { setCrudDialogRecordId(id); setCrudDialogOpen(true); };
+  const [crudDialogRecordId, setCrudDialogRecordId] = useState<string | null>(
+    null,
+  );
+  const openCreateDialog = () => {
+    setCrudDialogRecordId(null);
+    setCrudDialogOpen(true);
+  };
+  const openEditDialog = (id: string) => {
+    setCrudDialogRecordId(id);
+    setCrudDialogOpen(true);
+  };
   const useDialogMode = entityKey ? DIALOG_MODE_ENTITIES.has(entityKey) : false;
 
   const {
@@ -195,62 +214,70 @@ export function CrudListPage({
 
   const tableColumns = useMemo<TableColumn<Record<string, unknown>>[]>(
     () =>
-      (config?.fields ?? []).filter((field) => !field.hideInList).map((field) => {
-        const col = resolveColumnConfig(entityKey ?? "", field);
-        const widthPx = col.widthPx;
-        const filterDef = filterDefinitionByKey.get(field.key);
-        // Pick filter UI per column. Boolean fields and any field whose
-        // server-declared `filterDefinition.type === 'select'` get the dropdown
-        // filter; everything else falls back to the operator/value combo.
-        const useSelect =
-          (filterDef?.type === "select" && filterDef.options?.length) ||
-          field.type === "boolean";
-        const selectOptions =
-          filterDef?.type === "select"
-            ? filterDef.options
-            : field.type === "boolean"
-              ? [
-                  { value: "true", label: "Có" },
-                  { value: "false", label: "Không" },
-                ]
-              : undefined;
-        const alignRight = col.align === "right";
-        // For inventory items, the primary identifier cells (Mã SKU / Tên hàng hóa)
-        // open the edit screen directly instead of the row's detail view.
-        const opensEdit =
-          entityKey === "inventory-items" &&
-          (field.key === "code" || field.key === "name");
-        return {
-          key: field.key,
-          label: field.label,
-          width: widthPx,
-          headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
-          className: alignRight
-            ? `max-w-[${widthPx}px] text-right tabular-nums`
-            : `max-w-[${widthPx}px]`,
-          render: (row) => {
-            const content = formatCell(row[field.key], field, col.format);
-            if (!opensEdit) return content;
-            return (
-              <button
-                type="button"
-                className="text-left font-medium text-primary hover:underline"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate(
-                    `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
-                  );
-                }}
-              >
-                {content}
-              </button>
-            );
-          },
-          filterKind: useSelect ? "select" : "symbol",
-          filterOptions: selectOptions,
-        };
-      }),
-    [config?.fields, config?.idField, entityKey, filterDefinitionByKey, navigate],
+      (config?.fields ?? [])
+        .filter((field) => !field.hideInList)
+        .map((field) => {
+          const col = resolveColumnConfig(entityKey ?? "", field);
+          const widthPx = col.widthPx;
+          const filterDef = filterDefinitionByKey.get(field.key);
+          // Pick filter UI per column. Boolean fields and any field whose
+          // server-declared `filterDefinition.type === 'select'` get the dropdown
+          // filter; everything else falls back to the operator/value combo.
+          const useSelect =
+            (filterDef?.type === "select" && filterDef.options?.length) ||
+            field.type === "boolean";
+          const selectOptions =
+            filterDef?.type === "select"
+              ? filterDef.options
+              : field.type === "boolean"
+                ? [
+                    { value: "true", label: "Có" },
+                    { value: "false", label: "Không" },
+                  ]
+                : undefined;
+          const alignRight = col.align === "right";
+          // For inventory items, the primary identifier cells (Mã SKU / Tên hàng hóa)
+          // open the edit screen directly instead of the row's detail view.
+          const opensEdit =
+            entityKey === "inventory-items" &&
+            (field.key === "code" || field.key === "name");
+          return {
+            key: field.key,
+            label: field.label,
+            width: widthPx,
+            headerClassName: `w-[${widthPx}px] min-w-[${widthPx}px]`,
+            className: alignRight
+              ? `max-w-[${widthPx}px] text-right tabular-nums`
+              : `max-w-[${widthPx}px]`,
+            render: (row) => {
+              const content = formatCell(row[field.key], field, col.format);
+              if (!opensEdit) return content;
+              return (
+                <button
+                  type="button"
+                  className="text-left font-medium text-primary hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    navigate(
+                      `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
+                    );
+                  }}
+                >
+                  {content}
+                </button>
+              );
+            },
+            filterKind: useSelect ? "select" : "symbol",
+            filterOptions: selectOptions,
+          };
+        }),
+    [
+      config?.fields,
+      config?.idField,
+      entityKey,
+      filterDefinitionByKey,
+      navigate,
+    ],
   );
 
   // ─── Hooks that previously sat AFTER early-returns (Rules-of-Hooks fix) ──
@@ -276,15 +303,21 @@ export function CrudListPage({
     [idField, entityKey, filteredRecords, selectedRows, refetchRecords],
   );
 
-  const exportInventoryOptions = useMemo<ToolbarActionOption[] | undefined>(() => {
+  const exportInventoryOptions = useMemo<
+    ToolbarActionOption[] | undefined
+  >(() => {
     if (!inventoryConfig?.exportOptions?.length) return undefined;
     return inventoryConfig.exportOptions.map((option) => ({
       id: option.id,
       label: option.label,
       onClick:
         option.action === "export-selected"
-          ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
-          : () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext),
+          ? () =>
+              inventoryConfig.onExportInventorySelected?.(
+                inventoryActionContext,
+              )
+          : () =>
+              inventoryConfig.onExportInventoryAll?.(inventoryActionContext),
     }));
   }, [
     inventoryActionContext,
@@ -343,7 +376,10 @@ export function CrudListPage({
   };
 
   const handleCreate = () => {
-    if (useDialogMode) { openCreateDialog(); return; }
+    if (useDialogMode) {
+      openCreateDialog();
+      return;
+    }
     navigate(`/admin/${entityKey}/new`);
   };
 
@@ -411,28 +447,30 @@ export function CrudListPage({
         handleEdit: () => {
           if (!selectedRecord) return;
           const id = String(selectedRecord[config.idField]);
-          if (useDialogMode) { openEditDialog(id); return; }
+          if (useDialogMode) {
+            openEditDialog(id);
+            return;
+          }
           void navigate(`/admin/${entityKey}/${id}/edit`);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
         navigate: (to) => void navigate(to),
-        onImportInventory:
-          inventoryConfig?.onImportInventory
-            ? () => inventoryConfig.onImportInventory?.(inventoryActionContext)
-            : undefined,
-        onExportInventory:
-          inventoryConfig
-            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
-            : undefined,
-        onExportInventoryAll:
-          inventoryConfig
-            ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
-            : undefined,
-        onExportInventorySelected:
-          inventoryConfig?.onExportInventorySelected
-            ? () => inventoryConfig.onExportInventorySelected?.(inventoryActionContext)
-            : undefined,
+        onImportInventory: inventoryConfig?.onImportInventory
+          ? () => inventoryConfig.onImportInventory?.(inventoryActionContext)
+          : undefined,
+        onExportInventory: inventoryConfig
+          ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
+          : undefined,
+        onExportInventoryAll: inventoryConfig
+          ? () => inventoryConfig.onExportInventoryAll?.(inventoryActionContext)
+          : undefined,
+        onExportInventorySelected: inventoryConfig?.onExportInventorySelected
+          ? () =>
+              inventoryConfig.onExportInventorySelected?.(
+                inventoryActionContext,
+              )
+          : undefined,
         exportInventoryOptions,
       },
       {
@@ -446,15 +484,12 @@ export function CrudListPage({
 
   return (
     <AdminPageShell>
-      <div className="mb-2 shrink-0">
-        <h1 className="text-2xl font-semibold">{config.displayName}</h1>
-      </div>
-
-      <TableActionHeader
-        className="mb-3 shrink-0"
+      <PageHeader
+        className="mb-2"
+        title={config.displayName}
         breadcrumbs={breadcrumbs}
-        items={toolbarItems}
       />
+      <TableActionHeader className="shrink-0" items={toolbarItems} />
 
       <BaseDataTable
         columns={tableColumns}
@@ -553,7 +588,9 @@ export function CrudListPage({
           recordId={crudDialogRecordId}
           open={crudDialogOpen}
           onClose={() => setCrudDialogOpen(false)}
-          onSuccess={() => { void refetchRecords(); }}
+          onSuccess={() => {
+            void refetchRecords();
+          }}
         />
       )}
 

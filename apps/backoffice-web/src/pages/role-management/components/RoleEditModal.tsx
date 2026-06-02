@@ -66,7 +66,7 @@ export function RoleEditModal({
         </div>
       }
     >
-      <div className="flex flex-col gap-6 overflow-y-auto p-4">
+      <div className="flex flex-col gap-6 flex-1">
         {isSystem && (
           <Badge variant="secondary">
             Vai trò hệ thống — không chỉnh sửa hoặc xóa

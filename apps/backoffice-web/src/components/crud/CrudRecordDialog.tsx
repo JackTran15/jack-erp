@@ -12,7 +12,7 @@ import {
   MoneyInput,
   Textarea,
 } from "@erp/ui";
-import { HelpCircle } from "lucide-react";
+import { HelpButton } from "../HelpButton";
 import { useCrudConfig, useCrudCreate, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
@@ -303,13 +303,7 @@ export function CrudRecordDialog({
           </div>
 
           <DialogFooter className="flex items-center justify-between sm:justify-between">
-            <button
-              type="button"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Trợ giúp
-            </button>
+            <HelpButton />
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -346,13 +340,7 @@ export function CrudRecordDialog({
   // ── AppModal for complex forms (inventory-providers) ────────────────────────
   const modalFooter = (
     <div className="flex w-full items-center justify-between gap-2">
-      <button
-        type="button"
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <HelpCircle className="h-4 w-4" />
-        Trợ giúp
-      </button>
+      <HelpButton />
       <div className="flex gap-2">
         <Button type="button" onClick={() => void save(false)} disabled={isSaving}>
           {isSaving ? "Đang lưu…" : "Lưu"}

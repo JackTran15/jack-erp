@@ -2,8 +2,8 @@ import * as React from "react";
 import { cn } from "../lib/utils";
 
 export interface DocumentListShellProps {
-  /** Bold page title shown on the left of the tab bar (e.g. "Nhập kho"). */
-  title: React.ReactNode;
+  /** Bold page title shown on the left of the tab bar (e.g. "Nhập kho"). When omitted the title row is hidden. */
+  title?: React.ReactNode;
   /** Horizontal sub-page navigation. Render a <PageTabBar /> here. */
   tabs?: React.ReactNode;
   /** Right-aligned actions in the title row (e.g. branch selector). */
@@ -61,7 +61,8 @@ export function DocumentListShell({
     handle.setPointerCapture(e.pointerId);
     const startY = e.clientY;
     const startH = detailRef.current?.offsetHeight ?? detailHeight;
-    const containerHeight = containerRef.current?.offsetHeight ?? window.innerHeight;
+    const containerHeight =
+      containerRef.current?.offsetHeight ?? window.innerHeight;
     const maxH = Math.max(detailMinHeight, containerHeight - MIN_TABLE_AREA_PX);
 
     document.body.style.userSelect = "none";
@@ -104,23 +105,27 @@ export function DocumentListShell({
   return (
     <div
       ref={containerRef}
-      className={cn("flex h-full min-h-0 flex-col bg-background", className)}
+      className={cn("flex flex-1 min-h-0 flex-col bg-background", className)}
     >
-      <div className="flex shrink-0 items-center gap-6 border-b px-4 py-2">
-        <h1 className="text-base font-semibold">{title}</h1>
-        {tabs ? <div className="min-w-0 flex-1">{tabs}</div> : null}
-        {headerActions ? (
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {headerActions}
-          </div>
-        ) : null}
-      </div>
+      {(title || tabs || headerActions) && (
+        <div className="flex shrink-0 items-center gap-6 border-b px-4 py-2">
+          {title && <h1 className="text-xl font-semibold">{title}</h1>}
+          {tabs ? <div className="min-w-0 flex-1">{tabs}</div> : null}
+          {headerActions ? (
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {headerActions}
+            </div>
+          ) : null}
+        </div>
+      )}
       {toolbar ? <div className="shrink-0 border-b">{toolbar}</div> : null}
       {filters ? (
         <div className="shrink-0 border-b bg-muted/30 px-4 py-2">{filters}</div>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          {children}
+        </div>
         {summary ? (
           <div className="shrink-0 border-t bg-muted/40 px-4 py-2 text-sm font-medium">
             {summary}
