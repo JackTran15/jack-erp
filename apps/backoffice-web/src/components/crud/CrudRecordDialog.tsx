@@ -27,7 +27,7 @@ interface Props {
   recordId: string | null;
   open: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (record: Record<string, unknown>) => void;
 }
 
 function isBlank(v: unknown) {
@@ -252,12 +252,13 @@ export function CrudRecordDialog({
   const save = async (andNew = false) => {
     if (!validate()) return;
     try {
+      let saved: Record<string, unknown>;
       if (isEdit && recordId) {
-        await updateMutation.mutateAsync({ id: recordId, body: buildPayload() });
+        saved = await updateMutation.mutateAsync({ id: recordId, body: buildPayload() });
       } else {
-        await createMutation.mutateAsync(buildPayload());
+        saved = await createMutation.mutateAsync(buildPayload());
       }
-      onSuccess?.();
+      onSuccess?.(saved);
       if (andNew) {
         const defaults: Record<string, unknown> = {};
         editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });

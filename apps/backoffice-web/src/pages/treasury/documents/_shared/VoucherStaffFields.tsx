@@ -26,6 +26,7 @@ interface Props {
   onStaffLookupChange: (code: string) => void;
   onStaffClear: () => void;
   onOpenSearchDialog: () => void;
+  onCreateNew?: () => void;
 }
 
 const STAFF_LOOKUP_COLUMNS = [
@@ -58,6 +59,7 @@ export function VoucherStaffFields({
   onStaffLookupChange,
   onStaffClear,
   onOpenSearchDialog,
+  onCreateNew,
 }: Props) {
   const searchPartners = usePartnerSearch();
   const currentSelection = useMemo((): VoucherPartnerOption | null => {
@@ -154,6 +156,7 @@ export function VoucherStaffFields({
           portalToBody
           dropdownMinWidth={400}
           onSearchButtonClick={onOpenSearchDialog}
+          onCreateNew={onCreateNew}
         />
         <Input
           value={staffName}

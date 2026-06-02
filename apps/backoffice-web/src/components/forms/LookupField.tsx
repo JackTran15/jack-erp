@@ -11,7 +11,14 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Plus, Search, X } from "lucide-react";
-import { cn, Input } from "@erp/ui";
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from "@erp/ui";
 import { LookupSearchModal } from "./LookupSearchModal";
 
 /**
@@ -53,6 +60,8 @@ export interface LookupFieldProps<T> {
   disabled?: boolean;
   /** Provide to render the trailing `+` button that opens a quick-create dialog. */
   onCreateNew?: () => void;
+  /** When provided, the `+` button opens a dropdown menu instead of calling onCreateNew directly. */
+  createMenuItems?: Array<{ label: string; onClick: () => void }>;
   debounceMs?: number;
   /** Cap on items for non-paginated `search`. Ignored when search returns `{ items, hasMore }`. */
   maxSuggestions?: number;
@@ -112,6 +121,7 @@ export function LookupField<T>({
   placeholder,
   disabled,
   onCreateNew,
+  createMenuItems,
   debounceMs = 250,
   maxSuggestions = 50,
   className,
@@ -565,7 +575,28 @@ export function LookupField<T>({
       >
         <Search className="h-4 w-4" />
       </button>
-      {onCreateNew ? (
+      {createMenuItems && createMenuItems.length > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Thêm mới"
+              disabled={disabled}
+              onClick={() => setOpen(false)}
+              className="-ml-px flex items-center justify-center rounded-r-md border border-input bg-background px-2 text-primary hover:bg-accent disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {createMenuItems.map((item) => (
+              <DropdownMenuItem key={item.label} onClick={item.onClick}>
+                {item.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : onCreateNew ? (
         <button
           type="button"
           aria-label="Thêm mới"

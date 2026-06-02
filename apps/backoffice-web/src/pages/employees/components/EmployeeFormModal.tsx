@@ -2,7 +2,7 @@ import type { UserDetail } from "@erp/shared-interfaces";
 import { DocumentType } from "@erp/shared-interfaces";
 import { AppModal, Button, cn } from "@erp/ui";
 import { Loader2, Plus, RefreshCw, Save, X } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../hooks/document-numbering";
 import { getIamErrorMessage } from "../../../hooks/iam";
@@ -105,29 +105,22 @@ export function EmployeeFormModal({
   const { mutateAsync: generateDocumentNumber, isPending: isGeneratingCode } =
     useGenerateDocumentNumber();
 
+  const docNoRequestedRef = useRef(false);
   useEffect(() => {
-    if (!open || mode !== "create") return;
+    if (!open) {
+      docNoRequestedRef.current = false;
+      return;
+    }
+    if (mode !== "create" || docNoRequestedRef.current) return;
+    docNoRequestedRef.current = true;
 
-    let cancelled = false;
     void generateDocumentNumber({ documentType: DocumentType.EMPLOYEE })
       .then((code) => {
-        if (cancelled) return;
-        setDraft((current) => ({
-          ...current,
-          basic: { ...current.basic, code },
-        }));
+        setDraft((current) => ({ ...current, basic: { ...current.basic, code } }));
       })
       .catch((err) => {
-        if (cancelled) return;
-        toast.error(
-          getUserFacingApiErrorMessage(err) ||
-            "Không sinh được mã. Vui lòng nhập thủ công.",
-        );
+        toast.error(getUserFacingApiErrorMessage(err) || "Không sinh được mã. Vui lòng nhập thủ công.");
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [open, mode, generateDocumentNumber, setDraft]);
 
   const tabs = useMemo<TabItem<EmployeeFormTabEnum>[]>(

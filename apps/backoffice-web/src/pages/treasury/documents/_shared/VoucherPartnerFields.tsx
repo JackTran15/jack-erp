@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { FormField, Input } from "@erp/ui";
+import { PARTNER_LOOKUP_OPTIONS } from "./voucher-partner.constants";
 import { LookupField } from "../../../../components/forms/LookupField";
 import type { LookupSearchResult } from "../../../../components/forms/LookupField";
 import { READONLY_INPUT_CLASS } from "../../ledger-cash/ledger-cash.constants";
@@ -34,6 +35,7 @@ interface Props {
   onPartnerLookupChange: (code: string) => void;
   onPartnerClear: () => void;
   onOpenSearchDialog: () => void;
+  onCreateNew?: (kind: PartnerLookupType) => void;
 }
 
 const PARTNER_LOOKUP_COLUMNS = [
@@ -74,9 +76,21 @@ export function VoucherPartnerFields({
   onPartnerLookupChange,
   onPartnerClear,
   onOpenSearchDialog,
+  onCreateNew,
 }: Props) {
   const searchPartners = usePartnerSearch();
   const kindLabel = partnerKind ? PARTNER_LOOKUP_LABEL[partnerKind] : "";
+
+  const createMenuItems = useMemo(
+    () =>
+      onCreateNew
+        ? PARTNER_LOOKUP_OPTIONS.map((opt) => ({
+            label: opt.label,
+            onClick: () => onCreateNew(opt.value),
+          }))
+        : undefined,
+    [onCreateNew],
+  );
   const inlineSearchKind = partnerId
     ? (partnerKind ?? PartnerLookupType.ALL)
     : PartnerLookupType.ALL;
@@ -180,6 +194,7 @@ export function VoucherPartnerFields({
           portalToBody
           dropdownMinWidth={520}
           onSearchButtonClick={onOpenSearchDialog}
+          createMenuItems={createMenuItems}
         />
         <Input
           value={partnerName}
