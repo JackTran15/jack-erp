@@ -1,7 +1,7 @@
 import type { UserDetail } from "@erp/shared-interfaces";
 import { DocumentType } from "@erp/shared-interfaces";
 import { AppModal, Button, cn } from "@erp/ui";
-import { CircleHelp, Loader2, Plus, RefreshCw, Save, X } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useGenerateDocumentNumber } from "../../../hooks/document-numbering";
@@ -9,6 +9,8 @@ import { getIamErrorMessage } from "../../../hooks/iam";
 import { getUserFacingApiErrorMessage } from "../../../lib/user-facing-api-error";
 import type { EmployeeFormDraft, EmployeeFormMode } from "../employee.types";
 import { validateEmployeeDraft } from "../employee.validation";
+import { HelpButton } from "../../../components/HelpButton";
+import { Tabs, type TabItem } from "../../../components/tabs";
 import { EmployeeAccessTimeTab } from "./EmployeeAccessTimeTab";
 import { EmployeeBasicInfoTab } from "./EmployeeBasicInfoTab";
 import { EmployeeContactFormTab } from "./EmployeeContactFormTab";
@@ -128,8 +130,12 @@ export function EmployeeFormModal({
     };
   }, [open, mode, generateDocumentNumber, setDraft]);
 
-  const tabs = useMemo<EmployeeFormTabEnum[]>(
-    () => Object.values(EmployeeFormTabEnum),
+  const tabs = useMemo<TabItem<EmployeeFormTabEnum>[]>(
+    () =>
+      Object.values(EmployeeFormTabEnum).map((id) => ({
+        id,
+        label: EMPLOYEE_FORM_TAB_LABELS[id],
+      })),
     [],
   );
 
@@ -193,27 +199,7 @@ export function EmployeeFormModal({
         isLoadingDetail && "pointer-events-none select-none",
       )}
     >
-      <nav
-        aria-label="Tab biểu mẫu nhân viên"
-        className="flex shrink-0 gap-4 overflow-x-auto border-b text-sm"
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            tabIndex={isLoadingDetail ? -1 : undefined}
-            className={cn(
-              "whitespace-nowrap border-b-2 py-2 font-medium transition-colors",
-              activeTab === tab
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => setActiveTab(tab)}
-          >
-            {EMPLOYEE_FORM_TAB_LABELS[tab]}
-          </button>
-        ))}
-      </nav>
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
       <div className="min-h-0 flex-1 overflow-y-auto py-0">
         {formTabPanels[activeTab]}
       </div>
@@ -232,14 +218,7 @@ export function EmployeeFormModal({
       defaultHeight={750}
       footer={
         <div className="flex w-full items-center justify-between gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-            onClick={() => toast.info("Tài liệu trợ giúp sẽ được bổ sung sau.")}
-          >
-            <CircleHelp className="h-4 w-4" />
-            Trợ giúp
-          </button>
+          <HelpButton />
           <div className="flex items-center gap-2">
             <Button type="button" onClick={handleSave} disabled={!formReady}>
               <Save className="mr-1 h-4 w-4" />

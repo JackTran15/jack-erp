@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   IAM_PERMISSION_KEYS,
   type RoleSummary,
@@ -11,7 +9,9 @@ import {
   PageToolbar,
   type ToolbarItem,
 } from "@erp/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   BaseDataTable,
@@ -19,13 +19,12 @@ import {
 } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import {
-  applyColumnFilter,
   DEFAULT_COLUMN_FILTER_MODE,
+  applyColumnFilter,
   toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../components/table/pagination.dto";
-import { hasPermission } from "../../lib/permissions";
 import {
   emptyRoleDraft,
   getIamErrorMessage,
@@ -40,10 +39,11 @@ import {
   useSyncRoleUsers,
   useUpdateRole,
 } from "../../hooks/iam";
+import type { RoleFormDraft } from "../../lib/iam";
+import { hasPermission } from "../../lib/permissions";
 import { RoleDetailPanel } from "./components/RoleDetailPanel";
 import { RoleEditModal, type RoleEditMode } from "./components/RoleEditModal";
 import { RoleEmployeePickerModal } from "./components/RoleEmployeePickerModal";
-import type { RoleFormDraft } from "../../lib/iam";
 
 const FILTER_KEYS = ["name", "description"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -334,16 +334,10 @@ export function RoleManagementPage() {
   }
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <DocumentListShell
+        toolbar={<PageToolbar items={toolbarItems} tone="primary" />}
         title="Quản lý vai trò"
-        toolbar={
-          <PageToolbar
-            items={toolbarItems}
-            tone="primary"
-            className="rounded-none"
-          />
-        }
         detailPanel={
           <RoleDetailPanel
             role={selectedRole}
@@ -430,6 +424,6 @@ export function RoleManagementPage() {
           onConfirm={() => void handleDeleteRole()}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -298,6 +298,7 @@ export function InventoryItemCreateForm({
 
     const baseSku = String(values.code ?? "");
     const baseName = String(values.name ?? "").trim();
+    const categoryName = String(values.categoryName ?? "").trim();
     const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
 
     setVariantRows((prev) => {
@@ -311,7 +312,8 @@ export function InventoryItemCreateForm({
         // Name, unit and SKU always track the product (name/unit/code) — they
         // re-derive on every change rather than being kept per-row.
         const label = [color, size].filter(Boolean).join("/");
-        const variantName = baseName ? `${baseName} (${label})` : `(${label})`;
+        const fullName = [categoryName, baseName].filter(Boolean).join(" ");
+        const variantName = fullName ? `${fullName} (${label})` : `(${label})`;
         const sku = autoVariantSku(baseSku, color, size);
         const existing = byKey.get(key);
         if (existing) {
@@ -361,6 +363,7 @@ export function InventoryItemCreateForm({
     values.code,
     values.unit,
     values.name,
+    values.categoryName,
     savedVariantsByKey,
   ]);
 

@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@erp/ui";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -8,6 +8,7 @@ import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
+import { PageHeader } from "../layout/PageHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
@@ -161,31 +162,10 @@ export function CrudEditPage() {
   return (
     <AdminPageShell>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <nav
-            aria-label="Điều hướng trang"
-            className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
-          >
-            {breadcrumbs.map((crumb, index) => {
-              const isLast = index === breadcrumbs.length - 1;
-              const href = crumb.to;
-              const showLink = Boolean(href) && !isLast;
-              return (
-                <span key={`${crumb.label}-${index}`} className="flex items-center gap-1">
-                  {index > 0 ? <span>/</span> : null}
-                  {showLink && href ? (
-                    <Link className="hover:text-foreground hover:underline" to={href}>
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className={isLast ? "font-semibold text-foreground" : ""}>{crumb.label}</span>
-                  )}
-                </span>
-              );
-            })}
-          </nav>
-          <h1 className="mt-1 text-2xl font-semibold">Sửa {config.displayName}</h1>
-        </div>
+        <PageHeader
+          title={`Sửa ${config.displayName}`}
+          breadcrumbs={breadcrumbs}
+        />
         {entityKey !== "inventory-items" && (
           <div className="flex shrink-0 gap-2">
             <Button type="button" variant="outline" onClick={() => navigate(`/admin/${entityKey}/${id}`)}>
