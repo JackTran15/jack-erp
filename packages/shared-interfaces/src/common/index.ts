@@ -15,7 +15,11 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   code: string;
   message: string;
-  details?: Record<string, unknown>;
+  statusCode: number;
+  timestamp: string;
+  path: string;
+  requestId: string;
+  details?: unknown;
 }
 
 export interface IdempotencyHeaders {

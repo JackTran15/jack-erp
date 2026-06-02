@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { InventoryItemCategoryCrudService } from './item-category-crud.service';
 import { ItemCategoryEntity } from './item-category.entity';
 import {
@@ -115,6 +115,49 @@ describe('InventoryItemCategoryCrudService', () => {
       await service.create({ name: 'NoComm' } as any, actor);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
+
+    it('throws a Vietnamese conflict message when the category name already exists', async () => {
+      const error = new QueryFailedError('', [], {
+        code: '23505',
+        constraint: 'UQ_inventory_item_categories_org_name',
+      } as any);
+      repo.save.mockRejectedValue(error);
+
+      const promise = service.create({ name: 'Giày' } as any, actor);
+
+      await expect(promise).rejects.toThrow(ConflictException);
+      await expect(promise).rejects.toThrow('Tên nhóm hàng đã tồn tại.');
+      await expect(promise).rejects.toMatchObject({
+        response: {
+          code: 'PRODUCT_GROUP_NAME_CONFLICT',
+          message: 'Tên nhóm hàng đã tồn tại.',
+          details: [{ field: 'name', reason: 'ALREADY_EXISTS' }],
+        },
+      });
+    });
+
+    it('uses the generic conflict fallback for other unique violations', async () => {
+      const error = new QueryFailedError('', [], {
+        code: '23505',
+        constraint: 'UQ_inventory_item_categories_org_code',
+      } as any);
+      repo.save.mockRejectedValue(error);
+
+      const promise = service.create({ name: 'Giày' } as any, actor);
+
+      await expect(promise).rejects.toThrow(ConflictException);
+      await expect(promise).rejects.toThrow(
+        'A record with the same unique code already exists in this organization',
+      );
+    });
+
+    it('rethrows non-unique database errors', async () => {
+      repo.save.mockRejectedValue(new Error('DB connection lost'));
+
+      await expect(
+        service.create({ name: 'Giày' } as any, actor),
+      ).rejects.toThrow('DB connection lost');
+    });
   });
 
   describe('update', () => {
@@ -137,6 +180,36 @@ describe('InventoryItemCategoryCrudService', () => {
       const savedRows = mockManager.save.mock.calls[0][1];
       expect(savedRows).toHaveLength(1);
       expect(savedRows[0]).toMatchObject({ positionName: 'CSKH', method: CommissionMethod.PERCENT, rate: 3 });
+    });
+
+    it('does not save response-only commission rows on the category entity', async () => {
+      commissionRepo.find.mockResolvedValue([{ id: 'cm-1', categoryId: 'cat-1' }]);
+
+      await service.update('cat-1', { name: 'Giày dép' } as any, actor);
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.not.objectContaining({ commissions: expect.anything() }),
+      );
+    });
+
+    it('throws a Vietnamese conflict message when renamed to an existing category name', async () => {
+      const error = new QueryFailedError('', [], {
+        code: '23505',
+        constraint: 'UQ_inventory_item_categories_org_name',
+      } as any);
+      repo.save.mockRejectedValue(error);
+
+      const promise = service.update('cat-1', { name: 'Dép' } as any, actor);
+
+      await expect(promise).rejects.toThrow(ConflictException);
+      await expect(promise).rejects.toThrow('Tên nhóm hàng đã tồn tại.');
+      await expect(promise).rejects.toMatchObject({
+        response: {
+          code: 'PRODUCT_GROUP_NAME_CONFLICT',
+          message: 'Tên nhóm hàng đã tồn tại.',
+          details: [{ field: 'name', reason: 'ALREADY_EXISTS' }],
+        },
+      });
     });
   });
 

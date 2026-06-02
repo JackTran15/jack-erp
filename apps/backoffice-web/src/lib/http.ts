@@ -3,8 +3,12 @@ import { apiClient } from "./api-axios";
 
 export interface ApiError {
   status: number;
+  statusCode?: number;
   code: string;
   message: string;
+  timestamp?: string;
+  path?: string;
+  requestId?: string;
   details?: unknown;
 }
 
@@ -15,14 +19,57 @@ export class HttpError extends Error {
   }
 }
 
+function statusFromApiBody(body: Record<string, unknown>, fallback: number): number {
+  const fromStatusCode = body.statusCode;
+  if (typeof fromStatusCode === "number" && Number.isFinite(fromStatusCode)) {
+    return fromStatusCode;
+  }
+  const fromStatus = body.status;
+  if (typeof fromStatus === "number" && Number.isFinite(fromStatus)) {
+    return fromStatus;
+  }
+  const details = body.details;
+  if (details && typeof details === "object" && !Array.isArray(details)) {
+    const fromDetails = (details as Record<string, unknown>).statusCode;
+    if (typeof fromDetails === "number" && Number.isFinite(fromDetails)) {
+      return fromDetails;
+    }
+  }
+  return fallback;
+}
+
+function stringFromBody(
+  body: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = body[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 function toHttpError(err: unknown): never {
   if (err instanceof AxiosError && err.response) {
     const body = err.response.data;
     const apiErr: ApiError =
       body && typeof body === "object" && "message" in body
-        ? (body as ApiError)
+        ? {
+            status: statusFromApiBody(
+              body as Record<string, unknown>,
+              err.response.status,
+            ),
+            statusCode: statusFromApiBody(
+              body as Record<string, unknown>,
+              err.response.status,
+            ),
+            code: stringFromBody(body as Record<string, unknown>, "code") ?? "UNKNOWN",
+            message: String((body as Record<string, unknown>).message),
+            timestamp: stringFromBody(body as Record<string, unknown>, "timestamp"),
+            path: stringFromBody(body as Record<string, unknown>, "path"),
+            requestId: stringFromBody(body as Record<string, unknown>, "requestId"),
+            details: (body as Record<string, unknown>).details,
+          }
         : {
             status: err.response.status,
+            statusCode: err.response.status,
             code: "UNKNOWN",
             message: err.response.statusText || `HTTP ${err.response.status}`,
           };

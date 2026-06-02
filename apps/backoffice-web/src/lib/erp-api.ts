@@ -13,6 +13,13 @@ function httpStatusFromErrorBody(e: Record<string, unknown>): number {
   if (typeof fromStatus === "number" && Number.isFinite(fromStatus)) {
     return fromStatus;
   }
+  const details = e.details;
+  if (details && typeof details === "object") {
+    const fromDetails = (details as Record<string, unknown>).statusCode;
+    if (typeof fromDetails === "number" && Number.isFinite(fromDetails)) {
+      return fromDetails;
+    }
+  }
   return 0;
 }
 
@@ -21,10 +28,15 @@ function throwOnErpError(r: { error: unknown }): void {
   const err = r.error;
   if (err && typeof err === "object" && "message" in (err as object)) {
     const e = err as Record<string, unknown>;
+    const status = httpStatusFromErrorBody(e);
     throw new HttpError({
-      status: httpStatusFromErrorBody(e),
+      status,
+      statusCode: status,
       code: String(e.code ?? "UNKNOWN"),
       message: String(e.message ?? formatClientError(err)),
+      timestamp: typeof e.timestamp === "string" ? e.timestamp : undefined,
+      path: typeof e.path === "string" ? e.path : undefined,
+      requestId: typeof e.requestId === "string" ? e.requestId : undefined,
       details: e.details,
     } as ApiError);
   }

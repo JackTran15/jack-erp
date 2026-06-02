@@ -23,6 +23,12 @@ import {
 
 export type CrudOperation = 'create' | 'update' | 'delete';
 
+export interface UniqueViolationErrorBody {
+  code?: string;
+  message: string;
+  details?: unknown;
+}
+
 export abstract class BaseCrudService<
   TEntity extends BaseEntity,
   TCreate extends Record<string, any>,
@@ -88,16 +94,17 @@ export abstract class BaseCrudService<
       createdBy: actor.userId,
     } as any);
 
-    const saved = await this.repository.save(entity).catch((err) => {
-      if (err instanceof QueryFailedError &&
-        (((err as QueryFailedError & { code?: string }).code) ??
-          (err as any).driverError?.code) === '23505') {
-        throw new ConflictException(
-          'A record with the same unique code already exists in this organization',
-        );
-      }
-      throw err;
-    }) as unknown as TEntity;
+    let saved: TEntity;
+    try {
+      saved = (await this.repository.save(entity)) as unknown as TEntity;
+    } catch (err) {
+      this.mapPersistenceError(
+        'create',
+        prepared as Record<string, any>,
+        actor,
+        err,
+      );
+    }
     this.logger.log(`Created ${this.entityConfig.entityKey} id=${(saved as any).id}`);
     await this.afterCreate(saved, actor);
     return saved;
@@ -108,7 +115,7 @@ export abstract class BaseCrudService<
     payload: TUpdate,
     actor: ActorContext,
   ): Promise<TEntity> {
-    const existing = await this.getById(id, actor);
+    const existing = await this.getExistingForMutation(id, actor);
     await this.validateBusinessRules('update', payload, actor);
     const prepared = await this.beforeUpdate(id, payload, actor);
 
@@ -126,16 +133,17 @@ export abstract class BaseCrudService<
     }
 
     const merged = this.repository.merge(existing, prepared as any);
-    const saved = await this.repository.save(merged).catch((err) => {
-      if (err instanceof QueryFailedError &&
-        (((err as QueryFailedError & { code?: string }).code) ??
-          (err as any).driverError?.code) === '23505') {
-        throw new ConflictException(
-          'A record with the same unique code already exists in this organization',
-        );
-      }
-      throw err;
-    });
+    let saved: TEntity;
+    try {
+      saved = await this.repository.save(merged);
+    } catch (err) {
+      this.mapPersistenceError(
+        'update',
+        prepared as Record<string, any>,
+        actor,
+        err,
+      );
+    }
     this.logger.log(`Updated ${this.entityConfig.entityKey} id=${id}`);
     await this.afterUpdate(saved, actor);
     return saved;
@@ -223,6 +231,15 @@ export abstract class BaseCrudService<
     _actor: ActorContext,
   ): Promise<void> {}
 
+  protected getUniqueViolationMessage(
+    _operation: CrudOperation,
+    _payload: Record<string, any>,
+    _actor: ActorContext,
+    _err: QueryFailedError,
+  ): string | UniqueViolationErrorBody | null {
+    return 'A record with the same unique code already exists in this organization';
+  }
+
   /** Optional joins or selects before scoping/search (e.g. eager relations for list). */
   protected configureListQuery(
     _qb: SelectQueryBuilder<TEntity>,
@@ -237,6 +254,20 @@ export abstract class BaseCrudService<
   /** Relations to load in getById; override when configureListQuery adds joins. */
   protected getByIdRelations(): string[] {
     return [];
+  }
+
+  protected async getExistingForMutation(
+    id: string,
+    actor: ActorContext,
+  ): Promise<TEntity> {
+    const entity = await this.repository.findOne({
+      where: this.buildScopedWhere(id, actor),
+      relations: this.getByIdRelations(),
+    });
+    if (!entity) {
+      throw new NotFoundException(`Record ${id} not found`);
+    }
+    return entity;
   }
 
   // ---------------------------------------------------------------------------
@@ -324,5 +355,32 @@ export abstract class BaseCrudService<
       where.branchId = actor.branchId;
     }
     return where as FindOptionsWhere<TEntity>;
+  }
+
+  private mapPersistenceError(
+    operation: CrudOperation,
+    payload: Record<string, any>,
+    actor: ActorContext,
+    err: unknown,
+  ): never {
+    if (err instanceof QueryFailedError && this.isUniqueViolation(err)) {
+      const message = this.getUniqueViolationMessage(
+        operation,
+        payload,
+        actor,
+        err,
+      );
+      if (message) {
+        throw new ConflictException(message);
+      }
+    }
+    throw err;
+  }
+
+  private isUniqueViolation(err: QueryFailedError): boolean {
+    return (
+      ((err as QueryFailedError & { code?: string }).code ??
+        (err as any).driverError?.code) === '23505'
+    );
   }
 }

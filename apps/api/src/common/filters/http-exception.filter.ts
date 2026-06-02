@@ -9,6 +9,13 @@ import {
 import { Request, Response } from 'express';
 import type { ApiError } from '@erp/shared-interfaces';
 
+type ExceptionResponseBody = {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  error?: unknown;
+};
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -27,24 +34,42 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
+      const responseBody =
+        typeof exceptionResponse === 'object' && exceptionResponse !== null
+          ? (exceptionResponse as ExceptionResponseBody)
+          : {};
+      const message =
+        typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : Array.isArray(responseBody.message)
+            ? responseBody.message.map(String).join(', ')
+            : typeof responseBody.message === 'string'
+              ? responseBody.message
+              : exception.message;
 
       body = {
-        code: `HTTP_${status}`,
-        message:
-          typeof exceptionResponse === 'string'
-            ? exceptionResponse
-            : (exceptionResponse as any).message ?? exception.message,
-        details: {
-          requestId,
-          ...(typeof exceptionResponse === 'object' ? exceptionResponse : {}),
-        },
+        code:
+          typeof responseBody.code === 'string'
+            ? responseBody.code
+            : `HTTP_${status}`,
+        message,
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.originalUrl ?? request.url,
+        requestId,
+        details:
+          responseBody.details ??
+          (typeof exceptionResponse === 'object' ? exceptionResponse : undefined),
       };
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       body = {
         code: 'INTERNAL_ERROR',
         message: 'An unexpected error occurred',
-        details: { requestId },
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.originalUrl ?? request.url,
+        requestId,
       };
     }
 

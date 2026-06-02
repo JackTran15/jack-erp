@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import {
   CrudEntityConfig,
   DeletionPolicy,
   ScopingPolicy,
 } from '@erp/shared-interfaces';
-import { BaseCrudService } from '../../crud/base-crud.service';
+import {
+  BaseCrudService,
+  type CrudOperation,
+  type UniqueViolationErrorBody,
+} from '../../crud/base-crud.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import {
   ItemCategoryEntity,
@@ -119,6 +123,27 @@ export class InventoryItemCategoryCrudService extends BaseCrudService<
       return cleanCategoryPayload({ ...payload, name });
     }
     return cleanCategoryPayload(payload);
+  }
+
+  protected override getUniqueViolationMessage(
+    _operation: CrudOperation,
+    _payload: Record<string, any>,
+    _actor: ActorContext,
+    err: QueryFailedError,
+  ): string | UniqueViolationErrorBody | null {
+    const constraint = (err as QueryFailedError & {
+      driverError?: { constraint?: string };
+    }).driverError?.constraint;
+
+    if (constraint === 'UQ_inventory_item_categories_org_name') {
+      return {
+        code: 'PRODUCT_GROUP_NAME_CONFLICT',
+        message: 'Tên nhóm hàng đã tồn tại.',
+        details: [{ field: 'name', reason: 'ALREADY_EXISTS' }],
+      };
+    }
+
+    return super.getUniqueViolationMessage(_operation, _payload, _actor, err);
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
