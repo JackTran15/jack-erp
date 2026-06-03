@@ -146,4 +146,21 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
       expect.objectContaining({ brand: 'Nike', brandId: 'brand-x' }),
     );
   });
+
+  it('treats colors/sizes as virtual fields when updating a real item id', async () => {
+    await service.update(
+      'item-1',
+      { name: 'Renamed', colors: ['Đen'], sizes: ['39'] } as any,
+      actor,
+    );
+
+    expect(repo.merge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ name: 'Renamed' }),
+    );
+    expect(repo.merge).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ colors: expect.anything(), sizes: expect.anything() }),
+    );
+  });
 });

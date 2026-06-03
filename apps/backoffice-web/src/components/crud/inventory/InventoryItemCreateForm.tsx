@@ -338,6 +338,8 @@ export function InventoryItemCreateForm({
               : sku;
           next.push({
             id: `variant-${key}`,
+            itemId:
+              saved && typeof saved.id === "string" ? String(saved.id) : undefined,
             color,
             size,
             name: variantName,
@@ -373,6 +375,7 @@ export function InventoryItemCreateForm({
       variants:
         variantRows.length > 0
           ? variantRows.map((r) => ({
+              itemId: r.itemId,
               name: r.name,
               color: r.color || undefined,
               size: r.size || undefined,
@@ -959,12 +962,26 @@ export function InventoryItemCreateForm({
   const additionalTab = (
     <section className="rounded-md border border-border bg-background p-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+        <div className="grid gap-3 md:col-span-2 md:grid-cols-4">
+          <FormField
+            label="Trọng lượng (g)"
+            htmlFor="extra-net-weight"
+            layout="horizontal"
+            labelWidth="7rem"
+          >
+            <Input
+              id="extra-net-weight"
+              type="number"
+              inputMode="decimal"
+              value={String(values.weightGram ?? "")}
+              onChange={numberFieldHandler("weightGram")}
+            />
+          </FormField>
           <FormField
             label="Dài (cm)"
             htmlFor="extra-net-length"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-length"
@@ -978,7 +995,7 @@ export function InventoryItemCreateForm({
             label="Rộng (cm)"
             htmlFor="extra-net-width"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-width"
@@ -992,7 +1009,7 @@ export function InventoryItemCreateForm({
             label="Cao (cm)"
             htmlFor="extra-net-height"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-height"

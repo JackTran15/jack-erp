@@ -31,11 +31,21 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
 
   const qbNull = () => {
     const qb: Record<string, jest.Mock> = {};
-    ['where', 'andWhere', 'select', 'innerJoin', 'leftJoinAndSelect'].forEach(
+    [
+      'where',
+      'andWhere',
+      'select',
+      'innerJoin',
+      'leftJoinAndSelect',
+      'groupBy',
+      'having',
+      'distinct',
+    ].forEach(
       (m) => (qb[m] = jest.fn().mockReturnValue(qb)),
     );
     qb.getOne = jest.fn().mockResolvedValue(null);
     qb.getRawMany = jest.fn().mockResolvedValue([]);
+    qb.getCount = jest.fn().mockResolvedValue(1);
     return qb;
   };
 
@@ -52,14 +62,21 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
     itemRepo = {
       create: jest.fn().mockImplementation((d) => ({ ...d })),
       save: idGen('item'),
+      update: jest.fn().mockResolvedValue({ affected: 2 }),
+      createQueryBuilder: jest.fn().mockImplementation(() => qbNull()),
     };
     productRepo = {
       create: jest.fn().mockImplementation((d) => ({ ...d })),
       save: jest.fn().mockImplementation((e) => Promise.resolve({ ...e, id: 'prod-1' })),
+      findOne: jest
+        .fn()
+        .mockResolvedValue({ id: 'prod-1', code: 'P1', name: 'Prod', isActive: true }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     barcodeRepo = {
       create: jest.fn().mockImplementation((d) => ({ ...d })),
       save: idGen('bc'),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const attrRepo = () => ({
       createQueryBuilder: jest.fn().mockImplementation(() => qbNull()),
@@ -87,7 +104,7 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         },
         {
           provide: getRepositoryToken(BrandEntity),
-          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+          useValue: { findOne: jest.fn().mockResolvedValue({ id: 'brand-1', name: 'Nike' }) },
         },
         {
           provide: getRepositoryToken(LocationEntity),
@@ -138,5 +155,164 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
     const savedBarcodes = barcodeRepo.save.mock.calls.map((c) => c[0].code);
     expect(savedBarcodes).toContain('BC-1');
     expect(savedBarcodes).toContain('P1-DEN-39');
+  });
+
+  it('copies shared item fields to every created variant item', async () => {
+    await service.create(
+      {
+        code: 'P2',
+        name: 'Prod 2',
+        unit: 'Đôi',
+        categoryId: 'cat-1',
+        brand: 'Nike',
+        brandId: 'brand-1',
+        itemType: 'Giày',
+        purchasePrice: 100,
+        sellingPrice: 300,
+        isPosVisible: false,
+        weightGram: 250,
+        lengthCm: 30,
+        widthCm: 12,
+        heightCm: 10,
+        manufactureYear: 2026,
+        composition: 'Da',
+        packageWeightGram: 350,
+        packageLengthCm: 35,
+        packageWidthCm: 18,
+        packageHeightCm: 14,
+        oddSize: '33-35',
+        isGoldSilver: true,
+        manageBarcodePerUnit: true,
+        colors: ['Den'],
+        sizes: ['38'],
+      },
+      actor,
+    );
+
+    expect(itemRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'P2-38-Den',
+        categoryId: 'cat-1',
+        brand: 'Nike',
+        brandId: 'brand-1',
+        itemType: 'Giày',
+        isPosVisible: false,
+        weightGram: 250,
+        lengthCm: 30,
+        widthCm: 12,
+        heightCm: 10,
+        manufactureYear: 2026,
+        composition: 'Da',
+        packageWeightGram: 350,
+        packageLengthCm: 35,
+        packageWidthCm: 18,
+        packageHeightCm: 14,
+        oddSize: '33-35',
+        isGoldSilver: true,
+        manageBarcodePerUnit: true,
+      }),
+    );
+  });
+
+  it('updates shared item fields on existing product variants', async () => {
+    await service.update(
+      'prod-1',
+      {
+        code: 'P1',
+        name: 'Prod renamed',
+        _productId: 'prod-1',
+        unit: 'Đôi',
+        categoryId: 'cat-2',
+        brand: 'Nike',
+        brandId: 'brand-2',
+        itemType: 'Giày',
+        purchasePrice: 120,
+        sellingPrice: 320,
+        isPosVisible: false,
+        isActive: false,
+        weightGram: 260,
+        lengthCm: 31,
+        widthCm: 13,
+        heightCm: 11,
+        manufactureYear: 2025,
+        composition: 'Vải',
+        packageWeightGram: 360,
+        packageLengthCm: 36,
+        packageWidthCm: 19,
+        packageHeightCm: 15,
+        oddSize: '34-36',
+        isGoldSilver: true,
+        manageBarcodePerUnit: true,
+        colors: ['Den'],
+        sizes: ['38'],
+      },
+      actor,
+    );
+
+    expect(itemRepo.update).toHaveBeenCalledWith(
+      { productId: 'prod-1', organizationId: 'org-1' },
+      expect.objectContaining({
+        unit: 'Đôi',
+        categoryId: 'cat-2',
+        brand: 'Nike',
+        brandId: 'brand-2',
+        itemType: 'Giày',
+        purchasePrice: 120,
+        sellingPrice: 320,
+        isPosVisible: false,
+        isActive: false,
+        weightGram: 260,
+        lengthCm: 31,
+        widthCm: 13,
+        heightCm: 11,
+        manufactureYear: 2025,
+        composition: 'Vải',
+        packageWeightGram: 360,
+        packageLengthCm: 36,
+        packageWidthCm: 19,
+        packageHeightCm: 15,
+        oddSize: '34-36',
+        isGoldSilver: true,
+        manageBarcodePerUnit: true,
+      }),
+    );
+  });
+
+  it('updates an existing variant row from variants payload by itemId', async () => {
+    await service.update(
+      'prod-1',
+      {
+        _productId: 'prod-1',
+        colors: ['Den'],
+        sizes: ['38'],
+        variants: [
+          {
+            itemId: 'item-1',
+            name: 'Giày đổi tên',
+            unit: 'Đôi',
+            sku: 'SKU-NEW',
+            barcode: 'BC-NEW',
+            purchasePrice: 155,
+            sellPrice: 255,
+          },
+        ],
+      },
+      actor,
+    );
+
+    expect(itemRepo.update).toHaveBeenCalledWith(
+      { id: 'item-1', organizationId: 'org-1' },
+      expect.objectContaining({
+        name: 'Giày đổi tên',
+        unit: 'Đôi',
+        code: 'SKU-NEW',
+        purchasePrice: 155,
+        sellingPrice: 255,
+      }),
+    );
+    expect(barcodeRepo.update).toHaveBeenCalledWith(
+      { itemId: 'item-1', organizationId: 'org-1' },
+      { code: 'BC-NEW' },
+    );
   });
 });
