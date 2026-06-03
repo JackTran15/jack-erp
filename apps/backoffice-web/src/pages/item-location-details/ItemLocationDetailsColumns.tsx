@@ -1,5 +1,6 @@
 import type { TableColumn } from "../../components/table/BaseDataTable";
 import type { StockBalanceRow } from "../../api/stock-balances";
+import type { StockByLocationItem } from "@erp/shared-interfaces";
 
 export function buildItemLocationColumns(
   rowIndexMap: Map<string, number>,
@@ -50,13 +51,7 @@ export function buildItemLocationColumns(
       filterKind: "symbol",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      render: (r) => (
-        <span
-          className={r.belowMin ? "text-destructive font-medium" : undefined}
-        >
-          {Number(r.quantity).toLocaleString("vi-VN")}
-        </span>
-      ),
+      render: (r) => Number(r.quantity).toLocaleString("vi-VN"),
     },
     {
       key: "categoryName",
@@ -79,24 +74,68 @@ export function buildItemLocationColumns(
       filterKind: "symbol",
       render: (r) => r.location.storageName,
     },
+  ];
+}
+
+export function buildLocationStockItemColumns(
+  rowIndexMap: Map<string, number>,
+): TableColumn<StockByLocationItem>[] {
+  return [
     {
-      key: "minMax",
-      label: "Min / Max",
+      key: "index",
+      label: "STT",
+      width: 60,
+      headerClassName: "text-center",
+      className: "text-center text-muted-foreground tabular-nums",
+      filterKind: "none",
+      render: (r) => rowIndexMap.get(r.itemId) ?? "",
+    },
+    {
+      key: "itemCode",
+      label: "Mã SKU",
+      width: 150,
+      filterKind: "symbol",
+      className: "font-mono",
+      render: (r) => r.code,
+    },
+    {
+      key: "itemName",
+      label: "Tên hàng hóa",
+      width: 280,
+      filterKind: "symbol",
+      render: (r) => (
+        <span>
+          {r.name}
+          {r.variantLabel ? (
+            <span className="ml-1 text-xs text-muted-foreground">
+              ({r.variantLabel})
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: "quantity",
+      label: "Số lượng",
       width: 110,
       filterKind: "none",
       headerClassName: "text-right",
-      className: "text-right tabular-nums text-muted-foreground",
-      render: (r) => {
-        const min =
-          r.threshold.minQty == null
-            ? "—"
-            : Number(r.threshold.minQty).toLocaleString("vi-VN");
-        const max =
-          r.threshold.maxQty == null
-            ? "—"
-            : Number(r.threshold.maxQty).toLocaleString("vi-VN");
-        return `${min} / ${max}`;
-      },
+      className: "text-right tabular-nums",
+      render: (r) => Number(r.quantity).toLocaleString("vi-VN"),
+    },
+    {
+      key: "categoryName",
+      label: "Nhóm hàng hóa",
+      width: 180,
+      filterKind: "none",
+      render: (r) => r.categoryName ?? "",
+    },
+    {
+      key: "unit",
+      label: "ĐVT",
+      width: 80,
+      filterKind: "none",
+      render: (r) => r.unit,
     },
   ];
 }

@@ -31,7 +31,13 @@ export interface CreateGoodsIssueDto {
   targetBranchId?: string;
   reason?: string; // optional override / legacy
   notes?: string;
-  lines: { itemId: string; quantity: number; unitPrice?: number; notes?: string }[];
+  lines: {
+    itemId: string;
+    locationId?: string;
+    quantity: number;
+    unitPrice?: number;
+    notes?: string;
+  }[];
 }
 
 export interface GoodsIssueQuery extends PaginationQuery {
@@ -103,6 +109,7 @@ export class GoodsIssueService {
       lines: dto.lines.map((l) => {
         const line = new GoodsIssueLineEntity();
         line.itemId = l.itemId;
+        line.locationId = l.locationId ?? dto.locationId;
         line.quantity = l.quantity;
 
         const unitPrice = Number(l.unitPrice ?? 0);
@@ -154,7 +161,7 @@ export class GoodsIssueService {
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = gi.lines.map((line) => ({
         itemId: line.itemId,
-        locationId: gi.locationId,
+        locationId: line.locationId,
         branchId,
         organizationId: gi.organizationId,
         movementType: StockMovementType.GOODS_ISSUE,
@@ -196,7 +203,7 @@ export class GoodsIssueService {
       await this.dataSource.transaction(async () => {
         const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
           itemId: line.itemId,
-          locationId: gi.locationId,
+          locationId: line.locationId,
           branchId,
           organizationId: gi.organizationId,
           movementType: StockMovementType.ADJUSTMENT_INCREASE,

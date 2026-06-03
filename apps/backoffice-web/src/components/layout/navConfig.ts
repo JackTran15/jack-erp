@@ -106,15 +106,12 @@ export const navConfig: NavModule[] = [
     id: "inventory",
     label: "Kho hàng",
     icon: Warehouse,
-    defaultPath: "/inventory-management",
+    defaultPath: "/inventory/purchase-orders",
     flyout: { enabled: true },
     sections: [
       {
         id: "inventory-main",
         children: [
-          { to: "/inventory-management", label: "Quản lý kho", },
-          { to: "/products", label: "Sản phẩm", },
-          { to: "/inventory/storages", label: "Kho lưu trữ", },
           { to: "/inventory/purchase-orders", label: "Nhập kho", },
           { to: "/inventory/goods-issues", label: "Xuất kho", },
           { to: "/inventory/stock-transfers", label: "Chuyển kho", },

@@ -600,6 +600,7 @@ export class StockTakeService {
       const line = new GoodsIssueLineEntity();
       line.goodsIssueId = savedIssue.id;
       line.itemId = n.line.itemId;
+      line.locationId = n.line.locationId ?? headerLocationId;
       line.quantity = Math.abs(n.variance);
       line.unitPrice = '0';
       line.lineTotal = '0.00';

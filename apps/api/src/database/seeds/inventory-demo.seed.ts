@@ -5,9 +5,9 @@
  *   - 2 extra branches (HN, DN) in addition to the seed main HCM branch
  *   - 4 extra storages
  *   - ~12 extra locations (mix of SHELF / RACK / BIN / ZONE)
- *   - 4 extra categories
- *   - 5 extra providers (NCC, delivery partners)
- *   - ~15 extra items spanning categories
+ *   - 5 shoe categories with code, description and business status
+ *   - 5 extra providers (shoe brands + delivery partners)
+ *   - ~15 shoe items with pair unit, brand, purchase/selling prices
  *   - Stock balances with varied scenarios: high stock, low stock (below min),
  *     zero stock, multi-location for the same item
  *   - 3 thresholds (min/max) so "Below min" filter has results
@@ -54,11 +54,12 @@ const D = {
   // Locations (DN)
   locDNA01: '60000000-0000-4000-8000-000000000040',
   locDNB01: '60000000-0000-4000-8000-000000000041',
-  // Categories (in addition to existing Hardware + Giày dép)
-  catApparel: '2d233c45-8ec6-42cf-8a84-df519fced601',
-  catAccessory: '2d233c45-8ec6-42cf-8a84-df519fced602',
-  catBag: '2d233c45-8ec6-42cf-8a84-df519fced603',
-  catFood: '2d233c45-8ec6-42cf-8a84-df519fced604',
+  // Shoe categories
+  catShoes: '2d233c45-8ec6-42cf-8a84-df519fced600',
+  catMenShoes: '2d233c45-8ec6-42cf-8a84-df519fced601',
+  catWomenShoes: '2d233c45-8ec6-42cf-8a84-df519fced602',
+  catSportShoes: '2d233c45-8ec6-42cf-8a84-df519fced603',
+  catKidsShoes: '2d233c45-8ec6-42cf-8a84-df519fced604',
   // Providers (in addition to existing Default Supplier)
   providerABC: '65000000-0000-4000-8000-000000000010',
   providerXYZ: '65000000-0000-4000-8000-000000000011',
@@ -66,21 +67,21 @@ const D = {
   providerGHN: '65000000-0000-4000-8000-000000000020',
   providerGHTK: '65000000-0000-4000-8000-000000000021',
   // Items
-  itemKeyboard: '70000000-0000-4000-8000-000000000010',
-  itemMouse: '70000000-0000-4000-8000-000000000011',
-  itemWebcam: '70000000-0000-4000-8000-000000000012',
-  itemHeadset: '70000000-0000-4000-8000-000000000013',
-  itemRaincoat: '70000000-0000-4000-8000-000000000020',
-  itemThermo: '70000000-0000-4000-8000-000000000021',
-  itemBelt140: '70000000-0000-4000-8000-000000000022',
-  itemBelt1850: '70000000-0000-4000-8000-000000000023',
-  itemTshirtM: '70000000-0000-4000-8000-000000000030',
-  itemTshirtL: '70000000-0000-4000-8000-000000000031',
-  itemPants32: '70000000-0000-4000-8000-000000000032',
-  itemBackpack: '70000000-0000-4000-8000-000000000040',
-  itemHandbag: '70000000-0000-4000-8000-000000000041',
-  itemNoodle: '70000000-0000-4000-8000-000000000050',
-  itemWater: '70000000-0000-4000-8000-000000000051',
+  itemNikeAirForce: '70000000-0000-4000-8000-000000000010',
+  itemNikeCourt: '70000000-0000-4000-8000-000000000011',
+  itemAdidasStanSmith: '70000000-0000-4000-8000-000000000012',
+  itemAdidasRunfalcon: '70000000-0000-4000-8000-000000000013',
+  itemBitisHunter: '70000000-0000-4000-8000-000000000020',
+  itemBitisSandal: '70000000-0000-4000-8000-000000000021',
+  itemVascaraPump: '70000000-0000-4000-8000-000000000022',
+  itemVascaraLoafer: '70000000-0000-4000-8000-000000000023',
+  itemJunoHeel: '70000000-0000-4000-8000-000000000030',
+  itemJunoMaryJane: '70000000-0000-4000-8000-000000000031',
+  itemConverseChuck: '70000000-0000-4000-8000-000000000032',
+  itemPumaSmash: '70000000-0000-4000-8000-000000000040',
+  itemCrocsClassic: '70000000-0000-4000-8000-000000000041',
+  itemKidsSandal: '70000000-0000-4000-8000-000000000050',
+  itemKidsSneaker: '70000000-0000-4000-8000-000000000051',
   // Sample documents
   goodsReceipt1: '90000000-0000-4000-8000-000000000001',
   stockTake1: '90000000-0000-4000-8000-000000000010',
@@ -93,27 +94,75 @@ interface ItemSeed {
   name: string;
   unit: string;
   /** Logical key — resolved to real categoryId at runtime via lookup map. */
-  categoryKey: 'hardware' | 'apparel' | 'accessory' | 'bag' | 'food';
+  categoryKey: 'shoe' | 'men' | 'women' | 'sport' | 'kids';
+  brand: string;
+  itemType: string;
   purchasePrice: number;
   sellingPrice: number;
 }
 
+interface CategorySeed {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+const CATEGORIES: CategorySeed[] = [
+  {
+    id: D.catShoes,
+    code: 'GIAY_DEP',
+    name: 'Giày dép',
+    description: 'Nhóm hàng giày dép và sandal',
+    status: 'ACTIVE',
+  },
+  {
+    id: D.catMenShoes,
+    code: 'GIAY_NAM',
+    name: 'Giày nam',
+    description: 'Các mẫu giày dành cho nam',
+    status: 'ACTIVE',
+  },
+  {
+    id: D.catWomenShoes,
+    code: 'GIAY_NU',
+    name: 'Giày nữ',
+    description: 'Các mẫu giày dành cho nữ',
+    status: 'ACTIVE',
+  },
+  {
+    id: D.catSportShoes,
+    code: 'GIAY_THE_THAO',
+    name: 'Giày thể thao',
+    description: 'Giày sneaker, running và thể thao',
+    status: 'ACTIVE',
+  },
+  {
+    id: D.catKidsShoes,
+    code: 'GIAY_TRE_EM',
+    name: 'Giày trẻ em',
+    description: 'Các mẫu giày dành cho trẻ em',
+    status: 'ACTIVE',
+  },
+];
+
 const ITEMS: ItemSeed[] = [
-  { id: D.itemKeyboard, code: 'KEYB-MECH', name: 'Bàn phím cơ Akko', unit: 'cái', categoryKey: 'hardware', purchasePrice: 1_200_000, sellingPrice: 1_650_000 },
-  { id: D.itemMouse, code: 'MOUSE-WL', name: 'Chuột không dây Logitech M331', unit: 'cái', categoryKey: 'hardware', purchasePrice: 380_000, sellingPrice: 520_000 },
-  { id: D.itemWebcam, code: 'WEBCAM-HD', name: 'Webcam HD 1080p', unit: 'cái', categoryKey: 'hardware', purchasePrice: 750_000, sellingPrice: 990_000 },
-  { id: D.itemHeadset, code: 'HEADSET-USB', name: 'Tai nghe USB Microsoft LX-6000', unit: 'cái', categoryKey: 'hardware', purchasePrice: 850_000, sellingPrice: 1_150_000 },
-  { id: D.itemRaincoat, code: 'AOM-MT', name: 'Áo mưa MT', unit: 'cái', categoryKey: 'apparel', purchasePrice: 85_000, sellingPrice: 145_000 },
-  { id: D.itemTshirtM, code: 'TSHIRT-M', name: 'Áo thun MT size M', unit: 'cái', categoryKey: 'apparel', purchasePrice: 110_000, sellingPrice: 199_000 },
-  { id: D.itemTshirtL, code: 'TSHIRT-L', name: 'Áo thun MT size L', unit: 'cái', categoryKey: 'apparel', purchasePrice: 110_000, sellingPrice: 199_000 },
-  { id: D.itemPants32, code: 'PANTS-32', name: 'Quần jeans MT size 32', unit: 'cái', categoryKey: 'apparel', purchasePrice: 280_000, sellingPrice: 459_000 },
-  { id: D.itemThermo, code: 'BGN-500', name: 'Bình giữ nhiệt 500ml MT', unit: 'cái', categoryKey: 'accessory', purchasePrice: 95_000, sellingPrice: 169_000 },
-  { id: D.itemBelt140, code: 'DD140', name: 'Dây thắt lưng da DD140', unit: 'cái', categoryKey: 'accessory', purchasePrice: 120_000, sellingPrice: 219_000 },
-  { id: D.itemBelt1850, code: 'DD1850', name: 'Dây thắt lưng cao cấp DD1850', unit: 'cái', categoryKey: 'accessory', purchasePrice: 290_000, sellingPrice: 489_000 },
-  { id: D.itemBackpack, code: 'BPK-001', name: 'Ba lô MT đa năng', unit: 'cái', categoryKey: 'bag', purchasePrice: 320_000, sellingPrice: 549_000 },
-  { id: D.itemHandbag, code: 'TX-001', name: 'Túi xách tay MT da bò', unit: 'cái', categoryKey: 'bag', purchasePrice: 850_000, sellingPrice: 1_390_000 },
-  { id: D.itemNoodle, code: 'NOODLE-01', name: 'Mì gói Hảo Hảo', unit: 'gói', categoryKey: 'food', purchasePrice: 3_500, sellingPrice: 5_000 },
-  { id: D.itemWater, code: 'WATER-500', name: 'Nước suối 500ml', unit: 'chai', categoryKey: 'food', purchasePrice: 4_000, sellingPrice: 7_000 },
+  { id: D.itemNikeAirForce, code: 'NIKE-AF1-40-TRG', name: 'Nike Air Force 1 07 trắng size 40', unit: 'Đôi', categoryKey: 'men', brand: 'Nike', itemType: 'Giày nam', purchasePrice: 1_850_000, sellingPrice: 2_690_000 },
+  { id: D.itemNikeCourt, code: 'NIKE-COURT-39-DEN', name: 'Nike Court Vision Low đen size 39', unit: 'Đôi', categoryKey: 'sport', brand: 'Nike', itemType: 'Giày thể thao', purchasePrice: 1_250_000, sellingPrice: 1_890_000 },
+  { id: D.itemAdidasStanSmith, code: 'ADI-STAN-38-TRG', name: 'Adidas Stan Smith trắng size 38', unit: 'Đôi', categoryKey: 'women', brand: 'Adidas', itemType: 'Giày nữ', purchasePrice: 1_600_000, sellingPrice: 2_390_000 },
+  { id: D.itemAdidasRunfalcon, code: 'ADI-RUN-42-XAM', name: 'Adidas Runfalcon xám size 42', unit: 'Đôi', categoryKey: 'sport', brand: 'Adidas', itemType: 'Giày thể thao', purchasePrice: 980_000, sellingPrice: 1_490_000 },
+  { id: D.itemBitisHunter, code: 'BITIS-HUNTER-41-DEN', name: 'Biti’s Hunter Core đen size 41', unit: 'Đôi', categoryKey: 'men', brand: 'Biti’s', itemType: 'Giày nam', purchasePrice: 520_000, sellingPrice: 799_000 },
+  { id: D.itemBitisSandal, code: 'BITIS-SANDAL-37-KEM', name: 'Biti’s sandal nữ kem size 37', unit: 'Đôi', categoryKey: 'women', brand: 'Biti’s', itemType: 'Giày sandal', purchasePrice: 260_000, sellingPrice: 429_000 },
+  { id: D.itemVascaraPump, code: 'VAS-PUMP-36-DEN', name: 'Vascara giày cao gót đen size 36', unit: 'Đôi', categoryKey: 'women', brand: 'Vascara', itemType: 'Giày nữ', purchasePrice: 520_000, sellingPrice: 899_000 },
+  { id: D.itemVascaraLoafer, code: 'VAS-LOAFER-37-NAU', name: 'Vascara loafer nâu size 37', unit: 'Đôi', categoryKey: 'women', brand: 'Vascara', itemType: 'Giày nữ', purchasePrice: 480_000, sellingPrice: 799_000 },
+  { id: D.itemJunoHeel, code: 'JUNO-HEEL-36-KEM', name: 'Juno cao gót kem size 36', unit: 'Đôi', categoryKey: 'women', brand: 'Juno', itemType: 'Giày nữ', purchasePrice: 450_000, sellingPrice: 749_000 },
+  { id: D.itemJunoMaryJane, code: 'JUNO-MARY-38-DEN', name: 'Juno Mary Jane đen size 38', unit: 'Đôi', categoryKey: 'women', brand: 'Juno', itemType: 'Giày nữ', purchasePrice: 430_000, sellingPrice: 699_000 },
+  { id: D.itemConverseChuck, code: 'CONV-CHUCK-41-TRG', name: 'Converse Chuck Taylor trắng size 41', unit: 'Đôi', categoryKey: 'sport', brand: 'Converse', itemType: 'Giày thể thao', purchasePrice: 950_000, sellingPrice: 1_450_000 },
+  { id: D.itemPumaSmash, code: 'PUMA-SMASH-42-DEN', name: 'Puma Smash v2 đen size 42', unit: 'Đôi', categoryKey: 'sport', brand: 'Puma', itemType: 'Giày thể thao', purchasePrice: 820_000, sellingPrice: 1_290_000 },
+  { id: D.itemCrocsClassic, code: 'CROCS-CLASSIC-39-XANH', name: 'Crocs Classic xanh size 39', unit: 'Đôi', categoryKey: 'shoe', brand: 'Crocs', itemType: 'Dép/Sandal', purchasePrice: 620_000, sellingPrice: 990_000 },
+  { id: D.itemKidsSandal, code: 'KID-SANDAL-30-HONG', name: 'Sandal trẻ em hồng size 30', unit: 'Đôi', categoryKey: 'kids', brand: 'Biti’s', itemType: 'Giày trẻ em', purchasePrice: 180_000, sellingPrice: 299_000 },
+  { id: D.itemKidsSneaker, code: 'KID-SNEAKER-32-XANH', name: 'Sneaker trẻ em xanh size 32', unit: 'Đôi', categoryKey: 'kids', brand: 'Nike', itemType: 'Giày trẻ em', purchasePrice: 450_000, sellingPrice: 699_000 },
 ];
 
 interface BalanceSeed {
@@ -125,37 +174,32 @@ interface BalanceSeed {
 
 /** Stock balances giving a healthy mix of high/low/zero/multi-location. */
 const BALANCES: BalanceSeed[] = [
-  // Hardware — Main Rack HCM has the bulk
-  { itemId: D.itemKeyboard, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 25 },
-  { itemId: D.itemKeyboard, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA01, quantity: 8 },
-  { itemId: D.itemMouse, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 47 },
-  { itemId: D.itemMouse, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA02, quantity: 12 },
-  { itemId: D.itemMouse, branchId: D.branchHN, locationId: D.locHNA01, quantity: 18 },
-  { itemId: D.itemWebcam, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 2 }, // BELOW MIN
-  { itemId: D.itemHeadset, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA01, quantity: 15 },
-  { itemId: D.itemHeadset, branchId: D.branchDN, locationId: D.locDNA01, quantity: 6 },
-  // Apparel
-  { itemId: D.itemRaincoat, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 120 },
-  { itemId: D.itemTshirtM, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 45 },
-  { itemId: D.itemTshirtM, branchId: D.branchHN, locationId: D.locHNB01, quantity: 30 },
-  { itemId: D.itemTshirtL, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 38 },
-  { itemId: D.itemTshirtL, branchId: D.branchHN, locationId: D.locHNB01, quantity: 0 }, // ZERO
-  { itemId: D.itemPants32, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 22 },
-  // Accessories
-  { itemId: D.itemThermo, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 80 },
-  { itemId: D.itemThermo, branchId: D.branchDN, locationId: D.locDNB01, quantity: 25 },
-  { itemId: D.itemBelt140, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 5 }, // BELOW MIN
-  { itemId: D.itemBelt1850, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 17 },
-  // Bag
-  { itemId: D.itemBackpack, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 14 },
-  { itemId: D.itemBackpack, branchId: D.branchHN, locationId: D.locHNA01, quantity: 8 },
-  { itemId: D.itemHandbag, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA02, quantity: 3 },
-  // Food — high turnover items
-  { itemId: D.itemNoodle, branchId: MAIN_BRANCH_ID, locationId: D.locHCMTempT01, quantity: 500 },
-  { itemId: D.itemNoodle, branchId: D.branchHN, locationId: D.locHNA01, quantity: 320 },
-  { itemId: D.itemNoodle, branchId: D.branchDN, locationId: D.locDNA01, quantity: 180 },
-  { itemId: D.itemWater, branchId: MAIN_BRANCH_ID, locationId: D.locHCMTempT01, quantity: 250 },
-  { itemId: D.itemWater, branchId: D.branchDN, locationId: D.locDNA01, quantity: 50 }, // BELOW MIN
+  { itemId: D.itemNikeAirForce, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 25 },
+  { itemId: D.itemNikeAirForce, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA01, quantity: 8 },
+  { itemId: D.itemNikeCourt, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 47 },
+  { itemId: D.itemNikeCourt, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA02, quantity: 12 },
+  { itemId: D.itemNikeCourt, branchId: D.branchHN, locationId: D.locHNA01, quantity: 18 },
+  { itemId: D.itemAdidasStanSmith, branchId: MAIN_BRANCH_ID, locationId: MAIN_LOCATION_ID, quantity: 2 }, // BELOW MIN
+  { itemId: D.itemAdidasRunfalcon, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA01, quantity: 15 },
+  { itemId: D.itemAdidasRunfalcon, branchId: D.branchDN, locationId: D.locDNA01, quantity: 6 },
+  { itemId: D.itemBitisHunter, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 120 },
+  { itemId: D.itemVascaraPump, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 45 },
+  { itemId: D.itemVascaraPump, branchId: D.branchHN, locationId: D.locHNB01, quantity: 30 },
+  { itemId: D.itemVascaraLoafer, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 38 },
+  { itemId: D.itemVascaraLoafer, branchId: D.branchHN, locationId: D.locHNB01, quantity: 0 }, // ZERO
+  { itemId: D.itemJunoHeel, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 22 },
+  { itemId: D.itemBitisSandal, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 80 },
+  { itemId: D.itemBitisSandal, branchId: D.branchDN, locationId: D.locDNB01, quantity: 25 },
+  { itemId: D.itemJunoMaryJane, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 5 }, // BELOW MIN
+  { itemId: D.itemConverseChuck, branchId: MAIN_BRANCH_ID, locationId: D.locHCMC01, quantity: 17 },
+  { itemId: D.itemPumaSmash, branchId: MAIN_BRANCH_ID, locationId: D.locHCMB01, quantity: 14 },
+  { itemId: D.itemPumaSmash, branchId: D.branchHN, locationId: D.locHNA01, quantity: 8 },
+  { itemId: D.itemCrocsClassic, branchId: MAIN_BRANCH_ID, locationId: D.locHCMA02, quantity: 3 },
+  { itemId: D.itemKidsSandal, branchId: MAIN_BRANCH_ID, locationId: D.locHCMTempT01, quantity: 50 },
+  { itemId: D.itemKidsSandal, branchId: D.branchHN, locationId: D.locHNA01, quantity: 32 },
+  { itemId: D.itemKidsSandal, branchId: D.branchDN, locationId: D.locDNA01, quantity: 18 },
+  { itemId: D.itemKidsSneaker, branchId: MAIN_BRANCH_ID, locationId: D.locHCMTempT01, quantity: 25 },
+  { itemId: D.itemKidsSneaker, branchId: D.branchDN, locationId: D.locDNA01, quantity: 5 }, // BELOW MIN
 ];
 
 interface ThresholdSeed {
@@ -166,11 +210,11 @@ interface ThresholdSeed {
 }
 
 const THRESHOLDS: ThresholdSeed[] = [
-  { itemId: D.itemWebcam, locationId: MAIN_LOCATION_ID, minQty: 5, maxQty: 50 },
-  { itemId: D.itemBelt140, locationId: D.locHCMC01, minQty: 10, maxQty: 100 },
-  { itemId: D.itemWater, locationId: D.locDNA01, minQty: 100, maxQty: 500 },
-  { itemId: D.itemNoodle, locationId: MAIN_LOCATION_ID, minQty: 100, maxQty: 1000 },
-  { itemId: D.itemRaincoat, locationId: D.locHCMB01, minQty: 20, maxQty: 300 },
+  { itemId: D.itemAdidasStanSmith, locationId: MAIN_LOCATION_ID, minQty: 5, maxQty: 50 },
+  { itemId: D.itemJunoMaryJane, locationId: D.locHCMC01, minQty: 10, maxQty: 100 },
+  { itemId: D.itemKidsSneaker, locationId: D.locDNA01, minQty: 10, maxQty: 80 },
+  { itemId: D.itemKidsSandal, locationId: MAIN_LOCATION_ID, minQty: 20, maxQty: 200 },
+  { itemId: D.itemBitisHunter, locationId: D.locHCMB01, minQty: 20, maxQty: 300 },
 ];
 
 async function seedDemo() {
@@ -239,20 +283,91 @@ async function seedDemo() {
     // with different UUIDs. So we INSERT-IGNORE by name then resolve the real
     // ID by name lookup before using it on items.
     console.log('Seeding categories…');
-    const categories: Array<[string, string]> = [
-      [D.catApparel, 'Quần áo'],
-      [D.catAccessory, 'Phụ kiện'],
-      [D.catBag, 'Túi xách'],
-      [D.catFood, 'Thực phẩm'],
-    ];
-    for (const [id, name] of categories) {
+    for (const category of CATEGORIES) {
       await AppDataSource.query(
         `
-        INSERT INTO inventory_item_categories (id, organization_id, name, created_by, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, NOW(), NOW())
-        ON CONFLICT (organization_id, name) DO NOTHING
+        UPDATE inventory_item_categories
+        SET
+          code = $2,
+          description = $4,
+          status = $5::inventory_item_category_status_enum,
+          updated_at = NOW()
+        WHERE organization_id = $1
+          AND name = $3
         `,
-        [id, ORG_ID, name, ADMIN_USER_ID],
+        [
+          ORG_ID,
+          category.code,
+          category.name,
+          category.description,
+          category.status,
+        ],
+      );
+
+      await AppDataSource.query(
+        `
+        UPDATE inventory_item_categories
+        SET
+          code = $3,
+          name = $4,
+          description = $5,
+          status = $6::inventory_item_category_status_enum,
+          updated_at = NOW()
+        WHERE id = $1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM inventory_item_categories
+            WHERE organization_id = $2
+              AND name = $4
+              AND id <> $1
+          )
+        `,
+        [
+          category.id,
+          ORG_ID,
+          category.code,
+          category.name,
+          category.description,
+          category.status,
+        ],
+      );
+
+      await AppDataSource.query(
+        `
+        INSERT INTO inventory_item_categories
+          (id, organization_id, code, name, description, status, created_by, created_at, updated_at)
+        SELECT
+          $1::uuid,
+          $2::varchar,
+          $3::varchar,
+          $4::varchar,
+          $5::varchar,
+          $6::inventory_item_category_status_enum,
+          $7::varchar,
+          NOW(),
+          NOW()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM inventory_item_categories
+          WHERE organization_id = $2::varchar
+            AND (name = $4::varchar OR id = $1::uuid)
+        )
+        ON CONFLICT (organization_id, name) DO UPDATE SET
+          code = EXCLUDED.code,
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          status = EXCLUDED.status,
+          updated_at = NOW()
+        `,
+        [
+          category.id,
+          ORG_ID,
+          category.code,
+          category.name,
+          category.description,
+          category.status,
+          ADMIN_USER_ID,
+        ],
       );
     }
     // Build name → id map (handles pre-existing rows from data migration).
@@ -261,22 +376,18 @@ async function seedDemo() {
       [ORG_ID],
     ) as Array<{ id: string; name: string }>;
     const categoryIdByName = new Map(categoryRows.map((r) => [r.name, r.id]));
-    const HARDWARE_CAT_ID =
-      categoryIdByName.get('Phần cứng') ||
-      categoryIdByName.get('Hardware') ||
-      // Fallback to the static seed UUID from inventory.seed.ts (Hardware category).
-      '2d233c45-8ec6-42cf-8a84-df519fced6c7';
-    const APPAREL_CAT_ID = categoryIdByName.get('Quần áo')!;
-    const ACCESSORY_CAT_ID = categoryIdByName.get('Phụ kiện')!;
-    const BAG_CAT_ID = categoryIdByName.get('Túi xách')!;
-    const FOOD_CAT_ID = categoryIdByName.get('Thực phẩm')!;
+    const SHOE_CAT_ID = categoryIdByName.get('Giày dép')!;
+    const MEN_SHOES_CAT_ID = categoryIdByName.get('Giày nam')!;
+    const WOMEN_SHOES_CAT_ID = categoryIdByName.get('Giày nữ')!;
+    const SPORT_SHOES_CAT_ID = categoryIdByName.get('Giày thể thao')!;
+    const KIDS_SHOES_CAT_ID = categoryIdByName.get('Giày trẻ em')!;
 
     // ─── 5. Providers (suppliers + delivery partners) ───────────────
     console.log('Seeding providers…');
     const providers: Array<[string, string, string, string]> = [
-      [D.providerABC, 'NCC-ABC', 'Công ty TNHH ABC (giày dép)', '0901111111'],
-      [D.providerXYZ, 'NCC-XYZ', 'Công ty XYZ (phụ kiện)', '0902222222'],
-      [D.providerPhuCuong, 'NCC-PC', 'Công ty Phú Cường (quần áo)', '0903333333'],
+      [D.providerABC, 'NCC-NIKE', 'Nhà phân phối Nike Việt Nam', '0901111111'],
+      [D.providerXYZ, 'NCC-ADIDAS', 'Nhà phân phối Adidas Việt Nam', '0902222222'],
+      [D.providerPhuCuong, 'NCC-BITIS', 'Công ty Biti’s', '0903333333'],
       [D.providerGHN, 'DTGH-GHN', 'Giao hàng nhanh (GHN)', '1900636677'],
       [D.providerGHTK, 'DTGH-GHTK', 'Giao hàng tiết kiệm (GHTK)', '19000000'],
     ];
@@ -285,7 +396,12 @@ async function seedDemo() {
         `
         INSERT INTO inventory_providers (id, organization_id, code, name, phone, is_active, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, true, $6, NOW(), NOW())
-        ON CONFLICT (organization_id, code) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+          code = EXCLUDED.code,
+          name = EXCLUDED.name,
+          phone = EXCLUDED.phone,
+          is_active = true,
+          updated_at = NOW()
         `,
         [id, ORG_ID, code, name, phone, ADMIN_USER_ID],
       );
@@ -294,44 +410,57 @@ async function seedDemo() {
     // ─── 6. Items ───────────────────────────────────────────────────
     console.log(`Seeding ${ITEMS.length} items…`);
     const categoryKeyToId: Record<ItemSeed['categoryKey'], string> = {
-      hardware: HARDWARE_CAT_ID,
-      apparel: APPAREL_CAT_ID,
-      accessory: ACCESSORY_CAT_ID,
-      bag: BAG_CAT_ID,
-      food: FOOD_CAT_ID,
+      shoe: SHOE_CAT_ID,
+      men: MEN_SHOES_CAT_ID,
+      women: WOMEN_SHOES_CAT_ID,
+      sport: SPORT_SHOES_CAT_ID,
+      kids: KIDS_SHOES_CAT_ID,
     };
     for (const it of ITEMS) {
       await AppDataSource.query(
         `
         INSERT INTO items
           (id, organization_id, branch_id, code, name, unit, category_id,
-           is_active, is_pos_visible, purchase_price, selling_price,
+           brand, item_type, is_active, is_pos_visible, purchase_price, selling_price,
            is_gold_silver, manage_barcode_per_unit,
            created_by, created_at, updated_at)
-        VALUES ($1, $2, NULL, $3, $4, $5, $6, true, true, $7, $8, false, false, $9, NOW(), NOW())
-        ON CONFLICT (organization_id, code) DO NOTHING
+        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, true, true, $9, $10, false, false, $11, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          code = EXCLUDED.code,
+          name = EXCLUDED.name,
+          unit = EXCLUDED.unit,
+          category_id = EXCLUDED.category_id,
+          brand = EXCLUDED.brand,
+          item_type = EXCLUDED.item_type,
+          purchase_price = EXCLUDED.purchase_price,
+          selling_price = EXCLUDED.selling_price,
+          is_active = true,
+          is_pos_visible = true,
+          updated_at = NOW()
         `,
         [it.id, ORG_ID, it.code, it.name, it.unit, categoryKeyToId[it.categoryKey],
-         it.purchasePrice, it.sellingPrice, ADMIN_USER_ID],
+         it.brand, it.itemType, it.purchasePrice, it.sellingPrice, ADMIN_USER_ID],
       );
     }
 
     // ─── 7. Link items ↔ primary provider (best-effort) ─────────────
     console.log('Linking items ↔ providers…');
     const itemProviderLinks: Array<[string, string]> = [
-      [D.itemKeyboard, D.providerXYZ],
-      [D.itemMouse, D.providerXYZ],
-      [D.itemWebcam, D.providerXYZ],
-      [D.itemHeadset, D.providerXYZ],
-      [D.itemRaincoat, D.providerPhuCuong],
-      [D.itemTshirtM, D.providerPhuCuong],
-      [D.itemTshirtL, D.providerPhuCuong],
-      [D.itemPants32, D.providerPhuCuong],
-      [D.itemThermo, D.providerABC],
-      [D.itemBelt140, D.providerABC],
-      [D.itemBelt1850, D.providerABC],
-      [D.itemBackpack, D.providerABC],
-      [D.itemHandbag, D.providerABC],
+      [D.itemNikeAirForce, D.providerABC],
+      [D.itemNikeCourt, D.providerABC],
+      [D.itemKidsSneaker, D.providerABC],
+      [D.itemAdidasStanSmith, D.providerXYZ],
+      [D.itemAdidasRunfalcon, D.providerXYZ],
+      [D.itemBitisHunter, D.providerPhuCuong],
+      [D.itemBitisSandal, D.providerPhuCuong],
+      [D.itemKidsSandal, D.providerPhuCuong],
+      [D.itemVascaraPump, D.providerGHTK],
+      [D.itemVascaraLoafer, D.providerGHTK],
+      [D.itemJunoHeel, D.providerGHTK],
+      [D.itemJunoMaryJane, D.providerGHTK],
+      [D.itemConverseChuck, D.providerGHN],
+      [D.itemPumaSmash, D.providerGHN],
+      [D.itemCrocsClassic, D.providerGHN],
     ];
     for (const [itemId, providerId] of itemProviderLinks) {
       // Insert as non-primary to avoid violating the partial unique index
@@ -389,7 +518,7 @@ async function seedDemo() {
               NOW() - INTERVAL '5 days', $6::uuid, $6, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
-      [D.goodsReceipt1, ORG_ID, MAIN_BRANCH_ID, D.providerXYZ, MAIN_LOCATION_ID, ADMIN_USER_ID],
+      [D.goodsReceipt1, ORG_ID, MAIN_BRANCH_ID, D.providerABC, MAIN_LOCATION_ID, ADMIN_USER_ID],
     );
     // 2 lines
     await AppDataSource.query(
@@ -398,11 +527,11 @@ async function seedDemo() {
         (id, organization_id, branch_id, goods_receipt_id, item_id, location_id,
          uom_code, quantity, unit_price, line_total, note, created_by, created_at, updated_at)
       VALUES
-        (uuid_generate_v4(), $1, $2, $3, $4, $5, 'cái', 10, 380000, 3800000, NULL, $6, NOW(), NOW()),
-        (uuid_generate_v4(), $1, $2, $3, $7, $5, 'cái', 5,  850000, 4250000, NULL, $6, NOW(), NOW())
+        (uuid_generate_v4(), $1, $2, $3, $4, $5, 'Đôi', 10, 1850000, 18500000, NULL, $6, NOW(), NOW()),
+        (uuid_generate_v4(), $1, $2, $3, $7, $5, 'Đôi', 5,  1250000, 6250000, NULL, $6, NOW(), NOW())
       ON CONFLICT DO NOTHING
       `,
-      [ORG_ID, MAIN_BRANCH_ID, D.goodsReceipt1, D.itemMouse, MAIN_LOCATION_ID, ADMIN_USER_ID, D.itemHeadset],
+      [ORG_ID, MAIN_BRANCH_ID, D.goodsReceipt1, D.itemNikeAirForce, MAIN_LOCATION_ID, ADMIN_USER_ID, D.itemNikeCourt],
     );
 
     // ─── 11. Sample Stock Take (DRAFT — ready to count) ─────────────
@@ -463,7 +592,7 @@ async function seedDemo() {
         (uuid_generate_v4(), $1, $2, $3, $6, 10, NULL, $5, NOW(), NOW())
       ON CONFLICT DO NOTHING
       `,
-      [ORG_ID, MAIN_BRANCH_ID, D.transferOrder1, D.itemMouse, ADMIN_USER_ID, D.itemHeadset],
+      [ORG_ID, MAIN_BRANCH_ID, D.transferOrder1, D.itemNikeCourt, ADMIN_USER_ID, D.itemAdidasRunfalcon],
     );
 
     console.log('\n✅ Demo inventory seed completed.\n');
@@ -471,9 +600,9 @@ async function seedDemo() {
     console.log('  • 3 branches: HCM (main), Hà Nội, Đà Nẵng');
     console.log('  • 4 storages: Kho chính HCM, Kho tạm HCM, Kho chính HN, Kho chính DN');
     console.log('  • 10 locations (RACK/SHELF/ZONE mix)');
-    console.log('  • 5 categories (existing Hardware + Giày dép + 4 new)');
-    console.log('  • 6 providers (Default Supplier + 5 mới)');
-    console.log(`  • ${ITEMS.length} items spanning categories`);
+    console.log('  • 5 shoe categories with code, description and status');
+    console.log('  • 6 providers (Default Supplier + shoe/delivery providers)');
+    console.log(`  • ${ITEMS.length} shoe items with unit Đôi, brand, purchase/selling prices`);
     console.log(`  • ${BALANCES.length} stock balances (incl. below-min, zero)`);
     console.log(`  • ${THRESHOLDS.length} thresholds`);
     console.log('  • Sample: Goods Receipt NK000001 (POSTED)');
