@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { LOCATION_TYPE_LABEL, LocationType } from "@erp/shared-interfaces";
 import {
   AppModal,
   Button,
@@ -7,25 +7,27 @@ import {
   PageToolbar,
   type ToolbarItem,
 } from "@erp/ui";
-import { LocationType } from "@erp/shared-interfaces";
 import {
   Copy,
+  Download,
   HelpCircle,
   Pencil,
   Plus,
   RefreshCw,
   Save,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { apiClient } from "../../lib/api-axios";
-import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
-import { PaginationControls } from "../../components/table/PaginationControls";
-import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
-import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
+import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { PaginationControls } from "../../components/table/PaginationControls";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -33,6 +35,11 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { apiClient } from "../../lib/api-axios";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
+import { ImportLocationDialog } from "./import/ImportLocationDialog";
+import { downloadLocationsExcel } from "./import/import-location.api";
 
 interface InventoryLocation {
   id: string;
@@ -57,13 +64,6 @@ interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
-
-const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
-  [LocationType.SHELF]: "Kệ",
-  [LocationType.RACK]: "Giá",
-  [LocationType.BIN]: "Thùng",
-  [LocationType.ZONE]: "Khu vực",
-};
 
 const STATUS_LABEL = {
   ACTIVE: "Đang hoạt động",
@@ -91,7 +91,8 @@ function getActiveBranchId(): string | null {
 }
 
 export function ItemLocationsPage() {
-  const [locations, setLocations] = useState<PaginatedResponse<InventoryLocation> | null>(null);
+  const [locations, setLocations] =
+    useState<PaginatedResponse<InventoryLocation> | null>(null);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationStateDto>({
@@ -101,7 +102,9 @@ export function ItemLocationsPage() {
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [storageFilter, setStorageFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
+    "",
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<
@@ -109,9 +112,13 @@ export function ItemLocationsPage() {
     | { mode: "edit"; initial: InventoryLocation }
     | null
   >(null);
-  const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
-  const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
+  const [stockDialogLoc, setStockDialogLoc] =
+    useState<InventoryLocation | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadStorages = useCallback(async () => {
     try {
@@ -132,13 +139,18 @@ export function ItemLocationsPage() {
         pageSize: String(pagination.pageSize),
       });
       if (storageFilter) params.set("storageId", storageFilter);
-      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-        `/inventory/locations?${params}`,
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<InventoryLocation>
+      >(`/inventory/locations?${params}`);
       setLocations(data);
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setLocations({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+      });
     } finally {
       setLoading(false);
     }
@@ -284,7 +296,8 @@ export function ItemLocationsPage() {
       label: "Sửa",
       icon: Pencil,
       disabled: !selected,
-      onClick: () => selected && setDialogState({ mode: "edit", initial: selected }),
+      onClick: () =>
+        selected && setDialogState({ mode: "edit", initial: selected }),
     },
     {
       id: "delete",
@@ -298,7 +311,28 @@ export function ItemLocationsPage() {
       id: "reload",
       label: "Nạp",
       icon: RefreshCw,
-      onClick: () => void loadLocations(),
+      onClick: () => loadLocations(),
+    },
+    {
+      id: "import",
+      label: "Nhập khẩu",
+      icon: Upload,
+      onClick: () => setImportOpen(true),
+    },
+    {
+      id: "export",
+      label: "Xuất khẩu",
+      icon: Download,
+      onClick: async () => {
+        try {
+          await downloadLocationsExcel();
+          toast.success("Đã tải tệp xuất khẩu");
+        } catch (err) {
+          toast.error(
+            getUserFacingApiErrorMessage(err) || "Xuất khẩu thất bại",
+          );
+        }
+      },
     },
   ];
 
@@ -349,7 +383,8 @@ export function ItemLocationsPage() {
       key: "status",
       label: "Trạng thái",
       width: 160,
-      render: (row) => (row.isActive ? STATUS_LABEL.ACTIVE : STATUS_LABEL.INACTIVE),
+      render: (row) =>
+        row.isActive ? STATUS_LABEL.ACTIVE : STATUS_LABEL.INACTIVE,
     },
   ];
 
@@ -398,9 +433,15 @@ export function ItemLocationsPage() {
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={locations?.total ?? 0}
-            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageChange={(p) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
             onPageSizeChange={(nextPageSize) =>
-              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+              setPagination((prev) => ({
+                ...prev,
+                page: 1,
+                pageSize: nextPageSize,
+              }))
             }
             onRefresh={() => void loadLocations()}
           />
@@ -421,7 +462,9 @@ export function ItemLocationsPage() {
                 type="checkbox"
                 aria-label="Chọn dòng"
                 checked={selectedId === row.id}
-                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
+                onChange={() =>
+                  setSelectedId(selectedId === row.id ? null : row.id)
+                }
                 onClick={(e) => e.stopPropagation()}
               />
             ),
@@ -464,6 +507,12 @@ export function ItemLocationsPage() {
         />
       )}
 
+      <ImportLocationDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onCommitted={() => void loadLocations()}
+      />
+
       {stockDialogLoc && (
         <LocationStockItemsDialog
           locationId={stockDialogLoc.id}
@@ -499,8 +548,12 @@ function ItemLocationFormDialog({
 }) {
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
-  const [storageId, setStorageId] = useState(initial?.storageId ?? storages[0]?.id ?? "");
-  const [type, setType] = useState<LocationType>(initial?.type ?? LocationType.SHELF);
+  const [storageId, setStorageId] = useState(
+    initial?.storageId ?? storages[0]?.id ?? "",
+  );
+  const [type, setType] = useState<LocationType>(
+    initial?.type ?? LocationType.SHELF,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const submit = (intent: "save" | "save-and-add") => {
@@ -545,7 +598,11 @@ function ItemLocationFormDialog({
             Trợ giúp
           </button>
           <div className="flex items-center gap-2">
-            <Button type="button" disabled={saving} onClick={() => submit("save")}>
+            <Button
+              type="button"
+              disabled={saving}
+              onClick={() => submit("save")}
+            >
               <Save className="mr-1.5 h-4 w-4" />
               {saving ? "Đang lưu…" : "Lưu"}
             </Button>
@@ -560,7 +617,12 @@ function ItemLocationFormDialog({
                 Lưu và thêm mới
               </Button>
             ) : null}
-            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={onClose}
+            >
               <X className="mr-1.5 h-4 w-4" />
               Hủy bỏ
             </Button>

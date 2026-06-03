@@ -599,6 +599,8 @@ export class CsvImportService {
         return this.validateOpeningBalanceRow(row as CsvRow, actor);
       case ImportJobType.ADJUSTMENTS:
         return this.validateAdjustmentRow(row as CsvRow, actor);
+      default:
+        return [];
     }
   }
 
