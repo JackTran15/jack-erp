@@ -381,3 +381,25 @@ flowchart LR
   T4 --> T7
 ```
 
+## EPIC-03062026 POS per-line discount breakdown + line note in read APIs
+
+- [EPIC-03062026 POS per-line discount breakdown](./epics/EPIC-03062026-pos-line-discount-breakdown.md)
+- Mỗi dòng hàng trên hóa đơn POS mang KM/chiết khấu **thủ công** riêng (vd "KM 10 % (59.000) - cc") + ghi chú riêng, lưu **đầy đủ breakdown** (type/value/amount/reason) vào `invoice_items` và **trả về** ở mọi API đọc. `note` + `lineDiscount` (số tiền) đã có sẵn; thêm `line_discount_type/value/reason`. Ba V2 search posted (search/returnable/purchase-history) được gắn thêm `items[]` theo pattern của draft search. **Chỉ backend** — không đụng FE pos-web; không liên kết PromotionEntity (chiết khấu thủ công, không phải chương trình KM).
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-LDB-01](./tickets/TKT-LDB-01-be-schema-line-discount-breakdown.md) | BE: migration + entity — thêm `line_discount_type/value/reason` vào `invoice_items` |
+| [TKT-LDB-02](./tickets/TKT-LDB-02-be-dto-service-compute.md)            | BE: DTO 3 field mới + `computeLineDiscount()` dùng chung `create()`/`update()` |
+| [TKT-LDB-03](./tickets/TKT-LDB-03-be-read-apis-line-items.md)           | BE: gắn `items[]` vào 3 V2 search posted + verify detail/draft + openapi regen |
+| [TKT-LDB-04](./tickets/TKT-LDB-04-be-tests-e2e.md)                      | BE: unit compute + handler attach specs + E2E round-trip create→read + DoD     |
+
+### Ticket dependency graph (EPIC-03062026 line-discount)
+
+```mermaid
+flowchart LR
+  T1["TKT-LDB-01 Schema + entity"] --> T2["TKT-LDB-02 DTO + compute"]
+  T1 --> T3["TKT-LDB-03 Read APIs + openapi"]
+  T2 --> T4["TKT-LDB-04 Tests + E2E"]
+  T3 --> T4
+```
+

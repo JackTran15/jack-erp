@@ -165,6 +165,24 @@ describe('PosCatalogProductService', () => {
       expect(res.total).toBe(1);
       expect(res.data[0].id).toBe('I3');
     });
+
+    it('pushes categoryId into the item query (DB-level filter)', async () => {
+      itemRepo.find.mockResolvedValue([variantS, variantM]); // DB already filtered to C1
+
+      const res = await service.listProducts('branch-1', actor, {
+        page: 1,
+        pageSize: 20,
+        categoryId: 'C1',
+      } as any);
+
+      expect(itemRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ categoryId: 'C1' }),
+        }),
+      );
+      expect(res.total).toBe(1);
+      expect(res.data[0].id).toBe('P1');
+    });
   });
 
   describe('getProductDetail', () => {

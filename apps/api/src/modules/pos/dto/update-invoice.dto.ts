@@ -1,5 +1,6 @@
-import { IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
+import { IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsNumber, IsEnum, Min, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
+import { LineDiscountType } from '../entities/invoice-item.entity';
 
 export class UpdateInvoiceItemDto {
   @IsUUID() itemId: string;
@@ -10,6 +11,9 @@ export class UpdateInvoiceItemDto {
   @IsNumber() @Min(0) quantity: number;
   @IsNumber() @Min(0) unitPrice: number;
   @IsOptional() @IsNumber() @Min(0) lineDiscount?: number;
+  @IsOptional() @IsEnum(LineDiscountType) lineDiscountType?: LineDiscountType;
+  @IsOptional() @IsNumber() @Min(0) lineDiscountValue?: number;
+  @IsOptional() @IsString() @MaxLength(255) lineDiscountReason?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() sortOrder?: number;
 }

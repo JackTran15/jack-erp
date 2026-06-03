@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional } from 'class-validator';
+import { IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { PosCatalogDirection } from './pos-catalog.query.dto';
 
@@ -15,6 +15,13 @@ export class PosCatalogProductsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(PosCatalogDirection)
   direction?: PosCatalogDirection;
+
+  @ApiPropertyOptional({
+    description: 'Restrict results to products/items in this category.',
+  })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }
 
 /** Query for the product-level POS catalog detail. */
