@@ -13,7 +13,12 @@ import { ExcelImportItemService } from './excel-import-item.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 import { CsvImportController } from './csv-import.controller';
 import { CsvExportController } from './csv-export.controller';
+import { LocationImportService } from './location-import.service';
+import { LocationExportService } from './location-export.service';
+import { LocationImportWorkbookService } from './location-import-workbook.service';
 import { ItemEntity } from '../location/item.entity';
+import { StorageEntity } from '../location/storage.entity';
+import { LocationEntity } from '../location/location.entity';
 import { ItemProviderEntity } from '../location/item-provider.entity';
 import { ItemBarcodeEntity } from '../location/item-barcode.entity';
 import { ItemUnitEntity } from '../location/item-unit.entity';
@@ -39,6 +44,8 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
       ItemAttributeValueEntity,
       StockBalanceEntity,
       StockLedgerEntryEntity,
+      StorageEntity,
+      LocationEntity,
     ]),
     InventoryLocationModule,
     ProductModule,
@@ -52,6 +59,9 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
     ExcelParserService,
     ExcelImportItemService,
     InventoryImportWorkbookService,
+    LocationImportWorkbookService,
+    LocationImportService,
+    LocationExportService,
   ],
   exports: [CsvImportService, CsvExportService],
 })
