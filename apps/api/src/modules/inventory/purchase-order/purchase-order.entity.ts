@@ -6,6 +6,7 @@ import { PurchaseOrderLineEntity } from './purchase-order-line.entity';
 /** Phiếu đặt hàng — purchase order from supplier. Workflow: DRAFT → APPROVED → RECEIVING → RECEIVED | CANCELLED */
 @Entity('purchase_orders')
 @Index(['organizationId', 'status'])
+@Index('IDX_purchase_orders_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class PurchaseOrderEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated on approval' })
   documentNumber?: string;

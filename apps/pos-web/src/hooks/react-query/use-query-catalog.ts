@@ -1,12 +1,19 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { CATALOG_KEYS } from "@erp/pos/constants/react-query-key.constant";
-import { catalogService } from "@erp/pos/services/catalog.service";
+import {
+  CATALOG_KEYS,
+  POS_BRANCH_CATALOG_KEYS,
+} from "@erp/pos/constants/react-query-key.constant";
 import type {
   PosCatalogLine,
   PosProductDetail,
+  PosProductListResponse,
 } from "@erp/pos/interfaces/catalog.interface";
+import { catalogService } from "@erp/pos/services/catalog.service";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
+import { useQueryClient } from "@tanstack/react-query";
+import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
+import { useCallback } from "react";
 
 /**
  * Tồn kho bán tại quầy theo chi nhánh — `GET /pos/branches/:id/catalog`.
@@ -21,6 +28,29 @@ export function useCatalogQuery(
   return useQuery<PosCatalogLine[], Error>({
     queryKey: CATALOG_KEYS.LIST(branchId),
     queryFn: () => catalogService.fetch(branchId),
+    enabled: Boolean(branchId),
+    staleTime: 30_000,
+  });
+}
+
+/** Số product tải tối đa cho grid (1 trang, không phân trang thêm). */
+export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 100;
+
+/**
+ * Danh sách catalog mức PRODUCT cho grid — `GET /pos/branches/:id/catalog/products`.
+ * Tải 1 trang (pageSize=100); ô tìm header lọc client-side trên kết quả này.
+ * Dedupe theo `CATALOG_KEYS.PRODUCTS(branchId)`. Tắt khi chưa có branch.
+ */
+export function useCatalogProductsQuery(
+  branchId: string,
+): UseQueryResult<PosProductListResponse, Error> {
+  return useQuery<PosProductListResponse, Error>({
+    queryKey: CATALOG_KEYS.PRODUCTS(branchId),
+    queryFn: () =>
+      catalogService.listProducts(branchId, {
+        page: 1,
+        pageSize: POS_CATALOG_PRODUCTS_PAGE_SIZE,
+      }),
     enabled: Boolean(branchId),
     staleTime: 30_000,
   });
@@ -44,4 +74,47 @@ export function useCatalogProductDetailQuery(
     enabled: enabled && Boolean(branchId) && Boolean(id),
     staleTime: 30_000,
   });
+}
+
+export const POS_CATALOG_QUERY_LIMIT = 40;
+
+export function fetchPosBranchCatalog(
+  branchId: string,
+  direction: PosCatalogDirection,
+  search = "",
+): Promise<PosCatalogLine[]> {
+  return catalogService
+    .fetch(branchId, search.trim() || undefined, direction)
+    .then((rows) => rows.slice(0, POS_CATALOG_QUERY_LIMIT));
+}
+
+export function useSearchPosBranchCatalog() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string, direction: PosCatalogDirection, search: string) => {
+      const normalizedSearch = search.trim();
+      return queryClient.fetchQuery({
+        queryKey: POS_BRANCH_CATALOG_KEYS.LIST(
+          branchId,
+          direction,
+          normalizedSearch,
+        ),
+        queryFn: () =>
+          fetchPosBranchCatalog(branchId, direction, normalizedSearch),
+        staleTime: 30_000,
+      });
+    },
+    [queryClient],
+  );
+}
+
+export function useInvalidatePosBranchCatalog() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string, direction: PosCatalogDirection) =>
+      queryClient.invalidateQueries({
+        queryKey: POS_BRANCH_CATALOG_KEYS.PREFIX(branchId, direction),
+      }),
+    [queryClient],
+  );
 }

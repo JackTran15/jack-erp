@@ -18,6 +18,8 @@ import { JournalLineEntity } from './journal-line.entity';
 @Index('idx_journal_org_branch', ['organizationId', 'branchId'])
 @Index('idx_journal_posted_at', ['postedAt'])
 @Index('idx_journal_source_ref', ['sourceReferenceId'])
+@Index('IDX_journal_org_source_ref_status', ['organizationId', 'sourceReferenceId', 'status'])
+@Index('IDX_journal_org_branch_posted', ['organizationId', 'branchId', 'postedAt'])
 export class JournalEntryEntity extends BaseEntity {
   @Column({ name: 'document_number', length: 100, comment: 'Auto-generated journal number (e.g. JNL-20260425-00001)' })
   documentNumber: string;

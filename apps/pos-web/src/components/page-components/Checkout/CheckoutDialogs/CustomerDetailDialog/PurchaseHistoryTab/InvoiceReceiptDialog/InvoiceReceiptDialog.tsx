@@ -7,6 +7,13 @@ import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.consta
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { InvoiceStatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceStatusBadge/InvoiceStatusBadge";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
+import type { InvoiceType } from "@erp/pos/types/invoice.type";
+
+const INVOICE_TITLE_BY_TYPE: Record<InvoiceType, string> = {
+  SALE: "Hóa đơn thanh toán",
+  RETURN: "Hóa đơn đổi trả",
+  EXCHANGE: "Hóa đơn đổi hàng",
+};
 
 export interface InvoiceReceiptDialogProps {
   open: boolean;
@@ -77,7 +84,9 @@ export function InvoiceReceiptDialog({
         <>
           <header className="flex flex-col items-center gap-1 px-8 pb-5 pt-8 text-center">
             <h2 className="text-[20px] font-bold leading-tight text-[#1F2937]">
-              Hóa đơn thanh toán
+              {invoice.type
+                ? INVOICE_TITLE_BY_TYPE[invoice.type]
+                : INVOICE_TITLE_BY_TYPE.SALE}
             </h2>
             <p className="text-[14px] text-[#6B7280]">Số: {invoice.code}</p>
           </header>

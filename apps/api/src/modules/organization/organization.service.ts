@@ -13,6 +13,7 @@ import { OrganizationEntity, OrganizationStatus } from './organization.entity';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
 import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
+import { MembershipCardTypeSeederService } from '../customer/services/membership-card-type.seeder';
 
 @Injectable()
 export class OrganizationService {
@@ -23,6 +24,7 @@ export class OrganizationService {
     private readonly orgRepo: Repository<OrganizationEntity>,
     private readonly coaSeederService: CoaSeederService,
     private readonly cashVoucherCategorySeederService: CashVoucherCategorySeederService,
+    private readonly membershipCardTypeSeederService: MembershipCardTypeSeederService,
   ) {}
 
   async create(
@@ -63,6 +65,17 @@ export class OrganizationService {
     } catch (err) {
       this.logger.error(
         `Failed to seed cash voucher categories for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    try {
+      await this.membershipCardTypeSeederService.seedForOrganization(
+        saved.id,
+        actor.userId,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to seed membership card types for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
       );
     }
 

@@ -18,16 +18,22 @@ import {
   InvoiceListColumnKey,
 } from "@erp/pos/constants/invoice-list.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
-import type { InvoiceListFilters } from "@erp/pos/hooks/page-hooks/invoice-list/use-invoice-list";
+import type {
+  InvoiceListFilterOperators,
+  InvoiceListFilters,
+  InvoiceListOperatorKey,
+} from "@erp/pos/hooks/page-hooks/invoice-list/use-invoice-list";
 import type { InvoiceListRow } from "@erp/pos/interfaces/invoice.interface";
 import type { InvoiceStatus } from "@erp/pos/types/invoice.type";
 
 export interface InvoiceListTableProps {
   rows: ReadonlyArray<InvoiceListRow>;
   filters: InvoiceListFilters;
+  filterOperators: InvoiceListFilterOperators;
   visibleColumns: ReadonlySet<InvoiceListColumnKey>;
   grandTotal: number;
   onFilterChange: (key: keyof InvoiceListFilters, value: string) => void;
+  onFilterOperatorChange: (key: InvoiceListOperatorKey, op: FilterOperatorEnum) => void;
   onOpenInvoice: (row: InvoiceListRow) => void;
 }
 
@@ -57,20 +63,24 @@ function dateCell(value: string | null): string {
 export function InvoiceListTable({
   rows,
   filters,
+  filterOperators,
   visibleColumns,
   grandTotal,
   onFilterChange,
+  onFilterOperatorChange,
   onOpenInvoice,
 }: InvoiceListTableProps) {
   const allColumns = useMemo<
     Record<InvoiceListColumnKey, PosDataTableColumn<InvoiceListRow>>
   >(() => {
-    const textFilter = (key: keyof InvoiceListFilters) => (
+    const textFilter = (key: keyof InvoiceListFilters & InvoiceListOperatorKey) => (
       <PosDataTableFilterCell
         value={filters[key]}
         onChange={(next) => onFilterChange(key, next)}
         operatorType={FilterOperatorTypeEnum.TEXT}
         leadingOperator={FilterOperatorEnum.CONTAINS}
+        operator={filterOperators[key]}
+        onOperatorChange={(op) => onFilterOperatorChange(key, op)}
       />
     );
 
@@ -92,16 +102,22 @@ export function InvoiceListTable({
       [InvoiceListColumnKey.IssuedAt]: {
         key: InvoiceListColumnKey.IssuedAt,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.IssuedAt],
+        headerClassName: "min-w-[160px] whitespace-nowrap",
+        cellClassName: "min-w-[160px] whitespace-nowrap",
         render: (row) => dateCell(row.issuedAt),
       },
       [InvoiceListColumnKey.CreatedAt]: {
         key: InvoiceListColumnKey.CreatedAt,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.CreatedAt],
+        headerClassName: "min-w-[160px] whitespace-nowrap",
+        cellClassName: "min-w-[160px] whitespace-nowrap",
         render: (row) => dateCell(row.createdAt),
       },
       [InvoiceListColumnKey.Status]: {
         key: InvoiceListColumnKey.Status,
         title: INVOICE_LIST_COLUMN_LABELS[InvoiceListColumnKey.Status],
+        headerClassName: "min-w-[140px] whitespace-nowrap",
+        cellClassName: "min-w-[140px] whitespace-nowrap",
         render: (row) => <InvoiceStatusBadge status={row.status} />,
         filterRender: (
           <PosSelect<StatusOption>
@@ -145,6 +161,8 @@ export function InvoiceListTable({
             onChange={(next) => onFilterChange("amount", next)}
             operatorType={FilterOperatorTypeEnum.NUMBER}
             leadingOperator={FilterOperatorEnum.LESS_THAN_OR_EQUAL}
+            operator={filterOperators.amount}
+            onOperatorChange={(op) => onFilterOperatorChange("amount", op)}
             align="right"
           />
         ),
@@ -156,7 +174,7 @@ export function InvoiceListTable({
         filterRender: textFilter("note"),
       },
     };
-  }, [filters, onFilterChange, onOpenInvoice]);
+  }, [filters, filterOperators, onFilterChange, onFilterOperatorChange, onOpenInvoice]);
 
   const columns = useMemo(
     () =>

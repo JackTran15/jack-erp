@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsOptional,
@@ -9,7 +10,11 @@ import {
   Max,
   MinLength,
   MaxLength,
+  IsArray,
+  ArrayMaxSize,
+  ValidateNested,
 } from 'class-validator';
+import { CreateItemProviderInput, CreateItemUnitInput } from './create-item.dto';
 
 export class UpdateItemDto {
   @IsOptional()
@@ -85,4 +90,68 @@ export class UpdateItemDto {
   @IsOptional()
   @IsUUID()
   productId?: string;
+
+  // ─── Brand (denormalized name kept in sync with brandId) ─────────────
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  brand?: string;
+
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
+  // ─── Phase 2 primitives (now editable) ──────────────────────────────
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  itemType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  packageWeightGram?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  packageLengthCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  packageWidthCm?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  packageHeightCm?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isGoldSilver?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  oddSize?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  manageBarcodePerUnit?: boolean;
+
+  // ─── Nested arrays (reconciled on update) ───────────────────────────
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CreateItemProviderInput)
+  providers?: CreateItemProviderInput[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CreateItemUnitInput)
+  units?: CreateItemUnitInput[];
 }

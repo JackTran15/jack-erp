@@ -34,6 +34,8 @@ export function initialCheckoutDraft(): CheckoutDraft {
     },
     promotion: {
       appliedPromotion: null,
+      pointsRedeemed: 0,
+      appliedVoucher: null,
     },
     labels: {
       selectedLabelIds: [],

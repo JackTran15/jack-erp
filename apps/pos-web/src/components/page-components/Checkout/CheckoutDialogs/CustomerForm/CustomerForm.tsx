@@ -208,16 +208,21 @@ export function CustomerForm({
     if (!values.name.trim()) out.name = "Tên khách hàng không được bỏ trống";
     if (!isEdit && !(values.code ?? "").trim())
       out.code = "Mã khách hàng không được bỏ trống";
+    const phone = (values.phone ?? "").trim();
+    if (!phone) out.phone = "Số điện thoại không được bỏ trống";
+    else if (!/^0\d{9}$/.test(phone))
+      out.phone = "Số điện thoại không hợp lệ";
     return out;
   }, [values, isEdit]);
 
   const showNameError = Boolean(errors.name) && touched.name;
   const showCodeError = Boolean(errors.code) && touched.code;
+  const showPhoneError = Boolean(errors.phone) && touched.phone;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setTouched((t) => ({ ...t, name: true, code: true }));
-    if (errors.name || errors.code) return;
+    setTouched((t) => ({ ...t, name: true, code: true, phone: true }));
+    if (errors.name || errors.code || errors.phone) return;
 
     try {
       const editedId = isEdit ? customer?.id : undefined;
@@ -246,6 +251,11 @@ export function CustomerForm({
 
   const handleTouchName = useCallback(
     () => setTouched((t) => ({ ...t, name: true })),
+    [],
+  );
+
+  const handleTouchPhone = useCallback(
+    () => setTouched((t) => ({ ...t, phone: true })),
     [],
   );
 
@@ -299,9 +309,12 @@ export function CustomerForm({
             onChange={setField}
             showCodeError={showCodeError}
             showNameError={showNameError}
+            showPhoneError={showPhoneError}
             codeError={errors.code}
             nameError={errors.name}
+            phoneError={errors.phone}
             onTouchName={handleTouchName}
+            onTouchPhone={handleTouchPhone}
             nameInputRef={nameInputRef}
           />
 

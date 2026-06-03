@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { AppModal, Button, FormField, Input, MoneyInput } from "@erp/ui";
+import type { UserDetail } from "@erp/shared-interfaces";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { useCreateUser, getIamErrorMessage } from "../../hooks/iam";
+import type { EmployeeFormDraft } from "../../pages/employees/employee.types";
+import { EmployeeFormModal } from "../../pages/employees/components/EmployeeFormModal";
+import type { EmployeeFormSaveContext } from "../../pages/employees/components/EmployeeFormModal";
+import { CrudRecordDialog } from "../crud/CrudRecordDialog";
 
 interface BaseQuickDialogProps<T> {
   open: boolean;
@@ -25,77 +31,22 @@ export function QuickCreateProviderDialog({
   onClose,
   onCreated,
 }: BaseQuickDialogProps<QuickProvider>) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const reset = () => {
-    setCode("");
-    setName("");
-    setPhone("");
-    setEmail("");
-  };
-
-  const handleSave = async () => {
-    if (!code.trim() || !name.trim()) {
-      toast.error("Vui lòng nhập mã và tên nhà cung cấp.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const { data } = await apiClient.post<QuickProvider>("/inventory/providers", {
-        code: code.trim(),
-        name: name.trim(),
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
-        isActive: true,
-      });
-      toast.success(`Đã tạo NCC "${data.name}".`);
-      onCreated(data);
-      reset();
-      onClose();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!open) return null;
   return (
-    <AppModal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
+    <CrudRecordDialog
+      entityKey="inventory-providers"
+      recordId={null}
+      open={open}
+      onClose={onClose}
+      onSuccess={(record) => {
+        onCreated({
+          id: String(record.id ?? ""),
+          code: String(record.code ?? ""),
+          name: String(record.name ?? ""),
+          phone: record.phone != null ? String(record.phone) : undefined,
+          email: record.email != null ? String(record.email) : undefined,
+        });
       }}
-      title="Thêm nhanh nhà cung cấp"
-      onSave={() => void handleSave()}
-      onCancel={onClose}
-      saveLabel={saving ? "Đang lưu…" : "Lưu"}
-      saveDisabled={saving}
-      className="max-w-[480px]"
-    >
-      <div className="flex flex-col gap-3">
-        <FormField label="Mã NCC *">
-          <Input value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
-        </FormField>
-        <FormField label="Tên NCC *">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </FormField>
-        <FormField label="Điện thoại">
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </FormField>
-        <FormField label="Email">
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </FormField>
-      </div>
-    </AppModal>
+    />
   );
 }
 
@@ -386,5 +337,127 @@ export function QuickCreateLocationDialog({
         </FormField>
       </div>
     </AppModal>
+  );
+}
+
+// ─── Customer ─────────────────────────────────────────────────────────────────
+
+export interface QuickCustomer {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
+export function QuickCreateCustomerDialog({
+  open,
+  onClose,
+  onCreated,
+}: BaseQuickDialogProps<QuickCustomer>) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => {
+    setCode("");
+    setName("");
+    setPhone("");
+  };
+
+  const handleSave = async () => {
+    if (!code.trim() || !name.trim()) {
+      toast.error("Vui lòng nhập mã và tên khách hàng.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await apiClient.post<QuickCustomer>("/customers", {
+        code: code.trim(),
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+      });
+      toast.success(`Đã tạo khách hàng "${data.name}".`);
+      onCreated(data);
+      reset();
+      onClose();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+  return (
+    <AppModal
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title="Thêm nhanh khách hàng"
+      onSave={() => void handleSave()}
+      onCancel={onClose}
+      saveLabel={saving ? "Đang lưu…" : "Lưu"}
+      saveDisabled={saving}
+      className="max-w-[480px]"
+    >
+      <div className="flex flex-col gap-3">
+        <FormField label="Mã khách hàng *">
+          <Input value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
+        </FormField>
+        <FormField label="Tên khách hàng *">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
+        <FormField label="Điện thoại">
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </FormField>
+      </div>
+    </AppModal>
+  );
+}
+
+// ─── Employee ─────────────────────────────────────────────────────────────────
+
+export interface QuickEmployee {
+  id: string;
+  code: string;
+  name: string;
+}
+
+function userDetailToQuickEmployee(user: UserDetail): QuickEmployee {
+  return {
+    id: user.id,
+    code: user.code ?? user.profile?.code ?? "",
+    name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+  };
+}
+
+export function QuickCreateEmployeeDialog({
+  open,
+  onClose,
+  onCreated,
+}: BaseQuickDialogProps<QuickEmployee>) {
+  const createUser = useCreateUser();
+
+  const handleSave = async (draft: EmployeeFormDraft, _context: EmployeeFormSaveContext) => {
+    try {
+      const created = await createUser.mutateAsync(draft);
+      toast.success("Đã thêm nhân viên mới.");
+      onCreated(userDetailToQuickEmployee(created));
+      onClose();
+    } catch (err) {
+      toast.error(getIamErrorMessage(err, "Không lưu được nhân viên."));
+    }
+  };
+
+  return (
+    <EmployeeFormModal
+      open={open}
+      mode="create"
+      onClose={onClose}
+      onSave={(draft, context) => void handleSave(draft, context)}
+    />
   );
 }

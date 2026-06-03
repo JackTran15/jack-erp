@@ -4,8 +4,10 @@ import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSumma
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
 import {
+  selectEffectivePointsRedeemed,
   selectIsReturnExchangeInvoice,
   selectItemCountForPayment,
+  selectPointsDiscountAmount,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 
@@ -23,6 +25,12 @@ export function PaymentSummaryBlock({
     selectIsReturnExchangeInvoice,
   );
   const total = useCheckoutGrandTotal();
+  const pointsRedeemed = usePosCheckoutSessionStore(
+    selectEffectivePointsRedeemed,
+  );
+  const pointsDiscountAmount = usePosCheckoutSessionStore(
+    selectPointsDiscountAmount,
+  );
   const { deposit, returnFee } = useCheckoutPayment();
 
   return (
@@ -36,6 +44,12 @@ export function PaymentSummaryBlock({
         value={formatVnd(total)}
         emphasis="strong"
       />
+      {pointsRedeemed > 0 ? (
+        <PosSummaryRow
+          label={`Giảm giá (${pointsRedeemed} điểm)`}
+          value={`-${formatVnd(pointsDiscountAmount)}`}
+        />
+      ) : null}
       <PosSummaryRow
         label={
           onDepositClick ? (

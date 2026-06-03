@@ -21,7 +21,7 @@ export function BackofficeLayout() {
               sidebarCollapsed ? "ml-[60px]" : "ml-60",
             )}
           >
-            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col p-6">
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col p-2.5">
               <Outlet />
             </div>
           </main>

@@ -29,6 +29,11 @@ import {
   type LedgerCashVoucherDetail,
   type LedgerCashVoucherDocumentLine,
 } from "../../ledger-cash/ledger-cash.types";
+import {
+  QuickCreateCustomerDialog,
+  QuickCreateEmployeeDialog,
+  QuickCreateProviderDialog,
+} from "../../../../components/forms/QuickCreateDialogs";
 import { VoucherDocumentNumberField } from "../_shared/VoucherDocumentNumberField";
 import { VoucherEntitySearchModal } from "../_shared/VoucherEntitySearchModal";
 import { VoucherLink } from "../_shared/VoucherLink";
@@ -134,6 +139,8 @@ export function PaymentVoucherDialog({
   >([]);
   const [entitySearchTarget, setEntitySearchTarget] =
     useState<VoucherEntitySearchTarget | null>(null);
+  const [partnerCreateKind, setPartnerCreateKind] = useState<PartnerLookupType | null>(null);
+  const [staffCreateOpen, setStaffCreateOpen] = useState(false);
   const [debtPickOpen, setDebtPickOpen] = useState(false);
   const [paymentSubOption, setPaymentSubOption] = useState(
     PaymentOtherSubOption.OTHER,
@@ -651,6 +658,7 @@ export function PaymentVoucherDialog({
                 setCounterpartyPhone("");
               }}
               onOpenSearchDialog={() => setEntitySearchTarget("partner")}
+              onCreateNew={!readOnly && !isDebtRepayment ? (kind) => setPartnerCreateKind(kind) : undefined}
             />
             <FormField
               label={LABELS.person}
@@ -709,6 +717,7 @@ export function PaymentVoucherDialog({
                 setEmployeeName("");
               }}
               onOpenSearchDialog={() => setEntitySearchTarget("staff")}
+              onCreateNew={!readOnly ? () => setStaffCreateOpen(true) : undefined}
             />
             {showTransferAccount ? (
               <FormField
@@ -877,6 +886,61 @@ export function PaymentVoucherDialog({
           defaultRepaymentDate={voucherDate}
           initialPartner={debtPickInitialPartner}
           onConfirm={handleDebtRepaymentConfirm}
+        />
+      ) : null}
+      {partnerCreateKind === PartnerLookupType.SUPPLIER ? (
+        <QuickCreateProviderDialog
+          open
+          onClose={() => setPartnerCreateKind(null)}
+          onCreated={(p) => {
+            setPartnerKind(PartnerLookupType.SUPPLIER);
+            setPartnerId(p.id);
+            setCounterpartyCode(p.code);
+            setCounterpartyName(p.name);
+            setCounterpartyPhone(p.phone ?? "");
+            setPersonName((prev) => prev.trim() || p.name);
+            setPartnerCreateKind(null);
+          }}
+        />
+      ) : null}
+      {partnerCreateKind === PartnerLookupType.CUSTOMER ? (
+        <QuickCreateCustomerDialog
+          open
+          onClose={() => setPartnerCreateKind(null)}
+          onCreated={(c) => {
+            setPartnerKind(PartnerLookupType.CUSTOMER);
+            setPartnerId(c.id);
+            setCounterpartyCode(c.code);
+            setCounterpartyName(c.name);
+            setCounterpartyPhone(c.phone ?? "");
+            setPersonName((prev) => prev.trim() || c.name);
+            setPartnerCreateKind(null);
+          }}
+        />
+      ) : null}
+      {partnerCreateKind === PartnerLookupType.EMPLOYEE ? (
+        <QuickCreateEmployeeDialog
+          open
+          onClose={() => setPartnerCreateKind(null)}
+          onCreated={(e) => {
+            setPartnerKind(PartnerLookupType.EMPLOYEE);
+            setPartnerId(e.id);
+            setCounterpartyCode(e.code);
+            setCounterpartyName(e.name);
+            setPersonName((prev) => prev.trim() || e.name);
+            setPartnerCreateKind(null);
+          }}
+        />
+      ) : null}
+      {staffCreateOpen ? (
+        <QuickCreateEmployeeDialog
+          open
+          onClose={() => setStaffCreateOpen(false)}
+          onCreated={(e) => {
+            setStaffId(e.id);
+            setEmployeeCode(e.code);
+            setEmployeeName(e.name);
+          }}
         />
       ) : null}
     </>

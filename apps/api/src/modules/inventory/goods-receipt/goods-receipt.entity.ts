@@ -25,6 +25,7 @@ export enum GoodsReceiptPaymentMethod {
 /** Phiếu nhập kho — goods receipt. State: DRAFT → POSTED → (REVERSED) | CANCELLED. */
 @Entity('goods_receipts')
 @Index(['organizationId', 'status'])
+@Index('IDX_goods_receipts_org_branch_list', ['organizationId', 'branchId', 'status', 'receivedAt'])
 export class GoodsReceiptEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true, comment: 'Auto-generated on post (PNK-YY-####)' })
   documentNumber?: string;

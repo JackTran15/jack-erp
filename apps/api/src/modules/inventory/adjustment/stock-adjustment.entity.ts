@@ -12,6 +12,7 @@ export enum AdjustmentStatus {
 /** Document for correcting stock quantities at a location. Workflow: DRAFT → PENDING_APPROVAL → POSTED. */
 @Entity('stock_adjustments')
 @Index(['organizationId', 'status'])
+@Index('IDX_stock_adjustments_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class StockAdjustmentEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated document number' })
   documentNumber?: string;

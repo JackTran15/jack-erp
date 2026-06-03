@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { StockLedgerModule } from '../inventory/ledger/stock-ledger.module';
@@ -42,6 +43,8 @@ import { CheckoutReturnService } from './services/checkout-return.service';
 import { PointsRedemptionService } from './services/points-redemption.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
+import { InvoiceV2Controller } from './controllers/invoice-v2.controller';
+import { SearchInvoicesV2Handler } from './queries/search-invoices-v2.handler';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
 import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
 import { ReturnPostedPublisher } from './publishers/return-posted.publisher';
@@ -75,8 +78,9 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     WebSocketModule,
     PromotionModule,
     CustomerModule,
+    CqrsModule,
   ],
-  controllers: [PosController, InvoiceController],
+  controllers: [PosController, InvoiceController, InvoiceV2Controller],
   providers: [
     PosSessionService,
     PosCatalogService,
@@ -94,6 +98,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     CreateExchangeInvoiceService,
     CheckoutReturnService,
     PointsRedemptionService,
+    SearchInvoicesV2Handler,
   ],
   exports: [
     PosSessionService,

@@ -18,13 +18,21 @@ import {
 } from "@erp/shared-interfaces";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { useInvalidatePosBranchCatalog } from "@erp/pos/hooks/react-query/use-query-catalog";
+import { useInvalidateTempWarehouseCarriers } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-picker.store";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
 import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 
 export function useFastStockTransferActions() {
   const branchId = usePosBranchStore((s) => s.branchId);
+  const invalidatePosBranchCatalog = useInvalidatePosBranchCatalog();
+  const invalidateTempWarehouseCarriers = useInvalidateTempWarehouseCarriers();
   const data = useFastStockTransferData();
+  const clearProductCache = usePosFastStockTransferPickerStore(
+    (s) => s.clearProductCache,
+  );
   const {
     addLineMutation,
     updateLineMutation,
@@ -104,11 +112,21 @@ export function useFastStockTransferActions() {
   const refetchAll = useCallback(async () => {
     await Promise.all([
       data.refetchTempWarehouse(),
-      data.reloadCatalog(),
+      branchId ? invalidateTempWarehouseCarriers(branchId) : Promise.resolve(),
+      branchId
+        ? invalidatePosBranchCatalog(branchId, data.catalogDirection)
+        : Promise.resolve(),
+      clearProductCache(),
       data.refetchStorages(),
       data.refetchShowrooms(),
     ]);
-  }, [data]);
+  }, [
+    branchId,
+    clearProductCache,
+    data,
+    invalidatePosBranchCatalog,
+    invalidateTempWarehouseCarriers,
+  ]);
 
   const handleResetData = useCallback(() => {
     void refetchLinesData();
@@ -116,35 +134,39 @@ export function useFastStockTransferActions() {
     resetDialogs();
   }, [refetchLinesData, resetDialogs, resetWorkflow]);
 
-  const handleAddRow = useCallback(() => {
-    if (!data.branchId) {
-      setPageError("Chưa chọn chi nhánh.");
-      return;
-    }
-    if (data.isSessionClosed) {
-      setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
-      return;
-    }
-    if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
-      setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
-      return;
-    }
-    const body = mapDraftToAddBody(
-      data.toolbarDraft,
-      data.branchId,
-      data.direction,
-    );
-    if (data.toolbarDraft.carrier?.id) {
-      body.carrierUserId = data.toolbarDraft.carrier.id;
-    }
+  const handleAddRow = useCallback(
+    (onSuccess?: () => void) => {
+      if (!data.branchId) {
+        setPageError("Chưa chọn chi nhánh.");
+        return;
+      }
+      if (data.isSessionClosed) {
+        setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
+        return;
+      }
+      if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
+        setPageError("Vui lòng chọn hàng hóa và vị trí (nếu có).");
+        return;
+      }
+      const body = mapDraftToAddBody(
+        data.toolbarDraft,
+        data.branchId,
+        data.direction,
+      );
+      if (data.toolbarDraft.carrier?.id) {
+        body.carrierUserId = data.toolbarDraft.carrier.id;
+      }
 
-    addLineMutation.mutate(body, {
-      onSuccess: () => {
-        resetToolbarAfterAdd(data.toolbarDraft.carrier);
-      },
-      onError: (err) => setPageError(getErrorMessage(err)),
-    });
-  }, [addLineMutation, data, resetToolbarAfterAdd, setPageError]);
+      addLineMutation.mutate(body, {
+        onSuccess: () => {
+          resetToolbarAfterAdd(null);
+          onSuccess?.();
+        },
+        onError: (err) => setPageError(getErrorMessage(err)),
+      });
+    },
+    [addLineMutation, data, resetToolbarAfterAdd, setPageError],
+  );
 
   const handleStartEdit = useCallback(
     (rowId: string) => {
@@ -220,7 +242,13 @@ export function useFastStockTransferActions() {
         },
       );
     },
-    [clearEditingRow, data, remapTransferSelection, setPageError, updateLineMutation],
+    [
+      clearEditingRow,
+      data,
+      remapTransferSelection,
+      setPageError,
+      updateLineMutation,
+    ],
   );
 
   const handleToggleTransfer = useCallback(

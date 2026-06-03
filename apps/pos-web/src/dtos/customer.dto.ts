@@ -39,6 +39,17 @@ export interface CreateCustomerBody {
   membershipCard?: CreateMembershipCardInlineBody;
 }
 
+/** Body cho `POST /customers/:id/membership-card`. */
+export interface IssueMembershipCardBody {
+  tier: MembershipTierEnum;
+  issuedAt: string;
+}
+
+/** Body cho `PATCH /customers/:id/membership-card`. */
+export interface UpdateMembershipCardBody {
+  tier?: MembershipTierEnum;
+}
+
 // TODO: extend once BE `UpdateCustomerDto` accepts the richer fields
 // (gender, birthDate, nationalId, groupId, assignedStaffId, note,
 // companyName, taxCode, membershipCard).

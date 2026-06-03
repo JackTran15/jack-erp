@@ -9,7 +9,10 @@ import {
   type Ref,
 } from "react";
 import { cn } from "@erp/ui";
-import { ChevronDownIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
+import {
+  ChevronDownIcon,
+  CloseIcon,
+} from "@erp/pos/components/common/PosIcons/PosIcons";
 import {
   posFormFieldClass,
   posFormHeight,
@@ -101,6 +104,14 @@ export interface PosSearchPopoverProps<T> {
 
   inputRef?: Ref<HTMLInputElement>;
 
+  /**
+   * When provided and `value` is non-empty, the preset chrome renders a
+   * focusable X button (replacing the chevron) that calls `onClear` and
+   * refocuses the input. Lets keyboard users Shift+Tab onto the clear button
+   * and press Enter to wipe the field.
+   */
+  onClear?: () => void;
+
   /** Optional empty-state action shown when search returns nothing. */
   emptyAction?: { label: string; onClick: (currentQuery: string) => void };
 }
@@ -135,6 +146,7 @@ export function PosSearchPopover<T>({
   containerClassName,
   inputClassName,
   inputRef,
+  onClear,
   emptyAction,
 }: PosSearchPopoverProps<T>) {
   const inputId = useId();
@@ -222,6 +234,14 @@ export function PosSearchPopover<T>({
     [onSelect],
   );
 
+  const handleClear = useCallback(() => {
+    if (!onClear) return;
+    onClear();
+    setSuggestions([]);
+    setHighlightIdx(-1);
+    internalInputRef.current?.focus();
+  }, [onClear]);
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!open || suggestions.length === 0) {
       if (e.key === "Enter" && onSubmitQuery) {
@@ -285,15 +305,26 @@ export function PosSearchPopover<T>({
         )
       : prefix
     : prefix;
+  const showClearButton = Boolean(onClear) && value.length > 0 && !disabled;
   const resolvedSuffix = preset
-    ? (suffix ?? (
+    ? (suffix ??
+      (showClearButton ? (
+        <button
+          type="button"
+          aria-label="Xóa giá trị"
+          onClick={handleClear}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5C6BC0]/50"
+        >
+          <CloseIcon size={14} />
+        </button>
+      ) : (
         <span className="flex shrink-0 items-center text-gray-400">
           <ChevronDownIcon
             size={14}
             className={cn("transition-transform", open && "rotate-180")}
           />
         </span>
-      ))
+      )))
     : suffix;
   const resolvedPlaceholder = shortcut
     ? `(${shortcut}) ${placeholder ?? ""}`

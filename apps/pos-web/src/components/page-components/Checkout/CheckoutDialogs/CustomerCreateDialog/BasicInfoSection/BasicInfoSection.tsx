@@ -33,9 +33,12 @@ export interface BasicInfoSectionProps {
   /** Touched-error flags resolved by the parent. */
   showCodeError: boolean;
   showNameError: boolean;
+  showPhoneError: boolean;
   codeError?: string;
   nameError?: string;
+  phoneError?: string;
   onTouchName: () => void;
+  onTouchPhone: () => void;
   /** Forwarded to the "Khách hàng" input — caller uses it to auto-focus on dialog open. */
   nameInputRef?: Ref<HTMLInputElement>;
 }
@@ -50,9 +53,12 @@ export function BasicInfoSection({
   onChange,
   showCodeError,
   showNameError,
+  showPhoneError,
   codeError,
   nameError,
+  phoneError,
   onTouchName,
+  onTouchPhone,
   nameInputRef,
 }: BasicInfoSectionProps) {
   return (
@@ -94,6 +100,7 @@ export function BasicInfoSection({
         <PosTextInput
           id={ids.phone}
           label="Số điện thoại"
+          required
           fieldLayout="horizontal"
           labelClassName={FORM_ITEM_LABEL_CLASS}
           type="tel"
@@ -102,6 +109,9 @@ export function BasicInfoSection({
           variant="underline"
           value={values.phone ?? ""}
           onChange={(v) => onChange("phone", v)}
+          onBlur={onTouchPhone}
+          error={showPhoneError ? phoneError : undefined}
+          invalid={showPhoneError}
           placeholder="Số điện thoại"
         />
 

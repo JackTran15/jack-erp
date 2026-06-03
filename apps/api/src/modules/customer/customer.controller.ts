@@ -23,6 +23,7 @@ import { PaginationQueryDto, FilterQueryDto } from '../crud/dto';
 import { CustomerService } from './customer.service';
 import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
+import { MembershipCardTypeService } from './services/membership-card-type.service';
 import { CustomerSummaryService } from './services/customer-summary.service';
 import { CreateCustomerDto, UpdateCustomerDto, MergeCustomerDto } from './dto';
 import { CreateCustomerGroupDto } from './dto/create-customer-group.dto';
@@ -38,6 +39,7 @@ export class CustomerController {
     private readonly customerService: CustomerService,
     private readonly customerGroupService: CustomerGroupService,
     private readonly membershipCardService: MembershipCardService,
+    private readonly membershipCardTypeService: MembershipCardTypeService,
     private readonly customerSummaryService: CustomerSummaryService,
   ) {}
 
@@ -59,6 +61,16 @@ export class CustomerController {
   ) {
     const filters = filtersRaw ? this.parseFilters(filtersRaw) : {};
     return this.customerService.list(query, filters, actor);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Membership card type endpoints (must be before :id routes)
+  // ---------------------------------------------------------------------------
+
+  @Get('membership-card-types')
+  @RequirePermission('customer.read')
+  listCardTypes(@Actor() actor: ActorContext) {
+    return this.membershipCardTypeService.listActiveForActor(actor);
   }
 
   // ---------------------------------------------------------------------------

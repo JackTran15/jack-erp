@@ -1,5 +1,8 @@
 import { TooltipProvider } from "@erp/ui";
 import { InvoiceLineItemRow } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemRow";
+import { InvoiceLineItemRowContextMenu } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRowContextMenu/InvoiceLineItemRowContextMenu";
+import { LineDiscountDialog } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/LineDiscountDialog/LineDiscountDialog";
+import { RecentPriceDialog } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/RecentPriceDialog/RecentPriceDialog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 
 const HEADERS: Array<{ label: string; align?: "left" | "right" | "center" }> = [
@@ -25,6 +28,9 @@ export function InvoiceLineItemTable() {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex-1 overflow-auto bg-white">
+        <InvoiceLineItemRowContextMenu />
+        <LineDiscountDialog />
+        <RecentPriceDialog />
         <table className="w-full border-collapse text-left">
           <thead className="sticky top-0 z-[1] bg-gray-50">
             <tr className="h-10 border-b border-gray-200 text-[13px] font-medium text-gray-500">

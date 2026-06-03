@@ -8652,14 +8652,21 @@
     "/inventory/imports/items/validate": {
       "post": {
         "operationId": "CsvImportController_validateItems",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
         "responses": {
           "201": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8689,7 +8696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8710,7 +8717,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8740,7 +8747,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8761,7 +8768,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8791,7 +8798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryImportJobEntity"
+                  "type": "object"
                 }
               }
             }
@@ -8903,6 +8910,131 @@
         "tags": [
           "CsvImport"
         ]
+      },
+      "delete": {
+        "operationId": "CsvImportController_cancelJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CsvImportController_listJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportJobErrorRowsExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
       }
     },
     "/inventory/exports/items": {
@@ -8968,6 +9100,93 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/items/excel": {
+      "get": {
+        "operationId": "CsvExportController_exportItemsExcel",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/items/template": {
+      "get": {
+        "operationId": "CsvExportController_exportItemsTemplate",
+        "parameters": [],
         "responses": {
           "200": {
             "description": ""
@@ -19897,12 +20116,12 @@
         "type": "object",
         "properties": {
           "type": {
+            "type": "string",
             "enum": [
               "ITEMS",
               "OPENING_BALANCES",
               "ADJUSTMENTS"
-            ],
-            "type": "string"
+            ]
           },
           "fileName": {
             "type": "string"
@@ -19914,6 +20133,7 @@
             "type": "string"
           },
           "status": {
+            "type": "string",
             "enum": [
               "PENDING",
               "VALIDATING",
@@ -19923,8 +20143,7 @@
               "COMMITTED",
               "COMPLETED",
               "FAILED"
-            ],
-            "type": "string"
+            ]
           },
           "totalRows": {
             "type": "number"
@@ -19934,6 +20153,13 @@
           },
           "errorRows": {
             "type": "number"
+          },
+          "duplicateMode": {
+            "type": "string",
+            "enum": [
+              "UPDATE",
+              "SKIP"
+            ]
           },
           "rows": {
             "type": "array",
@@ -19974,6 +20200,7 @@
           "totalRows",
           "validRows",
           "errorRows",
+          "duplicateMode",
           "id",
           "organizationId",
           "createdAt",

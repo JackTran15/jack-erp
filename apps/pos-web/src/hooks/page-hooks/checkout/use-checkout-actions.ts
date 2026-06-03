@@ -8,6 +8,7 @@ import {
   useCreateExchangeInvoiceMutation,
   useCreateInvoiceMutation,
   useCreateReturnInvoiceMutation,
+  useRedeemPointsMutation,
   useUpdateInvoiceMutation,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import {
@@ -49,9 +50,12 @@ import {
   computeReceiptLines,
   selectActiveSession,
   selectCustomerDraft,
+  selectEffectivePointsRedeemed,
   selectGrandTotal,
   selectHasAnyCartLines,
+  selectMetaDraft,
   selectPaymentDraft,
+  selectPointsDiscountAmount,
   selectPurchaseCart,
   selectReturnCart,
   usePosCheckoutSessionStore,
@@ -91,6 +95,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createMutation = useCreateInvoiceMutation();
   const updateMutation = useUpdateInvoiceMutation();
   const checkoutMutation = useCheckoutInvoiceMutation();
+  const redeemPointsMutation = useRedeemPointsMutation();
   const createReturnMutation = useCreateReturnInvoiceMutation();
   const createExchangeMutation = useCreateExchangeInvoiceMutation();
   const checkoutReturnMutation = useCheckoutReturnMutation();
@@ -115,12 +120,16 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
     async (options?: { bypassOversellModal?: boolean }) => {
       const sessionState = usePosCheckoutSessionStore.getState();
       const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
+      const selectedSalesperson =
+        selectMetaDraft(sessionState).selectedSalesperson;
       const purchaseCart = selectPurchaseCart(sessionState);
       const ui = usePosCheckoutUiStore.getState();
       // Slice payment của tab đang active (snapshot tại thời điểm click F12).
       const p = selectPaymentDraft(sessionState);
 
       const grandTotal = selectGrandTotal(sessionState);
+      const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
+      const pointsToRedeem = selectEffectivePointsRedeemed(sessionState);
       const {
         settlementGrandTotal,
         settlementAbs,
@@ -131,6 +140,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         grandTotal,
         deposit: p.deposit,
         returnFee: p.returnFee,
+        pointsDiscountAmount,
         paymentLines: p.paymentLines,
         keepChange: p.keepChange,
         debt: p.debt,
@@ -204,6 +214,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 cart: purchaseCart,
                 customer: selectedCustomer,
                 note,
+                salesperson: selectedSalesperson,
               }),
             });
             invoiceId = updated.id;
@@ -214,9 +225,19 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
                 cart: purchaseCart,
                 customer: selectedCustomer,
                 note,
+                salesperson: selectedSalesperson,
               }),
             );
             invoiceId = created.id;
+          }
+          // Áp đổi điểm trên draft TRƯỚC khi checkout — BE validate (thẻ active /
+          // balance / giá trị đơn) tại bước này; lỗi 400 bắt ngay để không vào
+          // /checkout với số tiền sai. Điểm thực sự bị trừ khi /checkout commit.
+          if (pointsToRedeem > 0) {
+            await redeemPointsMutation.mutateAsync({
+              id: invoiceId,
+              points: pointsToRedeem,
+            });
           }
           await checkoutMutation.mutateAsync({
             id: invoiceId,
@@ -359,6 +380,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createMutation,
       updateMutation,
       checkoutMutation,
+      redeemPointsMutation,
       createReturnMutation,
       createExchangeMutation,
       checkoutReturnMutation,
@@ -396,6 +418,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createMutation.isPending ||
       updateMutation.isPending ||
       checkoutMutation.isPending ||
+      redeemPointsMutation.isPending ||
       createReturnMutation.isPending ||
       createExchangeMutation.isPending ||
       checkoutReturnMutation.isPending,

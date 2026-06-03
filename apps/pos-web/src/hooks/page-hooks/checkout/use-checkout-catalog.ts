@@ -3,7 +3,10 @@ import type { SearchSuggestion } from "@erp/pos/components/common/PosSearchPopov
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
-import { useCatalogQuery } from "@erp/pos/hooks/react-query/use-query-catalog";
+import {
+  useCatalogProductsQuery,
+  useCatalogQuery,
+} from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import {
   selectCatalogDraft,
@@ -24,6 +27,8 @@ interface ToolbarState {
 interface UseCheckoutCatalogResult {
   catalog: PosCatalogLine[];
   catalogLoading: boolean;
+  /** Loading riêng cho grid product-level (drive trạng thái Đang tải/Trống của grid). */
+  catalogProductsLoading: boolean;
   catalogError: string;
   refetchCatalog: () => void;
   toolbar: ToolbarState;
@@ -49,11 +54,17 @@ interface UseCheckoutCatalogResult {
 export function useCheckoutCatalog(): UseCheckoutCatalogResult {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
   const catalogQueryResult = useCatalogQuery(branchId);
+  const productsQueryResult = useCatalogProductsQuery(branchId);
   const catalog = useMemo(
     () => catalogQueryResult.data ?? [],
     [catalogQueryResult.data],
   );
+  const productCards = useMemo(
+    () => productsQueryResult.data?.data ?? [],
+    [productsQueryResult.data],
+  );
   const catalogLoading = catalogQueryResult.isLoading;
+  const catalogProductsLoading = productsQueryResult.isLoading;
   const catalogError = catalogQueryResult.error
     ? `Không tải được tồn kho: ${catalogQueryResult.error.message}`
     : "";
@@ -104,14 +115,19 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
     return catalog.filter((p) => matchesCatalogQuery(p, toolbar.query));
   }, [catalog, toolbar.query]);
 
+  // Grid hiển thị MỖI SẢN PHẨM 1 card (product-level). Lọc client-side theo tên
+  // trên danh sách product đã tải (endpoint products không có tham số search).
   const catalogProducts: CatalogProduct[] = useMemo(() => {
-    const filtered = catalog.filter((p) => matchesCatalogQuery(p, catalogQuery));
-    return filtered.map((p) => ({
-      id: p.itemId,
-      name: p.name,
-      price: p.sellingPrice ?? 0,
-    }));
-  }, [catalog, catalogQuery]);
+    const q = catalogQuery.trim().toLowerCase();
+    return productCards
+      .filter((c) => !q || c.name.toLowerCase().includes(q))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        price: c.minPrice ?? 0,
+        kind: c.kind,
+      }));
+  }, [productCards, catalogQuery]);
 
   const productSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
@@ -126,6 +142,7 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
   return {
     catalog,
     catalogLoading,
+    catalogProductsLoading,
     catalogError,
     refetchCatalog,
     toolbar,

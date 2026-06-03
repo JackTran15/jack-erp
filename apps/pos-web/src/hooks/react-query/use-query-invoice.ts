@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -6,7 +7,10 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import { INVOICE_KEYS } from "@erp/pos/constants/react-query-key.constant";
+import {
+  CUSTOMER_KEYS,
+  INVOICE_KEYS,
+} from "@erp/pos/constants/react-query-key.constant";
 import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { INVOICE_LIST_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/invoice-list.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
@@ -20,6 +24,7 @@ import type {
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
+  SearchInvoicesV2Body,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type {
@@ -226,6 +231,53 @@ export function useReturnableInvoicesQuery(
 }
 
 /**
+ * Danh sách hóa đơn v2 — POST /v2/invoices/search, server-side filter + pagination.
+ * Enrich mã/tên/SĐT khách qua `customerService.get` giống hook cũ.
+ * `placeholderData: keepPreviousData` giữ dữ liệu cũ trong khi load trang/filter mới.
+ */
+export function useInvoiceListV2Query(
+  body: SearchInvoicesV2Body,
+): UseQueryResult<{ rows: InvoiceListRow[]; total: number }, Error> {
+  const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  return useQuery<{ rows: InvoiceListRow[]; total: number }, Error>({
+    queryKey: INVOICE_KEYS.SEARCH_V2({ ...body, branchId } as Record<string, unknown>),
+    queryFn: async () => {
+      const res = await invoiceService.searchV2(body);
+      const ids = Array.from(
+        new Set(
+          res.data
+            .map((inv) => inv.customerId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const customer = await customerService.get(id);
+            return [
+              id,
+              { code: customer.code, name: customer.name, phone: customer.phone },
+            ] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      const byId = new Map(entries);
+      const rows = res.data.map((inv) =>
+        mapInvoiceToListRow(
+          inv,
+          inv.customerId ? byId.get(inv.customerId) ?? null : null,
+        ),
+      );
+      return { rows, total: res.total };
+    },
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
  * Danh sách hóa đơn cho trang `/invoices` — gồm cả bán/trả/đổi (`isDraft=false`,
  * không lọc status). Enrich mã/tên/SĐT khách qua `customerService.get` (endpoint
  * list chỉ trả `customerId`). Lọc theo ngày/cột + phân trang làm client-side ở
@@ -324,6 +376,51 @@ export function useCheckoutReturnMutation(): UseMutationResult<
     mutationFn: ({ id, body }) => invoiceService.checkoutReturn(id, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: INVOICE_KEYS.ALL });
+    },
+  });
+}
+
+// ─── Loyalty redeem (TKT-039 / loyalty-pos-fe-api-integration) ──────────────
+
+interface RedeemPointsVars {
+  id: string;
+  points: number;
+}
+
+/**
+ * `POST /invoices/:id/redeem-points` — ghi `pointsRedeemed` vào draft. Chỉ
+ * gọi ở bước finalize (sau khi đã có invoiceId từ create/update), không gọi
+ * khi user nhấn "Áp dụng" trong dialog.
+ */
+export function useRedeemPointsMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  RedeemPointsVars
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, RedeemPointsVars>({
+    mutationFn: ({ id, points }) =>
+      invoiceService.redeemPoints(id, { points }),
+    onSuccess: (_inv, { id }) => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DETAIL(id) });
+      // Điểm trên card chỉ giảm thực sự khi checkout commit, nhưng vẫn bust
+      // cache `customers/:id/summary` để lần mở dialog kế tiếp đọc số mới.
+      void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.ALL });
+    },
+  });
+}
+
+/** `DELETE /invoices/:id/redeem-points` — gỡ đổi điểm khỏi draft. */
+export function useClearRedeemPointsMutation(): UseMutationResult<
+  InvoiceRow,
+  Error,
+  { id: string }
+> {
+  const qc = useQueryClient();
+  return useMutation<InvoiceRow, Error, { id: string }>({
+    mutationFn: ({ id }) => invoiceService.clearRedeemPoints(id),
+    onSuccess: (_inv, { id }) => {
+      void qc.invalidateQueries({ queryKey: INVOICE_KEYS.DETAIL(id) });
     },
   });
 }

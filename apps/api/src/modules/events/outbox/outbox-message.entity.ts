@@ -12,7 +12,8 @@ import {
  * relay republishes verbatim.
  */
 @Entity('outbox_messages')
-@Index('idx_outbox_pending', ['nextAttemptAt'], { where: '"published_at" IS NULL' })
+@Index('idx_outbox_pending', ['nextAttemptAt', 'createdAt'], { where: '"published_at" IS NULL' })
+@Index('idx_outbox_published_cleanup', ['publishedAt'], { where: '"published_at" IS NOT NULL' })
 export class OutboxMessageEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

@@ -33,6 +33,18 @@ export const COLUMN_FILTER_MODE_OPTIONS: Array<{
 ];
 
 export type ColumnWidthVariant = "small" | "medium" | "large";
+export type ColumnTextAlign = "left" | "right";
+export type ColumnFormatKind = "default" | "numberVi" | "moneyVnd" | "customerStatus";
+
+export interface ColumnPresentation {
+  align?: ColumnTextAlign;
+  format?: ColumnFormatKind;
+  maxFractionDigits?: number;
+}
+
+export interface ColumnConfig extends ColumnPresentation {
+  width?: ColumnWidthVariant;
+}
 
 export const TABLE_COLUMN_WIDTH_PX: Record<ColumnWidthVariant, number> = {
   small: 120,
@@ -40,23 +52,25 @@ export const TABLE_COLUMN_WIDTH_PX: Record<ColumnWidthVariant, number> = {
   large: 260,
 };
 
-/** Ghi đè theo entityKey + fieldKey để kiểm soát độ rộng cột. */
-export const ENTITY_COLUMN_WIDTHS: Record<
+/** Per-entity column config overrides (width + alignment + value format). */
+export const ENTITY_COLUMN_CONFIGS: Record<
   string,
-  Record<string, ColumnWidthVariant>
+  Record<string, ColumnConfig>
 > = {
   "inventory-items": {
-    code: "medium",
-    name: "large",
-    unit: "small",
-    category: "medium",
-    purchasePrice: "medium",
-    sellingPrice: "medium",
-    providerId: "large",
-    providerName: "medium",
-    providerCode: "small",
-    isActive: "small",
-    createdAt: "medium",
+    code: { width: "medium" },
+    name: { width: "large" },
+    categoryName: { width: "medium" },
+    unit: { width: "small" },
+    brand: { width: "medium" },
+    purchasePrice: { width: "medium", align: "right", format: "moneyVnd" },
+    sellingPrice: { width: "medium", align: "right", format: "moneyVnd" },
+    isPosVisible: { width: "small" },
+    itemType: { width: "medium" },
+    isActive: { width: "small" },
+  },
+  customers: {
+    status: { format: "customerStatus" },
   },
 };
 
@@ -130,33 +144,40 @@ export function applyColumnFilter(
   }
 }
 
-export function resolveColumnWidthVariant(
+export function resolveColumnConfig(
   entityKey: string,
   field: FieldDefinition,
-): ColumnWidthVariant {
-  const entityWidths = ENTITY_COLUMN_WIDTHS[entityKey];
-  const configuredWidth = entityWidths?.[field.key];
-  if (configuredWidth) {
-    return configuredWidth;
-  }
+): {
+  widthPx: number;
+  align: ColumnTextAlign;
+  format?: ColumnFormatKind;
+} {
+  const configured = ENTITY_COLUMN_CONFIGS[entityKey]?.[field.key];
+  const configuredWidthVariant = configured?.width;
 
   const key = field.key.toLowerCase();
-  if (
+  const fallbackWidthVariant: ColumnWidthVariant =
     key.includes("name") ||
     key.includes("description") ||
     key.includes("address") ||
     key.includes("providerid")
-  ) {
-    return "large";
-  }
-  if (
-    key.includes("unit") ||
-    key === "id" ||
-    key.endsWith("id") ||
-    key.includes("code") ||
-    field.type === "boolean"
-  ) {
-    return "small";
-  }
-  return "medium";
+      ? "large"
+      : key.includes("unit") ||
+          key === "id" ||
+          key.endsWith("id") ||
+          key.includes("code") ||
+          field.type === "boolean"
+        ? "small"
+        : "medium";
+
+  const widthVariant = configuredWidthVariant ?? fallbackWidthVariant;
+  const widthPx = TABLE_COLUMN_WIDTH_PX[widthVariant];
+
+  const format =
+    configured?.format ??
+    (field.type === "number" ? ("numberVi" satisfies ColumnFormatKind) : undefined);
+
+  const align = configured?.align ?? (field.type === "number" ? "right" : "left");
+
+  return { widthPx, align, format };
 }

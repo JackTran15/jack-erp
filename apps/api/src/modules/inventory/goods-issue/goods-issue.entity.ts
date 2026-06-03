@@ -10,6 +10,7 @@ import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 /** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → APPROVED → POSTED | CANCELLED */
 @Entity('goods_issues')
 @Index(['organizationId', 'status'])
+@Index('IDX_goods_issues_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])
 export class GoodsIssueEntity extends BaseEntity {
   @Column({ name: 'document_number', nullable: true, unique: true, comment: 'Auto-generated on posting' })
   documentNumber?: string;

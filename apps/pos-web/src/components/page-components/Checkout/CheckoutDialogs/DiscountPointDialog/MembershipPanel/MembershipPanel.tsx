@@ -1,4 +1,5 @@
 import { cn, formatVnd } from "@erp/ui";
+import { LOYALTY_TEXT } from "@erp/pos/constants/checkout-messages.constant";
 import type { MemberCardData } from "@erp/pos/interfaces/discount-point.interface";
 import { MemberCardTeal } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/MemberCardTeal/MemberCardTeal";
 import { StatBlock } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/MembershipPanel/StatBlock/StatBlock";
@@ -10,6 +11,8 @@ interface MembershipPanelProps {
   pointsUsed: number;
   onChangePointsUsed: (next: number) => void;
 }
+
+const formatPoints = new Intl.NumberFormat("vi-VN");
 
 export function MembershipPanel({
   member,
@@ -37,8 +40,8 @@ export function MembershipPanel({
           tone="success"
         />
         <StatBlock
-          label="Điểm tích lũy"
-          value={formatVnd(loyaltyPoints)}
+          label={LOYALTY_TEXT.LOYALTY_POINTS_LABEL}
+          value={`${formatPoints.format(loyaltyPoints)} ${LOYALTY_TEXT.POINTS_SUFFIX}`}
           tone="warning"
           align="right"
         />

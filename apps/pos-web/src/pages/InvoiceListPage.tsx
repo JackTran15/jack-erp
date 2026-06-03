@@ -18,6 +18,8 @@ export function InvoiceListPage() {
     setDateRange,
     filters,
     setFilter,
+    filterOperators,
+    setFilterOperator,
     visibleColumns,
     columnSettingsOpen,
     openColumnSettings,
@@ -55,9 +57,11 @@ export function InvoiceListPage() {
             <InvoiceListTable
               rows={rows}
               filters={filters}
+              filterOperators={filterOperators}
               visibleColumns={visibleColumns}
               grandTotal={grandTotal}
               onFilterChange={setFilter}
+              onFilterOperatorChange={setFilterOperator}
               onOpenInvoice={openInvoice}
             />
           </div>

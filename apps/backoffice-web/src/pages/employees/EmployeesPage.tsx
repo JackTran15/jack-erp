@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   IAM_PERMISSION_KEYS,
   type UserDetail,
   type UserSummary,
 } from "@erp/shared-interfaces";
 import { DocumentListShell, PageToolbar, type ToolbarItem } from "@erp/ui";
+import { PageHeader } from "../../components/layout/PageHeader";
+import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import { Copy, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -88,6 +91,9 @@ function resolveUserListQuery(
 }
 
 export function EmployeesPage() {
+  const location = useLocation();
+  const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname);
+
   const canRead = hasPermission(IAM_PERMISSION_KEYS.USER_READ);
   const canWrite = hasPermission(IAM_PERMISSION_KEYS.USER_WRITE);
   const canDelete = hasPermission(IAM_PERMISSION_KEYS.USER_DELETE);
@@ -114,8 +120,13 @@ export function EmployeesPage() {
     [columnFilters, pagination],
   );
 
-  const { data: listData, isLoading, isError, error, refetch } =
-    useUsers(listFilters);
+  const {
+    data: listData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useUsers(listFilters);
   const { data: roles = [] } = useRoles();
   const { data: userDetail } = useUser(selectedId ?? undefined);
 
@@ -246,13 +257,13 @@ export function EmployeesPage() {
     if (!confirmDeactivate) return;
     try {
       await deactivateUser.mutateAsync(confirmDeactivate.id);
-      setSelectedId((id) =>
-        id === confirmDeactivate.id ? null : id,
-      );
+      setSelectedId((id) => (id === confirmDeactivate.id ? null : id));
       setConfirmDeactivate(null);
       toast.success("Đã ngừng hoạt động tài khoản.");
     } catch (err) {
-      toast.error(getIamErrorMessage(err, "Không ngừng hoạt động được tài khoản."));
+      toast.error(
+        getIamErrorMessage(err, "Không ngừng hoạt động được tài khoản."),
+      );
     }
   }, [confirmDeactivate, deactivateUser]);
 
@@ -357,16 +368,14 @@ export function EmployeesPage() {
   }
 
   return (
-    <>
-      <DocumentListShell
+    <div className="flex h-full flex-col">
+      <PageHeader
         title="Nhân viên"
-        toolbar={
-          <PageToolbar
-            items={toolbarItems}
-            tone="primary"
-            className="rounded-none"
-          />
-        }
+        breadcrumbs={breadcrumbs}
+        className="mb-2 shrink-0"
+      />
+      <DocumentListShell
+        toolbar={<PageToolbar items={toolbarItems} tone="primary" />}
         pagination={
           <PaginationControls
             page={pagination.page}
@@ -384,9 +393,7 @@ export function EmployeesPage() {
             }
           />
         }
-        detailPanel={
-          <EmployeeDetailPanel user={selectedUser} roles={roles} />
-        }
+        detailPanel={<EmployeeDetailPanel user={selectedUser} roles={roles} />}
       >
         {isError && (
           <p className="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
@@ -442,6 +449,6 @@ export function EmployeesPage() {
           onConfirm={() => void handleDeactivate()}
         />
       )}
-    </>
+    </div>
   );
 }

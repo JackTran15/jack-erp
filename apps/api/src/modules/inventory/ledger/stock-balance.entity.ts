@@ -6,6 +6,7 @@ import { ItemEntity } from '../location/item.entity';
 @Entity('stock_balances')
 @Unique(['organizationId', 'itemId', 'locationId'])
 @Index(['organizationId', 'branchId'])
+@Index('IDX_stock_balances_org_branch_item', ['organizationId', 'branchId', 'itemId'])
 export class StockBalanceEntity extends BaseEntity {
   @Column({ name: 'item_id', type: 'uuid', comment: 'The item being tracked' })
   itemId: string;

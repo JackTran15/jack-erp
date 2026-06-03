@@ -1,3 +1,94 @@
+function toLocalDateStr(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const dd   = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Converts a discrete date-range option to `{ from?, to? }` ISO date strings
+ * suitable for the v2 search API (DateRangeFilterDto).
+ * `ALL` and `OTHER` return `{}` (no date restriction).
+ */
+export function dateRangeToISO(
+  opt: PosDateRangeFilterOption,
+  now: Date = new Date(),
+): { from?: string; to?: string } {
+  if (opt === "ALL" || opt === "OTHER") return {};
+
+  const startOf = (d: Date) => {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    return c;
+  };
+  const today = startOf(now);
+
+  switch (opt) {
+    case "TODAY":
+      return { from: toLocalDateStr(today), to: toLocalDateStr(today) };
+
+    case "YESTERDAY": {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      return { from: toLocalDateStr(y), to: toLocalDateStr(y) };
+    }
+
+    case "LAST_7_DAYS": {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 6);
+      return { from: toLocalDateStr(from) };
+    }
+
+    case "LAST_14_DAYS": {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 13);
+      return { from: toLocalDateStr(from) };
+    }
+
+    case "THIS_WEEK": {
+      const from = new Date(today);
+      const day = (from.getDay() + 6) % 7;
+      from.setDate(from.getDate() - day);
+      return { from: toLocalDateStr(from) };
+    }
+
+    case "LAST_WEEK": {
+      const from = new Date(today);
+      const day = (from.getDay() + 6) % 7;
+      from.setDate(from.getDate() - day - 7);
+      const to = new Date(from);
+      to.setDate(to.getDate() + 6);
+      return { from: toLocalDateStr(from), to: toLocalDateStr(to) };
+    }
+
+    case "THIS_MONTH": {
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { from: toLocalDateStr(from) };
+    }
+
+    case "LAST_MONTH": {
+      const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const to   = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { from: toLocalDateStr(from), to: toLocalDateStr(to) };
+    }
+
+    case "THREE_MONTHS_AGO": {
+      const from = new Date(today);
+      from.setMonth(from.getMonth() - 3);
+      return { from: toLocalDateStr(from) };
+    }
+
+    case "SIX_MONTHS_AGO": {
+      const from = new Date(today);
+      from.setMonth(from.getMonth() - 6);
+      return { from: toLocalDateStr(from) };
+    }
+
+    default:
+      return {};
+  }
+}
+
 /**
  * Discrete date-range filter options shown in the
  * {@link PosDateRangeFilter} dropdown. Order matches the spec (12 entries,

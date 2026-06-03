@@ -6,14 +6,17 @@ import {
   PromoMenuOptionEnum,
   type PromoMenuOption,
 } from "@erp/pos/constants/checkout.constant";
+import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
 import { DiscountPointDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DiscountPointDialog/DiscountPointDialog";
 import { VoucherDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/VoucherDialog/VoucherDialog";
 import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
+import { useCustomerSummary } from "@erp/pos/hooks/react-query/use-query-customer";
 import { formatCustomerDisplay } from "@erp/pos/lib/common/customerUtils";
 import { lineTotal } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import {
   computeVoucherLineSource,
   selectCustomerDraft,
+  selectPromotionDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 
@@ -54,9 +57,18 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const { pickPromoOption, searchVoucher, applyVoucher } = useCheckoutPromotion();
+  const {
+    pickPromoOption,
+    searchVoucher,
+    applyVoucher,
+    setRedeemedPoints,
+    clearRedeemedPoints,
+  } = useCheckoutPromotion();
   const selectedCustomer = usePosCheckoutSessionStore(
     (s) => selectCustomerDraft(s).selectedCustomer,
+  );
+  const pointsRedeemed = usePosCheckoutSessionStore(
+    (s) => selectPromotionDraft(s).pointsRedeemed,
   );
   const sessionState = usePosCheckoutSessionStore();
   const voucherLines = useMemo(
@@ -66,6 +78,32 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
 
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
+
+  // Fetch summary chỉ khi dialog đang mở và có khách hàng → tránh request thừa
+  // khi cashier đóng popover hoặc chưa chọn khách. `useCustomer*` đã dedup theo
+  // cache + 30s staleTime, nên mở lại dialog cùng khách không gọi lại API.
+  const summaryEnabled = discountDialogOpen && Boolean(selectedCustomer?.id);
+  const { data: summary } = useCustomerSummary(
+    summaryEnabled ? selectedCustomer?.id : undefined,
+  );
+
+  const discountData = useMemo(() => {
+    if (!selectedCustomer) return undefined;
+    return {
+      member: {
+        name: formatCustomerDisplay(selectedCustomer),
+        cardNumber: summary?.membership?.cardNumber ?? null,
+        totalSpent: summary?.purchases.totalSpending ?? 0,
+        loyaltyPoints: summary?.membership?.points ?? 0,
+        pointsUsed: pointsRedeemed,
+        pointsRate: POINT_REDEMPTION_VALUE_VND,
+      },
+    };
+  }, [selectedCustomer, summary, pointsRedeemed]);
+
+  const canApplyPoints = Boolean(
+    selectedCustomer && summary?.membership && summary.membership.points > 0,
+  );
 
   const handlePick = useCallback(
     (key: PromoMenuOption) => {
@@ -163,17 +201,12 @@ export function PromoMenu({ open, onClose }: PromoMenuProps) {
       <DiscountPointDialog
         open={discountDialogOpen}
         onClose={() => setDiscountDialogOpen(false)}
-        data={
-          selectedCustomer
-            ? {
-                member: {
-                  name: formatCustomerDisplay(selectedCustomer),
-                  cardNumber: selectedCustomer.id,
-                },
-              }
-            : undefined
-        }
+        data={discountData}
         onSearchVoucher={searchVoucher}
+        onApply={setRedeemedPoints}
+        onClear={clearRedeemedPoints}
+        hasApplied={pointsRedeemed > 0}
+        canApply={canApplyPoints}
       />
 
       <VoucherDialog

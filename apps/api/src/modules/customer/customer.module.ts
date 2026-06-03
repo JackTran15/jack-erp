@@ -4,6 +4,7 @@ import { EntityRegistryService } from '../crud/entity-registry.service';
 import { CustomerEntity } from './customer.entity';
 import { CustomerGroupEntity } from './customer-group.entity';
 import { MembershipCardEntity } from './membership-card.entity';
+import { MembershipCardTypeEntity } from './membership-card-type.entity';
 import { PointHistoryEntity } from './point-history.entity';
 import { CustomerCreditEntity } from './customer-credit.entity';
 import { InvoiceEntity } from '../pos/entities/invoice.entity';
@@ -17,6 +18,12 @@ import { CustomerGroupService } from './customer-group.service';
 import { MembershipCardService } from './services/membership-card.service';
 import { CustomerCreditService } from './services/customer-credit.service';
 import { CustomerSummaryService } from './services/customer-summary.service';
+import {
+  MembershipCardTypeService,
+  MEMBERSHIP_CARD_TYPE_SERVICE_TOKEN,
+  MEMBERSHIP_CARD_TYPE_ENTITY_CONFIG,
+} from './services/membership-card-type.service';
+import { MembershipCardTypeSeederService } from './services/membership-card-type.seeder';
 import { CustomerController } from './customer.controller';
 import { LoyaltyPointsPublisher } from './publishers/loyalty-points.publisher';
 import { LoyaltyPointsConsumer } from './consumers/loyalty-points.consumer';
@@ -29,6 +36,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
       CustomerEntity,
       CustomerGroupEntity,
       MembershipCardEntity,
+      MembershipCardTypeEntity,
       PointHistoryEntity,
       CustomerCreditEntity,
       InvoiceEntity,
@@ -41,6 +49,9 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
     { provide: CUSTOMER_SERVICE_TOKEN, useExisting: CustomerService },
     CustomerGroupService,
     MembershipCardService,
+    MembershipCardTypeService,
+    { provide: MEMBERSHIP_CARD_TYPE_SERVICE_TOKEN, useExisting: MembershipCardTypeService },
+    MembershipCardTypeSeederService,
     LoyaltyPointsPublisher,
     LoyaltyPointsConsumer,
     LoyaltyPointsReversePublisher,
@@ -51,6 +62,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
   exports: [
     CustomerService,
     MembershipCardService,
+    MembershipCardTypeSeederService,
     LoyaltyPointsPublisher,
     LoyaltyPointsReversePublisher,
     CustomerCreditService,
@@ -65,6 +77,10 @@ export class CustomerModule implements OnModuleInit {
     this.entityRegistry.registerEntity(
       CUSTOMER_ENTITY_CONFIG,
       CUSTOMER_SERVICE_TOKEN,
+    );
+    this.entityRegistry.registerEntity(
+      MEMBERSHIP_CARD_TYPE_ENTITY_CONFIG,
+      MEMBERSHIP_CARD_TYPE_SERVICE_TOKEN,
     );
   }
 }

@@ -3,11 +3,13 @@ import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import {
   CheckoutPane,
   selectActiveSession,
+  selectCatalogDraft,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import type {
   CartLine,
+  CartLineDiscount,
   CatalogProduct,
 } from "@erp/pos/interfaces/checkout.interface";
 import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
@@ -177,11 +179,18 @@ export function useCheckoutSessionCart() {
         activeCheckoutPane === CheckoutPane.RETURN
           ? (latest?.returnCart ?? [])
           : (latest?.purchaseCart ?? []);
-      const existing = targetList.find((l) => l.itemId === product.itemId);
+      const splitLine =
+        selectCatalogDraft(usePosCheckoutSessionStore.getState()).toolbar
+          .splitLine === true;
+      const existing = splitLine
+        ? undefined
+        : targetList.find((l) => l.itemId === product.itemId);
       const affectedLineId = existing ? existing.lineId : crypto.randomUUID();
 
       const apply = (prev: CartLine[]) => {
-        const existingInPrev = prev.find((l) => l.itemId === product.itemId);
+        const existingInPrev = splitLine
+          ? undefined
+          : prev.find((l) => l.itemId === product.itemId);
         if (existingInPrev) {
           setCartError("");
           return prev.map((l) =>
@@ -278,6 +287,33 @@ export function useCheckoutSessionCart() {
         }
         return prev.map((x) => (x.lineId === lineId ? { ...x, qty: next } : x));
       });
+    },
+    [updateCartForLine],
+  );
+
+  const updateLineDiscount = useCallback(
+    (lineId: string, next: CartLineDiscount | null) => {
+      updateCartForLine(lineId, (prev) =>
+        prev.map((l) =>
+          l.lineId === lineId
+            ? { ...l, lineDiscount: next ?? undefined }
+            : l,
+        ),
+      );
+    },
+    [updateCartForLine],
+  );
+
+  const updateLineNote = useCallback(
+    (lineId: string, raw: string) => {
+      const trimmed = raw.trim();
+      updateCartForLine(lineId, (prev) =>
+        prev.map((l) =>
+          l.lineId === lineId
+            ? { ...l, note: trimmed.length > 0 ? trimmed : undefined }
+            : l,
+        ),
+      );
     },
     [updateCartForLine],
   );
@@ -398,6 +434,8 @@ export function useCheckoutSessionCart() {
     updateUnitPrice,
     updateQty,
     bumpQty,
+    updateLineDiscount,
+    updateLineNote,
     removeLine,
     isLineWarning,
     isReturnLine,

@@ -29,6 +29,12 @@ export interface CreateInvoiceBody {
   draftLabel?: string;
   note?: string;
   items?: CreateInvoiceItemBody[];
+  /**
+   * Nhân viên bán hàng được chọn (= userId). ⚠️ Backend hiện CHƯA whitelist
+   * trường này trên `CreateInvoiceDto` (ValidationPipe `forbidNonWhitelisted`),
+   * cần phối hợp BE bổ sung trước khi gửi thật, nếu không request sẽ 400.
+   */
+  salespersonId?: string;
 }
 
 /**
@@ -40,6 +46,17 @@ export interface UpdateInvoiceBody {
   draftLabel?: string;
   note?: string;
   items?: CreateInvoiceItemBody[];
+  /** Nhân viên bán hàng (= userId). Xem cảnh báo backend ở `CreateInvoiceBody`. */
+  salespersonId?: string;
+}
+
+/**
+ * Body cho `POST /invoices/:id/redeem-points` — áp dụng đổi điểm tích lũy vào
+ * draft. BE validate (thẻ active, balance ≥ points, points × 1.000 ≤ giá trị
+ * đơn còn lại); FE chỉ clamp `≥ 1` cho UX.
+ */
+export interface RedeemInvoicePointsBody {
+  points: number;
 }
 
 export interface InvoicePaymentLineBody {
@@ -121,6 +138,36 @@ export interface CheckoutReturnBody {
   creditExpiresAt?: string;
   payments?: InvoicePaymentLineBody[];
   note?: string;
+}
+
+// ─── v2 search (POST /v2/invoices/search) ─────────────────────────────────
+
+interface StringFilter { operator: "*" | "=" | "+" | "-" | "!"; value: string; }
+interface CompareFilter { operator: "=" | "<" | "<=" | ">" | ">="; value: string | number; }
+interface DateRangeFilter { from?: string; to?: string; }
+interface EnumFilter { value: string | null; }
+
+export interface SearchInvoicesV2Body {
+  page?:          number;
+  limit?:         number;
+  code?:          StringFilter;
+  status?:        EnumFilter;
+  type?:          EnumFilter;
+  issuedAt?:      DateRangeFilter;
+  createdAt?:     DateRangeFilter;
+  customerId?:    string;
+  customerCode?:  StringFilter;
+  customerName?:  StringFilter;
+  customerPhone?: StringFilter;
+  amountDue?:     CompareFilter;
+  note?:          StringFilter;
+}
+
+export interface InvoiceSearchV2Response {
+  data:  import("@erp/pos/interfaces/invoice.interface").InvoiceRow[];
+  total: number;
+  page:  number;
+  limit: number;
 }
 
 /** Query params cho `GET /invoices` — danh sách invoice có filter + phân trang. */
