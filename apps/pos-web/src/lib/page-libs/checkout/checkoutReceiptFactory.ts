@@ -66,9 +66,13 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
     0,
   );
-  const paid = totalPaid > 0 ? totalPaid : 0;
+  // Công nợ = nợ toàn phần: BE ghi payments=[], nên bản in cũng phản ánh đã trả
+  // = 0 và dồn toàn bộ vào "Khách nợ" (tránh vừa hiện đã trả đủ vừa hiện nợ đủ
+  // do dòng thanh toán auto-fill).
+  const effectiveTotalPaid = debt ? 0 : totalPaid;
+  const paid = effectiveTotalPaid > 0 ? effectiveTotalPaid : 0;
   const payments =
-    totalPaid > 0
+    effectiveTotalPaid > 0
       ? paymentLines
           .filter((l) => l.amount > 0)
           .map((l) => ({
@@ -77,7 +81,12 @@ export function buildCheckoutInvoicePayload({
           }))
       : [{ label: primaryMethodLabel, amount: 0 }];
 
-  const t = deriveInvoiceTotals({ grandTotal, totalPaid, keepChange, debt });
+  const t = deriveInvoiceTotals({
+    grandTotal,
+    totalPaid: effectiveTotalPaid,
+    keepChange,
+    debt,
+  });
 
   return {
     store: STORE_INFO,

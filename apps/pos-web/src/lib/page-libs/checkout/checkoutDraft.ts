@@ -31,6 +31,8 @@ export function initialCheckoutDraft(): CheckoutDraft {
       deposit: 0,
       returnFee: 0,
       firstAmountAuto: true,
+      paymentDueDate: null,
+      creditDays: null,
     },
     promotion: {
       appliedPromotion: null,
