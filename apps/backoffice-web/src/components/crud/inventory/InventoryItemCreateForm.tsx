@@ -184,8 +184,8 @@ export function InventoryItemCreateForm({
     const rec = initialRecord;
     setExtras((prev) => ({
       ...prev,
-      initialStock: "0",
-      initialStockUnitPrice: "0",
+      initialStock: numToStr(rec.initialStock) || "0",
+      initialStockUnitPrice: numToStr(rec.initialStockUnitPrice) || "0",
       showOnPos: rec.isPosVisible !== false,
       manageBarcodePerUnit: Boolean(rec.manageBarcodePerUnit),
       isGoldSilver: Boolean(rec.isGoldSilver),

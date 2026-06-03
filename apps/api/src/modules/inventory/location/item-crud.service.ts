@@ -170,7 +170,8 @@ export class InventoryItemCrudService extends BaseCrudService<
       const attrs = item.productId
         ? await this.loadProductAttributes(item.productId)
         : await this.loadItemAttributes(item.id);
-      return { ...transformed, ...attrs };
+      const opening = await this.loadInitialStockSnapshot(actor, item.id);
+      return { ...transformed, ...attrs, ...opening };
     }
 
     // Fall back: treat id as a product ID → return representative item
@@ -866,6 +867,34 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
   }
 
+  private async loadInitialStockSnapshot(
+    actor: ActorContext,
+    itemId: string,
+  ): Promise<{ initialStock: number; initialStockUnitPrice: number }> {
+    const rows = await this.dataSource.query<
+      Array<{ initialStock: string | number | null; notes: string | null }>
+    >(
+      `
+        SELECT
+          COALESCE(SUM(quantity)::float, 0) AS "initialStock",
+          (
+            ARRAY_AGG(notes ORDER BY posted_at DESC)
+            FILTER (WHERE notes IS NOT NULL)
+          )[1] AS notes
+        FROM stock_ledger_entries
+        WHERE organization_id = $1
+          AND item_id = $2
+          AND reference_type = 'INITIAL_STOCK'
+      `,
+      [actor.organizationId, itemId],
+    );
+    const row = rows[0];
+    return {
+      initialStock: finiteNumber(row?.initialStock) ?? 0,
+      initialStockUnitPrice: parseInitialStockUnitPrice(row?.notes) ?? 0,
+    };
+  }
+
   private buildCombos(
     colors: Array<{ id: string; label: string }>,
     sizes: Array<{ id: string; label: string }>,
@@ -1165,10 +1194,12 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const attrs = await this.loadProductAttributes(productId);
     const variants = await this.loadProductVariants(actor, productId);
+    const opening = await this.loadInitialStockSnapshot(actor, item.id);
 
     return {
       ...rest,
       ...attrs,
+      ...opening,
       variants,
       categoryName: category?.name ?? '',
       productName: product?.name ?? '',
@@ -1348,6 +1379,14 @@ function finiteNumber(value: unknown): number | undefined {
   if (value === null || value === undefined || value === '') return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function parseInitialStockUnitPrice(notes: unknown): number | undefined {
+  if (typeof notes !== 'string') return undefined;
+  const match = notes.match(/đơn giá nhập\s+([0-9.,]+)/i);
+  if (!match) return undefined;
+  const normalized = match[1].replace(/\./g, '').replace(',', '.');
+  return finiteNumber(normalized);
 }
 
 /**

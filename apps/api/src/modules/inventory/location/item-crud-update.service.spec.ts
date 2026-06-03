@@ -63,6 +63,7 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
     };
     dataSource = {
       transaction: jest.fn().mockImplementation(async (cb: any) => cb(mockManager)),
+      query: jest.fn().mockResolvedValue([]),
     };
 
     const repoMock = () => ({
@@ -162,5 +163,25 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
       expect.anything(),
       expect.not.objectContaining({ colors: expect.anything(), sizes: expect.anything() }),
     );
+  });
+
+  it('hydrates initial stock fields from the opening stock ledger entry', async () => {
+    dataSource.query.mockResolvedValueOnce([
+      {
+        initialStock: '12.5',
+        notes: 'Tồn kho đầu kỳ — đơn giá nhập 45000',
+      },
+    ]);
+
+    const record = await service.getById('item-1', actor);
+
+    expect(dataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('INITIAL_STOCK'),
+      ['org-1', 'item-1'],
+    );
+    expect(record).toMatchObject({
+      initialStock: 12.5,
+      initialStockUnitPrice: 45000,
+    });
   });
 });
