@@ -50,6 +50,7 @@ import {
   type QuickProvider,
 } from "../../components/forms/QuickCreateDialogs";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -664,7 +665,10 @@ interface FormLine {
   itemId: string;
   itemLabel: string;
   unit: string;
-  /** Bin / shelf location ("Vị trí") within the receipt's warehouse. */
+  /** Warehouse ("Kho") this line is received into. */
+  storageId: string;
+  storageLabel: string;
+  /** Bin / shelf location ("Vị trí") within the line's warehouse. */
   locationId: string;
   locationLabel: string;
   orderedQuantity: number;
@@ -676,6 +680,8 @@ const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
   unit: "",
+  storageId: "",
+  storageLabel: "",
   locationId: "",
   locationLabel: "",
   orderedQuantity: 1,
@@ -724,21 +730,6 @@ function PurchaseOrderFormDialog({
   const [providerId, setProviderId] = useState(initial?.providerId ?? "");
   const [providerCode, setProviderCode] = useState(initialProvider.code);
   const [providerName, setProviderName] = useState(initialProvider.name);
-  /**
-   * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
-   * the receipt header for legacy reasons, but the UI lets users pick a
-   * warehouse here and a bin per-line. On save the header `locationId` is
-   * derived from the first line's bin so the existing NOT NULL column stays
-   * happy without a schema migration.
-   */
-  const initialStorageId =
-    initial?.location?.storageId ?? "";
-  const initialStorageLabel =
-    initial && initial.location && initial.location.storageId
-      ? storages.find((s) => s.id === initial.location!.storageId)?.name ?? ""
-      : "";
-  const [storageId, setStorageId] = useState(initialStorageId);
-  const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
   const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
     initial?.purpose === "TRANSFER_IN" ? "TRANSFER" : "OTHER",
   );
@@ -762,6 +753,9 @@ function PurchaseOrderFormDialog({
           itemId: l.itemId,
           itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
           unit: l.uomCode ?? "",
+          storageId: l.location?.storageId ?? "",
+          storageLabel:
+            storages.find((s) => s.id === l.location?.storageId)?.name ?? "",
           locationId: l.locationId,
           locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
           orderedQuantity: Number(l.quantity),
@@ -782,6 +776,7 @@ function PurchaseOrderFormDialog({
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
+  const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
     Array<{ id: string; name: string; branchId: string }>
   >([]);
@@ -850,14 +845,19 @@ function PurchaseOrderFormDialog({
   );
 
   const searchLocationsForStorage = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      if (!storageId) return { items: [], hasMore: false, total: 0 };
+    async (
+      storageIdArg: string,
+      query: string,
+      page: number,
+      pageSize?: number,
+    ) => {
+      if (!storageIdArg) return { items: [], hasMore: false, total: 0 };
       const effectivePageSize = pageSize ?? 20;
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(effectivePageSize),
         search: query.trim(),
-        storageId,
+        storageId: storageIdArg,
       });
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
@@ -869,7 +869,7 @@ function PurchaseOrderFormDialog({
         total: data.total,
       };
     },
-    [storageId],
+    [],
   );
 
   const searchItems = useCallback(
@@ -926,42 +926,48 @@ function PurchaseOrderFormDialog({
       toast.error("Vui lòng chọn đối tượng (NCC).");
       return false;
     }
-    if (!storageId) {
-      toast.error("Vui lòng chọn kho nhập.");
-      return false;
-    }
     const persistableLines = getPersistableFormLines(lines);
     if (persistableLines.length === 0) {
       toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
+    if (persistableLines.some((l) => !l.storageId)) {
+      toast.error("Mỗi dòng hàng phải chọn kho.");
+      return false;
+    }
     setSaving(true);
     try {
-      const needsFallback = persistableLines.some((l) => !l.locationId);
-      let fallbackLocationId = "";
-      if (needsFallback) {
-        const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-          `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
-        );
-        const first = data.data[0];
-        if (!first) {
-          toast.error("Kho đã chọn chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
-          setSaving(false);
-          return false;
+      // Resolve a concrete bin per line. Lines may sit in different warehouses,
+      // so fall back to the first bin of each line's OWN warehouse (cached).
+      const fallbackByStorage = new Map<string, string>();
+      const resolvedLines: FormLine[] = [];
+      for (const l of persistableLines) {
+        let locationId = l.locationId;
+        if (!locationId) {
+          let fb = fallbackByStorage.get(l.storageId);
+          if (fb === undefined) {
+            const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+              `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(l.storageId)}`,
+            );
+            const first = data.data[0];
+            if (!first) {
+              toast.error("Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+              setSaving(false);
+              return false;
+            }
+            fb = first.id;
+            fallbackByStorage.set(l.storageId, fb);
+          }
+          locationId = fb;
         }
-        fallbackLocationId = first.id;
+        resolvedLines.push({ ...l, locationId });
       }
 
-      const resolvedLines = persistableLines.map((l) => ({
-        ...l,
-        locationId: l.locationId || fallbackLocationId,
-      }));
-
       const receivedAtIso = combineDateTimeISO(docDate, docTime);
-      // The header.locationId is a legacy anchor — pick any concrete bin so
-      // the backend's NOT NULL stays satisfied. Lines carry the real bin per
-      // row (with fallback applied above).
-      const headerLocationId = resolvedLines[0]?.locationId ?? fallbackLocationId;
+      // The header.locationId is a legacy anchor — use the first line's bin so
+      // the backend's NOT NULL stays satisfied. Lines carry the real kho/bin
+      // per row (with fallback applied above).
+      const headerLocationId = resolvedLines[0]?.locationId ?? "";
       const payload = {
         purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
         providerId: providerId || undefined,
@@ -998,7 +1004,6 @@ function PurchaseOrderFormDialog({
   }, [
     purpose,
     providerId,
-    storageId,
     lines,
     docDate,
     docTime,
@@ -1093,18 +1098,31 @@ function PurchaseOrderFormDialog({
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
               normalizeFormLines(
-                prev.map((l, i) =>
-                  i === idx
-                    ? {
-                        ...l,
-                        itemId: item.id,
-                        itemLabel: item.code,
-                        unit: item.unit,
-                        // Only overwrite if current price is 0 — preserve user's manual edits.
-                        unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                prev.map((l, i) => {
+                  if (i !== idx) return l;
+                  // A fresh line inherits the warehouse of the nearest line above it.
+                  let storageId = l.storageId;
+                  let storageLabel = l.storageLabel;
+                  if (!storageId) {
+                    for (let j = i - 1; j >= 0; j--) {
+                      if (prev[j].storageId) {
+                        storageId = prev[j].storageId;
+                        storageLabel = prev[j].storageLabel;
+                        break;
                       }
-                    : l,
-                ),
+                    }
+                  }
+                  return {
+                    ...l,
+                    itemId: item.id,
+                    itemLabel: item.code,
+                    unit: item.unit,
+                    storageId,
+                    storageLabel,
+                    // Only overwrite if current price is 0 — preserve user's manual edits.
+                    unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  };
+                }),
               ),
             );
             markDirty();
@@ -1134,23 +1152,64 @@ function PurchaseOrderFormDialog({
     {
       key: "warehouse",
       label: "Kho",
-      width: 140,
-      type: "readonly",
-      getValue: () => storageQuery,
+      width: 160,
+      placeholder: "Chọn kho",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn kho"
+          searchModalPlaceholder="Nhập tên kho"
+          dropdownMinWidth={320}
+          placeholder="Chọn kho"
+          value={row.storageLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, storageLabel: val, storageId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(s) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      storageId: s.id,
+                      storageLabel: s.name,
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchStorages}
+          itemKey={(s) => s.id}
+          renderItem={(s) => s.name}
+          renderMeta={() => ""}
+          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          disabled={isView}
+          className="h-full"
+        />
+      ),
     },
     {
       key: "position",
       label: "Vị trí",
       width: 160,
-      placeholder: storageId ? "Chọn vị trí" : "Chọn kho trước",
+      placeholder: "Chọn vị trí",
       renderEditor: (row, idx) => (
-        <LookupField
+        <LookupField<InventoryLocation>
           portalToBody
           enableSearchModal
           searchModalTitle="Chọn vị trí"
           searchModalPlaceholder="Nhập mã hoặc tên vị trí"
           dropdownMinWidth={360}
-          placeholder={storageId ? "Chọn vị trí" : "Chọn kho trước"}
+          placeholder={row.storageId ? "Chọn vị trí" : "Chọn kho trước"}
           value={row.locationLabel}
           onValueChange={(val) => {
             setLines((prev) =>
@@ -1170,7 +1229,7 @@ function PurchaseOrderFormDialog({
             );
             markDirty();
           }}
-          search={searchLocationsForStorage}
+          search={(q, p, ps) => searchLocationsForStorage(row.storageId, q, p, ps)}
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
           renderMeta={(loc) => loc.code}
@@ -1178,9 +1237,9 @@ function PurchaseOrderFormDialog({
             { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
             { key: "name", label: "Tên vị trí", render: (l) => l.name },
           ]}
-          disabled={isView || !storageId}
+          disabled={isView || !row.storageId}
           onCreateNew={
-            isView || !storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
@@ -1422,36 +1481,6 @@ function PurchaseOrderFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            <FieldRow label="Kho">
-              <LookupField
-                enableSearchModal
-                searchModalTitle="Chọn kho"
-                searchModalPlaceholder="Nhập tên kho"
-                placeholder="Chọn kho"
-                value={storageQuery}
-                onValueChange={(v) => {
-                  setStorageQuery(v);
-                  setStorageId("");
-                  markDirty();
-                }}
-                onSelect={(s) => {
-                  setStorageId(s.id);
-                  setStorageQuery(s.name);
-                  // Reset per-line bin selection — bins from a different
-                  // warehouse cannot move into the newly chosen warehouse.
-                  setLines((prev) =>
-                    prev.map((l) => ({ ...l, locationId: "", locationLabel: "" })),
-                  );
-                  markDirty();
-                }}
-                search={searchStorages}
-                itemKey={(s) => s.id}
-                renderItem={(s) => s.name}
-                renderMeta={() => ""}
-                columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
-                disabled={isView}
-              />
-            </FieldRow>
           </>
         }
         detailActions={
@@ -1460,7 +1489,11 @@ function PurchaseOrderFormDialog({
               <input type="checkbox" disabled />
               <span>Quét mã vạch</span>
             </label>
-            <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
+            <button
+              type="button"
+              onClick={() => setChooseKhoOpen(true)}
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+            >
               Chọn kho
             </button>
             <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
@@ -1563,6 +1596,29 @@ function PurchaseOrderFormDialog({
           markDirty();
         }}
       />
+
+      {chooseKhoOpen && (
+        <ChooseWarehouseDialog
+          storages={storages}
+          fieldLabel="Kho nhập"
+          defaultStorageId={
+            getPersistableFormLines(lines).find((l) => l.storageId)?.storageId
+          }
+          onClose={() => setChooseKhoOpen(false)}
+          onConfirm={(s) => {
+            setLines((prev) =>
+              prev.map((l) => ({
+                ...l,
+                storageId: s.id,
+                storageLabel: s.name,
+                locationId: "",
+                locationLabel: "",
+              })),
+            );
+            markDirty();
+          }}
+        />
+      )}
     </>
   );
 }

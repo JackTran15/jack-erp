@@ -551,6 +551,11 @@ export function InventoryItemCreateForm({
     const skip = renderedDynamicKeys.current;
     const managedElsewhere = new Set([
       "description",
+      // Giá mua TB / Giá bán TB — rendered manually in the THÔNG TIN block and
+      // hidden on the edit/detail view; keep them out of the auto-rendered
+      // remainder so they never re-appear at the bottom.
+      "purchasePrice",
+      "sellingPrice",
       "packageWeightGram",
       "packageLengthCm",
       "packageWidthCm",
@@ -713,8 +718,15 @@ export function InventoryItemCreateForm({
               />
             </FormField>
 
-            {renderDynamicField("purchasePrice")}
-            {renderDynamicField("sellingPrice")}
+            {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
+                tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
+                khớp với cách MISA hiển thị chi tiết mặt hàng. */}
+            {!isEdit && (
+              <>
+                {renderDynamicField("purchasePrice")}
+                {renderDynamicField("sellingPrice")}
+              </>
+            )}
 
             {/* Đơn vị tính cơ bản — searchable unit picker + quick-create */}
             <FormField
