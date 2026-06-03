@@ -8,7 +8,7 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 export interface LoyaltyPointsReversePayload {
   returnInvoiceId: string;
   customerId: string;
-  /** Absolute value of the subtotal being reversed (>=0). Consumer decrements `floor(subtotalDelta/1000)`. */
+  /** Absolute value of the subtotal being reversed (>=0). Consumer decrements `floor(subtotalDelta / POINT_EARN_VND_PER_POINT)`. */
   subtotalDelta: number;
   branchId?: string;
   organizationId: string;

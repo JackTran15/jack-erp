@@ -105,8 +105,8 @@ describe('PointsRedemptionService', () => {
     });
 
     it('throws when the point discount exceeds the redeemable amount', async () => {
-      // subtotal 5.000đ → maxDiscount 5.000đ; 10 points = 10.000đ > max.
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ subtotal: 5000 }));
+      // subtotal 4.000đ → maxDiscount 4.000đ; 10 points = 5.000đ > max.
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ subtotal: 4000 }));
       membershipCardService.findActiveCard.mockResolvedValue({ points: 100 });
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
@@ -120,10 +120,10 @@ describe('PointsRedemptionService', () => {
 
       const result = await service.applyRedemption('invoice-1', 30, actor);
 
-      // 30 points * 1.000đ = 30.000đ off → 70.000đ due.
+      // 30 points * 500đ = 15.000đ off → 85.000đ due.
       expect(result.pointsRedeemed).toBe(30);
-      expect(result.pointsDiscountAmount).toBe(30000);
-      expect(result.amountDue).toBe(70000);
+      expect(result.pointsDiscountAmount).toBe(15000);
+      expect(result.amountDue).toBe(85000);
       expect(invoiceRepo.save).toHaveBeenCalled();
     });
   });
