@@ -17,7 +17,14 @@ export interface CreateInvoiceItemBody {
   unit: string;
   quantity: number;
   unitPrice: number;
+  /** Legacy: số tiền KM thô; bị BE bỏ qua khi có `lineDiscountType`. */
   lineDiscount?: number;
+  /** KM thủ công per-line: BE tự tính `lineDiscount` từ `lineDiscountValue`. */
+  lineDiscountType?: "percent" | "amount";
+  /** 10 = 10% khi type=percent; số tiền VNĐ khi type=amount. */
+  lineDiscountValue?: number;
+  /** Lý do/nhãn KM (≤ 255). */
+  lineDiscountReason?: string;
   note?: string;
   sortOrder?: number;
 }
