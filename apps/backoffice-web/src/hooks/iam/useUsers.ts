@@ -13,6 +13,45 @@ export interface UserListFilters {
   isActive?: boolean;
 }
 
+interface EmployeeStringFilter {
+  operator: "*" | "=" | "+" | "-" | "!";
+  value: string;
+}
+
+export interface EmployeeSearchBody {
+  page: number;
+  limit: number;
+  code?: EmployeeStringFilter;
+  fullName?: EmployeeStringFilter;
+  email?: EmployeeStringFilter;
+  isActive?: boolean;
+}
+
+interface EmployeeSearchResponse {
+  data: UserSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Server-side employee search — `POST /v2/employees/search`. Returns the
+ * `{ data, total, page, limit }` envelope; rows keep the full `UserListItem`
+ * shape (code, profile.jobPosition, …) at runtime.
+ */
+export function useEmployeeSearch(body: EmployeeSearchBody) {
+  return useQuery({
+    queryKey: ["iam", "employees-search", body],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.POST<EmployeeSearchResponse>("/v2/employees/search", {
+          body,
+        }),
+      ),
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useUsers(filters: UserListFilters) {
   return useQuery({
     queryKey: ["iam", "users", filters],

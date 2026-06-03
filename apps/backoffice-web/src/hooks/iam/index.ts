@@ -46,7 +46,9 @@ export {
 export {
   useAllUserDetails,
   useAllUsers,
+  useEmployeeSearch,
   useUser,
   useUsers,
+  type EmployeeSearchBody,
   type UserListFilters,
 } from "./useUsers";

@@ -43,6 +43,9 @@ import {
   useCrudDelete,
   useCrudUpdate,
 } from "./useCrudApi";
+import { useCrudV2Search } from "./useCrudV2Search";
+import { CRUD_V2_SEARCH, buildV2Body } from "./crudV2Search";
+import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { CrudFormDialog } from "./CrudFormDialog";
 import { formatCrudFieldValue } from "../../lib/crud-display";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -147,15 +150,34 @@ export function CrudListPage({
     error: configError,
   } = useCrudConfig(entityKey ?? "");
 
-  const {
-    data: records,
-    isLoading: loading,
-    refetch: refetchRecords,
-  } = useCrudRecords(
+  // Entities with a server-side CQRS search endpoint filter against the whole
+  // dataset (server-side) instead of the loaded page; everything else keeps the
+  // generic GET /records + client-side filtering path.
+  const v2 = entityKey ? CRUD_V2_SEARCH[entityKey] : undefined;
+
+  const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
+  const v2Body = useMemo(
+    () => (v2 ? buildV2Body(v2, debouncedColumnFilters, page, pageSize) : null),
+    [v2, debouncedColumnFilters, page, pageSize],
+  );
+
+  const recordsQuery = useCrudRecords(
     entityKey ?? "",
     { page, pageSize, sortBy, sortOrder, search, filters: {} },
-    Boolean(config && entityKey),
+    Boolean(config && entityKey) && !v2,
   );
+  const v2Query = useCrudV2Search(
+    entityKey ?? "",
+    v2Body,
+    Boolean(v2 && config),
+  );
+
+  const records = v2 ? v2Query.data : recordsQuery.data;
+  const loading = v2 ? v2Query.isLoading : recordsQuery.isLoading;
+  const refetchRecords = () => {
+    if (v2) void v2Query.refetch();
+    else void recordsQuery.refetch();
+  };
 
   const createMutation = useCrudCreate(entityKey ?? "");
   const updateMutation = useCrudUpdate(entityKey ?? "");
@@ -192,6 +214,8 @@ export function CrudListPage({
 
   const filteredRecords = useMemo(() => {
     const source = records?.data ?? [];
+    // v2 entities are filtered server-side — render the rows as-is.
+    if (v2) return source;
     const fields = config?.fields ?? [];
     return source.filter((record) =>
       fields.every((field) => {
@@ -204,7 +228,7 @@ export function CrudListPage({
         return applyColumnFilter(comparable, filter);
       }),
     );
-  }, [records?.data, config?.fields, columnFilters]);
+  }, [records?.data, config?.fields, columnFilters, v2]);
 
   useEffect(() => {
     const visibleIds = new Set(
@@ -249,6 +273,32 @@ export function CrudListPage({
                   ]
                 : undefined;
           const alignRight = col.align === "right";
+          // For v2 (server-side) entities, a column is filterable only when it
+          // maps to a v2 DTO field; date fields use the from/to range cell.
+          const v2Kind = v2?.fields[field.key];
+          let filterKind:
+            | "symbol"
+            | "select"
+            | "date-range"
+            | "number-range"
+            | "none";
+          let filterOptions = selectOptions;
+          if (v2) {
+            if (!v2Kind) {
+              filterKind = "none";
+              filterOptions = undefined;
+            } else if (v2Kind === "date-range") {
+              filterKind = "date-range";
+              filterOptions = undefined;
+            } else if (v2Kind === "compare") {
+              filterKind = "number-range";
+              filterOptions = undefined;
+            } else {
+              filterKind = useSelect ? "select" : "symbol";
+            }
+          } else {
+            filterKind = useSelect ? "select" : "symbol";
+          }
           // For inventory items, the primary identifier cells (Mã SKU / Tên hàng hóa)
           // open the edit screen directly instead of the row's detail view.
           const opensEdit =
@@ -300,8 +350,8 @@ export function CrudListPage({
                 </button>
               );
             },
-            filterKind: useSelect ? "select" : "symbol",
-            filterOptions: selectOptions,
+            filterKind,
+            filterOptions,
           };
         }),
     [
@@ -310,6 +360,7 @@ export function CrudListPage({
       entityKey,
       filterDefinitionByKey,
       navigate,
+      v2,
     ],
   );
 
@@ -436,20 +487,41 @@ export function CrudListPage({
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
+        ...prev[fieldKey],
         mode,
         value: prev[fieldKey]?.value ?? "",
       },
     }));
+    if (v2) setPage(1);
   };
 
   const handleColumnFilterValueChange = (fieldKey: string, value: string) => {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
+        ...prev[fieldKey],
         mode: prev[fieldKey]?.mode ?? DEFAULT_COLUMN_FILTER_MODE,
         value,
       },
     }));
+    if (v2) setPage(1);
+  };
+
+  const handleColumnFilterRangeChange = (
+    fieldKey: string,
+    part: "from" | "to",
+    value: string,
+  ) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [fieldKey]: {
+        mode: prev[fieldKey]?.mode ?? DEFAULT_COLUMN_FILTER_MODE,
+        value: prev[fieldKey]?.value ?? "",
+        from: part === "from" ? value : prev[fieldKey]?.from,
+        to: part === "to" ? value : prev[fieldKey]?.to,
+      },
+    }));
+    if (v2) setPage(1);
   };
 
   const selectedRecord = selectedRows.length === 1 ? selectedRows[0] : null;
@@ -593,11 +665,12 @@ export function CrudListPage({
         onRowClick={handleRowClick}
         sortBy={sortBy}
         sortOrder={sortOrder}
-        onSort={handleSort}
+        onSort={v2 ? undefined : handleSort}
         columnFilterControl={{
           filters: columnFilters,
           onModeChange: handleColumnFilterModeChange,
           onValueChange: handleColumnFilterValueChange,
+          onRangeChange: handleColumnFilterRangeChange,
         }}
         leadingColumn={{
           width: 40,
