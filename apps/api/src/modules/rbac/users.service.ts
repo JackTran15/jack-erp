@@ -107,7 +107,23 @@ export class UsersService {
 
     const [rows, total] = await this.userRepo.findAndCount(baseFind);
 
-    // Batch-load profiles for the page in a single query (avoids N+1).
+    return {
+      data: await this.toListItems(rows, actor),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
+
+  /**
+   * Batch-loads employee profiles (with job position) for the given user rows and
+   * maps them to `UserListItem`. Shared by `list()` and the v2 employee search so
+   * both produce a byte-identical row shape. Single profile query — no N+1.
+   */
+  async toListItems(
+    rows: UserEntity[],
+    actor: ActorContext,
+  ): Promise<UserListItem[]> {
     const profiles = rows.length
       ? await this.profileRepo.find({
           where: {
@@ -118,13 +134,7 @@ export class UsersService {
         })
       : [];
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
-
-    return {
-      data: rows.map((u) => this.toListItem(u, profileByUser.get(u.id))),
-      total,
-      page: query.page,
-      pageSize: query.pageSize,
-    };
+    return rows.map((u) => this.toListItem(u, profileByUser.get(u.id)));
   }
 
   async findById(id: string, actor: ActorContext): Promise<UserDetail> {

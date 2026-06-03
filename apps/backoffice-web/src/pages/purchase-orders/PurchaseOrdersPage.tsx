@@ -57,6 +57,7 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
@@ -156,17 +157,31 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   REVERSED: "Đã đảo bút",
 };
 
+/** Filter keys align 1:1 with the `GoodsReceiptSearchV2Dto` body fields. */
 const FILTER_KEYS = [
   "date",
   "documentNumber",
-  "subject",
+  "party",
   "totalAmount",
-  "notes",
+  "description",
   "reason",
-  "documentType",
+  "purpose",
 ] as const;
 
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+const GR_SEARCH: V2SearchConfig = {
+  path: "/v2/goods-receipts/search",
+  fields: {
+    documentNumber: "string",
+    party: "string",
+    description: "string",
+    reason: "string",
+    purpose: "enum",
+    date: "date-range",
+    totalAmount: "compare",
+  },
+};
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce((acc, k) => {
@@ -207,21 +222,31 @@ export function PurchaseOrdersPage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-      });
-      const { data } = await apiClient.get<PaginatedResponse<PurchaseOrder>>(
-        `/goods-receipts?${params}`,
+      const body = buildV2Body(
+        GR_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setRecords(data);
+      const { data } = await apiClient.post<{
+        data: PurchaseOrder[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/goods-receipts/search", body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination]);
+  }, [pagination, columnFilters]);
 
   const loadProviders = useCallback(async () => {
     try {
@@ -246,7 +271,9 @@ export function PurchaseOrdersPage() {
   }, []);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
 
   useEffect(() => {
@@ -385,7 +412,8 @@ export function PurchaseOrdersPage() {
     {
       key: "date",
       label: "Ngày",
-      width: 110,
+      width: 150,
+      filterKind: "date-range",
       render: (row) =>
         row.receivedAt
           ? new Date(row.receivedAt).toLocaleDateString("vi-VN")
@@ -414,7 +442,7 @@ export function PurchaseOrdersPage() {
       ),
     },
     {
-      key: "subject",
+      key: "party",
       label: "Đối tượng",
       width: 180,
       render: (row) =>
@@ -425,12 +453,13 @@ export function PurchaseOrdersPage() {
       key: "totalAmount",
       label: "Tổng tiền",
       width: 140,
+      filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
       render: (row) => formatMoneyInteger(orderTotal(row)),
     },
     {
-      key: "notes",
+      key: "description",
       label: "Diễn giải",
       render: (row) => row.description ?? "",
     },
@@ -441,9 +470,14 @@ export function PurchaseOrdersPage() {
       render: (row) => row.reason ?? "",
     },
     {
-      key: "documentType",
+      key: "purpose",
       label: "Loại chứng từ",
       width: 200,
+      filterKind: "select",
+      filterOptions: [
+        { value: "OTHER", label: "Phiếu nhập kho khác" },
+        { value: "TRANSFER_IN", label: "Điều chuyển từ cửa hàng khác" },
+      ],
       render: (row) =>
         row.purpose === "TRANSFER_IN"
           ? "Điều chuyển từ cửa hàng khác"
@@ -451,21 +485,38 @@ export function PurchaseOrdersPage() {
     },
   ];
 
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], value },
-        })),
+        }));
+        resetPage();
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], [part]: value },
+        }));
+        resetPage();
+      },
     }),
-    [columnFilters],
+    [columnFilters, resetPage],
   );
 
   const totalSum = useMemo(

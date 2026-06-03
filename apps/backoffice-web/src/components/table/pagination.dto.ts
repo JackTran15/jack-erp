@@ -16,6 +16,9 @@ export type ColumnFilterMode =
 export interface ColumnFilter {
   mode: ColumnFilterMode;
   value: string;
+  /** For `date-range` filter cells only: inclusive from/to (YYYY-MM-DD). */
+  from?: string;
+  to?: string;
 }
 
 export const DEFAULT_COLUMN_FILTER_MODE: ColumnFilterMode = "contains";
@@ -59,14 +62,13 @@ export const ENTITY_COLUMN_CONFIGS: Record<
 > = {
   "inventory-items": {
     code: { width: "medium" },
+    barcode: { width: "medium" },
     name: { width: "large" },
-    categoryName: { width: "medium" },
     unit: { width: "small" },
     brand: { width: "medium" },
     purchasePrice: { width: "medium", align: "right", format: "moneyVnd" },
     sellingPrice: { width: "medium", align: "right", format: "moneyVnd" },
     isPosVisible: { width: "small" },
-    itemType: { width: "medium" },
     isActive: { width: "small" },
   },
   customers: {

@@ -1257,17 +1257,19 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   apiResource: 'inventory/items',
   idField: 'id',
   fields: [
-    // ── List-visible fields (shown in table) ──────────────────────────────
+    // ── List-visible fields (shown in table, order matches the UI) ────────
     { key: 'code', label: 'Mã SKU', type: 'string', required: true },
+    { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true },
     { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
-    { key: 'categoryName', label: 'Nhóm hàng hóa', type: 'string', readOnly: true },
     { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
     { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money', required: true },
     { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money', required: true },
     { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
-    { key: 'itemType', label: 'Loại hàng hóa', type: 'string' },
     { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
+    // ── Display fields removed from the table (kept for form/back-compat) ──
+    { key: 'categoryName', label: 'Nhóm hàng hóa', type: 'string', readOnly: true, hideInList: true },
+    { key: 'itemType', label: 'Loại hàng hóa', type: 'string', hideInList: true },
     // ── Form-only fields (hidden from list table) ─────────────────────────
     { key: 'categoryId', label: 'ID Danh mục', type: 'string', hideInList: true },
     { key: 'description', label: 'Mô tả', type: 'string', hideInList: true },
@@ -1312,10 +1314,6 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
         { label: 'Không', value: 'false' },
       ],
     },
-    { key: 'categoryId', label: 'ID Danh mục', type: 'text' },
-    { key: 'productId', label: 'ID Sản phẩm', type: 'text' },
-    { key: 'brand', label: 'Thương hiệu', type: 'text' },
-    { key: 'itemType', label: 'Nhóm hàng', type: 'text' },
   ],
   permissions: {
     create: 'inventory.write',

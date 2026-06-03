@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VERSION_NEUTRAL,
+  VersioningType,
+} from '@nestjs/common';
 import { AppModule } from '../../../src/app.module';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -28,6 +33,12 @@ export async function createTestApp(): Promise<INestApplication> {
     .compile();
 
   const app = moduleFixture.createNestApplication();
+
+  // Mirror main.ts so versioned routes (e.g. @Version('2')) resolve in E2E.
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: VERSION_NEUTRAL,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

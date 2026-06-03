@@ -13,7 +13,10 @@ export class FilterBuilder<T extends ObjectLiteral> {
   constructor(private readonly qb: SelectQueryBuilder<T>) {}
 
   private key(col: string): string {
-    return `p_${col.replace(/\./g, '_')}_${++_seq}`;
+    // `col` may be a full SQL expression (COALESCE(...), a correlated
+    // subquery, etc.), so strip every non-alphanumeric char to keep the bound
+    // parameter name valid. The trailing counter guarantees uniqueness.
+    return `p_${col.replace(/[^a-zA-Z0-9]/g, '_')}_${++_seq}`;
   }
 
   applyString(col: string, filter?: StringFilterDto): this {

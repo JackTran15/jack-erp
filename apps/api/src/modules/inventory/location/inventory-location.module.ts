@@ -1,4 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { InjectDataSource, TypeOrmModule } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { BranchModule } from '../../branch/branch.module';
@@ -30,6 +31,8 @@ import { ItemStockThresholdService } from './item-stock-threshold.service';
 import { InventoryLocationController } from './inventory-location.controller';
 import { InventoryLocationStockController } from './inventory-location-stock.controller';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
+import { InventoryItemV2Controller } from './controllers/inventory-item-v2.controller';
+import { SearchInventoryItemsV2Handler } from './queries/search-inventory-items-v2.handler';
 import {
   InventoryItemCrudService,
   INVENTORY_ITEM_ENTITY_CONFIG,
@@ -95,11 +98,17 @@ import { BrandEntity } from './brand.entity';
     StockLedgerModule,
     ProductModule,
     DocumentNumberingModule,
+    CqrsModule,
   ],
-  controllers: [InventoryLocationController, InventoryLocationStockController],
+  controllers: [
+    InventoryLocationController,
+    InventoryLocationStockController,
+    InventoryItemV2Controller,
+  ],
   providers: [
     InventoryLocationService,
     InventoryLocationStockService,
+    SearchInventoryItemsV2Handler,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
