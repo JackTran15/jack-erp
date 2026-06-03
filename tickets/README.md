@@ -351,3 +351,33 @@ flowchart LR
   T3 --> T9
 ```
 
+## EPIC-03062026 POS server-side invoice search
+
+- [EPIC-03062026 POS server-side invoice search](./epics/EPIC-03062026-pos-invoice-search.md)
+- Chuyển 3 màn danh sách hóa đơn trên `pos-web` từ lọc client-side sang **search server-side** qua các endpoint CQRS riêng (theo skill `cqrs-search-endpoint`), KHÔNG đụng `POST /v2/invoices/search` đang dùng cho `InvoiceListPage`. #5 "Đổi trả nhanh" = SALE+PAID; "Tổng thanh toán" = `totalPaid`; tên cửa hàng/chi nhánh do endpoint mới join branch trả inline.
+
+| Ticket                                                              | Mô tả                                                                 |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [TKT-PIS-01](./tickets/TKT-PIS-01-be-returnable-invoice-search.md)  | BE: `POST /v2/invoices/returnable/search` (#5, SALE+PAID, branch-scoped) |
+| [TKT-PIS-02](./tickets/TKT-PIS-02-be-purchase-history-search.md)    | BE: `POST /v2/invoices/purchase-history/search` (#2, org-wide / customerId) |
+| [TKT-PIS-03](./tickets/TKT-PIS-03-be-draft-invoice-search.md)       | BE: `POST /v2/invoices/drafts/search` (#4, free-text OR + date range) |
+| [TKT-PIS-04](./tickets/TKT-PIS-04-fe-invoice-search-data-layer.md)  | FE: DTOs + `invoiceService` + `INVOICE_KEYS` + hooks + filter→body mapper |
+| [TKT-PIS-05](./tickets/TKT-PIS-05-fe-return-goods-search.md)        | FE: wire "Đổi trả nhanh" (#5) server-side                            |
+| [TKT-PIS-06](./tickets/TKT-PIS-06-fe-purchase-history-search.md)    | FE: wire "Lịch sử mua hàng" (#2) server-side                          |
+| [TKT-PIS-07](./tickets/TKT-PIS-07-fe-draft-invoices-search.md)      | FE: wire "Hóa đơn chưa thanh toán" (#4) server-side                   |
+
+### Ticket dependency graph (EPIC-03062026)
+
+```mermaid
+flowchart LR
+  T1["TKT-PIS-01 BE returnable"] --> T4["TKT-PIS-04 FE data layer"]
+  T2["TKT-PIS-02 BE purchase-history"] --> T4
+  T3["TKT-PIS-03 BE drafts"] --> T4
+  T1 --> T5["TKT-PIS-05 FE #5"]
+  T2 --> T6["TKT-PIS-06 FE #2"]
+  T3 --> T7["TKT-PIS-07 FE #4"]
+  T4 --> T5
+  T4 --> T6
+  T4 --> T7
+```
+

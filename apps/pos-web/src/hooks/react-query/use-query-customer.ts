@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import {
+  keepPreviousData,
   useMutation,
   useQueries,
   useQuery,
@@ -15,8 +16,10 @@ import type { CustomerDetail, CustomerRow } from "@erp/pos/interfaces/customer.i
 import type { CustomerSummary } from "@erp/pos/interfaces/customer-summary.interface";
 import type { MembershipCard } from "@erp/pos/interfaces/membership-card.interface";
 import type { MembershipCardType } from "@erp/pos/interfaces/membership-card-type.interface";
-import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
-import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
+import type {
+  InvoiceSearchV2Response,
+  SearchPurchaseHistoryBody,
+} from "@erp/pos/dtos/invoice.dto";
 import type {
   CreateCustomerBody,
   IssueMembershipCardBody,
@@ -114,28 +117,31 @@ export function useCustomer(
 }
 
 /**
- * Lịch sử mua hàng của khách — `GET /invoices?customerId=...&isDraft=false`.
+ * Lịch sử mua hàng của khách — `POST /v2/invoices/purchase-history/search`,
+ * server-side filter + pagination. Org-wide cho 1 `customerId` (lịch sử trải
+ * nhiều cửa hàng); BE trả `branch` inline cho cột "Tên cửa hàng".
  *
- * Dùng endpoint invoice đã có (TKT-039); endpoint chuyên biệt
- * `GET /customers/:id/invoices` (TKT-044) chưa được backend implement. Danh
- * sách bị scope theo chi nhánh hiện tại qua header `X-Branch-Id`.
- *
- * Truyền `undefined` để tắt query (vd khi dialog chưa mở hoặc chưa ở tab này).
+ * Truyền `customerId = undefined` (hoặc `enabled = false`) để tắt query khi
+ * dialog chưa mở / chưa ở tab này.
  */
 export function useCustomerPurchaseHistory(
   customerId: string | undefined,
-): UseQueryResult<Paginated<InvoiceRow>, Error> {
-  return useQuery<Paginated<InvoiceRow>, Error>({
-    queryKey: CUSTOMER_KEYS.PURCHASE_HISTORY(customerId ?? ""),
+  body: Omit<SearchPurchaseHistoryBody, "customerId">,
+  enabled = true,
+): UseQueryResult<InvoiceSearchV2Response, Error> {
+  return useQuery<InvoiceSearchV2Response, Error>({
+    queryKey: CUSTOMER_KEYS.PURCHASE_HISTORY(
+      customerId ?? "",
+      body as Record<string, unknown>,
+    ),
     queryFn: () =>
-      invoiceService.list({
-        customerId,
-        isDraft: false,
-        page: 1,
-        limit: 100,
+      invoiceService.searchPurchaseHistory({
+        ...body,
+        customerId: customerId as string,
       }),
-    enabled: Boolean(customerId),
+    enabled: Boolean(customerId) && enabled,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

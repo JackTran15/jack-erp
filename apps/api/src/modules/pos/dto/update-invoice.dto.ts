@@ -19,4 +19,6 @@ export class UpdateInvoiceDto {
   @IsOptional() @IsString() draftLabel?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => UpdateInvoiceItemDto) items?: UpdateInvoiceItemDto[];
+  /** Employee (employee_profiles.id) credited with the sale. */
+  @IsOptional() @IsUUID() salespersonId?: string;
 }

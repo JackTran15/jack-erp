@@ -12,6 +12,7 @@ import { InvoiceItemEntity } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
+import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
@@ -34,6 +35,33 @@ export class InvoiceService {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * Resolves a salesperson identifier — accepting either an
+   * `employee_profiles.id` OR the employee's `user_id` — to the canonical
+   * `employee_profiles.id`, scoped to the actor's organisation (so the FE can
+   * send either id, and cross-tenant linkage is rejected). Throws 400 if no
+   * matching employee exists in the org.
+   */
+  private async resolveSalespersonProfileId(
+    manager: EntityManager,
+    salespersonId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const profile = await manager.findOne(EmployeeProfileEntity, {
+      where: [
+        { id: salespersonId, organizationId },
+        { userId: salespersonId, organizationId },
+      ],
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new BadRequestException(
+        `Salesperson ${salespersonId} not found in this organisation`,
+      );
+    }
+    return profile.id;
+  }
+
   async create(dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {
     const tempCode = `DRAFT-${Date.now()}`;
 
@@ -43,6 +71,14 @@ export class InvoiceService {
         (i) => i.quantity * i.unitPrice - (i.lineDiscount ?? 0),
       );
       const subtotal = lineTotals.reduce((sum, t) => sum + t, 0);
+
+      const salespersonProfileId = dto.salespersonId
+        ? await this.resolveSalespersonProfileId(
+            manager,
+            dto.salespersonId,
+            actor.organizationId,
+          )
+        : undefined;
 
       const invoiceEntity = manager.create(InvoiceEntity, {
         organizationId: actor.organizationId,
@@ -62,6 +98,7 @@ export class InvoiceService {
         depositAmount: 0,
         amountDue: subtotal,
         staffId: actor.userId,
+        salespersonId: salespersonProfileId,
       });
 
       const savedInvoice = await manager.save(invoiceEntity);
@@ -268,6 +305,13 @@ export class InvoiceService {
       if (dto.customerId !== undefined) invoice.customerId = dto.customerId;
       if (dto.draftLabel !== undefined) invoice.draftLabel = dto.draftLabel;
       if (dto.note !== undefined) invoice.note = dto.note;
+      if (dto.salespersonId) {
+        invoice.salespersonId = await this.resolveSalespersonProfileId(
+          manager,
+          dto.salespersonId,
+          actor.organizationId,
+        );
+      }
 
       await manager.save(invoice);
     });

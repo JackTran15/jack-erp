@@ -8,7 +8,10 @@ import type {
   InvoiceSearchV2Response,
   ListInvoicesParams,
   RedeemInvoicePointsBody,
+  SearchDraftInvoicesBody,
   SearchInvoicesV2Body,
+  SearchPurchaseHistoryBody,
+  SearchReturnableInvoicesBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
@@ -18,6 +21,27 @@ import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
 export const invoiceService = {
   searchV2: (body: SearchInvoicesV2Body): Promise<InvoiceSearchV2Response> =>
     http.post<InvoiceSearchV2Response>("/v2/invoices/search", body),
+
+  /** `POST /v2/invoices/returnable/search` — paid sales for the return page (#5). */
+  searchReturnable: (
+    body: SearchReturnableInvoicesBody,
+  ): Promise<InvoiceSearchV2Response> =>
+    http.post<InvoiceSearchV2Response>("/v2/invoices/returnable/search", body),
+
+  /** `POST /v2/invoices/purchase-history/search` — one customer's history (#2). */
+  searchPurchaseHistory: (
+    body: SearchPurchaseHistoryBody,
+  ): Promise<InvoiceSearchV2Response> =>
+    http.post<InvoiceSearchV2Response>(
+      "/v2/invoices/purchase-history/search",
+      body,
+    ),
+
+  /** `POST /v2/invoices/drafts/search` — held draft invoices (#4). */
+  searchDrafts: (
+    body: SearchDraftInvoicesBody,
+  ): Promise<InvoiceSearchV2Response> =>
+    http.post<InvoiceSearchV2Response>("/v2/invoices/drafts/search", body),
 
   create: (body: CreateInvoiceBody): Promise<InvoiceRow> =>
     http.post<InvoiceRow>("/invoices", body),
@@ -50,12 +74,6 @@ export const invoiceService = {
 
   delete: (id: string): Promise<void> =>
     http.delete<void>(`/invoices/${encodeURIComponent(id)}`),
-
-  listDrafts: (sessionId: string): Promise<InvoiceRow[]> => {
-    const params = new URLSearchParams({ session_id: sessionId });
-    // return http.get<InvoiceRow[]>(`/invoices/drafts?${params.toString()}`);
-    return http.get<InvoiceRow[]>(`/invoices/drafts`);
-  },
 
   // ─── Return / Exchange (EPIC-011) ─────────────────────────────────────────
 

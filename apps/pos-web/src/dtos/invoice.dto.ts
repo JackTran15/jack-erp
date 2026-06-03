@@ -30,9 +30,9 @@ export interface CreateInvoiceBody {
   note?: string;
   items?: CreateInvoiceItemBody[];
   /**
-   * Nhân viên bán hàng được chọn (= userId). ⚠️ Backend hiện CHƯA whitelist
-   * trường này trên `CreateInvoiceDto` (ValidationPipe `forbidNonWhitelisted`),
-   * cần phối hợp BE bổ sung trước khi gửi thật, nếu không request sẽ 400.
+   * Nhân viên bán hàng được chọn = employee profile id (`employee_profiles.id`,
+   * lấy từ picker `GET /branches/:id/salesmen`). BE lưu vào
+   * `invoices.salesperson_id` (FK → employee_profiles), tách khỏi `staffId` (người tạo đơn).
    */
   salespersonId?: string;
 }
@@ -46,7 +46,7 @@ export interface UpdateInvoiceBody {
   draftLabel?: string;
   note?: string;
   items?: CreateInvoiceItemBody[];
-  /** Nhân viên bán hàng (= userId). Xem cảnh báo backend ở `CreateInvoiceBody`. */
+  /** Nhân viên bán hàng = employee profile id. Xem `CreateInvoiceBody`. */
   salespersonId?: string;
 }
 
@@ -142,10 +142,10 @@ export interface CheckoutReturnBody {
 
 // ─── v2 search (POST /v2/invoices/search) ─────────────────────────────────
 
-interface StringFilter { operator: "*" | "=" | "+" | "-" | "!"; value: string; }
-interface CompareFilter { operator: "=" | "<" | "<=" | ">" | ">="; value: string | number; }
-interface DateRangeFilter { from?: string; to?: string; }
-interface EnumFilter { value: string | null; }
+export interface StringFilter { operator: "*" | "=" | "+" | "-" | "!"; value: string; }
+export interface CompareFilter { operator: "=" | "<" | "<=" | ">" | ">="; value: string | number; }
+export interface DateRangeFilter { from?: string; to?: string; }
+export interface EnumFilter { value: string | null; }
 
 export interface SearchInvoicesV2Body {
   page?:          number;
@@ -161,6 +161,40 @@ export interface SearchInvoicesV2Body {
   customerPhone?: StringFilter;
   amountDue?:     CompareFilter;
   note?:          StringFilter;
+}
+
+/** Body cho `POST /v2/invoices/returnable/search` — hóa đơn bán đã thanh toán (#5). */
+export interface SearchReturnableInvoicesBody {
+  page?:          number;
+  limit?:         number;
+  code?:          StringFilter;
+  createdAt?:     DateRangeFilter;
+  customerName?:  StringFilter;
+  customerPhone?: StringFilter;
+  totalPaid?:     CompareFilter;
+  branchName?:    StringFilter;
+}
+
+/** Body cho `POST /v2/invoices/purchase-history/search` — lịch sử mua của 1 khách (#2). */
+export interface SearchPurchaseHistoryBody {
+  customerId:  string;
+  page?:       number;
+  limit?:      number;
+  code?:       StringFilter;
+  issuedAt?:   DateRangeFilter;
+  storeName?:  StringFilter;
+  status?:     EnumFilter;
+  totalPaid?:  CompareFilter;
+  note?:       StringFilter;
+}
+
+/** Body cho `POST /v2/invoices/drafts/search` — hóa đơn lưu tạm (#4). */
+export interface SearchDraftInvoicesBody {
+  page?:      number;
+  limit?:     number;
+  search?:    string;
+  createdAt?: DateRangeFilter;
+  sessionId?: string;
 }
 
 export interface InvoiceSearchV2Response {

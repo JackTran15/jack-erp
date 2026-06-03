@@ -24,6 +24,7 @@ export function ReturnGoodsPage() {
     filters,
     setFilter,
     rows,
+    total,
     dialog,
     openInvoice,
     closeDialog,
@@ -73,7 +74,7 @@ export function ReturnGoodsPage() {
             page={1}
             totalPages={1}
             pageSize={RETURN_GOODS_DEFAULT_PAGE_SIZE}
-            total={rows.length}
+            total={total}
           />
         </div>
       </div>

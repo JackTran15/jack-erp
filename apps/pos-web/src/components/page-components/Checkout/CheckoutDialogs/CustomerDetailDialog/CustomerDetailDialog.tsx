@@ -4,7 +4,6 @@ import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import {
   useCustomer,
-  useCustomerPurchaseHistory,
   useCustomerSummary,
   useIssueMembershipCard,
   useMembershipCard,
@@ -19,7 +18,6 @@ import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
 import { InfoTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/InfoTab/InfoTab";
 import { mapCustomerToDetailData } from "@erp/pos/lib/page-libs/checkout/mapCustomerDetail";
-import { mapInvoicesToPurchaseHistory } from "@erp/pos/lib/page-libs/checkout/mapPurchaseHistory";
 import { OverviewTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/OverviewTab/OverviewTab";
 import { PurchaseHistoryTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/PurchaseHistoryTab";
 import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
@@ -147,17 +145,12 @@ export function CustomerDetailDialog({
     return { name: fallbackName ?? "" };
   }, [customerRaw, groupNameById, summary, card, fallbackName]);
 
-  // Lịch sử mua hàng — fetch lười, chỉ khi dialog mở và đang ở tab "Lịch sử
-  // mua hàng" để tránh gọi API thừa khi mở các tab khác.
+  // Lịch sử mua hàng — fetch lười trong chính `PurchaseHistoryTab`, chỉ khi
+  // dialog mở và đang ở tab này (server-side search). `branchName` truyền xuống
+  // làm fallback tên cửa hàng khi một dòng thiếu branch.
   const branchName = usePosBranchStore((s) => s.branchName);
   const historyEnabled =
     open && activeTab === CustomerDetailTabKeyEnum.HISTORY;
-  const { data: invoicesPage, isLoading: isHistoryLoading } =
-    useCustomerPurchaseHistory(historyEnabled ? customerId : undefined);
-  const purchaseHistory = useMemo(
-    () => mapInvoicesToPurchaseHistory(invoicesPage?.data ?? [], branchName),
-    [invoicesPage, branchName],
-  );
 
   const { mutate: issueCard, isPending: isIssuingCardPending } =
     useIssueMembershipCard();
@@ -255,8 +248,9 @@ export function CustomerDetailDialog({
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.HISTORY ? (
             <PurchaseHistoryTab
-              rows={purchaseHistory}
-              isLoading={isHistoryLoading}
+              customerId={customerId}
+              enabled={historyEnabled}
+              branchName={branchName}
               customerName={data.name}
               customerPhone={data.phone}
             />

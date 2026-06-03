@@ -36,6 +36,8 @@ export interface InvoiceRow {
   customerId?: string;
   /** Customer nhúng ở `GET /invoices/drafts`. Các endpoint khác có thể bỏ trống. */
   customer?: CustomerRow | null;
+  /** Branch nhúng ở các endpoint search v2 mới (returnable/purchase-history/drafts). */
+  branch?: { id: string; name: string } | null;
   staffId: string;
   subtotal: number;
   discountAmount: number;

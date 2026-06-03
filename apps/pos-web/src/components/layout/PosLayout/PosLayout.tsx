@@ -106,7 +106,10 @@ export function PosLayout() {
     (s) => s.openDraftInNewSession,
   );
 
+  // Badge đếm hóa đơn lưu tạm — body không filter (trùng cache key với dialog
+  // khi chưa nhập tìm kiếm). Đếm tối đa 100 (giới hạn 1 trang) — đủ cho draft.
   const draftsQuery = useDraftInvoicesQuery({
+    body: { page: 1, limit: 100 },
     sessionId: posSessionId,
     enabled: Boolean(posSessionId),
   });

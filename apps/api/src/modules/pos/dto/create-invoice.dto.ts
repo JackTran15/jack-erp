@@ -68,4 +68,9 @@ export class CreateInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceItemDto)
   items?: CreateInvoiceItemDto[];
+
+  /** Employee (employee_profiles.id) credited with the sale. */
+  @IsOptional()
+  @IsUUID()
+  salespersonId?: string;
 }

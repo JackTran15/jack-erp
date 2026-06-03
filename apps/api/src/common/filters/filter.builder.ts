@@ -77,7 +77,11 @@ export class FilterBuilder<T extends ObjectLiteral> {
 
     if (filter.to) {
       const k = this.key(`${col}_to`);
-      this.qb.andWhere(`${col} <= :${k}`, { [k]: filter.to });
+      // Inclusive of the whole `to` day even when the column carries a time
+      // component (e.g. `to = '2026-05-26'` must match rows at 2026-05-26 18:48).
+      this.qb.andWhere(`${col} < (:${k}::date + INTERVAL '1 day')`, {
+        [k]: filter.to,
+      });
     }
 
     return this;

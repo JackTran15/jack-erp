@@ -4,33 +4,42 @@ import { PosDataTable, type PosDataTableColumn } from "@erp/pos/components/commo
 import { PosDataTableFilterCell } from "@erp/pos/components/common/PosDataTable/PosDataTableFilterCell/PosDataTableFilterCell";
 import { PosPaginationBar } from "@erp/pos/components/common/PosPaginationBar/PosPaginationBar";
 import {
-  PurchaseHistoryStatusEnum,
-  PurchaseHistoryStatusFilterEnum,
-} from "@erp/pos/constants/checkout.constant";
-import {
   FilterOperatorEnum,
   FilterOperatorTypeEnum,
+  PurchaseHistoryStatusEnum,
+  PurchaseHistoryStatusFilterEnum,
 } from "@erp/pos/constants/checkout.constant";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { StatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/StatusBadge/StatusBadge";
 import { InvoiceReceiptDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceReceiptDialog";
-import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+import { formatViDateTime, parseViDate } from "@erp/pos/lib/common/dateTime";
+import { useDebounce } from "@erp/pos/hooks/common/use-debounce";
+import { useCustomerPurchaseHistory } from "@erp/pos/hooks/react-query/use-query-customer";
+import { mapInvoicesToPurchaseHistory } from "@erp/pos/lib/page-libs/checkout/mapPurchaseHistory";
 import {
-  matchesDateFilter,
-  matchesNumberFilter,
-  matchesTextFilter,
-} from "@erp/pos/lib/common/columnFilter";
+  columnToCompareFilter,
+  columnToStringFilter,
+} from "@erp/pos/lib/common/invoiceFilterToBody";
 import type { ColumnFilterState } from "@erp/pos/interfaces/column-filter.interface";
+import type {
+  DateRangeFilter,
+  SearchPurchaseHistoryBody,
+} from "@erp/pos/dtos/invoice.dto";
 import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.interface";
 
 export interface PurchaseHistoryTabProps {
-  rows: PurchaseHistoryEntry[];
-  /** Hiển thị "Đang tải…" thay cho empty-state trong lúc fetch lịch sử. */
-  isLoading?: boolean;
+  /** Customer whose history to fetch (`POST /v2/invoices/purchase-history/search`). */
+  customerId: string;
+  /** Fetch only when the dialog is open and this tab is active. */
+  enabled?: boolean;
+  /** Fallback store name when a row's branch is missing. */
+  branchName?: string | null;
   /** Tên + SĐT khách (hiển thị trong biên lai chi tiết). */
   customerName?: string;
   customerPhone?: string | null;
 }
+
+const PURCHASE_HISTORY_PAGE_SIZE = 100;
 
 const STATUS_FILTER_TO_STATUS: Record<
   PurchaseHistoryStatusFilterEnum,
@@ -39,6 +48,12 @@ const STATUS_FILTER_TO_STATUS: Record<
   [PurchaseHistoryStatusFilterEnum.ALL]: null,
   [PurchaseHistoryStatusFilterEnum.PAID]: PurchaseHistoryStatusEnum.PAID,
   [PurchaseHistoryStatusFilterEnum.DEBT]: PurchaseHistoryStatusEnum.DEBT,
+};
+
+/** UI status enum → backend `InvoiceStatus` value sent to the search endpoint. */
+const STATUS_TO_API: Record<PurchaseHistoryStatusEnum, string> = {
+  [PurchaseHistoryStatusEnum.PAID]: "paid",
+  [PurchaseHistoryStatusEnum.DEBT]: "debt",
 };
 
 /** Per-column filter state for the text/number/date columns (status uses its own select). */
@@ -59,15 +74,42 @@ const DEFAULT_COLUMN_FILTERS: PurchaseHistoryColumnFilters = {
   note: { operator: FilterOperatorEnum.CONTAINS, value: "" },
 };
 
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** A `dd/MM/yyyy` date cell + operator → `issuedAt` range filter. */
+function dateColumnToRange(state: ColumnFilterState): DateRangeFilter | undefined {
+  const parsed = parseViDate(state.value);
+  if (!parsed) return undefined;
+  const iso = toIsoDate(parsed);
+  switch (state.operator) {
+    case FilterOperatorEnum.LESS_THAN:
+    case FilterOperatorEnum.LESS_THAN_OR_EQUAL:
+      return { to: iso };
+    case FilterOperatorEnum.GREATER_THAN:
+    case FilterOperatorEnum.GREATER_THAN_OR_EQUAL:
+      return { from: iso };
+    case FilterOperatorEnum.EQUALS:
+      return { from: iso, to: iso };
+    default:
+      return undefined;
+  }
+}
+
 /**
- * "Lịch sử mua hàng" tab — data table with header + filter row + body +
- * pagination + grand-total footer. Per-column filters run client-side over the
- * already-loaded rows: text columns use CONTAINS/EQUALS/STARTS_WITH/…, the date
- * column parses `dd/MM/yyyy`, and amounts use `= < ≤ > ≥` (see `columnFilter.ts`).
+ * "Lịch sử mua hàng" tab — server-side filtered via
+ * `POST /v2/invoices/purchase-history/search`. The header filter row maps to v2
+ * filter shapes (debounced); the status select maps "Tất cả/Đã thanh toán/Ghi
+ * nợ" to the backend `status` enum. "Tên cửa hàng" comes from the joined branch.
  */
 export function PurchaseHistoryTab({
-  rows,
-  isLoading,
+  customerId,
+  enabled = true,
+  branchName,
   customerName,
   customerPhone,
 }: PurchaseHistoryTabProps) {
@@ -88,6 +130,37 @@ export function PurchaseHistoryTab({
     [],
   );
 
+  // Debounce the typed values so each keystroke doesn't fire a request.
+  const debouncedFilters = useDebounce(columnFilters);
+
+  const searchBody = useMemo<Omit<SearchPurchaseHistoryBody, "customerId">>(
+    () => ({
+      page: 1,
+      limit: PURCHASE_HISTORY_PAGE_SIZE,
+      code: columnToStringFilter(debouncedFilters.invoiceNumber),
+      issuedAt: dateColumnToRange(debouncedFilters.invoiceDate),
+      storeName: columnToStringFilter(debouncedFilters.storeName),
+      status: selectedStatus
+        ? { value: STATUS_TO_API[selectedStatus] }
+        : undefined,
+      totalPaid: columnToCompareFilter(debouncedFilters.totalAmount),
+      note: columnToStringFilter(debouncedFilters.note),
+    }),
+    [debouncedFilters, selectedStatus],
+  );
+
+  const { data, isLoading } = useCustomerPurchaseHistory(
+    customerId,
+    searchBody,
+    enabled,
+  );
+
+  const rows = useMemo(
+    () => mapInvoicesToPurchaseHistory(data?.data ?? [], branchName ?? null),
+    [data, branchName],
+  );
+  const total = data?.total ?? 0;
+
   const statusOptions = useMemo(
     () => [
       { value: PurchaseHistoryStatusFilterEnum.ALL, label: "Tất cả" },
@@ -100,21 +173,7 @@ export function PurchaseHistoryTab({
     [],
   );
 
-  const filtered = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          (selectedStatus === null || r.status === selectedStatus) &&
-          matchesDateFilter(r.invoiceDate, columnFilters.invoiceDate) &&
-          matchesTextFilter(r.invoiceNumber, columnFilters.invoiceNumber) &&
-          matchesTextFilter(r.storeName, columnFilters.storeName) &&
-          matchesNumberFilter(r.totalAmount, columnFilters.totalAmount) &&
-          matchesTextFilter(r.note ?? "", columnFilters.note),
-      ),
-    [rows, selectedStatus, columnFilters],
-  );
-
-  const grandTotal = filtered.reduce((s, r) => s + r.totalAmount, 0);
+  const grandTotal = rows.reduce((s, r) => s + r.totalAmount, 0);
   const columns = useMemo<
     ReadonlyArray<PosDataTableColumn<PurchaseHistoryEntry>>
   >(
@@ -241,14 +300,14 @@ export function PurchaseHistoryTab({
         <div className="max-h-[360px] overflow-auto border border-gray-200">
           <PosDataTable
             columns={columns}
-            dataSource={filtered}
+            dataSource={rows}
             rowKey={(row) => row.id}
             emptyText={isLoading ? "Đang tải…" : "Chưa có hóa đơn nào."}
             summaryRow={
-              filtered.length > 0 ? (
+              rows.length > 0 ? (
                 <tr className="h-10 border-t border-gray-200 text-[14px] font-semibold text-gray-900">
                   <td colSpan={4} className="px-3">
-                    Tổng hóa đơn: {filtered.length}
+                    Tổng hóa đơn: {total}
                   </td>
                   <td className="px-3 text-right">{formatVnd(grandTotal)}</td>
                   <td />
@@ -260,8 +319,8 @@ export function PurchaseHistoryTab({
         <PosPaginationBar
           page={1}
           totalPages={1}
-          pageSize={100}
-          total={filtered.length}
+          pageSize={PURCHASE_HISTORY_PAGE_SIZE}
+          total={total}
         />
       </div>
 

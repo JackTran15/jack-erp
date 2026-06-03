@@ -8,8 +8,8 @@ import type { PurchaseHistoryEntry } from "@erp/pos/interfaces/customer-detail.i
  * hàng. Chỉ giữ hoá đơn không phải draft và có trạng thái paid/debt/partial_debt
  * (loại draft/pending/cancelled — không phải giao dịch mua hoàn tất).
  *
- * `storeName` lấy theo tên chi nhánh hiện tại vì `GET /invoices` bị scope theo
- * `X-Branch-Id` (response không kèm tên chi nhánh).
+ * `storeName` lấy từ `inv.branch.name` (BE join trả inline); fallback `branchName`
+ * khi thiếu. "Tổng thanh toán" = `totalPaid`.
  */
 const STATUS_MAP: Partial<Record<InvoiceRow["status"], PurchaseHistoryStatus>> = {
   paid: PurchaseHistoryStatusEnum.PAID,
@@ -30,9 +30,9 @@ export function mapInvoicesToPurchaseHistory(
       id: inv.id,
       invoiceDate: new Date(inv.issuedAt ?? inv.createdAt),
       invoiceNumber: inv.code,
-      storeName: branchName ?? "",
+      storeName: inv.branch?.name ?? branchName ?? "",
       status,
-      totalAmount: inv.amountDue,
+      totalAmount: Number(inv.totalPaid) || 0,
       note: inv.note,
     });
   }
