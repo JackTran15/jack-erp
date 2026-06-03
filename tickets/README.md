@@ -403,3 +403,23 @@ flowchart LR
   T3 --> T4
 ```
 
+## EPIC-03062026 Loyalty point rate change (earn ÷10000, redeem 1pt = 500đ)
+
+- [EPIC-03062026 Loyalty point rate change](./epics/EPIC-03062026-loyalty-point-rate-change.md)
+- Đổi giá trị chương trình tích điểm: 1.000.000đ mua hàng → **100 điểm** (10% ÷ 1.000), đổi **100 điểm = 50.000đ** (1 điểm = 500đ), cashback thực ~**5%** (giảm từ ~100%). Chỉ đổi **2 hằng số** `POINT_EARN_VND_PER_POINT` (1000 → **10000**) + `POINT_REDEMPTION_VALUE_VND` (1000 → **500**) + sửa số magic `1000` trong consumer hoàn điểm khi trả hàng → dùng hằng số. **Không** migration, **không** entity/endpoint/event mới. ⚠️ Yêu cầu gốc chỉ nói redemption, nhưng ví dụ (1tr → 100 điểm) buộc đổi cả earn — chốt ở Step 3.
+
+| Ticket                                                                       | Mô tả                                                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [TKT-LPR-01](./tickets/TKT-LPR-01-be-rate-constants-and-reversal-fix.md)      | BE: đổi 2 hằng số earn/redeem + thay magic `1000` ở reverse consumer + unit test |
+| [TKT-LPR-02](./tickets/TKT-LPR-02-fe-pos-redemption-mirror.md)               | FE: cập nhật mirror `POINT_REDEMPTION_VALUE_VND = 500` ở pos-web + copy hiển thị |
+| [TKT-LPR-03](./tickets/TKT-LPR-03-e2e-loyalty-rate-regression.md)            | E2E: regression earn 100 / redeem 50.000 / reverse 100 + re-baseline assertions |
+
+### Ticket dependency graph (EPIC-03062026 loyalty-rate)
+
+```mermaid
+flowchart LR
+  T1["TKT-LPR-01 BE constants + reversal fix"] --> T2["TKT-LPR-02 FE mirror"]
+  T1 --> T3["TKT-LPR-03 E2E regression"]
+  T2 --> T3
+```
+

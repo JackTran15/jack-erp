@@ -173,7 +173,7 @@ describe('Loyalty (E2E)', () => {
       return res.body.id;
     };
 
-    it('reduces amountDue by points * 1000 and records the redemption', async () => {
+    it('reduces amountDue by points * 500 and records the redemption', async () => {
       const customerId = await createCustomer('Redeem OK');
       await issueCardWithPoints(customerId, 100);
       const invoiceId = await createDraft(customerId);
@@ -184,10 +184,10 @@ describe('Loyalty (E2E)', () => {
         .send({ points: 30 })
         .expect(201);
 
-      // subtotal 60.000 − 30 points * 1.000 = 30.000 due.
+      // subtotal 60.000 − 30 points * 500 = 45.000 due.
       expect(res.body.pointsRedeemed).toBe(30);
-      expect(Number(res.body.pointsDiscountAmount)).toBe(30000);
-      expect(Number(res.body.amountDue)).toBe(30000);
+      expect(Number(res.body.pointsDiscountAmount)).toBe(15000);
+      expect(Number(res.body.amountDue)).toBe(45000);
     });
 
     it('rejects redeeming more points than the balance', async () => {
