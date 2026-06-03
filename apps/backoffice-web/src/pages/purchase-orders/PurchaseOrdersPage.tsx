@@ -57,6 +57,10 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
@@ -679,6 +683,12 @@ const emptyLine = (): FormLine => ({
   notes: "",
 });
 
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
+
 function PurchaseOrderFormDialog({
   mode,
   initial,
@@ -745,9 +755,10 @@ function PurchaseOrderFormDialog({
   const [docTime, setDocTime] = useState(
     `${pad2(initialReceivedAt.getHours())}:${pad2(initialReceivedAt.getMinutes())}`,
   );
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
           unit: l.uomCode ?? "",
@@ -756,9 +767,10 @@ function PurchaseOrderFormDialog({
           orderedQuantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice),
           notes: l.note ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -902,8 +914,9 @@ function PurchaseOrderFormDialog({
     [],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
-  const totalAmount = lines.reduce(
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
+  const totalAmount = summaryLines.reduce(
     (s, l) => s + Number(l.orderedQuantity || 0) * Number(l.unitPrice || 0),
     0,
   );
@@ -917,17 +930,14 @@ function PurchaseOrderFormDialog({
       toast.error("Vui lòng chọn kho nhập.");
       return false;
     }
-    if (lines.length === 0) {
-      toast.error("Vui lòng thêm ít nhất một dòng hàng hóa.");
-      return false;
-    }
-    if (lines.some((l) => !l.itemId)) {
-      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
+      toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
     setSaving(true);
     try {
-      const needsFallback = lines.some((l) => !l.locationId);
+      const needsFallback = persistableLines.some((l) => !l.locationId);
       let fallbackLocationId = "";
       if (needsFallback) {
         const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
@@ -942,7 +952,7 @@ function PurchaseOrderFormDialog({
         fallbackLocationId = first.id;
       }
 
-      const resolvedLines = lines.map((l) => ({
+      const resolvedLines = persistableLines.map((l) => ({
         ...l,
         locationId: l.locationId || fallbackLocationId,
       }));
@@ -1082,17 +1092,19 @@ function PurchaseOrderFormDialog({
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      unit: item.unit,
-                      // Only overwrite if current price is 0 — preserve user's manual edits.
-                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
-                    }
-                  : l,
+              normalizeFormLines(
+                prev.map((l, i) =>
+                  i === idx
+                    ? {
+                        ...l,
+                        itemId: item.id,
+                        itemLabel: item.code,
+                        unit: item.unit,
+                        // Only overwrite if current price is 0 — preserve user's manual edits.
+                        unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                      }
+                    : l,
+                ),
               ),
             );
             markDirty();
@@ -1469,11 +1481,13 @@ function PurchaseOrderFormDialog({
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              setLines((prev) => prev.filter((_, i) => i !== idx));
+              setLines((prev) =>
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
+              );
               markDirty();
             }}
             showAddRow={!isView}
@@ -1537,10 +1551,12 @@ function PurchaseOrderFormDialog({
           const idx = quickItemLineIdx;
           if (idx === null) return;
           setLines((prev) =>
-            prev.map((l, i) =>
-              i === idx
-                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
-                : l,
+            normalizeFormLines(
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  : l,
+              ),
             ),
           );
           setQuickItemLineIdx(null);

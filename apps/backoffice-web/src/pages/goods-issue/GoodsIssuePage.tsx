@@ -59,6 +59,10 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -729,6 +733,12 @@ const emptyLine = (): FormLine => ({
   notes: "",
 });
 
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
+
 function GoodsIssueFormDialog({
   mode,
   initial,
@@ -821,9 +831,10 @@ function GoodsIssueFormDialog({
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   });
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           // Prefer the eager-loaded item code; fall back to the legacy
           // flat itemCode field or a short id slice as last resort.
@@ -837,9 +848,10 @@ function GoodsIssueFormDialog({
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice ?? 0),
           notes: l.notes ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -1008,8 +1020,9 @@ function GoodsIssueFormDialog({
     [reasonBucket],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
-  const totalAmount = lines.reduce(
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.quantity || 0), 0);
+  const totalAmount = summaryLines.reduce(
     (s, l) => s + Number(l.quantity || 0) * Number(l.unitPrice || 0),
     0,
   );
@@ -1021,8 +1034,9 @@ function GoodsIssueFormDialog({
       toast.error("Vui lòng chọn kho xuất.");
       return false;
     }
-    if (lines.some((l) => !l.itemId)) {
-      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
+      toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
     if ((purpose === "OTHER" || purpose === "DISPOSAL") && !reasonId) {
@@ -1035,7 +1049,7 @@ function GoodsIssueFormDialog({
     }
     setSaving(true);
     try {
-      let headerLocationId = lines.find((l) => l.locationId)?.locationId ?? "";
+      let headerLocationId = persistableLines.find((l) => l.locationId)?.locationId ?? "";
       if (!headerLocationId) {
         const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
           `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
@@ -1057,7 +1071,7 @@ function GoodsIssueFormDialog({
           purpose === "OTHER" || purpose === "DISPOSAL" ? reasonId : undefined,
         targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
         notes: notes || undefined,
-        lines: lines.map((l) => ({
+        lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice) || 0,
@@ -1160,17 +1174,19 @@ function GoodsIssueFormDialog({
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      unit: item.unit,
-                      // Auto-fill only if user hasn't already typed a price.
-                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
-                    }
-                  : l,
+              normalizeFormLines(
+                prev.map((l, i) =>
+                  i === idx
+                    ? {
+                        ...l,
+                        itemId: item.id,
+                        itemLabel: item.code,
+                        unit: item.unit,
+                        // Auto-fill only if user hasn't already typed a price.
+                        unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                      }
+                    : l,
+                ),
               ),
             );
             markDirty();
@@ -1580,11 +1596,13 @@ function GoodsIssueFormDialog({
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+              setLines((prev) =>
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
+              );
               markDirty();
             }}
             showAddRow={!isView}
@@ -1649,10 +1667,12 @@ function GoodsIssueFormDialog({
           const idx = quickItemLineIdx;
           if (idx === null) return;
           setLines((prev) =>
-            prev.map((l, i) =>
-              i === idx
-                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
-                : l,
+            normalizeFormLines(
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  : l,
+              ),
             ),
           );
           setQuickItemLineIdx(null);
