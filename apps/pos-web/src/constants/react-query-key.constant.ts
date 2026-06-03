@@ -65,9 +65,16 @@ export const SALES_HIERARCHY_KEYS = {
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
-  PRODUCTS: (branchId: string) => ["catalog", "products", branchId] as const,
+  PRODUCTS: (branchId: string, categoryId?: string) =>
+    ["catalog", "products", branchId, categoryId ?? "all"] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
+} as const;
+
+export const ITEM_CATEGORY_KEYS = {
+  ALL: ["item-categories"] as const,
+  LIST: (params: Record<string, unknown>) =>
+    ["item-categories", "list", params] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {

@@ -3,10 +3,8 @@ import { useCallback, useMemo } from "react";
 import { buildLocalSearch } from "@erp/pos/lib/page-libs/checkout/buildLocalSearch";
 import { mapSalesmanToSalesperson } from "@erp/pos/lib/page-libs/checkout/mapSalesman";
 import { useSalesmenQuery } from "@erp/pos/hooks/react-query/use-query-sales-hierarchy";
-import {
-  CATALOG_GROUP_OPTIONS,
-  PRICE_BOOK_OPTIONS,
-} from "@erp/pos/constants/checkout.constant";
+import { useItemCategoriesQuery } from "@erp/pos/hooks/react-query/use-query-item-category";
+import { PRICE_BOOK_OPTIONS } from "@erp/pos/constants/checkout.constant";
 import type {
   PriceBook,
   ProductGroup,
@@ -48,7 +46,15 @@ export const useCheckoutMeta = (): CheckoutMeta => {
     [salesmen],
   );
   const priceBooks = PRICE_BOOK_OPTIONS;
-  const productGroups = CATALOG_GROUP_OPTIONS;
+  const { data: categoriesData } = useItemCategoriesQuery();
+  // Option "Tất cả" (id rỗng = không lọc) đứng đầu, sau đó là danh mục thật.
+  const productGroups = useMemo<ProductGroup[]>(
+    () => [
+      { id: "", name: "Tất cả" },
+      ...(categoriesData?.data ?? []).map((c) => ({ id: c.id, name: c.name })),
+    ],
+    [categoriesData],
+  );
 
   const { selectedSalesperson, selectedPriceBook } = usePosCheckoutSessionStore(
     selectMetaDraft,

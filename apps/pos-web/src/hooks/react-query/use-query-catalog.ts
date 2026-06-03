@@ -43,13 +43,15 @@ export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 100;
  */
 export function useCatalogProductsQuery(
   branchId: string,
+  categoryId?: string,
 ): UseQueryResult<PosProductListResponse, Error> {
   return useQuery<PosProductListResponse, Error>({
-    queryKey: CATALOG_KEYS.PRODUCTS(branchId),
+    queryKey: CATALOG_KEYS.PRODUCTS(branchId, categoryId),
     queryFn: () =>
       catalogService.listProducts(branchId, {
         page: 1,
         pageSize: POS_CATALOG_PRODUCTS_PAGE_SIZE,
+        categoryId,
       }),
     enabled: Boolean(branchId),
     staleTime: 30_000,
