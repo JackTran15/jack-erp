@@ -4,6 +4,7 @@ import type { DataSource } from 'typeorm';
 import { BranchModule } from '../../branch/branch.module';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { ProductModule } from '../product/product.module';
+import { StockTransferModule } from '../transfer/stock-transfer.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ItemEntity } from './item.entity';
@@ -94,6 +95,7 @@ import { BrandEntity } from './brand.entity';
     BranchModule,
     StockLedgerModule,
     ProductModule,
+    StockTransferModule,
     DocumentNumberingModule,
   ],
   controllers: [InventoryLocationController, InventoryLocationStockController],

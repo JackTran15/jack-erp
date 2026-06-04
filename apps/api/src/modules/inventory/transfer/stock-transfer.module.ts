@@ -5,12 +5,18 @@ import { DocumentNumberingModule } from '../../document-numbering/document-numbe
 import { StockTransferEntity } from './stock-transfer.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 import { LocationEntity } from '../location/location.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockTransferService } from './stock-transfer.service';
 import { StockTransferController } from './stock-transfer.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StockTransferEntity, StockTransferLineEntity, LocationEntity]),
+    TypeOrmModule.forFeature([
+      StockTransferEntity,
+      StockTransferLineEntity,
+      LocationEntity,
+      StockBalanceEntity,
+    ]),
     StockLedgerModule,
     DocumentNumberingModule,
   ],
