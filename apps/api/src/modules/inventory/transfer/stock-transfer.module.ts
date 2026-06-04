@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
+import { ItemCostSnapshotModule } from '../location/item-cost-snapshot.module';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 import { LocationEntity } from '../location/location.entity';
@@ -10,9 +11,14 @@ import { StockTransferController } from './stock-transfer.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StockTransferEntity, StockTransferLineEntity, LocationEntity]),
+    TypeOrmModule.forFeature([
+      StockTransferEntity,
+      StockTransferLineEntity,
+      LocationEntity,
+    ]),
     StockLedgerModule,
     DocumentNumberingModule,
+    ItemCostSnapshotModule,
   ],
   controllers: [StockTransferController],
   providers: [StockTransferService],

@@ -4,16 +4,21 @@ import {
   ConflictException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { BranchStatus, PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
-import { ActorContext } from '../../common/decorators/actor-context.decorator';
-import { OrganizationService } from '../organization/organization.service';
-import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
-import { BranchEntity } from './branch.entity';
-import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
-import { CreateBranchDto, UpdateBranchDto } from './dto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, Repository } from "typeorm";
+import {
+  BranchStatus,
+  PaginationQuery,
+  PaginatedResponse,
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../common/decorators/actor-context.decorator";
+import { OrganizationService } from "../organization/organization.service";
+import { BranchCashProvisioningService } from "../accounting/cash/branch-cash-provisioning.service";
+import { BranchEntity } from "./branch.entity";
+import { UserBranchAssignmentEntity } from "./user-branch-assignment.entity";
+import { CreateBranchDto, UpdateBranchDto } from "./dto";
+import { StorageEntity } from "../inventory/location/storage.entity";
 
 @Injectable()
 export class BranchService {
@@ -26,12 +31,10 @@ export class BranchService {
     private readonly assignmentRepo: Repository<UserBranchAssignmentEntity>,
     private readonly orgService: OrganizationService,
     private readonly branchCashProvisioning: BranchCashProvisioningService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async create(
-    dto: CreateBranchDto,
-    actor: ActorContext,
-  ): Promise<BranchEntity> {
+  async create(dto: CreateBranchDto, actor: ActorContext): Promise<BranchEntity> {
     const existing = await this.branchRepo.findOne({
       where: { organizationId: actor.organizationId, name: dto.name },
     });
@@ -57,16 +60,40 @@ export class BranchService {
     });
     const isMainBranch = branchCount === 0;
 
-    const branch = this.branchRepo.create({
-      ...dto,
-      organizationId: actor.organizationId,
-      branchId: undefined,
-      isMainBranch,
-      status: BranchStatus.ACTIVE,
-      createdBy: actor.userId,
-    });
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(BranchEntity);
+      const branch = await repo.save(
+        repo.create({
+          ...dto,
+          organizationId: actor.organizationId,
+          branchId: undefined,
+          isMainBranch,
+          status: BranchStatus.ACTIVE,
+          createdBy: actor.userId,
+        }),
+      );
 
-    const saved = await this.branchRepo.save(branch);
+      await manager.save(
+        manager.create(UserBranchAssignmentEntity, {
+          userId: actor.userId,
+          branchId: branch.id,
+          organizationId: branch.organizationId,
+          assignedBy: actor.userId,
+        }),
+      );
+
+      await manager.save(
+        manager.create(StorageEntity, {
+          name: branch.name,
+          isMainStorage: true,
+          branchId: branch.id,
+          organizationId: branch.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
+
+      return branch;
+    });
 
     if (isMainBranch) {
       await this.orgService.setMainBranch(actor.organizationId, saved.id);
@@ -75,9 +102,7 @@ export class BranchService {
       );
     }
 
-    // Provision the branch's single cash fund (one-fund-per-branch model).
-    // Best-effort: a cash-side failure must not roll back branch creation; the
-    // fund is recoverable via the backfill migration / next provisioning run.
+    // Best-effort: cash-side failure must not roll back branch creation.
     try {
       await this.branchCashProvisioning.ensureBranchCashFund(
         actor.organizationId,
@@ -132,8 +157,8 @@ export class BranchService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
       order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
+        ? { [query.sortBy]: query.sortOrder ?? "asc" }
+        : { createdAt: "DESC" },
     });
 
     return { data, total, page: query.page, pageSize: query.pageSize };
@@ -153,11 +178,11 @@ export class BranchService {
     const branch = await this.findById(id, actor);
 
     if (branch.status === BranchStatus.ARCHIVED) {
-      throw new BadRequestException('Branch is already archived');
+      throw new BadRequestException("Branch is already archived");
     }
     if (branch.status !== BranchStatus.SUSPENDED) {
       throw new BadRequestException(
-        'Branch must be suspended before archiving',
+        "Branch must be suspended before archiving",
       );
     }
 
@@ -170,7 +195,7 @@ export class BranchService {
     });
     if (activeSubBranches > 0) {
       throw new BadRequestException(
-        'Cannot archive branch with active sub-branches',
+        "Cannot archive branch with active sub-branches",
       );
     }
 
@@ -183,7 +208,7 @@ export class BranchService {
     });
     if (suspendedSubBranches > 0) {
       throw new BadRequestException(
-        'Cannot archive branch with suspended sub-branches',
+        "Cannot archive branch with suspended sub-branches",
       );
     }
 
@@ -195,9 +220,7 @@ export class BranchService {
     const branch = await this.findById(id, actor);
 
     if (branch.status !== BranchStatus.ACTIVE) {
-      throw new BadRequestException(
-        'Only active branches can be suspended',
-      );
+      throw new BadRequestException("Only active branches can be suspended");
     }
 
     branch.status = BranchStatus.SUSPENDED;

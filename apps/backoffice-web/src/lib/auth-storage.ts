@@ -43,6 +43,14 @@ export function clearSession(): void {
   localStorage.removeItem("access_token");
 }
 
+export function getActiveBranch(): string | null {
+  return localStorage.getItem(BRANCH);
+}
+
+export function setActiveBranch(id: string): void {
+  localStorage.setItem(BRANCH, id);
+}
+
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH);
 }

@@ -942,11 +942,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<void> {
     const data = row.rawData as CsvRow;
-    const { itemId, locationId, branchId } = await this.resolveLocationCodes(
-      data,
-      actor,
-    );
+    const { itemId, locationId, branchId, purchasePrice } =
+      await this.resolveLocationCodes(data, actor);
 
+    // Opening balance CSV does not carry a unit price column; fall back to
+    // items.purchase_price (same policy as the Task 1 backfill).
     const params: RecordMovementParams = {
       itemId,
       locationId,
@@ -958,6 +958,7 @@ export class CsvImportService {
       referenceId: job.id,
       notes: `CSV import opening balance (row ${row.rowNumber})`,
       actorContext: actor,
+      unitCost: purchasePrice,
     };
 
     await this.stockLedgerService.recordMovement(params);
@@ -969,10 +970,8 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<void> {
     const data = row.rawData as CsvRow;
-    const { itemId, locationId, branchId } = await this.resolveLocationCodes(
-      data,
-      actor,
-    );
+    const { itemId, locationId, branchId, purchasePrice } =
+      await this.resolveLocationCodes(data, actor);
     const delta = Number(data.deltaQuantity);
 
     const params: RecordMovementParams = {
@@ -989,6 +988,7 @@ export class CsvImportService {
       referenceId: job.id,
       notes: `CSV import adjustment reason=${data.reasonCode} ref=${data.referenceNo ?? ""} (row ${row.rowNumber})`,
       actorContext: actor,
+      unitCost: purchasePrice,
     };
 
     await this.stockLedgerService.recordMovement(params);
@@ -997,13 +997,18 @@ export class CsvImportService {
   private async resolveLocationCodes(
     data: CsvRow,
     actor: ActorContext,
-  ): Promise<{ itemId: string; locationId: string; branchId: string }> {
-    const itemEntity = await this.dataSource.getRepository("items").findOne({
+  ): Promise<{
+    itemId: string;
+    locationId: string;
+    branchId: string;
+    purchasePrice: number;
+  }> {
+    const itemEntity = (await this.dataSource.getRepository("items").findOne({
       where: {
         organizationId: actor.organizationId,
         code: data.itemCode,
       },
-    });
+    })) as { id: string; purchasePrice?: string | number } | null;
     if (!itemEntity) {
       throw new BadRequestException(`Item code "${data.itemCode}" not found`);
     }
@@ -1040,6 +1045,7 @@ export class CsvImportService {
       itemId: itemEntity.id,
       locationId: locationEntity.id,
       branchId: branchEntity.id,
+      purchasePrice: Number(itemEntity.purchasePrice ?? 0),
     };
   }
 

@@ -16,6 +16,7 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockAdjustmentEntity, AdjustmentStatus } from './stock-adjustment.entity';
 import { StockAdjustmentLineEntity } from './stock-adjustment-line.entity';
 
@@ -53,6 +54,7 @@ export class StockAdjustmentService {
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly configService: ConfigService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {
     this.approvalThreshold = this.configService.get<number>(
       'ADJUSTMENT_APPROVAL_THRESHOLD',
@@ -218,6 +220,17 @@ export class StockAdjustmentService {
       actor,
     );
 
+    // Snapshot `items.purchase_price` per item so ADJUSTMENT_INCREASE /
+    // ADJUSTMENT_DECREASE rows carry a consistent unit_cost for downstream
+    // reporting (movement value, WAC reconciliation, etc.).
+    const itemIds = Array.from(
+      new Set(adjustment.lines.map((l) => l.itemId)),
+    );
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      adjustment.organizationId,
+      itemIds,
+    );
+
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = [];
 
@@ -236,6 +249,7 @@ export class StockAdjustmentService {
           referenceId: adjustment.id,
           notes: `Adjustment ${documentNumber}: ${adjustment.reasonCode}`,
           actorContext: actor,
+          unitCost: itemCostByItemId.get(line.itemId) ?? 0,
         });
       }
 

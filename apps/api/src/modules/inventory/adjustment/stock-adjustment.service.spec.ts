@@ -8,10 +8,12 @@ import { StockAdjustmentService, CreateAdjustmentDto } from './stock-adjustment.
 import { StockAdjustmentEntity, AdjustmentStatus } from './stock-adjustment.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 
 describe('StockAdjustmentService', () => {
   let service: StockAdjustmentService;
   let adjustmentRepo: Record<string, jest.Mock>;
+  let itemCostSnapshotService: Record<string, jest.Mock>;
   let ledgerService: Record<string, jest.Mock>;
   let docNumbering: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
@@ -43,6 +45,12 @@ describe('StockAdjustmentService', () => {
       findOne: jest.fn(),
     };
 
+    itemCostSnapshotService = {
+      snapshotCosts: jest
+        .fn()
+        .mockResolvedValue(new Map<string, number>([['item-1', 4]])),
+    };
+
     ledgerService = {
       recordBatchMovements: jest.fn().mockResolvedValue([]),
     };
@@ -71,6 +79,7 @@ describe('StockAdjustmentService', () => {
         { provide: StockLedgerService, useValue: ledgerService },
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: ConfigService, useValue: configService },
+        { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
       ],
     }).compile();
 
@@ -159,6 +168,8 @@ describe('StockAdjustmentService', () => {
           expect.objectContaining({
             movementType: StockMovementType.ADJUSTMENT_INCREASE,
             quantity: 10,
+            // unit_cost snapshot from items.purchase_price (4.00)
+            unitCost: 4,
           }),
         ]),
       );

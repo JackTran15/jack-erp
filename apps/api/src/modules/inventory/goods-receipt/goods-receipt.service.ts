@@ -192,6 +192,7 @@ export class GoodsReceiptService {
           referenceId: receipt.id,
           notes: `Huỷ phiếu nhập kho ${receipt.documentNumber ?? receipt.id}`,
           actorContext: actor,
+          unitCost: Number(line.unitPrice),
         }));
         await this.stockLedger.recordBatchMovements(reversals);
 
@@ -386,6 +387,7 @@ export class GoodsReceiptService {
         referenceId: receipt.id,
         notes: `Phiếu nhập kho ${documentNumber}`,
         actorContext: actor,
+        unitCost: Number(line.unitPrice),
       }));
       await this.stockLedger.recordBatchMovements(movements);
 
@@ -414,7 +416,7 @@ export class GoodsReceiptService {
       }
     });
 
-    await this.eventPublisher.publish('inventory.goods_receipt.posted', {
+    await this.eventPublisher.publish(ERP_TOPICS.GOODS_RECEIPT_POSTED, {
       eventId: randomUUID(),
       eventType: DomainEventType.GOODS_RECEIPT_POSTED,
       timestamp: new Date().toISOString(),
