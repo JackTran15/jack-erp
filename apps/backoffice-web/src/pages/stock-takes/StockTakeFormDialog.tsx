@@ -20,6 +20,7 @@ import {
   Printer,
   RotateCcw,
   Save,
+  Settings2,
   Trash2,
   X,
 } from "lucide-react";
@@ -52,6 +53,8 @@ interface Props {
   /** Called after any successful save / process so the list page can refresh. */
   onSaved: () => Promise<void> | void;
   onRequestDelete?: () => void;
+  /** Open the "Xử lý" confirm for a saved DRAFT phiếu. */
+  onRequestProcess?: (st: StockTake) => void;
 }
 
 interface LineRow {
@@ -131,6 +134,7 @@ export function StockTakeFormDialog({
   onClose,
   onSaved,
   onRequestDelete,
+  onRequestProcess,
 }: Props) {
   // Internal current snapshot — flips from null → entity after the first save in new mode.
   const [stockTake, setStockTake] = useState<StockTake | null>(initialStockTake ?? null);
@@ -239,23 +243,39 @@ export function StockTakeFormDialog({
   /** Triggered when user picks an item in the row's SKU lookup. */
   const handlePickItem = useCallback(
     async (item: ItemOption, rowIndex: number) => {
-      // Resolve location + expected qty.
-      const balance = await fetchFirstBalance(item.id);
-      let locationId = balance?.locationId ?? "";
-      let locationCode = balance?.location?.code ?? "";
-      let expectedQty = balance ? Number(balance.quantity) : 0;
+      // A row can only be resolved against a concrete storage. Without one we
+      // can't look up a location — surface that instead of failing silently.
+      if (!effectiveStorageId) {
+        toast.error("Chưa chọn kho kiểm kê — không thể thêm hàng hóa.");
+        return;
+      }
 
-      if (!locationId) {
-        const fallback = await fetchFirstLocation();
-        if (!fallback) {
-          toast.error(
-            "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
-          );
-          return;
+      // Resolve location + expected qty. Network failures here would otherwise
+      // be an unhandled rejection that drops the picked item with no feedback.
+      let locationId = "";
+      let locationCode = "";
+      let expectedQty = 0;
+      try {
+        const balance = await fetchFirstBalance(item.id);
+        locationId = balance?.locationId ?? "";
+        locationCode = balance?.location?.code ?? "";
+        expectedQty = balance ? Number(balance.quantity) : 0;
+
+        if (!locationId) {
+          const fallback = await fetchFirstLocation();
+          if (!fallback) {
+            toast.error(
+              "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
+            );
+            return;
+          }
+          locationId = fallback.id;
+          locationCode = fallback.code;
+          expectedQty = 0;
         }
-        locationId = fallback.id;
-        locationCode = fallback.code;
-        expectedQty = 0;
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        return;
       }
 
       if (isNew || !stockTake) {
@@ -316,7 +336,14 @@ export function StockTakeFormDialog({
         toast.error(getUserFacingApiErrorMessage(err));
       }
     },
-    [fetchFirstBalance, fetchFirstLocation, isNew, stockTake, markDirty],
+    [
+      effectiveStorageId,
+      fetchFirstBalance,
+      fetchFirstLocation,
+      isNew,
+      stockTake,
+      markDirty,
+    ],
   );
 
   const handleDeleteRow = useCallback(
@@ -378,12 +405,15 @@ export function StockTakeFormDialog({
           "/inventory/stock-takes",
           payload,
         );
-        // Switch to edit mode: re-seed rows from server (server may reorder ids).
+        // Reflect the saved entity locally before any callbacks read state.
         setStockTake(data);
         setRows(data.lines.map(toLineRow));
         setDirty(false);
         toast.success(`Đã tạo phiếu ${data.documentNumber ?? ""}.`);
+        // New phiếu is persisted — close back to the list so the user can
+        // process it from the toolbar / inline "Xử lý". onClose reloads.
         await onSaved();
+        onClose();
         return true;
       }
 
@@ -423,6 +453,7 @@ export function StockTakeFormDialog({
     countDate,
     countTime,
     onSaved,
+    onClose,
   ]);
 
   // ─── Close handling ──────────────────────────────────────────────────────
@@ -460,6 +491,13 @@ export function StockTakeFormDialog({
       icon: Save,
       disabled: isLocked || saving,
       onClick: () => void handleSave(),
+    },
+    {
+      id: "process",
+      label: "Xử lý",
+      icon: Settings2,
+      disabled: !onRequestProcess || isLocked || isNew || !stockTake,
+      onClick: () => stockTake && onRequestProcess?.(stockTake),
     },
     {
       id: "delete",

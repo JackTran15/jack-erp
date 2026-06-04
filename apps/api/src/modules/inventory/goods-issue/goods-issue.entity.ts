@@ -7,7 +7,7 @@ import { LocationEntity } from '../location/location.entity';
 import { ProviderEntity } from '../location/provider.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
-/** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → APPROVED → POSTED | CANCELLED */
+/** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → POSTED | CANCELLED */
 @Entity('goods_issues')
 @Index(['organizationId', 'status'])
 @Index('IDX_goods_issues_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])

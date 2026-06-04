@@ -7,10 +7,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { randomUUID } from 'crypto';
 import {
   DocumentType,
-  DomainEventType,
   GoodsReceiptPurpose,
   GoodsReceiptStatus,
   JournalSource,
@@ -25,7 +23,6 @@ import {
   StockLedgerService,
 } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { EventPublisher } from '../../events/event-publisher.service';
 import { CashService } from '../../accounting/cash/cash.service';
 import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
 import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
@@ -64,7 +61,6 @@ export class GoodsReceiptService {
     private readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
-    private readonly eventPublisher: EventPublisher,
     private readonly cashService: CashService,
     private readonly cashFundResolver: CashFundResolverService,
     private readonly journalService: JournalService,
@@ -110,6 +106,43 @@ export class GoodsReceiptService {
       `Goods receipt ${saved.id} created as DRAFT ${documentNumber} by ${actor.userId}`,
     );
     return this.findOrFail(saved.id, actor.organizationId);
+  }
+
+  // ─── Create + Post (single user action — clone MISA) ──────────────────────
+  //
+  // The HTTP create endpoint must yield a POSTED phiếu (number assigned, stock
+  // ledger written) so it shows up in reports immediately. We persist the DRAFT
+  // then post it; if posting fails we hard-delete the just-created DRAFT (its
+  // lines cascade) so no orphan phiếu is left behind — atomic from the user's
+  // point of view. The standalone post() endpoint is untouched.
+
+  async createAndPost(
+    dto: CreateGoodsReceiptDto,
+    actor: ActorContext,
+  ): Promise<GoodsReceiptEntity> {
+    const draft = await this.create(dto, actor);
+    try {
+      return await this.post(draft.id, actor);
+    } catch (err) {
+      // Roll back the orphan DRAFT (lines FK has onDelete: CASCADE) so a failed
+      // post leaves nothing persisted.
+      await this.receiptRepo.delete({ id: draft.id, organizationId: actor.organizationId });
+      this.logger.warn(
+        `Goods receipt ${draft.id} create+post failed; orphan DRAFT removed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      if (
+        err instanceof BadRequestException ||
+        err instanceof ConflictException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+      throw new BadRequestException(
+        'Không thể nhập kho. Vui lòng thử lại.',
+      );
+    }
   }
 
   // ─── Update (only DRAFT) ──────────────────────────────────────────────────
@@ -415,29 +448,6 @@ export class GoodsReceiptService {
         );
       }
     });
-
-    await this.eventPublisher.publish('inventory.goods_receipt.posted', {
-      eventId: randomUUID(),
-      eventType: DomainEventType.GOODS_RECEIPT_POSTED,
-      timestamp: new Date().toISOString(),
-      organizationId: receipt.organizationId,
-      branchId,
-      correlationId: randomUUID(),
-      payload: {
-        receiptId: receipt.id,
-        documentNumber,
-        purpose: receipt.purpose,
-        providerId: receipt.providerId,
-        totalAmount: receipt.lines.reduce(
-          (sum, l) => sum + Number(l.quantity) * Number(l.unitPrice),
-          0,
-        ),
-        lineCount: receipt.lines.length,
-        postedAt: new Date().toISOString(),
-        postedBy: actor.userId,
-      },
-    });
-
     this.logger.log(`Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`);
     return this.findOrFail(id, actor.organizationId);
   }

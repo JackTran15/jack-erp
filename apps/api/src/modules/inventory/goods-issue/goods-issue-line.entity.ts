@@ -14,6 +14,9 @@ export class GoodsIssueLineEntity {
   @Column({ name: 'item_id', type: 'uuid', comment: 'Item being issued from stock' })
   itemId: string;
 
+  @Column({ name: 'location_id', type: 'uuid', comment: 'Source bin/location the stock is issued from' })
+  locationId: string;
+
   @Column({ type: 'numeric', comment: 'Quantity to issue (always positive)' })
   quantity: number;
 

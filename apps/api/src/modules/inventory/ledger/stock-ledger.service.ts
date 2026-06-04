@@ -164,7 +164,17 @@ export class StockLedgerService {
       return savedEntry;
     });
 
-    await this.publishMovementEvent(entry);
+    // Event publish is a post-commit side-effect — never let a broker failure
+    // undo a committed ledger movement.
+    try {
+      await this.publishMovementEvent(entry);
+    } catch (err) {
+      this.logger.error(
+        `Stock movement ledger committed but event publish failed (non-fatal): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
 
     return entry;
   }
@@ -234,7 +244,15 @@ export class StockLedgerService {
       key: entry.itemId,
     }));
 
-    await this.eventPublisher.publishBatch(eventMessages);
+    try {
+      await this.eventPublisher.publishBatch(eventMessages);
+    } catch (err) {
+      this.logger.error(
+        `Stock ledger committed (${entries.length} movement(s)) but event publish failed (non-fatal): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
 
     return entries;
   }
