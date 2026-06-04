@@ -46,6 +46,8 @@ export const CUSTOMER_KEYS = {
     customerId: string,
     filters: Record<string, unknown> = {},
   ) => ["customers", "purchase-history", customerId, filters] as const,
+  /** `GET /invoices/customers/:id/debts` — sổ công nợ của một khách. */
+  DEBTS: (customerId: string) => ["customers", customerId, "debts"] as const,
   /** `GET /customers/:id/summary` — tổng chi tiêu + công nợ + thẻ thành viên. */
   SUMMARY: (id: string) => ["customers", id, "summary"] as const,
   /** `GET /customers/:id/membership-card`. */

@@ -151,6 +151,8 @@ export function CustomerDetailDialog({
   const branchName = usePosBranchStore((s) => s.branchName);
   const historyEnabled =
     open && activeTab === CustomerDetailTabKeyEnum.HISTORY;
+  // Công nợ — fetch lười trong chính `DebtTab`, chỉ khi dialog mở & đang ở tab này.
+  const debtEnabled = open && activeTab === CustomerDetailTabKeyEnum.DEBT;
 
   const { mutate: issueCard, isPending: isIssuingCardPending } =
     useIssueMembershipCard();
@@ -256,7 +258,12 @@ export function CustomerDetailDialog({
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.DEBT ? (
-            <DebtTab rows={data.debts ?? []} />
+            <DebtTab
+              customerId={customerId}
+              enabled={debtEnabled}
+              customerName={data.name}
+              customerPhone={data.phone}
+            />
           ) : null}
         </div>
       </PosDialog.Body>

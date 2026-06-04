@@ -20,6 +20,7 @@ import type {
   InvoiceSearchV2Response,
   SearchPurchaseHistoryBody,
 } from "@erp/pos/dtos/invoice.dto";
+import type { CustomerDebtRow } from "@erp/pos/interfaces/debt.interface";
 import type {
   CreateCustomerBody,
   IssueMembershipCardBody,
@@ -142,6 +143,23 @@ export function useCustomerPurchaseHistory(
     enabled: Boolean(customerId) && enabled,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Sổ công nợ của khách — `GET /invoices/customers/:id/debts`. Trả toàn bộ chứng
+ * từ công nợ (mọi trạng thái) của khách trong org. Truyền `customerId = undefined`
+ * (hoặc `enabled = false`) để tắt query khi dialog chưa mở / chưa ở tab "Công nợ".
+ */
+export function useCustomerDebts(
+  customerId: string | undefined,
+  enabled = true,
+): UseQueryResult<CustomerDebtRow[], Error> {
+  return useQuery<CustomerDebtRow[], Error>({
+    queryKey: CUSTOMER_KEYS.DEBTS(customerId ?? ""),
+    queryFn: () => invoiceService.getCustomerDebts(customerId as string),
+    enabled: Boolean(customerId) && enabled,
+    staleTime: 30_000,
   });
 }
 
