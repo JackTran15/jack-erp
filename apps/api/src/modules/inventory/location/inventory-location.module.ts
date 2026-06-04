@@ -48,12 +48,8 @@ import {
 } from "./provider-crud.service";
 import { ProviderEntity } from "./provider.entity";
 import { ShowroomEntity } from "./showroom.entity";
-import {
-  InventoryItemCategoryCrudService,
-  INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG,
-  INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
-} from './item-category-crud.service';
 import { ItemCostSnapshotModule } from './item-cost-snapshot.module';
+import {
   INVENTORY_STORAGE_ENTITY_CONFIG,
   INVENTORY_STORAGE_SERVICE_TOKEN,
   InventoryStorageCrudService,

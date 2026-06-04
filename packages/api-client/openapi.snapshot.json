@@ -7986,22 +7986,31 @@
         ]
       }
     },
-    "/inventory/stock/transfers/intra-warehouse": {
-      "post": {
-        "operationId": "StockTransferController_createIntraWarehouseTransfer",
-        "parameters": [],
+    "/inventory/stock/transfers/{id}": {
+      "patch": {
+        "operationId": "StockTransferController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
+                "$ref": "#/components/schemas/CreateTransferDto"
               }
             }
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
@@ -8015,9 +8024,7 @@
         "tags": [
           "StockTransfer"
         ]
-      }
-    },
-    "/inventory/stock/transfers/{id}": {
+      },
       "get": {
         "operationId": "StockTransferController_getById",
         "parameters": [
@@ -8047,19 +8054,20 @@
         ]
       }
     },
-    "/inventory/stock/transfers/{id}/approve": {
+    "/inventory/stock/transfers/intra-warehouse": {
       "post": {
-        "operationId": "StockTransferController_approve",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
+        "operationId": "StockTransferController_createIntraWarehouseTransfer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
+              }
             }
           }
-        ],
+        },
         "responses": {
           "201": {
             "description": "",
@@ -11889,36 +11897,6 @@
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GoodsIssueEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "GoodsIssue"
-        ]
-      }
-    },
-    "/inventory/goods-issues/{id}/approve": {
-      "post": {
-        "operationId": "GoodsIssueController_approve",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
             "description": "",
             "content": {
               "application/json": {
@@ -17738,11 +17716,15 @@
           "name": {
             "type": "string"
           },
-          "parentGroupId": {
-            "type": "string"
-          },
           "description": {
             "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
           },
           "id": {
             "type": "string"
@@ -17770,6 +17752,7 @@
         },
         "required": [
           "name",
+          "status",
           "id",
           "organizationId",
           "createdAt",
@@ -20174,6 +20157,15 @@
           },
           "transfer": {
             "$ref": "#/components/schemas/StockTransferEntity"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemEntity"
+          },
+          "sourceLocation": {
+            "$ref": "#/components/schemas/LocationEntity"
+          },
+          "destinationLocation": {
+            "$ref": "#/components/schemas/LocationEntity"
           }
         },
         "required": [
@@ -23115,6 +23107,9 @@
           "itemId": {
             "type": "string"
           },
+          "locationId": {
+            "type": "string"
+          },
           "quantity": {
             "type": "number"
           },
@@ -23132,12 +23127,16 @@
           },
           "item": {
             "$ref": "#/components/schemas/ItemEntity"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationEntity"
           }
         },
         "required": [
           "id",
           "goodsIssueId",
           "itemId",
+          "locationId",
           "quantity",
           "unitPrice",
           "lineTotal"
