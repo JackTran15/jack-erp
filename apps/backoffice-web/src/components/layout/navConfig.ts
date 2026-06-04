@@ -3,7 +3,6 @@ import {
   Settings,
   Warehouse,
   BarChart3,
-  GitBranch,
   ClipboardCheck,
   Users,
   ShoppingCart,
@@ -25,7 +24,7 @@ import {
   DollarSign,
   Hash,
   Layers,
-  LayoutGrid
+  LayoutGrid,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { hasPermission } from "../../lib/permissions";
@@ -96,9 +95,7 @@ export const navConfig: NavModule[] = [
     sections: [
       {
         id: "overview-main",
-        children: [
-          { to: "/", label: "Bảng điều khiển", end: true },
-        ],
+        children: [{ to: "/", label: "Bảng điều khiển", end: true }],
       },
     ],
   },
@@ -112,13 +109,13 @@ export const navConfig: NavModule[] = [
       {
         id: "inventory-main",
         children: [
-          { to: "/inventory/purchase-orders", label: "Nhập kho", },
-          { to: "/inventory/goods-issues", label: "Xuất kho", },
-          { to: "/inventory/stock-transfers", label: "Chuyển kho", },
-          { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển", },
-          { to: "/inventory/stock-takes", label: "Kiểm kê kho", },
-          { to: "/inventory/item-locations", label: "Vị trí hàng hóa", },
-          { to: "/inventory/item-location-details", label: "Chi tiết vị trí", },
+          { to: "/inventory/purchase-orders", label: "Nhập kho" },
+          { to: "/inventory/goods-issues", label: "Xuất kho" },
+          { to: "/inventory/stock-transfers", label: "Chuyển kho" },
+          { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển" },
+          { to: "/inventory/stock-takes", label: "Kiểm kê kho" },
+          { to: "/inventory/item-locations", label: "Vị trí hàng hóa" },
+          { to: "/inventory/item-location-details", label: "Chi tiết vị trí" },
         ],
       },
     ],
@@ -131,9 +128,7 @@ export const navConfig: NavModule[] = [
     sections: [
       {
         id: "customers-main",
-        children: [
-          { to: "/admin/customers", label: "Danh sách khách hàng", },
-        ],
+        children: [{ to: "/admin/customers", label: "Danh sách khách hàng" }],
       },
     ],
   },
@@ -152,7 +147,10 @@ export const navConfig: NavModule[] = [
         id: "treasury-cash",
         label: "TIỀN MẶT",
         children: [
-          { to: "/treasury/cash/receipts-expenses", label: "Thu, chi tiền mặt" },
+          {
+            to: "/treasury/cash/receipts-expenses",
+            label: "Thu, chi tiền mặt",
+          },
           { to: "/treasury/cash/count", label: "Kiểm kê tiền mặt" },
           { to: "/treasury/cash/ledger", label: "Sổ chi tiết tiền mặt" },
         ],
@@ -161,8 +159,14 @@ export const navConfig: NavModule[] = [
         id: "treasury-deposit",
         label: "TIỀN GỬI",
         children: [
-          { to: "/treasury/wip/deposit-receipts-expenses", label: "Thu, chi tiền gửi" },
-          { to: "/treasury/wip/deposit-reconciliation", label: "Đối chiếu tiền gửi" },
+          {
+            to: "/treasury/wip/deposit-receipts-expenses",
+            label: "Thu, chi tiền gửi",
+          },
+          {
+            to: "/treasury/wip/deposit-reconciliation",
+            label: "Đối chiếu tiền gửi",
+          },
           { to: "/treasury/wip/deposit-ledger", label: "Sổ chi tiết tiền gửi" },
         ],
       },
@@ -192,46 +196,54 @@ export const navConfig: NavModule[] = [
       {
         id: "reports-overview",
         label: "Tổng hợp",
-        children: [
-          { to: "/reports", label: "Bảng tổng hợp", end: true },
-        ],
+        children: [{ to: "/reports", label: "Bảng tổng hợp", end: true }],
       },
       {
         id: "reports-detail",
         label: "Chi tiết",
         children: [
-          { to: "/reports/sales", label: "Doanh số", },
-          { to: "/reports/inventory", label: "Tồn kho", },
-          { to: "/reports/aging", label: "Công nợ", },
-          { to: "/reports/cash", label: "Tiền mặt", },
+          { to: "/reports/sales", label: "Doanh số" },
+          { to: "/reports/inventory", label: "Tồn kho" },
+          { to: "/reports/aging", label: "Công nợ" },
+          { to: "/reports/cash", label: "Tiền mặt" },
         ],
       },
       {
         id: "storage-reports",
         label: "Báo cáo kho",
         children: [
-          { to: "/reports/storage/stock-summary", label: "Tổng hợp nhập xuất tồn kho", },
-          { to: "/reports/storage/stock-document-details", label: "Bảng kê chi tiết phiếu nhập xuất kho", },
-          { to: "/reports/storage/stock-quantity-details", label: "Chi tiết số lượng nhập xuất tồn kho", },
-          { to: "/reports/storage/stock-summary-by-branch", label: "Tổng hợp nhập xuất tồn kho theo cửa hàng", },
-          { to: "/reports/storage/stock-by-branch", label: "Số lượng tồn kho theo cửa hàng", },
-          { to: "/reports/storage/transfer-summary", label: "Tổng hợp nhập xuất điều chuyển", },
-          { to: "/reports/storage/transfer-by-branch", label: "Tổng hợp hàng hóa điều chuyển theo cửa hàng", },
-          { to: "/reports/storage/temporary-issues", label: "Hàng hoá xuất kho tạm", },
-        ],
-      },
-    ],
-  },
-  {
-    id: "branch",
-    label: "Chi nhánh",
-    icon: GitBranch,
-    defaultPath: "/branch-management/sales-hierarchy",
-    sections: [
-      {
-        id: "branch-main",
-        children: [
-          { to: "/branch-management/sales-hierarchy", label: "Cấp bậc kinh doanh", },
+          {
+            to: "/reports/storage/stock-summary",
+            label: "Tổng hợp nhập xuất tồn kho",
+          },
+          {
+            to: "/reports/storage/stock-document-details",
+            label: "Bảng kê chi tiết phiếu nhập xuất kho",
+          },
+          {
+            to: "/reports/storage/stock-quantity-details",
+            label: "Chi tiết số lượng nhập xuất tồn kho",
+          },
+          {
+            to: "/reports/storage/stock-summary-by-branch",
+            label: "Tổng hợp nhập xuất tồn kho theo cửa hàng",
+          },
+          {
+            to: "/reports/storage/stock-by-branch",
+            label: "Số lượng tồn kho theo cửa hàng",
+          },
+          {
+            to: "/reports/storage/transfer-summary",
+            label: "Tổng hợp nhập xuất điều chuyển",
+          },
+          {
+            to: "/reports/storage/transfer-by-branch",
+            label: "Tổng hợp hàng hóa điều chuyển theo cửa hàng",
+          },
+          {
+            to: "/reports/storage/temporary-issues",
+            label: "Hàng hoá xuất kho tạm",
+          },
         ],
       },
     ],
@@ -246,9 +258,9 @@ export const navConfig: NavModule[] = [
       {
         id: "onboarding-main",
         children: [
-          { to: "/onboarding/approvals", label: "Hàng chờ phê duyệt", },
-          { to: "/onboarding/org-registration", label: "Đăng ký tổ chức", },
-          { to: "/onboarding/branch-registration", label: "Đăng ký chi nhánh", },
+          { to: "/onboarding/approvals", label: "Hàng chờ phê duyệt" },
+          { to: "/onboarding/org-registration", label: "Đăng ký tổ chức" },
+          { to: "/onboarding/branch-registration", label: "Đăng ký chi nhánh" },
         ],
       },
     ],
@@ -271,10 +283,14 @@ export const navConfig: NavModule[] = [
           { to: "/admin/inventory-item-categories", label: "Nhóm hàng hoá" },
           { to: "/admin/inventory-items", label: "Hàng hoá" },
           {
-            to: "/admin/inventory-item-units", label: "Đơn vị tính" },
+            to: "/admin/inventory-item-units",
+            label: "Đơn vị tính",
+          },
           { to: "/admin/inventory-item-barcodes", label: "In tem mã" },
           {
-            to: "/admin/inventory-item-prices", label: "Bảng giá" },
+            to: "/admin/inventory-item-prices",
+            label: "Bảng giá",
+          },
           { to: "/admin/inventory-storages", label: "Kho hàng" },
           { to: "/admin/inventory-stock-balances", label: "Tồn kho" },
         ],
@@ -307,10 +323,13 @@ export const navConfig: NavModule[] = [
             permission: "iam.user.read",
           },
           { to: "/admin/job-positions", label: "Vị trí công việc" },
-          { to: "/admin/stores", label: "Cửa hàng" },
+          { to: "/admin/branches", label: "Cửa hàng" },
           { to: "/admin/cash-boxes", label: "Két đựng tiền" },
           { to: "/admin/work-shifts", label: "Ca làm việc" },
-          { to: "/admin/payment-methods", label: "Phương thức dịch vụ và thanh toán" },
+          {
+            to: "/admin/payment-methods",
+            label: "Phương thức dịch vụ và thanh toán",
+          },
           { to: "/admin/bank-accounts", label: "Tài khoản ngân hàng" },
           { to: "/admin/sales-channels", label: "Kênh bán hàng" },
         ],
@@ -335,8 +354,8 @@ export const navConfig: NavModule[] = [
       {
         id: "settings-main",
         children: [
-          { to: "/setup", label: "Thiết lập chung", },
-          { to: "/settings/document-numbering", label: "Đánh số chứng từ", },
+          { to: "/setup", label: "Thiết lập chung" },
+          { to: "/settings/document-numbering", label: "Đánh số chứng từ" },
           {
             to: "/role-management",
             label: "Quản lý vai trò",

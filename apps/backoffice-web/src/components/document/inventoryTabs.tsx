@@ -3,7 +3,6 @@ import { PageTabBar, type PageTabItem } from "@erp/ui";
 import type { ReactNode } from "react";
 
 export type InventoryTabId =
-  | "storages"
   | "purchase-orders"
   | "transfer-in"
   | "goods-issues"
@@ -19,7 +18,6 @@ export const INVENTORY_TABS: (PageTabItem & {
   /** Pages that aren't built yet are rendered as disabled placeholders. */
   comingSoon?: boolean;
 })[] = [
-  { id: "storages", label: "Kho lưu trữ", href: "/inventory/storages" },
   { id: "purchase-orders", label: "Nhập kho", href: "/inventory/purchase-orders" },
   { id: "transfer-in", label: "Điều chuyển từ cửa hàng khác", href: "#", comingSoon: true },
   { id: "goods-issues", label: "Xuất kho", href: "/inventory/goods-issues" },
