@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
-import { AppModal, FormField, Input, MoneyInput } from "@erp/ui";
-import { formatCustomerStatus } from "../../lib/customer-display";
+import { AppModal, Button, Input, MoneyInput, Textarea } from "@erp/ui";
+import { HelpCircle, Save, X } from "lucide-react";
 import { apiClient } from "../../lib/api-axios";
+import { formatCrudEnumOption } from "../../lib/crud-display";
 import { SearchListingInput } from "../forms/SearchListingInput";
 
 type SearchSelection = {
@@ -246,6 +247,13 @@ export function CrudFormDialog({
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const base = buildInitialValues(editableFields, record, duplicateSource);
     editableFields.forEach((f) => {
+      if (
+        config.entityKey === "inventory-item-categories" &&
+        f.key === "status" &&
+        !base[f.key]
+      ) {
+        base[f.key] = "ACTIVE";
+      }
       const searchConfig = getSearchFieldConfig(config.entityKey, f.key);
       if (!searchConfig) return;
       if (record) {
@@ -303,6 +311,8 @@ export function CrudFormDialog({
       delete payload.createdAt;
       delete payload.updatedAt;
       await onSubmit(payload);
+    } catch {
+      return;
     } finally {
       setSubmitting(false);
     }
@@ -319,7 +329,7 @@ export function CrudFormDialog({
   const saveLabel = submitting
     ? "Đang lưu…"
     : isEdit
-      ? "Cập nhật"
+      ? "Lưu"
       : "Lưu";
 
   return (
@@ -334,13 +344,31 @@ export function CrudFormDialog({
           ? "Dữ liệu đã được sao chép từ bản ghi đã chọn. Hãy chỉnh các trường bắt buộc (ví dụ mã, SKU) nếu trùng trước khi lưu."
           : undefined
       }
-      onSave={handleSave}
-      onCancel={onClose}
-      saveLabel={saveLabel}
-      cancelLabel="Huỷ"
-      saveDisabled={submitting}
+      defaultWidth={560}
+      defaultHeight={460}
+      footer={
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-sm text-primary-blue transition-colors hover:text-primary-blue-hover"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Trợ giúp
+          </button>
+          <div className="flex items-center gap-2">
+            <Button type="button" disabled={submitting} onClick={handleSave}>
+              <Save className="mr-1.5 h-4 w-4" />
+              {saveLabel}
+            </Button>
+            <Button type="button" variant="outline" disabled={submitting} onClick={onClose}>
+              <X className="mr-1.5 h-4 w-4" />
+              Hủy bỏ
+            </Button>
+          </div>
+        </div>
+      }
     >
-      <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 py-2">
         {editableFields.map((f) => (
           <FieldInput
             key={f.key}
@@ -374,7 +402,7 @@ function FieldInput({
 
   if (field.type === "boolean") {
     return (
-      <div className="space-y-1.5">
+      <FieldRow label={field.label} required={field.required} error={error}>
         <div className="flex items-start gap-3">
           <input
             id={id}
@@ -385,44 +413,31 @@ function FieldInput({
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${id}-error` : undefined}
           />
-          <label
-            htmlFor={id}
-            className="cursor-pointer select-none text-sm font-medium leading-snug text-foreground"
-          >
-            {field.label}
-            {field.required ? (
-              <span className="ml-0.5 text-destructive" aria-hidden>
-                *
-              </span>
-            ) : null}
+          <label htmlFor={id} className="cursor-pointer select-none text-sm leading-snug">
+            Có
           </label>
         </div>
-        {error ? (
-          <p id={`${id}-error`} className="text-xs text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </FieldRow>
     );
   }
 
   if (field.type === "enum" && field.enumValues) {
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+      <FieldRow label={field.label} required={field.required} error={error}>
         <select
           id={id}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
         >
           <option value="">— Chọn —</option>
           {field.enumValues.map((ev) => (
             <option key={ev} value={ev}>
-              {field.key === "status" ? formatCustomerStatus(ev) : ev}
+              {formatCrudEnumOption(field, ev)}
             </option>
           ))}
         </select>
-      </FormField>
+      </FieldRow>
     );
   }
 
@@ -430,7 +445,7 @@ function FieldInput({
     const selection = value as SearchSelection;
     const label = selection?.label ?? "";
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+      <FieldRow label={field.label} required={field.required} error={error}>
         <SearchListingInput
           inputId={id}
           value={label}
@@ -448,14 +463,14 @@ function FieldInput({
           placeholder={searchConfig.placeholder}
           required={field.required}
         />
-      </FormField>
+      </FieldRow>
     );
   }
 
   if (field.type === "number") {
     if (field.numberFormat === "money") {
       return (
-        <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+        <FieldRow label={field.label} required={field.required} error={error}>
           <MoneyInput
             id={id}
             value={
@@ -465,11 +480,11 @@ function FieldInput({
             }
             onChange={(v) => onChange(v === "" ? "" : v)}
           />
-        </FormField>
+        </FieldRow>
       );
     }
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+      <FieldRow label={field.label} required={field.required} error={error}>
         <Input
           id={id}
           type="number"
@@ -478,31 +493,74 @@ function FieldInput({
             onChange(e.target.value === "" ? "" : Number(e.target.value))
           }
         />
-      </FormField>
+      </FieldRow>
     );
   }
 
   if (field.type === "date") {
     return (
-      <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+      <FieldRow label={field.label} required={field.required} error={error}>
         <Input
           id={id}
           type="date"
           value={value ? String(value).slice(0, 10) : ""}
           onChange={(e) => onChange(e.target.value)}
         />
-      </FormField>
+      </FieldRow>
+    );
+  }
+
+  if (field.key === "description") {
+    return (
+      <FieldRow label={field.label} required={field.required} error={error}>
+        <Textarea
+          id={id}
+          className="min-h-[104px] resize-y leading-relaxed"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+        />
+      </FieldRow>
     );
   }
 
   return (
-    <FormField label={field.label} htmlFor={id} error={error} required={field.required}>
+    <FieldRow label={field.label} required={field.required} error={error}>
       <Input
         id={id}
         type="text"
         value={String(value ?? "")}
         onChange={(e) => onChange(e.target.value)}
       />
-    </FormField>
+    </FieldRow>
+  );
+}
+
+function FieldRow({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] items-start gap-3">
+      <label className="pt-1.5 text-sm">
+        {label}
+        {required ? <span className="ml-0.5 text-destructive">*</span> : null}
+      </label>
+      <div className="min-w-0">
+        {children}
+        {error ? (
+          <p className="mt-1 text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -11,6 +11,7 @@ import { LocationType } from "@erp/shared-interfaces";
 import {
   Copy,
   HelpCircle,
+  PackageOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -25,7 +26,8 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { ArrangeLocationDialog } from "../item-location-details/ArrangeLocationDialog";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -73,6 +75,60 @@ const STATUS_LABEL = {
 const FILTER_KEYS = ["code", "name"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
+const naturalCollator = new Intl.Collator("vi-VN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  return naturalCollator.compare(a ?? "", b ?? "");
+}
+
+function sortLocationsByCode(rows: InventoryLocation[]) {
+  return [...rows].sort(
+    (a, b) =>
+      compareText(a.code, b.code) ||
+      compareText(a.name, b.name),
+  );
+}
+
+function buildNextDuplicateText(base: string, existingValues: Iterable<string>) {
+  const normalizedExisting = new Set(
+    Array.from(existingValues, (v) => v.trim().toLowerCase()).filter(Boolean),
+  );
+  const trimmed = base.trim();
+  const match = trimmed.match(/^(.*?)(?:\.(\d+))?$/);
+  const root = match?.[1]?.trim() || "COPY";
+  const start = match?.[2] ? Number(match[2]) + 1 : 2;
+
+  for (let n = start; n < start + 1000; n += 1) {
+    const candidate = `${root}.${n}`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) return candidate;
+  }
+
+  return `${root}.${Date.now()}`;
+}
+
+function buildDuplicateLocationDraft(
+  selected: InventoryLocation,
+  rows: InventoryLocation[],
+): Partial<InventoryLocation> {
+  return {
+    ...selected,
+    id: undefined,
+    code: buildNextDuplicateText(
+      selected.code,
+      rows
+        .filter((row) => row.storageId === selected.storageId)
+        .map((row) => row.code),
+    ),
+    name: buildNextDuplicateText(
+      selected.name || selected.code,
+      rows.map((row) => row.name),
+    ),
+  };
+}
+
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
     (acc, k) => {
@@ -112,11 +168,23 @@ export function ItemLocationsPage() {
   const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(null);
   const [saving, setSaving] = useState(false);
   const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
 
   const loadStorages = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      setStorages([]);
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      return;
+    }
     try {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "200",
+        branchId,
+      });
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch (err) {
@@ -125,11 +193,18 @@ export function ItemLocationsPage() {
   }, []);
 
   const loadLocations = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
+        branchId,
       });
       if (storageFilter) params.set("storageId", storageFilter);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
@@ -165,7 +240,7 @@ export function ItemLocationsPage() {
 
   const filteredRows = useMemo(() => {
     const rows = locations?.data ?? [];
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       if (statusFilter === "active" && !row.isActive) return false;
       if (statusFilter === "inactive" && row.isActive) return false;
       for (const key of FILTER_KEYS) {
@@ -187,6 +262,7 @@ export function ItemLocationsPage() {
       }
       return true;
     });
+    return sortLocationsByCode(filtered);
   }, [locations, columnFilters, statusFilter]);
 
   const handleCreate = useCallback(
@@ -259,6 +335,10 @@ export function ItemLocationsPage() {
     [loadLocations, selectedId],
   );
 
+  const openStockDialog = useCallback((loc: InventoryLocation) => {
+    setStockDialogLoc(loc);
+  }, []);
+
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -275,7 +355,7 @@ export function ItemLocationsPage() {
         if (!selected) return;
         setDialogState({
           mode: "create",
-          initial: { ...selected, id: undefined, code: "", name: "" },
+          initial: buildDuplicateLocationDraft(selected, locations?.data ?? []),
         });
       },
     },
@@ -288,7 +368,7 @@ export function ItemLocationsPage() {
     },
     {
       id: "delete",
-      label: "Ngừng hoạt động",
+      label: "Xóa",
       icon: Trash2,
       variant: "danger",
       disabled: !selected || !selected.isActive,
@@ -300,6 +380,12 @@ export function ItemLocationsPage() {
       icon: RefreshCw,
       onClick: () => void loadLocations(),
     },
+    {
+      id: "arrange",
+      label: "Xếp vị trí hàng hóa",
+      icon: PackageOpen,
+      onClick: () => setArrangeOpen(true),
+    },
   ];
 
   const columns: TableColumn<InventoryLocation>[] = [
@@ -310,8 +396,8 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          className="text-foreground"
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.code}
@@ -325,8 +411,8 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.name}
@@ -390,7 +476,7 @@ export function ItemLocationsPage() {
   return (
     <>
       <DocumentListShell
-        title="Vị trí hàng hóa"
+        title={<InventoryPageTitle>Vị trí hàng hóa</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="item-locations" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         pagination={
@@ -471,6 +557,12 @@ export function ItemLocationsPage() {
           onClose={() => setStockDialogLoc(null)}
         />
       )}
+
+      <ArrangeLocationDialog
+        open={arrangeOpen}
+        onOpenChange={setArrangeOpen}
+        onSaved={() => void loadLocations()}
+      />
     </>
   );
 }
@@ -539,7 +631,7 @@ function ItemLocationFormDialog({
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            className="flex items-center gap-1.5 text-sm text-primary-blue transition-colors hover:text-primary-blue-hover"
           >
             <HelpCircle className="h-4 w-4" />
             Trợ giúp

@@ -170,7 +170,8 @@ export class InventoryItemCrudService extends BaseCrudService<
       const attrs = item.productId
         ? await this.loadProductAttributes(item.productId)
         : await this.loadItemAttributes(item.id);
-      return { ...transformed, ...attrs };
+      const opening = await this.loadInitialStockSnapshot(actor, item.id);
+      return { ...transformed, ...attrs, ...opening };
     }
 
     // Fall back: treat id as a product ID → return representative item
@@ -272,12 +273,8 @@ export class InventoryItemCrudService extends BaseCrudService<
   ): Promise<any> {
     const normalized = normalizePayload(payload);
 
-    // Product-level update: add any new variant combos
-    if (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) {
-      return this.updateProductWithVariants(id, normalized, actor);
-    }
-
-    // Resolve / clear brand FK and keep the denormalized name in sync.
+    // Resolve / clear brand FK and keep the denormalized name in sync. Do this
+    // before the product-variant branch as those payloads also carry brandId.
     if ('brandId' in normalized) {
       if (normalized.brandId) {
         normalized.brand = await this.resolveBrandName(normalized.brandId, actor);
@@ -285,6 +282,16 @@ export class InventoryItemCrudService extends BaseCrudService<
         normalized.brandId = null;
         normalized.brand = null;
       }
+    }
+
+    // Product-level update: add any new variant combos. The edit form can also
+    // carry virtual colors/sizes for a real item ID; only the product fallback
+    // response includes _productId equal to the route id.
+    if (
+      (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) &&
+      normalized._productId === id
+    ) {
+      return this.updateProductWithVariants(id, normalized, actor);
     }
 
     // Only reconcile nested collections that were explicitly provided — a patch
@@ -595,6 +602,9 @@ export class InventoryItemCrudService extends BaseCrudService<
     } = payload;
 
     if (!productName) throw new BadRequestException('Tên hàng hóa là bắt buộc');
+    if (categoryId) {
+      await this.ensureCategoryBelongsToOrg(categoryId, actor);
+    }
 
     const productRepo = this.dataSource.getRepository(ProductEntity);
     const product = await productRepo
@@ -647,6 +657,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     const barcodeRepo = this.dataSource.getRepository(ItemBarcodeEntity);
     const str = (val: unknown): string | undefined =>
       typeof val === 'string' && val.trim() ? val.trim() : undefined;
+    const sharedItemFields = pickProductVariantSharedItemFields(payload);
 
     let itemsCreated = 0;
 
@@ -669,6 +680,7 @@ export class InventoryItemCrudService extends BaseCrudService<
             code,
             name: itemName,
             unit: str(v?.unit) ?? unit,
+            ...sharedItemFields,
             isActive: isActive !== false,
             isPosVisible: isPosVisible !== false,
             purchasePrice: Number(v?.purchasePrice ?? purchasePrice) || 0,
@@ -723,6 +735,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       where: { id: productId, organizationId: actor.organizationId },
     });
     if (!product) throw new NotFoundException(`Product ${productId} not found`);
+    if (payload.categoryId) {
+      await this.ensureCategoryBelongsToOrg(payload.categoryId, actor);
+    }
 
     const patch: Partial<ProductEntity> = {};
     if (name) patch.name = name;
@@ -731,6 +746,15 @@ export class InventoryItemCrudService extends BaseCrudService<
     if (Object.keys(patch).length > 0) {
       await productRepo.update({ id: productId }, patch as any);
     }
+
+    const sharedPatch = pickProductVariantSharedItemFields(payload);
+    if (Object.keys(sharedPatch).length > 0) {
+      await this.repository.update(
+        { productId, organizationId: actor.organizationId } as any,
+        sharedPatch as any,
+      );
+    }
+    await this.updateExistingVariantRowsFromPayload(payload.variants, actor);
 
     const colorDef = (colors as string[]).length > 0
       ? await this.resolveOrCreateAttrDef(productId, 'Color', actor)
@@ -773,7 +797,11 @@ export class InventoryItemCrudService extends BaseCrudService<
           code,
           name: variantLabel ? `${product.name} ${variantLabel}` : product.name,
           unit: payload.unit || 'Đôi',
-          isActive: product.isActive,
+          ...sharedPatch,
+          isActive:
+            payload.isActive !== undefined
+              ? payload.isActive !== false
+              : product.isActive,
           isPosVisible: payload.isPosVisible !== false,
           purchasePrice: Number(payload.purchasePrice) || 0,
           sellingPrice: Number(payload.sellingPrice) || 0,
@@ -796,6 +824,75 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const attrs = await this.loadProductAttributes(productId);
     return { productId, itemsAdded, ...attrs } as any;
+  }
+
+  private async updateExistingVariantRowsFromPayload(
+    variants: unknown,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (!Array.isArray(variants) || variants.length === 0) return;
+    const barcodeRepo = this.dataSource.getRepository(ItemBarcodeEntity);
+
+    for (const raw of variants as Record<string, any>[]) {
+      const itemId = typeof raw?.itemId === 'string' ? raw.itemId : undefined;
+      if (!itemId) continue;
+
+      const itemPatch: Record<string, any> = {};
+      const name = cleanString(raw.name);
+      const unit = cleanString(raw.unit);
+      const sku = cleanString(raw.sku);
+      const purchasePrice = finiteNumber(raw.purchasePrice);
+      const sellingPrice = finiteNumber(raw.sellPrice);
+
+      if (name) itemPatch.name = name;
+      if (unit) itemPatch.unit = unit;
+      if (sku) itemPatch.code = sku;
+      if (purchasePrice !== undefined) itemPatch.purchasePrice = purchasePrice;
+      if (sellingPrice !== undefined) itemPatch.sellingPrice = sellingPrice;
+
+      if (Object.keys(itemPatch).length > 0) {
+        await this.repository.update(
+          { id: itemId, organizationId: actor.organizationId } as any,
+          itemPatch as any,
+        );
+      }
+
+      const barcode = cleanString(raw.barcode);
+      if (barcode) {
+        await barcodeRepo.update(
+          { itemId, organizationId: actor.organizationId } as any,
+          { code: barcode } as any,
+        );
+      }
+    }
+  }
+
+  private async loadInitialStockSnapshot(
+    actor: ActorContext,
+    itemId: string,
+  ): Promise<{ initialStock: number; initialStockUnitPrice: number }> {
+    const rows = await this.dataSource.query<
+      Array<{ initialStock: string | number | null; notes: string | null }>
+    >(
+      `
+        SELECT
+          COALESCE(SUM(quantity)::float, 0) AS "initialStock",
+          (
+            ARRAY_AGG(notes ORDER BY posted_at DESC)
+            FILTER (WHERE notes IS NOT NULL)
+          )[1] AS notes
+        FROM stock_ledger_entries
+        WHERE organization_id = $1
+          AND item_id = $2
+          AND reference_type = 'INITIAL_STOCK'
+      `,
+      [actor.organizationId, itemId],
+    );
+    const row = rows[0];
+    return {
+      initialStock: finiteNumber(row?.initialStock) ?? 0,
+      initialStockUnitPrice: parseInitialStockUnitPrice(row?.notes) ?? 0,
+    };
   }
 
   private buildCombos(
@@ -1097,10 +1194,12 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const attrs = await this.loadProductAttributes(productId);
     const variants = await this.loadProductVariants(actor, productId);
+    const opening = await this.loadInitialStockSnapshot(actor, item.id);
 
     return {
       ...rest,
       ...attrs,
+      ...opening,
       variants,
       categoryName: category?.name ?? '',
       productName: product?.name ?? '',
@@ -1222,6 +1321,7 @@ function stripDerivedFields<T extends Record<string, any>>(payload: T): T {
   delete next.category;
   delete next.productName;
   delete next.product;
+  delete next._productId;
   delete next.providers;
   delete next.barcodes;
   delete next.thresholds;
@@ -1233,6 +1333,60 @@ function stripDerivedFields<T extends Record<string, any>>(payload: T): T {
   delete next.colors;
   delete next.sizes;
   return next;
+}
+
+function pickProductVariantSharedItemFields(
+  payload: Record<string, any>,
+): Record<string, any> {
+  const keys = [
+    'unit',
+    'categoryId',
+    'brand',
+    'brandId',
+    'itemType',
+    'purchasePrice',
+    'sellingPrice',
+    'isPosVisible',
+    'isActive',
+    'weightGram',
+    'lengthCm',
+    'widthCm',
+    'heightCm',
+    'manufactureYear',
+    'composition',
+    'packageWeightGram',
+    'packageLengthCm',
+    'packageWidthCm',
+    'packageHeightCm',
+    'oddSize',
+    'isGoldSilver',
+    'manageBarcodePerUnit',
+  ];
+  const picked: Record<string, any> = {};
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(payload, key)) {
+      picked[key] = payload[key];
+    }
+  }
+  return picked;
+}
+
+function cleanString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseInitialStockUnitPrice(notes: unknown): number | undefined {
+  if (typeof notes !== 'string') return undefined;
+  const match = notes.match(/đơn giá nhập\s+([0-9.,]+)/i);
+  if (!match) return undefined;
+  const normalized = match[1].replace(/\./g, '').replace(',', '.');
+  return finiteNumber(normalized);
 }
 
 /**

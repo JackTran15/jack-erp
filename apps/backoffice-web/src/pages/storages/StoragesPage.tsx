@@ -20,7 +20,7 @@ import { erpApi } from "../../lib/erp-api";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../components/table/PaginationControls";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -227,7 +227,7 @@ export function StoragesPage() {
   return (
     <>
       <DocumentListShell
-        title="Kho lưu trữ"
+        title={<InventoryPageTitle>Kho lưu trữ</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="storages" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={

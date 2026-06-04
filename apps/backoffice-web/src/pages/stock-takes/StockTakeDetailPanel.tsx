@@ -47,7 +47,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
               className={
                 isActive
                   ? "font-semibold text-foreground"
-                  : "text-primary hover:underline"
+                  : "text-primary-blue transition-colors hover:text-primary-blue-hover"
               }
             >
               {item.label}

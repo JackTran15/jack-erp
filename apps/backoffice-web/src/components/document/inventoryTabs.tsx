@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { PageTabBar, type PageTabItem } from "@erp/ui";
+import type { ReactNode } from "react";
 
 export type InventoryTabId =
   | "storages"
@@ -31,19 +32,23 @@ export const INVENTORY_TABS: (PageTabItem & {
 ];
 
 export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
+  const linkClassName =
+    "font-medium text-primary-blue transition-colors hover:text-primary-blue-hover";
+
   return (
     <PageTabBar
       activeId={activeId}
       items={INVENTORY_TABS}
       renderItem={(item, isActive) => {
+        // Ẩn tab đang active khỏi thanh nav — chỉ hiện các trang khác.
         if (isActive) {
-          return <span className="font-semibold text-foreground">{item.label}</span>;
+          return null;
         }
         const tab = item as (typeof INVENTORY_TABS)[number];
         if (tab.comingSoon) {
           return (
             <span
-              className="cursor-not-allowed text-muted-foreground/70"
+              className="cursor-not-allowed font-medium text-primary-blue/60"
               title="Sắp triển khai"
             >
               {item.label}
@@ -51,11 +56,15 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
           );
         }
         return (
-          <Link to={item.href ?? "#"} className="text-primary hover:underline">
+          <Link to={item.href ?? "#"} className={linkClassName}>
             {item.label}
           </Link>
         );
       }}
     />
   );
+}
+
+export function InventoryPageTitle({ children }: { children: ReactNode }) {
+  return <span className="text-xl">{children}</span>;
 }
