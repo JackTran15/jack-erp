@@ -1,6 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { ItemEntity } from '../location/item.entity';
+import { LocationEntity } from '../location/location.entity';
 
 /** Single item line within a goods issue document. */
 @Entity('goods_issue_lines')
@@ -36,4 +37,8 @@ export class GoodsIssueLineEntity {
   @ManyToOne(() => ItemEntity, { eager: true })
   @JoinColumn({ name: 'item_id' })
   item?: ItemEntity;
+
+  @ManyToOne(() => LocationEntity, { eager: true })
+  @JoinColumn({ name: 'location_id' })
+  location?: LocationEntity;
 }

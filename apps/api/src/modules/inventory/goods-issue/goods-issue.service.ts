@@ -31,7 +31,13 @@ export interface CreateGoodsIssueDto {
   targetBranchId?: string;
   reason?: string; // optional override / legacy
   notes?: string;
-  lines: { itemId: string; quantity: number; unitPrice?: number; notes?: string }[];
+  lines: {
+    itemId: string;
+    locationId?: string;
+    quantity: number;
+    unitPrice?: number;
+    notes?: string;
+  }[];
 }
 
 export interface GoodsIssueQuery extends PaginationQuery {
@@ -172,7 +178,7 @@ export class GoodsIssueService {
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = gi.lines.map((line) => ({
         itemId: line.itemId,
-        locationId: gi.locationId,
+        locationId: line.locationId,
         branchId,
         organizationId: gi.organizationId,
         movementType: StockMovementType.GOODS_ISSUE,
@@ -181,6 +187,7 @@ export class GoodsIssueService {
         referenceId: gi.id,
         notes: `Xuất hàng: ${documentNumber}`,
         actorContext: actor,
+        unitCost: Number(line.unitPrice ?? 0),
         unitCost: Number(line.unitPrice ?? 0),
       }));
 
@@ -215,7 +222,7 @@ export class GoodsIssueService {
       await this.dataSource.transaction(async () => {
         const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
           itemId: line.itemId,
-          locationId: gi.locationId,
+          locationId: line.locationId,
           branchId,
           organizationId: gi.organizationId,
           movementType: StockMovementType.ADJUSTMENT_INCREASE,
@@ -224,6 +231,7 @@ export class GoodsIssueService {
           referenceId: gi.id,
           notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
           actorContext: actor,
+          unitCost: Number(line.unitPrice ?? 0),
           unitCost: Number(line.unitPrice ?? 0),
         }));
         await this.ledgerService.recordBatchMovements(reversals);

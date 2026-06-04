@@ -1,7 +1,7 @@
 import type React from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
 import { Button, formatMoneyInteger } from "@erp/ui";
-import { formatCustomerStatus } from "../../lib/customer-display";
+import { formatCrudFieldValue } from "../../lib/crud-display";
 
 interface CrudDetailViewProps {
   config: CrudEntityConfig;
@@ -64,7 +64,7 @@ export function CrudDetailView({
 
 function formatValue(value: unknown, field: FieldDefinition): React.ReactNode {
   if (value === null || value === undefined) return "—";
-  if (field.key === "status") return formatCustomerStatus(value);
+  if (field.type === "enum") return formatCrudFieldValue(value, field);
   if (field.type === "boolean") {
     return (
       <input

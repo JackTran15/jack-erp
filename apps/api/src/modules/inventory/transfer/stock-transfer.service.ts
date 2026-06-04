@@ -243,6 +243,15 @@ export class StockTransferService {
       itemIds,
     );
 
+    // Snapshot `purchase_price` per item once at posting time so both legs of
+    // the transfer (TRANSFER_OUT + TRANSFER_IN) carry the same unit_cost and
+    // line_value sums net to zero across the move.
+    const itemIds = Array.from(new Set(transfer.lines.map((l) => l.itemId)));
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      transfer.organizationId,
+      itemIds,
+    );
+
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = [];
 

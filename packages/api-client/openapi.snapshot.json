@@ -3275,664 +3275,6 @@
         ]
       }
     },
-    "/branches": {
-      "post": {
-        "operationId": "BranchController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateBranchDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      },
-      "get": {
-        "operationId": "BranchController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/main": {
-      "get": {
-        "operationId": "BranchController_findMainBranch",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/users/{userId}/branches": {
-      "get": {
-        "operationId": "BranchController_getUserBranches",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserBranchAssignmentEntity"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/{id}": {
-      "get": {
-        "operationId": "BranchController_findById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      },
-      "patch": {
-        "operationId": "BranchController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateBranchDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/{id}/archive": {
-      "post": {
-        "operationId": "BranchController_archive",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/{id}/suspend": {
-      "post": {
-        "operationId": "BranchController_suspend",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BranchEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/{id}/assign-user/{userId}": {
-      "post": {
-        "operationId": "BranchController_assignUser",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserBranchAssignmentEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      },
-      "delete": {
-        "operationId": "BranchController_unassignUser",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Branch"
-        ]
-      }
-    },
-    "/branches/{id}/salesmen": {
-      "get": {
-        "operationId": "SalesHierarchyController_listSalesmen",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SalesmanAssignmentEntity"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/branches/{id}/salesmen/assign": {
-      "post": {
-        "operationId": "SalesHierarchyController_assignSalesman",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignSalesPersonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SalesmanAssignmentEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/branches/{id}/salesmen/unassign": {
-      "post": {
-        "operationId": "SalesHierarchyController_unassignSalesman",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnassignSalesPersonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/branches/{id}/sales-managers": {
-      "get": {
-        "operationId": "SalesHierarchyController_listSalesManagers",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SalesManagerAssignmentEntity"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/branches/{id}/sales-managers/assign": {
-      "post": {
-        "operationId": "SalesHierarchyController_assignSalesManager",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignSalesPersonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SalesManagerAssignmentEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/branches/{id}/sales-managers/unassign": {
-      "post": {
-        "operationId": "SalesHierarchyController_unassignSalesManager",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnassignSalesPersonDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "SalesHierarchy"
-        ]
-      }
-    },
-    "/dead-letter-events": {
-      "get": {
-        "operationId": "DeadLetterController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "PENDING",
-                "RESOLVED",
-                "IGNORED"
-              ]
-            }
-          },
-          {
-            "name": "topic",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "DeadLetter"
-        ]
-      }
-    },
-    "/dead-letter-events/{id}": {
-      "get": {
-        "operationId": "DeadLetterController_getById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeadLetterEventEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DeadLetter"
-        ]
-      }
-    },
-    "/dead-letter-events/{id}/replay": {
-      "post": {
-        "operationId": "DeadLetterController_replay",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeadLetterEventEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DeadLetter"
-        ]
-      }
-    },
-    "/dead-letter-events/{id}/ignore": {
-      "post": {
-        "operationId": "DeadLetterController_ignore",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IgnoreDeadLetterDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeadLetterEventEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "DeadLetter"
-        ]
-      }
-    },
     "/customers": {
       "post": {
         "operationId": "CustomerController_create",
@@ -4028,6 +3370,30 @@
         "responses": {
           "200": {
             "description": ""
+          }
+        },
+        "tags": [
+          "Customer"
+        ]
+      }
+    },
+    "/customers/membership-card-types": {
+      "get": {
+        "operationId": "CustomerController_listCardTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipCardTypeEntity"
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -4499,6 +3865,664 @@
         ]
       }
     },
+    "/branches": {
+      "post": {
+        "operationId": "BranchController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      },
+      "get": {
+        "operationId": "BranchController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/main": {
+      "get": {
+        "operationId": "BranchController_findMainBranch",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/users/{userId}/branches": {
+      "get": {
+        "operationId": "BranchController_getUserBranches",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBranchAssignmentEntity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}": {
+      "get": {
+        "operationId": "BranchController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      },
+      "patch": {
+        "operationId": "BranchController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}/archive": {
+      "post": {
+        "operationId": "BranchController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}/suspend": {
+      "post": {
+        "operationId": "BranchController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}/assign-user/{userId}": {
+      "post": {
+        "operationId": "BranchController_assignUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBranchAssignmentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      },
+      "delete": {
+        "operationId": "BranchController_unassignUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branches/{id}/salesmen": {
+      "get": {
+        "operationId": "SalesHierarchyController_listSalesmen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/branches/{id}/salesmen/assign": {
+      "post": {
+        "operationId": "SalesHierarchyController_assignSalesman",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignSalesPersonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesmanAssignmentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/branches/{id}/salesmen/unassign": {
+      "post": {
+        "operationId": "SalesHierarchyController_unassignSalesman",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnassignSalesPersonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/branches/{id}/sales-managers": {
+      "get": {
+        "operationId": "SalesHierarchyController_listSalesManagers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/branches/{id}/sales-managers/assign": {
+      "post": {
+        "operationId": "SalesHierarchyController_assignSalesManager",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignSalesPersonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesManagerAssignmentEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/branches/{id}/sales-managers/unassign": {
+      "post": {
+        "operationId": "SalesHierarchyController_unassignSalesManager",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnassignSalesPersonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "SalesHierarchy"
+        ]
+      }
+    },
+    "/dead-letter-events": {
+      "get": {
+        "operationId": "DeadLetterController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RESOLVED",
+                "IGNORED"
+              ]
+            }
+          },
+          {
+            "name": "topic",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DeadLetter"
+        ]
+      }
+    },
+    "/dead-letter-events/{id}": {
+      "get": {
+        "operationId": "DeadLetterController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeadLetterEventEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DeadLetter"
+        ]
+      }
+    },
+    "/dead-letter-events/{id}/replay": {
+      "post": {
+        "operationId": "DeadLetterController_replay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeadLetterEventEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DeadLetter"
+        ]
+      }
+    },
+    "/dead-letter-events/{id}/ignore": {
+      "post": {
+        "operationId": "DeadLetterController_ignore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IgnoreDeadLetterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeadLetterEventEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DeadLetter"
+        ]
+      }
+    },
     "/inventory/items": {
       "post": {
         "operationId": "InventoryLocationController_createItem",
@@ -4588,6 +4612,198 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/by-product/{productId}": {
+      "get": {
+        "operationId": "InventoryLocationController_getRepresentativeItemForProduct",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/products": {
+      "get": {
+        "operationId": "InventoryLocationController_listProductGroups",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Ignored — results are always sorted by code ASC",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/products/{productId}": {
+      "get": {
+        "operationId": "InventoryLocationController_getProductGroup",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InventoryLocation"
+        ]
+      }
+    },
+    "/inventory/items/products/{productId}/items": {
+      "get": {
+        "operationId": "InventoryLocationController_listProductItems",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
             }
           }
         ],
@@ -9181,6 +9397,28 @@
         "tags": [
           "CsvExport"
         ]
+      },
+      "post": {
+        "operationId": "CsvExportController_exportItemsExcelSelected",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportItemsBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
       }
     },
     "/inventory/exports/items/template": {
@@ -10469,6 +10707,37 @@
         },
         "tags": [
           "Invoice"
+        ]
+      }
+    },
+    "/v2/invoices/search": {
+      "post": {
+        "operationId": "InvoiceV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "InvoiceV2"
         ]
       }
     },
@@ -16294,335 +16563,6 @@
           "documentType"
         ]
       },
-      "CreateBranchDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "parentBranchId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "BranchEntity": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
-            ],
-            "type": "string"
-          },
-          "isMainBranch": {
-            "type": "boolean"
-          },
-          "parentBranchId": {
-            "type": "string"
-          },
-          "parentBranch": {
-            "$ref": "#/components/schemas/BranchEntity"
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "name",
-          "status",
-          "isMainBranch",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "UserBranchAssignmentEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "assignedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "assignedBy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "branchId",
-          "organizationId",
-          "assignedAt",
-          "assignedBy"
-        ]
-      },
-      "UpdateBranchDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "address": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED",
-              "ARCHIVED"
-            ]
-          }
-        }
-      },
-      "SalesmanAssignmentEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "assignedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "assignedBy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "branchId",
-          "organizationId",
-          "assignedAt",
-          "assignedBy"
-        ]
-      },
-      "AssignSalesPersonDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "userId"
-        ]
-      },
-      "UnassignSalesPersonDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "userId"
-        ]
-      },
-      "SalesManagerAssignmentEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "assignedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "assignedBy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "branchId",
-          "organizationId",
-          "assignedAt",
-          "assignedBy"
-        ]
-      },
-      "DeadLetterEventEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "topic": {
-            "type": "string"
-          },
-          "partition": {
-            "type": "number"
-          },
-          "offset": {
-            "type": "string"
-          },
-          "key": {
-            "type": "string"
-          },
-          "payload": {
-            "type": "object"
-          },
-          "error": {
-            "type": "string"
-          },
-          "retryCount": {
-            "type": "number"
-          },
-          "status": {
-            "enum": [
-              "PENDING",
-              "RESOLVED",
-              "IGNORED"
-            ],
-            "type": "string"
-          },
-          "resolvedBy": {
-            "type": "string"
-          },
-          "resolvedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "topic",
-          "payload",
-          "retryCount",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "IgnoreDeadLetterDto": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 2000
-          }
-        }
-      },
       "CreateMembershipCardInlineDto": {
         "type": "object",
         "properties": {
@@ -16814,6 +16754,70 @@
           "name",
           "status",
           "code",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "MembershipCardTypeEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "none",
+              "silver",
+              "gold",
+              "diamond"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "name",
+          "tier",
+          "isActive",
+          "sortOrder",
           "id",
           "organizationId",
           "createdAt",
@@ -17158,6 +17162,335 @@
           "issuedAt"
         ]
       },
+      "CreateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "parentBranchId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "BranchEntity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "isMainBranch": {
+            "type": "boolean"
+          },
+          "parentBranchId": {
+            "type": "string"
+          },
+          "parentBranch": {
+            "$ref": "#/components/schemas/BranchEntity"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "isMainBranch",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "UserBranchAssignmentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "branchId",
+          "organizationId",
+          "assignedAt",
+          "assignedBy"
+        ]
+      },
+      "UpdateBranchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ARCHIVED"
+            ]
+          }
+        }
+      },
+      "AssignSalesPersonDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "SalesmanAssignmentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "branchId",
+          "organizationId",
+          "assignedAt",
+          "assignedBy"
+        ]
+      },
+      "UnassignSalesPersonDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "SalesManagerAssignmentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "assignedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "assignedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "branchId",
+          "organizationId",
+          "assignedAt",
+          "assignedBy"
+        ]
+      },
+      "DeadLetterEventEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "partition": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "error": {
+            "type": "string"
+          },
+          "retryCount": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "RESOLVED",
+              "IGNORED"
+            ],
+            "type": "string"
+          },
+          "resolvedBy": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "topic",
+          "payload",
+          "retryCount",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "IgnoreDeadLetterDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
       "CreateItemBarcodeInput": {
         "type": "object",
         "properties": {
@@ -17315,6 +17648,10 @@
             "type": "string",
             "maxLength": 100
           },
+          "brandId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "itemType": {
             "type": "string",
             "maxLength": 100
@@ -17395,7 +17732,16 @@
       "ItemCategoryEntity": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string"
+          },
           "name": {
+            "type": "string"
+          },
+          "parentGroupId": {
+            "type": "string"
+          },
+          "description": {
             "type": "string"
           },
           "id": {
@@ -17431,7 +17777,7 @@
           "createdBy"
         ]
       },
-      "ProviderEntity": {
+      "SupplierGroupEntity": {
         "type": "object",
         "properties": {
           "code": {
@@ -17440,13 +17786,13 @@
           "name": {
             "type": "string"
           },
-          "email": {
+          "parentGroupId": {
             "type": "string"
           },
-          "phone": {
-            "type": "string"
+          "parentGroup": {
+            "$ref": "#/components/schemas/SupplierGroupEntity"
           },
-          "notes": {
+          "description": {
             "type": "string"
           },
           "isActive": {
@@ -17487,9 +17833,138 @@
           "createdBy"
         ]
       },
+      "ProviderEntity": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "organization",
+              "individual"
+            ],
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "group": {
+            "$ref": "#/components/schemas/SupplierGroupEntity"
+          },
+          "maxDebt": {
+            "type": "string",
+            "description": "Maximum outstanding debt in VND. Returned as string by pg (numeric type)."
+          },
+          "debtTermDays": {
+            "type": "number"
+          },
+          "bankName": {
+            "type": "string"
+          },
+          "bankAccountNumber": {
+            "type": "string"
+          },
+          "bankBranch": {
+            "type": "string"
+          },
+          "isCustomer": {
+            "type": "boolean"
+          },
+          "taxCode": {
+            "type": "string"
+          },
+          "contactTitle": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string"
+          },
+          "contactEmail": {
+            "type": "string"
+          },
+          "contactPhone": {
+            "type": "string"
+          },
+          "contactPosition": {
+            "type": "string"
+          },
+          "contactAddress": {
+            "type": "string"
+          },
+          "salutation": {
+            "type": "string"
+          },
+          "idCardNumber": {
+            "type": "string"
+          },
+          "idCardIssueDate": {
+            "type": "string"
+          },
+          "idCardIssuePlace": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isActive",
+          "type",
+          "isCustomer",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
       "ProductEntity": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
@@ -17884,6 +18359,9 @@
           "brand": {
             "type": "string"
           },
+          "brandId": {
+            "type": "string"
+          },
           "itemType": {
             "type": "string"
           },
@@ -18098,6 +18576,58 @@
           "productId": {
             "type": "string",
             "format": "uuid"
+          },
+          "brand": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "brandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemType": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "packageWeightGram": {
+            "type": "number",
+            "minimum": 0
+          },
+          "packageLengthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "packageWidthCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "packageHeightCm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "isGoldSilver": {
+            "type": "boolean"
+          },
+          "oddSize": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "manageBarcodePerUnit": {
+            "type": "boolean"
+          },
+          "providers": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateItemProviderInput"
+            }
+          },
+          "units": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateItemUnitInput"
+            }
           }
         }
       },
@@ -20259,6 +20789,10 @@
           "updatedAt"
         ]
       },
+      "ExportItemsBodyDto": {
+        "type": "object",
+        "properties": {}
+      },
       "PosProductCardDto": {
         "type": "object",
         "properties": {
@@ -21727,6 +22261,174 @@
           "refundMethod",
           "revenueAccountId"
         ]
+      },
+      "StringFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "*",
+              "=",
+              "+",
+              "-",
+              "!"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "EnumFilterDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "DateRangeFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "CompareFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "=",
+              "<",
+              "<=",
+              ">",
+              ">="
+            ]
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "InvoiceSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Số hóa đơn",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "status": {
+            "description": "Trạng thái",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "type": {
+            "description": "Loại hóa đơn",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "issuedAt": {
+            "description": "Ngày hóa đơn",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Ngày tạo đơn",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Mã / tên khách hàng — filter by customer UUID",
+            "format": "uuid"
+          },
+          "customerPhone": {
+            "description": "Số điện thoại",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "customerCode": {
+            "description": "Mã khách hàng",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "customerName": {
+            "description": "Tên khách hàng",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "amountDue": {
+            "description": "Tổng thanh toán",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "note": {
+            "description": "Ghi chú",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        }
       },
       "DiscountCodeEntity": {
         "type": "object",

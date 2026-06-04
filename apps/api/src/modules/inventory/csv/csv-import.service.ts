@@ -1003,7 +1003,7 @@ export class CsvImportService {
     branchId: string;
     purchasePrice: number;
   }> {
-    const itemEntity = (await this.dataSource.getRepository('items').findOne({
+    const itemEntity = (await this.dataSource.getRepository("items").findOne({
       where: {
         organizationId: actor.organizationId,
         code: data.itemCode,

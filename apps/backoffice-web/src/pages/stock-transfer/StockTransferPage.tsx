@@ -37,11 +37,15 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -290,7 +294,7 @@ export function StockTransferPage() {
   return (
     <>
       <DocumentListShell
-        title="Chuyển kho"
+        title={<InventoryPageTitle>Chuyển kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="stock-transfer" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={
@@ -399,6 +403,12 @@ const emptyLine = (): FormLine => ({
   notes: "",
 });
 
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
+
 function TransferFormDialog({
   mode,
   initial,
@@ -452,9 +462,11 @@ function TransferFormDialog({
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   });
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial && initial.lines.length > 0
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+    if (initial.lines.length === 0) return isView ? [] : [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
           itemName: l.item?.name ?? "",
@@ -469,9 +481,10 @@ function TransferFormDialog({
             : "",
           quantity: Number(l.quantity),
           notes: l.notes ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -549,15 +562,17 @@ function TransferFormDialog({
     [storages],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.quantity || 0), 0);
 
   const handleSave = useCallback(async () => {
     if (!sourceLocationId || !destLocationId) {
       setError("Vui lòng chọn vị trí xuất và vị trí nhập mặc định.");
       return;
     }
-    if (lines.some((l) => !l.itemId)) {
-      setError("Vui lòng chọn mặt hàng cho mọi dòng.");
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
+      setError("Cần ít nhất 1 dòng hàng hợp lệ.");
       return;
     }
     setSaving(true);
@@ -574,7 +589,7 @@ function TransferFormDialog({
         sourceBranchId: srcLoc.branchId,
         destinationBranchId: dstLoc.branchId,
         notes: notes || undefined,
-        lines: lines.map((l) => ({
+        lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           sourceLocationId: l.sourceLocationId || sourceLocationId,
           destinationLocationId: l.destLocationId || destLocationId,
@@ -962,18 +977,26 @@ function TransferFormDialog({
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              if (lines.length === 1) {
-                setLines([emptyLine()]);
-              } else {
-                setLines((prev) => prev.filter((_, i) => i !== idx));
-              }
+              setLines((prev) =>
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
+              );
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
+            showAddRow={!isView}
+            showRowActions={!isView}
           />
+        }
+        footerSummary={
+          <div className="flex items-center justify-between">
+            <span>Số dòng = {lines.length}</span>
+            <span>
+              Số lượng: <strong className="ml-1">{totalQty}</strong>
+            </span>
+          </div>
         }
       />
 

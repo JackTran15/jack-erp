@@ -337,7 +337,7 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
             type="button"
             onClick={addRow}
             disabled={submitting}
-            className="flex items-center gap-1 rounded px-2 py-1 text-sm text-primary hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-sm text-primary-blue transition-colors hover:bg-primary-blue/10 hover:text-primary-blue-hover disabled:pointer-events-none disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             Thêm dòng

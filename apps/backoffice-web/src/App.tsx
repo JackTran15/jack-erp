@@ -12,6 +12,7 @@ import { CrudCreatePage } from "./components/crud/CrudCreatePage";
 import { ProviderGroupListPage } from "./pages/inventory/ProviderGroupListPage";
 import { CrudDetailPage } from "./components/crud/CrudDetailPage";
 import { CrudEditPage } from "./components/crud/CrudEditPage";
+import { BranchManagementPage } from "./pages/branch-management/BranchManagementPage";
 import { SalesHierarchyPage } from "./pages/branch-management/SalesHierarchyPage";
 import { OrgRegistrationPage } from "./pages/onboarding/OrgRegistrationPage";
 import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPage";
@@ -36,6 +37,7 @@ import { TransferByBranchReportPage } from "./pages/reports/storage/TransferByBr
 import { TemporaryIssuesReportPage } from "./pages/reports/storage/TemporaryIssuesReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
+import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
 import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
 import { TransferOrdersPage } from "./pages/transfer-orders/TransferOrdersPage";
@@ -43,7 +45,7 @@ import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
 import { StockTransferPage } from "./pages/stock-transfer/StockTransferPage";
 import { ItemLocationsPage } from "./pages/item-locations/ItemLocationsPage";
-import { StoragesPage } from "./pages/storages/StoragesPage";
+
 import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 import { ProductsPage } from "./pages/products/ProductsPage";
@@ -82,12 +84,38 @@ export function App() {
               <Route element={<BackofficeLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/admin/employees" element={<EmployeesPage />} />
-                <Route path="/admin/provider-groups" element={<ProviderGroupListPage />} />
-                <Route path="/admin/:entityKey/new" element={<CrudCreatePage />} />
-                <Route path="/admin/:entityKey/:id/edit" element={<CrudEditPage />} />
-                <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />
-                <Route path="/admin/:entityKey/:id" element={<CrudDetailPage />} />
-                <Route path="/admin/inventory-items" element={<InventoryItemsPage />} />
+                <Route
+                  path="/admin/provider-groups"
+                  element={<ProviderGroupListPage />}
+                />
+                <Route
+                  path="/admin/:entityKey/new"
+                  element={<CrudCreatePage />}
+                />
+                <Route
+                  path="/admin/:entityKey/:id/edit"
+                  element={<CrudEditPage />}
+                />
+                <Route
+                  path="/admin/customers/:id"
+                  element={<CustomerDetailPage />}
+                />
+                <Route
+                  path="/admin/:entityKey/:id"
+                  element={<CrudDetailPage />}
+                />
+                <Route
+                  path="/admin/inventory-items"
+                  element={<InventoryItemsPage />}
+                />
+                <Route
+                  path="/admin/inventory-storages"
+                  element={<InventoryStoragesPage />}
+                />
+                <Route
+                  path="/admin/branches"
+                  element={<BranchManagementPage />}
+                />
                 <Route path="/admin/:entityKey" element={<CrudListPage />} />
                 <Route
                   path="/branch-management/sales-hierarchy"
@@ -116,10 +144,6 @@ export function App() {
                   element={<ItemLocationsPage />}
                 />
                 <Route
-                  path="/inventory/storages"
-                  element={<StoragesPage />}
-                />
-                <Route
                   path="/inventory/item-location-details"
                   element={<ItemLocationDetailsPage />}
                 />
@@ -139,24 +163,42 @@ export function App() {
                   path="/onboarding/branch-registration"
                   element={<BranchRegistrationPage />}
                 />
-                <Route path="/onboarding/approvals" element={<ApprovalQueuePage />} />
+                <Route
+                  path="/onboarding/approvals"
+                  element={<ApprovalQueuePage />}
+                />
                 <Route
                   path="/onboarding/approvals/:id"
                   element={<RegistrationDetailPage />}
                 />
                 <Route path="/reports" element={<DashboardReportPage />} />
-                <Route path="/reports/dashboard" element={<DashboardReportPage />} />
+                <Route
+                  path="/reports/dashboard"
+                  element={<DashboardReportPage />}
+                />
                 <Route path="/reports/sales" element={<SalesReportPage />} />
-                <Route path="/reports/inventory" element={<InventoryReportPage />} />
+                <Route
+                  path="/reports/inventory"
+                  element={<InventoryReportPage />}
+                />
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
                 <Route
                   path="/treasury/cash/receipts-expenses"
                   element={<TreasuryCashReceiptsPage />}
                 />
-                <Route path="/treasury/cash/count" element={<TreasuryCashCountPage />} />
-                <Route path="/treasury/cash/ledger" element={<LedgerCashPage />} />
-                <Route path="/treasury/wip/:slug" element={<TreasuryWipPage />} />
+                <Route
+                  path="/treasury/cash/count"
+                  element={<TreasuryCashCountPage />}
+                />
+                <Route
+                  path="/treasury/cash/ledger"
+                  element={<LedgerCashPage />}
+                />
+                <Route
+                  path="/treasury/wip/:slug"
+                  element={<TreasuryWipPage />}
+                />
                 <Route
                   path="/ledger-cash"
                   element={<Navigate to="/treasury/cash/ledger" replace />}

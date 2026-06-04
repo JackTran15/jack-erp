@@ -15,7 +15,7 @@ import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -227,7 +227,7 @@ export function StockTakesPage() {
       render: (r) => (
         <button
           type="button"
-          className="font-mono text-primary hover:underline"
+          className="font-mono text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             void openForEdit(r.id);
@@ -286,7 +286,7 @@ export function StockTakesPage() {
   return (
     <>
       <DocumentListShell
-        title="Kiểm kê kho"
+        title={<InventoryPageTitle>Kiểm kê kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="stock-take" />}
         toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
         filters={

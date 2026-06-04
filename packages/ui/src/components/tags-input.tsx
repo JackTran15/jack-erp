@@ -21,6 +21,7 @@ function TagsInput({
 }: TagsInputProps) {
   const [inputValue, setInputValue] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isComposingRef = React.useRef(false);
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -35,6 +36,13 @@ function TagsInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
+      if (
+        isComposingRef.current ||
+        e.nativeEvent.isComposing ||
+        e.keyCode === 229
+      ) {
+        return;
+      }
       e.preventDefault();
       addTag(inputValue);
     } else if (e.key === "Backspace" && inputValue === "" && value.length > 0) {
@@ -45,19 +53,19 @@ function TagsInput({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+        "flex w-full min-w-0 flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
         disabled && "opacity-50 cursor-not-allowed",
         className,
       )}
       onClick={() => inputRef.current?.focus()}
     >
       {value.map((tag) => (
-        <Badge key={tag} variant="secondary" className="gap-1">
-          {tag}
+        <Badge key={tag} variant="secondary" className="min-w-0 max-w-full gap-1">
+          <span className="min-w-0 truncate">{tag}</span>
           {!disabled ? (
             <button
               type="button"
-              className="ml-0.5 rounded-full p-0.5 hover:bg-muted"
+              className="ml-0.5 shrink-0 rounded-full p-0.5 hover:bg-muted"
               onClick={(e) => {
                 e.stopPropagation();
                 removeTag(tag);
@@ -76,6 +84,12 @@ function TagsInput({
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
+        onCompositionStart={() => {
+          isComposingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false;
+        }}
         placeholder={value.length === 0 ? placeholder : ""}
         disabled={disabled}
       />

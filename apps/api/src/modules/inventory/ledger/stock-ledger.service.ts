@@ -394,17 +394,22 @@ export class StockLedgerService {
       'th.max_qty AS "maxQty"',
     ]);
 
-    const sortBy = (query.sortBy ?? 'lastMovementAt') as string;
+    const sortBy = (query.sortBy ?? 'locationCode') as string;
     const sortMap: Record<string, string> = {
+      createdAt: 'sb.created_at',
       itemCode: 'item.code',
       itemName: 'item.name',
       quantity: 'sb.quantity',
       lastMovementAt: 'sb.last_movement_at',
+      locationCode: 'loc.code',
       locationName: 'loc.name',
       storageName: 'storage.name',
     };
-    const sortExpr = sortMap[sortBy] ?? 'sb.last_movement_at';
-    qb.orderBy(sortExpr, (query.sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC');
+    const sortExpr = sortMap[sortBy] ?? 'loc.code';
+    qb.orderBy(sortExpr, (query.sortOrder ?? 'asc').toUpperCase() as 'ASC' | 'DESC');
+    if (sortBy === 'locationCode' && typeof qb.addOrderBy === 'function') {
+      qb.addOrderBy('item.code', 'ASC');
+    }
 
     qb.offset((page - 1) * pageSize).limit(pageSize);
 

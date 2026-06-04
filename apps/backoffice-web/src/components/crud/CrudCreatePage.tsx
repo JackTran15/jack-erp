@@ -110,6 +110,7 @@ export function CrudCreatePage() {
 
     try {
       await createMutation.mutateAsync(payload);
+      toast.success(`Đã tạo ${config.displayName}.`);
       navigate(`/admin/${entityKey}`, { replace: true });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -164,22 +165,23 @@ export function CrudCreatePage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {editableFields.map((field) => (
-                <CrudFieldInput
-                  key={field.key}
-                  inputIdPrefix="create"
-                  field={field}
-                  value={values[field.key]}
-                  error={errors[field.key]}
-                  entityKey={entityKey}
-                  onChange={(nextValue) => {
-                    setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next[field.key];
-                      return next;
-                    });
-                  }}
-                />
+                <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+                  <CrudFieldInput
+                    inputIdPrefix="create"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    entityKey={entityKey}
+                    onChange={(nextValue) => {
+                      setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[field.key];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -192,4 +194,3 @@ export function CrudCreatePage() {
 function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
-

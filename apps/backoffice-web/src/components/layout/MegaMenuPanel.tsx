@@ -33,28 +33,38 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
   function MegaMenuPanel({ module }, ref) {
     const { sidebarCollapsed } = useLayout();
     const columnSplit = splitFlyoutSections(module);
+    const hasSplitColumns = columnSplit != null;
 
     return (
       <div
         ref={ref}
         className={cn(
-          "fixed top-14 z-30 h-[calc(100vh-3.5rem)]",
-          "w-[500px] overflow-y-auto",
+          "fixed top-14 z-[70] h-[calc(100vh-3.5rem)]",
+          "w-max min-w-56 overflow-y-auto",
           "border-l border-gray-700 bg-gray-900 text-white shadow-2xl",
           "transition-[left] duration-200",
-          sidebarCollapsed ? "left-[60px]" : "left-60",
+          sidebarCollapsed
+            ? "left-[60px] max-w-[calc(100vw-60px)]"
+            : "left-60 max-w-[calc(100vw-15rem)]",
         )}
       >
         <div className="p-5">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-6 items-start">
+          <div
+            className={cn(
+              "grid items-start gap-x-5 gap-y-6",
+              hasSplitColumns
+                ? "grid-cols-[repeat(2,minmax(14rem,max-content))]"
+                : "grid-cols-[minmax(14rem,max-content)]",
+            )}
+          >
             {columnSplit ? (
               <>
-                <div className="flex flex-col gap-y-6">
+                <div className="flex min-w-0 flex-col gap-y-6">
                   {columnSplit.left.map((section) => (
                     <SectionColumn key={section.id} section={section} />
                   ))}
                 </div>
-                <div className="flex flex-col gap-y-6">
+                <div className="flex min-w-0 flex-col gap-y-6">
                   {columnSplit.right.map((section) => (
                     <SectionColumn key={section.id} section={section} />
                   ))}
@@ -80,7 +90,7 @@ interface SectionColumnProps {
 
 function SectionColumn({ section }: SectionColumnProps) {
   return (
-    <div>
+    <div className="min-w-0">
       {section.label && (
         <h3 className="mb-2 rounded px-2 py-1 text-[14px] font-bold uppercase tracking-widest text-gray-400 bg-gray-800">
           {section.label}
@@ -117,7 +127,7 @@ function MegaMenuLink({ child }: MegaMenuLinkProps) {
         )
       }
     >
-      <span>{child.label}</span>
+      <span className="whitespace-normal">{child.label}</span>
     </NavLink>
   );
 }

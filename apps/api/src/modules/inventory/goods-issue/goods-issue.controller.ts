@@ -33,6 +33,12 @@ class GoodsIssueLineDto {
   @IsUUID()
   itemId: string;
 
+  /** Per-line bin/location to issue from. Optional — falls back to the
+   *  header locationId when omitted (POS sales, transfer flows). */
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
   @IsNumber()
   @Min(0.01)
   quantity: number;

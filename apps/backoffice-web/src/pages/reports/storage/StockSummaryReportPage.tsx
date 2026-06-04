@@ -14,32 +14,17 @@ import {
 import type { TableColumn } from "../../../components/table/BaseDataTable";
 import { useStockSummaryReport } from "../../../hooks/use-inventory-reports";
 import type { StockPeriodRow } from "../../../api/inventory-reports";
+import { useBranches } from "../../../hooks/iam/useBranches";
+import {
+  useReportStorages,
+  useReportCategories,
+  useReportUnits,
+} from "../../../hooks/use-report-filter-options";
 
-const STORE_OPTIONS = [
-  { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
-  { value: "MTDANANG", label: "Giày MT Đà Nẵng" },
-];
-const WAREHOUSE_OPTIONS = [
-  { value: "__all__", label: "Tất cả kho" },
-  { value: "MTCANTHO", label: "SHOWROOM CẦN THƠ" },
-  { value: "MTDANANG", label: "SHOWROOM ĐÀ NẴNG" },
-];
-const GROUP_OPTIONS = [
-  { value: "__all__", label: "Tất cả nhóm" },
-  { value: "Giày nam", label: "Giày nam" },
-  { value: "Giày nữ", label: "Giày nữ" },
-  { value: "Sandal nữ", label: "Sandal nữ" },
-  { value: "Dép nữ", label: "Dép nữ" },
-  { value: "Dép nam", label: "Dép nam" },
-];
 const STAT_OPTIONS = [
   { value: "item", label: "Hàng hóa" },
   { value: "parent", label: "Mẫu mã" },
   { value: "group", label: "Nhóm hàng hóa" },
-];
-const UNIT_OPTIONS = [
-  { value: "__all__", label: "Tất cả ĐVT" },
-  { value: "Đôi", label: "Đôi" },
 ];
 
 /** Row shape consumed by the existing column definitions. */
@@ -106,22 +91,35 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
 }
 
 export function StockSummaryReportPage() {
-  const filterFields: FilterField[] = [
-    {
-      key: "store",
-      label: "Cửa hàng",
-      type: "radio-scope",
-      allLabel: "Tất cả",
-      scopeLabel: "Theo nhóm cửa hàng",
-      options: STORE_OPTIONS,
-      placeholder: "Chọn cửa hàng",
-    },
-    { key: "warehouse", label: "Kho", type: "select", options: WAREHOUSE_OPTIONS },
-    { key: "group", label: "Nhóm hàng hóa", type: "select", options: GROUP_OPTIONS },
-    { key: "stat", label: "Thống kê theo", type: "select", options: STAT_OPTIONS },
-    { key: "unit", label: "Đơn vị tính", type: "select", options: UNIT_OPTIONS },
-    { key: "period", label: "Kỳ báo cáo", type: "period" },
-  ];
+  const { data: branches } = useBranches();
+  const { options: warehouseOptions } = useReportStorages();
+  const { options: groupOptions } = useReportCategories();
+  const { options: unitOptions } = useReportUnits();
+
+  const storeOptions = useMemo(
+    () => (branches ?? []).map((b) => ({ value: b.id, label: b.name })),
+    [branches],
+  );
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      {
+        key: "store",
+        label: "Cửa hàng",
+        type: "radio-scope",
+        allLabel: "Tất cả",
+        scopeLabel: "Theo nhóm cửa hàng",
+        options: storeOptions,
+        placeholder: "Chọn cửa hàng",
+      },
+      { key: "warehouse", label: "Kho", type: "select", options: warehouseOptions },
+      { key: "group", label: "Nhóm hàng hóa", type: "select", options: groupOptions },
+      { key: "stat", label: "Thống kê theo", type: "select", options: STAT_OPTIONS },
+      { key: "unit", label: "Đơn vị tính", type: "select", options: unitOptions },
+      { key: "period", label: "Kỳ báo cáo", type: "period" },
+    ],
+    [storeOptions, warehouseOptions, groupOptions, unitOptions],
+  );
 
   const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({
@@ -144,6 +142,9 @@ export function StockSummaryReportPage() {
     [data],
   );
 
+  // Unit column filter options — exclude the "Tất cả ĐVT" sentinel
+  const unitFilterOptions = useMemo(() => unitOptions.slice(1), [unitOptions]);
+
   const num = "text-right tabular-nums";
   const columns: TableColumn<ViewRow>[] = [
     { key: "image", label: "Ảnh hàng hóa", width: 110, filterKind: "none", render: () => (
@@ -154,7 +155,7 @@ export function StockSummaryReportPage() {
     { key: "parentName", label: "Tên Mẫu mã", width: 160, render: (r) => r.parentName },
     { key: "color", label: "Màu sắc", width: 100, render: (r) => r.color },
     { key: "size", label: "Size", width: 80, render: (r) => r.size },
-    { key: "unit", label: "Đơn vị tính", width: 110, render: (r) => r.unit, filterKind: "select", filterOptions: UNIT_OPTIONS.slice(1) },
+    { key: "unit", label: "Đơn vị tính", width: 110, render: (r) => r.unit, filterKind: "select", filterOptions: unitFilterOptions },
     { key: "group", label: "Nhóm hàng hóa", width: 140, render: (r) => r.group },
     { key: "brand", label: "Thương hiệu", width: 120, render: (r) => r.brand },
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },

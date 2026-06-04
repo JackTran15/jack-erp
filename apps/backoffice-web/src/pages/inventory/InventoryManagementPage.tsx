@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -199,7 +199,7 @@ export function InventoryManagementPage() {
 
   return (
     <DocumentListShell
-      title="Tổng hợp tồn kho"
+      title={<InventoryPageTitle>Tổng hợp tồn kho</InventoryPageTitle>}
       tabs={<InventoryTabBar activeId="stock-summary" />}
       filters={
         <div className="flex flex-col gap-2">
