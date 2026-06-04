@@ -416,7 +416,7 @@ export class GoodsReceiptService {
       }
     });
 
-    await this.eventPublisher.publish('inventory.goods_receipt.posted', {
+    await this.eventPublisher.publish(ERP_TOPICS.GOODS_RECEIPT_POSTED, {
       eventId: randomUUID(),
       eventType: DomainEventType.GOODS_RECEIPT_POSTED,
       timestamp: new Date().toISOString(),

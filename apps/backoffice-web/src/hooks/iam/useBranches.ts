@@ -20,7 +20,7 @@ export function useBranches(): UseQueryResult<BranchOption[]> {
     queryFn: async () => {
       const res = requireErpData(
         await erpApi.GET<BranchListResponse>("/branches", {
-          params: { query: { page: 1, pageSize: 200 } },
+          params: { query: { page: 1, pageSize: 100 } },
         }),
       );
       return res.data;
@@ -31,5 +31,10 @@ export function useBranches(): UseQueryResult<BranchOption[]> {
 
 export function useInvalidateBranches(): () => void {
   const qc = useQueryClient();
-  return () => void qc.invalidateQueries({ queryKey: BRANCHES_QUERY_KEY });
+  return () => {
+    qc.invalidateQueries({ queryKey: BRANCHES_QUERY_KEY });
+    qc.invalidateQueries({
+      queryKey: ["crud", "inventory-storages", "records"],
+    });
+  };
 }
