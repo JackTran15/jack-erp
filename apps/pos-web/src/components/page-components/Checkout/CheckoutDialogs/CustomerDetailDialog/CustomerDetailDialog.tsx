@@ -13,6 +13,11 @@ import { IssueMembershipCardDialog } from "@erp/pos/components/page-components/C
 import { MembershipTierEnum } from "@erp/pos/types/customer.type";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import {
+  selectEffectivePointsRedeemed,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
 import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
@@ -154,6 +159,18 @@ export function CustomerDetailDialog({
   // Công nợ — fetch lười trong chính `DebtTab`, chỉ khi dialog mở & đang ở tab này.
   const debtEnabled = open && activeTab === CustomerDetailTabKeyEnum.DEBT;
 
+  // Đổi điểm — ghi vào draft checkout (mock FE) rồi đóng dialog để hiển thị ở
+  // payment summary. Prefill ô nhập bằng số điểm đang áp dụng cho đơn.
+  const appliedPoints = usePosCheckoutSessionStore(selectEffectivePointsRedeemed);
+  const { setRedeemedPoints } = useCheckoutPromotion();
+  const handleRedeemPoints = useCallback(
+    (points: number) => {
+      setRedeemedPoints(points);
+      onClose();
+    },
+    [setRedeemedPoints, onClose],
+  );
+
   const { mutate: issueCard, isPending: isIssuingCardPending } =
     useIssueMembershipCard();
   const { mutate: updateCard, isPending: isUpdatingCardPending } =
@@ -233,6 +250,8 @@ export function CustomerDetailDialog({
               onChangeCard={() => setIsIssuingCard(true)}
               onRefreshPoints={onRefreshPoints}
               onIssueCard={() => setIsIssuingCard(true)}
+              appliedPoints={appliedPoints}
+              onRedeemPoints={handleRedeemPoints}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.INFO ? (
