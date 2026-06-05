@@ -14,11 +14,7 @@ import {
 import type { TableColumn } from "../../../components/table/BaseDataTable";
 import { useTransferSummaryReport } from "../../../hooks/use-inventory-reports";
 import type { TransferSummaryRow as ApiTransferSummaryRow } from "../../../api/inventory-reports";
-
-const STORE_OPTIONS = [
-  { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
-  { value: "MTDANANG", label: "Giày MT Đà Nẵng" },
-];
+import { useBranches } from "../../../hooks/iam/useBranches";
 
 interface ViewRow {
   branchId: string;
@@ -57,17 +53,28 @@ function mapApiRow(row: ApiTransferSummaryRow): ViewRow {
 }
 
 export function TransferSummaryReportPage() {
-  const filterFields: FilterField[] = [
-    {
-      key: "store",
-      label: "Cửa hàng",
-      type: "radio-scope",
-      allLabel: "Tất cả",
-      scopeLabel: "Theo nhóm cửa hàng",
-      options: STORE_OPTIONS,
-    },
-    { key: "period", label: "Kỳ báo cáo", type: "period" },
-  ];
+  const { data: branches } = useBranches();
+
+  const storeOptions = useMemo(
+    () => (branches ?? []).map((b) => ({ value: b.id, label: b.name })),
+    [branches],
+  );
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      {
+        key: "store",
+        label: "Cửa hàng",
+        type: "radio-scope",
+        allLabel: "Tất cả",
+        scopeLabel: "Theo nhóm cửa hàng",
+        options: storeOptions,
+        placeholder: "Chọn cửa hàng",
+      },
+      { key: "period", label: "Kỳ báo cáo", type: "period" },
+    ],
+    [storeOptions],
+  );
 
   const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({

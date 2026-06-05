@@ -14,19 +14,8 @@ import {
 import type { TableColumn } from "../../../components/table/BaseDataTable";
 import { useStockSummaryByBranchReport } from "../../../hooks/use-inventory-reports";
 import type { StockPeriodRow } from "../../../api/inventory-reports";
-
-const STORE_OPTIONS = [
-  { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
-  { value: "MTDANANG", label: "Giày MT Đà Nẵng" },
-];
-const GROUP_OPTIONS = [
-  { value: "__all__", label: "Tất cả nhóm" },
-  { value: "Giày nam", label: "Giày nam" },
-  { value: "Giày nữ", label: "Giày nữ" },
-  { value: "Sandal nữ", label: "Sandal nữ" },
-  { value: "Dép nữ", label: "Dép nữ" },
-  { value: "Dép nam", label: "Dép nam" },
-];
+import { useBranches } from "../../../hooks/iam/useBranches";
+import { useReportCategories } from "../../../hooks/use-report-filter-options";
 
 interface ViewRow {
   itemId: string;
@@ -75,18 +64,30 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
 }
 
 export function StockSummaryByBranchReportPage() {
-  const filterFields: FilterField[] = [
-    {
-      key: "store",
-      label: "Cửa hàng",
-      type: "radio-scope",
-      allLabel: "Tất cả",
-      scopeLabel: "Theo nhóm cửa hàng",
-      options: STORE_OPTIONS,
-    },
-    { key: "group", label: "Nhóm hàng hóa", type: "select", options: GROUP_OPTIONS },
-    { key: "period", label: "Kỳ báo cáo", type: "period" },
-  ];
+  const { data: branches } = useBranches();
+  const { options: groupOptions } = useReportCategories();
+
+  const storeOptions = useMemo(
+    () => (branches ?? []).map((b) => ({ value: b.id, label: b.name })),
+    [branches],
+  );
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      {
+        key: "store",
+        label: "Cửa hàng",
+        type: "radio-scope",
+        allLabel: "Tất cả",
+        scopeLabel: "Theo nhóm cửa hàng",
+        options: storeOptions,
+        placeholder: "Chọn cửa hàng",
+      },
+      { key: "group", label: "Nhóm hàng hóa", type: "select", options: groupOptions },
+      { key: "period", label: "Kỳ báo cáo", type: "period" },
+    ],
+    [storeOptions, groupOptions],
+  );
 
   const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({

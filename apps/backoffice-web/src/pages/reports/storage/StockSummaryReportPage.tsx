@@ -64,8 +64,6 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
     name: row.itemName,
     unit: row.unit,
     group: row.categoryName ?? "",
-    // Parent SKU / brand / color / size / supplier are not denormalized into
-    // the period-snapshot rows yet — leave empty until the backend joins them.
     parentSku: row.parentSku ?? "",
     parentName: row.parentName ?? "",
     brand: "",
@@ -112,10 +110,30 @@ export function StockSummaryReportPage() {
         options: storeOptions,
         placeholder: "Chọn cửa hàng",
       },
-      { key: "warehouse", label: "Kho", type: "select", options: warehouseOptions },
-      { key: "group", label: "Nhóm hàng hóa", type: "select", options: groupOptions },
-      { key: "stat", label: "Thống kê theo", type: "select", options: STAT_OPTIONS },
-      { key: "unit", label: "Đơn vị tính", type: "select", options: unitOptions },
+      {
+        key: "warehouse",
+        label: "Kho",
+        type: "select",
+        options: warehouseOptions,
+      },
+      {
+        key: "group",
+        label: "Nhóm hàng hóa",
+        type: "select",
+        options: groupOptions,
+      },
+      {
+        key: "stat",
+        label: "Thống kê theo",
+        type: "select",
+        options: STAT_OPTIONS,
+      },
+      {
+        key: "unit",
+        label: "Đơn vị tính",
+        type: "select",
+        options: unitOptions,
+      },
       { key: "period", label: "Kỳ báo cáo", type: "period" },
     ],
     [storeOptions, warehouseOptions, groupOptions, unitOptions],
@@ -132,48 +150,198 @@ export function StockSummaryReportPage() {
       buildApiFilters(filterValues, period, {
         storeFieldKey: "store",
         categoryFieldKey: "group",
+        warehouseFieldKey: "warehouse",
+        statFieldKey: "stat",
       }),
     [filterValues, period],
   );
 
   const { data, isLoading } = useStockSummaryReport(apiFilters);
-  const rows = useMemo<ViewRow[]>(
-    () => (data?.data ?? []).map(mapApiRow),
-    [data],
-  );
+
+  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
+
+  const rows = useMemo<ViewRow[]>(() => {
+    const raw = (data?.data ?? []).map(mapApiRow);
+    if (unitFilter !== "__all__") {
+      return raw.filter((r) => r.unit === unitFilter);
+    }
+    return raw;
+  }, [data, unitFilter]);
 
   // Unit column filter options — exclude the "Tất cả ĐVT" sentinel
   const unitFilterOptions = useMemo(() => unitOptions.slice(1), [unitOptions]);
 
   const num = "text-right tabular-nums";
   const columns: TableColumn<ViewRow>[] = [
-    { key: "image", label: "Ảnh hàng hóa", width: 110, filterKind: "none", render: () => (
-        <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">📦</div>
-      ) },
+    {
+      key: "image",
+      label: "Ảnh hàng hóa",
+      width: 110,
+      filterKind: "none",
+      render: () => (
+        <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+          📦
+        </div>
+      ),
+    },
     { key: "name", label: "Tên hàng hóa", width: 240, render: (r) => r.name },
-    { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
-    { key: "parentName", label: "Tên Mẫu mã", width: 160, render: (r) => r.parentName },
+    {
+      key: "parentSku",
+      label: "Mã SKU mẫu mã",
+      width: 140,
+      render: (r) => r.parentSku,
+    },
+    {
+      key: "parentName",
+      label: "Tên Mẫu mã",
+      width: 160,
+      render: (r) => r.parentName,
+    },
     { key: "color", label: "Màu sắc", width: 100, render: (r) => r.color },
     { key: "size", label: "Size", width: 80, render: (r) => r.size },
-    { key: "unit", label: "Đơn vị tính", width: 110, render: (r) => r.unit, filterKind: "select", filterOptions: unitFilterOptions },
-    { key: "group", label: "Nhóm hàng hóa", width: 140, render: (r) => r.group },
+    {
+      key: "unit",
+      label: "Đơn vị tính",
+      width: 110,
+      render: (r) => r.unit,
+      filterKind: "select",
+      filterOptions: unitFilterOptions,
+    },
+    {
+      key: "group",
+      label: "Nhóm hàng hóa",
+      width: 140,
+      render: (r) => r.group,
+    },
     { key: "brand", label: "Thương hiệu", width: 120, render: (r) => r.brand },
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
-    { key: "positionCode", label: "Mã vị trí", width: 110, render: (r) => r.positionCode },
-    { key: "positionName", label: "Tên vị trí", width: 110, render: (r) => r.positionName },
-    { key: "openingQty",   group: "Tồn đầu kỳ",   label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.openingQty },
-    { key: "openingValue", group: "Tồn đầu kỳ",   label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.openingValue) },
-    { key: "inQty",        group: "Nhập trong kỳ", label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.inQty },
-    { key: "inValue",      group: "Nhập trong kỳ", label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.inValue) },
-    { key: "outQty",       group: "Xuất trong kỳ", label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.outQty },
-    { key: "outValue",     group: "Xuất trong kỳ", label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.outValue) },
-    { key: "endingQty",    group: "Tồn cuối kỳ",   label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.openingQty + r.inQty - r.outQty },
-    { key: "endingValue",  group: "Tồn cuối kỳ",   label: "Giá trị",  width: 140, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.openingValue + r.inValue - r.outValue) },
-    { key: "transferOutQty",   group: "Đang chuyển đi", label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.transferOutQty },
-    { key: "transferOutValue", group: "Đang chuyển đi", label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.transferOutValue) },
-    { key: "incomingQty",   group: "Sắp nhận về", label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.incomingQty },
-    { key: "incomingValue", group: "Sắp nhận về", label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.incomingValue) },
-    { key: "supplier", label: "Nhà cung cấp", width: 160, render: (r) => r.supplier },
+    {
+      key: "positionCode",
+      label: "Mã vị trí",
+      width: 110,
+      render: (r) => r.positionCode,
+    },
+    {
+      key: "positionName",
+      label: "Tên vị trí",
+      width: 110,
+      render: (r) => r.positionName,
+    },
+    {
+      key: "openingQty",
+      group: "Tồn đầu kỳ",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.openingQty,
+    },
+    {
+      key: "openingValue",
+      group: "Tồn đầu kỳ",
+      label: "Giá trị",
+      width: 130,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => formatMoneyInteger(r.openingValue),
+    },
+    {
+      key: "inQty",
+      group: "Nhập trong kỳ",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.inQty,
+    },
+    {
+      key: "inValue",
+      group: "Nhập trong kỳ",
+      label: "Giá trị",
+      width: 130,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => formatMoneyInteger(r.inValue),
+    },
+    {
+      key: "outQty",
+      group: "Xuất trong kỳ",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.outQty,
+    },
+    {
+      key: "outValue",
+      group: "Xuất trong kỳ",
+      label: "Giá trị",
+      width: 130,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => formatMoneyInteger(r.outValue),
+    },
+    {
+      key: "endingQty",
+      group: "Tồn cuối kỳ",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.openingQty + r.inQty - r.outQty,
+    },
+    {
+      key: "endingValue",
+      group: "Tồn cuối kỳ",
+      label: "Giá trị",
+      width: 140,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) =>
+        formatMoneyInteger(r.openingValue + r.inValue - r.outValue),
+    },
+    {
+      key: "transferOutQty",
+      group: "Đang chuyển đi",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.transferOutQty,
+    },
+    {
+      key: "transferOutValue",
+      group: "Đang chuyển đi",
+      label: "Giá trị",
+      width: 130,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => formatMoneyInteger(r.transferOutValue),
+    },
+    {
+      key: "incomingQty",
+      group: "Sắp nhận về",
+      label: "Số lượng",
+      width: 110,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.incomingQty,
+    },
+    {
+      key: "incomingValue",
+      group: "Sắp nhận về",
+      label: "Giá trị",
+      width: 130,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => formatMoneyInteger(r.incomingValue),
+    },
+    {
+      key: "supplier",
+      label: "Nhà cung cấp",
+      width: 160,
+      render: (r) => r.supplier,
+    },
   ];
 
   return (
@@ -184,8 +352,14 @@ export function StockSummaryReportPage() {
       buildSubtitle={(values) => [
         { label: "Cửa hàng", value: resolveLabel(filterFields[0]!, values) },
         { label: "Kho", value: resolveLabel(filterFields[1]!, values) },
-        { label: "Nhóm hàng hóa", value: resolveLabel(filterFields[2]!, values) },
-        { label: "Thống kê theo", value: resolveLabel(filterFields[3]!, values) },
+        {
+          label: "Nhóm hàng hóa",
+          value: resolveLabel(filterFields[2]!, values),
+        },
+        {
+          label: "Thống kê theo",
+          value: resolveLabel(filterFields[3]!, values),
+        },
       ]}
       columns={columns}
       rows={rows}

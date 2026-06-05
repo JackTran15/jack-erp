@@ -25,6 +25,9 @@ export type InventoryReportPreset =
   | "this_year"
   | "custom";
 
+/** Mirrors the backend ItemGroupBy enum. */
+export type ItemGroupBy = "item" | "parent" | "group";
+
 export interface InventoryReportFilters {
   preset?: InventoryReportPreset;
   /** yyyy-MM-dd */
@@ -32,7 +35,10 @@ export interface InventoryReportFilters {
   /** yyyy-MM-dd */
   endDate?: string;
   branchIds?: string[];
+  locationIds?: string[];
   categoryIds?: string[];
+  /** Item-dimension grouping: per-SKU (item), per-product (parent), per-category (group). */
+  itemGroupBy?: ItemGroupBy;
   search?: string;
   page?: number;
   pageSize?: number;
@@ -186,8 +192,11 @@ function buildBaseQuery(filters: InventoryReportFilters): QueryRecord {
   if (filters.branchIds && filters.branchIds.length > 0)
     // backend DTO splits comma-delimited strings into arrays
     out.branchIds = filters.branchIds.join(",");
+  if (filters.locationIds && filters.locationIds.length > 0)
+    out.locationIds = filters.locationIds.join(",");
   if (filters.categoryIds && filters.categoryIds.length > 0)
     out.categoryIds = filters.categoryIds.join(",");
+  if (filters.itemGroupBy) out.itemGroupBy = filters.itemGroupBy;
   if (filters.search) out.search = filters.search;
   if (filters.page) out.page = filters.page;
   if (filters.pageSize) out.pageSize = filters.pageSize;

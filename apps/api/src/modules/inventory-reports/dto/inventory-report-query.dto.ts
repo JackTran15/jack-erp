@@ -9,6 +9,9 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { ITEM_GROUP_BY_VALUES, type ItemGroupBy } from '../services/stock-period.service';
+
+export { ItemGroupBy };
 
 export const PERIOD_PRESETS = [
   'today',
@@ -63,6 +66,25 @@ export class InventoryReportQueryDto {
   @IsArray()
   @IsString({ each: true })
   categoryIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Location/warehouse IDs to filter',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',') : value))
+  @IsArray()
+  @IsString({ each: true })
+  locationIds?: string[];
+
+  @ApiPropertyOptional({
+    enum: ITEM_GROUP_BY_VALUES,
+    default: 'item',
+    description: 'Item-dimension grouping: item (per SKU), parent (per product), group (per category)',
+  })
+  @IsOptional()
+  @IsIn(ITEM_GROUP_BY_VALUES as unknown as string[])
+  itemGroupBy?: ItemGroupBy;
 
   @ApiPropertyOptional({ description: 'Full-text search on item code/name' })
   @IsOptional()
