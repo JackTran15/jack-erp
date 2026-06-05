@@ -26,7 +26,7 @@ export const ERP_TOPICS = {
   LOYALTY_POINTS_REVERSE: 'erp.loyalty.points.reverse',
   CASH_REFUND: 'erp.cash.refund',
   JOURNAL_POST_RETURN: 'erp.journal.post.return',
-  
+  GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
 } as const;
 
 export type ErpTopic = (typeof ERP_TOPICS)[keyof typeof ERP_TOPICS];

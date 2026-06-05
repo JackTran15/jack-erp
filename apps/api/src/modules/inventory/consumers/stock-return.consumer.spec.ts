@@ -4,6 +4,7 @@ import { DomainEvent, DomainEventType, StockMovementType } from '@erp/shared-int
 import { StockReturnConsumer } from './stock-return.consumer';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { InvoiceCancelledPayload } from '../../pos/publishers/invoice-cancelled.publisher';
 
 const buildEvent = (
@@ -33,10 +34,19 @@ const buildEvent = (
 describe('StockReturnConsumer', () => {
   let consumer: StockReturnConsumer;
   let ledgerRepo: { findOne: jest.Mock };
+  let itemCostSnapshotService: { snapshotCosts: jest.Mock };
   let stockLedgerService: { recordBatchMovements: jest.Mock };
 
   beforeEach(async () => {
     ledgerRepo = { findOne: jest.fn().mockResolvedValue(null) };
+    itemCostSnapshotService = {
+      snapshotCosts: jest.fn().mockResolvedValue(
+        new Map<string, number>([
+          ['item-A', 10],
+          ['item-B', 5.5],
+        ]),
+      ),
+    };
     stockLedgerService = { recordBatchMovements: jest.fn().mockResolvedValue([]) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -44,6 +54,7 @@ describe('StockReturnConsumer', () => {
         StockReturnConsumer,
         { provide: getRepositoryToken(StockLedgerEntryEntity), useValue: ledgerRepo },
         { provide: StockLedgerService, useValue: stockLedgerService },
+        { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
       ],
     }).compile();
 
@@ -63,7 +74,13 @@ describe('StockReturnConsumer', () => {
         quantity: 2,
         referenceType: 'INVOICE_CANCEL',
         referenceId: 'inv-1',
+        // unit_cost snapshot from items.purchase_price (10.00). Service then
+        // derives line_value = quantity * unitCost = 2 * 10 = 20 (signed +).
+        unitCost: 10,
       }),
+    );
+    expect(movements[1]).toEqual(
+      expect.objectContaining({ itemId: 'item-B', unitCost: 5.5 }),
     );
   });
 

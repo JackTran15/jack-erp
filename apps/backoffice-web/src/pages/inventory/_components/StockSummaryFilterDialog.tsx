@@ -68,9 +68,16 @@ export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: P
     if (!open) return;
     void (async () => {
       try {
+        // Scope warehouse options to the active branch (same as the document
+        // pages) — the X-Branch-Id source used by api-axios.ts.
+        const activeBranchId =
+          localStorage.getItem("active_branch_id") ??
+          localStorage.getItem("branch_id");
         const [storagesRes, categoriesRes, options] = await Promise.all([
           apiClient.get<PaginatedResponse<StorageOption>>(
-            "/inventory/storages?page=1&pageSize=200",
+            `/inventory/storages?page=1&pageSize=200${
+              activeBranchId ? `&branchId=${encodeURIComponent(activeBranchId)}` : ""
+            }`,
           ),
           apiClient.get<PaginatedResponse<CategoryOption>>(
             "/admin/entities/inventory-item-categories/records?page=1&pageSize=200",

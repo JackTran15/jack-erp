@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { HelpCircle, Loader2, Plus, Trash2 } from "lucide-react";
 import { AppModal, Button } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { assignItemsBatch } from "../../api/stock-balances";
+import { assignArrange } from "../../api/stock-balances";
+import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,15 @@ function emptyRow(): ArrangeRow {
   };
 }
 
+function isRowComplete(row: ArrangeRow): boolean {
+  return Boolean(row.itemId && row.storageId && row.locationId);
+}
+
+// A row is "empty" (not yet started) until an item is selected.
+function isRowEmpty(row: ArrangeRow): boolean {
+  return !row.itemId;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): ReactElement {
@@ -79,8 +89,13 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
 
   // Reset when closed
   useEffect(() => {
-    if (!open) setRows([emptyRow()]);
+    if (!open) {
+      setRows([emptyRow()]);
+    }
   }, [open]);
+
+  // Always keep exactly one blank trailing row (unified grid rule).
+  useTrailingEmptyRow(rows, setRows, { isEmpty: isRowEmpty, makeEmpty: emptyRow });
 
   // ─── Search functions ─────────────────────────────────────────────────────
 
@@ -118,15 +133,7 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
   // ─── Row mutations ────────────────────────────────────────────────────────
 
   const updateRow = useCallback((uid: string, patch: Partial<ArrangeRow>) => {
-    setRows((prev) => {
-      const next = prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r));
-      // Auto-append a fresh row once the last filled row has SKU + location
-      const last = next[next.length - 1];
-      if (last && last.itemId && last.locationId) {
-        return [...next, emptyRow()];
-      }
-      return next;
-    });
+    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
   }, []);
 
   const removeRow = useCallback((uid: string) => {
@@ -145,17 +152,23 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
   // ─── Save ─────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
-    const valid = rows.filter((r) => r.itemId && r.locationId);
-    if (valid.length === 0) {
-      toast.error("Chưa có dòng nào hợp lệ để lưu");
+    const lines = rows
+      .filter(isRowComplete)
+      .map((row) => ({
+        itemId: row.itemId as string,
+        storageId: row.storageId as string,
+        destinationLocationId: row.locationId as string,
+      }));
+
+    if (lines.length === 0) {
+      toast.error("Chưa có dòng nào hợp lệ để xếp");
       return;
     }
+
     try {
       setSubmitting(true);
-      await assignItemsBatch(
-        valid.map((r) => ({ itemId: r.itemId!, locationId: r.locationId! })),
-      );
-      toast.success(`Đã xếp ${valid.length} hàng hoá thành công.`);
+      await assignArrange(lines);
+      toast.success(`Đã xếp ${lines.length} hàng hóa lên vị trí.`);
       onSaved();
       onOpenChange(false);
     } catch (err) {
@@ -165,18 +178,22 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
     }
   }, [rows, onSaved, onOpenChange]);
 
+  // ─── Derived ──────────────────────────────────────────────────────────────
+
+  const validRowCount = rows.filter(isRowComplete).length;
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Xếp vị trí hàng hoá"
-      defaultWidth={960}
+      title="Xếp vị trí hàng hóa"
+      defaultWidth={1000}
       defaultHeight={600}
     >
       {/* Header bar */}
-      <div className="flex flex-wrap items-center gap-4 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center justify-end gap-4 border-b px-4 py-3">
         {/* Quét mã vạch (visual only, disabled) */}
         <label className="flex cursor-not-allowed items-center gap-1.5 text-sm text-muted-foreground opacity-50">
           <input type="checkbox" disabled />
@@ -190,23 +207,23 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
           <thead className="sticky top-0 z-10 bg-muted/90 text-left backdrop-blur">
             <tr>
               <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
-              <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
-              <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hoá</th>
+              <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
+              <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
               <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
-              <th className="w-20 border-b px-3 py-2 text-xs font-medium text-muted-foreground">ĐVT</th>
-              <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Vị trí</th>
+              <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Đơn vị tính</th>
+              <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Vị trí</th>
               <th className="w-10 border-b px-2 py-2" />
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
               <tr key={row.uid} className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}>
-                <td className="border-b px-2 py-1.5 text-center text-xs text-muted-foreground">
+                <td className="border-b px-2 py-2 text-center text-xs text-muted-foreground">
                   {idx + 1}
                 </td>
 
                 {/* Mã SKU — LookupField */}
-                <td className="border-b px-2 py-1">
+                <td className="border-b px-2 py-2">
                   <LookupField<ItemSearchResult>
                     placeholder="Tìm mã hoặc tên"
                     value={row.itemCode}
@@ -216,7 +233,6 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                         itemId: null,
                         itemName: "",
                         unit: "",
-                        storageName: "",
                       })
                     }
                     onSelect={(item) =>
@@ -233,19 +249,19 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                     renderMeta={(item) => item.code}
                     columns={[
                       { key: "code", label: "Mã", className: "w-[110px] font-mono text-xs", render: (item) => item.code },
-                      { key: "name", label: "Tên hàng hoá", render: (item) => item.name },
+                      { key: "name", label: "Tên hàng hóa", render: (item) => item.name },
                     ]}
                     className="w-full"
                   />
                 </td>
 
-                {/* Tên hàng hoá — readonly */}
-                <td className="border-b px-3 py-1.5 text-muted-foreground">
+                {/* Tên hàng hóa — readonly */}
+                <td className="border-b px-3 py-2 text-muted-foreground">
                   {row.itemName || <span className="opacity-40">—</span>}
                 </td>
 
                 {/* Kho — LookupField */}
-                <td className="border-b px-2 py-1">
+                <td className="border-b px-2 py-2">
                   <LookupField<InventoryStorage>
                     placeholder="Chọn kho"
                     value={row.storageName}
@@ -275,13 +291,13 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                   />
                 </td>
 
-                {/* ĐVT — readonly */}
-                <td className="border-b px-3 py-1.5 text-muted-foreground">
+                {/* Đơn vị tính — readonly */}
+                <td className="border-b px-3 py-2 text-muted-foreground">
                   {row.unit || <span className="opacity-40">—</span>}
                 </td>
 
                 {/* Vị trí — LookupField, filtered by storage */}
-                <td className="border-b px-2 py-1">
+                <td className="border-b px-2 py-2">
                   <LookupField<InventoryLocation>
                     placeholder="Chọn vị trí"
                     value={row.locationCode}
@@ -314,12 +330,12 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                 </td>
 
                 {/* Trash */}
-                <td className="border-b px-2 py-1.5 text-center">
+                <td className="border-b px-2 py-2 text-center">
                   <button
                     type="button"
                     onClick={() => removeRow(row.uid)}
                     className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Xoá dòng"
+                    aria-label="Xóa dòng"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -328,11 +344,9 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
             ))}
           </tbody>
         </table>
-      </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t px-4 py-2">
-        <div className="flex items-center gap-3">
+        {/* Thêm dòng */}
+        <div className="px-4 py-2">
           <button
             type="button"
             onClick={addRow}
@@ -342,9 +356,37 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
             <Plus className="h-3.5 w-3.5" />
             Thêm dòng
           </button>
-          <span className="text-sm text-muted-foreground">Số dòng = {rows.length}</span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t px-4 py-2">
+        <div className="flex items-center gap-4">
+          <a
+            href="#"
+            onClick={(e) => e.preventDefault()}
+            className="flex items-center gap-1 text-sm text-primary-blue hover:text-primary-blue-hover hover:underline"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            Trợ giúp
+          </a>
+          <span className="text-sm text-muted-foreground">
+            Số dòng = {rows.length}
+            {validRowCount > 0 && (
+              <span className="ml-2 text-foreground">· Sẽ xếp {validRowCount} dòng</span>
+            )}
+          </span>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            disabled={submitting}
+            onClick={() => void handleSave()}
+          >
+            {submitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Lưu
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -352,14 +394,6 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
             onClick={() => onOpenChange(false)}
           >
             Hủy bỏ
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            disabled={submitting}
-            onClick={() => void handleSave()}
-          >
-            Lưu
           </Button>
         </div>
       </div>

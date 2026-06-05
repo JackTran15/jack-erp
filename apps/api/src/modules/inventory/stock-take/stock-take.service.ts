@@ -6,12 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, FindOptionsWhere, Repository } from 'typeorm';
+import { Between, DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
 import {
   DocumentType,
   GoodsIssuePurpose,
+  GoodsIssueReferenceType,
   GoodsIssueStatus,
   GoodsReceiptPurpose,
+  GoodsReceiptReferenceType,
   GoodsReceiptStatus,
   PaginatedResponse,
   PaginationQuery,
@@ -25,6 +27,8 @@ import { GoodsIssueLineEntity } from '../goods-issue/goods-issue-line.entity';
 import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
 import { GoodsReceiptLineEntity } from '../goods-receipt/goods-receipt-line.entity';
 import { LocationEntity } from '../location/location.entity';
+import { ItemEntity } from '../location/item.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import {
   RecordMovementParams,
@@ -107,6 +111,7 @@ export class StockTakeService {
     private readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
     private readonly documentNumbering: DocumentNumberingService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
   /**
@@ -376,6 +381,21 @@ export class StockTakeService {
 
     await this.dataSource.transaction(async (manager) => {
       const stockTakeRef = st.documentNumber ?? st.id.slice(0, 8);
+      const description = `Xử lý chênh lệch theo phiếu kiểm kê số ${stockTakeRef}`;
+
+      // Snapshot purchase price per item ONCE — used both for the generated
+      // receipt/issue line values (MISA values the adjustment document at cost)
+      // and the ledger movement unit_cost. Computed before creating the docs.
+      const itemIds = Array.from(new Set(variances.map((v) => v.itemId)));
+      const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+        st.organizationId,
+        itemIds,
+      );
+
+      const items = await manager.find(ItemEntity, {
+        where: { id: In(itemIds), organizationId: st.organizationId },
+      });
+      const itemUnitByItemId = new Map(items.map((i) => [i.id, i.unit]));
 
       if (positives.length > 0) {
         const receipt = await this.createGeneratedReceipt(
@@ -384,7 +404,9 @@ export class StockTakeService {
           branchId,
           st,
           positives,
-          `Kiểm kê ${stockTakeRef} — thừa kho`,
+          description,
+          itemCostByItemId,
+          itemUnitByItemId,
         );
         generatedReceiptId = receipt.id;
       }
@@ -396,7 +418,8 @@ export class StockTakeService {
           branchId,
           st,
           negatives,
-          `Kiểm kê ${stockTakeRef} — thiếu kho`,
+          description,
+          itemCostByItemId,
         );
         generatedIssueId = issue.id;
       }
@@ -423,8 +446,9 @@ export class StockTakeService {
         quantity: v.variance,
         referenceType: 'STOCK_TAKE',
         referenceId: st.id,
-        notes: `Kiểm kê ${stockTakeRef}`,
+        notes: description,
         actorContext: actor,
+        unitCost: itemCostByItemId.get(v.itemId) ?? 0,
       }));
       await this.stockLedger.recordBatchMovements(movements);
     });
@@ -522,6 +546,8 @@ export class StockTakeService {
     st: StockTakeEntity,
     positives: Array<{ line: StockTakeLineEntity; variance: number }>,
     reason: string,
+    costByItemId: Map<string, number>,
+    unitByItemId: Map<string, string>,
   ): Promise<GoodsReceiptEntity> {
     const documentNumber = await this.documentNumbering.generate(
       DocumentType.GOODS_RECEIPT,
@@ -536,7 +562,9 @@ export class StockTakeService {
       createdBy: actor.userId,
       documentNumber,
       status: GoodsReceiptStatus.POSTED,
-      purpose: GoodsReceiptPurpose.OTHER,
+      purpose: GoodsReceiptPurpose.STOCK_TAKE,
+      referenceType: GoodsReceiptReferenceType.STOCK_TAKE,
+      referenceId: st.id,
       reason,
       description: reason,
       receivedAt: new Date(),
@@ -555,10 +583,11 @@ export class StockTakeService {
       line.goodsReceiptId = savedReceipt.id;
       line.itemId = p.line.itemId;
       line.locationId = p.line.locationId;
-      line.uomCode = 'Cái';
+      const cost = costByItemId.get(p.line.itemId) ?? 0;
+      line.uomCode = unitByItemId.get(p.line.itemId) ?? 'Cái';
       line.quantity = String(p.variance);
-      line.unitPrice = '0';
-      line.lineTotal = '0.00';
+      line.unitPrice = cost.toFixed(2);
+      line.lineTotal = (p.variance * cost).toFixed(2);
       line.note = p.line.reason ?? undefined;
       return line;
     });
@@ -573,6 +602,7 @@ export class StockTakeService {
     st: StockTakeEntity,
     negatives: Array<{ line: StockTakeLineEntity; variance: number }>,
     reason: string,
+    costByItemId: Map<string, number>,
   ): Promise<GoodsIssueEntity> {
     const documentNumber = await this.documentNumbering.generate(
       DocumentType.GOODS_ISSUE,
@@ -588,7 +618,9 @@ export class StockTakeService {
       documentNumber,
       locationId: headerLocationId,
       status: GoodsIssueStatus.POSTED,
-      purpose: GoodsIssuePurpose.OTHER,
+      purpose: GoodsIssuePurpose.STOCK_TAKE,
+      referenceType: GoodsIssueReferenceType.STOCK_TAKE,
+      referenceId: st.id,
       reason,
       notes: reason,
       postedAt: new Date(),
@@ -601,9 +633,11 @@ export class StockTakeService {
       line.goodsIssueId = savedIssue.id;
       line.itemId = n.line.itemId;
       line.locationId = n.line.locationId ?? headerLocationId;
-      line.quantity = Math.abs(n.variance);
-      line.unitPrice = '0';
-      line.lineTotal = '0.00';
+      const cost = costByItemId.get(n.line.itemId) ?? 0;
+      const qty = Math.abs(n.variance);
+      line.quantity = qty;
+      line.unitPrice = cost.toFixed(2);
+      line.lineTotal = (qty * cost).toFixed(2);
       line.notes = n.line.reason ?? undefined;
       return line;
     });
@@ -619,4 +653,5 @@ export class StockTakeService {
     if (!st) throw new NotFoundException(`Phiếu kiểm kê ${id} không tìm thấy`);
     return st;
   }
+
 }

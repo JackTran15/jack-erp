@@ -22,4 +22,13 @@ export class CreateLocationDto {
   @IsOptional()
   @IsEnum(LocationType)
   type?: LocationType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

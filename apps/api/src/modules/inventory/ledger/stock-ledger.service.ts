@@ -34,6 +34,15 @@ export interface RecordMovementParams {
   referenceId: string;
   notes?: string;
   actorContext: ActorContext;
+  skipLocationAssignment?: boolean;
+  /**
+   * Cost snapshot at posting time (positive number). When provided, the ledger
+   * entry will persist both `unit_cost` and a signed `line_value = quantity *
+   * unit_cost` (positive=in, negative=out). Callers should derive this from
+   * the source document's unit price (e.g. goods_receipt_lines.unitPrice) or
+   * fall back to items.purchasePrice when the source has no price column.
+   */
+  unitCost?: number;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -55,6 +64,8 @@ export interface BalanceQuery extends PaginationQuery {
   search?: string;
   /** Only return rows where quantity < minQty (threshold). */
   belowMin?: boolean;
+  /** When true, only balances at the virtual "Chưa xếp" (unassigned) location. */
+  unassigned?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -125,11 +136,13 @@ export class StockLedgerService {
   async recordMovement(
     params: RecordMovementParams,
   ): Promise<StockLedgerEntryEntity> {
-    await this.pslService.validateAndAssignByLocation(
-      params.itemId,
-      params.locationId,
-      params.actorContext,
-    );
+    if (!params.skipLocationAssignment) {
+      await this.pslService.validateAndAssignByLocation(
+        params.itemId,
+        params.locationId,
+        params.actorContext,
+      );
+    }
 
     const entry = await this.dataSource.transaction(async (manager) => {
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
@@ -157,12 +170,23 @@ export class StockLedgerService {
     return entry;
   }
 
+  /**
+   * Records a batch of stock movements (ledger entries + balance upserts).
+   *
+   * When `manager` is supplied the writes run on the caller's transaction (so the
+   * caller can hold a pessimistic lock across validation + posting) and event
+   * publishing is the caller's responsibility — call {@link publishMovementEvents}
+   * after the surrounding transaction commits. Without `manager` the method opens
+   * its own transaction and publishes events itself (unchanged legacy behaviour).
+   */
   async recordBatchMovements(
     movements: RecordMovementParams[],
+    manager?: EntityManager,
   ): Promise<StockLedgerEntryEntity[]> {
     if (movements.length === 0) return [];
 
     for (const params of movements) {
+      if (params.skipLocationAssignment) continue;
       await this.pslService.validateAndAssignByLocation(
         params.itemId,
         params.locationId,
@@ -170,32 +194,26 @@ export class StockLedgerService {
       );
     }
 
-    const entries = await this.dataSource.transaction(async (manager) => {
-      const savedEntries: StockLedgerEntryEntity[] = [];
-      const now = new Date();
+    const write = (m: EntityManager) => this.writeBatchMovements(m, movements);
 
-      for (const params of movements) {
-        const ledgerEntry = manager.create(StockLedgerEntryEntity, {
-          itemId: params.itemId,
-          locationId: params.locationId,
-          branchId: params.branchId,
-          organizationId: params.organizationId,
-          movementType: params.movementType,
-          quantity: params.quantity,
-          referenceType: params.referenceType,
-          referenceId: params.referenceId,
-          notes: params.notes,
-          postedAt: now,
-          createdBy: params.actorContext.userId,
-        });
-        const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
-        savedEntries.push(savedEntry);
+    const entries = manager
+      ? await write(manager)
+      : await this.dataSource.transaction(write);
 
-        await this.upsertBalance(manager, params);
-      }
+    // When a manager is provided the caller owns the transaction lifecycle and
+    // must publish events post-commit; otherwise publish here as before.
+    if (!manager) {
+      await this.publishMovementEvents(entries);
+    }
 
-      return savedEntries;
-    });
+    return entries;
+  }
+
+  /** Publishes STOCK_MOVEMENT_POSTED for each entry. Call after the posting transaction commits. */
+  async publishMovementEvents(
+    entries: StockLedgerEntryEntity[],
+  ): Promise<void> {
+    if (entries.length === 0) return;
 
     const eventMessages = entries.map((entry) => ({
       topic: ERP_TOPICS.STOCK_MOVEMENT_POSTED,
@@ -219,9 +237,15 @@ export class StockLedgerService {
       key: entry.itemId,
     }));
 
-    await this.eventPublisher.publishBatch(eventMessages);
-
-    return entries;
+    try {
+      await this.eventPublisher.publishBatch(eventMessages);
+    } catch (err) {
+      this.logger.error(
+        `Stock ledger committed (${entries.length} movement(s)) but event publish failed (non-fatal): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async getBalance(
@@ -274,6 +298,9 @@ export class StockLedgerService {
       qb.andWhere('loc.storage_id = :storageId', {
         storageId: query.storageId,
       });
+    }
+    if (query.unassigned) {
+      qb.andWhere('loc.is_unassigned = true');
     }
     if (query.search && query.search.trim()) {
       const q = `%${query.search.trim().toLowerCase()}%`;
@@ -469,6 +496,54 @@ export class StockLedgerService {
   }
 
   // ─── Private helpers ──────────────────────────────────────────────
+
+  private async writeBatchMovements(
+    manager: EntityManager,
+    movements: RecordMovementParams[],
+  ): Promise<StockLedgerEntryEntity[]> {
+    const savedEntries: StockLedgerEntryEntity[] = [];
+    const now = new Date();
+
+    for (const params of movements) {
+      const { unitCost, lineValue } = this.deriveCostFields(params);
+      const ledgerEntry = manager.create(StockLedgerEntryEntity, {
+        itemId: params.itemId,
+        locationId: params.locationId,
+        branchId: params.branchId,
+        organizationId: params.organizationId,
+        movementType: params.movementType,
+        quantity: params.quantity,
+        referenceType: params.referenceType,
+        referenceId: params.referenceId,
+        notes: params.notes,
+        postedAt: now,
+        createdBy: params.actorContext.userId,
+        unitCost,
+        lineValue,
+      });
+      const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
+      savedEntries.push(savedEntry);
+
+      await this.upsertBalance(manager, params);
+    }
+
+    return savedEntries;
+  }
+
+  private deriveCostFields(
+    params: RecordMovementParams,
+  ): { unitCost?: number; lineValue?: number } {
+    if (params.unitCost === undefined || params.unitCost === null) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const cost = Math.abs(Number(params.unitCost));
+    if (!Number.isFinite(cost)) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const signedQty = Number(params.quantity);
+    const lineValue = Number((signedQty * cost).toFixed(2));
+    return { unitCost: cost, lineValue };
+  }
 
   private async upsertBalance(
     manager: EntityManager,

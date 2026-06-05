@@ -1,18 +1,27 @@
-import { useMemo } from "react";
-import { formatMoneyInteger } from "@erp/ui";
+import { useMemo, useState } from "react";
+import {
+  formatMoneyInteger,
+  resolvePeriodRange,
+  type PeriodValue,
+} from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { useTransferSummaryReport } from "../../../hooks/use-inventory-reports";
+import type { TransferSummaryRow as ApiTransferSummaryRow } from "../../../api/inventory-reports";
 
 const STORE_OPTIONS = [
   { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
   { value: "MTDANANG", label: "Giày MT Đà Nẵng" },
 ];
 
-interface TransferSummaryRow {
+interface ViewRow {
+  branchId: string;
   branchCode: string;
   branchName: string;
   inQty: number;
@@ -27,36 +36,25 @@ interface TransferSummaryRow {
   inOutDiffValue: number;
 }
 
-const MOCK_ROWS: TransferSummaryRow[] = [
-  {
-    branchCode: "CT",
-    branchName: "Giày MT Cần Thơ",
-    inQty: 5,
-    inValue: 1_700_000,
-    outQty: 8,
-    outValue: 2_720_000,
-    receivedQty: 8,
-    receivedValue: 2_720_000,
-    diffQty: 0,
-    diffValue: 0,
-    inOutDiffQty: 0,
-    inOutDiffValue: 0,
-  },
-  {
-    branchCode: "DN",
-    branchName: "Giày MT Đà Nẵng",
-    inQty: 8,
-    inValue: 2_720_000,
-    outQty: 5,
-    outValue: 1_700_000,
-    receivedQty: 5,
-    receivedValue: 1_700_000,
-    diffQty: 0,
-    diffValue: 0,
-    inOutDiffQty: 0,
-    inOutDiffValue: 0,
-  },
-];
+function mapApiRow(row: ApiTransferSummaryRow): ViewRow {
+  return {
+    branchId: row.branchId,
+    branchCode: row.branchCode ?? "",
+    branchName: row.branchName,
+    inQty: row.qtyIn,
+    inValue: row.valueIn,
+    outQty: row.qtyOut,
+    outValue: row.valueOut,
+    receivedQty: row.qtyReceived,
+    receivedValue: row.valueReceived,
+    diffQty: row.qtyDifference,
+    diffValue: row.valueDifference,
+    // The endpoint exposes a single "difference" metric; we keep the two
+    // legacy columns aligned for now.
+    inOutDiffQty: row.qtyDifference,
+    inOutDiffValue: row.valueDifference,
+  };
+}
 
 export function TransferSummaryReportPage() {
   const filterFields: FilterField[] = [
@@ -71,8 +69,28 @@ export function TransferSummaryReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
+    () =>
+      buildApiFilters(filterValues, period, {
+        storeFieldKey: "store",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useTransferSummaryReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
+
   const num = "text-right tabular-nums";
-  const columns: TableColumn<TransferSummaryRow>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "branchCode", label: "Mã cửa hàng", width: 130, render: (r) => r.branchCode },
     { key: "branchName", label: "Tên cửa hàng", width: 220, render: (r) => r.branchName },
     { key: "inQty",    group: "Nhập kho điều chuyển", label: "Số lượng", width: 110, headerClassName: "text-right", className: num, render: (r) => r.inQty },
@@ -87,10 +105,8 @@ export function TransferSummaryReportPage() {
     { key: "inOutDiffValue", group: "Chênh lệch nhập xuất điều chuyển", label: "Giá trị",  width: 130, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.inOutDiffValue) },
   ];
 
-  const rows = useMemo(() => MOCK_ROWS, []);
-
   return (
-    <StorageReportShell<TransferSummaryRow>
+    <StorageReportShell<ViewRow>
       title="Tổng hợp nhập xuất điều chuyển"
       storageKey="reports/storage/transfer-summary"
       filterFields={filterFields}
@@ -99,8 +115,14 @@ export function TransferSummaryReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có dữ liệu điều chuyển."
-      getRowKey={(r) => r.branchCode}
+      getRowKey={(r) => r.branchId || r.branchCode}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

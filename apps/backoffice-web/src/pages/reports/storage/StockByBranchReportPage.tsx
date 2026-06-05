@@ -1,11 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { resolvePeriodRange, type PeriodValue } from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
-import { generateMockStock, type MockStockSku } from "./_shared/mock";
+import { useStockByBranchReport } from "../../../hooks/use-inventory-reports";
+import type {
+  StockByBranchBranchHeader,
+  StockByBranchRow as ApiStockByBranchRow,
+} from "../../../api/inventory-reports";
 
 const GROUP_OPTIONS = [
   { value: "__all__", label: "Tất cả nhóm" },
@@ -28,12 +35,7 @@ const UNIT_OPTIONS = [
   { value: "Đôi", label: "Đôi" },
 ];
 
-const BRANCH_COLUMNS: { code: string; name: string }[] = [
-  { code: "MTCANTHO", name: "Giày MT Cần Thơ" },
-  { code: "CT", name: "CT" },
-];
-
-interface StockByBranchRow {
+interface ViewRow {
   sku: string;
   name: string;
   parentSku: string;
@@ -47,35 +49,24 @@ interface StockByBranchRow {
   perBranch: Record<string, number>;
 }
 
-/**
- * Aggregate the mock per-branch stock into one row per SKU with branch-level
- * column totals.
- */
-function aggregateByBranch(rows: MockStockSku[]): StockByBranchRow[] {
-  const map = new Map<string, StockByBranchRow>();
-  for (const r of rows) {
-    const ending = r.openingQty + r.inQty - r.outQty;
-    let entry = map.get(r.sku);
-    if (!entry) {
-      entry = {
-        sku: r.sku,
-        name: r.name,
-        parentSku: r.parentSku,
-        parentName: r.parentName,
-        color: r.color,
-        size: r.size,
-        unit: r.unit,
-        group: r.group,
-        brand: r.brand,
-        total: 0,
-        perBranch: {},
-      };
-      map.set(r.sku, entry);
-    }
-    entry.total += ending;
-    entry.perBranch[r.branchCode] = (entry.perBranch[r.branchCode] ?? 0) + ending;
+function mapApiRow(row: ApiStockByBranchRow): ViewRow {
+  const perBranch: Record<string, number> = {};
+  for (const [branchId, value] of Object.entries(row.perBranch)) {
+    perBranch[branchId] = value.qty;
   }
-  return Array.from(map.values());
+  return {
+    sku: row.sku,
+    name: row.name,
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    color: "",
+    size: "",
+    unit: row.unit,
+    group: row.categoryName ?? "",
+    brand: "",
+    total: row.totalQty,
+    perBranch,
+  };
 }
 
 export function StockByBranchReportPage() {
@@ -87,39 +78,64 @@ export function StockByBranchReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
-  const rows = useMemo(() => aggregateByBranch(generateMockStock()), []);
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
+    () =>
+      buildApiFilters(filterValues, period, {
+        categoryFieldKey: "group",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useStockByBranchReport(apiFilters);
+  const branches: StockByBranchBranchHeader[] = useMemo(
+    () => data?.branches ?? [],
+    [data],
+  );
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
-  const columns: TableColumn<StockByBranchRow>[] = [
-    { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
-    { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
-    { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
-    { key: "parentName", label: "Tên Mẫu mã", width: 150, render: (r) => r.parentName },
-    { key: "color", label: "Màu sắc", width: 100, render: (r) => r.color },
-    { key: "size", label: "Size", width: 80, render: (r) => r.size },
-    { key: "unit", label: "Đơn vị tính", width: 110, render: (r) => r.unit },
-    { key: "group", label: "Nhóm hàng hóa", width: 140, render: (r) => r.group },
-    { key: "brand", label: "Thương hiệu", width: 120, render: (r) => r.brand },
-    {
-      key: "total",
-      label: "Tồn cuối kỳ",
-      width: 120,
-      headerClassName: "text-right",
-      className: num,
-      render: (r) => r.total,
-    },
-    ...BRANCH_COLUMNS.map<TableColumn<StockByBranchRow>>((b) => ({
-      key: `branch_${b.code}`,
-      label: b.code,
-      width: 130,
-      headerClassName: "text-right",
-      className: num,
-      render: (r) => r.perBranch[b.code] ?? 0,
-    })),
-  ];
+  const columns: TableColumn<ViewRow>[] = useMemo(
+    () => [
+      { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
+      { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
+      { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
+      { key: "parentName", label: "Tên Mẫu mã", width: 150, render: (r) => r.parentName },
+      { key: "color", label: "Màu sắc", width: 100, render: (r) => r.color },
+      { key: "size", label: "Size", width: 80, render: (r) => r.size },
+      { key: "unit", label: "Đơn vị tính", width: 110, render: (r) => r.unit },
+      { key: "group", label: "Nhóm hàng hóa", width: 140, render: (r) => r.group },
+      { key: "brand", label: "Thương hiệu", width: 120, render: (r) => r.brand },
+      {
+        key: "total",
+        label: "Tồn cuối kỳ",
+        width: 120,
+        headerClassName: "text-right",
+        className: num,
+        render: (r) => r.total,
+      },
+      ...branches.map<TableColumn<ViewRow>>((b) => ({
+        key: `branch_${b.id}`,
+        label: b.code ?? b.name,
+        width: 130,
+        headerClassName: "text-right",
+        className: num,
+        render: (r) => r.perBranch[b.id] ?? 0,
+      })),
+    ],
+    [branches],
+  );
 
   return (
-    <StorageReportShell<StockByBranchRow>
+    <StorageReportShell<ViewRow>
       title="Số lượng tồn kho theo cửa hàng"
       storageKey="reports/storage/stock-by-branch"
       filterFields={filterFields}
@@ -131,15 +147,21 @@ export function StockByBranchReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có dữ liệu tồn kho theo cửa hàng."
       getRowKey={(r) => r.sku}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const totals: Record<string, number> = {
           total: rs.reduce((s, r) => s + r.total, 0),
         };
-        for (const b of BRANCH_COLUMNS) {
-          totals[`branch_${b.code}`] = rs.reduce(
-            (s, r) => s + (r.perBranch[b.code] ?? 0),
+        for (const b of branches) {
+          totals[`branch_${b.id}`] = rs.reduce(
+            (s, r) => s + (r.perBranch[b.id] ?? 0),
             0,
           );
         }

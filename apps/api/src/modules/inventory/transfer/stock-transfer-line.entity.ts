@@ -1,5 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
 import { StockTransferEntity } from './stock-transfer.entity';
+import { ItemEntity } from '../location/item.entity';
+import { LocationEntity } from '../location/location.entity';
 
 /** Single item line within a stock transfer document. */
 @Entity('stock_transfer_lines')
@@ -40,4 +42,16 @@ export class StockTransferLineEntity {
   })
   @JoinColumn({ name: 'transfer_id' })
   transfer?: StockTransferEntity;
+
+  @ManyToOne(() => ItemEntity, { eager: true })
+  @JoinColumn({ name: 'item_id' })
+  item?: ItemEntity;
+
+  @ManyToOne(() => LocationEntity, { eager: true })
+  @JoinColumn({ name: 'source_location_id' })
+  sourceLocation?: LocationEntity;
+
+  @ManyToOne(() => LocationEntity, { eager: true })
+  @JoinColumn({ name: 'destination_location_id' })
+  destinationLocation?: LocationEntity;
 }

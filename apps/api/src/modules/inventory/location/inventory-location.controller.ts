@@ -420,10 +420,19 @@ export class InventoryLocationController {
   @Get('locations')
   @RequirePermission('inventory.read')
   listLocations(
-    @Query() query: PaginationQueryDto & { storageId?: string; branchId?: string },
+    @Query()
+    query: PaginationQueryDto & {
+      storageId?: string;
+      branchId?: string;
+      includeUnassigned?: string;
+    },
     @Actor() actor: ActorContext,
   ) {
-    return this.service.listLocations(query, actor);
+    const includeUnassigned =
+      query.includeUnassigned === 'true' ||
+      (query.includeUnassigned as unknown) === true ||
+      query.includeUnassigned === '1';
+    return this.service.listLocations({ ...query, includeUnassigned }, actor);
   }
 
   @Get('locations/:id')

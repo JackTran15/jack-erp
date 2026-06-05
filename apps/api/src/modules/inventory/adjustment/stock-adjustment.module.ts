@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
+import { ItemCostSnapshotModule } from '../location/item-cost-snapshot.module';
 import { StockAdjustmentEntity } from './stock-adjustment.entity';
 import { StockAdjustmentLineEntity } from './stock-adjustment-line.entity';
 import { StockAdjustmentService } from './stock-adjustment.service';
@@ -15,6 +16,7 @@ import { StockAdjustmentController } from './stock-adjustment.controller';
     ]),
     StockLedgerModule,
     DocumentNumberingModule,
+    ItemCostSnapshotModule,
   ],
   controllers: [StockAdjustmentController],
   providers: [StockAdjustmentService],

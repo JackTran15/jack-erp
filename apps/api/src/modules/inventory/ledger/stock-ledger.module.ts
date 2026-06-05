@@ -13,6 +13,7 @@ import {
   INVENTORY_STOCK_BALANCE_SERVICE_TOKEN,
 } from './stock-balance-crud.service';
 import { ProductModule } from '../product/product.module';
+import { ItemCostSnapshotModule } from '../location/item-cost-snapshot.module';
 import { StockDeductionPublisher } from '../publishers/stock-deduction.publisher';
 import { StockDeductionConsumer } from '../consumers/stock-deduction.consumer';
 import { StockReturnConsumer } from '../consumers/stock-return.consumer';
@@ -20,8 +21,12 @@ import { StockReturnInConsumer } from '../consumers/stock-return-in.consumer';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StockLedgerEntryEntity, StockBalanceEntity]),
+    TypeOrmModule.forFeature([
+      StockLedgerEntryEntity,
+      StockBalanceEntity,
+    ]),
     ProductModule,
+    ItemCostSnapshotModule,
   ],
   controllers: [StockLedgerController, StockSummaryController],
   providers: [

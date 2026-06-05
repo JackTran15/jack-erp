@@ -3,7 +3,7 @@ import { TransferStatus } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 
-/** Document authorizing movement of inventory between locations/branches. Workflow: DRAFT → APPROVED → POSTED. */
+/** Document authorizing movement of inventory between locations/branches. Workflow: DRAFT → POSTED (or CANCELLED). */
 @Entity('stock_transfers')
 @Index(['organizationId', 'status'])
 @Index('IDX_stock_transfers_org_branch_list', ['organizationId', 'branchId', 'status', 'createdAt'])

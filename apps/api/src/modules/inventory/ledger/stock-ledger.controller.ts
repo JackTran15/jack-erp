@@ -62,6 +62,12 @@ export class BalanceQueryDto extends PaginationQueryDto {
   @IsBoolean()
   belowMin?: boolean;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  unassigned?: boolean;
+
   // Per-column string filters
   @ApiPropertyOptional()
   @IsOptional()

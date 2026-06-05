@@ -4,11 +4,17 @@ export interface IntraWarehouseTransferLine {
   itemId: string;
   quantity: number;
   notes?: string;
+  /** Per-line source location. Falls back to header `sourceLocationId` when omitted. */
+  sourceLocationId?: string;
+  /** Per-line destination location. Falls back to header `destinationLocationId` when omitted. */
+  destinationLocationId?: string;
 }
 
 export interface CreateIntraWarehouseTransferPayload {
-  sourceLocationId: string;
-  destinationLocationId: string;
+  /** Header-level source. Optional when every line carries its own `sourceLocationId`. */
+  sourceLocationId?: string;
+  /** Header-level destination. Optional when every line carries its own `destinationLocationId`. */
+  destinationLocationId?: string;
   lines: IntraWarehouseTransferLine[];
 }
 
@@ -16,8 +22,8 @@ export interface StockTransferResult {
   id: string;
   status: string;
   documentNumber?: string;
-  sourceLocationId: string;
-  destinationLocationId: string;
+  sourceLocationId?: string;
+  destinationLocationId?: string;
   postedAt?: string;
 }
 
