@@ -462,7 +462,7 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         const variant = coerceCheckoutVariant(draft.checkoutVariant);
 
         // Dựng thẳng draft per-tab từ bản lưu tạm: khách + dòng thanh toán đã lưu.
-        // Số tiền đã lưu là cụ thể (không auto) nên `firstAmountAuto = false`.
+        // Nếu chỉ còn 1 dòng, số tiền sẽ tự bám theo "Còn phải thu" khi giỏ đổi.
         const base = initialCheckoutDraft();
         const restoredDraft: CheckoutDraft = {
           ...base,
@@ -483,7 +483,6 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
                   paymentLines: draft.payments.map((row) =>
                     createPaymentLine(row.method, row.amount),
                   ),
-                  firstAmountAuto: false,
                 }
               : base.payment,
         };
