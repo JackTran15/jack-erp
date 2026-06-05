@@ -7,6 +7,7 @@ import {
   useCustomerSummary,
   useIssueMembershipCard,
   useMembershipCard,
+  useRefreshCustomerPoints,
   useUpdateMembershipCard,
 } from "@erp/pos/hooks/react-query/use-query-customer";
 import { IssueMembershipCardDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/IssueMembershipCardDialog/IssueMembershipCardDialog";
@@ -47,7 +48,6 @@ export interface CustomerDetailDialogProps {
   onCollectDebt?: () => void;
   /** Card-related callbacks for the membership card on the overview tab. */
   onChangeCard?: () => void;
-  onRefreshPoints?: () => void;
   /**
    * Fires after the user saves edits via the in-place `CustomerForm` on the
    * "Thông tin" tab. The parent typically forwards this to `pickCustomer` so
@@ -95,7 +95,6 @@ export function CustomerDetailDialog({
   onConfirm,
   onCollectDebt,
   onChangeCard,
-  onRefreshPoints,
   onCustomerUpdated,
 }: CustomerDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<CustomerDetailTabKey>(initialTab);
@@ -132,6 +131,10 @@ export function CustomerDetailDialog({
   const { data: card } = useMembershipCard(
     summaryEnabled ? customerId : undefined,
   );
+
+  // Nút "Làm mới điểm tích lũy" — invalidate summary + membership-card để
+  // refetch điểm mới nhất mà không cần reload trang.
+  const handleRefreshPoints = useRefreshCustomerPoints(customerId);
 
   const groupNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -248,7 +251,7 @@ export function CustomerDetailDialog({
             <OverviewTab
               data={data}
               onChangeCard={() => setIsIssuingCard(true)}
-              onRefreshPoints={onRefreshPoints}
+              onRefreshPoints={handleRefreshPoints}
               onIssueCard={() => setIsIssuingCard(true)}
               appliedPoints={appliedPoints}
               onRedeemPoints={handleRedeemPoints}
