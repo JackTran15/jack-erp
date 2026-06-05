@@ -6945,7 +6945,10 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @enum {string} */
-            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL";
+            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "STOCK_TAKE";
             notes?: string;
             approvedBy?: string;
             /** Format: date-time */
@@ -7038,7 +7041,7 @@ export interface components {
         };
         CreateGoodsReceiptDto: {
             /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN";
+            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7047,7 +7050,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             /** @description Source branch for transfer-in. Stored separately from referenceId. */
             sourceBranchId?: string;
             receivedAt: string;
@@ -7073,14 +7076,14 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
             /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN";
+            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             providerId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
             sourceBranchId?: string;
             /** Format: date-time */
@@ -7137,7 +7140,7 @@ export interface components {
         };
         UpdateGoodsReceiptDto: {
             /** @enum {string} */
-            purpose?: "OTHER" | "TRANSFER_IN";
+            purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7146,7 +7149,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             sourceBranchId?: string;
             receivedAt?: string;
             /** Format: uuid */

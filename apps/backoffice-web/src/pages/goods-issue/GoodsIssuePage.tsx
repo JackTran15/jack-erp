@@ -71,7 +71,8 @@ export type GoodsIssuePurposeUI =
   | "OTHER"
   | "SALE"
   | "TRANSFER_OUT"
-  | "DISPOSAL";
+  | "DISPOSAL"
+  | "STOCK_TAKE";
 
 interface GoodsIssueLine {
   id: string;
@@ -105,6 +106,8 @@ interface GoodsIssue {
   reasonRef?: { id: string; code: string; name: string } | null;
   targetBranchId?: string;
   targetBranch?: { id: string; name: string } | null;
+  referenceId?: string | null;
+  referenceType?: string | null;
   status: GoodsIssueStatus;
   issueDate?: string;
   notes?: string;
@@ -195,6 +198,7 @@ const PURPOSE_LABELS: Record<GoodsIssuePurposeUI, string> = {
   SALE: "Phiếu xuất kho bán hàng",
   TRANSFER_OUT: "Điều chuyển đến cửa hàng khác",
   DISPOSAL: "Hủy hàng",
+  STOCK_TAKE: "Phiếu xuất kho kiểm kê",
 };
 
 const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
@@ -909,6 +913,32 @@ function GoodsIssueFormDialog({
     Array<{ id: string; name: string; branchId: string }>
   >([]);
 
+  // "Tham chiếu": phiếu xuất kho kiểm kê được sinh tự động khi "Xử lý" một phiếu
+  // kiểm kê. API chỉ trả referenceId — resolve số phiếu KK gốc để hiển thị.
+  const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  const referenceStockTakeId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId ?? null : null;
+  useEffect(() => {
+    if (!referenceStockTakeId) {
+      setReferenceNumber(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${referenceStockTakeId}`,
+        );
+        if (!cancelled) setReferenceNumber(data.documentNumber ?? null);
+      } catch {
+        // best-effort — tham chiếu chỉ mang tính thông tin
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceStockTakeId]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -1593,7 +1623,13 @@ function GoodsIssueFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {referenceNumber ? (
+                <span className="font-mono text-sm font-medium text-foreground">
+                  {referenceNumber}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>

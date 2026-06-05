@@ -40,7 +40,7 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
     update: 'inventory.write',
     delete: 'inventory.write',
   },
-  scopingPolicy: ScopingPolicy.ORGANIZATION,
+  scopingPolicy: ScopingPolicy.BRANCH,
   deletionPolicy: DeletionPolicy.HARD,
 };
 

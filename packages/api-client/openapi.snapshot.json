@@ -23031,9 +23031,19 @@
               "OTHER",
               "SALE",
               "TRANSFER_OUT",
-              "DISPOSAL"
+              "DISPOSAL",
+              "STOCK_TAKE"
             ],
             "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "referenceType": {
+            "type": "string",
+            "enum": [
+              "STOCK_TAKE"
+            ]
           },
           "notes": {
             "type": "string"
@@ -23281,7 +23291,8 @@
             "type": "string",
             "enum": [
               "OTHER",
-              "TRANSFER_IN"
+              "TRANSFER_IN",
+              "STOCK_TAKE"
             ]
           },
           "providerId": {
@@ -23308,7 +23319,8 @@
             "type": "string",
             "enum": [
               "PURCHASE_ORDER",
-              "STOCK_TRANSFER"
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
             ]
           },
           "sourceBranchId": {
@@ -23381,7 +23393,8 @@
           "purpose": {
             "enum": [
               "OTHER",
-              "TRANSFER_IN"
+              "TRANSFER_IN",
+              "STOCK_TAKE"
             ],
             "type": "string"
           },
@@ -23403,7 +23416,8 @@
           "referenceType": {
             "enum": [
               "PURCHASE_ORDER",
-              "STOCK_TRANSFER"
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
             ],
             "type": "string"
           },
@@ -23587,7 +23601,8 @@
             "type": "string",
             "enum": [
               "OTHER",
-              "TRANSFER_IN"
+              "TRANSFER_IN",
+              "STOCK_TAKE"
             ]
           },
           "providerId": {
@@ -23614,7 +23629,8 @@
             "type": "string",
             "enum": [
               "PURCHASE_ORDER",
-              "STOCK_TRANSFER"
+              "STOCK_TRANSFER",
+              "STOCK_TAKE"
             ]
           },
           "sourceBranchId": {

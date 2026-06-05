@@ -64,7 +64,7 @@ import {
 } from "../inventory-line-normalization";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
-type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
+type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
 
 interface GoodsReceiptLine {
   id: string;
@@ -93,7 +93,7 @@ interface GoodsReceipt {
   reason?: string | null;
   description?: string | null;
   referenceId?: string | null;
-  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | null;
+  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE" | null;
   sourceBranchId?: string | null;
   receivedAt: string;
   locationId: string;
@@ -474,7 +474,9 @@ export function PurchaseOrdersPage() {
       render: (row) =>
         row.purpose === "TRANSFER_IN"
           ? "Điều chuyển từ cửa hàng khác"
-          : "Phiếu nhập kho khác",
+          : row.purpose === "STOCK_TAKE"
+            ? "Phiếu nhập kho kiểm kê"
+            : "Phiếu nhập kho khác",
     },
   ];
 
@@ -833,6 +835,34 @@ function PurchaseOrderFormDialog({
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
+
+  // "Tham chiếu": when this receipt was auto-generated from a stock-take
+  // ("Xử lý"), resolve the originating phiếu kiểm kê's document number (KK…).
+  const [stockTakeRefNumber, setStockTakeRefNumber] = useState<string | undefined>(
+    undefined,
+  );
+  const stockTakeRefId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId : undefined;
+  useEffect(() => {
+    if (!stockTakeRefId) {
+      setStockTakeRefNumber(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${stockTakeRefId}`,
+        );
+        if (!cancelled) setStockTakeRefNumber(data.documentNumber ?? undefined);
+      } catch {
+        // best-effort — the reference is informational only
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stockTakeRefId]);
 
   const [quickProviderOpen, setQuickProviderOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
@@ -1519,7 +1549,11 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {stockTakeRefNumber ? (
+                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>

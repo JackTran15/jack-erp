@@ -1,5 +1,9 @@
 import { Entity, Column, OneToMany, ManyToOne, JoinColumn, Index } from 'typeorm';
-import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
+import {
+  GoodsIssuePurpose,
+  GoodsIssueReferenceType,
+  GoodsIssueStatus,
+} from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
@@ -51,6 +55,12 @@ export class GoodsIssueEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: GoodsIssuePurpose, default: GoodsIssuePurpose.OTHER, comment: 'Mục đích xuất kho: OTHER | SALE | TRANSFER_OUT | DISPOSAL' })
   purpose: GoodsIssuePurpose;
+
+  @Column({ name: 'reference_id', type: 'uuid', nullable: true, comment: 'Source document id (e.g. the stock-take that generated this issue)' })
+  referenceId?: string;
+
+  @Column({ name: 'reference_type', type: 'varchar', nullable: true, comment: 'Source document type — see GoodsIssueReferenceType (Tham chiếu KK)' })
+  referenceType?: GoodsIssueReferenceType;
 
   @Column({ nullable: true, comment: 'Free-text notes' })
   notes?: string;

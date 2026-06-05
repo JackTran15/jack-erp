@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DocumentFormDialog,
   FormField,
@@ -11,6 +11,7 @@ import {
   type UnsavedChangesChoice,
 } from "@erp/ui";
 import {
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CloudUpload,
@@ -160,6 +161,44 @@ export function StockTakeFormDialog({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+
+  // "Tham chiếu": the NK/XK documents auto-generated when this stock-take was
+  // processed. The API stores only their ids, so resolve the document numbers.
+  const [refDocs, setRefDocs] = useState<{ receipt?: string; issue?: string }>(
+    {},
+  );
+  const refReceiptId = stockTake?.generatedReceiptId;
+  const refIssueId = stockTake?.generatedIssueId;
+  useEffect(() => {
+    if (!refReceiptId && !refIssueId) {
+      setRefDocs({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const next: { receipt?: string; issue?: string } = {};
+      try {
+        if (refReceiptId) {
+          const { data } = await apiClient.get<{ documentNumber?: string }>(
+            `/goods-receipts/${refReceiptId}`,
+          );
+          next.receipt = data.documentNumber ?? undefined;
+        }
+        if (refIssueId) {
+          const { data } = await apiClient.get<{ documentNumber?: string }>(
+            `/inventory/goods-issues/${refIssueId}`,
+          );
+          next.issue = data.documentNumber ?? undefined;
+        }
+      } catch {
+        // best-effort — the reference is informational only
+      }
+      if (!cancelled) setRefDocs(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refReceiptId, refIssueId]);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
   const markDirty = useCallback(() => {
@@ -493,13 +532,6 @@ export function StockTakeFormDialog({
       onClick: () => void handleSave(),
     },
     {
-      id: "process",
-      label: "Xử lý",
-      icon: Settings2,
-      disabled: !onRequestProcess || isLocked || isNew || !stockTake,
-      onClick: () => stockTake && onRequestProcess?.(stockTake),
-    },
-    {
       id: "delete",
       label: "Xoá",
       icon: Trash2,
@@ -596,14 +628,14 @@ export function StockTakeFormDialog({
     },
     {
       key: "unit",
-      label: "ĐVT",
+      label: "Đơn vị tính",
       width: 80,
       type: "readonly",
       getValue: (r) => r.unit,
     },
     {
       key: "expectedQty",
-      label: "Theo số",
+      label: "Theo sổ",
       width: 100,
       type: "readonly",
       align: "right",
@@ -672,6 +704,20 @@ export function StockTakeFormDialog({
       ? `Phiếu kiểm kê ${stockTake?.documentNumber ?? ""}`
       : `Sửa phiếu kiểm kê ${stockTake?.documentNumber ?? ""}`;
 
+  // MISA shows the processing outcome next to the "CHỨNG TỪ" block.
+  const processStatusBadge =
+    stockTake?.status === "POSTED" ? (
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-600">
+        <CheckCircle2 className="h-4 w-4" /> Đã xử lý
+      </span>
+    ) : stockTake?.status === "CANCELLED" ? (
+      <span className="text-sm font-semibold text-destructive">Đã huỷ</span>
+    ) : (
+      <span className="text-sm font-semibold text-muted-foreground">
+        Chưa xử lý
+      </span>
+    );
+
   return (
     <>
       <DocumentFormDialog
@@ -711,10 +757,31 @@ export function StockTakeFormDialog({
                 className="h-8 bg-muted/40"
               />
             </FormField>
+            <FormField label="Tham chiếu">
+              <div className="flex h-8 items-center gap-3 text-sm">
+                {refDocs.receipt || refDocs.issue ? (
+                  <>
+                    {refDocs.receipt ? (
+                      <span className="font-mono font-medium text-foreground">
+                        {refDocs.receipt}
+                      </span>
+                    ) : null}
+                    {refDocs.issue ? (
+                      <span className="font-mono font-medium text-foreground">
+                        {refDocs.issue}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            </FormField>
           </>
         }
         documentInfo={
           <>
+            <div className="mb-1 flex justify-end">{processStatusBadge}</div>
             <FormField label="Số phiếu KK">
               <Input
                 value={
@@ -778,6 +845,23 @@ export function StockTakeFormDialog({
                 placeholder="Nhập kết luận sau khi kiểm kê…"
               />
             </div>
+          </div>
+        }
+        footerSummary={
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs italic text-muted-foreground">
+              Bấm "Xử lý" phần mềm sẽ tự động sinh phiếu nhập kho/xuất kho tương ứng
+              với số lượng và giá trị hàng hóa chênh lệch thừa/thiếu sau kiểm kê.
+            </p>
+            <button
+              type="button"
+              onClick={() => stockTake && onRequestProcess?.(stockTake)}
+              disabled={!onRequestProcess || isLocked || isNew || !stockTake}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Settings2 className="h-4 w-4" />
+              Xử lý
+            </button>
           </div>
         }
       />
