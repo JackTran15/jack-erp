@@ -64,7 +64,7 @@ import {
 } from "../inventory-line-normalization";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
-type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
+type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
 
 interface GoodsReceiptLine {
   id: string;
@@ -93,7 +93,7 @@ interface GoodsReceipt {
   reason?: string | null;
   description?: string | null;
   referenceId?: string | null;
-  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | null;
+  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE" | null;
   sourceBranchId?: string | null;
   receivedAt: string;
   locationId: string;
@@ -144,6 +144,14 @@ interface InventoryStorage {
   id: string;
   name: string;
   branchId: string;
+  isMainStorage?: boolean;
+}
+
+/** Active branch — same source the axios client uses for the X-Branch-Id header. */
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ?? localStorage.getItem("branch_id")
+  );
 }
 
 interface InventoryItem {
@@ -155,11 +163,13 @@ interface InventoryItem {
   purchasePrice?: number | string | null;
 }
 
+// MISA collapse labels: DRAFT = "Chưa thực hiện", POSTED = "Đã thực hiện" (xanh),
+// CANCELLED/REVERSED = "Đã hủy".
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "Chưa duyệt",
-  POSTED: "Đã duyệt",
-  CANCELLED: "Đã huỷ",
-  REVERSED: "Đã đảo bút",
+  DRAFT: "Chưa thực hiện",
+  POSTED: "Đã thực hiện",
+  CANCELLED: "Đã hủy",
+  REVERSED: "Đã hủy",
 };
 
 const FILTER_KEYS = [
@@ -209,6 +219,7 @@ export function PurchaseOrdersPage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PurchaseOrder | null>(null);
+  const [confirmVoid, setConfirmVoid] = useState<PurchaseOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -242,8 +253,13 @@ export function PurchaseOrdersPage() {
 
   const loadStorages = useCallback(async () => {
     try {
+      // Scope warehouses to the active branch (same id the axios client sends as
+      // X-Branch-Id) so the kho dropdown only lists this branch's warehouses.
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      const branchId = getActiveBranchId();
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch {
@@ -290,10 +306,16 @@ export function PurchaseOrdersPage() {
     await loadRecords();
   }, [loadRecords]);
 
-  const handleApprove = async (order: PurchaseOrder) => {
+  // Void/reverse a receipt ("Hoãn"). Calls the cancel endpoint, which reverses
+  // the stock ledger when the doc was POSTED before marking it cancelled.
+  const handleVoid = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
-      await apiClient.post(`/goods-receipts/${order.id}/post`);
+      await apiClient.delete(`/goods-receipts/${order.id}`);
+      setConfirmVoid(null);
+      setDialogMode(null);
+      setEditingOrder(null);
+      if (selectedId === order.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -453,7 +475,9 @@ export function PurchaseOrdersPage() {
       render: (row) =>
         row.purpose === "TRANSFER_IN"
           ? "Điều chuyển từ cửa hàng khác"
-          : "Phiếu nhập kho khác",
+          : row.purpose === "STOCK_TAKE"
+            ? "Phiếu nhập kho kiểm kê"
+            : "Phiếu nhập kho khác",
     },
   ];
 
@@ -571,7 +595,7 @@ export function PurchaseOrdersPage() {
             setEditingOrder(null);
             await loadRecords();
           }}
-          onApprove={editingOrder ? () => void handleApprove(editingOrder) : undefined}
+          onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={editingOrder ? () => setConfirmDelete(editingOrder) : undefined}
         />
       )}
@@ -585,6 +609,22 @@ export function PurchaseOrdersPage() {
           loading={actionLoading === confirmDelete.id}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => void handleDelete(confirmDelete)}
+        />
+      )}
+
+      {confirmVoid && (
+        <ConfirmActionModal
+          title="Hoãn phiếu nhập kho"
+          message={
+            confirmVoid.status === "POSTED"
+              ? `Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này sẽ đảo bút tồn kho đã ghi và không thể hoàn tác.`
+              : `Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này không thể hoàn tác.`
+          }
+          confirmLabel="Hoãn phiếu"
+          cancelLabel="Quay lại"
+          loading={actionLoading === confirmVoid.id}
+          onCancel={() => setConfirmVoid(null)}
+          onConfirm={() => void handleVoid(confirmVoid)}
         />
       )}
     </>
@@ -705,7 +745,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber,
   onClose,
   onSaved,
-  onApprove,
+  onVoid,
   onRequestDelete,
 }: {
   mode: "create" | "edit" | "view";
@@ -716,7 +756,8 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber?: string;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
-  onApprove?: () => void;
+  /** Void/reverse the receipt → "Hoãn" toolbar button. */
+  onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
@@ -731,6 +772,29 @@ function PurchaseOrderFormDialog({
   const [providerId, setProviderId] = useState(initial?.providerId ?? "");
   const [providerCode, setProviderCode] = useState(initialProvider.code);
   const [providerName, setProviderName] = useState(initialProvider.name);
+  /**
+   * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
+   * the receipt header for legacy reasons, but the UI lets users pick a
+   * warehouse here and a bin per-line. On save the header `locationId` is
+   * derived from the first line's bin so the existing NOT NULL column stays
+   * happy without a schema migration.
+   */
+  // On a fresh create, default the warehouse to the branch's main storage
+  // (fallback: first available) so the first line's Kho is pre-filled.
+  const defaultStorage = useMemo(
+    () => storages.find((s) => s.isMainStorage) ?? storages[0] ?? null,
+    [storages],
+  );
+  const initialStorageId = initial
+    ? initial.location?.storageId ?? ""
+    : defaultStorage?.id ?? "";
+  const initialStorageLabel = initial
+    ? initial.location?.storageId
+      ? storages.find((s) => s.id === initial.location!.storageId)?.name ?? ""
+      : ""
+    : defaultStorage?.name ?? "";
+  const [storageId, setStorageId] = useState(initialStorageId);
+  const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
   const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
     initial?.purpose === "TRANSFER_IN" ? "TRANSFER" : "OTHER",
   );
@@ -773,6 +837,34 @@ function PurchaseOrderFormDialog({
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
+  // "Tham chiếu": when this receipt was auto-generated from a stock-take
+  // ("Xử lý"), resolve the originating phiếu kiểm kê's document number (KK…).
+  const [stockTakeRefNumber, setStockTakeRefNumber] = useState<string | undefined>(
+    undefined,
+  );
+  const stockTakeRefId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId : undefined;
+  useEffect(() => {
+    if (!stockTakeRefId) {
+      setStockTakeRefNumber(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${stockTakeRefId}`,
+        );
+        if (!cancelled) setStockTakeRefNumber(data.documentNumber ?? undefined);
+      } catch {
+        // best-effort — the reference is informational only
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stockTakeRefId]);
+
   const [quickProviderOpen, setQuickProviderOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
@@ -786,9 +878,12 @@ function PurchaseOrderFormDialog({
     let cancelled = false;
     void (async () => {
       try {
+        const params = new URLSearchParams({ page: "1", pageSize: "200" });
+        const branchId = getActiveBranchId();
+        if (branchId) params.set("branchId", branchId);
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
-        >("/inventory/storages?page=1&pageSize=200");
+        >(`/inventory/storages?${params}`);
         if (!cancelled) setStorageCache(data.data);
       } catch {
         // best-effort — quick-create location modal will show empty list
@@ -798,6 +893,15 @@ function PurchaseOrderFormDialog({
       cancelled = true;
     };
   }, []);
+
+  // If the dialog opens for a new receipt before warehouses finished loading,
+  // back-fill the default (main) storage once it arrives — but never override a
+  // warehouse the user already picked or an existing receipt's saved warehouse.
+  useEffect(() => {
+    if (initial || storageId || !defaultStorage) return;
+    setStorageId(defaultStorage.id);
+    setStorageQuery(defaultStorage.name);
+  }, [initial, storageId, defaultStorage]);
 
   const markDirty = () => {
     if (!dirty) setDirty(true);
@@ -994,10 +1098,12 @@ function PurchaseOrderFormDialog({
       if (initial && mode === "edit") {
         await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
       } else {
+        // Create now saves + posts atomically: the phiếu lands POSTED with the
+        // stock ledger written, so it appears in reports immediately.
         await apiClient.post("/goods-receipts", payload);
       }
       setDirty(false);
-      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã tạo phiếu nhập kho.");
+      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã nhập kho thành công.");
       await onSaved();
       return true;
     } catch (err) {
@@ -1068,8 +1174,10 @@ function PurchaseOrderFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      disabled: !onApprove || initial?.status !== "DRAFT",
-      onClick: () => onApprove?.(),
+      // "Hoãn" = void/reverse a POSTED receipt (reverses the stock ledger).
+      // Never posts/approves.
+      disabled: !onVoid || initial?.status !== "POSTED",
+      onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
@@ -1446,7 +1554,11 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {stockTakeRefNumber ? (
+                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>

@@ -4,6 +4,7 @@ import { DomainEvent, DomainEventType, StockMovementType } from '@erp/shared-int
 import { StockDeductionConsumer } from './stock-deduction.consumer';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockDeductionPayload } from '../publishers/stock-deduction.publisher';
 
 const buildEvent = (
@@ -30,10 +31,14 @@ const buildEvent = (
 describe('StockDeductionConsumer', () => {
   let consumer: StockDeductionConsumer;
   let ledgerRepo: { findOne: jest.Mock };
+  let itemCostSnapshotService: { snapshotOne: jest.Mock };
   let stockLedgerService: { recordBatchMovements: jest.Mock };
 
   beforeEach(async () => {
     ledgerRepo = { findOne: jest.fn() };
+    itemCostSnapshotService = {
+      snapshotOne: jest.fn().mockResolvedValue(12.5),
+    };
     stockLedgerService = { recordBatchMovements: jest.fn().mockResolvedValue([]) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,6 +46,7 @@ describe('StockDeductionConsumer', () => {
         StockDeductionConsumer,
         { provide: getRepositoryToken(StockLedgerEntryEntity), useValue: ledgerRepo },
         { provide: StockLedgerService, useValue: stockLedgerService },
+        { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
       ],
     }).compile();
 
@@ -60,7 +66,21 @@ describe('StockDeductionConsumer', () => {
         quantity: -2,
         referenceType: 'INVOICE',
         referenceId: 'inv-1',
+        // Snapshot of items.purchase_price (12.50). Service computes
+        // line_value = quantity * unitCost = -2 * 12.5 = -25 (signed).
+        unitCost: 12.5,
       }),
+    ]);
+  });
+
+  it('snapshots items.purchase_price as unitCost (falls back to 0 when item missing)', async () => {
+    ledgerRepo.findOne.mockResolvedValue(null);
+    itemCostSnapshotService.snapshotOne.mockResolvedValueOnce(0);
+
+    await consumer.handle(buildEvent());
+
+    expect(stockLedgerService.recordBatchMovements).toHaveBeenCalledWith([
+      expect.objectContaining({ unitCost: 0 }),
     ]);
   });
 

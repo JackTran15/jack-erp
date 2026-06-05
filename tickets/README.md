@@ -351,3 +351,55 @@ flowchart LR
   T3 --> T9
 ```
 
+## EPIC-03062026 POS server-side invoice search
+
+- [EPIC-03062026 POS server-side invoice search](./epics/EPIC-03062026-pos-invoice-search.md)
+- Chuyển 3 màn danh sách hóa đơn trên `pos-web` từ lọc client-side sang **search server-side** qua các endpoint CQRS riêng (theo skill `cqrs-search-endpoint`), KHÔNG đụng `POST /v2/invoices/search` đang dùng cho `InvoiceListPage`. #5 "Đổi trả nhanh" = SALE+PAID; "Tổng thanh toán" = `totalPaid`; tên cửa hàng/chi nhánh do endpoint mới join branch trả inline.
+
+| Ticket                                                              | Mô tả                                                                 |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [TKT-PIS-01](./tickets/TKT-PIS-01-be-returnable-invoice-search.md)  | BE: `POST /v2/invoices/returnable/search` (#5, SALE+PAID, branch-scoped) |
+| [TKT-PIS-02](./tickets/TKT-PIS-02-be-purchase-history-search.md)    | BE: `POST /v2/invoices/purchase-history/search` (#2, org-wide / customerId) |
+| [TKT-PIS-03](./tickets/TKT-PIS-03-be-draft-invoice-search.md)       | BE: `POST /v2/invoices/drafts/search` (#4, free-text OR + date range) |
+| [TKT-PIS-04](./tickets/TKT-PIS-04-fe-invoice-search-data-layer.md)  | FE: DTOs + `invoiceService` + `INVOICE_KEYS` + hooks + filter→body mapper |
+| [TKT-PIS-05](./tickets/TKT-PIS-05-fe-return-goods-search.md)        | FE: wire "Đổi trả nhanh" (#5) server-side                            |
+| [TKT-PIS-06](./tickets/TKT-PIS-06-fe-purchase-history-search.md)    | FE: wire "Lịch sử mua hàng" (#2) server-side                          |
+| [TKT-PIS-07](./tickets/TKT-PIS-07-fe-draft-invoices-search.md)      | FE: wire "Hóa đơn chưa thanh toán" (#4) server-side                   |
+
+### Ticket dependency graph (EPIC-03062026)
+
+```mermaid
+flowchart LR
+  T1["TKT-PIS-01 BE returnable"] --> T4["TKT-PIS-04 FE data layer"]
+  T2["TKT-PIS-02 BE purchase-history"] --> T4
+  T3["TKT-PIS-03 BE drafts"] --> T4
+  T1 --> T5["TKT-PIS-05 FE #5"]
+  T2 --> T6["TKT-PIS-06 FE #2"]
+  T3 --> T7["TKT-PIS-07 FE #4"]
+  T4 --> T5
+  T4 --> T6
+  T4 --> T7
+```
+
+## EPIC-03062026 POS per-line discount breakdown + line note in read APIs
+
+- [EPIC-03062026 POS per-line discount breakdown](./epics/EPIC-03062026-pos-line-discount-breakdown.md)
+- Mỗi dòng hàng trên hóa đơn POS mang KM/chiết khấu **thủ công** riêng (vd "KM 10 % (59.000) - cc") + ghi chú riêng, lưu **đầy đủ breakdown** (type/value/amount/reason) vào `invoice_items` và **trả về** ở mọi API đọc. `note` + `lineDiscount` (số tiền) đã có sẵn; thêm `line_discount_type/value/reason`. Ba V2 search posted (search/returnable/purchase-history) được gắn thêm `items[]` theo pattern của draft search. **Chỉ backend** — không đụng FE pos-web; không liên kết PromotionEntity (chiết khấu thủ công, không phải chương trình KM).
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-LDB-01](./tickets/TKT-LDB-01-be-schema-line-discount-breakdown.md) | BE: migration + entity — thêm `line_discount_type/value/reason` vào `invoice_items` |
+| [TKT-LDB-02](./tickets/TKT-LDB-02-be-dto-service-compute.md)            | BE: DTO 3 field mới + `computeLineDiscount()` dùng chung `create()`/`update()` |
+| [TKT-LDB-03](./tickets/TKT-LDB-03-be-read-apis-line-items.md)           | BE: gắn `items[]` vào 3 V2 search posted + verify detail/draft + openapi regen |
+| [TKT-LDB-04](./tickets/TKT-LDB-04-be-tests-e2e.md)                      | BE: unit compute + handler attach specs + E2E round-trip create→read + DoD     |
+
+### Ticket dependency graph (EPIC-03062026 line-discount)
+
+```mermaid
+flowchart LR
+  T1["TKT-LDB-01 Schema + entity"] --> T2["TKT-LDB-02 DTO + compute"]
+  T1 --> T3["TKT-LDB-03 Read APIs + openapi"]
+  T2 --> T4["TKT-LDB-04 Tests + E2E"]
+  T3 --> T4
+```
+

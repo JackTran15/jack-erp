@@ -118,6 +118,50 @@ describe('StockLedgerService', () => {
         expect.objectContaining({ itemId: 'item-1' }),
       );
     });
+
+    it('persists unit_cost and a signed line_value when unitCost is supplied (IN)', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement({
+        ...baseParams,
+        quantity: 10,
+        unitCost: 12.5,
+      });
+
+      // line_value = quantity * unitCost = 10 * 12.5 = 125 (positive: stock in)
+      expect(result).toEqual(
+        expect.objectContaining({ unitCost: 12.5, lineValue: 125 }),
+      );
+      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
+        StockLedgerEntryEntity,
+        expect.objectContaining({ unitCost: 12.5, lineValue: 125 }),
+      );
+    });
+
+    it('persists a negative line_value for OUT movements', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement({
+        ...baseParams,
+        movementType: StockMovementType.GOODS_ISSUE,
+        quantity: -4,
+        unitCost: 7,
+      });
+
+      // line_value = -4 * 7 = -28 (negative: stock out)
+      expect(result).toEqual(
+        expect.objectContaining({ unitCost: 7, lineValue: -28 }),
+      );
+    });
+
+    it('leaves unit_cost and line_value null when caller omits unitCost', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      const result = await service.recordMovement(baseParams);
+
+      expect(result.unitCost).toBeUndefined();
+      expect(result.lineValue).toBeUndefined();
+    });
   });
 
   describe('recordBatchMovements', () => {

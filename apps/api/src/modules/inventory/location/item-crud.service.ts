@@ -259,6 +259,9 @@ export class InventoryItemCrudService extends BaseCrudService<
         referenceId: saved.id,
         notes: `Tồn kho đầu kỳ — đơn giá nhập ${nested.initialStockUnitPrice ?? 0}`,
         actorContext: actor,
+        unitCost: Number(
+          nested.initialStockUnitPrice ?? saved.purchasePrice ?? 0,
+        ),
       });
     }
 

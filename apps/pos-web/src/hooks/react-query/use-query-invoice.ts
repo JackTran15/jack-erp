@@ -11,7 +11,6 @@ import {
   CUSTOMER_KEYS,
   INVOICE_KEYS,
 } from "@erp/pos/constants/react-query-key.constant";
-import { RETURN_GOODS_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/return-goods.constant";
 import { INVOICE_LIST_DEFAULT_PAGE_SIZE } from "@erp/pos/constants/invoice-list.constant";
 import { invoiceService } from "@erp/pos/services/invoice.service";
 import { customerService } from "@erp/pos/services/customer.service";
@@ -24,7 +23,9 @@ import type {
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
+  SearchDraftInvoicesBody,
   SearchInvoicesV2Body,
+  SearchReturnableInvoicesBody,
   UpdateInvoiceBody,
 } from "@erp/pos/dtos/invoice.dto";
 import type {
@@ -144,89 +145,59 @@ export function useInvoiceDetailQuery(
 }
 
 interface UseDraftInvoicesQueryInput {
+  body: SearchDraftInvoicesBody;
+  /**
+   * Chỉ dùng để tách cache theo terminal; KHÔNG gửi làm filter — giữ nguyên
+   * hành vi hiện tại (liệt kê mọi draft của org/chi nhánh, không scope session).
+   */
   sessionId: string;
   enabled?: boolean;
 }
 
+/**
+ * Hóa đơn lưu tạm (#4) — server-side free-text + date-range search qua
+ * `POST /v2/invoices/drafts/search`. Trả thẳng `InvoiceRow[]` (kèm `customer`
+ * inline) để giữ nguyên mapping của `DraftInvoicesDialog` + optimistic update
+ * của `useDeleteInvoiceMutation` (cùng prefix `INVOICE_KEYS.DRAFTS_PREFIX`).
+ */
 export function useDraftInvoicesQuery(
   input: UseDraftInvoicesQueryInput,
 ): UseQueryResult<InvoiceRow[], Error> {
   return useQuery<InvoiceRow[], Error>({
-    queryKey: INVOICE_KEYS.DRAFTS(input.sessionId),
-    queryFn: () => invoiceService.listDrafts(input.sessionId),
+    queryKey: INVOICE_KEYS.DRAFTS_SEARCH({
+      ...input.body,
+      sessionId: input.sessionId,
+    } as Record<string, unknown>),
+    queryFn: async () => (await invoiceService.searchDrafts(input.body)).data,
     enabled: Boolean(input.sessionId) && (input.enabled ?? true),
     staleTime: 5_000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ─── Return / Exchange (EPIC-011) ───────────────────────────────────────────
 
-interface UseReturnableInvoicesQueryInput {
-  dateFrom?: string;
-  dateTo?: string;
-  enabled?: boolean;
-}
-
 /**
- * Hóa đơn đã thanh toán (`status=paid`) cho trang đổi trả. Enrich tên/sđt khách
- * qua `customerService.get` (endpoint list chỉ trả `customerId`). `branchName`
- * lấy từ branch store — POS scope 1 chi nhánh, BE đã lọc theo `X-Branch-Id`.
+ * Hóa đơn bán đã thanh toán (type=SALE, status=PAID) cho trang đổi trả (#5) —
+ * server-side filter + pagination qua `POST /v2/invoices/returnable/search`.
+ * Customer + branch được BE trả inline (join), không còn enrich N+1 nữa.
+ * BE đã lọc type/status nên client không cần loại RETURN/EXCHANGE.
  */
 export function useReturnableInvoicesQuery(
-  input: UseReturnableInvoicesQueryInput = {},
-): UseQueryResult<ReturnInvoiceRow[], Error> {
+  body: SearchReturnableInvoicesBody,
+): UseQueryResult<{ rows: ReturnInvoiceRow[]; total: number }, Error> {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
-  const branchName = usePosBranchStore((s) => s.branchName) ?? "—";
-  return useQuery<ReturnInvoiceRow[], Error>({
-    queryKey: INVOICE_KEYS.RETURNABLE({
-      branchId,
-      dateFrom: input.dateFrom,
-      dateTo: input.dateTo,
-    }),
+  return useQuery<{ rows: ReturnInvoiceRow[]; total: number }, Error>({
+    queryKey: INVOICE_KEYS.RETURNABLE({ ...body, branchId } as Record<string, unknown>),
     queryFn: async () => {
-      const page = await invoiceService.list({
-        status: "paid",
-        isDraft: false,
-        dateFrom: input.dateFrom,
-        dateTo: input.dateTo,
-        page: 1,
-        limit: RETURN_GOODS_DEFAULT_PAGE_SIZE,
-      });
-      // Chỉ hóa đơn BÁN mới đổi/trả được. Đơn RETURN/EXCHANGE sau tất toán cũng
-      // `status=paid` nên lọt vào list — loại trừ chúng để bấm vào không bị BE
-      // báo "only SALE can be returned". Lọc kiểu loại trừ (giữ SALE + thiếu type)
-      // để an toàn nếu response không kèm `type`.
-      const saleInvoices = page.data.filter(
-        (inv) => inv.type !== "RETURN" && inv.type !== "EXCHANGE",
+      const res = await invoiceService.searchReturnable(body);
+      const rows = res.data.map((inv) =>
+        mapInvoiceToReturnRow(inv, inv.customer ?? null, inv.branch?.name ?? ""),
       );
-      const ids = Array.from(
-        new Set(
-          saleInvoices
-            .map((inv) => inv.customerId)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const customer = await customerService.get(id);
-            return [id, { name: customer.name, phone: customer.phone }] as const;
-          } catch {
-            return [id, null] as const;
-          }
-        }),
-      );
-      const byId = new Map(entries);
-      return saleInvoices.map((inv) =>
-        mapInvoiceToReturnRow(
-          inv,
-          inv.customerId ? byId.get(inv.customerId) ?? null : null,
-          branchName,
-        ),
-      );
+      return { rows, total: res.total };
     },
-    enabled: input.enabled ?? true,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -54,6 +54,8 @@ const DIALOG_MODE_ENTITIES = new Set([
   "inventory-item-units",
   "inventory-providers",
   "provider-groups",
+  "branches",
+  "inventory-storages",
 ]);
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
@@ -73,6 +75,7 @@ interface CrudListPageProps {
   entityKey?: string;
   initialSort?: { sortBy: string; sortOrder: "asc" | "desc" };
   disableRowClick?: boolean;
+  onRecordSaved?: () => void;
   inventoryConfig?: {
     exportOptions?: Array<{
       id: string;
@@ -92,6 +95,7 @@ export function CrudListPage({
   entityKey: entityKeyProp,
   initialSort,
   disableRowClick,
+  onRecordSaved,
   inventoryConfig,
 }: CrudListPageProps) {
   const params = useParams<{ entityKey: string }>();
@@ -694,6 +698,7 @@ export function CrudListPage({
           onClose={() => setCrudDialogOpen(false)}
           onSuccess={() => {
             void refetchRecords();
+            onRecordSaved?.();
           }}
         />
       )}

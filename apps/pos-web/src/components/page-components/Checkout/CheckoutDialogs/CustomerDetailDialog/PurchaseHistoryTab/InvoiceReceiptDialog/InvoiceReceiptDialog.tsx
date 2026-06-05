@@ -3,6 +3,7 @@ import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
 import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { useInvoiceDetailQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
+import { formatDiscountLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { InvoiceStatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceStatusBadge/InvoiceStatusBadge";
@@ -144,6 +145,22 @@ export function InvoiceReceiptDialog({
                         {it.itemCode ? (
                           <div className="text-[12px] text-[#9CA3AF]">
                             {it.itemCode}
+                          </div>
+                        ) : null}
+                        {it.lineDiscountType ? (
+                          <div className="text-[12px] italic text-[#E5403A]">
+                            {formatDiscountLabel({
+                              type: it.lineDiscountType,
+                              value: Number(it.lineDiscountValue) || 0,
+                              amount: Number(it.lineDiscount) || 0,
+                              reason: it.lineDiscountReason ?? "",
+                            })}
+                          </div>
+                        ) : null}
+                        {it.note ? (
+                          <div className="text-[12px] italic text-[#6B7280]">
+                            Ghi chú:{" "}
+                            <span className="text-[#9CA3AF]">{it.note}</span>
                           </div>
                         ) : null}
                       </td>

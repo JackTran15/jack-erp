@@ -8,10 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, EntityManager } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceEntity, InvoiceStatus } from '../entities/invoice.entity';
-import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  LineDiscountType,
+} from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
+import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
@@ -34,15 +38,105 @@ export class InvoiceService {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * Resolves a salesperson identifier — accepting either an
+   * `employee_profiles.id` OR the employee's `user_id` — to the canonical
+   * `employee_profiles.id`, scoped to the actor's organisation (so the FE can
+   * send either id, and cross-tenant linkage is rejected). Throws 400 if no
+   * matching employee exists in the org.
+   */
+  private async resolveSalespersonProfileId(
+    manager: EntityManager,
+    salespersonId: string,
+    organizationId: string,
+  ): Promise<string> {
+    const profile = await manager.findOne(EmployeeProfileEntity, {
+      where: [
+        { id: salespersonId, organizationId },
+        { userId: salespersonId, organizationId },
+      ],
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new BadRequestException(
+        `Salesperson ${salespersonId} not found in this organisation`,
+      );
+    }
+    return profile.id;
+  }
+
+  /**
+   * Resolves a line item's manual discount into the persisted breakdown. When a
+   * `lineDiscountType` is supplied the server computes the discount amount from
+   * the raw value (percent of gross, or a flat amount), clamped to the line
+   * gross so the line total never goes negative. With no type it falls back to
+   * the legacy raw `lineDiscount` amount (type/value stay null), preserving the
+   * previous arithmetic. The free-text reason is kept regardless.
+   */
+  private computeLineDiscount(item: {
+    quantity: number;
+    unitPrice: number;
+    lineDiscount?: number;
+    lineDiscountType?: LineDiscountType;
+    lineDiscountValue?: number;
+    lineDiscountReason?: string;
+  }): {
+    amount: number;
+    lineTotal: number;
+    type: LineDiscountType | null;
+    value: number | null;
+    reason: string | null;
+  } {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const gross = item.quantity * item.unitPrice;
+    const reason = item.lineDiscountReason ?? null;
+
+    if (item.lineDiscountType) {
+      const value = item.lineDiscountValue;
+      if (value === undefined || value === null || value < 0) {
+        throw new BadRequestException(
+          'lineDiscountValue is required and must be >= 0 when lineDiscountType is set',
+        );
+      }
+      if (item.lineDiscountType === LineDiscountType.PERCENT && value > 100) {
+        throw new BadRequestException(
+          'lineDiscountValue must be <= 100 for percent discounts',
+        );
+      }
+      const raw =
+        item.lineDiscountType === LineDiscountType.PERCENT
+          ? round2((gross * value) / 100)
+          : round2(value);
+      const amount = Math.min(raw, gross);
+      return {
+        amount,
+        lineTotal: round2(gross - amount),
+        type: item.lineDiscountType,
+        value,
+        reason,
+      };
+    }
+
+    // Legacy path: identical arithmetic to the previous implementation.
+    const amount = item.lineDiscount ?? 0;
+    return { amount, lineTotal: gross - amount, type: null, value: null, reason };
+  }
+
   async create(dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {
     const tempCode = `DRAFT-${Date.now()}`;
 
     const invoice = await this.dataSource.transaction(async (manager) => {
       const items = dto.items ?? [];
-      const lineTotals = items.map(
-        (i) => i.quantity * i.unitPrice - (i.lineDiscount ?? 0),
-      );
-      const subtotal = lineTotals.reduce((sum, t) => sum + t, 0);
+      const lineDiscounts = items.map((i) => this.computeLineDiscount(i));
+      const subtotal = lineDiscounts.reduce((sum, d) => sum + d.lineTotal, 0);
+
+      const salespersonProfileId = dto.salespersonId
+        ? await this.resolveSalespersonProfileId(
+            manager,
+            dto.salespersonId,
+            actor.organizationId,
+          )
+        : undefined;
 
       const invoiceEntity = manager.create(InvoiceEntity, {
         organizationId: actor.organizationId,
@@ -62,6 +156,7 @@ export class InvoiceService {
         depositAmount: 0,
         amountDue: subtotal,
         staffId: actor.userId,
+        salespersonId: salespersonProfileId,
       });
 
       const savedInvoice = await manager.save(invoiceEntity);
@@ -82,6 +177,7 @@ export class InvoiceService {
           const productId = catalog?.productId;
           const resolvedLocationId =
             item.locationId ?? (productId ? productLocationMap.get(productId) : undefined);
+          const d = lineDiscounts[index];
           return manager.create(InvoiceItemEntity, {
             organizationId: actor.organizationId,
             branchId: actor.branchId,
@@ -96,8 +192,11 @@ export class InvoiceService {
             unitPrice: item.unitPrice,
             unitPriceDefault: catalog?.sellingPrice ?? 0,
             costPrice: catalog?.purchasePrice ?? 0,
-            lineDiscount: item.lineDiscount ?? 0,
-            lineTotal: item.quantity * item.unitPrice - (item.lineDiscount ?? 0),
+            lineDiscount: d.amount,
+            lineDiscountType: d.type ?? undefined,
+            lineDiscountValue: d.value ?? undefined,
+            lineDiscountReason: d.reason ?? undefined,
+            lineTotal: d.lineTotal,
             note: item.note,
             sortOrder: item.sortOrder ?? index,
           });
@@ -221,6 +320,8 @@ export class InvoiceService {
 
     await this.dataSource.transaction(async (manager) => {
       if (dto.items !== undefined) {
+        const lineDiscounts = dto.items.map((i) => this.computeLineDiscount(i));
+
         await manager.delete(InvoiceItemEntity, { invoiceId: id });
 
         if (dto.items.length > 0) {
@@ -234,6 +335,7 @@ export class InvoiceService {
             const productId = catalog?.productId;
             const resolvedLocationId =
               item.locationId ?? (productId ? productLocationMap.get(productId) : undefined);
+            const d = lineDiscounts[index];
             return manager.create(InvoiceItemEntity, {
               organizationId: actor.organizationId,
               branchId: actor.branchId,
@@ -248,8 +350,11 @@ export class InvoiceService {
               unitPrice: item.unitPrice,
               unitPriceDefault: catalog?.sellingPrice ?? 0,
               costPrice: catalog?.purchasePrice ?? 0,
-              lineDiscount: item.lineDiscount ?? 0,
-              lineTotal: item.quantity * item.unitPrice - (item.lineDiscount ?? 0),
+              lineDiscount: d.amount,
+              lineDiscountType: d.type ?? undefined,
+              lineDiscountValue: d.value ?? undefined,
+              lineDiscountReason: d.reason ?? undefined,
+              lineTotal: d.lineTotal,
               note: item.note,
               sortOrder: item.sortOrder ?? index,
             });
@@ -257,10 +362,7 @@ export class InvoiceService {
           await manager.save(itemEntities);
         }
 
-        const lineTotals = dto.items.map(
-          (i) => i.quantity * i.unitPrice - (i.lineDiscount ?? 0),
-        );
-        const subtotal = lineTotals.reduce((sum, t) => sum + t, 0);
+        const subtotal = lineDiscounts.reduce((sum, d) => sum + d.lineTotal, 0);
         invoice.subtotal = subtotal;
         invoice.amountDue = computeAmountDue(invoice);
       }
@@ -268,6 +370,13 @@ export class InvoiceService {
       if (dto.customerId !== undefined) invoice.customerId = dto.customerId;
       if (dto.draftLabel !== undefined) invoice.draftLabel = dto.draftLabel;
       if (dto.note !== undefined) invoice.note = dto.note;
+      if (dto.salespersonId) {
+        invoice.salespersonId = await this.resolveSalespersonProfileId(
+          manager,
+          dto.salespersonId,
+          actor.organizationId,
+        );
+      }
 
       await manager.save(invoice);
     });

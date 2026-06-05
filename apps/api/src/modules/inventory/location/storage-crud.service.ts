@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   CrudEntityConfig,
   DeletionPolicy,
@@ -11,38 +11,19 @@ import { StorageEntity } from './storage.entity';
 
 export const INVENTORY_STORAGE_SERVICE_TOKEN = 'InventoryStorageCrudService';
 
-@Injectable()
-export class InventoryStorageCrudService extends BaseCrudService<
-  StorageEntity,
-  Record<string, any>,
-  Record<string, any>
-> {
-  protected readonly entityConfig: CrudEntityConfig =
-    INVENTORY_STORAGE_ENTITY_CONFIG;
-
-  constructor(
-    @InjectRepository(StorageEntity)
-    protected readonly repository: Repository<StorageEntity>,
-    protected readonly dataSource: DataSource,
-  ) {
-    super(dataSource);
-  }
-}
-
 export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'inventory-storages',
   displayName: 'Kho lưu trữ',
   apiResource: 'inventory/storages',
   idField: 'id',
   fields: [
-    { key: 'name', label: 'Tên', type: 'string', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', type: 'string', required: true },
-    { key: 'isMainStorage', label: 'Kho chính', type: 'boolean' },
-    { key: 'createdAt', label: 'Ngày tạo', type: 'date' },
+    { key: 'name',          label: 'Tên kho',       type: 'string',  required: true },
+    { key: 'branchName',    label: 'Tên cửa hàng',  type: 'string',  readOnly: true },
+    { key: 'isMainStorage', label: 'Kho chính',     type: 'boolean' },
+    { key: 'createdAt',     label: 'Ngày tạo',      type: 'date',    readOnly: true },
   ],
-  searchableFields: ['name', 'branchId'],
+  searchableFields: ['name'],
   filterDefinitions: [
-    { key: 'branchId', label: 'ID chi nhánh', type: 'text' },
     {
       key: 'isMainStorage',
       label: 'Kho chính',
@@ -62,3 +43,39 @@ export const INVENTORY_STORAGE_ENTITY_CONFIG: CrudEntityConfig = {
   scopingPolicy: ScopingPolicy.BRANCH,
   deletionPolicy: DeletionPolicy.HARD,
 };
+
+@Injectable()
+export class InventoryStorageCrudService extends BaseCrudService<
+  StorageEntity,
+  Record<string, any>,
+  Record<string, any>
+> {
+  protected readonly entityConfig: CrudEntityConfig =
+    INVENTORY_STORAGE_ENTITY_CONFIG;
+
+  constructor(
+    @InjectRepository(StorageEntity)
+    protected readonly repository: Repository<StorageEntity>,
+    protected readonly dataSource: DataSource,
+  ) {
+    super(dataSource);
+  }
+
+  protected configureListQuery(
+    qb: SelectQueryBuilder<StorageEntity>,
+    alias: string,
+  ): void {
+    qb.leftJoinAndSelect(`${alias}.branch`, 'branch');
+  }
+
+  protected transformListResults(data: StorageEntity[]): unknown[] {
+    return data.map((row) => ({
+      ...row,
+      branchName: row.branch?.name ?? '—',
+    }));
+  }
+
+  protected getByIdRelations(): string[] {
+    return ['branch'];
+  }
+}

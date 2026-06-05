@@ -2,6 +2,11 @@ export { StorageReportShell } from "./StorageReportShell";
 export { ReportFilterPopover, withDefaults } from "./ReportFilterDialog";
 export { ColumnConfigDialog, type ColumnConfigEntry } from "./ColumnConfigDialog";
 export { ALL_VALUE } from "./types";
+export {
+  buildApiFilters,
+  mapPeriodToApi,
+  pickSourceBranchId,
+} from "./apiFilters";
 export type {
   FilterField,
   FilterFieldOption,

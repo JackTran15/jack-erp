@@ -34,6 +34,7 @@ import { TransferOrderModule } from './modules/inventory/transfer-order/transfer
 import { ProductModule } from './modules/inventory/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { JobPositionModule } from './modules/hr/job-position/job-position.module';
+import { InventoryReportsModule } from './modules/inventory-reports/inventory-reports.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { JobPositionModule } from './modules/hr/job-position/job-position.module
     ProductModule,
     PromotionModule,
     JobPositionModule,
+    InventoryReportsModule,
   ],
 })
 export class AppModule {}

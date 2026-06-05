@@ -27,6 +27,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (email: string, password: string, organizationId: string) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -94,14 +95,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const refresh = useCallback(async () => {
+    const rt = getRefreshToken();
+    if (!rt) return;
+    const { data } = await erpApi.POST<RefreshResponse>("/auth/refresh", {
+      body: { refreshToken: rt },
+    });
+    if (data) persistRefreshResponse(data);
+  }, []);
+
   const value = useMemo<AuthState>(
     () => ({
       isReady: !bootstrapping,
       isAuthenticated: bootstrapped === true,
       login,
       logout,
+      refresh,
     }),
-    [bootstrapping, bootstrapped, login, logout],
+    [bootstrapping, bootstrapped, login, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -35,6 +35,14 @@ export interface RecordMovementParams {
   notes?: string;
   actorContext: ActorContext;
   skipLocationAssignment?: boolean;
+  /**
+   * Cost snapshot at posting time (positive number). When provided, the ledger
+   * entry will persist both `unit_cost` and a signed `line_value = quantity *
+   * unit_cost` (positive=in, negative=out). Callers should derive this from
+   * the source document's unit price (e.g. goods_receipt_lines.unitPrice) or
+   * fall back to items.purchasePrice when the source has no price column.
+   */
+  unitCost?: number;
 }
 
 export interface LedgerQuery extends PaginationQuery {
@@ -229,7 +237,15 @@ export class StockLedgerService {
       key: entry.itemId,
     }));
 
-    await this.eventPublisher.publishBatch(eventMessages);
+    try {
+      await this.eventPublisher.publishBatch(eventMessages);
+    } catch (err) {
+      this.logger.error(
+        `Stock ledger committed (${entries.length} movement(s)) but event publish failed (non-fatal): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async getBalance(
@@ -489,6 +505,7 @@ export class StockLedgerService {
     const now = new Date();
 
     for (const params of movements) {
+      const { unitCost, lineValue } = this.deriveCostFields(params);
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
         locationId: params.locationId,
@@ -501,6 +518,8 @@ export class StockLedgerService {
         notes: params.notes,
         postedAt: now,
         createdBy: params.actorContext.userId,
+        unitCost,
+        lineValue,
       });
       const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
       savedEntries.push(savedEntry);
@@ -509,6 +528,21 @@ export class StockLedgerService {
     }
 
     return savedEntries;
+  }
+
+  private deriveCostFields(
+    params: RecordMovementParams,
+  ): { unitCost?: number; lineValue?: number } {
+    if (params.unitCost === undefined || params.unitCost === null) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const cost = Math.abs(Number(params.unitCost));
+    if (!Number.isFinite(cost)) {
+      return { unitCost: undefined, lineValue: undefined };
+    }
+    const signedQty = Number(params.quantity);
+    const lineValue = Number((signedQty * cost).toFixed(2));
+    return { unitCost: cost, lineValue };
   }
 
   private async upsertBalance(

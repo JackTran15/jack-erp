@@ -34,11 +34,11 @@ export function derivePaymentDisplay(input: {
   const { rawOver, rawUnder } = rawPaymentDeltas(input.totalPaid, settlementAbs);
   const applyKeep = input.keepChange && !input.debt;
 
-  if (input.debt && (rawOver > 0 || rawUnder > 0)) {
+  if (input.debt) {
     return {
       changeAmount: 0,
       shortageAmount: 0,
-      debtAmount: rawOver > 0 ? rawOver : rawUnder,
+      debtAmount: settlementAbs,
     };
   }
 

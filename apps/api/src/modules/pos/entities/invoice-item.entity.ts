@@ -6,6 +6,11 @@ export enum ItemDirection {
   IN  = 'IN',
 }
 
+export enum LineDiscountType {
+  PERCENT = 'percent',
+  AMOUNT = 'amount',
+}
+
 /** Single line item on a POS invoice. Snapshot columns preserve pricing at the time of sale. */
 @Entity('invoice_items')
 @Index(['invoiceId'])
@@ -42,8 +47,17 @@ export class InvoiceItemEntity extends BaseEntity {
   @Column({ name: 'cost_price', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Cost price (COGS) at sale time (server-populated, not from client)' })
   costPrice: number;
 
-  @Column({ name: 'line_discount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Discount applied to this line only' })
+  @Column({ name: 'line_discount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Discount applied to this line only (server-computed amount)' })
   lineDiscount: number;
+
+  @Column({ name: 'line_discount_type', type: 'enum', enum: LineDiscountType, nullable: true, comment: 'Type of manual per-line discount; null = legacy raw lineDiscount only' })
+  lineDiscountType?: LineDiscountType;
+
+  @Column({ name: 'line_discount_value', type: 'numeric', precision: 18, scale: 2, nullable: true, comment: 'Raw user-entered discount value (e.g. 10 for 10%, or a currency amount)' })
+  lineDiscountValue?: number;
+
+  @Column({ name: 'line_discount_reason', type: 'varchar', length: 255, nullable: true, comment: 'Free-text label/reason for the per-line discount (e.g. "cc")' })
+  lineDiscountReason?: string;
 
   @Column({ name: 'line_total', type: 'numeric', precision: 18, scale: 2, comment: 'Final line amount (quantity × unitPrice − lineDiscount)' })
   lineTotal: number;

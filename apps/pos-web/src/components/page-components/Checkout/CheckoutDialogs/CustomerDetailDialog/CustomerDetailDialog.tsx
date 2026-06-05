@@ -4,7 +4,6 @@ import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import {
   useCustomer,
-  useCustomerPurchaseHistory,
   useCustomerSummary,
   useIssueMembershipCard,
   useMembershipCard,
@@ -14,12 +13,16 @@ import { IssueMembershipCardDialog } from "@erp/pos/components/page-components/C
 import { MembershipTierEnum } from "@erp/pos/types/customer.type";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import {
+  selectEffectivePointsRedeemed,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
 import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
 import { InfoTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/InfoTab/InfoTab";
 import { mapCustomerToDetailData } from "@erp/pos/lib/page-libs/checkout/mapCustomerDetail";
-import { mapInvoicesToPurchaseHistory } from "@erp/pos/lib/page-libs/checkout/mapPurchaseHistory";
 import { OverviewTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/OverviewTab/OverviewTab";
 import { PurchaseHistoryTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/PurchaseHistoryTab";
 import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
@@ -147,16 +150,25 @@ export function CustomerDetailDialog({
     return { name: fallbackName ?? "" };
   }, [customerRaw, groupNameById, summary, card, fallbackName]);
 
-  // Lịch sử mua hàng — fetch lười, chỉ khi dialog mở và đang ở tab "Lịch sử
-  // mua hàng" để tránh gọi API thừa khi mở các tab khác.
+  // Lịch sử mua hàng — fetch lười trong chính `PurchaseHistoryTab`, chỉ khi
+  // dialog mở và đang ở tab này (server-side search). `branchName` truyền xuống
+  // làm fallback tên cửa hàng khi một dòng thiếu branch.
   const branchName = usePosBranchStore((s) => s.branchName);
   const historyEnabled =
     open && activeTab === CustomerDetailTabKeyEnum.HISTORY;
-  const { data: invoicesPage, isLoading: isHistoryLoading } =
-    useCustomerPurchaseHistory(historyEnabled ? customerId : undefined);
-  const purchaseHistory = useMemo(
-    () => mapInvoicesToPurchaseHistory(invoicesPage?.data ?? [], branchName),
-    [invoicesPage, branchName],
+  // Công nợ — fetch lười trong chính `DebtTab`, chỉ khi dialog mở & đang ở tab này.
+  const debtEnabled = open && activeTab === CustomerDetailTabKeyEnum.DEBT;
+
+  // Đổi điểm — ghi vào draft checkout (mock FE) rồi đóng dialog để hiển thị ở
+  // payment summary. Prefill ô nhập bằng số điểm đang áp dụng cho đơn.
+  const appliedPoints = usePosCheckoutSessionStore(selectEffectivePointsRedeemed);
+  const { setRedeemedPoints } = useCheckoutPromotion();
+  const handleRedeemPoints = useCallback(
+    (points: number) => {
+      setRedeemedPoints(points);
+      onClose();
+    },
+    [setRedeemedPoints, onClose],
   );
 
   const { mutate: issueCard, isPending: isIssuingCardPending } =
@@ -238,6 +250,8 @@ export function CustomerDetailDialog({
               onChangeCard={() => setIsIssuingCard(true)}
               onRefreshPoints={onRefreshPoints}
               onIssueCard={() => setIsIssuingCard(true)}
+              appliedPoints={appliedPoints}
+              onRedeemPoints={handleRedeemPoints}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.INFO ? (
@@ -255,14 +269,20 @@ export function CustomerDetailDialog({
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.HISTORY ? (
             <PurchaseHistoryTab
-              rows={purchaseHistory}
-              isLoading={isHistoryLoading}
+              customerId={customerId}
+              enabled={historyEnabled}
+              branchName={branchName}
               customerName={data.name}
               customerPhone={data.phone}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.DEBT ? (
-            <DebtTab rows={data.debts ?? []} />
+            <DebtTab
+              customerId={customerId}
+              enabled={debtEnabled}
+              customerName={data.name}
+              customerPhone={data.phone}
+            />
           ) : null}
         </div>
       </PosDialog.Body>

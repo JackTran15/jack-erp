@@ -21,6 +21,9 @@ export const INVOICE_KEYS = {
     ["invoices", "list", filters] as const,
   DRAFTS_PREFIX: ["invoices", "drafts"] as const,
   DRAFTS: (sessionId: string) => ["invoices", "drafts", sessionId] as const,
+  /** Tìm kiếm hóa đơn lưu tạm server-side qua POST /v2/invoices/drafts/search. */
+  DRAFTS_SEARCH: (body: Record<string, unknown>) =>
+    ["invoices", "drafts", "search", body] as const,
   DETAIL: (id: string) => ["invoices", "detail", id] as const,
   /** Tìm kiếm hóa đơn server-side qua POST /v2/invoices/search. */
   SEARCH_V2: (body: Record<string, unknown>) =>
@@ -39,8 +42,12 @@ export const CUSTOMER_KEYS = {
   LIST: (params: { page?: number; pageSize?: number } = {}) =>
     ["customers", "list", params] as const,
   SEARCH: (query: string) => ["customers", "search", query] as const,
-  PURCHASE_HISTORY: (customerId: string) =>
-    ["customers", "purchase-history", customerId] as const,
+  PURCHASE_HISTORY: (
+    customerId: string,
+    filters: Record<string, unknown> = {},
+  ) => ["customers", "purchase-history", customerId, filters] as const,
+  /** `GET /invoices/customers/:id/debts` — sổ công nợ của một khách. */
+  DEBTS: (customerId: string) => ["customers", customerId, "debts"] as const,
   /** `GET /customers/:id/summary` — tổng chi tiêu + công nợ + thẻ thành viên. */
   SUMMARY: (id: string) => ["customers", id, "summary"] as const,
   /** `GET /customers/:id/membership-card`. */
@@ -60,9 +67,16 @@ export const SALES_HIERARCHY_KEYS = {
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,
-  PRODUCTS: (branchId: string) => ["catalog", "products", branchId] as const,
+  PRODUCTS: (branchId: string, categoryId?: string) =>
+    ["catalog", "products", branchId, categoryId ?? "all"] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
+} as const;
+
+export const ITEM_CATEGORY_KEYS = {
+  ALL: ["item-categories"] as const,
+  LIST: (params: Record<string, unknown>) =>
+    ["item-categories", "list", params] as const,
 } as const;
 
 export const CUSTOMER_GROUP_KEYS = {

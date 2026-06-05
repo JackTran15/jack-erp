@@ -1,3 +1,34 @@
+import { Module, OnModuleInit } from "@nestjs/common";
+import { InjectDataSource, TypeOrmModule } from "@nestjs/typeorm";
+import type { DataSource } from "typeorm";
+import { BranchModule } from "../../branch/branch.module";
+import { EntityRegistryService } from "../../crud/entity-registry.service";
+import { DocumentNumberingModule } from "../../document-numbering/document-numbering.module";
+import { StockBalanceEntity } from "../ledger/stock-balance.entity";
+import { StockLedgerModule } from "../ledger/stock-ledger.module";
+import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
+import { ProductAttributeDefinitionEntity } from "../product/product-attribute-definition.entity";
+import { ProductAttributeOptionEntity } from "../product/product-attribute-option.entity";
+import { ProductModule } from "../product/product.module";
+import {
+  BRAND_ENTITY_CONFIG,
+  BRAND_SERVICE_TOKEN,
+  BrandCrudService,
+} from "./brand-crud.service";
+import { BrandEntity } from "./brand.entity";
+import { InventoryLocationStockController } from "./inventory-location-stock.controller";
+import { InventoryLocationStockService } from "./inventory-location-stock.service";
+import { InventoryLocationController } from "./inventory-location.controller";
+import { InventoryLocationService } from "./inventory-location.service";
+import { ItemBarcodeEntity } from "./item-barcode.entity";
+import { ItemBarcodeService } from "./item-barcode.service";
+import { ItemCategoryCommissionEntity } from "./item-category-commission.entity";
+import {
+  INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG,
+  INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
+  InventoryItemCategoryCrudService,
+} from "./item-category-crud.service";
+import { ItemCategoryEntity } from "./item-category.entity";
 import { Module, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource, TypeOrmModule } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
@@ -32,42 +63,44 @@ import { InventoryLocationController } from './inventory-location.controller';
 import { InventoryLocationStockController } from './inventory-location-stock.controller';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 import {
-  InventoryItemCrudService,
   INVENTORY_ITEM_ENTITY_CONFIG,
   INVENTORY_ITEM_SERVICE_TOKEN,
-} from './item-crud.service';
+  InventoryItemCrudService,
+} from "./item-crud.service";
+import { ItemProviderEntity } from "./item-provider.entity";
+import { ItemProviderService } from "./item-provider.service";
+import { ItemStockThresholdEntity } from "./item-stock-threshold.entity";
+import { ItemStockThresholdService } from "./item-stock-threshold.service";
+import { ItemUnitEntity } from "./item-unit.entity";
+import { ItemEntity } from "./item.entity";
+import { LocationEntity } from "./location.entity";
 import {
-  InventoryStorageCrudService,
-  INVENTORY_STORAGE_ENTITY_CONFIG,
-  INVENTORY_STORAGE_SERVICE_TOKEN,
-} from './storage-crud.service';
-import {
-  InventoryProviderCrudService,
   INVENTORY_PROVIDER_ENTITY_CONFIG,
   INVENTORY_PROVIDER_SERVICE_TOKEN,
-} from './provider-crud.service';
+  InventoryProviderCrudService,
+} from "./provider-crud.service";
+import { ProviderEntity } from "./provider.entity";
+import { ShowroomEntity } from "./showroom.entity";
+import { ItemCostSnapshotModule } from './item-cost-snapshot.module';
 import {
-  InventoryItemCategoryCrudService,
-  INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG,
-  INVENTORY_ITEM_CATEGORY_SERVICE_TOKEN,
-} from './item-category-crud.service';
+  INVENTORY_STORAGE_ENTITY_CONFIG,
+  INVENTORY_STORAGE_SERVICE_TOKEN,
+  InventoryStorageCrudService,
+} from "./storage-crud.service";
+import { StorageManagerAssignmentEntity } from "./storage-manager-assignment.entity";
+import { StorageEntity } from "./storage.entity";
 import {
-  ProviderGroupCrudService,
   PROVIDER_GROUP_ENTITY_CONFIG,
   PROVIDER_GROUP_SERVICE_TOKEN,
-} from './supplier-group-crud.service';
+  ProviderGroupCrudService,
+} from "./supplier-group-crud.service";
+import { SupplierGroupEntity } from "./supplier-group.entity";
 import {
-  UnitOfMeasureCrudService,
   UNIT_OF_MEASURE_ENTITY_CONFIG,
   UNIT_OF_MEASURE_SERVICE_TOKEN,
-} from './unit-of-measure-crud.service';
-import { UnitOfMeasureEntity } from './unit-of-measure.entity';
-import {
-  BrandCrudService,
-  BRAND_ENTITY_CONFIG,
-  BRAND_SERVICE_TOKEN,
-} from './brand-crud.service';
-import { BrandEntity } from './brand.entity';
+  UnitOfMeasureCrudService,
+} from "./unit-of-measure-crud.service";
+import { UnitOfMeasureEntity } from "./unit-of-measure.entity";
 
 @Module({
   imports: [
@@ -112,7 +145,10 @@ import { BrandEntity } from './brand.entity';
     ProviderGroupCrudService,
     UnitOfMeasureCrudService,
     BrandCrudService,
-    { provide: INVENTORY_ITEM_SERVICE_TOKEN, useExisting: InventoryItemCrudService },
+    {
+      provide: INVENTORY_ITEM_SERVICE_TOKEN,
+      useExisting: InventoryItemCrudService,
+    },
     {
       provide: INVENTORY_STORAGE_SERVICE_TOKEN,
       useExisting: InventoryStorageCrudService,

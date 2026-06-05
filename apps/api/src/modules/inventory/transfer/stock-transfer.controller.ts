@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -93,7 +94,17 @@ export class StockTransferController {
   @Post()
   @RequirePermission('inventory.transfer.create')
   create(@Body() dto: CreateTransferDto, @Actor() actor: ActorContext) {
-    return this.service.create(dto, actor);
+    return this.service.createAndPost(dto, actor);
+  }
+
+  @Patch(':id')
+  @RequirePermission('inventory.transfer.create')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateTransferDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.update(id, dto, actor);
   }
 
   @Post('intra-warehouse')
@@ -122,15 +133,6 @@ export class StockTransferController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor.organizationId);
-  }
-
-  @Post(':id/approve')
-  @RequirePermission('inventory.transfer.approve')
-  approve(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Actor() actor: ActorContext,
-  ) {
-    return this.service.approve(id, actor);
   }
 
   @Post(':id/post')

@@ -12,9 +12,9 @@ export interface ReturnRowCustomer {
 }
 
 /**
- * `InvoiceRow` (`GET /invoices`) → dòng hiển thị bảng đổi trả. `branchName` lấy
- * từ branch store (POS chỉ scope 1 chi nhánh); `customer` enrich riêng vì
- * endpoint danh sách chỉ trả `customerId`. `amountDue` về dạng string nên `Number(...)`.
+ * `InvoiceRow` (`POST /v2/invoices/returnable/search`) → dòng hiển thị bảng đổi
+ * trả. `customer` + `branchName` nay được BE trả inline (join), không cần enrich
+ * riêng. "Tổng thanh toán" = `totalPaid` (về dạng string nên `Number(...)`).
  */
 export function mapInvoiceToReturnRow(
   inv: InvoiceRow,
@@ -29,7 +29,7 @@ export function mapInvoiceToReturnRow(
     customerId: inv.customerId ?? null,
     customerName: customer?.name ?? "",
     customerPhone: customer?.phone ?? "",
-    totalAmount: Number(inv.amountDue) || 0,
+    totalAmount: Number(inv.totalPaid) || 0,
     branchName,
   };
 }

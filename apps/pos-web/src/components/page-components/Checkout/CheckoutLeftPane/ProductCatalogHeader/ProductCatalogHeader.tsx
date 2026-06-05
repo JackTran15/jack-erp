@@ -65,10 +65,18 @@ export function ProductCatalogHeader({ inputRef }: ProductCatalogHeaderProps) {
           setCatalogGroup(g.id);
           setGroupQuery(g.name);
         }}
+        onClear={() => {
+          // Clear value → về category mặc định (categoryId = null) → hiện tất cả.
+          setCatalogGroup(undefined);
+          setGroupQuery("");
+        }}
         itemKey={(g) => g.id}
         renderItem={(g) => g.name}
         placeholder="Lọc theo nhóm hàng hóa"
         ariaLabel="Lọc theo nhóm hàng hóa"
+        // type="text" để bỏ nút clear (X) native của input search — chỉ giữ nút
+        // clear của PosSearchPopover (reset filter về mặc định).
+        inputType="text"
         variant="boxed"
         leadingIcon={<BoxIcon size={16} className="text-gray-500" />}
         minChars={0}
