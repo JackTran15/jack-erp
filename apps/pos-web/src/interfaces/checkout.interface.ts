@@ -181,11 +181,6 @@ export interface CheckoutPaymentDraft {
    */
   returnFee: number;
   /**
-   * `true` khi số tiền dòng đầu vẫn tự đồng bộ theo "số tiền cần thanh toán".
-   * Chuyển `false` khi nhân viên tự nhập số / chọn gợi ý.
-   */
-  firstAmountAuto: boolean;
-  /**
    * Hạn thanh toán công nợ (ISO `YYYY-MM-DD`), chọn ở modal "Hạn thanh toán".
    * Chỉ lưu frontend state — BE chưa có field tương ứng. `null` = chưa đặt.
    */

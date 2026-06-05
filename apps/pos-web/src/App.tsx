@@ -16,12 +16,16 @@ import { UiCatalogPage } from "./pages/UiCatalogPage";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      staleTime: 0,
       retry: 1,
       refetchOnWindowFocus: false,
     },
   },
 });
+
+// 
+// Fix query
+// Fix số tiền ko reset đúng
 
 export function App() {
   return (

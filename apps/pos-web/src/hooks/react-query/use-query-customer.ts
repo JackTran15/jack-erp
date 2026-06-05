@@ -298,3 +298,20 @@ export function useUpdateMembershipCard(): UseMutationResult<
     },
   });
 }
+
+/**
+ * Trả về callback invalidate cache điểm tích lũy của 1 khách (summary +
+ * membership-card) để React Query refetch điểm mới nhất mà không cần reload
+ * trang. Dùng cho nút "Làm mới điểm tích lũy" trên `MembershipCard`.
+ * No-op khi chưa có `customerId`.
+ */
+export function useRefreshCustomerPoints(customerId?: string): () => void {
+  const qc = useQueryClient();
+  return useCallback(() => {
+    if (!customerId) return;
+    void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.SUMMARY(customerId) });
+    void qc.invalidateQueries({
+      queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD(customerId),
+    });
+  }, [qc, customerId]);
+}

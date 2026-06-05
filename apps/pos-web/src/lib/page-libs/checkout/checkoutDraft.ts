@@ -30,7 +30,6 @@ export function initialCheckoutDraft(): CheckoutDraft {
       selectedSuggestionId: null,
       deposit: 0,
       returnFee: 0,
-      firstAmountAuto: true,
       paymentDueDate: null,
       creditDays: null,
     },
@@ -98,21 +97,16 @@ export function ensureDraftShape(maybe: unknown): CheckoutDraft {
 // ---------------------------------------------------------------------------
 
 /**
- * Áp danh sách dòng thanh toán mới. Nhân viên tự sửa số tiền dòng đầu (khi đang
- * 1 dòng) → ngừng auto-fill.
+ * Áp danh sách dòng thanh toán mới. Số tiền nhân viên gõ tay chỉ giữ tới khi
+ * tổng (settlementAbs) đổi lần kế — `computeFirstLineAuto` sẽ ghi đè lại.
  */
 export function computeChangedPaymentLines(
-  prev: CheckoutPaymentDraft,
+  _prev: CheckoutPaymentDraft,
   next: PaymentLine[],
 ): Partial<CheckoutPaymentDraft> {
-  const manualFirstAmountEdit =
-    prev.paymentLines.length === 1 &&
-    next.length === 1 &&
-    next[0]?.amount !== prev.paymentLines[0]?.amount;
   return {
     paymentLines: next,
     selectedSuggestionId: null,
-    firstAmountAuto: manualFirstAmountEdit ? false : prev.firstAmountAuto,
   };
 }
 
@@ -136,19 +130,19 @@ export function computePickSuggestionLines(
   return {
     selectedSuggestionId: suggestion.id,
     paymentLines: nextLines,
-    firstAmountAuto: false,
   };
 }
 
 /**
- * Tự điền số tiền dòng đầu = `amount` khi còn ở chế độ auto (đúng 1 dòng). Trả
- * về `{}` (no-op) khi không đủ điều kiện hoặc số tiền không đổi.
+ * Tự điền số tiền dòng đầu = `amount` khi chỉ có đúng 1 dòng thanh toán (dòng đầu
+ * luôn bám theo "Còn phải thu"). Trả về `{}` (no-op) khi có ≥2 dòng (split payment)
+ * hoặc số tiền không đổi.
  */
 export function computeFirstLineAuto(
   prev: CheckoutPaymentDraft,
   amount: number,
 ): Partial<CheckoutPaymentDraft> {
-  if (!prev.firstAmountAuto || prev.paymentLines.length !== 1) return {};
+  if (prev.paymentLines.length !== 1) return {};
   const first = prev.paymentLines[0]!;
   if (first.amount === amount) return {};
   return {
