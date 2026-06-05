@@ -43,7 +43,9 @@ interface InventoryLocation {
   storageId: string;
   branchId: string;
   type: LocationType;
+  description?: string | null;
   isActive: boolean;
+  hasItems?: boolean;
 }
 
 interface InventoryStorage {
@@ -59,13 +61,6 @@ interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
-
-const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
-  [LocationType.SHELF]: "Kệ",
-  [LocationType.RACK]: "Giá",
-  [LocationType.BIN]: "Thùng",
-  [LocationType.ZONE]: "Khu vực",
-};
 
 const STATUS_LABEL = {
   ACTIVE: "Đang hoạt động",
@@ -279,7 +274,8 @@ export function ItemLocationsPage() {
           name: draft.name,
           storageId: draft.storageId,
           branchId,
-          type: draft.type,
+          description: draft.description || undefined,
+          isActive: draft.isActive,
         });
         toast.success("Đã tạo vị trí mới.");
         await loadLocations();
@@ -299,8 +295,11 @@ export function ItemLocationsPage() {
       setSaving(true);
       try {
         await apiClient.patch(`/inventory/locations/${id}`, {
+          code: draft.code,
           name: draft.name,
-          type: draft.type,
+          storageId: draft.storageId,
+          description: draft.description,
+          isActive: draft.isActive,
         });
         toast.success("Đã cập nhật vị trí.");
         await loadLocations();
@@ -426,10 +425,26 @@ export function ItemLocationsPage() {
       render: (row) => storageNameById.get(row.storageId) ?? row.storageId,
     },
     {
-      key: "type",
-      label: "Loại",
-      width: 120,
-      render: (row) => LOCATION_TYPE_LABEL[row.type] ?? row.type,
+      key: "description",
+      label: "Mô tả",
+      width: 280,
+      render: (row) =>
+        row.description?.trim() ? (
+          row.description
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "arrange",
+      label: "Xếp hàng hóa",
+      width: 140,
+      render: (row) =>
+        row.hasItems ? (
+          "Đã xếp"
+        ) : (
+          <span className="text-muted-foreground">Chưa xếp</span>
+        ),
     },
     {
       key: "status",
@@ -499,6 +514,7 @@ export function ItemLocationsPage() {
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          onRowDoubleClick={(row) => setDialogState({ mode: "edit", initial: row })}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,
@@ -571,7 +587,8 @@ interface LocationDraft {
   code: string;
   name: string;
   storageId: string;
-  type: LocationType;
+  description: string;
+  isActive: boolean;
 }
 
 function ItemLocationFormDialog({
@@ -592,7 +609,8 @@ function ItemLocationFormDialog({
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [storageId, setStorageId] = useState(initial?.storageId ?? storages[0]?.id ?? "");
-  const [type, setType] = useState<LocationType>(initial?.type ?? LocationType.SHELF);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (intent: "save" | "save-and-add") => {
@@ -606,13 +624,16 @@ function ItemLocationFormDialog({
         code: code.trim(),
         name: name.trim(),
         storageId,
-        type,
+        description: description.trim(),
+        isActive,
       },
       intent,
     );
     if (intent === "save-and-add") {
       setCode("");
       setName("");
+      setDescription("");
+      setIsActive(true);
     }
   };
 
@@ -669,7 +690,6 @@ function ItemLocationFormDialog({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Vd: A01.01"
-            disabled={isEdit}
           />
         </FieldRow>
 
@@ -686,7 +706,6 @@ function ItemLocationFormDialog({
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={storageId}
             onChange={(e) => setStorageId(e.target.value)}
-            disabled={isEdit}
           >
             {storages.length === 0 ? (
               <option value="">Chưa có kho — tạo kho trước</option>
@@ -699,18 +718,37 @@ function ItemLocationFormDialog({
           </select>
         </FieldRow>
 
-        <FieldRow label="Loại vị trí">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={type}
-            onChange={(e) => setType(e.target.value as LocationType)}
-          >
-            {Object.values(LocationType).map((t) => (
-              <option key={t} value={t}>
-                {LOCATION_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
+        <FieldRow label="Mô tả">
+          <textarea
+            className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ghi chú cho vị trí (không bắt buộc)"
+            maxLength={500}
+          />
+        </FieldRow>
+
+        <FieldRow label="Trạng thái">
+          <div className="flex items-center gap-6 pt-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="location-status"
+                checked={isActive}
+                onChange={() => setIsActive(true)}
+              />
+              Đang hoạt động
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="location-status"
+                checked={!isActive}
+                onChange={() => setIsActive(false)}
+              />
+              Ngừng hoạt động
+            </label>
+          </div>
         </FieldRow>
       </div>
     </AppModal>

@@ -136,3 +136,22 @@ export async function assignItemsBatch(
   );
   return data;
 }
+
+export interface ArrangeLine {
+  itemId: string;
+  storageId: string;
+  destinationLocationId: string;
+}
+
+export interface ArrangeResult {
+  moved: number;
+  transferId: string | null;
+}
+
+export async function assignArrange(lines: ArrangeLine[]): Promise<ArrangeResult> {
+  const { data } = await apiClient.post<ArrangeResult>(
+    "/inventory/locations/arrange",
+    { lines },
+  );
+  return data;
+}

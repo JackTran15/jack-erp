@@ -137,6 +137,7 @@ interface InventoryLocation {
   name: string;
   code: string;
   storageId: string;
+  isUnassigned?: boolean;
 }
 
 interface InventoryStorage {
@@ -1051,15 +1052,19 @@ function PurchaseOrderFormDialog({
           let fb = fallbackByStorage.get(l.storageId);
           if (fb === undefined) {
             const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-              `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(l.storageId)}`,
+              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true`,
             );
-            const first = data.data[0];
-            if (!first) {
+            const locations = data.data;
+            if (!locations || locations.length === 0) {
               toast.error("Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
               setSaving(false);
               return false;
             }
-            fb = first.id;
+            const unassigned =
+              locations.find((loc) => loc.isUnassigned === true) ??
+              locations.find((loc) => loc.code === "__UNASSIGNED__") ??
+              locations[0];
+            fb = unassigned.id;
             fallbackByStorage.set(l.storageId, fb);
           }
           locationId = fb;

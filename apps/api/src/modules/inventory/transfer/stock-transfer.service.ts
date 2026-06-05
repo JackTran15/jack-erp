@@ -16,12 +16,22 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 import { LocationEntity } from '../location/location.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
+
+/** A fully-resolved intra-warehouse move line: source/dest are concrete location ids. */
+export interface IntraWarehouseMoveLine {
+  itemId: string;
+  quantity: number;
+  sourceLocationId: string;
+  destinationLocationId: string;
+  notes?: string;
+}
 
 export interface CreateTransferDto {
   sourceLocationId: string;
@@ -62,6 +72,8 @@ export class StockTransferService {
     private readonly transferRepo: Repository<StockTransferEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(StockBalanceEntity)
+    private readonly balanceRepo: Repository<StockBalanceEntity>,
     private readonly dataSource: DataSource,
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
@@ -334,36 +346,60 @@ export class StockTransferService {
   }
 
   /**
-   * Validates same-storage constraint, then creates → posts an
-   * intra-warehouse transfer in one shot.
+   * Resolves each line's effective source/destination (line override → header
+   * fallback), then delegates to {@link postIntraWarehouseMoves}.
    */
   async createIntraWarehouseTransferAndPost(
     dto: CreateIntraWarehouseTransferDto,
     actor: ActorContext,
   ): Promise<StockTransferEntity> {
-    // 1. Source and destination must differ
-    if (dto.sourceLocationId === dto.destinationLocationId) {
-      throw new BadRequestException('Vị trí nguồn và đích phải khác nhau');
-    }
+    const lines: IntraWarehouseMoveLine[] = dto.lines.map((l, idx) => {
+      const sourceLocationId = l.sourceLocationId ?? dto.sourceLocationId;
+      const destinationLocationId =
+        l.destinationLocationId ?? dto.destinationLocationId;
 
-    // 2. Both locations must exist in the actor's org
-    const [source, dest] = await Promise.all([
-      this.locationRepo.findOne({
-        where: { id: dto.sourceLocationId, organizationId: actor.organizationId },
-      }),
-      this.locationRepo.findOne({
-        where: { id: dto.destinationLocationId, organizationId: actor.organizationId },
-      }),
-    ]);
+      if (!sourceLocationId) {
+        throw new BadRequestException(
+          `Dòng ${idx + 1}: thiếu vị trí nguồn (chưa chọn vị trí hiện tại).`,
+        );
+      }
+      if (!destinationLocationId) {
+        throw new BadRequestException(
+          `Dòng ${idx + 1}: thiếu vị trí đích (chưa chọn vị trí chuyển đến).`,
+        );
+      }
 
-    if (!source) throw new NotFoundException('Vị trí nguồn không tồn tại');
-    if (!dest) throw new NotFoundException('Vị trí đích không tồn tại');
+      return {
+        itemId: l.itemId,
+        quantity: l.quantity,
+        sourceLocationId,
+        destinationLocationId,
+        notes: l.notes,
+      };
+    });
 
-    // 3. Both locations must belong to the same storage
-    if (source.storageId !== dest.storageId) {
-      throw new BadRequestException(
-        'Chuyển vị trí trong cùng kho: 2 vị trí phải cùng một kho.',
-      );
+    return this.postIntraWarehouseMoves(lines, actor);
+  }
+
+  /**
+   * Shared entry point for every intra-warehouse move (Chuyển vị trí, and the
+   * arrange flow which passes the "Chưa xếp" location as each line's source).
+   *
+   * Validates per line: positive quantity, source ≠ dest, both locations exist
+   * in the actor's org and share the same storage, and that the on-hand quantity
+   * at each (item, source) is sufficient. The on-hand check reads stock balances
+   * with a pessimistic write lock (SELECT … FOR UPDATE) inside the same
+   * transaction that writes the ledger, so concurrent moves cannot oversell.
+   *
+   * All-or-nothing: any failed line aborts the whole posting (nothing is written).
+   * On success the transfer is created → approved → posted (immutable) and returned.
+   */
+  async postIntraWarehouseMoves(
+    lines: IntraWarehouseMoveLine[],
+    actor: ActorContext,
+  ): Promise<StockTransferEntity> {
+    if (!lines || lines.length === 0) {
+      throw new BadRequestException('Cần ít nhất một dòng để chuyển vị trí');
     }
 
     if (!actor.branchId) {
@@ -372,23 +408,178 @@ export class StockTransferService {
       );
     }
 
-    // 4. Build the CreateTransferDto
-    const createDto: CreateTransferDto = {
-      sourceBranchId: actor.branchId,
-      destinationBranchId: actor.branchId,
-      sourceLocationId: dto.sourceLocationId,
-      destinationLocationId: dto.destinationLocationId,
-      lines: dto.lines.map((l) => ({
-        itemId: l.itemId,
-        quantity: l.quantity,
-        notes: l.notes,
-      })),
-    };
+    for (const [idx, line] of lines.entries()) {
+      if (!(line.quantity > 0)) {
+        throw new BadRequestException(
+          `Dòng ${idx + 1}: số lượng chuyển phải lớn hơn 0`,
+        );
+      }
+      if (line.sourceLocationId === line.destinationLocationId) {
+        throw new BadRequestException(
+          `Dòng ${idx + 1}: vị trí nguồn và đích phải khác nhau`,
+        );
+      }
+    }
 
-    // 5. Run create → post sequentially. Each step has its own
-    // save/transaction internally; a failure in either stops the flow.
-    const draft = await this.create(createDto, actor);
-    return this.post(draft.id, actor);
+    // Load every distinct location referenced and validate org + same-storage.
+    const locationIds = [
+      ...new Set(
+        lines.flatMap((l) => [l.sourceLocationId, l.destinationLocationId]),
+      ),
+    ];
+    const locations = await this.locationRepo.find({
+      where: locationIds.map((id) => ({
+        id,
+        organizationId: actor.organizationId,
+      })),
+    });
+    const locationById = new Map(locations.map((loc) => [loc.id, loc]));
+
+    for (const [idx, line] of lines.entries()) {
+      const source = locationById.get(line.sourceLocationId);
+      const dest = locationById.get(line.destinationLocationId);
+      if (!source) {
+        throw new NotFoundException(
+          `Dòng ${idx + 1}: vị trí nguồn không tồn tại`,
+        );
+      }
+      if (!dest) {
+        throw new NotFoundException(
+          `Dòng ${idx + 1}: vị trí đích không tồn tại`,
+        );
+      }
+      if (source.storageId !== dest.storageId) {
+        throw new BadRequestException(
+          `Dòng ${idx + 1}: vị trí nguồn và đích phải cùng một kho.`,
+        );
+      }
+    }
+
+    // Required quantity per (item, source) — same pair across lines is summed.
+    const requiredByKey = new Map<string, { itemId: string; sourceLocationId: string; quantity: number }>();
+    for (const line of lines) {
+      const key = `${line.itemId}::${line.sourceLocationId}`;
+      const existing = requiredByKey.get(key);
+      if (existing) {
+        existing.quantity += line.quantity;
+      } else {
+        requiredByKey.set(key, {
+          itemId: line.itemId,
+          sourceLocationId: line.sourceLocationId,
+          quantity: line.quantity,
+        });
+      }
+    }
+
+    const documentNumber = await this.documentNumberingService.generate(
+      DocumentType.TRANSFER,
+      actor.branchId,
+      actor,
+    );
+
+    const { transferId, ledgerEntries } = await this.dataSource.transaction(
+      async (manager) => {
+        // Lock + validate on-hand at each (item, source) before any write.
+        for (const req of requiredByKey.values()) {
+          const balance = await manager
+            .createQueryBuilder(StockBalanceEntity, 'sb')
+            .setLock('pessimistic_write')
+            .where('sb.organization_id = :organizationId', {
+              organizationId: actor.organizationId,
+            })
+            .andWhere('sb.item_id = :itemId', { itemId: req.itemId })
+            .andWhere('sb.location_id = :locationId', {
+              locationId: req.sourceLocationId,
+            })
+            .getOne();
+
+          const onHand = balance ? Number(balance.quantity) : 0;
+          if (req.quantity > onHand) {
+            const loc = locationById.get(req.sourceLocationId);
+            const locLabel = loc ? `${loc.name} (${loc.code})` : req.sourceLocationId;
+            throw new BadRequestException(
+              `Không đủ tồn để chuyển: hàng ${req.itemId} tại vị trí ${locLabel} ` +
+                `chỉ còn ${onHand}, cần chuyển ${req.quantity}.`,
+            );
+          }
+        }
+
+        // Create the posted transfer record within the locked transaction.
+        const transfer = manager.create(StockTransferEntity, {
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          sourceLocationId: lines[0].sourceLocationId,
+          destinationLocationId: lines[0].destinationLocationId,
+          sourceBranchId: actor.branchId,
+          destinationBranchId: actor.branchId,
+          status: TransferStatus.POSTED,
+          documentNumber,
+          createdBy: actor.userId,
+          approvedBy: actor.userId,
+          approvedAt: new Date(),
+          postedBy: actor.userId,
+          postedAt: new Date(),
+          lines: lines.map((l) => {
+            const line = new StockTransferLineEntity();
+            line.itemId = l.itemId;
+            line.quantity = l.quantity;
+            line.sourceLocationId = l.sourceLocationId;
+            line.destinationLocationId = l.destinationLocationId;
+            line.notes = l.notes;
+            return line;
+          }),
+        });
+        const savedTransfer = await manager.save(StockTransferEntity, transfer);
+
+        const movements: RecordMovementParams[] = [];
+        for (const line of lines) {
+          movements.push({
+            itemId: line.itemId,
+            locationId: line.sourceLocationId,
+            branchId: actor.branchId!,
+            organizationId: actor.organizationId,
+            movementType: StockMovementType.TRANSFER_OUT,
+            quantity: -line.quantity,
+            referenceType: 'TRANSFER',
+            referenceId: savedTransfer.id,
+            notes: `Transfer out: ${documentNumber}`,
+            actorContext: actor,
+            // Source & dest are two shelves of the same product/storage — the
+            // one-shelf-per-product PSL guard must not run on transfer legs.
+            skipLocationAssignment: true,
+          });
+          movements.push({
+            itemId: line.itemId,
+            locationId: line.destinationLocationId,
+            branchId: actor.branchId!,
+            organizationId: actor.organizationId,
+            movementType: StockMovementType.TRANSFER_IN,
+            quantity: line.quantity,
+            referenceType: 'TRANSFER',
+            referenceId: savedTransfer.id,
+            notes: `Transfer in: ${documentNumber}`,
+            actorContext: actor,
+            skipLocationAssignment: true,
+          });
+        }
+
+        // Reuse the ledger writer on this same locked transaction; events are
+        // published after commit so a rollback never leaks an event.
+        const entries = await this.ledgerService.recordBatchMovements(
+          movements,
+          manager,
+        );
+
+        return { transferId: savedTransfer.id, ledgerEntries: entries };
+      },
+    );
+
+    await this.ledgerService.publishMovementEvents(ledgerEntries);
+
+    this.logger.log(
+      `Intra-warehouse transfer ${transferId} posted as ${documentNumber}`,
+    );
+    return this.findOrFail(transferId, actor.organizationId);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────

@@ -222,7 +222,10 @@ export interface Location {
   code: string;
   name: string;
   type: LocationType;
+  description?: string | null;
   isActive: boolean;
+  isUnassigned: boolean;
+  hasItems?: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
