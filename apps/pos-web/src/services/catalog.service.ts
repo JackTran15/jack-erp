@@ -11,6 +11,8 @@ export interface ListCatalogProductsParams {
   direction?: PosCatalogDirection;
   page?: number;
   pageSize?: number;
+  /** Lọc theo danh mục (inventory-item-categories). */
+  categoryId?: string;
 }
 
 export const catalogService = {
@@ -39,6 +41,7 @@ export const catalogService = {
     if (params.direction) qs.set("direction", params.direction);
     if (params.page !== undefined) qs.set("page", String(params.page));
     if (params.pageSize !== undefined) qs.set("pageSize", String(params.pageSize));
+    if (params.categoryId) qs.set("categoryId", params.categoryId);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return http.get<PosProductListResponse>(
       `/pos/branches/${encodeURIComponent(branchId)}/catalog/products${suffix}`,

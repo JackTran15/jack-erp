@@ -53,8 +53,13 @@ interface UseCheckoutCatalogResult {
  */
 export function useCheckoutCatalog(): UseCheckoutCatalogResult {
   const branchId = usePosBranchStore((s) => s.branchId) ?? "";
+  // catalogGroup giữ id danh mục đã chọn ("" = "Tất cả" = không lọc).
+  const catalogGroupId = usePosCheckoutSessionStore(
+    (s) => selectCatalogDraft(s).catalogGroup,
+  );
+  const categoryId = catalogGroupId ? catalogGroupId : undefined;
   const catalogQueryResult = useCatalogQuery(branchId);
-  const productsQueryResult = useCatalogProductsQuery(branchId);
+  const productsQueryResult = useCatalogProductsQuery(branchId, categoryId);
   const catalog = useMemo(
     () => catalogQueryResult.data ?? [],
     [catalogQueryResult.data],

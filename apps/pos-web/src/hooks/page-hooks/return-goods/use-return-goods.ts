@@ -2,21 +2,30 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
 import {
-  isInDateRange,
+  dateRangeToISO,
   type PosDateRangeFilterOption,
 } from "@erp/pos/lib/common/dateRangeFilter";
-import { EMPTY_RETURN_INVOICE_FILTERS } from "@erp/pos/constants/return-goods.constant";
+import {
+  EMPTY_RETURN_INVOICE_FILTERS,
+  RETURN_GOODS_DEFAULT_PAGE_SIZE,
+} from "@erp/pos/constants/return-goods.constant";
 import {
   useEligibleReturnsQuery,
   useReturnableInvoicesQuery,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
+import { useDebounce } from "@erp/pos/hooks/common/use-debounce";
 import { mapEligibleLineToReturnableItem } from "@erp/pos/lib/page-libs/return-goods/returnInvoiceMapper";
+import {
+  toCompareFilter,
+  toStringFilter,
+} from "@erp/pos/lib/common/invoiceFilterToBody";
 import { buildInvoiceReturnCartLines } from "@erp/pos/lib/page-libs/return-goods/toCheckoutCartLines";
 import {
   clampReturnQty,
   sumSelectedReturnTotal,
 } from "@erp/pos/lib/page-libs/return-goods/returnGoodsMath";
 import type { ReturnInvoiceFilters } from "@erp/pos/dtos/return-goods.dto";
+import type { SearchReturnableInvoicesBody } from "@erp/pos/dtos/invoice.dto";
 import type {
   ReturnInvoiceRow,
   ReturnableItem,
@@ -29,8 +38,10 @@ interface UseReturnGoodsResult {
   /** Per-column filter inputs in the table header strip. */
   filters: ReturnInvoiceFilters;
   setFilter: (key: keyof ReturnInvoiceFilters, value: string) => void;
-  /** Paid invoice rows (from `GET /invoices`) after applying filters + date range. */
+  /** Paid sale rows from `POST /v2/invoices/returnable/search` (server-filtered). */
   rows: ReadonlyArray<ReturnInvoiceRow>;
+  /** Total matching rows reported by the server (for the pagination bar). */
+  total: number;
   /** Loading state for the invoice listing. */
   isLoading: boolean;
   /** Items-dialog state for the currently active invoice. */
@@ -54,26 +65,15 @@ interface UseReturnGoodsResult {
   confirmReturn: () => void;
 }
 
-function matchesText(haystack: string, needle: string): boolean {
-  if (!needle.trim()) return true;
-  return haystack.toLowerCase().includes(needle.trim().toLowerCase());
-}
-
-function matchesNumberInput(value: number, raw: string): boolean {
-  const trimmed = raw.trim();
-  if (!trimmed) return true;
-  const target = Number.parseFloat(trimmed.replace(/[.,\s]/g, ""));
-  if (!Number.isFinite(target)) return true;
-  return value <= target;
-}
-
 /**
  * State machine for the `/return-goods` page. Owns the date-range pill, the
  * per-column filter strip, the items dialog, and per-line return quantities.
- * Listing comes from `GET /invoices` (status=paid); the returnable lines for a
- * chosen invoice are fetched lazily via `GET /invoices/:id/eligible-returns`.
- * Confirm pushes the selection into a new INVOICE_RETURN checkout tab carrying
- * the original invoice id (→ `POST /invoices/returns` mode=regular at checkout).
+ * Listing comes from `POST /v2/invoices/returnable/search` (type=SALE,
+ * status=PAID, server-side filter + date range, branch-scoped); the returnable
+ * lines for a chosen invoice are fetched lazily via
+ * `GET /invoices/:id/eligible-returns`. Confirm pushes the selection into a new
+ * INVOICE_RETURN checkout tab carrying the original invoice id
+ * (→ `POST /invoices/returns` mode=regular at checkout).
  */
 export function useReturnGoods(): UseReturnGoodsResult {
   const navigate = useNavigate();
@@ -86,25 +86,30 @@ export function useReturnGoods(): UseReturnGoodsResult {
     () => ({ ...EMPTY_RETURN_INVOICE_FILTERS }),
   );
 
-  const invoicesQuery = useReturnableInvoicesQuery();
-  const allRows = useMemo(
-    () => invoicesQuery.data ?? [],
+  // Debounce the column inputs so typing doesn't fire a request per keystroke.
+  const debouncedFilters = useDebounce(filters);
+
+  const searchBody = useMemo<SearchReturnableInvoicesBody>(() => {
+    const dateFilter = dateRangeToISO(dateRange);
+    const hasDate = Boolean(dateFilter.from ?? dateFilter.to);
+    return {
+      page: 1,
+      limit: RETURN_GOODS_DEFAULT_PAGE_SIZE,
+      code:          toStringFilter(debouncedFilters.invoiceNumber),
+      customerName:  toStringFilter(debouncedFilters.customerName),
+      customerPhone: toStringFilter(debouncedFilters.customerPhone),
+      branchName:    toStringFilter(debouncedFilters.branchName),
+      totalPaid:     toCompareFilter(debouncedFilters.totalAmount),
+      ...(hasDate ? { createdAt: dateFilter } : {}),
+    };
+  }, [dateRange, debouncedFilters]);
+
+  const invoicesQuery = useReturnableInvoicesQuery(searchBody);
+  const rows = useMemo(
+    () => invoicesQuery.data?.rows ?? [],
     [invoicesQuery.data],
   );
-
-  const rows = useMemo(() => {
-    return allRows.filter((row) => {
-      if (!isInDateRange(row.createdAt, dateRange)) return false;
-      if (!matchesText(row.invoiceNumber, filters.invoiceNumber)) return false;
-      if (!matchesText(row.customerName, filters.customerName)) return false;
-      if (!matchesText(row.customerPhone, filters.customerPhone)) return false;
-      if (!matchesText(row.branchName, filters.branchName)) return false;
-      if (!matchesNumberInput(row.totalAmount, filters.totalAmount)) {
-        return false;
-      }
-      return true;
-    });
-  }, [allRows, dateRange, filters]);
+  const total = invoicesQuery.data?.total ?? 0;
 
   const setFilter = useCallback<UseReturnGoodsResult["setFilter"]>(
     (key, value) => {
@@ -222,6 +227,7 @@ export function useReturnGoods(): UseReturnGoodsResult {
     filters,
     setFilter,
     rows,
+    total,
     isLoading: invoicesQuery.isLoading,
     dialog: {
       open: dialogOpen,

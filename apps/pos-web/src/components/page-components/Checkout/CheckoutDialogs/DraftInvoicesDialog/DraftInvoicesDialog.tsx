@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import {
-  isInDateRange,
+  dateRangeToISO,
   type PosDateRangeFilterOption,
 } from "@erp/pos/lib/common/dateRangeFilter";
 import { useControllableState } from "@erp/pos/hooks/common/use-controllable-state";
+import { useDebounce } from "@erp/pos/hooks/common/use-debounce";
 import { useDialogReset } from "@erp/pos/hooks/common/use-dialog-reset";
 import { useDraftInvoicesQuery } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { mapInvoiceRowToDraftInvoice } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
+import type { SearchDraftInvoicesBody } from "@erp/pos/dtos/invoice.dto";
 import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
 import { FilterBar } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/FilterBar/FilterBar";
 import { InvoiceDetailPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceDetailPanel/InvoiceDetailPanel";
 import { InvoiceListPanel } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/DraftInvoicesDialog/InvoiceListPanel/InvoiceListPanel";
+
+const DRAFT_INVOICES_PAGE_SIZE = 100;
 
 export interface DraftInvoicesDialogProps {
   open: boolean;
@@ -64,18 +68,6 @@ export function DraftInvoicesDialog({
   dateFilter,
   onDateFilterChange,
 }: DraftInvoicesDialogProps) {
-  const draftsQuery = useDraftInvoicesQuery({ sessionId, enabled: open });
-
-  // API drafts trả kèm object `customer` nhúng (name/phone) → dùng thẳng để hiển
-  // thị + filter, không cần resolve qua `GET /customers/:id` từng id nữa.
-  const drafts = useMemo<DraftInvoice[]>(
-    () =>
-      (draftsQuery.data ?? []).map((row) =>
-        mapInvoiceRowToDraftInvoice(row, row.customer ?? null),
-      ),
-    [draftsQuery.data],
-  );
-
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSelectedId,
   );
@@ -90,6 +82,35 @@ export function DraftInvoicesDialog({
     onChange: onDateFilterChange,
   });
 
+  // Free-text + date range đẩy xuống server (debounce text để khỏi gọi mỗi ký tự).
+  const debouncedSearch = useDebounce(searchState.value);
+  const searchBody = useMemo<SearchDraftInvoicesBody>(() => {
+    const range = dateRangeToISO(filterState.value);
+    const hasDate = Boolean(range.from ?? range.to);
+    return {
+      page: 1,
+      limit: DRAFT_INVOICES_PAGE_SIZE,
+      search: debouncedSearch.trim() || undefined,
+      ...(hasDate ? { createdAt: range } : {}),
+    };
+  }, [debouncedSearch, filterState.value]);
+
+  const draftsQuery = useDraftInvoicesQuery({
+    body: searchBody,
+    sessionId,
+    enabled: open,
+  });
+
+  // API drafts trả kèm object `customer` nhúng (name/phone) → map thẳng. Việc lọc
+  // đã chuyển về server, không filter client nữa.
+  const drafts = useMemo<DraftInvoice[]>(
+    () =>
+      (draftsQuery.data ?? []).map((row) =>
+        mapInvoiceRowToDraftInvoice(row, row.customer ?? null),
+      ),
+    [draftsQuery.data],
+  );
+
   const handleOpenReset = useCallback(() => {
     setSelectedId(initialSelectedId ?? drafts[0]?.id ?? null);
     searchState.reset("");
@@ -97,35 +118,21 @@ export function DraftInvoicesDialog({
   }, [drafts, filterState, initialSelectedId, searchState]);
   useDialogReset(open, handleOpenReset);
 
-  const filteredDrafts = useMemo(() => {
-    const q = searchState.value.trim().toLowerCase();
-    return drafts.filter((d) => {
-      if (!isInDateRange(d.createdAt, filterState.value)) return false;
-      if (!q) return true;
-      const haystacks = [
-        d.invoiceNumber,
-        d.customerName ?? "",
-        d.customerPhone ?? "",
-      ];
-      return haystacks.some((s) => s.toLowerCase().includes(q));
-    });
-  }, [drafts, searchState.value, filterState.value]);
-
-  // Keep `selectedId` valid when the filtered list changes.
+  // Keep `selectedId` valid when the (server-filtered) list changes.
   useEffect(() => {
     if (!open) return;
-    if (filteredDrafts.length === 0) {
+    if (drafts.length === 0) {
       setSelectedId(null);
       return;
     }
-    if (!selectedId || !filteredDrafts.some((d) => d.id === selectedId)) {
-      setSelectedId(filteredDrafts[0]!.id);
+    if (!selectedId || !drafts.some((d) => d.id === selectedId)) {
+      setSelectedId(drafts[0]!.id);
     }
-  }, [filteredDrafts, open, selectedId]);
+  }, [drafts, open, selectedId]);
 
   const selectedDraft = useMemo(
-    () => filteredDrafts.find((d) => d.id === selectedId) ?? null,
-    [filteredDrafts, selectedId],
+    () => drafts.find((d) => d.id === selectedId) ?? null,
+    [drafts, selectedId],
   );
 
   const handleConfirm = () => {
@@ -164,7 +171,7 @@ export function DraftInvoicesDialog({
         ) : (
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[38fr_62fr]">
             <InvoiceListPanel
-              drafts={filteredDrafts}
+              drafts={drafts}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onDelete={onDelete}

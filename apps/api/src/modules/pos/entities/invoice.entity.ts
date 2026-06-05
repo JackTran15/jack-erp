@@ -105,6 +105,9 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'staff_id', type: 'uuid', comment: 'Staff member who created / owns the invoice' })
   staffId: string;
 
+  @Column({ name: 'salesperson_id', type: 'uuid', nullable: true, comment: 'Employee (employee_profiles.id) credited with the sale; distinct from staffId (the creator)' })
+  salespersonId?: string;
+
   @Column({ name: 'price_list_id', type: 'uuid', nullable: true, comment: 'Price list applied at invoice creation (future feature)' })
   priceListId?: string;
 

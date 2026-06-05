@@ -154,6 +154,9 @@ export function PosSearchPopover<T>({
   const wrapRef = useRef<HTMLDivElement>(null);
   const internalInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bỏ qua lần search do refocus ngay sau khi clear (value lúc đó vẫn là giá trị
+  // cũ chưa flush → tránh dropdown lọc theo option vừa xóa).
+  const skipFocusSearchRef = useRef(false);
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion<T>[]>([]);
   const [open, setOpen] = useState(false);
@@ -239,8 +242,12 @@ export function PosSearchPopover<T>({
     onClear();
     setSuggestions([]);
     setHighlightIdx(-1);
+    // Refocus fire onFocus với value cũ → skip lần đó, rồi tự load lại option
+    // cho query rỗng (minChars 0 → hiện đủ danh sách; minChars cao → rỗng).
+    skipFocusSearchRef.current = true;
     internalInputRef.current?.focus();
-  }, [onClear]);
+    void runSearch("");
+  }, [onClear, runSearch]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!open || suggestions.length === 0) {
@@ -345,6 +352,10 @@ export function PosSearchPopover<T>({
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => {
             setOpen(true);
+            if (skipFocusSearchRef.current) {
+              skipFocusSearchRef.current = false;
+              return;
+            }
             if (trimmed.length >= minChars && suggestions.length === 0) {
               void runSearch(trimmed);
             }

@@ -50,6 +50,11 @@ interface UseCheckoutPaymentResult {
   /** Phí đổi trả (return/exchange) — cộng vào settlement. */
   returnFee: number;
   setReturnFee: (value: Updater<number>) => void;
+  /** Hạn thanh toán công nợ (ISO `YYYY-MM-DD`) — frontend state. */
+  paymentDueDate: string | null;
+  setPaymentDueDate: (value: Updater<string | null>) => void;
+  creditDays: number | null;
+  setCreditDays: (value: Updater<number | null>) => void;
   /** Tự điền số tiền dòng đầu = `amount` khi còn ở chế độ auto (1 dòng). */
   setFirstLineAmountAuto: (amount: number) => void;
   grandTotal: number;
@@ -92,6 +97,8 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     selectedSuggestionId,
     deposit,
     returnFee,
+    paymentDueDate,
+    creditDays,
   } = payment;
 
   // Action generic + behavior action lấy từ session store (reference ổn định).
@@ -181,6 +188,22 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
       updateDraftSlice("payment", (p) => ({
         ...p,
         returnFee: apply(p.returnFee, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setPaymentDueDate = useCallback(
+    (value: Updater<string | null>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        paymentDueDate: apply(p.paymentDueDate, value),
+      })),
+    [updateDraftSlice],
+  );
+  const setCreditDays = useCallback(
+    (value: Updater<number | null>) =>
+      updateDraftSlice("payment", (p) => ({
+        ...p,
+        creditDays: apply(p.creditDays, value),
       })),
     [updateDraftSlice],
   );
@@ -275,6 +298,10 @@ export function useCheckoutPayment(): UseCheckoutPaymentResult {
     setDeposit,
     returnFee,
     setReturnFee,
+    paymentDueDate,
+    setPaymentDueDate,
+    creditDays,
+    setCreditDays,
     setFirstLineAmountAuto,
     grandTotal,
     settlementGrandTotal,

@@ -29,20 +29,29 @@ interface BuildCreateInvoicePayloadInput {
 /**
  * Build payload cho `POST /invoices`. Mapping CartLine → CreateInvoiceItemBody:
  *   - sortOrder = index (giữ thứ tự cart hiện hữu).
- *   - lineDiscount = 0 (chiết khấu dòng chưa wire vào UI).
+ *   - note + KM dòng (`lineDiscount` {type,value,reason}) gửi lên để BE tự tính
+ *     `lineDiscount` amount + `lineTotal`. Chỉ gắn field khi dòng thực sự có.
  */
 function mapCartToInvoiceItems(cart: CartLine[]): CreateInvoiceItemBody[] {
-  return cart.map((line, index) => ({
-    itemId: line.itemId,
-    locationId: line.locationId || undefined,
-    itemCode: line.code,
-    itemName: line.name,
-    unit: line.unit,
-    quantity: line.qty,
-    unitPrice: line.unitPrice,
-    lineDiscount: 0,
-    sortOrder: index,
-  }));
+  return cart.map((line, index) => {
+    const item: CreateInvoiceItemBody = {
+      itemId: line.itemId,
+      locationId: line.locationId || undefined,
+      itemCode: line.code,
+      itemName: line.name,
+      unit: line.unit,
+      quantity: line.qty,
+      unitPrice: line.unitPrice,
+      sortOrder: index,
+    };
+    if (line.note) item.note = line.note;
+    if (line.lineDiscount) {
+      item.lineDiscountType = line.lineDiscount.type;
+      item.lineDiscountValue = line.lineDiscount.value;
+      item.lineDiscountReason = line.lineDiscount.reason;
+    }
+    return item;
+  });
 }
 
 export function buildCreateInvoicePayload(
@@ -135,17 +144,30 @@ export function mapInvoiceRowToDraftInvoice(
   row: InvoiceRow,
   customer?: CustomerRow | null,
 ): DraftInvoice {
-  const lines: CartLine[] = (row.items ?? []).map((item) => ({
-    lineId: item.id,
-    itemId: item.itemId,
-    name: item.itemName,
-    code: item.itemCode,
-    unit: item.unit,
-    unitPrice: Number(item.unitPrice) || 0,
-    qty: Number(item.quantity) || 0,
-    locationId: item.locationId ?? "",
-    maxQty: Number.MAX_SAFE_INTEGER,
-  }));
+  const lines: CartLine[] = (row.items ?? []).map((item) => {
+    const line: CartLine = {
+      lineId: item.id,
+      itemId: item.itemId,
+      name: item.itemName,
+      code: item.itemCode,
+      unit: item.unit,
+      unitPrice: Number(item.unitPrice) || 0,
+      qty: Number(item.quantity) || 0,
+      locationId: item.locationId ?? "",
+      maxQty: Number.MAX_SAFE_INTEGER,
+    };
+    if (item.note) line.note = item.note;
+    // Chỉ KM thủ công (có type+value+reason) mới dựng lại được CartLineDiscount;
+    // dòng legacy chỉ có `lineDiscount` amount thì bỏ qua.
+    if (item.lineDiscountType && item.lineDiscountValue != null) {
+      line.lineDiscount = {
+        type: item.lineDiscountType,
+        value: Number(item.lineDiscountValue) || 0,
+        reason: item.lineDiscountReason ?? "",
+      };
+    }
+    return line;
+  });
 
   return {
     id: row.id,

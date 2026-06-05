@@ -61,8 +61,16 @@ export class PosCatalogProductService {
   ): Promise<PaginatedResponse<PosProductCardDto>> {
     const orgId = actor.organizationId;
 
+    const itemWhere: FindOptionsWhere<ItemEntity> = {
+      organizationId: orgId,
+      isActive: true,
+      isPosVisible: true,
+    };
+    if (query.categoryId) {
+      itemWhere.categoryId = query.categoryId;
+    }
     const items = await this.itemRepo.find({
-      where: { organizationId: orgId, isActive: true, isPosVisible: true },
+      where: itemWhere,
       relations: ['product', 'category'],
     });
 

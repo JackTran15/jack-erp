@@ -59,16 +59,35 @@ export function lineTotal(line: CartLine): number {
 }
 
 /**
- * Nhãn KM dòng hiển thị/in: `percent` → "KM {value} % ({tiền giảm}) - {lý do}";
- * `amount` → "KM {value} - {lý do}". Trả "" nếu dòng không có KM.
+ * Nhãn KM dùng chung (dòng cart lẫn item hóa đơn đã lưu): `percent` →
+ * "KM {value} % ({tiền giảm}) - {lý do}"; `amount` → "KM {value} - {lý do}".
+ */
+export function formatDiscountLabel(input: {
+  type: "percent" | "amount";
+  /** Giá trị KM thô user nhập (10 = 10% hoặc số tiền VNĐ). */
+  value: number;
+  /** Số tiền giảm (VNĐ) đã tính — chỉ dùng cho nhãn `percent`. */
+  amount: number;
+  reason: string;
+}): string {
+  if (input.type === "percent") {
+    return `KM ${input.value} % (${formatVnd(input.amount)}) - ${input.reason}`;
+  }
+  return `KM ${formatVnd(input.value)} - ${input.reason}`;
+}
+
+/**
+ * Nhãn KM dòng hiển thị/in từ `CartLine`. Trả "" nếu dòng không có KM.
  */
 export function formatLineDiscountLabel(line: CartLine): string {
   const d = line.lineDiscount;
   if (!d) return "";
-  if (d.type === "percent") {
-    return `KM ${d.value} % (${formatVnd(lineDiscountAmount(line))}) - ${d.reason}`;
-  }
-  return `KM ${formatVnd(d.value)} - ${d.reason}`;
+  return formatDiscountLabel({
+    type: d.type,
+    value: d.value,
+    amount: lineDiscountAmount(line),
+    reason: d.reason,
+  });
 }
 
 /** Sale line: qty above on-hand snapshot (`maxQty`) — bán vượt tồn / bán khống. */

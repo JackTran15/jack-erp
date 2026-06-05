@@ -44,7 +44,13 @@ import { PointsRedemptionService } from './services/points-redemption.service';
 import { PosController } from './pos.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 import { InvoiceV2Controller } from './controllers/invoice-v2.controller';
+import { ReturnableInvoiceV2Controller } from './controllers/returnable-invoice-v2.controller';
+import { PurchaseHistoryV2Controller } from './controllers/purchase-history-v2.controller';
+import { DraftInvoiceV2Controller } from './controllers/draft-invoice-v2.controller';
 import { SearchInvoicesV2Handler } from './queries/search-invoices-v2.handler';
+import { SearchReturnableInvoicesV2Handler } from './queries/search-returnable-invoices-v2.handler';
+import { SearchPurchaseHistoryV2Handler } from './queries/search-purchase-history-v2.handler';
+import { SearchDraftInvoicesV2Handler } from './queries/search-draft-invoices-v2.handler';
 import { InvoiceCancelledPublisher } from './publishers/invoice-cancelled.publisher';
 import { DebtPaymentVoucherLinkConsumer } from './consumers/debt-payment-voucher-link.consumer';
 import { ReturnPostedPublisher } from './publishers/return-posted.publisher';
@@ -80,7 +86,14 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     CustomerModule,
     CqrsModule,
   ],
-  controllers: [PosController, InvoiceController, InvoiceV2Controller],
+  controllers: [
+    PosController,
+    InvoiceController,
+    InvoiceV2Controller,
+    ReturnableInvoiceV2Controller,
+    PurchaseHistoryV2Controller,
+    DraftInvoiceV2Controller,
+  ],
   providers: [
     PosSessionService,
     PosCatalogService,
@@ -99,6 +112,9 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     CheckoutReturnService,
     PointsRedemptionService,
     SearchInvoicesV2Handler,
+    SearchReturnableInvoicesV2Handler,
+    SearchPurchaseHistoryV2Handler,
+    SearchDraftInvoicesV2Handler,
   ],
   exports: [
     PosSessionService,
