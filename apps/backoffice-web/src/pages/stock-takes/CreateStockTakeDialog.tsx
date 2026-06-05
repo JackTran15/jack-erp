@@ -28,6 +28,14 @@ function todayIso(): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Active branch the user is scoped to — same source as the X-Branch-Id header. */
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
+  );
+}
+
 export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
   const [storages, setStorages] = useState<StorageOption[]>([]);
   const [storageId, setStorageId] = useState<string>("");
@@ -37,8 +45,11 @@ export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
     let cancelled = false;
     void (async () => {
       try {
+        const params = new URLSearchParams({ page: "1", pageSize: "200" });
+        const branchId = getActiveBranchId();
+        if (branchId) params.set("branchId", branchId);
         const { data } = await apiClient.get<PaginatedResponse<StorageOption>>(
-          "/inventory/storages?page=1&pageSize=200",
+          `/inventory/storages?${params}`,
         );
         if (!cancelled) setStorages(data.data);
       } catch {

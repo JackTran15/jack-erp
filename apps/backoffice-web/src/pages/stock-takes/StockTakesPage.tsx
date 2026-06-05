@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  cn,
   DocumentListShell,
   PageToolbar,
   PeriodFilter,
@@ -136,10 +137,18 @@ export function StockTakesPage() {
   const handleProcess = async (st: StockTake) => {
     setActionLoading(st.id);
     try {
-      await apiClient.post(`/inventory/stock-takes/${st.id}/process`);
-      toast.success(
-        "Đã xử lý phiếu kiểm kê — phiếu nhập/xuất chênh lệch đã được sinh.",
+      const { data } = await apiClient.post<StockTake>(
+        `/inventory/stock-takes/${st.id}/process`,
       );
+      if (data.generatedReceiptId || data.generatedIssueId) {
+        toast.success(
+          "Đã xử lý phiếu kiểm kê — đã sinh phiếu nhập/xuất chênh lệch.",
+        );
+      } else {
+        toast.info(
+          "Đã xử lý phiếu kiểm kê — không có chênh lệch nên không sinh phiếu.",
+        );
+      }
       setConfirmProcess(null);
       await loadRecords();
     } catch (err) {
@@ -191,9 +200,8 @@ export function StockTakesPage() {
       id: "process",
       label: "Xử lý",
       icon: Settings2,
-      // Tạm disable — flow xử lý chưa khớp MISA; sẽ xem xét lại sau.
-      disabled: true,
-      onClick: () => {},
+      disabled: !selected || selected.status !== "DRAFT",
+      onClick: () => selected && setConfirmProcess(selected),
     },
     {
       id: "delete",
@@ -254,8 +262,29 @@ export function StockTakesPage() {
     {
       key: "status",
       label: "Trạng thái",
-      width: 140,
-      render: (r) => STATUS_LABEL[r.status],
+      width: 180,
+      render: (r) =>
+        r.status === "DRAFT" ? (
+          <span className="flex items-center gap-2">
+            <span>{STATUS_LABEL[r.status]}</span>
+            <button
+              type="button"
+              className="font-medium text-emerald-600 hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmProcess(r);
+              }}
+            >
+              Xử lý
+            </button>
+          </span>
+        ) : (
+          <span
+            className={cn(r.status === "POSTED" && "text-emerald-600")}
+          >
+            {STATUS_LABEL[r.status]}
+          </span>
+        ),
     },
   ];
 
@@ -357,6 +386,10 @@ export function StockTakesPage() {
               ? () => setConfirmCancel(editing)
               : undefined
           }
+          onRequestProcess={(st) => {
+            setEditing(null);
+            setConfirmProcess(st);
+          }}
         />
       ) : null}
 

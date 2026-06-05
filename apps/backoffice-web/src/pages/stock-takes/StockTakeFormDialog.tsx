@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DocumentFormDialog,
   FormField,
@@ -11,6 +11,7 @@ import {
   type UnsavedChangesChoice,
 } from "@erp/ui";
 import {
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CloudUpload,
@@ -20,6 +21,7 @@ import {
   Printer,
   RotateCcw,
   Save,
+  Settings2,
   Trash2,
   X,
 } from "lucide-react";
@@ -52,6 +54,8 @@ interface Props {
   /** Called after any successful save / process so the list page can refresh. */
   onSaved: () => Promise<void> | void;
   onRequestDelete?: () => void;
+  /** Open the "Xử lý" confirm for a saved DRAFT phiếu. */
+  onRequestProcess?: (st: StockTake) => void;
 }
 
 interface LineRow {
@@ -131,6 +135,7 @@ export function StockTakeFormDialog({
   onClose,
   onSaved,
   onRequestDelete,
+  onRequestProcess,
 }: Props) {
   // Internal current snapshot — flips from null → entity after the first save in new mode.
   const [stockTake, setStockTake] = useState<StockTake | null>(initialStockTake ?? null);
@@ -156,6 +161,44 @@ export function StockTakeFormDialog({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+
+  // "Tham chiếu": the NK/XK documents auto-generated when this stock-take was
+  // processed. The API stores only their ids, so resolve the document numbers.
+  const [refDocs, setRefDocs] = useState<{ receipt?: string; issue?: string }>(
+    {},
+  );
+  const refReceiptId = stockTake?.generatedReceiptId;
+  const refIssueId = stockTake?.generatedIssueId;
+  useEffect(() => {
+    if (!refReceiptId && !refIssueId) {
+      setRefDocs({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const next: { receipt?: string; issue?: string } = {};
+      try {
+        if (refReceiptId) {
+          const { data } = await apiClient.get<{ documentNumber?: string }>(
+            `/goods-receipts/${refReceiptId}`,
+          );
+          next.receipt = data.documentNumber ?? undefined;
+        }
+        if (refIssueId) {
+          const { data } = await apiClient.get<{ documentNumber?: string }>(
+            `/inventory/goods-issues/${refIssueId}`,
+          );
+          next.issue = data.documentNumber ?? undefined;
+        }
+      } catch {
+        // best-effort — the reference is informational only
+      }
+      if (!cancelled) setRefDocs(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refReceiptId, refIssueId]);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
   const markDirty = useCallback(() => {
@@ -239,23 +282,39 @@ export function StockTakeFormDialog({
   /** Triggered when user picks an item in the row's SKU lookup. */
   const handlePickItem = useCallback(
     async (item: ItemOption, rowIndex: number) => {
-      // Resolve location + expected qty.
-      const balance = await fetchFirstBalance(item.id);
-      let locationId = balance?.locationId ?? "";
-      let locationCode = balance?.location?.code ?? "";
-      let expectedQty = balance ? Number(balance.quantity) : 0;
+      // A row can only be resolved against a concrete storage. Without one we
+      // can't look up a location — surface that instead of failing silently.
+      if (!effectiveStorageId) {
+        toast.error("Chưa chọn kho kiểm kê — không thể thêm hàng hóa.");
+        return;
+      }
 
-      if (!locationId) {
-        const fallback = await fetchFirstLocation();
-        if (!fallback) {
-          toast.error(
-            "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
-          );
-          return;
+      // Resolve location + expected qty. Network failures here would otherwise
+      // be an unhandled rejection that drops the picked item with no feedback.
+      let locationId = "";
+      let locationCode = "";
+      let expectedQty = 0;
+      try {
+        const balance = await fetchFirstBalance(item.id);
+        locationId = balance?.locationId ?? "";
+        locationCode = balance?.location?.code ?? "";
+        expectedQty = balance ? Number(balance.quantity) : 0;
+
+        if (!locationId) {
+          const fallback = await fetchFirstLocation();
+          if (!fallback) {
+            toast.error(
+              "Kho được chọn chưa có vị trí nào — tạo vị trí trước khi kiểm kê.",
+            );
+            return;
+          }
+          locationId = fallback.id;
+          locationCode = fallback.code;
+          expectedQty = 0;
         }
-        locationId = fallback.id;
-        locationCode = fallback.code;
-        expectedQty = 0;
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        return;
       }
 
       if (isNew || !stockTake) {
@@ -316,7 +375,14 @@ export function StockTakeFormDialog({
         toast.error(getUserFacingApiErrorMessage(err));
       }
     },
-    [fetchFirstBalance, fetchFirstLocation, isNew, stockTake, markDirty],
+    [
+      effectiveStorageId,
+      fetchFirstBalance,
+      fetchFirstLocation,
+      isNew,
+      stockTake,
+      markDirty,
+    ],
   );
 
   const handleDeleteRow = useCallback(
@@ -378,12 +444,15 @@ export function StockTakeFormDialog({
           "/inventory/stock-takes",
           payload,
         );
-        // Switch to edit mode: re-seed rows from server (server may reorder ids).
+        // Reflect the saved entity locally before any callbacks read state.
         setStockTake(data);
         setRows(data.lines.map(toLineRow));
         setDirty(false);
         toast.success(`Đã tạo phiếu ${data.documentNumber ?? ""}.`);
+        // New phiếu is persisted — close back to the list so the user can
+        // process it from the toolbar / inline "Xử lý". onClose reloads.
         await onSaved();
+        onClose();
         return true;
       }
 
@@ -423,6 +492,7 @@ export function StockTakeFormDialog({
     countDate,
     countTime,
     onSaved,
+    onClose,
   ]);
 
   // ─── Close handling ──────────────────────────────────────────────────────
@@ -558,14 +628,14 @@ export function StockTakeFormDialog({
     },
     {
       key: "unit",
-      label: "ĐVT",
+      label: "Đơn vị tính",
       width: 80,
       type: "readonly",
       getValue: (r) => r.unit,
     },
     {
       key: "expectedQty",
-      label: "Theo số",
+      label: "Theo sổ",
       width: 100,
       type: "readonly",
       align: "right",
@@ -634,6 +704,20 @@ export function StockTakeFormDialog({
       ? `Phiếu kiểm kê ${stockTake?.documentNumber ?? ""}`
       : `Sửa phiếu kiểm kê ${stockTake?.documentNumber ?? ""}`;
 
+  // MISA shows the processing outcome next to the "CHỨNG TỪ" block.
+  const processStatusBadge =
+    stockTake?.status === "POSTED" ? (
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-600">
+        <CheckCircle2 className="h-4 w-4" /> Đã xử lý
+      </span>
+    ) : stockTake?.status === "CANCELLED" ? (
+      <span className="text-sm font-semibold text-destructive">Đã huỷ</span>
+    ) : (
+      <span className="text-sm font-semibold text-muted-foreground">
+        Chưa xử lý
+      </span>
+    );
+
   return (
     <>
       <DocumentFormDialog
@@ -673,10 +757,31 @@ export function StockTakeFormDialog({
                 className="h-8 bg-muted/40"
               />
             </FormField>
+            <FormField label="Tham chiếu">
+              <div className="flex h-8 items-center gap-3 text-sm">
+                {refDocs.receipt || refDocs.issue ? (
+                  <>
+                    {refDocs.receipt ? (
+                      <span className="font-mono font-medium text-foreground">
+                        {refDocs.receipt}
+                      </span>
+                    ) : null}
+                    {refDocs.issue ? (
+                      <span className="font-mono font-medium text-foreground">
+                        {refDocs.issue}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            </FormField>
           </>
         }
         documentInfo={
           <>
+            <div className="mb-1 flex justify-end">{processStatusBadge}</div>
             <FormField label="Số phiếu KK">
               <Input
                 value={
@@ -740,6 +845,23 @@ export function StockTakeFormDialog({
                 placeholder="Nhập kết luận sau khi kiểm kê…"
               />
             </div>
+          </div>
+        }
+        footerSummary={
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs italic text-muted-foreground">
+              Bấm "Xử lý" phần mềm sẽ tự động sinh phiếu nhập kho/xuất kho tương ứng
+              với số lượng và giá trị hàng hóa chênh lệch thừa/thiếu sau kiểm kê.
+            </p>
+            <button
+              type="button"
+              onClick={() => stockTake && onRequestProcess?.(stockTake)}
+              disabled={!onRequestProcess || isLocked || isNew || !stockTake}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Settings2 className="h-4 w-4" />
+              Xử lý
+            </button>
           </div>
         }
       />

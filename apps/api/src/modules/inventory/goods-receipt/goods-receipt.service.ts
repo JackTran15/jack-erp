@@ -64,11 +64,11 @@ export class GoodsReceiptService {
     private readonly dataSource: DataSource,
     private readonly stockLedger: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
-    private readonly eventPublisher: EventPublisher,
     private readonly cashService: CashService,
     private readonly cashFundResolver: CashFundResolverService,
     private readonly journalService: JournalService,
     private readonly outboxService: OutboxService,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
@@ -110,6 +110,43 @@ export class GoodsReceiptService {
       `Goods receipt ${saved.id} created as DRAFT ${documentNumber} by ${actor.userId}`,
     );
     return this.findOrFail(saved.id, actor.organizationId);
+  }
+
+  // ─── Create + Post (single user action — clone MISA) ──────────────────────
+  //
+  // The HTTP create endpoint must yield a POSTED phiếu (number assigned, stock
+  // ledger written) so it shows up in reports immediately. We persist the DRAFT
+  // then post it; if posting fails we hard-delete the just-created DRAFT (its
+  // lines cascade) so no orphan phiếu is left behind — atomic from the user's
+  // point of view. The standalone post() endpoint is untouched.
+
+  async createAndPost(
+    dto: CreateGoodsReceiptDto,
+    actor: ActorContext,
+  ): Promise<GoodsReceiptEntity> {
+    const draft = await this.create(dto, actor);
+    try {
+      return await this.post(draft.id, actor);
+    } catch (err) {
+      // Roll back the orphan DRAFT (lines FK has onDelete: CASCADE) so a failed
+      // post leaves nothing persisted.
+      await this.receiptRepo.delete({ id: draft.id, organizationId: actor.organizationId });
+      this.logger.warn(
+        `Goods receipt ${draft.id} create+post failed; orphan DRAFT removed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      if (
+        err instanceof BadRequestException ||
+        err instanceof ConflictException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+      throw new BadRequestException(
+        'Không thể nhập kho. Vui lòng thử lại.',
+      );
+    }
   }
 
   // ─── Update (only DRAFT) ──────────────────────────────────────────────────

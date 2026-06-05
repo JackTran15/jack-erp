@@ -48,6 +48,7 @@ import {
 } from "./provider-crud.service";
 import { ProviderEntity } from "./provider.entity";
 import { ShowroomEntity } from "./showroom.entity";
+import { ItemCostSnapshotModule } from './item-cost-snapshot.module';
 import {
   INVENTORY_STORAGE_ENTITY_CONFIG,
   INVENTORY_STORAGE_SERVICE_TOKEN,

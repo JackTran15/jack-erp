@@ -107,7 +107,6 @@ export class TempWarehouseTransferConsumer {
         },
         actor,
       );
-      await this.stockTransferService.approve(transfer.id, actor);
       await this.stockTransferService.post(transfer.id, actor);
 
       await this.tempWarehouseService.markTransferCompleted(
@@ -183,7 +182,6 @@ export class TempWarehouseTransferConsumer {
       },
       actor,
     );
-    await this.stockTransferService.approve(transfer.id, actor);
     await this.stockTransferService.post(transfer.id, actor);
 
     await this.tempWarehouseService.markLinesTransferred(

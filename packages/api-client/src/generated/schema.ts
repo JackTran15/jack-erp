@@ -2411,22 +2411,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/inventory/stock/transfers/intra-warehouse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTransferController_createIntraWarehouseTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/inventory/stock/transfers/{id}": {
         parameters: {
             query?: never;
@@ -2440,10 +2424,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["StockTransferController_update"];
         trace?: never;
     };
-    "/inventory/stock/transfers/{id}/approve": {
+    "/inventory/stock/transfers/intra-warehouse": {
         parameters: {
             query?: never;
             header?: never;
@@ -2452,7 +2436,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["StockTransferController_approve"];
+        post: operations["StockTransferController_createIntraWarehouseTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3726,22 +3710,6 @@ export interface paths {
         get: operations["GoodsIssueController_getById"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/goods-issues/{id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["GoodsIssueController_approve"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5320,8 +5288,9 @@ export interface components {
         ItemCategoryEntity: {
             code?: string;
             name: string;
-            parentGroupId?: string;
             description?: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -6075,6 +6044,9 @@ export interface components {
             quantity: number;
             notes?: string;
             transfer?: components["schemas"]["StockTransferEntity"];
+            item?: components["schemas"]["ItemEntity"];
+            sourceLocation?: components["schemas"]["LocationEntity"];
+            destinationLocation?: components["schemas"]["LocationEntity"];
         };
         IntraWarehouseTransferLineDto: {
             /**
@@ -6973,7 +6945,10 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @enum {string} */
-            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL";
+            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
+            referenceId?: string;
+            /** @enum {string} */
+            referenceType?: "STOCK_TAKE";
             notes?: string;
             approvedBy?: string;
             /** Format: date-time */
@@ -6998,12 +6973,14 @@ export interface components {
             id: string;
             goodsIssueId: string;
             itemId: string;
+            locationId: string;
             quantity: number;
             unitPrice: string;
             lineTotal: string;
             notes?: string;
             goodsIssue?: components["schemas"]["GoodsIssueEntity"];
             item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
         };
         CreateIssueReasonDto: {
             /**
@@ -7064,7 +7041,7 @@ export interface components {
         };
         CreateGoodsReceiptDto: {
             /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN";
+            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7073,7 +7050,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             /** @description Source branch for transfer-in. Stored separately from referenceId. */
             sourceBranchId?: string;
             receivedAt: string;
@@ -7099,14 +7076,14 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
             /** @enum {string} */
-            purpose: "OTHER" | "TRANSFER_IN";
+            purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             providerId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
             sourceBranchId?: string;
             /** Format: date-time */
@@ -7163,7 +7140,7 @@ export interface components {
         };
         UpdateGoodsReceiptDto: {
             /** @enum {string} */
-            purpose?: "OTHER" | "TRANSFER_IN";
+            purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7172,7 +7149,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
+            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
             sourceBranchId?: string;
             receivedAt?: string;
             /** Format: uuid */
@@ -12193,29 +12170,6 @@ export interface operations {
             };
         };
     };
-    StockTransferController_createIntraWarehouseTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateIntraWarehouseTransferDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
     StockTransferController_getById: {
         parameters: {
             query?: never;
@@ -12237,7 +12191,7 @@ export interface operations {
             };
         };
     };
-    StockTransferController_approve: {
+    StockTransferController_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -12246,7 +12200,34 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransferDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferController_createIntraWarehouseTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIntraWarehouseTransferDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -14461,27 +14442,6 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueEntity"];
-                };
-            };
-        };
-    };
-    GoodsIssueController_approve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
                 headers: {
                     [name: string]: unknown;
                 };

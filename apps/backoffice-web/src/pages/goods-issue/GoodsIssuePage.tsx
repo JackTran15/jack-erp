@@ -71,7 +71,8 @@ export type GoodsIssuePurposeUI =
   | "OTHER"
   | "SALE"
   | "TRANSFER_OUT"
-  | "DISPOSAL";
+  | "DISPOSAL"
+  | "STOCK_TAKE";
 
 interface GoodsIssueLine {
   id: string;
@@ -105,6 +106,8 @@ interface GoodsIssue {
   reasonRef?: { id: string; code: string; name: string } | null;
   targetBranchId?: string;
   targetBranch?: { id: string; name: string } | null;
+  referenceId?: string | null;
+  referenceType?: string | null;
   status: GoodsIssueStatus;
   issueDate?: string;
   notes?: string;
@@ -150,6 +153,15 @@ interface InventoryStorage {
   id: string;
   name: string;
   branchId: string;
+  isMainStorage?: boolean;
+}
+
+/** Active branch id used as X-Branch-Id (set by api-axios from localStorage). */
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
+  );
 }
 
 const FILTER_KEYS = [
@@ -186,6 +198,7 @@ const PURPOSE_LABELS: Record<GoodsIssuePurposeUI, string> = {
   SALE: "Phiếu xuất kho bán hàng",
   TRANSFER_OUT: "Điều chuyển đến cửa hàng khác",
   DISPOSAL: "Hủy hàng",
+  STOCK_TAKE: "Phiếu xuất kho kiểm kê",
 };
 
 const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
@@ -193,6 +206,13 @@ const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
   "TRANSFER_OUT",
   "DISPOSAL",
 ];
+
+const STATUS_LABELS: Record<GoodsIssueStatus, string> = {
+  DRAFT: "Chưa thực hiện",
+  APPROVED: "Chưa thực hiện",
+  POSTED: "Đã thực hiện",
+  CANCELLED: "Đã hoãn",
+};
 
 interface BranchOption {
   id: string;
@@ -229,7 +249,7 @@ export function GoodsIssuePage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingIssue, setEditingIssue] = useState<GoodsIssue | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<GoodsIssue | null>(null);
-  const [confirmPost, setConfirmPost] = useState<GoodsIssue | null>(null);
+  const [confirmVoid, setConfirmVoid] = useState<GoodsIssue | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -263,8 +283,11 @@ export function GoodsIssuePage() {
 
   const loadStorages = useCallback(async () => {
     try {
+      const branchId = getActiveBranchId();
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch {
@@ -311,23 +334,14 @@ export function GoodsIssuePage() {
     await loadRecords();
   }, [loadRecords]);
 
-  const handleApprove = async (issue: GoodsIssue) => {
+  const handleVoid = async (issue: GoodsIssue) => {
     setActionLoading(issue.id);
     try {
-      await apiClient.post(`/inventory/goods-issues/${issue.id}/approve`);
-      await reloadAfterMutation();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handlePost = async (issue: GoodsIssue) => {
-    setActionLoading(issue.id);
-    try {
-      await apiClient.post(`/inventory/goods-issues/${issue.id}/post`);
-      setConfirmPost(null);
+      // Hoãn = đảo bút phiếu đã thực hiện. Cùng endpoint cancel() như "Xóa",
+      // nhưng với phiếu POSTED, BE sẽ đảo bút tồn kho trước khi đánh dấu huỷ.
+      await apiClient.post(`/inventory/goods-issues/${issue.id}/cancel`);
+      setConfirmVoid(null);
+      if (selectedId === issue.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -497,6 +511,24 @@ export function GoodsIssuePage() {
       width: 200,
       render: (row) => PURPOSE_LABELS[row.purpose ?? "OTHER"],
     },
+    {
+      key: "status",
+      label: "Trạng thái",
+      width: 130,
+      render: (row) => (
+        <span
+          className={
+            row.status === "POSTED"
+              ? "text-green-600"
+              : row.status === "CANCELLED"
+                ? "text-muted-foreground"
+                : "text-foreground"
+          }
+        >
+          {STATUS_LABELS[row.status]}
+        </span>
+      ),
+    },
   ];
 
   const columnFilterControl = useMemo(
@@ -611,8 +643,7 @@ export function GoodsIssuePage() {
             setEditingIssue(null);
             await loadRecords();
           }}
-          onApprove={editingIssue ? () => void handleApprove(editingIssue) : undefined}
-          onPost={editingIssue ? () => setConfirmPost(editingIssue) : undefined}
+          onVoid={editingIssue ? () => setConfirmVoid(editingIssue) : undefined}
           onRequestDelete={editingIssue ? () => setConfirmDelete(editingIssue) : undefined}
         />
       )}
@@ -629,15 +660,15 @@ export function GoodsIssuePage() {
         />
       )}
 
-      {confirmPost && (
+      {confirmVoid && (
         <ConfirmActionModal
-          title="Xác nhận xuất kho"
-          message={`Xuất hàng theo phiếu ${confirmPost.documentNumber ?? confirmPost.id}? Thao tác này sẽ trừ tồn kho ngay lập tức và không thể hoàn tác.`}
-          confirmLabel="Xuất kho"
+          title="Hoãn phiếu xuất kho"
+          message={`Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này sẽ đảo bút tồn kho đã xuất.`}
+          confirmLabel="Hoãn phiếu"
           cancelLabel="Quay lại"
-          loading={actionLoading === confirmPost.id}
-          onCancel={() => setConfirmPost(null)}
-          onConfirm={() => void handlePost(confirmPost)}
+          loading={actionLoading === confirmVoid.id}
+          onCancel={() => setConfirmVoid(null)}
+          onConfirm={() => void handleVoid(confirmVoid)}
         />
       )}
     </>
@@ -755,8 +786,7 @@ function GoodsIssueFormDialog({
   actionLoading,
   onClose,
   onSaved,
-  onApprove,
-  onPost,
+  onVoid,
   onRequestDelete,
 }: {
   mode: "create" | "edit" | "view";
@@ -767,8 +797,7 @@ function GoodsIssueFormDialog({
   actionLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
-  onApprove?: () => void;
-  onPost?: () => void;
+  onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
@@ -807,6 +836,21 @@ function GoodsIssueFormDialog({
   const [customerId, setCustomerId] = useState(initialCustomer.id);
   const [customerCode, setCustomerCode] = useState(initialCustomer.code);
   const [customerName, setCustomerName] = useState(initialCustomer.name);
+  // Storage derived from the saved location's parent. Cached storages let us
+  // resolve a name immediately on open; the picker will reset both if user
+  // changes warehouse later. For a new (create) phiếu, default to the active
+  // branch's main storage (list is main-first; fall back to the first kho).
+  const defaultStorage = useMemo(
+    () => storages.find((s) => s.isMainStorage) ?? storages[0],
+    [storages],
+  );
+  const initialStorageId =
+    initial?.location?.storageId ?? (initial ? "" : defaultStorage?.id ?? "");
+  const initialStorageName = initialStorageId
+    ? storages.find((s) => s.id === initialStorageId)?.name ?? ""
+    : "";
+  const [storageId, setStorageId] = useState(initialStorageId);
+  const [storageQuery, setStorageQuery] = useState(initialStorageName);
   const [purpose, setPurpose] = useState<GoodsIssuePurposeUI>(
     initial?.purpose && MANUAL_PURPOSES.includes(initial.purpose)
       ? initial.purpose
@@ -869,13 +913,42 @@ function GoodsIssueFormDialog({
     Array<{ id: string; name: string; branchId: string }>
   >([]);
 
+  // "Tham chiếu": phiếu xuất kho kiểm kê được sinh tự động khi "Xử lý" một phiếu
+  // kiểm kê. API chỉ trả referenceId — resolve số phiếu KK gốc để hiển thị.
+  const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  const referenceStockTakeId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId ?? null : null;
+  useEffect(() => {
+    if (!referenceStockTakeId) {
+      setReferenceNumber(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${referenceStockTakeId}`,
+        );
+        if (!cancelled) setReferenceNumber(data.documentNumber ?? null);
+      } catch {
+        // best-effort — tham chiếu chỉ mang tính thông tin
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceStockTakeId]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
+        const branchId = getActiveBranchId();
+        const params = new URLSearchParams({ page: "1", pageSize: "200" });
+        if (branchId) params.set("branchId", branchId);
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
-        >("/inventory/storages?page=1&pageSize=200");
+        >(`/inventory/storages?${params}`);
         if (!cancelled) setStorageCache(data.data);
       } catch {
         // best-effort
@@ -1038,10 +1111,6 @@ function GoodsIssueFormDialog({
       toast.error("Mỗi dòng hàng phải chọn kho.");
       return false;
     }
-    if ((purpose === "OTHER" || purpose === "DISPOSAL") && !reasonId) {
-      toast.error("Vui lòng chọn lý do xuất kho.");
-      return false;
-    }
     if (purpose === "TRANSFER_OUT" && !targetBranchId) {
       toast.error("Vui lòng chọn cửa hàng đích để điều chuyển.");
       return false;
@@ -1079,7 +1148,9 @@ function GoodsIssueFormDialog({
         providerId: customerId || undefined,
         purpose,
         reasonId:
-          purpose === "OTHER" || purpose === "DISPOSAL" ? reasonId : undefined,
+          (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
+            ? reasonId
+            : undefined,
         targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
         notes: notes || undefined,
         lines: resolvedLines.map((l) => ({
@@ -1091,7 +1162,9 @@ function GoodsIssueFormDialog({
         })),
       });
       setDirty(false);
-      toast.success("Đã tạo phiếu xuất kho.");
+      // "Lưu" tạo + thực hiện luôn (giống MISA): phiếu trả về đã ở trạng thái
+      // đã xuất kho, đã ghi sổ tồn kho.
+      toast.success("Đã xuất kho.");
       await onSaved();
       return true;
     } catch (err) {
@@ -1152,8 +1225,9 @@ function GoodsIssueFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      disabled: !onApprove || initial?.status !== "DRAFT",
-      onClick: () => onApprove?.(),
+      // Hoãn chỉ áp dụng cho phiếu đã thực hiện (POSTED) — đảo bút tồn kho.
+      disabled: !onVoid || initial?.status !== "POSTED",
+      onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
@@ -1549,7 +1623,13 @@ function GoodsIssueFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {referenceNumber ? (
+                <span className="font-mono text-sm font-medium text-foreground">
+                  {referenceNumber}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1614,15 +1694,6 @@ function GoodsIssueFormDialog({
             >
               Nhập khẩu
             </button>
-            {onPost && initial?.status === "APPROVED" && (
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-green-600 hover:underline"
-                onClick={onPost}
-              >
-                Xuất kho
-              </button>
-            )}
           </>
         }
         detail={
