@@ -6,11 +6,11 @@ import {
   DropdownMenuTrigger,
 } from "@erp/ui";
 import { ChevronDown } from "lucide-react";
-import { useBranches } from "../../hooks/iam/useBranches";
+import { useMyBranches } from "../../hooks/iam/useBranches";
 import { getActiveBranch, setActiveBranch } from "../../lib/auth-storage";
 
 export function BranchSelector() {
-  const { data: branches } = useBranches();
+  const { data: branches } = useMyBranches();
 
   if (!branches?.length) return null;
 

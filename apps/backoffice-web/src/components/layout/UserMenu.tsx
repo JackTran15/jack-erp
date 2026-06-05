@@ -10,17 +10,17 @@ import {
   DropdownMenuSeparator,
 } from "@erp/ui";
 import { useAuth } from "../../hooks/useAuth";
-
-function getDisplayName(): string {
-  const orgId = localStorage.getItem("organization_id");
-  if (orgId) return orgId;
-  return "Admin";
-}
+import { useCurrentUser } from "../../hooks/iam/useCurrentUser";
 
 export function UserMenu() {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const displayName = getDisplayName();
+  const { data: user } = useCurrentUser();
+
+  const displayName = user
+    ? `${user.firstName} ${user.lastName}`.trim()
+    : "Unknown";
+  const subtitle = user?.roles.map((r) => r.name).join(", ") ?? "";
 
   const handleLogout = () => {
     void logout().then(() => navigate("/login", { replace: true }));
@@ -39,11 +39,18 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="font-normal">
-          <p className="text-xs font-semibold text-foreground">Tài khoản</p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{displayName}</p>
+          <p className="text-xs font-semibold text-foreground">{displayName}</p>
+          {subtitle && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {subtitle}
+            </p>
+          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem
+          onClick={handleLogout}
+          className="text-destructive focus:text-destructive"
+        >
           <LogOut className="h-4 w-4" />
           Đăng xuất
         </DropdownMenuItem>

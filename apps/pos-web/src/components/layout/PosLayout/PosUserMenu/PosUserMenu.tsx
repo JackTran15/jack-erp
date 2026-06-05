@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@erp/ui";
 import {
@@ -13,6 +8,7 @@ import {
 
 export interface PosUserMenuProps {
   name: string;
+  subtitle?: string;
   /** Initials override; falls back to first letter of `name`. */
   initials?: string;
   onLogout: () => void;
@@ -28,7 +24,12 @@ interface PanelPosition {
  * Renders the popover via portal so it escapes the topbar stacking context;
  * click-outside on the scrim and Escape both close it.
  */
-export function PosUserMenu({ name, initials, onLogout }: PosUserMenuProps) {
+export function PosUserMenu({
+  name,
+  subtitle,
+  initials,
+  onLogout,
+}: PosUserMenuProps) {
   const fallback = (initials ?? name.charAt(0)).toUpperCase();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -77,14 +78,17 @@ export function PosUserMenu({ name, initials, onLogout }: PosUserMenuProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
-          "inline-flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-gray-700 transition-colors hover:bg-gray-100 flex-shrink-0",
+          "inline-flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[13px] text-gray-700 transition-colors hover:bg-gray-100 flex-shrink-0 min-w-40",
           open && "bg-gray-100",
         )}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-[12px] font-semibold text-white">
-          {fallback}
-        </span>
-        <span className="font-medium">{name}</span>
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-[12px] font-semibold text-white">
+            {fallback}
+          </span>
+          <span className="font-medium">{name}</span>
+        </div>
+
         <ChevronDownIcon
           size={14}
           className={cn(
@@ -109,16 +113,18 @@ export function PosUserMenu({ name, initials, onLogout }: PosUserMenuProps) {
                 className="fixed z-50 w-[240px] rounded-xl border border-gray-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
               >
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-[14px] font-semibold text-white">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-[14px] font-semibold text-white">
                     {fallback}
                   </span>
                   <div className="min-w-0">
                     <div className="truncate text-[14px] font-medium text-gray-900">
                       {name}
                     </div>
-                    <div className="truncate text-[12px] text-gray-500">
-                      Thu ngân
-                    </div>
+                    {subtitle && (
+                      <div className="truncate text-[12px] text-gray-500">
+                        {subtitle}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="border-t border-gray-100" />

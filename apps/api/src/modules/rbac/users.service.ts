@@ -159,6 +159,21 @@ export class UsersService {
     };
   }
 
+  async getMe(actor: ActorContext): Promise<UserDetail & { roles: { id: string; name: string }[] }> {
+    const [detail, roles] = await Promise.all([
+      this.findById(actor.userId, actor),
+      this.roleRepo
+        .createQueryBuilder('role')
+        .innerJoin(UserRoleEntity, 'ur', 'ur.role_id = role.id AND ur.user_id = :userId AND ur.organization_id = :orgId', {
+          userId: actor.userId,
+          orgId: actor.organizationId,
+        })
+        .select(['role.id', 'role.name'])
+        .getMany(),
+    ]);
+    return { ...detail, roles };
+  }
+
   async create(dto: CreateUserDto, actor: ActorContext): Promise<UserDetail> {
     const normalizedEmail = dto.email.trim().toLowerCase();
 

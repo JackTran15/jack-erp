@@ -20,7 +20,6 @@ export const usePosBranchStore = create<PosBranchState>()(
       name: "pos-branch",
       partialize: (state) => ({
         branchId: state.branchId,
-        branchName: state.branchName,
       }),
     },
   ),

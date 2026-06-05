@@ -1,28 +1,44 @@
+import { useEffect } from "react";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { MapPinIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
+import { useNavigate } from "react-router-dom";
+import type { BranchRow } from "@erp/pos/interfaces/branch.interface";
 
-interface BranchOption {
-  id: string;
-  name: string;
-}
-
-/**
- * Branch indicator in the POS topbar. Reads the active branch from the branch
- * store and renders it as a single-option {@link PosSelect}. Branch switching
- * lives on the dedicated `/chon-chi-nhanh` page.
- */
 export function PosLocationIndicator() {
+  const navigate = useNavigate();
   const branchId = usePosBranchStore((s) => s.branchId);
-  const branchName = usePosBranchStore((s) => s.branchName);
-  const current: BranchOption | null =
-    branchId && branchName ? { id: branchId, name: branchName } : null;
+  const setBranch = usePosBranchStore((s) => s.setBranch);
+
+  const { data: branches = [] } = useMyBranchesQuery();
+
+  useEffect(() => {
+    if (!branches.length) return;
+    const match = branches.find((b) => b.id === branchId);
+    if (match) {
+      setBranch(match.id, match.name);
+    } else {
+      const first = branches[0];
+      setBranch(first.id, first.name);
+      navigate("/", { replace: true });
+    }
+  }, [branches, branchId, setBranch, navigate]);
+
+  const current: BranchRow | null =
+    branches.find((b) => b.id === branchId) ?? null;
+
+  const handleChange = (branch: BranchRow) => {
+    if (branch.id === branchId) return;
+    setBranch(branch.id, branch.name);
+    navigate("/", { replace: true });
+  };
 
   return (
-    <PosSelect<BranchOption>
-      items={current ? [current] : []}
+    <PosSelect<BranchRow>
+      items={branches}
       value={current}
-      onChange={() => {}}
+      onChange={handleChange}
       itemKey={(b) => b.id}
       renderItem={(b) => b.name}
       ariaLabel="Chi nhánh"

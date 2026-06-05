@@ -83,6 +83,11 @@ export class BranchController {
     return this.branchService.getUserBranches(userId, actor);
   }
 
+  @Get('me')
+  listMyBranches(@Actor() actor: ActorContext) {
+    return this.branchService.listMyBranches(actor);
+  }
+
   @Get(':id')
   findById(
     @Param('id', ParseUUIDPipe) id: string,

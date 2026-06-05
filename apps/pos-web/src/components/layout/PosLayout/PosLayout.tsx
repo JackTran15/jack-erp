@@ -31,6 +31,7 @@ import {
 } from "@erp/pos/lib/common/localstorage";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { authService } from "@erp/pos/services/auth.service";
+import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
 import {
   PosNotificationPopover,
   type NotificationItem,
@@ -96,6 +97,12 @@ export function PosLayout() {
   const cashierDisplayName = usePosCheckoutSessionStore(
     (s) => s.cashierDisplayName,
   );
+  const { data: currentUser } = useCurrentUserQuery();
+  const displayName =
+    currentUser
+      ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+      : (cashierDisplayName ?? "");
+  const roleSubtitle = currentUser?.roles.map((r) => r.name).join(", ") ?? undefined;
   const draftsDialogOpen = usePosCheckoutSessionStore(
     (s) => s.draftsDialogOpen,
   );
@@ -269,7 +276,8 @@ export function PosLayout() {
             onClick={() => setSyncDialogOpen(true)}
           />
           <PosUserMenu
-            name={cashierDisplayName ?? "Phan Thanh Hà"}
+            name={displayName}
+            subtitle={roleSubtitle}
             onLogout={handleLogout}
           />
           <PosIconButton

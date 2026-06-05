@@ -7,6 +7,14 @@ import type { PosCatalogDirection } from "@erp/pos/types/catalog.type";
 import type { TempWarehouseDirection } from "@erp/shared-interfaces";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 
+export const USER_KEYS = {
+  ME: ["user", "me"] as const,
+} as const;
+
+export const BRANCH_KEYS = {
+  MY_BRANCHES: ["branches", "me"] as const,
+} as const;
+
 export const ACCOUNT_KEYS = {
   ALL: ["accounts"] as const,
   PAYMENT: ["accounts", "payment"] as const,
