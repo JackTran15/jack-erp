@@ -296,7 +296,13 @@ export function StockTakesPage() {
       <DocumentListShell
         title={<InventoryPageTitle>Kiểm kê kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="stock-take" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}

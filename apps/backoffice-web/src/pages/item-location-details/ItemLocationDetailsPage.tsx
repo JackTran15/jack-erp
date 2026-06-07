@@ -280,7 +280,13 @@ export function ItemLocationDetailsPage() {
           </InventoryPageTitle>
         }
         tabs={<InventoryTabBar activeId="item-location-details" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         pagination={
           <PaginationControls
             page={page}
