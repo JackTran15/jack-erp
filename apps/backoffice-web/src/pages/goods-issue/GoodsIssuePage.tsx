@@ -573,7 +573,13 @@ export function GoodsIssuePage() {
       <DocumentListShell
         title={<InventoryPageTitle>Xuất kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="goods-issues" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}

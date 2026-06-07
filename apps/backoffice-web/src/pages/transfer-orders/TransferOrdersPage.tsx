@@ -392,7 +392,13 @@ export function TransferOrdersPage() {
       <DocumentListShell
         title={<InventoryPageTitle>Lệnh điều chuyển</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="transfer-order" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}

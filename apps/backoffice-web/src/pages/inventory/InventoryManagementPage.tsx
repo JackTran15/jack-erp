@@ -219,13 +219,13 @@ export function InventoryManagementPage() {
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              className="bg-primary-blue text-white hover:bg-primary-blue-hover"
               onClick={() => setFilterDialogOpen(true)}
             >
               <Filter className="mr-1.5 h-3.5 w-3.5" />
               Bộ lọc
               {activeAdvancedCount > 0 ? (
-                <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground">
+                <span className="ml-1.5 rounded-full bg-white px-1.5 text-[10px] font-semibold leading-4 text-primary-blue">
                   {activeAdvancedCount}
                 </span>
               ) : null}

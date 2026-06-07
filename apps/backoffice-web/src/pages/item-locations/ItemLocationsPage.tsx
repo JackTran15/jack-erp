@@ -493,7 +493,13 @@ export function ItemLocationsPage() {
       <DocumentListShell
         title={<InventoryPageTitle>Vị trí hàng hóa</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="item-locations" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         pagination={
           <PaginationControls
             page={pagination.page}

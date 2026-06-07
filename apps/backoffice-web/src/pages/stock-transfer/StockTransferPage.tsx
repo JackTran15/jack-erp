@@ -296,7 +296,13 @@ export function StockTransferPage() {
       <DocumentListShell
         title={<InventoryPageTitle>Chuyển kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="stock-transfer" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}

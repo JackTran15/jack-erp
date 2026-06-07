@@ -525,7 +525,13 @@ export function PurchaseOrdersPage() {
       <DocumentListShell
         title={<InventoryPageTitle>Nhập kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="purchase-orders" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}
