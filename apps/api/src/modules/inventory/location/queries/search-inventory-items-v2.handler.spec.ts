@@ -16,42 +16,29 @@ const actor: ActorContext = {
   roles: [],
 };
 
-// Two variants of product P1 + one orphan item.
-const PRODUCT = { id: 'P1', code: 'GELLI', name: 'Giày Gelli' };
-const items = [
-  {
-    id: 'i-1', productId: 'P1', product: PRODUCT, code: 'GELLI-39', name: 'Giày Gelli (39)',
-    unit: 'đôi', brand: 'Acme', purchasePrice: '300000', sellingPrice: '500000',
-    isActive: true, isPosVisible: true, barcodes: [{ code: 'B1' }],
-  },
-  {
-    id: 'i-2', productId: 'P1', product: PRODUCT, code: 'GELLI-40', name: 'Giày Gelli (40)',
-    unit: 'đôi', brand: 'Acme', purchasePrice: '400000', sellingPrice: '700000',
-    isActive: true, isPosVisible: true, barcodes: [{ code: 'B2' }],
-  },
-  {
-    id: 'i-3', productId: null, product: null, code: 'LAPTOP-15', name: 'Laptop 15',
-    unit: 'pcs', brand: null, purchasePrice: '1000000', sellingPrice: '1500000',
-    isActive: false, isPosVisible: true, barcodes: [],
-  },
-] as unknown as ItemEntity[];
-
+// Aggregation/filtering now runs in SQL (mirrors listProductGroups), so the
+// unit test exercises the query construction: org scoping is param $1, filters
+// append parameterized WHERE clauses, pagination becomes LIMIT/OFFSET, and the
+// raw rows + count pass straight through into the envelope.
 describe('SearchInventoryItemsV2Handler', () => {
   let handler: SearchInventoryItemsV2Handler;
-  let qb: Record<string, jest.Mock>;
+  let query: jest.Mock;
+
+  // query() is called twice per execute (data, then count) via Promise.all.
+  const stubRows = [{ type: 'product', code: 'GELLI' }];
+  const stubCount = [{ total: 7 }];
 
   beforeEach(async () => {
-    qb = {
-      leftJoinAndSelect: jest.fn(() => qb),
-      where: jest.fn(() => qb),
-      getMany: jest.fn().mockResolvedValue(items),
-    };
+    query = jest
+      .fn()
+      .mockResolvedValueOnce(stubRows) // dataSql
+      .mockResolvedValueOnce(stubCount); // countSql
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SearchInventoryItemsV2Handler,
         {
           provide: getRepositoryToken(ItemEntity),
-          useValue: { createQueryBuilder: jest.fn(() => qb) },
+          useValue: { manager: { query } },
         },
       ],
     }).compile();
@@ -61,68 +48,57 @@ describe('SearchInventoryItemsV2Handler', () => {
   const run = (dto: Record<string, unknown>) =>
     handler.execute(new SearchInventoryItemsV2Query(dto, actor));
 
-  it('groups variants per product, joins barcodes, averages prices, sorts code ASC, returns {data,total,page,limit}', async () => {
-    const res = await run({});
+  /** The data query is the first call: [sql, params]. */
+  const dataCall = () => query.mock.calls[0] as [string, unknown[]];
 
-    expect(qb.where).toHaveBeenCalledWith('item.organizationId = :orgId', {
-      orgId: 'org-1',
+  it('scopes by organizationId ($1), paginates via LIMIT/OFFSET, passes rows + count through', async () => {
+    const res = await run({ page: 2, limit: 5 });
+
+    const [sql, params] = dataCall();
+    expect(params[0]).toBe('org-1'); // $1 = orgId
+    expect(sql).toContain('organization_id = $1');
+    // last two params are limit, offset
+    expect(params.slice(-2)).toEqual([5, 5]); // offset = (2-1)*5
+    expect(sql).toContain('LIMIT');
+    expect(sql).toContain('OFFSET');
+
+    expect(res).toEqual({ data: stubRows, total: 7, page: 2, limit: 5 });
+  });
+
+  it('omits the WHERE clause when no filters are supplied', async () => {
+    await run({});
+    const [sql, params] = dataCall();
+    expect(sql).not.toContain('WHERE combined'); // no post-CTE filter clause
+    // only orgId + limit + offset
+    expect(params).toEqual(['org-1', 20, 0]);
+  });
+
+  it('builds a parameterized ILIKE clause for a CONTAINS string filter', async () => {
+    await run({ barcode: { operator: StringOperator.CONTAINS, value: 'B2' } });
+    const [sql, params] = dataCall();
+    expect(sql).toMatch(/COALESCE\(barcode, ''\) ILIKE \$2/);
+    expect(params).toContain('%B2%');
+  });
+
+  it('escapes wildcards in string filter values', async () => {
+    await run({ name: { operator: StringOperator.CONTAINS, value: '50%_off' } });
+    const [, params] = dataCall();
+    expect(params).toContain('%50\\%\\_off%');
+  });
+
+  it('builds a numeric comparison clause for a compare filter', async () => {
+    await run({
+      purchasePrice: { operator: CompareOperator.LTE, value: 350000 },
     });
-    expect(res.total).toBe(2);
-    expect(res).toMatchObject({ page: 1, limit: 20 });
-    expect(res.data.map((r) => r.code)).toEqual(['GELLI', 'LAPTOP-15']);
-
-    const gelli = res.data[0];
-    expect(gelli).toMatchObject({
-      type: 'product',
-      id: 'P1',
-      code: 'GELLI',
-      name: 'Giày Gelli',
-      barcode: 'B1, B2',
-      unit: 'đôi',
-      brand: 'Acme',
-      purchasePrice: 350000,
-      sellingPrice: 600000,
-      isPosVisible: true,
-      isActive: true,
-      itemCount: 2,
-    });
-
-    const laptop = res.data[1];
-    expect(laptop).toMatchObject({
-      type: 'orphan',
-      code: 'LAPTOP-15',
-      barcode: '',
-      brand: null,
-      itemCount: 0,
-      isActive: false,
-    });
+    const [sql, params] = dataCall();
+    expect(sql).toMatch(/"purchasePrice" <= \$2/);
+    expect(params).toContain(350000);
   });
 
-  it('filters by barcode (contains)', async () => {
-    const res = await run({ barcode: { operator: StringOperator.CONTAINS, value: 'B2' } });
-    expect(res.data.map((r) => r.code)).toEqual(['GELLI']);
-  });
-
-  it('filters by brand (contains, case-insensitive)', async () => {
-    const res = await run({ brand: { operator: StringOperator.CONTAINS, value: 'acme' } });
-    expect(res.data.map((r) => r.code)).toEqual(['GELLI']);
-  });
-
-  it('filters by purchasePrice (<=) on the averaged value', async () => {
-    const res = await run({ purchasePrice: { operator: CompareOperator.LTE, value: 350000 } });
-    expect(res.data.map((r) => r.code)).toEqual(['GELLI']);
-  });
-
-  it('filters by isActive', async () => {
-    const res = await run({ isActive: false });
-    expect(res.data.map((r) => r.code)).toEqual(['LAPTOP-15']);
-  });
-
-  it('paginates', async () => {
-    const p1 = await run({ page: 1, limit: 1 });
-    expect(p1.data.map((r) => r.code)).toEqual(['GELLI']);
-    expect(p1.total).toBe(2);
-    const p2 = await run({ page: 2, limit: 1 });
-    expect(p2.data.map((r) => r.code)).toEqual(['LAPTOP-15']);
+  it('builds an equality clause for a boolean filter', async () => {
+    await run({ isActive: false });
+    const [sql, params] = dataCall();
+    expect(sql).toMatch(/"isActive" = \$2/);
+    expect(params).toContain(false);
   });
 });
