@@ -16,9 +16,13 @@ import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 import {
   CreateStockTakeDialog,
   type StockTakeDraft,
@@ -29,8 +33,38 @@ import {
   STATUS_LABEL,
   type PaginatedResponse,
   type StockTake,
+  type StockTakeStatus,
   type StorageOption,
 } from "./stock-takes.types";
+
+/** Filter keys align 1:1 with the `StockTakeSearchV2Dto` body fields. */
+const FILTER_KEYS = [
+  "date",
+  "documentNumber",
+  "storage",
+  "purpose",
+  "status",
+] as const;
+
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+const ST_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/stock-takes/search",
+  fields: {
+    documentNumber: "string",
+    storage: "string",
+    purpose: "string",
+    status: "enum",
+    date: "date-range",
+  },
+};
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce((acc, k) => {
+    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+    return acc;
+  }, {} as Record<FilterKey, ColumnFilter>);
+}
 
 export function StockTakesPage() {
   const [records, setRecords] = useState<PaginatedResponse<StockTake> | null>(null);
@@ -40,6 +74,8 @@ export function StockTakesPage() {
     const range = resolvePeriodRange("this_month");
     return { preset: "this_month", ...range };
   });
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -65,30 +101,42 @@ export function StockTakesPage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-        fromDate: period.from,
-        toDate: period.to,
-      });
-      const { data } = await apiClient.get<PaginatedResponse<StockTake>>(
-        `/inventory/stock-takes?${params}`,
+      const body = buildV2Body(
+        ST_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setRecords(data);
+      // Period filter drives the date range unless the column date filter is set.
+      if (!body.date) body.date = { from: period.from, to: period.to };
+      const { data } = await apiClient.post<{
+        data: StockTake[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/inventory/stock-takes/search", body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, period.from, period.to]);
+  }, [pagination.page, pagination.pageSize, period.from, period.to, columnFilters]);
 
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
 
   const storageNameById = useMemo(() => {
@@ -215,9 +263,10 @@ export function StockTakesPage() {
   // ─── Columns ─────────────────────────────────────────────────────────────
   const columns: TableColumn<StockTake>[] = [
     {
-      key: "createdAt",
+      key: "date",
       label: "Ngày",
       width: 130,
+      filterKind: "date-range",
       render: (r) => new Date(r.createdAt).toLocaleDateString("vi-VN"),
     },
     {
@@ -255,9 +304,47 @@ export function StockTakesPage() {
       key: "status",
       label: "Trạng thái",
       width: 140,
+      filterKind: "select",
+      filterOptions: (Object.keys(STATUS_LABEL) as StockTakeStatus[]).map(
+        (value) => ({ value, label: STATUS_LABEL[value] }),
+      ),
       render: (r) => STATUS_LABEL[r.status],
     },
   ];
+
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], value },
+        }));
+        resetPage();
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], [part]: value },
+        }));
+        resetPage();
+      },
+    }),
+    [columnFilters, resetPage],
+  );
 
   /** What the bottom panel shows: prefer the currently-open form over the list selection. */
   const panelStockTake = editing ?? selected;
@@ -296,6 +383,7 @@ export function StockTakesPage() {
           emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id)}
+          columnFilterControl={columnFilterControl}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,

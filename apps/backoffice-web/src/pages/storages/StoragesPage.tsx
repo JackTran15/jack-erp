@@ -17,16 +17,41 @@ import {
 } from "@erp/ui";
 import { Plus, RefreshCw } from "lucide-react";
 import { erpApi } from "../../lib/erp-api";
+import { apiClient } from "../../lib/api-axios";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 const ENTITY_KEY = "inventory-storages";
+
+/** Server-side v2 search config — filter keys align 1:1 with the search DTO. */
+const STORAGE_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory-storages/search",
+  fields: {
+    name: "string",
+    isMainStorage: "boolean",
+  },
+};
+
+const FILTER_KEYS = ["name", "isMainStorage"] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce((acc, k) => {
+    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+    return acc;
+  }, {} as Record<FilterKey, ColumnFilter>);
+}
 
 type RowData = Record<string, unknown>;
 
@@ -52,6 +77,8 @@ export function StoragesPage() {
   const [editingRecord, setEditingRecord] = useState<RowData | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<RowData | null>(null);
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
 
   // Re-sort when switching tab so each view emphasises its own dimension.
   useEffect(() => {
@@ -78,34 +105,75 @@ export function StoragesPage() {
   const loadRecords = useCallback(async () => {
     if (!config) return;
     setLoading(true);
-    const { data, error } = await erpApi.GET("/admin/entities/{entityKey}/records", {
-      params: {
-        path: { entityKey: ENTITY_KEY },
-        query: {
-          page: pagination.page,
-          pageSize: pagination.pageSize,
-          sortBy: pagination.sortBy,
-          sortOrder: pagination.sortOrder,
-          search: pagination.search || undefined,
-        },
-      },
-    });
-    if (error) {
-      setError(formatClientError(error));
-    } else {
-      setRecords(data as unknown as PaginatedResponse<RowData>);
+    try {
+      // Sort is server-side now: the sub-tab drives sortBy ('name' | 'branchId').
+      const body = {
+        ...buildV2Body(
+          STORAGE_SEARCH,
+          columnFilters as unknown as Record<string, ColumnFilter>,
+          pagination.page,
+          pagination.pageSize,
+        ),
+        sortBy: pagination.sortBy,
+        sortOrder: pagination.sortOrder,
+      };
+      const { data } = await apiClient.post<{
+        data: RowData[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(STORAGE_SEARCH.path, body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
       setError(null);
+    } catch (err) {
+      setError(getUserFacingApiErrorMessage(err));
+      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [config, pagination]);
+  }, [config, pagination, columnFilters]);
 
   useEffect(() => {
     void loadConfig();
   }, [loadConfig]);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
+
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], value },
+        }));
+        resetPage();
+      },
+    }),
+    [columnFilters, resetPage],
+  );
 
   const columns = useMemo<TableColumn<RowData>[]>(() => {
     if (!config) return [];
@@ -118,11 +186,27 @@ export function StoragesPage() {
           return 0;
         })
       : config.fields;
-    return fields.map((field) => ({
-      key: field.key,
-      label: field.label,
-      render: (row) => formatCell(row[field.key], field),
-    }));
+    return fields.map((field) => {
+      const column: TableColumn<RowData> = {
+        key: field.key,
+        label: field.label,
+        render: (row) => formatCell(row[field.key], field),
+      };
+      // Only `name` and `isMainStorage` map to a server-side filter; everything
+      // else renders an empty (non-filterable) cell.
+      if (field.key === "name") {
+        column.filterKind = "symbol";
+      } else if (field.key === "isMainStorage") {
+        column.filterKind = "select";
+        column.filterOptions = [
+          { value: "true", label: "Có" },
+          { value: "false", label: "Không" },
+        ];
+      } else {
+        column.filterKind = "none";
+      }
+      return column;
+    });
   }, [config, subTab]);
 
   const summary = useMemo(() => {
@@ -283,6 +367,7 @@ export function StoragesPage() {
           getRowKey={(row, index) =>
             String((config && row[config.idField]) ?? `row-${index}`)
           }
+          columnFilterControl={columnFilterControl}
           renderActions={(row) => (
             <div className="flex gap-2">
               <Button

@@ -33,6 +33,7 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 interface InventoryLocation {
   id: string;
@@ -42,6 +43,8 @@ interface InventoryLocation {
   branchId: string;
   type: LocationType;
   isActive: boolean;
+  /** Flattened storage name from the v2 search handler ("Thuộc kho"). */
+  storageName?: string;
 }
 
 interface InventoryStorage {
@@ -72,6 +75,16 @@ const STATUS_LABEL = {
 
 const FILTER_KEYS = ["code", "name"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+// String/enum column filters sent to the server. `storageId` (dropdown) and
+// `isActive` (status select) are scope filters appended manually below.
+const LOCATION_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory-locations/search",
+  fields: {
+    code: "string",
+    name: "string",
+  },
+};
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
@@ -127,29 +140,51 @@ export function ItemLocationsPage() {
   const loadLocations = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-      });
-      if (storageFilter) params.set("storageId", storageFilter);
-      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-        `/inventory/locations?${params}`,
+      const body = buildV2Body(
+        LOCATION_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setLocations(data);
+      // Scope filters: dropdown storage + status select → exact-match params.
+      if (storageFilter) body.storageId = storageFilter;
+      if (statusFilter === "active") body.isActive = true;
+      else if (statusFilter === "inactive") body.isActive = false;
+
+      const { data } = await apiClient.post<{
+        data: InventoryLocation[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/inventory-locations/search", body);
+      setLocations({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, storageFilter]);
+  }, [
+    pagination.page,
+    pagination.pageSize,
+    columnFilters,
+    storageFilter,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
 
   useEffect(() => {
-    void loadLocations();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadLocations(), 300);
+    return () => clearTimeout(t);
   }, [loadLocations]);
 
   const storageNameById = useMemo(() => {
@@ -162,32 +197,6 @@ export function ItemLocationsPage() {
     () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
     [locations, selectedId],
   );
-
-  const filteredRows = useMemo(() => {
-    const rows = locations?.data ?? [];
-    return rows.filter((row) => {
-      if (statusFilter === "active" && !row.isActive) return false;
-      if (statusFilter === "inactive" && row.isActive) return false;
-      for (const key of FILTER_KEYS) {
-        const filter = columnFilters[key];
-        if (!filter.value.trim()) continue;
-        const text = String(row[key] ?? "").toLowerCase();
-        const value = filter.value.toLowerCase();
-        const matches =
-          filter.mode === "equals"
-            ? text === value
-            : filter.mode === "startsWith"
-              ? text.startsWith(value)
-              : filter.mode === "endsWith"
-                ? text.endsWith(value)
-                : filter.mode === "notContains"
-                  ? !text.includes(value)
-                  : text.includes(value);
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [locations, columnFilters, statusFilter]);
 
   const handleCreate = useCallback(
     async (draft: LocationDraft) => {
@@ -337,7 +346,9 @@ export function ItemLocationsPage() {
       key: "storage",
       label: "Thuộc kho",
       width: 220,
-      render: (row) => storageNameById.get(row.storageId) ?? row.storageId,
+      // Prefer the server-flattened storageName; fall back to the local map.
+      render: (row) =>
+        row.storageName || storageNameById.get(row.storageId) || row.storageId,
     },
     {
       key: "type",
@@ -353,6 +364,11 @@ export function ItemLocationsPage() {
     },
   ];
 
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
   const columnFilterControl = useMemo(
     () => ({
       filters: {
@@ -366,11 +382,13 @@ export function ItemLocationsPage() {
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], mode },
         }));
+        resetPage();
       },
       onValueChange: (key: string, value: string) => {
+        // Any filter edit resets to page 1 so server results start at the top.
+        resetPage();
         if (key === "storage") {
           setStorageFilter(value);
-          setPagination((p) => ({ ...p, page: 1 }));
           return;
         }
         if (key === "status") {
@@ -384,7 +402,7 @@ export function ItemLocationsPage() {
         }));
       },
     }),
-    [columnFilters, storageFilter, statusFilter],
+    [columnFilters, storageFilter, statusFilter, resetPage],
   );
 
   return (
@@ -408,7 +426,7 @@ export function ItemLocationsPage() {
       >
         <BaseDataTable
           columns={columns}
-          rows={filteredRows}
+          rows={locations?.data ?? []}
           loading={loading}
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
@@ -467,7 +485,7 @@ export function ItemLocationsPage() {
       {stockDialogLoc && (
         <LocationStockItemsDialog
           locationId={stockDialogLoc.id}
-          fallbackTitle={`${storageNameById.get(stockDialogLoc.storageId) ?? ""} - ${stockDialogLoc.code}`}
+          fallbackTitle={`${stockDialogLoc.storageName || storageNameById.get(stockDialogLoc.storageId) || ""} - ${stockDialogLoc.code}`}
           onClose={() => setStockDialogLoc(null)}
         />
       )}

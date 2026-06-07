@@ -45,6 +45,7 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 type TOStatus = "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
 
@@ -105,6 +106,7 @@ interface InventoryItem {
   unit: string;
 }
 
+/** Filter keys align 1:1 with the `TransferOrderSearchV2Dto` body fields. */
 const FILTER_KEYS = [
   "date",
   "documentNumber",
@@ -114,6 +116,17 @@ const FILTER_KEYS = [
 ] as const;
 
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+const TO_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/transfer-orders/search",
+  fields: {
+    documentNumber: "string",
+    notes: "string",
+    destinationBranch: "string",
+    status: "enum",
+    date: "date-range",
+  },
+};
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce((acc, k) => {
@@ -151,21 +164,31 @@ export function TransferOrdersPage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-      });
-      const { data } = await apiClient.get<PaginatedResponse<TransferOrder>>(
-        `/inventory/transfer-orders?${params}`,
+      const body = buildV2Body(
+        TO_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setRecords(data);
+      const { data } = await apiClient.post<{
+        data: TransferOrder[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/inventory/transfer-orders/search", body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination]);
+  }, [pagination, columnFilters]);
 
   const loadBranches = useCallback(async () => {
     try {
@@ -190,7 +213,9 @@ export function TransferOrdersPage() {
   }, []);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
 
   useEffect(() => {
@@ -304,6 +329,7 @@ export function TransferOrdersPage() {
       key: "date",
       label: "Ngày",
       width: 110,
+      filterKind: "date-range",
       render: (row) =>
         row.requestedDate
           ? new Date(row.requestedDate).toLocaleDateString("vi-VN")
@@ -349,25 +375,47 @@ export function TransferOrdersPage() {
       key: "status",
       label: "Trạng thái",
       width: 140,
+      filterKind: "select",
+      filterOptions: (Object.keys(STATUS_LABEL) as TOStatus[]).map((value) => ({
+        value,
+        label: STATUS_LABEL[value],
+      })),
       render: (row) => STATUS_LABEL[row.status],
     },
   ];
 
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], value },
-        })),
+        }));
+        resetPage();
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], [part]: value },
+        }));
+        resetPage();
+      },
     }),
-    [columnFilters],
+    [columnFilters, resetPage],
   );
 
   const nextDocumentNumber = useMemo(() => {

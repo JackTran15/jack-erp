@@ -1,4 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EntityRegistryService } from '../../crud/entity-registry.service';
 import { ProductEntity } from './product.entity';
@@ -15,9 +16,12 @@ import { ProductStorageLocationService } from './product-storage-location.servic
 import { LocationEntity } from '../location/location.entity';
 import { ProductController } from './product.controller';
 import { ProductAttributeController } from './product-attribute.controller';
+import { ProductV2Controller } from './controllers/product-v2.controller';
+import { SearchProductsV2Handler } from './queries/search-products-v2.handler';
 
 @Module({
   imports: [
+    CqrsModule,
     TypeOrmModule.forFeature([
       ProductEntity,
       ProductAttributeDefinitionEntity,
@@ -29,12 +33,17 @@ import { ProductAttributeController } from './product-attribute.controller';
       LocationEntity,
     ]),
   ],
-  controllers: [ProductController, ProductAttributeController],
+  controllers: [
+    ProductController,
+    ProductAttributeController,
+    ProductV2Controller,
+  ],
   providers: [
     ProductCrudService,
     ProductAttributeService,
     VariantGenerationService,
     ProductStorageLocationService,
+    SearchProductsV2Handler,
     {
       provide: PRODUCT_SERVICE_TOKEN,
       useExisting: ProductCrudService,

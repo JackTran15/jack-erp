@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CustomerEntity } from '../customer/customer.entity';
 import { ProviderEntity } from '../inventory/location/provider.entity';
 import { ItemCategoryEntity } from '../inventory/location/item-category.entity';
+import { StorageEntity } from '../inventory/location/storage.entity';
+import { LocationEntity } from '../inventory/location/location.entity';
 import { JobPositionEntity } from '../hr/job-position/job-position.entity';
 import { AccountEntity } from '../accounting/coa/account.entity';
 import { UserEntity } from '../auth/user.entity';
@@ -14,6 +16,8 @@ import { SearchJobPositionsV2Handler } from './queries/search-job-positions-v2.h
 import { SearchAccountsV2Handler } from './queries/search-accounts-v2.handler';
 import { SearchEmployeesV2Handler } from './queries/search-employees-v2.handler';
 import { SearchItemCategoriesV2Handler } from './queries/search-item-categories-v2.handler';
+import { SearchStoragesV2Handler } from './queries/search-storages-v2.handler';
+import { SearchLocationsV2Handler } from './queries/search-locations-v2.handler';
 
 /**
  * Hosts the versioned `POST /v2/<entity>/search` endpoints for backoffice admin
@@ -27,6 +31,8 @@ import { SearchItemCategoriesV2Handler } from './queries/search-item-categories-
       CustomerEntity,
       ProviderEntity,
       ItemCategoryEntity,
+      StorageEntity,
+      LocationEntity,
       JobPositionEntity,
       AccountEntity,
       UserEntity,
@@ -40,6 +46,8 @@ import { SearchItemCategoriesV2Handler } from './queries/search-item-categories-
     SearchAccountsV2Handler,
     SearchEmployeesV2Handler,
     SearchItemCategoriesV2Handler,
+    SearchStoragesV2Handler,
+    SearchLocationsV2Handler,
   ],
 })
 export class AdminSearchModule {}

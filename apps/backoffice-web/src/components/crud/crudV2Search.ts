@@ -88,6 +88,27 @@ export const CRUD_V2_SEARCH: Record<string, V2SearchConfig> = {
       createdAt: "date-range",
     },
   },
+  // Kho lưu trữ. Branch-scoped server-side. `branchId` là bộ lọc scope dạng
+  // dropdown (UUID chính xác) — không phải column-filter generic, nên xử lý ở
+  // toolbar của page, không khai ở đây.
+  "inventory-storages": {
+    path: "/v2/inventory-storages/search",
+    fields: {
+      name: "string",
+      isMainStorage: "boolean",
+    },
+  },
+  // Vị trí hàng hóa. `storageId` là bộ lọc scope dạng dropdown (UUID chính xác),
+  // xử lý ở toolbar của page — không khai ở đây.
+  "inventory-locations": {
+    path: "/v2/inventory-locations/search",
+    fields: {
+      code: "string",
+      name: "string",
+      type: "enum",
+      isActive: "boolean",
+    },
+  },
 };
 
 /** FE filter mode → backend `StringOperator` symbol. */

@@ -41,9 +41,13 @@ import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
 import { InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -53,6 +57,37 @@ const STATUS_LABEL: Record<TransferStatus, string> = {
   POSTED: "Đã chuyển",
   CANCELLED: "Đã huỷ",
 };
+
+/** Filter keys align 1:1 with the `StockTransferSearchV2Dto` body fields. */
+const FILTER_KEYS = [
+  "date",
+  "documentNumber",
+  "status",
+  "sourceLocation",
+  "destinationLocation",
+  "notes",
+] as const;
+
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+const ST_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/stock/transfers/search",
+  fields: {
+    documentNumber: "string",
+    status: "enum",
+    sourceLocation: "string",
+    destinationLocation: "string",
+    notes: "string",
+    date: "date-range",
+  },
+};
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce((acc, k) => {
+    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+    return acc;
+  }, {} as Record<FilterKey, ColumnFilter>);
+}
 
 interface TransferLine {
   id?: string;
@@ -69,6 +104,9 @@ interface Transfer {
   status: TransferStatus;
   sourceLocationId: string;
   destinationLocationId: string;
+  /** Tên vị trí xuất/nhập do endpoint v2 join sẵn (null nếu vị trí đã bị xoá). */
+  sourceLocationName?: string | null;
+  destinationLocationName?: string | null;
   sourceBranchId: string;
   destinationBranchId: string;
   notes?: string;
@@ -114,6 +152,8 @@ export function StockTransferPage() {
     const range = resolvePeriodRange("this_month");
     return { preset: "this_month", ...range };
   });
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -124,24 +164,36 @@ export function StockTransferPage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-      });
-      const { data } = await apiClient.get<PaginatedResponse<Transfer>>(
-        `/inventory/stock/transfers?${params}`,
+      const body = buildV2Body(
+        ST_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setRecords(data);
+      const { data } = await apiClient.post<{
+        data: Transfer[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/inventory/stock/transfers/search", body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination]);
+  }, [pagination, columnFilters]);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
 
   const selected = useMemo(
@@ -254,6 +306,7 @@ export function StockTransferPage() {
       key: "date",
       label: "Ngày",
       width: 110,
+      filterKind: "date-range",
       render: (row) => new Date(row.createdAt).toLocaleDateString("vi-VN"),
     },
     {
@@ -271,24 +324,42 @@ export function StockTransferPage() {
       key: "status",
       label: "Trạng thái",
       width: 140,
+      filterKind: "select",
+      filterOptions: (Object.keys(STATUS_LABEL) as TransferStatus[]).map(
+        (value) => ({ value, label: STATUS_LABEL[value] }),
+      ),
       render: (row) => STATUS_LABEL[row.status],
+    },
+    {
+      key: "sourceLocation",
+      label: "Vị trí xuất",
+      width: 160,
+      render: (row) => row.sourceLocationName ?? "—",
+    },
+    {
+      key: "destinationLocation",
+      label: "Vị trí nhập",
+      width: 160,
+      render: (row) => row.destinationLocationName ?? "—",
     },
     {
       key: "lineCount",
       label: "Số dòng",
       width: 90,
+      filterKind: "none",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      render: (row) => row.lines.length,
+      render: (row) => row.lines?.length ?? 0,
     },
     {
       key: "totalQuantity",
       label: "Tổng số lượng",
       width: 130,
+      filterKind: "none",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
       render: (row) =>
-        row.lines.reduce((s, l) => s + Number(l.quantity), 0).toLocaleString("vi-VN"),
+        (row.lines ?? []).reduce((s, l) => s + Number(l.quantity), 0).toLocaleString("vi-VN"),
     },
     {
       key: "notes",
@@ -296,6 +367,40 @@ export function StockTransferPage() {
       render: (row) => row.notes ?? "",
     },
   ];
+
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as unknown as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], mode },
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], value },
+        }));
+        resetPage();
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], [part]: value },
+        }));
+        resetPage();
+      },
+    }),
+    [columnFilters, resetPage],
+  );
 
   return (
     <>
@@ -345,6 +450,7 @@ export function StockTransferPage() {
               />
             ),
           }}
+          columnFilterControl={columnFilterControl}
         />
       </DocumentListShell>
 

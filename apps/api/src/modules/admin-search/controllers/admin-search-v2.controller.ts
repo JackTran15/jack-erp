@@ -12,12 +12,16 @@ import { JobPositionSearchV2Dto } from '../dto/job-position-search-v2.dto';
 import { AccountSearchV2Dto } from '../dto/account-search-v2.dto';
 import { EmployeeSearchV2Dto } from '../dto/employee-search-v2.dto';
 import { ItemCategorySearchV2Dto } from '../dto/item-category-search-v2.dto';
+import { StorageSearchV2Dto } from '../dto/storage-search-v2.dto';
+import { LocationSearchV2Dto } from '../dto/location-search-v2.dto';
 import { SearchCustomersV2Query } from '../queries/search-customers-v2.query';
 import { SearchProvidersV2Query } from '../queries/search-providers-v2.query';
 import { SearchJobPositionsV2Query } from '../queries/search-job-positions-v2.query';
 import { SearchAccountsV2Query } from '../queries/search-accounts-v2.query';
 import { SearchEmployeesV2Query } from '../queries/search-employees-v2.query';
 import { SearchItemCategoriesV2Query } from '../queries/search-item-categories-v2.query';
+import { SearchStoragesV2Query } from '../queries/search-storages-v2.query';
+import { SearchLocationsV2Query } from '../queries/search-locations-v2.query';
 
 /**
  * Single versioned controller hosting server-side CQRS search for the backoffice
@@ -87,5 +91,25 @@ export class AdminSearchV2Controller {
     @Actor() actor: ActorContext,
   ) {
     return this.queryBus.execute(new SearchItemCategoriesV2Query(dto, actor));
+  }
+
+  @Post('inventory-storages/search')
+  @Version('2')
+  @RequirePermission('inventory.read')
+  searchStorages(
+    @Body() dto: StorageSearchV2Dto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.queryBus.execute(new SearchStoragesV2Query(dto, actor));
+  }
+
+  @Post('inventory-locations/search')
+  @Version('2')
+  @RequirePermission('inventory.read')
+  searchLocations(
+    @Body() dto: LocationSearchV2Dto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.queryBus.execute(new SearchLocationsV2Query(dto, actor));
   }
 }
