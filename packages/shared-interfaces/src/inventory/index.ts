@@ -44,6 +44,7 @@ export enum GoodsIssuePurpose {
 
 export enum GoodsIssueReferenceType {
   STOCK_TAKE = "STOCK_TAKE",
+  TRANSFER_ORDER = "TRANSFER_ORDER",
 }
 
 export enum IssueReasonPurpose {
@@ -59,8 +60,8 @@ export enum StockTakeStatus {
 
 export enum TransferOrderStatus {
   DRAFT = "DRAFT",
-  APPROVED = "APPROVED",
-  EXECUTED = "EXECUTED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }
 
@@ -393,4 +394,42 @@ export interface GoodsIssue {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+}
+
+/**
+ * A DRAFT transfer order that the active branch (as source) can issue stock
+ * from — the row shape returned by GET /inventory/transfer-orders/issuable and
+ * rendered in the "Chọn lệnh điều chuyển" picker on the goods-issue form.
+ */
+export interface IssuableTransferOrderListItem {
+  id: string;
+  documentNumber: string;
+  /** "Ngày" — requestedDate when set, otherwise the creation date. ISO string. */
+  requestedDate: string | null;
+  /** "Lý do" — the transfer order notes. */
+  notes: string | null;
+  destinationBranchId: string;
+  /** "Điều chuyển đến" — resolved destination branch name, inlined per row. */
+  destinationBranchName: string;
+  status: TransferOrderStatus;
+}
+
+/** One edited goods-issue line submitted when exporting from the form. */
+export interface ExportTransferOrderLine {
+  itemId: string;
+  locationId: string;
+  quantity: number;
+  unitPrice?: number;
+  notes?: string;
+}
+
+/**
+ * Optional body of POST /inventory/transfer-orders/:id/export. When `lines` is
+ * present the export uses the (possibly edited) form lines instead of deriving
+ * them from the transfer order; omitting it preserves the legacy derive path.
+ */
+export interface ExportTransferOrderRequest {
+  lines?: ExportTransferOrderLine[];
+  reason?: string;
+  notes?: string;
 }

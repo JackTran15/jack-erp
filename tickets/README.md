@@ -209,16 +209,16 @@ flowchart LR
 - [EPIC-20052026 Employee HR Profile](./epics/EPIC-20052026-employee-hr-management.md)
 - Mở rộng DB + API backend để lưu/đọc dữ liệu HR mà FE (`pages/employees/`, modal 5 tab) đã thu thập sẵn; gỡ readonly 3 tab HR.
 
-| Ticket | Mô tả |
-|---|---|
+| Ticket     | Mô tả                                                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | TKT-EMP-01 | Migration: 5 bảng (`job_positions`, `employee_profiles`, `employee_addresses`, `employee_emergency_contacts`, `employee_access_schedules`) + enums + index/unique |
-| TKT-EMP-02 | shared-interfaces: enums HR + `EmployeeProfilePayload`/`EmployeeProfileView`; mở rộng `CreateUserRequest`/`UpdateUserRequest`/`UserDetail` |
-| TKT-EMP-03 | Entities + `job_positions` đăng ký `EntityRegistryService` + permissions seed `hr.job_position.*` |
-| TKT-EMP-04 | DTO `EmployeeProfileDto` + mở rộng `UsersService.create/update/findById` (transaction, validate, inline jobPosition) + unit test |
-| TKT-EMP-05 | `pnpm openapi:generate` + commit api-client snapshot |
-| TKT-EMP-06 | FE wiring `user-form.ts` + `employee.mappers.ts`; enable field code/mobile |
-| TKT-EMP-07 | FE gỡ readonly 3 tab HR + dropdown vị trí công việc + detail panel |
-| TKT-EMP-08 | E2E employee flow + docs |
+| TKT-EMP-02 | shared-interfaces: enums HR + `EmployeeProfilePayload`/`EmployeeProfileView`; mở rộng `CreateUserRequest`/`UpdateUserRequest`/`UserDetail`                        |
+| TKT-EMP-03 | Entities + `job_positions` đăng ký `EntityRegistryService` + permissions seed `hr.job_position.*`                                                                 |
+| TKT-EMP-04 | DTO `EmployeeProfileDto` + mở rộng `UsersService.create/update/findById` (transaction, validate, inline jobPosition) + unit test                                  |
+| TKT-EMP-05 | `pnpm openapi:generate` + commit api-client snapshot                                                                                                              |
+| TKT-EMP-06 | FE wiring `user-form.ts` + `employee.mappers.ts`; enable field code/mobile                                                                                        |
+| TKT-EMP-07 | FE gỡ readonly 3 tab HR + dropdown vị trí công việc + detail panel                                                                                                |
+| TKT-EMP-08 | E2E employee flow + docs                                                                                                                                          |
 
 ### Ticket dependency graph (EPIC-20052026)
 
@@ -245,33 +245,33 @@ flowchart LR
 
 ### Phase 1 (manual flow + ledger + kiểm kê)
 
-| Ticket | Mô tả |
-|---|---|
-| [TKT-CV-00](./tickets/TKT-CV-00-cash-tx-jeid-refactor.md) | **Prerequisite** — refactor `recordMovement`/`JournalService.post` nhận `manager?` + `recordMovement` trả `journalEntryId` (vá atomic, deadlock cash-count, dual-write gap) |
-| [TKT-CV-01](./tickets/TKT-CV-01-schema-migration.md) | Migration 6 bảng + enums + reversal dedupe index (DocumentType cash đã có sẵn — chỉ verify) |
-| [TKT-CV-02](./tickets/TKT-CV-02-module-bootstrap-categories.md) | Entities + DTOs + module + register categories + seed mặc định |
-| [TKT-CV-03](./tickets/TKT-CV-03-cash-receipt-service.md) | CashReceiptService + Controller (CRUD/post/reverse + 2 internal method) |
-| [TKT-CV-04](./tickets/TKT-CV-04-cash-payment-service.md) | CashPaymentService + Controller (đối xứng) |
-| [TKT-CV-05](./tickets/TKT-CV-05-cash-ledger-service.md) | CashLedgerService + Controller (cursor pagination, running balance in-RAM) |
-| [TKT-CV-06](./tickets/TKT-CV-06-cash-count-service.md) | CashCountService + Controller (variance → voucher) |
-| [TKT-CV-07](./tickets/TKT-CV-07-permissions-coa-seed.md) | Permissions seed + COA TK 711/811 |
-| [TKT-CV-12](./tickets/TKT-CV-12-openapi-e2e-manual.md) | OpenAPI regen + E2E manual flow (gate Phase 1) |
+| Ticket                                                          | Mô tả                                                                                                                                                                       |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [TKT-CV-00](./tickets/TKT-CV-00-cash-tx-jeid-refactor.md)       | **Prerequisite** — refactor `recordMovement`/`JournalService.post` nhận `manager?` + `recordMovement` trả `journalEntryId` (vá atomic, deadlock cash-count, dual-write gap) |
+| [TKT-CV-01](./tickets/TKT-CV-01-schema-migration.md)            | Migration 6 bảng + enums + reversal dedupe index (DocumentType cash đã có sẵn — chỉ verify)                                                                                 |
+| [TKT-CV-02](./tickets/TKT-CV-02-module-bootstrap-categories.md) | Entities + DTOs + module + register categories + seed mặc định                                                                                                              |
+| [TKT-CV-03](./tickets/TKT-CV-03-cash-receipt-service.md)        | CashReceiptService + Controller (CRUD/post/reverse + 2 internal method)                                                                                                     |
+| [TKT-CV-04](./tickets/TKT-CV-04-cash-payment-service.md)        | CashPaymentService + Controller (đối xứng)                                                                                                                                  |
+| [TKT-CV-05](./tickets/TKT-CV-05-cash-ledger-service.md)         | CashLedgerService + Controller (cursor pagination, running balance in-RAM)                                                                                                  |
+| [TKT-CV-06](./tickets/TKT-CV-06-cash-count-service.md)          | CashCountService + Controller (variance → voucher)                                                                                                                          |
+| [TKT-CV-07](./tickets/TKT-CV-07-permissions-coa-seed.md)        | Permissions seed + COA TK 711/811                                                                                                                                           |
+| [TKT-CV-12](./tickets/TKT-CV-12-openapi-e2e-manual.md)          | OpenAPI regen + E2E manual flow (gate Phase 1)                                                                                                                              |
 
 ### Phase 2 (auto-create vouchers + Transactional Outbox)
 
-| Ticket | Mô tả |
-|---|---|
-| [TKT-CV-13](./tickets/TKT-CV-13-schema-extension.md) | Schema extension: unique reference + payment_method/cash/JE link |
-| [TKT-CV-14](./tickets/TKT-CV-14-event-topics-dtos.md) | Event topics + payload DTOs |
-| [TKT-CV-15](./tickets/TKT-CV-15-voucher-consumers.md) | 4 voucher consumers (POS createAndPost / 3 flow createVoucherForMovement) |
-| [TKT-CV-16](./tickets/TKT-CV-16-refactor-pos-consumer.md) | Refactor CashFromPaymentConsumer → pos-cash-sale consumer |
-| [TKT-CV-17](./tickets/TKT-CV-17-source-accounting-publish.md) | A-revised source accounting + publish needed (debt/GR/expense) |
-| [TKT-CV-18](./tickets/TKT-CV-18-link-back-consumers.md) | Link-back consumers (FK back-fill) |
-| [TKT-CV-22](./tickets/TKT-CV-22-voucher-source-api.md) | API delta: source filter + sourceLink (BE-only; UI defer) |
-| [TKT-CV-23](./tickets/TKT-CV-23-openapi-e2e-auto.md) | OpenAPI regen + E2E auto flow (gate Phase 2) |
-| [TKT-CV-OB1](./tickets/TKT-CV-OB1-outbox-schema.md) | Transactional Outbox — schema |
-| [TKT-CV-OB2](./tickets/TKT-CV-OB2-outbox-service-relay.md) | Transactional Outbox — service + relay |
-| [TKT-CV-OB3](./tickets/TKT-CV-OB3-wire-publish-outbox.md) | Wire publish qua outbox |
+| Ticket                                                        | Mô tả                                                                     |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [TKT-CV-13](./tickets/TKT-CV-13-schema-extension.md)          | Schema extension: unique reference + payment_method/cash/JE link          |
+| [TKT-CV-14](./tickets/TKT-CV-14-event-topics-dtos.md)         | Event topics + payload DTOs                                               |
+| [TKT-CV-15](./tickets/TKT-CV-15-voucher-consumers.md)         | 4 voucher consumers (POS createAndPost / 3 flow createVoucherForMovement) |
+| [TKT-CV-16](./tickets/TKT-CV-16-refactor-pos-consumer.md)     | Refactor CashFromPaymentConsumer → pos-cash-sale consumer                 |
+| [TKT-CV-17](./tickets/TKT-CV-17-source-accounting-publish.md) | A-revised source accounting + publish needed (debt/GR/expense)            |
+| [TKT-CV-18](./tickets/TKT-CV-18-link-back-consumers.md)       | Link-back consumers (FK back-fill)                                        |
+| [TKT-CV-22](./tickets/TKT-CV-22-voucher-source-api.md)        | API delta: source filter + sourceLink (BE-only; UI defer)                 |
+| [TKT-CV-23](./tickets/TKT-CV-23-openapi-e2e-auto.md)          | OpenAPI regen + E2E auto flow (gate Phase 2)                              |
+| [TKT-CV-OB1](./tickets/TKT-CV-OB1-outbox-schema.md)           | Transactional Outbox — schema                                             |
+| [TKT-CV-OB2](./tickets/TKT-CV-OB2-outbox-service-relay.md)    | Transactional Outbox — service + relay                                    |
+| [TKT-CV-OB3](./tickets/TKT-CV-OB3-wire-publish-outbox.md)     | Wire publish qua outbox                                                   |
 
 ### Ticket dependency graph (EPIC-18052026 — BE-only)
 
@@ -317,17 +317,17 @@ flowchart LR
 - [EPIC-31052026 Inventory Item Form Refactor](./epics/EPIC-31052026-inventory-item-form-refactor.md)
 - Mở rộng [EPIC-010 Item Management Enhancement](./epics/EPIC-010-item-management-enhancement.md): refactor form tạo/sửa hàng hóa (`backoffice-web`) cho khớp ảnh tham chiếu + Brand master-data + Item Category (nhóm cha/mô tả/hoa hồng) + multi-provider + đơn vị chuyển đổi + edit mode.
 
-| Ticket                                                                  | Mô tả                                                              |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [TKT-IIF-01](./tickets/TKT-IIF-01-brand-master-entity.md)               | BE: `BrandEntity` (`inventory-brands`) + `item.brandId`           |
-| [TKT-IIF-02](./tickets/TKT-IIF-02-item-category-extension.md)           | BE: Item Category + nhóm cha + mô tả + bảng hoa hồng              |
-| [TKT-IIF-03](./tickets/TKT-IIF-03-item-update-nested.md)                | BE: Item update reconcile providers/units + brandId               |
-| [TKT-IIF-04](./tickets/TKT-IIF-04-fe-data-hooks.md)                     | FE: hooks brand/category/unit/provider (bỏ data hardcode)        |
-| [TKT-IIF-05](./tickets/TKT-IIF-05-fe-dialogs.md)                        | FE: 4 dialog quick-create + danh sách thương hiệu (#3/#4/#5/#6/#7) |
-| [TKT-IIF-06](./tickets/TKT-IIF-06-fe-form-layout.md)                    | FE: refactor layout tab cơ bản (#2) + wire dropdown + #9          |
-| [TKT-IIF-07](./tickets/TKT-IIF-07-fe-multi-provider-table.md)           | FE: bảng nhiều nhà cung cấp (#8)                                  |
-| [TKT-IIF-08](./tickets/TKT-IIF-08-fe-edit-mode.md)                      | FE: edit mode dùng lại form giàu                                  |
-| [TKT-IIF-09](./tickets/TKT-IIF-09-test-plan.md)                         | E2E + test plan + DoD gate                                         |
+| Ticket                                                        | Mô tả                                                              |
+| ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [TKT-IIF-01](./tickets/TKT-IIF-01-brand-master-entity.md)     | BE: `BrandEntity` (`inventory-brands`) + `item.brandId`            |
+| [TKT-IIF-02](./tickets/TKT-IIF-02-item-category-extension.md) | BE: Item Category + nhóm cha + mô tả + bảng hoa hồng               |
+| [TKT-IIF-03](./tickets/TKT-IIF-03-item-update-nested.md)      | BE: Item update reconcile providers/units + brandId                |
+| [TKT-IIF-04](./tickets/TKT-IIF-04-fe-data-hooks.md)           | FE: hooks brand/category/unit/provider (bỏ data hardcode)          |
+| [TKT-IIF-05](./tickets/TKT-IIF-05-fe-dialogs.md)              | FE: 4 dialog quick-create + danh sách thương hiệu (#3/#4/#5/#6/#7) |
+| [TKT-IIF-06](./tickets/TKT-IIF-06-fe-form-layout.md)          | FE: refactor layout tab cơ bản (#2) + wire dropdown + #9           |
+| [TKT-IIF-07](./tickets/TKT-IIF-07-fe-multi-provider-table.md) | FE: bảng nhiều nhà cung cấp (#8)                                   |
+| [TKT-IIF-08](./tickets/TKT-IIF-08-fe-edit-mode.md)            | FE: edit mode dùng lại form giàu                                   |
+| [TKT-IIF-09](./tickets/TKT-IIF-09-test-plan.md)               | E2E + test plan + DoD gate                                         |
 
 ### Ticket dependency graph (EPIC-31052026)
 
@@ -356,15 +356,15 @@ flowchart LR
 - [EPIC-03062026 POS server-side invoice search](./epics/EPIC-03062026-pos-invoice-search.md)
 - Chuyển 3 màn danh sách hóa đơn trên `pos-web` từ lọc client-side sang **search server-side** qua các endpoint CQRS riêng (theo skill `cqrs-search-endpoint`), KHÔNG đụng `POST /v2/invoices/search` đang dùng cho `InvoiceListPage`. #5 "Đổi trả nhanh" = SALE+PAID; "Tổng thanh toán" = `totalPaid`; tên cửa hàng/chi nhánh do endpoint mới join branch trả inline.
 
-| Ticket                                                              | Mô tả                                                                 |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [TKT-PIS-01](./tickets/TKT-PIS-01-be-returnable-invoice-search.md)  | BE: `POST /v2/invoices/returnable/search` (#5, SALE+PAID, branch-scoped) |
-| [TKT-PIS-02](./tickets/TKT-PIS-02-be-purchase-history-search.md)    | BE: `POST /v2/invoices/purchase-history/search` (#2, org-wide / customerId) |
-| [TKT-PIS-03](./tickets/TKT-PIS-03-be-draft-invoice-search.md)       | BE: `POST /v2/invoices/drafts/search` (#4, free-text OR + date range) |
-| [TKT-PIS-04](./tickets/TKT-PIS-04-fe-invoice-search-data-layer.md)  | FE: DTOs + `invoiceService` + `INVOICE_KEYS` + hooks + filter→body mapper |
-| [TKT-PIS-05](./tickets/TKT-PIS-05-fe-return-goods-search.md)        | FE: wire "Đổi trả nhanh" (#5) server-side                            |
-| [TKT-PIS-06](./tickets/TKT-PIS-06-fe-purchase-history-search.md)    | FE: wire "Lịch sử mua hàng" (#2) server-side                          |
-| [TKT-PIS-07](./tickets/TKT-PIS-07-fe-draft-invoices-search.md)      | FE: wire "Hóa đơn chưa thanh toán" (#4) server-side                   |
+| Ticket                                                             | Mô tả                                                                       |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| [TKT-PIS-01](./tickets/TKT-PIS-01-be-returnable-invoice-search.md) | BE: `POST /v2/invoices/returnable/search` (#5, SALE+PAID, branch-scoped)    |
+| [TKT-PIS-02](./tickets/TKT-PIS-02-be-purchase-history-search.md)   | BE: `POST /v2/invoices/purchase-history/search` (#2, org-wide / customerId) |
+| [TKT-PIS-03](./tickets/TKT-PIS-03-be-draft-invoice-search.md)      | BE: `POST /v2/invoices/drafts/search` (#4, free-text OR + date range)       |
+| [TKT-PIS-04](./tickets/TKT-PIS-04-fe-invoice-search-data-layer.md) | FE: DTOs + `invoiceService` + `INVOICE_KEYS` + hooks + filter→body mapper   |
+| [TKT-PIS-05](./tickets/TKT-PIS-05-fe-return-goods-search.md)       | FE: wire "Đổi trả nhanh" (#5) server-side                                   |
+| [TKT-PIS-06](./tickets/TKT-PIS-06-fe-purchase-history-search.md)   | FE: wire "Lịch sử mua hàng" (#2) server-side                                |
+| [TKT-PIS-07](./tickets/TKT-PIS-07-fe-draft-invoices-search.md)     | FE: wire "Hóa đơn chưa thanh toán" (#4) server-side                         |
 
 ### Ticket dependency graph (EPIC-03062026)
 
@@ -386,12 +386,12 @@ flowchart LR
 - [EPIC-03062026 POS per-line discount breakdown](./epics/EPIC-03062026-pos-line-discount-breakdown.md)
 - Mỗi dòng hàng trên hóa đơn POS mang KM/chiết khấu **thủ công** riêng (vd "KM 10 % (59.000) - cc") + ghi chú riêng, lưu **đầy đủ breakdown** (type/value/amount/reason) vào `invoice_items` và **trả về** ở mọi API đọc. `note` + `lineDiscount` (số tiền) đã có sẵn; thêm `line_discount_type/value/reason`. Ba V2 search posted (search/returnable/purchase-history) được gắn thêm `items[]` theo pattern của draft search. **Chỉ backend** — không đụng FE pos-web; không liên kết PromotionEntity (chiết khấu thủ công, không phải chương trình KM).
 
-| Ticket                                                                  | Mô tả                                                                          |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Ticket                                                                  | Mô tả                                                                               |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | [TKT-LDB-01](./tickets/TKT-LDB-01-be-schema-line-discount-breakdown.md) | BE: migration + entity — thêm `line_discount_type/value/reason` vào `invoice_items` |
-| [TKT-LDB-02](./tickets/TKT-LDB-02-be-dto-service-compute.md)            | BE: DTO 3 field mới + `computeLineDiscount()` dùng chung `create()`/`update()` |
-| [TKT-LDB-03](./tickets/TKT-LDB-03-be-read-apis-line-items.md)           | BE: gắn `items[]` vào 3 V2 search posted + verify detail/draft + openapi regen |
-| [TKT-LDB-04](./tickets/TKT-LDB-04-be-tests-e2e.md)                      | BE: unit compute + handler attach specs + E2E round-trip create→read + DoD     |
+| [TKT-LDB-02](./tickets/TKT-LDB-02-be-dto-service-compute.md)            | BE: DTO 3 field mới + `computeLineDiscount()` dùng chung `create()`/`update()`      |
+| [TKT-LDB-03](./tickets/TKT-LDB-03-be-read-apis-line-items.md)           | BE: gắn `items[]` vào 3 V2 search posted + verify detail/draft + openapi regen      |
+| [TKT-LDB-04](./tickets/TKT-LDB-04-be-tests-e2e.md)                      | BE: unit compute + handler attach specs + E2E round-trip create→read + DoD          |
 
 ### Ticket dependency graph (EPIC-03062026 line-discount)
 
@@ -408,11 +408,11 @@ flowchart LR
 - [EPIC-03062026 Loyalty point rate change](./epics/EPIC-03062026-loyalty-point-rate-change.md)
 - Đổi giá trị chương trình tích điểm: 1.000.000đ mua hàng → **100 điểm** (10% ÷ 1.000), đổi **100 điểm = 50.000đ** (1 điểm = 500đ), cashback thực ~**5%** (giảm từ ~100%). Chỉ đổi **2 hằng số** `POINT_EARN_VND_PER_POINT` (1000 → **10000**) + `POINT_REDEMPTION_VALUE_VND` (1000 → **500**) + sửa số magic `1000` trong consumer hoàn điểm khi trả hàng → dùng hằng số. **Không** migration, **không** entity/endpoint/event mới. ⚠️ Yêu cầu gốc chỉ nói redemption, nhưng ví dụ (1tr → 100 điểm) buộc đổi cả earn — chốt ở Step 3.
 
-| Ticket                                                                       | Mô tả                                                                       |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [TKT-LPR-01](./tickets/TKT-LPR-01-be-rate-constants-and-reversal-fix.md)      | BE: đổi 2 hằng số earn/redeem + thay magic `1000` ở reverse consumer + unit test |
-| [TKT-LPR-02](./tickets/TKT-LPR-02-fe-pos-redemption-mirror.md)               | FE: cập nhật mirror `POINT_REDEMPTION_VALUE_VND = 500` ở pos-web + copy hiển thị |
-| [TKT-LPR-03](./tickets/TKT-LPR-03-e2e-loyalty-rate-regression.md)            | E2E: regression earn 100 / redeem 50.000 / reverse 100 + re-baseline assertions |
+| Ticket                                                                   | Mô tả                                                                            |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [TKT-LPR-01](./tickets/TKT-LPR-01-be-rate-constants-and-reversal-fix.md) | BE: đổi 2 hằng số earn/redeem + thay magic `1000` ở reverse consumer + unit test |
+| [TKT-LPR-02](./tickets/TKT-LPR-02-fe-pos-redemption-mirror.md)           | FE: cập nhật mirror `POINT_REDEMPTION_VALUE_VND = 500` ở pos-web + copy hiển thị |
+| [TKT-LPR-03](./tickets/TKT-LPR-03-e2e-loyalty-rate-regression.md)        | E2E: regression earn 100 / redeem 50.000 / reverse 100 + re-baseline assertions  |
 
 ### Ticket dependency graph (EPIC-03062026 loyalty-rate)
 
@@ -428,14 +428,14 @@ flowchart LR
 - [EPIC-03062026 Backoffice admin list server-side CQRS search](./epics/EPIC-03062026-admin-list-cqrs-search.md)
 - Thêm endpoint **CQRS v2 search** (theo skill `cqrs-search-endpoint`) cho 5 màn danh sách admin hiện do generic CRUD (`/admin/entities/:entityKey/records`) + `/admin/users` phục vụ: `customers`, `inventory-providers`, `job-positions`, `accounts`, `employees`. **Một controller chung** `AdminSearchV2Controller` (module mới `AdminSearchModule`) host cả 5 route `POST /v2/<entity>/search`; 4 module entity cũ KHÔNG đụng. Nâng filter lên **per-column operators** (contains/equals/range/compare) query toàn bộ dataset, phân trang. **Chỉ backend** — KHÔNG rewire FE, KHÔNG đụng `/records` hay `/admin/users`. Ràng buộc cứng: **dữ liệu từng dòng giống hệt hiện tại, không trả thiếu** — giữ `groupName` (NCC), `profile.jobPosition` (nhân viên), `parentAccountId` thô (COA), `code` (KH). Envelope đổi sang `{ data,total,page,limit }` (an toàn vì FE chưa nối). Tất cả scope theo `organizationId` (không branch-scope). Tái dùng permission cũ, không seed mới.
 
-| Ticket                                                                  | Mô tả                                                                          |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [TKT-ACS-01](./tickets/TKT-ACS-01-be-customers-search.md)               | BE: scaffold `AdminSearchModule`/controller + `POST /v2/customers/search`       |
-| [TKT-ACS-02](./tickets/TKT-ACS-02-be-inventory-providers-search.md)     | BE: `POST /v2/inventory-providers/search` (giữ `groupName` flatten)            |
-| [TKT-ACS-03](./tickets/TKT-ACS-03-be-job-positions-search.md)           | BE: `POST /v2/job-positions/search` (đơn giản, soft-delete excluded)           |
-| [TKT-ACS-04](./tickets/TKT-ACS-04-be-accounts-search.md)                | BE: `POST /v2/accounts/search` (giữ `parentAccountId` thô, không join)         |
-| [TKT-ACS-05](./tickets/TKT-ACS-05-be-employees-search.md)               | BE: `POST /v2/employees/search` (giữ full `UserListItem`, tái dùng mapper)     |
-| [TKT-ACS-06](./tickets/TKT-ACS-06-openapi-regen.md)                      | OpenAPI regen + api-client snapshot cho FE epic sau                            |
+| Ticket                                                              | Mô tả                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [TKT-ACS-01](./tickets/TKT-ACS-01-be-customers-search.md)           | BE: scaffold `AdminSearchModule`/controller + `POST /v2/customers/search`  |
+| [TKT-ACS-02](./tickets/TKT-ACS-02-be-inventory-providers-search.md) | BE: `POST /v2/inventory-providers/search` (giữ `groupName` flatten)        |
+| [TKT-ACS-03](./tickets/TKT-ACS-03-be-job-positions-search.md)       | BE: `POST /v2/job-positions/search` (đơn giản, soft-delete excluded)       |
+| [TKT-ACS-04](./tickets/TKT-ACS-04-be-accounts-search.md)            | BE: `POST /v2/accounts/search` (giữ `parentAccountId` thô, không join)     |
+| [TKT-ACS-05](./tickets/TKT-ACS-05-be-employees-search.md)           | BE: `POST /v2/employees/search` (giữ full `UserListItem`, tái dùng mapper) |
+| [TKT-ACS-06](./tickets/TKT-ACS-06-openapi-regen.md)                 | OpenAPI regen + api-client snapshot cho FE epic sau                        |
 
 ### Ticket dependency graph (EPIC-03062026 admin-list-cqrs-search)
 
@@ -457,12 +457,12 @@ flowchart LR
 - [EPIC-03062026 Backoffice admin list server-side search — FE wiring](./epics/EPIC-03062026-admin-list-cqrs-search-fe.md)
 - Nối `backoffice-web` (5 màn admin) vào 5 endpoint CQRS `POST /v2/<entity>/search`: filter theo từng cột query **toàn bộ** dataset + phân trang server-side, bỏ lọc client-side (`applyColumnFilter` cũ chỉ lọc trang đã tải). **Mở rộng `CrudListPage` có cổng (registry 4 entity CRUD)** — entity khác KHÔNG đổi; `EmployeesPage` migrate riêng. Bỏ sort cột (createdAt DESC như POS v2). Thêm filter cell **date-range** cho `createdAt`. Chỉ FE.
 
-| Ticket                                                        | Mô tả                                                                  |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [TKT-ACSFE-01](./tickets/TKT-ACSFE-01-fe-data-layer.md)       | FE: registry + `ColumnFilter→v2 body` mapper + hooks (`useCrudV2Search`/employee) |
-| [TKT-ACSFE-02](./tickets/TKT-ACSFE-02-fe-datatable-date-range.md) | FE: thêm filter kind `date-range` vào `BaseDataTable`                |
-| [TKT-ACSFE-03](./tickets/TKT-ACSFE-03-fe-crudlistpage-wiring.md) | FE: `CrudListPage` server-side v2 search có cổng (4 entity CRUD)     |
-| [TKT-ACSFE-04](./tickets/TKT-ACSFE-04-fe-employees-page.md)   | FE: migrate `EmployeesPage` sang `POST /v2/employees/search`           |
+| Ticket                                                            | Mô tả                                                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [TKT-ACSFE-01](./tickets/TKT-ACSFE-01-fe-data-layer.md)           | FE: registry + `ColumnFilter→v2 body` mapper + hooks (`useCrudV2Search`/employee) |
+| [TKT-ACSFE-02](./tickets/TKT-ACSFE-02-fe-datatable-date-range.md) | FE: thêm filter kind `date-range` vào `BaseDataTable`                             |
+| [TKT-ACSFE-03](./tickets/TKT-ACSFE-03-fe-crudlistpage-wiring.md)  | FE: `CrudListPage` server-side v2 search có cổng (4 entity CRUD)                  |
+| [TKT-ACSFE-04](./tickets/TKT-ACSFE-04-fe-employees-page.md)       | FE: migrate `EmployeesPage` sang `POST /v2/employees/search`                      |
 
 ### Ticket dependency graph (EPIC-03062026 admin-list-cqrs-search-fe)
 
@@ -479,11 +479,11 @@ flowchart LR
 - [EPIC-03062026 Inventory item server-side grouped search (v2)](./epics/EPIC-03062026-inventory-item-search-v2.md)
 - Thêm endpoint **CQRS v2 search** (skill `cqrs-search-endpoint`) cho mặt hàng kho: `POST /v2/inventory-items/search`. Đẩy filter của trang `/admin/inventory-items` xuống backend (search toàn cục + `isActive`/`isPosVisible`/`categoryId`/`productId`/`brand`/`itemType`), **trả y hệt shape product-group** mà `listProductGroups` đang trả (`ProductGroupRow`, envelope `{ data,total,page,pageSize }`, sort `code ASC`, gom nhóm product+category, `AVG/bool_and/MIN/COUNT`). **Chỉ backend** — KHÔNG rewire FE (làm sau); chạy `openapi:generate` chuẩn bị cho FE. Scope `organizationId` (không branch-scope), permission `inventory.read`, không seed mới. Đề xuất **Hướng A** (mở rộng SQL `listProductGroups`) để bảo đảm byte-identical; Hướng B (in-memory) nêu kèm — chốt ở Step 3.
 
-| Ticket                                                                       | Mô tả                                                                          |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [TKT-IIS-01](./tickets/TKT-IIS-01-be-extend-product-group-filters.md)        | BE: mở rộng `listProductGroups` + `ProductGroupsQueryDto` với 5 filter optional |
-| [TKT-IIS-02](./tickets/TKT-IIS-02-be-cqrs-grouped-search-endpoint.md)        | BE: DTO + Query + Handler + `@Version('2')` controller + wire `CqrsModule`      |
-| [TKT-IIS-03](./tickets/TKT-IIS-03-be-openapi-and-tests.md)                   | BE: `openapi:generate` + tests (parity/scope/filter) + DoD gate                |
+| Ticket                                                                | Mô tả                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [TKT-IIS-01](./tickets/TKT-IIS-01-be-extend-product-group-filters.md) | BE: mở rộng `listProductGroups` + `ProductGroupsQueryDto` với 5 filter optional |
+| [TKT-IIS-02](./tickets/TKT-IIS-02-be-cqrs-grouped-search-endpoint.md) | BE: DTO + Query + Handler + `@Version('2')` controller + wire `CqrsModule`      |
+| [TKT-IIS-03](./tickets/TKT-IIS-03-be-openapi-and-tests.md)            | BE: `openapi:generate` + tests (parity/scope/filter) + DoD gate                 |
 
 ### Ticket dependency graph (EPIC-03062026 inventory-item-search-v2)
 
@@ -498,15 +498,15 @@ flowchart LR
 - [EPIC-03062026 Inventory list server-side CQRS search](./epics/EPIC-03062026-inventory-list-cqrs-search.md)
 - Phase-2 of the admin-list CQRS search initiative. Add **CQRS v2 search endpoints** + FE wiring for three more list surfaces: Nhóm hàng hoá (`/admin/inventory-item-categories`), Nhập kho (`/inventory/purchase-orders` → goods-receipts), Xuất kho (`/inventory/goods-issues`). Reuses `FilterBuilder` + shared filter sub-DTOs, envelope `{ data, total, page, limit }`, sort = each page's current default. **Trả y chang** what the FE renders today (goods-receipt/issue keep nested `provider`/`targetBranch`; categories full entity) **plus** a computed `totalAmount` (SQL `SUM(qty×unitPrice)` subquery, filterable). categories search goes in `AdminSearchModule`; goods-receipt/issue in their own modules (`*-v2.controller.ts`, mirroring `inventory-item-v2.controller.ts`). FE: categories = one `CRUD_V2_SEARCH` registry entry; Nhập/Xuất kho = bespoke filter rows on the hand-built pages. No schema/migration/events; org-scope categories, org+branch goods-receipt/issue; reuse `inventory.read`.
 
-| Ticket                                                                | Mô tả                                                                                  |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [TKT-ILS-01](./tickets/TKT-ILS-01-be-goods-receipt-search.md)         | BE: `POST /v2/goods-receipts/search` (goods-receipt module) + computed `totalAmount`   |
-| [TKT-ILS-02](./tickets/TKT-ILS-02-be-goods-issue-search.md)           | BE: `POST /v2/inventory/goods-issues/search` + polymorphic party + `totalAmount`       |
-| [TKT-ILS-03](./tickets/TKT-ILS-03-be-item-categories-search.md)       | BE: `POST /v2/inventory-item-categories/search` (AdminSearch module)                   |
-| [TKT-ILS-04](./tickets/TKT-ILS-04-openapi-regen.md)                   | OpenAPI regen + api-client snapshot for the 3 endpoints                                 |
-| [TKT-ILS-05](./tickets/TKT-ILS-05-fe-goods-receipt-page.md)           | FE: Nhập kho (`PurchaseOrdersPage`) server-side per-column filters + pagination         |
-| [TKT-ILS-06](./tickets/TKT-ILS-06-fe-goods-issue-page.md)             | FE: Xuất kho (`GoodsIssuePage`) server-side per-column filters + pagination             |
-| [TKT-ILS-07](./tickets/TKT-ILS-07-fe-categories-registry.md)          | FE: add `inventory-item-categories` entry to `CRUD_V2_SEARCH`                            |
+| Ticket                                                          | Mô tả                                                                                |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [TKT-ILS-01](./tickets/TKT-ILS-01-be-goods-receipt-search.md)   | BE: `POST /v2/goods-receipts/search` (goods-receipt module) + computed `totalAmount` |
+| [TKT-ILS-02](./tickets/TKT-ILS-02-be-goods-issue-search.md)     | BE: `POST /v2/inventory/goods-issues/search` + polymorphic party + `totalAmount`     |
+| [TKT-ILS-03](./tickets/TKT-ILS-03-be-item-categories-search.md) | BE: `POST /v2/inventory-item-categories/search` (AdminSearch module)                 |
+| [TKT-ILS-04](./tickets/TKT-ILS-04-openapi-regen.md)             | OpenAPI regen + api-client snapshot for the 3 endpoints                              |
+| [TKT-ILS-05](./tickets/TKT-ILS-05-fe-goods-receipt-page.md)     | FE: Nhập kho (`PurchaseOrdersPage`) server-side per-column filters + pagination      |
+| [TKT-ILS-06](./tickets/TKT-ILS-06-fe-goods-issue-page.md)       | FE: Xuất kho (`GoodsIssuePage`) server-side per-column filters + pagination          |
+| [TKT-ILS-07](./tickets/TKT-ILS-07-fe-categories-registry.md)    | FE: add `inventory-item-categories` entry to `CRUD_V2_SEARCH`                        |
 
 ### Ticket dependency graph (EPIC-03062026 inventory-list-cqrs-search)
 
@@ -518,5 +518,66 @@ flowchart LR
   T4 --> T5["TKT-ILS-05 FE Nhập kho"]
   T4 --> T6["TKT-ILS-06 FE Xuất kho"]
   T4 --> T7["TKT-ILS-07 FE categories registry"]
+```
+
+## EPIC-07062026 Phiếu Điều Chuyển Kho (two-phase — extends TransferOrder)
+
+- [EPIC-07062026 Phiếu Điều Chuyển Kho](./epics/EPIC-07062026-inventory-transfer-voucher.md)
+- Biến **Lệnh điều chuyển hiện có** (`transfer_orders`) thành phiếu điều chuyển **2 pha**: Store A xác nhận **xuất**, Store B xác nhận **nhập** ở 2 thời điểm khác nhau, phiếu ở `IN_PROGRESS` (đang luân chuyển) ở giữa. State machine mới `DRAFT → IN_PROGRESS → COMPLETED` (+ `CANCELLED`) **thay** `DRAFT→APPROVED→EXECUTED` cũ (migrate `EXECUTED→COMPLETED`, `APPROVED→DRAFT`; bỏ `approve`/`markExecuted`). **Mở rộng tại chỗ** `transfer_orders` + `transfer_order_lines` (KHÔNG bảng mới); thêm **kho nguồn + kho đích theo từng dòng**. 2 chân tồn kho **tái dùng** GoodsIssue(`TRANSFER_OUT`) + GoodsReceipt(`TRANSFER_IN`) ledger-only (không bút toán/công nợ); `import_reference` = id GoodsReceipt nhập. Tồn âm ("xuất kho khống") được phép (ledger không chặn, cảnh báo client-side). Giữ mã `LDC` (`DocumentType.TRANSFER_ORDER`, render QR để in). Chỉ `backoffice-web` (sửa `TransferOrdersPage`), không scanner camera. Cancel `IN_PROGRESS` đảo chân xuất.
+
+| Ticket                                                        | Mô tả                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [TKT-ITV-01](./tickets/TKT-ITV-01-schema-transfer-voucher.md) | BE: mở rộng `transfer_orders`+lines + rebuild enum `TransferOrderStatus` + data migration  |
+| [TKT-ITV-02](./tickets/TKT-ITV-02-shared-interfaces.md)       | Shared: rebuild `TransferOrderStatus` + thêm field `TransferOrder`/`TransferOrderLine`     |
+| [TKT-ITV-03](./tickets/TKT-ITV-03-service.md)                 | BE: viết lại service create/getByCode/update/export/import/cancel; bỏ approve/markExecuted |
+| [TKT-ITV-04](./tickets/TKT-ITV-04-controller-module.md)       | BE: controller thay approve/execute → export/import + by-code; module wiring + events      |
+| [TKT-ITV-05](./tickets/TKT-ITV-05-permissions.md)             | BE: seed `inventory.transfer.export` + `.import` + VI labels                               |
+| [TKT-ITV-06](./tickets/TKT-ITV-06-openapi.md)                 | OpenAPI regen + api-client snapshot (bỏ approve/execute, thêm export/import)               |
+| [TKT-ITV-07](./tickets/TKT-ITV-07-fe-data-layer.md)           | FE: mở rộng hook transfer-order (export/import/by-code) + cảnh báo tồn âm                  |
+| [TKT-ITV-08](./tickets/TKT-ITV-08-fe-ui.md)                   | FE: cải tạo `TransferOrdersPage` — kho nguồn/đích theo dòng + xuất/nhập + QR               |
+| [TKT-ITV-09](./tickets/TKT-ITV-09-e2e.md)                     | E2E round-trip 2 pha + migration remap + tồn âm + cancel-reverse + idempotency + DoD       |
+
+### Ticket dependency graph (EPIC-07062026)
+
+```mermaid
+flowchart LR
+  T1["TKT-ITV-01 Schema + enum rebuild"] --> T2["TKT-ITV-02 shared-interfaces"]
+  T1 --> T3["TKT-ITV-03 Service rewrite"]
+  T3 --> T4["TKT-ITV-04 Controller + module"]
+  T5["TKT-ITV-05 Permissions"] --> T4
+  T4 --> T6["TKT-ITV-06 OpenAPI"]
+  T2 --> T7["TKT-ITV-07 FE data layer"]
+  T6 --> T7
+  T7 --> T8["TKT-ITV-08 FE UI rework"]
+  T4 --> T9["TKT-ITV-09 E2E + DoD"]
+  T5 --> T9
+  T8 --> T9
+```
+
+## EPIC-08062026 Lập phiếu xuất kho từ Lệnh điều chuyển ("Tiện ích" MISA)
+
+- [EPIC-08062026 Lập phiếu xuất kho từ Lệnh điều chuyển](./epics/EPIC-08062026-goods-issue-from-transfer.md)
+- Thêm menu **Tiện ích** (MISA-style) vào form **Phiếu xuất kho** (`GoodsIssueFormDialog`, `backoffice-web`), mục **"Lập từ lệnh điều chuyển"** → dialog "Chọn lệnh điều chuyển" liệt kê lệnh `DRAFT` của **chi nhánh nguồn** → chọn → nạp dòng vào form → **Lưu = chân xuất (export)** của EPIC-07062026 (spawn 1 GoodsIssue `TRANSFER_OUT` có `referenceType=TRANSFER_ORDER`, lệnh `DRAFT→IN_PROGRESS`). **Một lần trừ kho duy nhất, KHÔNG migration** (cột `goods_issues.reference_*`/`target_branch_id` đã có). **Phụ thuộc EPIC-07062026 đã land**; mở rộng `POST /:id/export` để nhận dòng đã sửa + gắn reference.
+
+| Ticket                                                       | Mô tả                                                                                                                   |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| [TKT-IFT-01](./tickets/TKT-IFT-01-shared-interfaces.md)      | Shared: `GoodsIssueReferenceType.TRANSFER_ORDER` + `IssuableTransferOrderListItem` + `ExportTransferOrderRequest`       |
+| [TKT-IFT-02](./tickets/TKT-IFT-02-be-issuable-and-export.md) | BE: `GET /issuable` (DRAFT + source branch + date) + `confirmExport` nhận dòng đã sửa + gắn reference (KHÔNG migration) |
+| [TKT-IFT-03](./tickets/TKT-IFT-03-openapi.md)                | OpenAPI regen + api-client snapshot                                                                                     |
+| [TKT-IFT-04](./tickets/TKT-IFT-04-fe-data-layer.md)          | FE: `useIssuableTransferOrders` + `useExportTransferOrder` (export-with-lines) + mapper                                 |
+| [TKT-IFT-05](./tickets/TKT-IFT-05-fe-ui.md)                  | FE: dropdown Tiện ích + `SelectTransferOrderDialog` + prefill + save-as-export                                          |
+| [TKT-IFT-06](./tickets/TKT-IFT-06-e2e.md)                    | E2E: issuable scope + export-from-form + no-double-issue + idempotency + DoD gate                                       |
+
+### Ticket dependency graph (EPIC-08062026)
+
+```mermaid
+flowchart LR
+  ITV["EPIC-07062026 (ITV) landed"] --> T2
+  T1["TKT-IFT-01 shared-interfaces"] --> T2["TKT-IFT-02 BE issuable + export"]
+  T2 --> T3["TKT-IFT-03 OpenAPI"]
+  T3 --> T4["TKT-IFT-04 FE data layer"]
+  T4 --> T5["TKT-IFT-05 FE UI"]
+  T2 --> T6["TKT-IFT-06 E2E + DoD"]
+  T5 --> T6
 ```
 

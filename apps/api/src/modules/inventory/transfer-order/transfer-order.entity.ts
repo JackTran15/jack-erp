@@ -37,6 +37,41 @@ export class TransferOrderEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({
+    name: 'attachment_ids',
+    type: 'jsonb',
+    default: () => "'[]'::jsonb",
+  })
+  attachmentIds: string[];
+
+  // ── Two-phase transfer linkage (export → import) ──────────────────────────
+  /** GoodsIssue spawned when the source branch confirms export (DRAFT → IN_PROGRESS). */
+  @Column({ name: 'export_goods_issue_id', type: 'uuid', nullable: true })
+  exportGoodsIssueId?: string;
+
+  /** GoodsReceipt spawned when the destination branch confirms import — the import_reference. */
+  @Column({ name: 'import_goods_receipt_id', type: 'uuid', nullable: true })
+  importGoodsReceiptId?: string;
+
+  @Column({ name: 'exported_at', type: 'timestamptz', nullable: true })
+  exportedAt?: Date;
+
+  @Column({ name: 'exported_by', type: 'uuid', nullable: true })
+  exportedBy?: string;
+
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+  completedAt?: Date;
+
+  @Column({ name: 'completed_by', type: 'uuid', nullable: true })
+  completedBy?: string;
+
+  @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
+  cancelledAt?: Date;
+
+  @Column({ name: 'cancelled_by', type: 'uuid', nullable: true })
+  cancelledBy?: string;
+
+  // ── Legacy columns from the old DRAFT→APPROVED→EXECUTED flow (no longer written) ──
   @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
   approvedAt?: Date;
 
