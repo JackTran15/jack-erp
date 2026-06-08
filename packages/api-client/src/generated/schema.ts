@@ -182,7 +182,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/admin/users/me": {
         parameters: {
             query?: never;
@@ -199,8 +198,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/admin/users/{id}": {
         parameters: {
             query?: never;
@@ -1258,7 +1255,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/branches/me": {
         parameters: {
             query?: never;
@@ -1275,8 +1271,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/branches/{id}": {
         parameters: {
             query?: never;
@@ -1968,7 +1962,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/inventory/locations/arrange": {
         parameters: {
             query?: never;
@@ -1986,8 +1979,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/locations/{locationId}/stock-items/{itemId}": {
         parameters: {
             query?: never;
@@ -2005,8 +1996,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-=======
     "/v2/inventory-items/search": {
         parameters: {
             query?: never;
@@ -2024,7 +2013,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/stock/balances": {
         parameters: {
             query?: never;
@@ -2233,7 +2221,6 @@ export interface paths {
         patch: operations["ProductAttributeController_updateOption"];
         trace?: never;
     };
-<<<<<<< HEAD
     "/inventory/stock/transfers": {
         parameters: {
             query?: never;
@@ -2314,8 +2301,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/payables": {
         parameters: {
             query?: never;
@@ -2556,105 +2541,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-=======
-    "/inventory/stock/transfers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockTransferController_list"];
-        put?: never;
-        post: operations["StockTransferController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock/transfers/intra-warehouse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTransferController_createIntraWarehouseTransfer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock/transfers/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockTransferController_getById"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock/transfers/{id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTransferController_approve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock/transfers/{id}/post": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTransferController_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock/transfers/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTransferController_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/stock/adjustments": {
         parameters: {
             query?: never;
@@ -3944,25 +3830,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-=======
-    "/inventory/goods-issues/{id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["GoodsIssueController_approve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/goods-issues/{id}/post": {
         parameters: {
             query?: never;
@@ -3995,8 +3862,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-=======
     "/v2/inventory/goods-issues/search": {
         parameters: {
             query?: never;
@@ -4013,7 +3878,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/issue-reasons": {
         parameters: {
             query?: never;
@@ -4094,8 +3958,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
-=======
     "/v2/goods-receipts/search": {
         parameters: {
             query?: never;
@@ -4112,7 +3974,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/inventory/stock-takes": {
         parameters: {
             query?: never;
@@ -4257,153 +4118,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/stock-summary": {
-=======
-    "/v2/customers/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Tổng hợp nhập xuất tồn kho */
         get: operations["InventoryReportsController_stockSummary"];
         put?: never;
         post?: never;
-=======
-        get?: never;
-        put?: never;
-        post: operations["AdminSearchV2Controller_searchCustomers_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/stock-document-details": {
-=======
-    "/v2/inventory-providers/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Bảng kê chi tiết phiếu nhập xuất */
         get: operations["InventoryReportsController_stockDocumentDetails"];
         put?: never;
         post?: never;
-=======
-        get?: never;
-        put?: never;
-        post: operations["AdminSearchV2Controller_searchProviders_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/stock-quantity-details": {
-=======
-    "/v2/job-positions/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Chi tiết số lượng nhập xuất tồn */
         get: operations["InventoryReportsController_stockQuantityDetails"];
         put?: never;
         post?: never;
-=======
-        get?: never;
-        put?: never;
-        post: operations["AdminSearchV2Controller_searchJobPositions_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/stock-summary-by-branch": {
-=======
-    "/v2/accounts/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Tổng hợp nhập xuất tồn theo cửa hàng */
         get: operations["InventoryReportsController_stockSummaryByBranch"];
         put?: never;
         post?: never;
-=======
-        get?: never;
-        put?: never;
-        post: operations["AdminSearchV2Controller_searchAccounts_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/stock-by-branch": {
-=======
-    "/v2/employees/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Số lượng tồn theo cửa hàng (pivot) */
         get: operations["InventoryReportsController_stockByBranch"];
         put?: never;
         post?: never;
-=======
-        get?: never;
-        put?: never;
-        post: operations["AdminSearchV2Controller_searchEmployees_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-<<<<<<< HEAD
     "/reports/inventory/transfer-summary": {
-=======
-    "/v2/inventory-item-categories/search": {
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         /** Tổng hợp nhập xuất điều chuyển */
         get: operations["InventoryReportsController_transferSummary"];
         put?: never;
@@ -4425,11 +4231,102 @@ export interface paths {
         get: operations["InventoryReportsController_transferByBranch"];
         put?: never;
         post?: never;
-=======
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/customers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchCustomers_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-providers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchProviders_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/job-positions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchJobPositions_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/accounts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchAccounts_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/employees/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchEmployees_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-item-categories/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         get?: never;
         put?: never;
         post: operations["AdminSearchV2Controller_searchItemCategories_v2"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         delete?: never;
         options?: never;
         head?: never;
@@ -5633,14 +5530,9 @@ export interface components {
         ItemCategoryEntity: {
             code?: string;
             name: string;
-<<<<<<< HEAD
             description?: string;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
-=======
-            parentGroupId?: string;
-            description?: string;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -5773,7 +5665,6 @@ export interface components {
             storageId: string;
             /** @enum {string} */
             type: "SHELF" | "RACK" | "BIN" | "ZONE";
-<<<<<<< HEAD
             description?: string | null;
             isActive: boolean;
             isUnassigned: boolean;
@@ -5784,10 +5675,6 @@ export interface components {
              *     "Xếp hàng hóa: Đã xếp / Chưa xếp" column. Undefined on endpoints that don't compute it.
              */
             hasItems?: boolean;
-=======
-            isActive: boolean;
-            storage?: components["schemas"]["StorageEntity"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -6015,7 +5902,6 @@ export interface components {
             branchId: string;
             /** @enum {string} */
             type?: "SHELF" | "RACK" | "BIN" | "ZONE";
-<<<<<<< HEAD
             description?: string;
             isActive?: boolean;
         };
@@ -6028,14 +5914,6 @@ export interface components {
             type?: "SHELF" | "RACK" | "BIN" | "ZONE";
             isActive?: boolean;
             description?: string;
-=======
-        };
-        UpdateLocationDto: {
-            name?: string;
-            /** @enum {string} */
-            type?: "SHELF" | "RACK" | "BIN" | "ZONE";
-            isActive?: boolean;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         };
         AssignStorageManagerDto: {
             /** Format: uuid */
@@ -6129,7 +6007,6 @@ export interface components {
         BatchAssignItemsDto: {
             rows: components["schemas"]["BatchAssignItemRowDto"][];
         };
-<<<<<<< HEAD
         ArrangeLocationLineDto: {
             /**
              * Format: uuid
@@ -6149,7 +6026,7 @@ export interface components {
         };
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
-=======
+        };
         StringFilterDto: {
             /** @enum {string} */
             operator: "*" | "=" | "+" | "-" | "!";
@@ -6207,7 +6084,6 @@ export interface components {
             total: number;
             page: number;
             limit: number;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         };
         StockBalanceEntity: {
             itemId: string;
@@ -6293,7 +6169,6 @@ export interface components {
             sortOrder?: number;
             codeSuffix?: string;
         };
-<<<<<<< HEAD
         CreateTransferDto: Record<string, never>;
         StockTransferEntity: {
             documentNumber?: string;
@@ -6371,8 +6246,6 @@ export interface components {
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
         };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         CreatePayableDto: {
             vendorName: string;
             amount: number;
@@ -6544,73 +6417,6 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
-<<<<<<< HEAD
-=======
-        CreateTransferDto: Record<string, never>;
-        StockTransferEntity: {
-            documentNumber?: string;
-            sourceLocationId: string;
-            destinationLocationId: string;
-            sourceBranchId: string;
-            destinationBranchId: string;
-            /** @enum {string} */
-            status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
-            approvedBy?: string;
-            /** Format: date-time */
-            approvedAt?: string;
-            postedBy?: string;
-            /** Format: date-time */
-            postedAt?: string;
-            notes?: string;
-            lines: components["schemas"]["StockTransferLineEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        StockTransferLineEntity: {
-            id: string;
-            transferId: string;
-            itemId: string;
-            sourceLocationId?: string;
-            destinationLocationId?: string;
-            quantity: number;
-            notes?: string;
-            transfer?: components["schemas"]["StockTransferEntity"];
-        };
-        IntraWarehouseTransferLineDto: {
-            /**
-             * Format: uuid
-             * @description UUID of the inventory item
-             */
-            itemId: string;
-            /** @description Quantity to transfer (must be > 0) */
-            quantity: number;
-            /** @description Optional notes for this line */
-            notes?: string;
-        };
-        CreateIntraWarehouseTransferDto: {
-            /**
-             * Format: uuid
-             * @description UUID of the source location
-             */
-            sourceLocationId: string;
-            /**
-             * Format: uuid
-             * @description UUID of the destination location (must be in same storage as source)
-             */
-            destinationLocationId: string;
-            /** @description Lines to transfer */
-            lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
-        };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         CreateAdjustmentDto: Record<string, never>;
         StockAdjustmentEntity: {
             documentNumber?: string;
@@ -7287,14 +7093,6 @@ export interface components {
             payments?: components["schemas"]["InvoicePaymentLineDto"][];
             note?: string;
         };
-<<<<<<< HEAD
-        StringFilterDto: {
-            /** @enum {string} */
-            operator: "*" | "=" | "+" | "-" | "!";
-            value: string;
-        };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         EnumFilterDto: {
             value: string | null;
         };
@@ -7302,14 +7100,6 @@ export interface components {
             from?: string;
             to?: string;
         };
-<<<<<<< HEAD
-        CompareFilterDto: {
-            /** @enum {string} */
-            operator: "=" | "<" | "<=" | ">" | ">=";
-            value: Record<string, never>;
-        };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         InvoiceSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -7576,14 +7366,10 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
             /** @enum {string} */
-<<<<<<< HEAD
             purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
             referenceId?: string;
             /** @enum {string} */
             referenceType?: "STOCK_TAKE";
-=======
-            purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             notes?: string;
             approvedBy?: string;
             /** Format: date-time */
@@ -7608,19 +7394,14 @@ export interface components {
             id: string;
             goodsIssueId: string;
             itemId: string;
-<<<<<<< HEAD
             locationId: string;
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             quantity: number;
             unitPrice: string;
             lineTotal: string;
             notes?: string;
             goodsIssue?: components["schemas"]["GoodsIssueEntity"];
             item?: components["schemas"]["ItemEntity"];
-<<<<<<< HEAD
             location?: components["schemas"]["LocationEntity"];
-=======
         };
         GoodsIssueSearchV2Dto: {
             /** @default 1 */
@@ -7641,7 +7422,6 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         };
         CreateIssueReasonDto: {
             /**
@@ -7702,11 +7482,7 @@ export interface components {
         };
         CreateGoodsReceiptDto: {
             /** @enum {string} */
-<<<<<<< HEAD
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-=======
-            purpose: "OTHER" | "TRANSFER_IN";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7715,11 +7491,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-<<<<<<< HEAD
             referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-=======
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             /** @description Source branch for transfer-in. Stored separately from referenceId. */
             sourceBranchId?: string;
             receivedAt: string;
@@ -7745,22 +7517,14 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
             /** @enum {string} */
-<<<<<<< HEAD
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-=======
-            purpose: "OTHER" | "TRANSFER_IN";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             providerId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
             referenceId?: string;
             /** @enum {string} */
-<<<<<<< HEAD
             referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-=======
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             /** @description Convenience: source branch for TRANSFER_IN — orthogonal to referenceId (which points to a stock-transfer doc). */
             sourceBranchId?: string;
             /** Format: date-time */
@@ -7817,11 +7581,7 @@ export interface components {
         };
         UpdateGoodsReceiptDto: {
             /** @enum {string} */
-<<<<<<< HEAD
             purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
-=======
-            purpose?: "OTHER" | "TRANSFER_IN";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             /** Format: uuid */
             providerId?: string;
             deliveredBy?: string;
@@ -7830,11 +7590,7 @@ export interface components {
             /** Format: uuid */
             referenceId?: string;
             /** @enum {string} */
-<<<<<<< HEAD
             referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE";
-=======
-            referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER";
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             sourceBranchId?: string;
             receivedAt?: string;
             /** Format: uuid */
@@ -7844,8 +7600,6 @@ export interface components {
             cashPayment?: components["schemas"]["CashSettlementDto"];
             cashReceipt?: components["schemas"]["CashSettlementDto"];
         };
-<<<<<<< HEAD
-=======
         GoodsReceiptSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -7866,7 +7620,6 @@ export interface components {
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
         };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         CreateStockTakeLineDto: {
             itemId: string;
             locationId?: string;
@@ -8017,8 +7770,6 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
         };
         MarkExecutedDto: Record<string, never>;
-<<<<<<< HEAD
-=======
         CustomerSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -8139,7 +7890,6 @@ export interface components {
             /** @description Ngày tạo (creation date range) */
             createdAt?: components["schemas"]["DateRangeFilterDto"];
         };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     };
     responses: never;
     parameters: never;
@@ -8482,7 +8232,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
     UsersController_getMe: {
         parameters: {
             query?: never;
@@ -8502,8 +8251,6 @@ export interface operations {
             };
         };
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     UsersController_findById: {
         parameters: {
             query?: never;
@@ -10711,7 +10458,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
     BranchController_listMyBranches: {
         parameters: {
             query?: never;
@@ -10731,8 +10477,6 @@ export interface operations {
             };
         };
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     BranchController_findById: {
         parameters: {
             query?: never;
@@ -12101,7 +11845,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
     InventoryLocationStockController_arrange: {
         parameters: {
             query?: never;
@@ -12124,8 +11867,6 @@ export interface operations {
             };
         };
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     InventoryLocationStockController_removeItemFromLocation: {
         parameters: {
             query?: never;
@@ -12146,8 +11887,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
-=======
     InventoryItemV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -12171,7 +11910,6 @@ export interface operations {
             };
         };
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     StockLedgerController_listBalances: {
         parameters: {
             query?: {
@@ -12181,10 +11919,7 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 search?: string;
                 filters?: string;
-<<<<<<< HEAD
                 unassigned?: boolean;
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
                 locationCode?: string;
                 locationCodeMode?: string;
                 locationName?: string;
@@ -12648,7 +12383,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
     StockTransferController_list: {
         parameters: {
             query?: {
@@ -12807,8 +12541,6 @@ export interface operations {
             };
         };
     };
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     PayablesController_list: {
         parameters: {
             query?: {
@@ -13214,163 +12946,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
-=======
-    StockTransferController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StockTransferController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateTransferDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
-    StockTransferController_createIntraWarehouseTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateIntraWarehouseTransferDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
-    StockTransferController_getById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
-    StockTransferController_approve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
-    StockTransferController_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
-    StockTransferController_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTransferEntity"];
-                };
-            };
-        };
-    };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     StockAdjustmentController_list: {
         parameters: {
             query?: {
@@ -15612,30 +15187,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
-=======
-    GoodsIssueController_approve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GoodsIssueEntity"];
-                };
-            };
-        };
-    };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     GoodsIssueController_post: {
         parameters: {
             query?: never;
@@ -15678,8 +15229,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
-=======
     GoodsIssueV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -15703,7 +15252,6 @@ export interface operations {
             };
         };
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     IssueReasonController_list: {
         parameters: {
             query?: {
@@ -15949,8 +15497,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
-=======
     GoodsReceiptV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -15974,7 +15520,6 @@ export interface operations {
             };
         };
     };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     StockTakeController_list: {
         parameters: {
             query?: {
@@ -16317,7 +15862,6 @@ export interface operations {
             };
         };
     };
-<<<<<<< HEAD
     InventoryReportsController_stockSummary: {
         parameters: {
             query?: {
@@ -16329,21 +15873,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-    AdminSearchV2Controller_searchCustomers_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16365,37 +15907,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CustomerSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AdminSearchV2Controller_searchProviders_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16417,37 +15941,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProviderSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AdminSearchV2Controller_searchJobPositions_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16469,37 +15975,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JobPositionSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AdminSearchV2Controller_searchAccounts_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16521,37 +16009,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AccountSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AdminSearchV2Controller_searchEmployees_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16573,37 +16043,19 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
                 pageSize?: number;
             };
-=======
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmployeeSearchV2Dto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    AdminSearchV2Controller_searchItemCategories_v2: {
-        parameters: {
-            query?: never;
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             header?: never;
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         requestBody?: never;
         responses: {
             200: {
@@ -16625,6 +16077,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -16643,7 +16099,131 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-=======
+            };
+        };
+    };
+    AdminSearchV2Controller_searchCustomers_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchProviders_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchJobPositions_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobPositionSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchAccounts_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchEmployees_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchItemCategories_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ItemCategorySearchV2Dto"];
@@ -16657,7 +16237,6 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
             };
         };
     };

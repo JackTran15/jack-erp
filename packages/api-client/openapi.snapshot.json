@@ -3983,7 +3983,6 @@
         ]
       }
     },
-<<<<<<< HEAD
     "/branches/me": {
       "get": {
         "operationId": "BranchController_listMyBranches",
@@ -4008,8 +4007,6 @@
         ]
       }
     },
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
     "/branches/{id}": {
       "get": {
         "operationId": "BranchController_findById",
@@ -13254,7 +13251,6 @@
         ]
       }
     },
-<<<<<<< HEAD
     "/reports/inventory/stock-summary": {
       "get": {
         "operationId": "InventoryReportsController_stockSummary",
@@ -13319,6 +13315,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13430,6 +13453,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13535,6 +13585,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13646,6 +13723,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13751,6 +13855,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13862,6 +13993,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13970,6 +14128,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -14018,7 +14203,9 @@
         "summary": "Hàng hóa điều chuyển theo cửa hàng",
         "tags": [
           "inventory-reports"
-=======
+        ]
+      }
+    },
     "/v2/customers/search": {
       "post": {
         "operationId": "AdminSearchV2Controller_searchCustomers_v2",
@@ -14202,7 +14389,6 @@
         },
         "tags": [
           "AdminSearchV2"
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         ]
       }
     }
@@ -18180,7 +18366,6 @@
           "name": {
             "type": "string"
           },
-<<<<<<< HEAD
           "description": {
             "type": "string"
           },
@@ -18191,14 +18376,6 @@
               "INACTIVE"
             ]
           },
-=======
-          "parentGroupId": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
           "id": {
             "type": "string"
           },
@@ -19742,7 +19919,6 @@
           "rows"
         ]
       },
-<<<<<<< HEAD
       "ArrangeLocationLineDto": {
         "type": "object",
         "properties": {
@@ -19781,7 +19957,8 @@
         },
         "required": [
           "lines"
-=======
+        ]
+      },
       "StringFilterDto": {
         "type": "object",
         "properties": {
@@ -19993,7 +20170,6 @@
           "total",
           "page",
           "limit"
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
         ]
       },
       "StockBalanceEntity": {
@@ -23097,31 +23273,6 @@
           "revenueAccountId"
         ]
       },
-<<<<<<< HEAD
-      "StringFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "*",
-              "=",
-              "+",
-              "-",
-              "!"
-            ]
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
       "EnumFilterDto": {
         "type": "object",
         "properties": {
@@ -23145,31 +23296,6 @@
           }
         }
       },
-<<<<<<< HEAD
-      "CompareFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "=",
-              "<",
-              "<=",
-              ">",
-              ">="
-            ]
-          },
-          "value": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
-=======
->>>>>>> 2f93747 (feat(admin-search): implement v2 search endpoints for customers, providers, job positions, accounts, employees, and item categories; add corresponding DTOs and handlers)
       "InvoiceSearchV2Dto": {
         "type": "object",
         "properties": {
