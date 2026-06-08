@@ -47,6 +47,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "goods_receipt.post", module: "inventory" },
   { key: "inventory.transfer.read", module: "inventory" },
   { key: "inventory.transfer.create", module: "inventory" },
+  { key: "inventory.transfer.export", module: "inventory" },
+  { key: "inventory.transfer.import", module: "inventory" },
   { key: "inventory.transfer.post", module: "inventory" },
   { key: "inventory.transfer.cancel", module: "inventory" },
   { key: "inventory.adjustment.read", module: "inventory" },

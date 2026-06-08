@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Not, Repository } from 'typeorm';
 import {
   GoodsIssuePurpose,
+  GoodsIssueReferenceType,
   GoodsIssueStatus,
   StockMovementType,
   DocumentType,
@@ -30,6 +31,10 @@ export interface CreateGoodsIssueDto {
   reasonId?: string;
   targetBranchId?: string;
   reason?: string; // optional override / legacy
+  /** Source document id (e.g. the transfer order this issue was created from). */
+  referenceId?: string;
+  /** Source document type — see GoodsIssueReferenceType. */
+  referenceType?: GoodsIssueReferenceType;
   notes?: string;
   lines: {
     itemId: string;
@@ -104,12 +109,16 @@ export class GoodsIssueService {
       reason: reasonText,
       reasonId,
       targetBranchId,
+      referenceId: dto.referenceId,
+      referenceType: dto.referenceType,
       notes: dto.notes,
       status: GoodsIssueStatus.DRAFT,
       lines: dto.lines.map((l) => {
         const line = new GoodsIssueLineEntity();
         line.itemId = l.itemId;
-        line.locationId = dto.locationId;
+        // Honor a per-line source location (used by transfer export where each
+        // line can be pulled from a different warehouse); fall back to header.
+        line.locationId = l.locationId ?? dto.locationId;
         line.quantity = l.quantity;
 
         const unitPrice = Number(l.unitPrice ?? 0);

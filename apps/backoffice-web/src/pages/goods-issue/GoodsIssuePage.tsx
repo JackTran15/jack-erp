@@ -31,6 +31,7 @@ import {
   Save,
   Tags,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +67,11 @@ import {
   getPersistableLines,
 } from "../inventory-line-normalization";
 import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  SelectTransferOrderDialog,
+  type TransferOrderDetail,
+} from "./SelectTransferOrderDialog";
+import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -993,6 +999,13 @@ function GoodsIssueFormDialog({
   // "Tham chiếu": phiếu xuất kho kiểm kê được sinh tự động khi "Xử lý" một phiếu
   // kiểm kê. API chỉ trả referenceId — resolve số phiếu KK gốc để hiển thị.
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  // "Lập từ lệnh điều chuyển": when set, this form represents the export leg of a
+  // transfer order — Save calls the transfer export endpoint instead of creating
+  // a standalone goods issue.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sourceTransferOrderId, setSourceTransferOrderId] = useState<string | null>(
+    null,
+  );
   const referenceStockTakeId =
     initial?.referenceType === "STOCK_TAKE" ? initial.referenceId ?? null : null;
   useEffect(() => {
@@ -1051,6 +1064,52 @@ function GoodsIssueFormDialog({
       setNotes("");
       notesAutoFilledRef.current = false;
     }
+    markDirty();
+  };
+
+  /** Load a picked transfer order into the form as the export leg. */
+  const prefillFromTransferOrder = useCallback(
+    (detail: TransferOrderDetail, row: IssuableTransferOrderListItem) => {
+      setPurpose("TRANSFER_OUT");
+      setReasonId("");
+      setReasonLabel("");
+      setTargetBranchId(detail.destinationBranchId);
+      setTargetBranchLabel(row.destinationBranchName);
+      setReferenceNumber(detail.documentNumber ?? row.documentNumber);
+      setSourceTransferOrderId(detail.id);
+      const autoNotes =
+        detail.notes ||
+        `Xuất kho hàng hóa điều chuyển đến cửa hàng ${row.destinationBranchName}`;
+      setNotes(autoNotes);
+      notesAutoFilledRef.current = true;
+      const mapped: FormLine[] = detail.lines.map((l) => {
+        const storageId = l.sourceStorageId ?? detail.sourceStorageId ?? "";
+        const storageLabel = storageId
+          ? storages.find((s) => s.id === storageId)?.name ?? ""
+          : "";
+        return {
+          itemId: l.itemId,
+          itemLabel: l.item?.code ?? "",
+          unit: l.item?.unit ?? "",
+          storageId,
+          storageLabel,
+          locationId: "",
+          locationLabel: "",
+          quantity: Number(l.requestedQty),
+          unitPrice: Number(l.item?.purchasePrice ?? 0),
+          notes: l.note ?? "",
+        };
+      });
+      setLines(normalizeFormLines(mapped));
+      setDirty(true);
+    },
+    [storages],
+  );
+
+  /** Unlink the transfer order — the form reverts to a plain goods issue. */
+  const clearTransferSource = () => {
+    setSourceTransferOrderId(null);
+    setReferenceNumber(null);
     markDirty();
   };
 
@@ -1219,25 +1278,35 @@ function GoodsIssueFormDialog({
         resolvedLines.push({ ...l, locationId });
       }
       const headerLocationId = resolvedLines[0]?.locationId ?? "";
+      const issueLines = resolvedLines.map((l) => ({
+        itemId: l.itemId,
+        locationId: l.locationId,
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice) || 0,
+        notes: l.notes || undefined,
+      }));
 
-      await apiClient.post("/inventory/goods-issues", {
-        locationId: headerLocationId,
-        providerId: customerId || undefined,
-        purpose,
-        reasonId:
-          (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
-            ? reasonId
-            : undefined,
-        targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
-        notes: notes || undefined,
-        lines: resolvedLines.map((l) => ({
-          itemId: l.itemId,
-          locationId: l.locationId,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice) || 0,
-          notes: l.notes || undefined,
-        })),
-      });
+      if (sourceTransferOrderId) {
+        // Saving the export leg of a transfer order: this posts the goods issue
+        // and advances the transfer order DRAFT → IN_PROGRESS server-side.
+        await apiClient.post(
+          `/inventory/transfer-orders/${sourceTransferOrderId}/export`,
+          { notes: notes || undefined, lines: issueLines },
+        );
+      } else {
+        await apiClient.post("/inventory/goods-issues", {
+          locationId: headerLocationId,
+          providerId: customerId || undefined,
+          purpose,
+          reasonId:
+            (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
+              ? reasonId
+              : undefined,
+          targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
+          notes: notes || undefined,
+          lines: issueLines,
+        });
+      }
       setDirty(false);
       // "Lưu" tạo + thực hiện luôn (giống MISA): phiếu trả về đã ở trạng thái
       // đã xuất kho, đã ghi sổ tồn kho.
@@ -1250,7 +1319,16 @@ function GoodsIssueFormDialog({
     } finally {
       setSaving(false);
     }
-  }, [customerId, lines, notes, purpose, reasonId, targetBranchId, onSaved]);
+  }, [
+    customerId,
+    lines,
+    notes,
+    purpose,
+    reasonId,
+    targetBranchId,
+    sourceTransferOrderId,
+    onSaved,
+  ]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -1306,6 +1384,23 @@ function GoodsIssueFormDialog({
       disabled: !onVoid || initial?.status !== "POSTED",
       onClick: () => onVoid?.(),
     },
+    ...(mode === "create"
+      ? [
+          {
+            id: "utilities",
+            label: "Tiện ích",
+            icon: Wrench,
+            onClick: () => {},
+            options: [
+              {
+                id: "from-transfer",
+                label: "Lập từ lệnh điều chuyển",
+                onClick: () => setPickerOpen(true),
+              },
+            ],
+          } as ToolbarItem,
+        ]
+      : []),
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
     { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
@@ -1555,7 +1650,7 @@ function GoodsIssueFormDialog({
               onChange={(e) =>
                 handlePurposeChange(e.target.value as GoodsIssuePurposeUI)
               }
-              disabled={isView}
+              disabled={isView || sourceTransferOrderId !== null}
             >
               {MANUAL_PURPOSES.map((p) => (
                 <option key={p} value={p}>
@@ -1708,8 +1803,20 @@ function GoodsIssueFormDialog({
             </FieldRow>
             <FieldRow label="Tham chiếu">
               {referenceNumber ? (
-                <span className="font-mono text-sm font-medium text-foreground">
-                  {referenceNumber}
+                <span className="inline-flex items-center gap-1">
+                  <span className="font-mono text-sm font-medium text-foreground">
+                    {referenceNumber}
+                  </span>
+                  {sourceTransferOrderId && !isView ? (
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-destructive hover:underline"
+                      title="Gỡ liên kết lệnh điều chuyển"
+                      onClick={clearTransferSource}
+                    >
+                      (x)
+                    </button>
+                  ) : null}
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">—</span>
@@ -1919,6 +2026,12 @@ function GoodsIssueFormDialog({
           }}
         />
       )}
+
+      <SelectTransferOrderDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={prefillFromTransferOrder}
+      />
     </>
   );
 }

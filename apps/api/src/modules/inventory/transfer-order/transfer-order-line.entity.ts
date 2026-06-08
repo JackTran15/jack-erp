@@ -30,6 +30,10 @@ export class TransferOrderLineEntity {
   @Column({ name: 'requested_qty', type: 'numeric', precision: 18, scale: 3 })
   requestedQty: string;
 
+  /** Source warehouse (storage) to pull this line from at export; null falls back to the header source storage. */
+  @Column({ name: 'source_storage_id', type: 'uuid', nullable: true })
+  sourceStorageId?: string;
+
   @Column({ type: 'text', nullable: true })
   note?: string;
 

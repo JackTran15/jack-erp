@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
+import { BranchEntity } from '../../branch/branch.entity';
+import { GoodsIssueModule } from '../goods-issue/goods-issue.module';
+import { GoodsReceiptModule } from '../goods-receipt/goods-receipt.module';
+import { LocationEntity } from '../location/location.entity';
 import { TransferOrderEntity } from './transfer-order.entity';
 import { TransferOrderLineEntity } from './transfer-order-line.entity';
 import { TransferOrderService } from './transfer-order.service';
@@ -8,8 +12,15 @@ import { TransferOrderController } from './transfer-order.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TransferOrderEntity, TransferOrderLineEntity]),
+    TypeOrmModule.forFeature([
+      TransferOrderEntity,
+      TransferOrderLineEntity,
+      LocationEntity,
+      BranchEntity,
+    ]),
     DocumentNumberingModule,
+    GoodsIssueModule,
+    GoodsReceiptModule,
   ],
   controllers: [TransferOrderController],
   providers: [TransferOrderService],

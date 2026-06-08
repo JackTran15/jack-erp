@@ -51,6 +51,8 @@ export const STAFF_PERMISSION_KEYS: string[] = [
   'inventory.temp-warehouse.close',
   'inventory.transfer.read',
   'inventory.transfer.create',
+  'inventory.transfer.export',
+  'inventory.transfer.import',
   'pos.sale.create',
   'pos.invoice.read',
   'pos.invoice.write',

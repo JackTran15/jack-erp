@@ -13174,6 +13174,60 @@
         ]
       }
     },
+    "/inventory/transfer-orders/issuable": {
+      "get": {
+        "operationId": "TransferOrderController_listIssuable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/by-code/{code}": {
+      "get": {
+        "operationId": "TransferOrderController_getByCode",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/{id}": {
       "get": {
         "operationId": "TransferOrderController_getById",
@@ -13187,6 +13241,44 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      },
+      "patch": {
+        "operationId": "TransferOrderController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransferOrderDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -13225,9 +13317,9 @@
         ]
       }
     },
-    "/inventory/transfer-orders/{id}/approve": {
+    "/inventory/transfer-orders/{id}/export": {
       "post": {
-        "operationId": "TransferOrderController_approve",
+        "operationId": "TransferOrderController_confirmExport",
         "parameters": [
           {
             "name": "id",
@@ -13238,6 +13330,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportTransferOrderDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "",
@@ -13255,9 +13357,9 @@
         ]
       }
     },
-    "/inventory/transfer-orders/{id}/execute": {
+    "/inventory/transfer-orders/{id}/import": {
       "post": {
-        "operationId": "TransferOrderController_markExecuted",
+        "operationId": "TransferOrderController_confirmImport",
         "parameters": [
           {
             "name": "id",
@@ -13273,7 +13375,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MarkExecutedDto"
+                "$ref": "#/components/schemas/ImportTransferOrderDto"
               }
             }
           }
@@ -19983,6 +20085,7 @@
           "rows"
         ]
       },
+<<<<<<< HEAD
       "ArrangeLocationLineDto": {
         "type": "object",
         "properties": {
@@ -20242,6 +20345,8 @@
           "limit"
         ]
       },
+=======
+>>>>>>> 4c06ae1 (ttt)
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -24253,10 +24358,11 @@
             "type": "string"
           },
           "referenceType": {
-            "type": "string",
             "enum": [
-              "STOCK_TAKE"
-            ]
+              "STOCK_TAKE",
+              "TRANSFER_ORDER"
+            ],
+            "type": "string"
           },
           "notes": {
             "type": "string"
@@ -25312,8 +25418,8 @@
           "status": {
             "enum": [
               "DRAFT",
-              "APPROVED",
-              "EXECUTED",
+              "IN_PROGRESS",
+              "COMPLETED",
               "CANCELLED"
             ],
             "type": "string"
@@ -25334,6 +25440,40 @@
             "type": "string"
           },
           "notes": {
+            "type": "string"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exportGoodsIssueId": {
+            "type": "string"
+          },
+          "importGoodsReceiptId": {
+            "type": "string",
+            "description": "GoodsReceipt spawned when the destination branch confirms import — the import_reference."
+          },
+          "exportedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "exportedBy": {
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "completedBy": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cancelledBy": {
             "type": "string"
           },
           "approvedAt": {
@@ -25391,6 +25531,7 @@
           "status",
           "sourceBranchId",
           "destinationBranchId",
+          "attachmentIds",
           "lines",
           "id",
           "organizationId",
@@ -25419,6 +25560,10 @@
           },
           "requestedQty": {
             "type": "string"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "description": "Source warehouse (storage) to pull this line from at export; null falls back to the header source storage."
           },
           "note": {
             "type": "string"
@@ -25453,7 +25598,15 @@
           "transferOrder"
         ]
       },
-      "MarkExecutedDto": {
+      "UpdateTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ExportTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ImportTransferOrderDto": {
         "type": "object",
         "properties": {}
       },
