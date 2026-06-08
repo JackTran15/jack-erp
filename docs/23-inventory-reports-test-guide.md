@@ -20,7 +20,7 @@ Phase 4 → Điều chuyển (Transfer)        → movement: TRANSFER_OUT / TRAN
 Phase 5 → Kiểm kho (Stock Take)         → movement: ADJUSTMENT_INCREASE / ADJUSTMENT_DECREASE
 ```
 
-Tất cả các phiếu phải được **POST** mới ghi vào `stock_ledger_entries`. Phiếu DRAFT không ảnh hưởng báo cáo.
+Phiếu nhập, phiếu xuất và phiếu điều chuyển tự động ghi vào `stock_ledger_entries` khi lưu — không còn trạng thái DRAFT. Chỉ phiếu kiểm kho vẫn cần POST thủ công.
 
 ---
 
@@ -58,22 +58,19 @@ Tạo 2 branch mới để test (mỗi branch tự tạo kho mặc định cùng
 
 | Bước | Thao tác |
 |------|----------|
-| 1-1 | Tạo phiếu nhập **GR-HN-01** (DRAFT) |
+| 1-1 | Tạo phiếu nhập **GR-HN-01** → tự động POSTED |
 |     | - SKU-001: số lượng **10**, đơn giá **15,000,000** |
 |     | - SKU-002: số lượng **20**, đơn giá **500,000** |
-| 1-2 | POST phiếu GR-HN-01 → status chuyển sang POSTED |
-| 1-3 | Tạo phiếu nhập **GR-HN-02** (DRAFT) |
+| 1-2 | Tạo phiếu nhập **GR-HN-02** → tự động POSTED |
 |     | - SKU-003: số lượng **100**, đơn giá **20,000** |
-| 1-4 | POST phiếu GR-HN-02 |
 
 **Switch sang branch HCM-01**, tạo thêm:
 
 | Bước | Thao tác |
 |------|----------|
-| 1-5 | Tạo phiếu nhập **GR-HCM-01** (DRAFT) |
+| 1-3 | Tạo phiếu nhập **GR-HCM-01** → tự động POSTED |
 |     | - SKU-001: số lượng **5**, đơn giá **15,200,000** (giá khác HN để test avg) |
 |     | - SKU-002: số lượng **10**, đơn giá **510,000** |
-| 1-6 | POST phiếu GR-HCM-01 |
 
 Sau bước này, `stock_ledger_entries` có 5 rows với `movement_type = PURCHASE_RECEIPT`.
 
@@ -87,13 +84,9 @@ Sau bước này, `stock_ledger_entries` có 5 rows với `movement_type = PURCH
 
 | Bước | Thao tác |
 |------|----------|
-| 2-1 | Tạo phiếu xuất **GI-HN-01** (DRAFT) |
+| 2-1 | Tạo phiếu xuất **GI-HN-01** → tự động POSTED |
 |     | - SKU-001: số lượng **3**, đơn giá **15,000,000** |
 |     | - SKU-002: số lượng **5**, đơn giá **500,000** |
-| 2-2 | Click **Duyệt** → status chuyển sang `APPROVED` |
-| 2-3 | Click **Xuất kho** (hiện sau khi APPROVED) → status `POSTED`, ghi ledger |
-| 2-4 | Tạo phiếu xuất **GI-HN-02** (DRAFT) — **KHÔNG Duyệt / Xuất kho** (để test TC-05) |
-|     | - SKU-001: số lượng **1**, đơn giá **15,000,000** |
 
 Sau bước này, `stock_ledger_entries` có thêm 2 rows với `movement_type = SALE_ISSUE`, quantity âm.
 
@@ -126,14 +119,12 @@ Sau bước này, `stock_ledger_entries` có thêm 2 rows với `movement_type =
 
 | Bước | Thao tác |
 |------|----------|
-| 4-1 | Tạo phiếu điều chuyển **TRF-001** (DRAFT) |
+| 4-1 | Tạo phiếu điều chuyển **TRF-001** → tự động tạo `TRANSFER_OUT` (HN-01) + `TRANSFER_IN` (HCM-01) |
 |     | - Nguồn: HN-01 → Đích: HCM-01 |
 |     | - SKU-001: số lượng **4** |
 |     | - SKU-002: số lượng **3** |
-| 4-2 | POST phiếu TRF-001 → tạo `TRANSFER_OUT` (HN-01) + `TRANSFER_IN` (HCM-01) |
-| 4-3 | Tạo phiếu điều chuyển **TRF-002** (DRAFT) — **điều chuyển ngược** HCM-01 → HN-01 |
+| 4-2 | Tạo phiếu điều chuyển **TRF-002** — **điều chuyển ngược** HCM-01 → HN-01 |
 |     | - SKU-001: số lượng **1** |
-| 4-4 | POST phiếu TRF-002 |
 
 ---
 
@@ -231,19 +222,6 @@ Kỳ vọng: phiếu nhập hôm qua không xuất hiện trong "Nhập kỳ"; n
 
 ---
 
-**TC-04: Phiếu DRAFT không ảnh hưởng báo cáo**
-
-Phiếu GI-HN-02 (Phase 2, bước 2-3) còn DRAFT.
-
-| Filter | Giá trị |
-|--------|---------|
-| Period | `this_month` |
-| Branch | HN-01 |
-
-Kỳ vọng: SKU-001 "Xuất kỳ" = 3 (chỉ từ GI-HN-01), không bao gồm 1 unit của GI-HN-02.
-
----
-
 ### Báo cáo 2 — Bảng kê chi tiết phiếu nhập xuất
 
 Route: `/reports/storage/stock-document-details`
@@ -265,18 +243,6 @@ Kỳ vọng: mỗi phiếu đã POST có ít nhất 1 row. Kiểm tra cột `doc
 | ADJ-HN-01 | `STOCK_ADJUSTMENT` |
 | ADJ-HN-02 | `STOCK_ADJUSTMENT` |
 | TRF-001 | `STOCK_TRANSFER` |
-
----
-
-**TC-06: Phiếu DRAFT (GI-HN-02) KHÔNG xuất hiện**
-
-| Filter | Giá trị |
-|--------|---------|
-| Period | `this_month` |
-| Branch | HN-01 |
-| Search | `SKU-001` |
-
-Kỳ vọng: rows liên quan SKU-001 chỉ có từ GR-HN-01, GI-HN-01, TRF-001. Không có row nào từ GI-HN-02 (còn DRAFT).
 
 ---
 
@@ -469,7 +435,7 @@ Kỳ vọng: mỗi (item, dest_branch) là 1 row riêng. TRF-001 tạo 2 rows (S
 
 | Triệu chứng | Nguyên nhân | Cách kiểm tra |
 |-------------|-------------|---------------|
-| Report trống, không có dòng nào | Phiếu còn DRAFT | `SELECT * FROM stock_ledger_entries WHERE reference_id = '<doc_id>'` — nếu không có row → phiếu chưa được POST |
+| Report trống, không có dòng nào | Phiếu kiểm kho còn DRAFT | `SELECT * FROM stock_ledger_entries WHERE reference_id = '<doc_id>'` — nếu không có row → phiếu chưa được POST |
 | Số liệu cũ hơn 45s so với thực tế | Cache Redis chưa hết TTL | Đổi bất kỳ 1 filter rồi đổi lại → cache miss → fresh data |
 | 403 Forbidden | User thiếu permission `inventory.reports.read` | Chạy `pnpm seed:sync-admin-permissions`, logout → login lại |
 | 500 "operator does not exist: character varying = uuid" | Câu view join branch_id sai kiểu | Kiểm tra câu query dùng `b.id::text = X.branch_id` |
@@ -486,7 +452,7 @@ Sau khi thực hiện Phase 0–5, check từng ô:
 - [ ] `stock_ledger_entries` có đủ 5 loại `movement_type`: `PURCHASE_RECEIPT`, `SALE_ISSUE`, `ADJUSTMENT_INCREASE`, `ADJUSTMENT_DECREASE`, `TRANSFER_OUT`, `TRANSFER_IN`
 - [ ] Report 1 (HN-01): SKU-001 tồn cuối = 4, SKU-002 = 10, SKU-003 = 150
 - [ ] Report 1 (HCM-01): SKU-001 tồn cuối = 11, SKU-002 = 13
-- [ ] Report 2: GI-HN-02 (DRAFT) không xuất hiện
+- [ ] Report 2: mỗi phiếu nhập/xuất đã lưu đều xuất hiện đúng `doc_kind`
 - [ ] Report 3: tổng tồn per location khớp Report 1
 - [ ] Report 4: điều chuyển TRF-001 đối xứng giữa HN-01 và HCM-01
 - [ ] Report 5: pivot hiện đúng qty per branch, SKU-004 không xuất hiện

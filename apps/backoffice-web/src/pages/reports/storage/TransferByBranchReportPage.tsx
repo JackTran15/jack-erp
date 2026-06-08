@@ -18,27 +18,16 @@ import type {
   TransferByBranchFilters,
   TransferByBranchRow as ApiTransferByBranchRow,
 } from "../../../api/inventory-reports";
+import { useBranches } from "../../../hooks/iam/useBranches";
+import {
+  useReportCategories,
+  useReportUnits,
+} from "../../../hooks/use-report-filter-options";
 
-const SOURCE_STORE_OPTIONS = [
-  { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
-];
-const TARGET_STORE_OPTIONS = [
-  { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
-  { value: "MTDANANG", label: "Giày MT Đà Nẵng" },
-];
-const GROUP_OPTIONS = [
-  { value: "__all__", label: "Tất cả nhóm" },
-  { value: "Giày nam", label: "Giày nam" },
-  { value: "Giày nữ", label: "Giày nữ" },
-  { value: "Sandal nữ", label: "Sandal nữ" },
-];
 const STAT_OPTIONS = [
-  { value: "item", label: "Hàng hóa" },
+  { value: "item",   label: "Hàng hóa" },
   { value: "parent", label: "Mẫu mã" },
-];
-const UNIT_OPTIONS = [
-  { value: "__all__", label: "Tất cả ĐVT" },
-  { value: "Đôi", label: "Đôi" },
+  { value: "group",  label: "Nhóm hàng hóa" },
 ];
 
 interface ViewRow {
@@ -86,21 +75,39 @@ function mapApiRow(row: ApiTransferByBranchRow): ViewRow {
 }
 
 export function TransferByBranchReportPage() {
-  const filterFields: FilterField[] = [
-    { key: "sourceStore", label: "Cửa hàng xuất", type: "select", options: SOURCE_STORE_OPTIONS },
-    {
-      key: "targetStore",
-      label: "Cửa hàng nhận",
-      type: "radio-scope",
-      allLabel: "Tất cả",
-      scopeLabel: "Chọn cửa hàng",
-      options: TARGET_STORE_OPTIONS,
-    },
-    { key: "group", label: "Nhóm hàng hóa", type: "select", options: GROUP_OPTIONS },
-    { key: "stat", label: "Thống kê theo", type: "select", options: STAT_OPTIONS },
-    { key: "unit", label: "Đơn vị tính", type: "select", options: UNIT_OPTIONS },
-    { key: "period", label: "Kỳ báo cáo", type: "period" },
-  ];
+  const { data: branches } = useBranches();
+  const { options: groupOptions } = useReportCategories();
+  const { options: unitOptions } = useReportUnits();
+
+  const branchOptions = useMemo(
+    () => (branches ?? []).map((b) => ({ value: b.id, label: b.name })),
+    [branches],
+  );
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      {
+        key: "sourceStore",
+        label: "Cửa hàng xuất",
+        type: "select",
+        options: [{ value: "__all__", label: "Tất cả" }, ...branchOptions],
+      },
+      {
+        key: "targetStore",
+        label: "Cửa hàng nhận",
+        type: "radio-scope",
+        allLabel: "Tất cả",
+        scopeLabel: "Chọn cửa hàng",
+        options: branchOptions,
+        placeholder: "Chọn cửa hàng nhận",
+      },
+      { key: "group",  label: "Nhóm hàng hóa", type: "select", options: groupOptions },
+      { key: "stat",   label: "Thống kê theo",  type: "select", options: STAT_OPTIONS },
+      { key: "unit",   label: "Đơn vị tính",    type: "select", options: unitOptions },
+      { key: "period", label: "Kỳ báo cáo",     type: "period" },
+    ],
+    [branchOptions, groupOptions, unitOptions],
+  );
 
   const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({
@@ -108,21 +115,24 @@ export function TransferByBranchReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
+
   const apiFilters: TransferByBranchFilters = useMemo(() => {
     const base = buildApiFilters(filterValues, period, {
       storeFieldKey: "targetStore",
       categoryFieldKey: "group",
+      statFieldKey: "stat",
     });
-    // sourceStore is a single select; only forward real UUIDs.
     const sourceBranchId = pickSourceBranchId(filterValues, "sourceStore");
     return { ...base, sourceBranchId };
   }, [filterValues, period]);
 
   const { data, isLoading } = useTransferByBranchReport(apiFilters);
-  const rows = useMemo<ViewRow[]>(
-    () => (data?.data ?? []).map(mapApiRow),
-    [data],
-  );
+  const rows = useMemo<ViewRow[]>(() => {
+    const raw = (data?.data ?? []).map(mapApiRow);
+    if (unitFilter !== "__all__") return raw.filter((r) => r.unit === unitFilter);
+    return raw;
+  }, [data, unitFilter]);
 
   const num = "text-right tabular-nums";
   const columns: TableColumn<ViewRow>[] = [

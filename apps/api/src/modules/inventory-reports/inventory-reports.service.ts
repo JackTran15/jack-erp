@@ -110,6 +110,7 @@ export class InventoryReportsService {
 
     const pivotQuery: StockBalancePivotQuery = {
       organizationId: actor.organizationId,
+      itemGroupBy: dto.itemGroupBy,
       branchIds: dto.branchIds,
       categoryIds: dto.categoryIds,
       search: dto.search,
@@ -215,6 +216,7 @@ export class InventoryReportsService {
       destinationBranchIds: dto.branchIds,
       categoryIds: dto.categoryIds,
       search: dto.search,
+      itemGroupBy: dto.itemGroupBy,
       page,
       pageSize,
     };
@@ -319,7 +321,9 @@ export class InventoryReportsService {
       startDate: period.startDate,
       endDate: period.endDate,
       groupBy,
+      itemGroupBy: dto.itemGroupBy,
       branchIds: dto.branchIds,
+      locationIds: dto.locationIds,
       categoryIds: dto.categoryIds,
       search: dto.search,
       includeBreakdown,
@@ -363,9 +367,14 @@ export class InventoryReportsService {
       startDate: query.startDate.toISOString(),
       endDate: query.endDate.toISOString(),
       groupBy: query.groupBy,
+      itemGroupBy: query.itemGroupBy ?? 'item',
       branchIds:
         query.branchIds && query.branchIds.length > 0
           ? [...query.branchIds].sort()
+          : null,
+      locationIds:
+        query.locationIds && query.locationIds.length > 0
+          ? [...query.locationIds].sort()
           : null,
       categoryIds:
         query.categoryIds && query.categoryIds.length > 0
@@ -386,6 +395,7 @@ export class InventoryReportsService {
     query: StockBalancePivotQuery,
   ): string {
     const normalised = {
+      itemGroupBy: query.itemGroupBy ?? 'item',
       branchIds:
         query.branchIds && query.branchIds.length > 0
           ? [...query.branchIds].sort()
@@ -448,6 +458,7 @@ export class InventoryReportsService {
     const normalised = {
       startDate: query.startDate.toISOString(),
       endDate: query.endDate.toISOString(),
+      itemGroupBy: query.itemGroupBy ?? 'item',
       sourceBranchId: query.sourceBranchId,
       destinationBranchIds:
         query.destinationBranchIds && query.destinationBranchIds.length > 0

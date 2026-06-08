@@ -1,5 +1,5 @@
 import type { PeriodValue } from "@erp/ui";
-import type { InventoryReportFilters } from "../../../../api/inventory-reports";
+import type { InventoryReportFilters, ItemGroupBy } from "../../../../api/inventory-reports";
 import { ALL_VALUE, type FilterValues } from "./types";
 
 // UUID v4 detector — only forward real branch IDs (not legacy mock codes like
@@ -41,8 +41,10 @@ interface ResolvedScopeOptions {
   storeFieldKey?: string;
   /** Filter key that holds category UUIDs. */
   categoryFieldKey?: string;
-  /** Filter key holding a single warehouse UUID (currently unused at API level). */
+  /** Filter key holding a single warehouse/location UUID. */
   warehouseFieldKey?: string;
+  /** Filter key holding the item-dimension groupBy ("item" | "parent" | "group"). */
+  statFieldKey?: string;
 }
 
 /**
@@ -75,6 +77,23 @@ export function buildApiFilters(
     if (typeof raw === "string" && raw !== ALL_VALUE) {
       const id = pickSingleUuid(raw);
       if (id) out.categoryIds = [id];
+    }
+  }
+
+  // Warehouse/location — single select that carries a UUID; "__all__" = all locations.
+  if (opts.warehouseFieldKey) {
+    const raw = values[opts.warehouseFieldKey];
+    if (typeof raw === "string" && raw !== ALL_VALUE) {
+      const id = pickSingleUuid(raw);
+      if (id) out.locationIds = [id];
+    }
+  }
+
+  // Item-dimension groupBy ("item" | "parent" | "group").
+  if (opts.statFieldKey) {
+    const raw = values[opts.statFieldKey];
+    if (typeof raw === "string" && (raw === "item" || raw === "parent" || raw === "group")) {
+      out.itemGroupBy = raw as ItemGroupBy;
     }
   }
 

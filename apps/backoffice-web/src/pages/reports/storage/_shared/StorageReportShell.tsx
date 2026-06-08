@@ -315,7 +315,14 @@ export function StorageReportShell<T>({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2">
         <PeriodFilter
           value={period}
-          onChange={setPeriod}
+          onChange={(nextPeriod) => {
+            setPeriod(nextPeriod);
+            // Keep the dialog's period field in sync so it reflects the toolbar value when opened.
+            const periodField = filterFields.find((f) => f.type === "period");
+            if (periodField) {
+              setFilterValues((prev) => ({ ...prev, [periodField.key]: nextPeriod }));
+            }
+          }}
           onApply={() => onApply?.(filterValues, period)}
         />
         <div className="flex items-center gap-1.5">

@@ -13,26 +13,20 @@ import type {
   StockByBranchBranchHeader,
   StockByBranchRow as ApiStockByBranchRow,
 } from "../../../api/inventory-reports";
+import {
+  useReportCategories,
+  useReportUnits,
+} from "../../../hooks/use-report-filter-options";
 
-const GROUP_OPTIONS = [
-  { value: "__all__", label: "Tất cả nhóm" },
-  { value: "Giày nam", label: "Giày nam" },
-  { value: "Giày nữ", label: "Giày nữ" },
-  { value: "Sandal nữ", label: "Sandal nữ" },
-  { value: "Dép nữ", label: "Dép nữ" },
-  { value: "Dép nam", label: "Dép nam" },
+const STAT_OPTIONS = [
+  { value: "item",   label: "Hàng hóa" },
+  { value: "parent", label: "Mẫu mã" },
+  { value: "group",  label: "Nhóm hàng hóa" },
 ];
+
+// Brand has no dedicated BE entity yet — kept as static list.
 const BRAND_OPTIONS = [
   { value: "__all__", label: "Tất cả" },
-  { value: "MT", label: "Giày MT" },
-];
-const STAT_OPTIONS = [
-  { value: "item", label: "Hàng hóa" },
-  { value: "parent", label: "Mẫu mã" },
-];
-const UNIT_OPTIONS = [
-  { value: "__all__", label: "Tất cả ĐVT" },
-  { value: "Đôi", label: "Đôi" },
 ];
 
 interface ViewRow {
@@ -70,13 +64,19 @@ function mapApiRow(row: ApiStockByBranchRow): ViewRow {
 }
 
 export function StockByBranchReportPage() {
-  const filterFields: FilterField[] = [
-    { key: "group", label: "Nhóm hàng hóa", type: "select", options: GROUP_OPTIONS },
-    { key: "brand", label: "Thương hiệu", type: "select", options: BRAND_OPTIONS },
-    { key: "stat", label: "Thống kê theo", type: "select", options: STAT_OPTIONS },
-    { key: "unit", label: "Đơn vị tính", type: "select", options: UNIT_OPTIONS },
-    { key: "period", label: "Kỳ báo cáo", type: "period" },
-  ];
+  const { options: groupOptions } = useReportCategories();
+  const { options: unitOptions } = useReportUnits();
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      { key: "group",  label: "Nhóm hàng hóa", type: "select", options: groupOptions },
+      { key: "brand",  label: "Thương hiệu",    type: "select", options: BRAND_OPTIONS },
+      { key: "stat",   label: "Thống kê theo",  type: "select", options: STAT_OPTIONS },
+      { key: "unit",   label: "Đơn vị tính",    type: "select", options: unitOptions },
+      { key: "period", label: "Kỳ báo cáo",     type: "period" },
+    ],
+    [groupOptions, unitOptions],
+  );
 
   const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({
@@ -84,10 +84,13 @@ export function StockByBranchReportPage() {
     ...resolvePeriodRange("this_month"),
   }));
 
+  const unitFilter = (filterValues.unit as string | undefined) ?? "__all__";
+
   const apiFilters = useMemo(
     () =>
       buildApiFilters(filterValues, period, {
         categoryFieldKey: "group",
+        statFieldKey: "stat",
       }),
     [filterValues, period],
   );
@@ -97,10 +100,11 @@ export function StockByBranchReportPage() {
     () => data?.branches ?? [],
     [data],
   );
-  const rows = useMemo<ViewRow[]>(
-    () => (data?.data ?? []).map(mapApiRow),
-    [data],
-  );
+  const rows = useMemo<ViewRow[]>(() => {
+    const raw = (data?.data ?? []).map(mapApiRow);
+    if (unitFilter !== "__all__") return raw.filter((r) => r.unit === unitFilter);
+    return raw;
+  }, [data, unitFilter]);
 
   const num = "text-right tabular-nums";
   const columns: TableColumn<ViewRow>[] = useMemo(

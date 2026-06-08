@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { type ItemGroupBy } from './stock-period.service';
 
 // ──────────────────────────────────────────────────────────────────
 // Báo cáo 6 — Tổng hợp nhập xuất điều chuyển (per-branch totals)
@@ -53,6 +54,7 @@ export interface TransferByBranchQuery {
   destinationBranchIds?: string[];
   categoryIds?: string[];
   search?: string;
+  itemGroupBy?: ItemGroupBy;
   page: number;
   pageSize: number;
 }
@@ -198,35 +200,26 @@ export class TransferReportService {
   // ──────────────────────────────────────────────────────────────────
   async byBranch(query: TransferByBranchQuery): Promise<TransferByBranchResult> {
     const destinationBranchIds =
-      query.destinationBranchIds && query.destinationBranchIds.length > 0
-        ? query.destinationBranchIds
-        : null;
-    const categoryIds =
-      query.categoryIds && query.categoryIds.length > 0
-        ? query.categoryIds
-        : null;
-    const search =
-      query.search && query.search.trim().length > 0
-        ? query.search.trim()
-        : null;
+      query.destinationBranchIds?.length ? query.destinationBranchIds : null;
+    const categoryIds = query.categoryIds?.length ? query.categoryIds : null;
+    const search = query.search?.trim().length ? query.search.trim() : null;
+    const itemGroupBy: ItemGroupBy = query.itemGroupBy ?? 'item';
 
     const page = Math.max(1, query.page);
     const pageSize = Math.max(1, query.pageSize);
     const offset = (page - 1) * pageSize;
 
-    // OUT leg: sourceBranchId is the user's source filter.
-    // IN leg (mirror): also include reverse transfers where the OTHER
-    //   branch shipped TO sourceBranchId — so the report can show
-    //   "things this branch received" too. The FE schema has both inQty
-    //   and outQty so we surface both directions, grouped by the "other"
-    //   branch (= destination for OUT rows, = source for IN rows).
-    const dataSql = `
-      WITH out_leg AS (
+    // Base CTEs — always aggregate at item level first.
+    // Parameters:
+    //   $1 orgId  $2 startDate  $3 endDate  $4 sourceBranchId
+    //   $5 destinationBranchIds  $6 categoryIds  $7 search
+    const baseCtes = `
+      out_leg AS (
         SELECT
           stl.item_id,
           st.destination_branch_id AS other_branch_id,
-          SUM(stl.quantity) AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0)) AS value
+          SUM(stl.quantity)                                   AS qty,
+          SUM(stl.quantity * COALESCE(i.purchase_price, 0))  AS value
         FROM stock_transfers st
         JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
         JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
@@ -241,8 +234,8 @@ export class TransferReportService {
         SELECT
           stl.item_id,
           st.source_branch_id AS other_branch_id,
-          SUM(stl.quantity) AS qty,
-          SUM(stl.quantity * COALESCE(i.purchase_price, 0)) AS value
+          SUM(stl.quantity)                                   AS qty,
+          SUM(stl.quantity * COALESCE(i.purchase_price, 0))  AS value
         FROM stock_transfers st
         JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
         JOIN items i ON i.id = stl.item_id AND i.organization_id = st.organization_id
@@ -255,84 +248,125 @@ export class TransferReportService {
       ),
       combined AS (
         SELECT
-          COALESCE(o.item_id, ii.item_id) AS item_id,
-          COALESCE(o.other_branch_id, ii.other_branch_id) AS other_branch_id,
-          COALESCE(o.qty, 0) AS out_qty,
+          COALESCE(o.item_id, ii.item_id)                       AS item_id,
+          COALESCE(o.other_branch_id, ii.other_branch_id)       AS other_branch_id,
+          COALESCE(o.qty, 0)   AS out_qty,
           COALESCE(o.value, 0) AS out_value,
-          COALESCE(ii.qty, 0) AS in_qty,
+          COALESCE(ii.qty, 0)  AS in_qty,
           COALESCE(ii.value, 0) AS in_value
         FROM out_leg o
         FULL OUTER JOIN in_leg ii
           ON o.item_id = ii.item_id AND o.other_branch_id = ii.other_branch_id
       )
-      SELECT
-        i.id AS item_id,
-        i.code AS sku,
-        i.name AS item_name,
-        pr.name AS parent_name,
-        i.unit AS unit,
-        ic.id AS category_id,
-        ic.name AS category_name,
-        b.id AS dest_branch_id,
-        b.name AS dest_branch_name,
-        c.out_qty,
-        c.out_value,
-        c.in_qty,
-        c.in_value
-      FROM combined c
-      JOIN items i ON i.id = c.item_id AND i.organization_id = $1
-      LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
-      LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
-      JOIN branches b ON b.id = c.other_branch_id AND b.organization_id = $1
-      WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
-        AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
-      ORDER BY i.code ASC, b.name ASC
-      LIMIT $8 OFFSET $9
     `;
 
-    const countSql = `
-      WITH out_leg AS (
-        SELECT
-          stl.item_id,
-          st.destination_branch_id AS other_branch_id
-        FROM stock_transfers st
-        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
-        WHERE st.organization_id = $1
-          AND st.status = 'POSTED'
-          AND st.posted_at >= $2 AND st.posted_at < $3
-          AND st.source_branch_id = $4
-          AND ($5::uuid[] IS NULL OR st.destination_branch_id = ANY($5))
-        GROUP BY stl.item_id, st.destination_branch_id
-      ),
-      in_leg AS (
-        SELECT
-          stl.item_id,
-          st.source_branch_id AS other_branch_id
-        FROM stock_transfers st
-        JOIN stock_transfer_lines stl ON stl.transfer_id = st.id
-        WHERE st.organization_id = $1
-          AND st.status = 'POSTED'
-          AND st.posted_at >= $2 AND st.posted_at < $3
-          AND st.destination_branch_id = $4
-          AND ($5::uuid[] IS NULL OR st.source_branch_id = ANY($5))
-        GROUP BY stl.item_id, st.source_branch_id
-      ),
-      combined AS (
-        SELECT
-          COALESCE(o.item_id, ii.item_id) AS item_id,
-          COALESCE(o.other_branch_id, ii.other_branch_id) AS other_branch_id
-        FROM out_leg o
-        FULL OUTER JOIN in_leg ii
-          ON o.item_id = ii.item_id AND o.other_branch_id = ii.other_branch_id
-      )
-      SELECT COUNT(*)::int AS total
-      FROM combined c
-      JOIN items i ON i.id = c.item_id AND i.organization_id = $1
-      WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
-        AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
-    `;
+    let dataSql: string;
+    let countSql: string;
 
-    const params = [
+    if (itemGroupBy === 'item') {
+      dataSql = `
+        WITH ${baseCtes}
+        SELECT
+          i.id    AS item_id,
+          i.code  AS sku,
+          i.name  AS item_name,
+          pr.code AS parent_sku,
+          pr.name AS parent_name,
+
+          i.unit  AS unit,
+          ic.id   AS category_id,
+          ic.name AS category_name,
+          b.id    AS dest_branch_id,
+          b.name  AS dest_branch_name,
+          c.out_qty, c.out_value, c.in_qty, c.in_value
+        FROM combined c
+        JOIN  items i  ON i.id = c.item_id AND i.organization_id = $1
+        LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
+        LEFT JOIN products pr ON pr.id = i.product_id AND pr.organization_id = i.organization_id
+        JOIN  branches b ON b.id = c.other_branch_id AND b.organization_id = $1
+        WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
+          AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+        ORDER BY i.code ASC, b.name ASC
+        LIMIT $8 OFFSET $9
+      `;
+      countSql = `
+        WITH ${baseCtes}
+        SELECT COUNT(*)::int AS total
+        FROM combined c
+        JOIN items i ON i.id = c.item_id AND i.organization_id = $1
+        WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
+          AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+      `;
+    } else {
+      const aggKeyExpr = itemGroupBy === 'parent'
+        ? `COALESCE(i.product_id::text, i.id::text)`
+        : `i.category_id::text`;
+
+      const aggCte = `
+        item_agg AS (
+          SELECT
+            ${aggKeyExpr}              AS agg_key,
+            c.other_branch_id,
+            MIN(i.code)                AS fallback_sku,
+            MIN(i.name)                AS fallback_name,
+            SUM(c.out_qty)             AS out_qty,
+            SUM(c.out_value)           AS out_value,
+            SUM(c.in_qty)              AS in_qty,
+            SUM(c.in_value)            AS in_value
+          FROM combined c
+          JOIN items i ON i.id = c.item_id AND i.organization_id = $1
+          WHERE ($6::uuid[] IS NULL OR i.category_id = ANY($6))
+            AND ($7::text IS NULL OR i.code ILIKE '%' || $7 || '%' OR i.name ILIKE '%' || $7 || '%')
+          GROUP BY ${aggKeyExpr}, c.other_branch_id
+        )
+      `;
+
+      const displayCols = itemGroupBy === 'parent'
+        ? `
+          ia.agg_key                            AS item_id,
+          COALESCE(p.code, ia.fallback_sku)     AS sku,
+          COALESCE(p.name, ia.fallback_name)    AS item_name,
+          NULL::text AS parent_sku, NULL::text AS parent_name,
+          NULL::text AS unit, NULL::uuid AS category_id, NULL::text AS category_name`
+        : `
+          ia.agg_key                                    AS item_id,
+          COALESCE(ic.name, 'Không phân nhóm')          AS sku,
+          COALESCE(ic.name, 'Không phân nhóm')          AS item_name,
+          NULL::text AS parent_sku, NULL::text AS parent_name,
+          NULL::text AS unit,
+          ia.agg_key                                    AS category_id,
+          COALESCE(ic.name, 'Không phân nhóm')          AS category_name`;
+
+      const joinLookup = itemGroupBy === 'parent'
+        ? `LEFT JOIN products p ON p.id::text = ia.agg_key AND p.organization_id = $1`
+        : `LEFT JOIN inventory_item_categories ic ON ic.id::text = ia.agg_key`;
+
+      const orderByCol = itemGroupBy === 'parent'
+        ? `COALESCE(p.code, ia.fallback_sku)`
+        : `COALESCE(ic.name, 'Không phân nhóm')`;
+
+      dataSql = `
+        WITH ${baseCtes},
+        ${aggCte}
+        SELECT
+          ${displayCols},
+          b.id   AS dest_branch_id,
+          b.name AS dest_branch_name,
+          ia.out_qty, ia.out_value, ia.in_qty, ia.in_value
+        FROM item_agg ia
+        ${joinLookup}
+        JOIN branches b ON b.id = ia.other_branch_id AND b.organization_id = $1
+        ORDER BY ${orderByCol} ASC NULLS LAST, b.name ASC
+        LIMIT $8 OFFSET $9
+      `;
+      countSql = `
+        WITH ${baseCtes},
+        ${aggCte}
+        SELECT COUNT(*)::int AS total FROM item_agg ia
+      `;
+    }
+
+    const params: unknown[] = [
       query.organizationId,
       query.startDate,
       query.endDate,
@@ -349,32 +383,30 @@ export class TransferReportService {
 
     const total = Number(countRows[0]?.total ?? 0);
 
-    const data: TransferByBranchRow[] = (rows as RawTransferByBranchRow[]).map(
-      (r) => {
-        const outQty = Number(r.out_qty ?? 0);
-        const outValue = Number(r.out_value ?? 0);
-        const inQty = Number(r.in_qty ?? 0);
-        const inValue = Number(r.in_value ?? 0);
-        return {
-          itemId: r.item_id,
-          sku: r.sku,
-          itemName: r.item_name,
-          parentSku: r.parent_name ?? null,
-          parentName: r.parent_name ?? null,
-          unit: r.unit ?? '',
-          categoryId: r.category_id ?? null,
-          categoryName: r.category_name ?? null,
-          destinationBranchId: r.dest_branch_id,
-          destinationBranchName: r.dest_branch_name ?? '',
-          outQty,
-          outValue,
-          outAvgPrice: outQty > 0 ? outValue / outQty : 0,
-          inQty,
-          inValue,
-          inAvgPrice: inQty > 0 ? inValue / inQty : 0,
-        };
-      },
-    );
+    const data: TransferByBranchRow[] = (rows as RawTransferByBranchRow[]).map((r) => {
+      const outQty = Number(r.out_qty ?? 0);
+      const outValue = Number(r.out_value ?? 0);
+      const inQty = Number(r.in_qty ?? 0);
+      const inValue = Number(r.in_value ?? 0);
+      return {
+        itemId: r.item_id,
+        sku: r.sku ?? '',
+        itemName: r.item_name ?? '',
+        parentSku: r.parent_sku ?? null,
+        parentName: r.parent_name ?? null,
+        unit: r.unit ?? '',
+        categoryId: r.category_id ?? null,
+        categoryName: r.category_name ?? null,
+        destinationBranchId: r.dest_branch_id,
+        destinationBranchName: r.dest_branch_name ?? '',
+        outQty,
+        outValue,
+        outAvgPrice: outQty > 0 ? outValue / outQty : 0,
+        inQty,
+        inValue,
+        inAvgPrice: inQty > 0 ? inValue / inQty : 0,
+      };
+    });
 
     return { data, total };
   }
@@ -391,8 +423,9 @@ interface RawTransferSummaryRow {
 
 interface RawTransferByBranchRow {
   item_id: string;
-  sku: string;
-  item_name: string;
+  sku: string | null;
+  item_name: string | null;
+  parent_sku: string | null;
   parent_name: string | null;
   unit: string | null;
   category_id: string | null;
