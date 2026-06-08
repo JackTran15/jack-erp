@@ -8,6 +8,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { StringFilterDto } from '../../../common/filters/filter.dto';
 
@@ -46,10 +47,12 @@ export class StorageSearchV2Dto {
   isMainStorage?: boolean;
 
   /** Sort column — whitelisted to the columns the list can order by. */
+  @ApiPropertyOptional({ enum: ['name', 'branchId'] })
   @IsOptional()
   @IsIn(['name', 'branchId'])
   sortBy?: 'name' | 'branchId';
 
+  @ApiPropertyOptional({ enum: ['asc', 'desc'] })
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
