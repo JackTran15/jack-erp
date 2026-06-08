@@ -460,6 +460,27 @@
         ]
       }
     },
+    "/admin/users/me": {
+      "get": {
+        "operationId": "UsersController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/admin/users/{id}": {
       "get": {
         "operationId": "UsersController_findById",
@@ -3962,6 +3983,30 @@
         ]
       }
     },
+    "/branches/me": {
+      "get": {
+        "operationId": "BranchController_listMyBranches",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BranchEntity"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
     "/branches/{id}": {
       "get": {
         "operationId": "BranchController_findById",
@@ -6120,6 +6165,31 @@
         ]
       }
     },
+    "/inventory/locations/arrange": {
+      "post": {
+        "operationId": "InventoryLocationStockController_arrange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArrangeLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kết quả: { moved, transferId }"
+          }
+        },
+        "summary": "Xếp vị trí: chuyển số lượng hàng từ \"Chưa xếp\" của kho lên kệ thật + ghi vị trí ưu tiên (PSL).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items/{itemId}": {
       "delete": {
         "operationId": "InventoryLocationStockController_removeItemFromLocation",
@@ -6212,6 +6282,14 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -7188,6 +7266,267 @@
         ]
       }
     },
+    "/inventory/stock/transfers": {
+      "post": {
+        "operationId": "StockTransferController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      },
+      "get": {
+        "operationId": "StockTransferController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/{id}": {
+      "patch": {
+        "operationId": "StockTransferController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      },
+      "get": {
+        "operationId": "StockTransferController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/intra-warehouse": {
+      "post": {
+        "operationId": "StockTransferController_createIntraWarehouseTransfer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/{id}/post": {
+      "post": {
+        "operationId": "StockTransferController_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
+    "/inventory/stock/transfers/{id}/cancel": {
+      "post": {
+        "operationId": "StockTransferController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTransferEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransfer"
+        ]
+      }
+    },
     "/payables": {
       "post": {
         "operationId": "PayablesController_create",
@@ -7881,267 +8220,6 @@
         },
         "tags": [
           "Expenses"
-        ]
-      }
-    },
-    "/inventory/stock/transfers": {
-      "post": {
-        "operationId": "StockTransferController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTransferDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      },
-      "get": {
-        "operationId": "StockTransferController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      }
-    },
-    "/inventory/stock/transfers/{id}": {
-      "patch": {
-        "operationId": "StockTransferController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTransferDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      },
-      "get": {
-        "operationId": "StockTransferController_getById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      }
-    },
-    "/inventory/stock/transfers/intra-warehouse": {
-      "post": {
-        "operationId": "StockTransferController_createIntraWarehouseTransfer",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateIntraWarehouseTransferDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      }
-    },
-    "/inventory/stock/transfers/{id}/post": {
-      "post": {
-        "operationId": "StockTransferController_post",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
-        ]
-      }
-    },
-    "/inventory/stock/transfers/{id}/cancel": {
-      "post": {
-        "operationId": "StockTransferController_cancel",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTransferEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTransfer"
         ]
       }
     },
@@ -9725,6 +9803,16 @@
                 "showroom"
               ]
             }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict results to products/items in this category.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -10746,6 +10834,99 @@
         },
         "tags": [
           "InvoiceV2"
+        ]
+      }
+    },
+    "/v2/invoices/returnable/search": {
+      "post": {
+        "operationId": "ReturnableInvoiceV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnableInvoiceSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "ReturnableInvoiceV2"
+        ]
+      }
+    },
+    "/v2/invoices/purchase-history/search": {
+      "post": {
+        "operationId": "PurchaseHistoryV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseHistorySearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "PurchaseHistoryV2"
+        ]
+      }
+    },
+    "/v2/invoices/drafts/search": {
+      "post": {
+        "operationId": "DraftInvoiceV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftInvoiceSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "DraftInvoiceV2"
         ]
       }
     },
@@ -18117,11 +18298,22 @@
             ],
             "type": "string"
           },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
           "isActive": {
+            "type": "boolean"
+          },
+          "isUnassigned": {
             "type": "boolean"
           },
           "storage": {
             "$ref": "#/components/schemas/StorageEntity"
+          },
+          "hasItems": {
+            "type": "boolean",
+            "description": "Transient (not a column): whether any item has been placed at this location\n(has ≥1 stock_balance row). Populated by listLocations to drive the\n\"Xếp hàng hóa: Đã xếp / Chưa xếp\" column. Undefined on endpoints that don't compute it."
           },
           "id": {
             "type": "string"
@@ -18153,6 +18345,7 @@
           "storageId",
           "type",
           "isActive",
+          "isUnassigned",
           "id",
           "organizationId",
           "createdAt",
@@ -18876,6 +19069,13 @@
               "BIN",
               "ZONE"
             ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "isActive": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -18887,10 +19087,19 @@
       "UpdateLocationDto": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
           "name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
           },
           "type": {
             "type": "string",
@@ -18903,6 +19112,10 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
           }
         }
       },
@@ -19237,6 +19450,46 @@
           "rows"
         ]
       },
+      "ArrangeLocationLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Hàng hoá (item) cần xếp"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Kho chứa vị trí \"Chưa xếp\" (nguồn) và kệ đích"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Vị trí kệ đích để xếp hàng lên"
+          }
+        },
+        "required": [
+          "itemId",
+          "storageId",
+          "destinationLocationId"
+        ]
+      },
+      "ArrangeLocationDto": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArrangeLocationLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -19493,6 +19746,201 @@
         },
         "required": [
           "valueLabel"
+        ]
+      },
+      "CreateTransferDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "StockTransferEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "sourceLocationId": {
+            "type": "string"
+          },
+          "destinationLocationId": {
+            "type": "string"
+          },
+          "sourceBranchId": {
+            "type": "string"
+          },
+          "destinationBranchId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "APPROVED",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "approvedBy": {
+            "type": "string"
+          },
+          "approvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTransferLineEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "sourceLocationId",
+          "destinationLocationId",
+          "sourceBranchId",
+          "destinationBranchId",
+          "status",
+          "lines",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "StockTransferLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "transferId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "sourceLocationId": {
+            "type": "string"
+          },
+          "destinationLocationId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "transfer": {
+            "$ref": "#/components/schemas/StockTransferEntity"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemEntity"
+          },
+          "sourceLocation": {
+            "$ref": "#/components/schemas/LocationEntity"
+          },
+          "destinationLocation": {
+            "$ref": "#/components/schemas/LocationEntity"
+          }
+        },
+        "required": [
+          "id",
+          "transferId",
+          "itemId",
+          "quantity"
+        ]
+      },
+      "IntraWarehouseTransferLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the inventory item"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Quantity to transfer (must be > 0)"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional per-line source location (overrides the header source)"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional per-line destination location (overrides the header destination; must be in same storage as source)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes for this line"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateIntraWarehouseTransferDto": {
+        "type": "object",
+        "properties": {
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the source location (fallback when a line omits its own source)"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the destination location (fallback when a line omits its own destination; must be in same storage as source)"
+          },
+          "lines": {
+            "minItems": 1,
+            "description": "Lines to transfer",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntraWarehouseTransferLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
         ]
       },
       "CreatePayableDto": {
@@ -20037,193 +20485,6 @@
           "createdAt",
           "updatedAt",
           "createdBy"
-        ]
-      },
-      "CreateTransferDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "StockTransferEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "sourceLocationId": {
-            "type": "string"
-          },
-          "destinationLocationId": {
-            "type": "string"
-          },
-          "sourceBranchId": {
-            "type": "string"
-          },
-          "destinationBranchId": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "DRAFT",
-              "APPROVED",
-              "POSTED",
-              "CANCELLED"
-            ],
-            "type": "string"
-          },
-          "approvedBy": {
-            "type": "string"
-          },
-          "approvedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "postedBy": {
-            "type": "string"
-          },
-          "postedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockTransferLineEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "sourceLocationId",
-          "destinationLocationId",
-          "sourceBranchId",
-          "destinationBranchId",
-          "status",
-          "lines",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "StockTransferLineEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "transferId": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "sourceLocationId": {
-            "type": "string"
-          },
-          "destinationLocationId": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "transfer": {
-            "$ref": "#/components/schemas/StockTransferEntity"
-          },
-          "item": {
-            "$ref": "#/components/schemas/ItemEntity"
-          },
-          "sourceLocation": {
-            "$ref": "#/components/schemas/LocationEntity"
-          },
-          "destinationLocation": {
-            "$ref": "#/components/schemas/LocationEntity"
-          }
-        },
-        "required": [
-          "id",
-          "transferId",
-          "itemId",
-          "quantity"
-        ]
-      },
-      "IntraWarehouseTransferLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID of the inventory item"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 0.000001,
-            "description": "Quantity to transfer (must be > 0)"
-          },
-          "notes": {
-            "type": "string",
-            "description": "Optional notes for this line"
-          }
-        },
-        "required": [
-          "itemId",
-          "quantity"
-        ]
-      },
-      "CreateIntraWarehouseTransferDto": {
-        "type": "object",
-        "properties": {
-          "sourceLocationId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID of the source location"
-          },
-          "destinationLocationId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID of the destination location (must be in same storage as source)"
-          },
-          "lines": {
-            "minItems": 1,
-            "description": "Lines to transfer",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IntraWarehouseTransferLineDto"
-            }
-          }
-        },
-        "required": [
-          "sourceLocationId",
-          "destinationLocationId",
-          "lines"
         ]
       },
       "CreateAdjustmentDto": {
@@ -21193,7 +21454,26 @@
           },
           "lineDiscount": {
             "type": "number",
+            "description": "Server-computed discount amount; ignored when lineDiscountType is set.",
             "minimum": 0
+          },
+          "lineDiscountType": {
+            "type": "string",
+            "description": "Manual per-line discount type; when set, the server computes lineDiscount from lineDiscountValue.",
+            "enum": [
+              "percent",
+              "amount"
+            ]
+          },
+          "lineDiscountValue": {
+            "type": "number",
+            "description": "Raw discount value: 10 means 10% when type=percent; a currency amount when type=amount.",
+            "minimum": 0
+          },
+          "lineDiscountReason": {
+            "type": "string",
+            "description": "Free-text reason/label for the discount, e.g. \"cc\".",
+            "maxLength": 255
           },
           "note": {
             "type": "string"
@@ -21232,6 +21512,11 @@
             "items": {
               "$ref": "#/components/schemas/CreateInvoiceItemDto"
             }
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "Employee (employee_profiles.id) credited with the sale.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -21326,6 +21611,9 @@
           "staffId": {
             "type": "string"
           },
+          "salespersonId": {
+            "type": "string"
+          },
           "priceListId": {
             "type": "string"
           },
@@ -21418,6 +21706,19 @@
           },
           "lineDiscount": {
             "type": "number"
+          },
+          "lineDiscountType": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "amount"
+            ]
+          },
+          "lineDiscountValue": {
+            "type": "number"
+          },
+          "lineDiscountReason": {
+            "type": "string"
           },
           "lineTotal": {
             "type": "number"
@@ -21535,6 +21836,19 @@
           },
           "lineDiscount": {
             "type": "number"
+          },
+          "lineDiscountType": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "amount"
+            ]
+          },
+          "lineDiscountValue": {
+            "type": "number"
+          },
+          "lineDiscountReason": {
+            "type": "string"
           },
           "lineTotal": {
             "type": "number"
@@ -21711,6 +22025,9 @@
             "type": "string"
           },
           "staffId": {
+            "type": "string"
+          },
+          "salespersonId": {
             "type": "string"
           },
           "priceListId": {
@@ -21968,6 +22285,21 @@
             "type": "number",
             "minimum": 0
           },
+          "lineDiscountType": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "amount"
+            ]
+          },
+          "lineDiscountValue": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lineDiscountReason": {
+            "type": "string",
+            "maxLength": 255
+          },
           "note": {
             "type": "string"
           },
@@ -22002,6 +22334,11 @@
             "items": {
               "$ref": "#/components/schemas/UpdateInvoiceItemDto"
             }
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "Employee (employee_profiles.id) credited with the sale.",
+            "format": "uuid"
           }
         }
       },
@@ -22419,6 +22756,174 @@
                 "$ref": "#/components/schemas/StringFilterDto"
               }
             ]
+          }
+        }
+      },
+      "ReturnableInvoiceSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Invoice code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "customerName": {
+            "description": "Customer name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "customerPhone": {
+            "description": "Customer phone",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "totalPaid": {
+            "description": "Total amount paid",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "branchName": {
+            "description": "Branch name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "PurchaseHistorySearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "Customer whose history is requested",
+            "format": "uuid"
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Invoice code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "issuedAt": {
+            "description": "Invoice (issued) date",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "storeName": {
+            "description": "Store / branch name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "status": {
+            "description": "Invoice status (null/absent = all)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "totalPaid": {
+            "description": "Total amount paid",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "note": {
+            "description": "Note",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId"
+        ]
+      },
+      "DraftInvoiceSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "search": {
+            "type": "string",
+            "description": "Free-text: matches invoice code OR customer name OR customer phone"
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Optional POS session scope"
           }
         }
       },

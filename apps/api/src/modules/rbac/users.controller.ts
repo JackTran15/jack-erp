@@ -59,6 +59,11 @@ export class UsersController {
     );
   }
 
+  @Get('me')
+  getMe(@Actor() actor: ActorContext) {
+    return this.users.getMe(actor);
+  }
+
   @Get(':id')
   @RequirePermission('iam.user.read')
   findById(

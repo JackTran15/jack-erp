@@ -29,6 +29,19 @@ export function useBranches(): UseQueryResult<BranchOption[]> {
   });
 }
 
+export function useMyBranches(): UseQueryResult<BranchOption[]> {
+  return useQuery({
+    queryKey: ["branches", "me"] as const,
+    queryFn: async () => {
+      const res = requireErpData(
+        await erpApi.GET<BranchOption[]>("/branches/me"),
+      );
+      return res;
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useInvalidateBranches(): () => void {
   const qc = useQueryClient();
   return () => {

@@ -280,4 +280,21 @@ export class BranchService {
       where: { userId, organizationId: actor.organizationId },
     });
   }
+
+  async listMyBranches(actor: ActorContext): Promise<BranchEntity[]> {
+    const assignments = await this.assignmentRepo.find({
+      where: { userId: actor.userId, organizationId: actor.organizationId },
+      select: ['branchId'],
+    });
+
+    if (!assignments.length) return [];
+
+    return this.branchRepo.find({
+      where: assignments.map((a) => ({
+        id: a.branchId,
+        organizationId: actor.organizationId,
+      })),
+      order: { createdAt: 'ASC' },
+    });
+  }
 }
