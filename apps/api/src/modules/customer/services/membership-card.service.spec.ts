@@ -544,4 +544,51 @@ describe('MembershipCardService', () => {
       expect(mockManager.increment).not.toHaveBeenCalled();
     });
   });
+
+  // =========================================================================
+  // awardPointsForInvoice — earn on checkout (floor(subtotal / 10000))
+  // =========================================================================
+  describe('awardPointsForInvoice', () => {
+    it('credits floor(subtotal / 10000) points — 1.000.000đ earns 100', async () => {
+      cardRepo.findOne.mockResolvedValue(cardStub());
+
+      await service.awardPointsForInvoice(
+        { id: 'inv-1', customerId: 'cust-1', subtotal: 1_000_000 },
+        actor,
+      );
+
+      expect(mockManager.increment).toHaveBeenCalledWith(
+        MembershipCardEntity,
+        { id: 'card-1' },
+        'points',
+        100,
+      );
+      expect(mockManager.insert).toHaveBeenCalledWith(
+        PointHistoryEntity,
+        expect.objectContaining({ type: PointType.EARN, delta: 100 }),
+      );
+    });
+
+    it('credits nothing below the earn threshold (subtotal < 10.000đ)', async () => {
+      cardRepo.findOne.mockResolvedValue(cardStub());
+
+      await service.awardPointsForInvoice(
+        { id: 'inv-1', customerId: 'cust-1', subtotal: 9_999 },
+        actor,
+      );
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when the customer has no active card', async () => {
+      cardRepo.findOne.mockResolvedValue(null);
+
+      await service.awardPointsForInvoice(
+        { id: 'inv-1', customerId: 'cust-1', subtotal: 1_000_000 },
+        actor,
+      );
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
 });

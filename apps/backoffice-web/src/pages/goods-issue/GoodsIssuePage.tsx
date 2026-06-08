@@ -64,6 +64,7 @@ import {
   ensureTrailingBlankLine,
   getPersistableLines,
 } from "../inventory-line-normalization";
+import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -164,17 +165,31 @@ function getActiveBranchId(): string | null {
   );
 }
 
+/** Filter keys align 1:1 with the `GoodsIssueSearchV2Dto` body fields. */
 const FILTER_KEYS = [
   "date",
   "documentNumber",
-  "subject",
+  "party",
   "totalAmount",
   "notes",
   "reason",
-  "documentType",
+  "purpose",
 ] as const;
 
 type FilterKey = (typeof FILTER_KEYS)[number];
+
+const GI_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/goods-issues/search",
+  fields: {
+    documentNumber: "string",
+    party: "string",
+    notes: "string",
+    reason: "string",
+    purpose: "enum",
+    date: "date-range",
+    totalAmount: "compare",
+  },
+};
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce((acc, k) => {
@@ -254,21 +269,31 @@ export function GoodsIssuePage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pagination.page),
-        pageSize: String(pagination.pageSize),
-      });
-      const { data } = await apiClient.get<PaginatedResponse<GoodsIssue>>(
-        `/inventory/goods-issues?${params}`,
+      const body = buildV2Body(
+        GI_SEARCH,
+        columnFilters as unknown as Record<string, ColumnFilter>,
+        pagination.page,
+        pagination.pageSize,
       );
-      setRecords(data);
+      const { data } = await apiClient.post<{
+        data: GoodsIssue[];
+        total: number;
+        page: number;
+        limit: number;
+      }>("/v2/inventory/goods-issues/search", body);
+      setRecords({
+        data: data.data,
+        total: data.total,
+        page: data.page,
+        pageSize: data.limit,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
       setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
     } finally {
       setLoading(false);
     }
-  }, [pagination]);
+  }, [pagination, columnFilters]);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -296,7 +321,9 @@ export function GoodsIssuePage() {
   }, []);
 
   useEffect(() => {
-    void loadRecords();
+    // Debounce so rapid filter typing settles into a single request.
+    const t = setTimeout(() => void loadRecords(), 300);
+    return () => clearTimeout(t);
   }, [loadRecords]);
 
   useEffect(() => {
@@ -443,7 +470,8 @@ export function GoodsIssuePage() {
     {
       key: "date",
       label: "Ngày",
-      width: 110,
+      width: 150,
+      filterKind: "date-range",
       render: (row) =>
         row.issueDate
           ? new Date(row.issueDate).toLocaleDateString("vi-VN")
@@ -472,7 +500,7 @@ export function GoodsIssuePage() {
       ),
     },
     {
-      key: "subject",
+      key: "party",
       label: "Đối tượng",
       width: 180,
       render: (row) => {
@@ -490,6 +518,7 @@ export function GoodsIssuePage() {
       key: "totalAmount",
       label: "Tổng tiền",
       width: 140,
+      filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
       render: (row) => formatMoneyInteger(issueTotal(row)),
@@ -506,9 +535,13 @@ export function GoodsIssuePage() {
       render: (row) => row.reason ?? "",
     },
     {
-      key: "documentType",
+      key: "purpose",
       label: "Loại chứng từ",
       width: 200,
+      filterKind: "select",
+      filterOptions: (Object.keys(PURPOSE_LABELS) as GoodsIssuePurposeUI[]).map(
+        (value) => ({ value, label: PURPOSE_LABELS[value] }),
+      ),
       render: (row) => PURPOSE_LABELS[row.purpose ?? "OTHER"],
     },
     {
@@ -531,21 +564,38 @@ export function GoodsIssuePage() {
     },
   ];
 
+  // Any filter edit resets to page 1 so the server result starts from the top.
+  const resetPage = useCallback(
+    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    [],
+  );
+
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        resetPage();
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], value },
-        })),
+        }));
+        resetPage();
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as FilterKey]: { ...prev[key as FilterKey], [part]: value },
+        }));
+        resetPage();
+      },
     }),
-    [columnFilters],
+    [columnFilters, resetPage],
   );
 
   const totalSum = useMemo(

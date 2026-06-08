@@ -49,6 +49,6 @@ import { PermissionsController } from './permissions.controller';
     UsersService,
     RolesService,
   ],
-  exports: [RbacService, PermissionGuard, BranchScopeGuard],
+  exports: [RbacService, PermissionGuard, BranchScopeGuard, UsersService],
 })
 export class RbacModule {}

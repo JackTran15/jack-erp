@@ -35,6 +35,7 @@ import { ProductModule } from './modules/inventory/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { JobPositionModule } from './modules/hr/job-position/job-position.module';
 import { InventoryReportsModule } from './modules/inventory-reports/inventory-reports.module';
+import { AdminSearchModule } from './modules/admin-search/admin-search.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { InventoryReportsModule } from './modules/inventory-reports/inventory-re
     PromotionModule,
     JobPositionModule,
     InventoryReportsModule,
+    AdminSearchModule,
   ],
 })
 export class AppModule {}

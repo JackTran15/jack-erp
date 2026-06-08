@@ -6,6 +6,7 @@ import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { MembershipCardEntity } from '../membership-card.entity';
 import { PointHistoryEntity, PointType } from '../point-history.entity';
+import { POINT_EARN_VND_PER_POINT } from '../loyalty.constants';
 import { LoyaltyPointsReversePayload } from '../publishers/loyalty-points-reverse.publisher';
 
 @Injectable()
@@ -47,7 +48,9 @@ export class LoyaltyPointsReverseConsumer {
       return;
     }
 
-    const requestedDelta = Math.floor(Math.abs(Number(subtotalDelta)) / 1000);
+    const requestedDelta = Math.floor(
+      Math.abs(Number(subtotalDelta)) / POINT_EARN_VND_PER_POINT,
+    );
     if (requestedDelta <= 0) {
       this.logger.log(
         `Loyalty reverse: zero delta for return ${returnInvoiceId}, recording NO-OP history`,

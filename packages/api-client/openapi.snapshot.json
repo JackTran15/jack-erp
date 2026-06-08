@@ -6222,6 +6222,38 @@
         ]
       }
     },
+    "/v2/inventory-items/search": {
+      "post": {
+        "operationId": "InventoryItemV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryItemSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryItemSearchV2ResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Product-grouped inventory item search (server-side filters)",
+        "tags": [
+          "InventoryItemV2"
+        ]
+      }
+    },
     "/inventory/stock/balances": {
       "get": {
         "operationId": "StockLedgerController_listBalances",
@@ -12153,6 +12185,37 @@
         ]
       }
     },
+    "/v2/inventory/goods-issues/search": {
+      "post": {
+        "operationId": "GoodsIssueV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsIssueSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsIssueV2"
+        ]
+      }
+    },
     "/inventory/issue-reasons": {
       "get": {
         "operationId": "IssueReasonController_list",
@@ -12562,6 +12625,37 @@
         },
         "tags": [
           "GoodsReceipt"
+        ]
+      }
+    },
+    "/v2/goods-receipts/search": {
+      "post": {
+        "operationId": "GoodsReceiptV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoodsReceiptSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "GoodsReceiptV2"
         ]
       }
     },
@@ -13224,6 +13318,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13329,6 +13450,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13440,6 +13588,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13545,6 +13720,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13656,6 +13858,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13761,6 +13990,33 @@
               "items": {
                 "type": "string"
               }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
             }
           },
           {
@@ -13872,6 +14128,33 @@
             }
           },
           {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
             "name": "search",
             "required": false,
             "in": "query",
@@ -13920,6 +14203,192 @@
         "summary": "Hàng hóa điều chuyển theo cửa hàng",
         "tags": [
           "inventory-reports"
+        ]
+      }
+    },
+    "/v2/customers/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchCustomers_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/inventory-providers/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchProviders_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/job-positions/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchJobPositions_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobPositionSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/accounts/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchAccounts_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/employees/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchEmployees_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/inventory-item-categories/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchItemCategories_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemCategorySearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
         ]
       }
     }
@@ -19490,6 +19959,219 @@
           "lines"
         ]
       },
+      "StringFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "*",
+              "=",
+              "+",
+              "-",
+              "!"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "CompareFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "=",
+              "<",
+              "<=",
+              ">",
+              ">="
+            ]
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "InventoryItemSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Mã SKU",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "barcode": {
+            "description": "Mã vạch — matches if any barcode of the group matches",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Tên hàng hóa",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "unit": {
+            "description": "Đơn vị tính",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "brand": {
+            "description": "Thương hiệu",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "purchasePrice": {
+            "description": "Giá mua TB (average purchase price)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "sellingPrice": {
+            "description": "Giá bán TB (average selling price)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "isPosVisible": {
+            "type": "boolean",
+            "description": "Hiển thị trên MH bán hàng"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Trạng thái (active)"
+          }
+        }
+      },
+      "InventoryItemGroupRowDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "product",
+              "orphan"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "barcode": {
+            "type": "string",
+            "description": "All barcodes of the group, comma-joined (\"\" if none)"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "purchasePrice": {
+            "type": "number",
+            "description": "Average purchase price across the group"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Average selling price across the group"
+          },
+          "isPosVisible": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "itemCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "code",
+          "name",
+          "barcode",
+          "unit",
+          "brand",
+          "purchasePrice",
+          "sellingPrice",
+          "isPosVisible",
+          "isActive",
+          "itemCount"
+        ]
+      },
+      "InventoryItemSearchV2ResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryItemGroupRowDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -22591,28 +23273,6 @@
           "revenueAccountId"
         ]
       },
-      "StringFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "*",
-              "=",
-              "+",
-              "-",
-              "!"
-            ]
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
       "EnumFilterDto": {
         "type": "object",
         "properties": {
@@ -22635,28 +23295,6 @@
             "type": "string"
           }
         }
-      },
-      "CompareFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "=",
-              "<",
-              "<=",
-              ">",
-              ">="
-            ]
-          },
-          "value": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
       },
       "InvoiceSearchV2Dto": {
         "type": "object",
@@ -23657,6 +24295,78 @@
           "lineTotal"
         ]
       },
+      "GoodsIssueSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "description": "Số phiếu xuất (document number)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "party": {
+            "description": "Đối tượng (counterparty — matches provider.name or targetBranch.name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "notes": {
+            "description": "Diễn giải (notes)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Lý do (reason)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "purpose": {
+            "description": "Loại chứng từ (purpose enum: OTHER | SALE | TRANSFER_OUT | DISPOSAL)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "date": {
+            "description": "Ngày (created date range — GoodsIssueEntity has no dedicated issue date)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
       "CreateIssueReasonDto": {
         "type": "object",
         "properties": {
@@ -24169,6 +24879,78 @@
           }
         }
       },
+      "GoodsReceiptSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "description": "Số phiếu nhập (document number)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "party": {
+            "description": "Đối tượng (counterparty — matches provider.name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "description": {
+            "description": "Diễn giải (description)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "reason": {
+            "description": "Lý do (reason)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "purpose": {
+            "description": "Loại chứng từ (purpose enum: OTHER | TRANSFER_IN)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "date": {
+            "description": "Ngày (received date range)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Tổng tiền (computed line total: SUM(quantity * unit_price))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
       "CreateStockTakeLineDto": {
         "type": "object",
         "properties": {
@@ -24604,6 +25386,358 @@
       "MarkExecutedDto": {
         "type": "object",
         "properties": {}
+      },
+      "CustomerSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Customer code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Customer name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "email": {
+            "description": "Email",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "phone": {
+            "description": "Phone",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "status": {
+            "description": "Lifecycle status (ACTIVE / INACTIVE / MERGED)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date range",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Exact branch filter (entity is organization-scoped; this is a filter, not a scope)",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProviderSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Provider code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Provider name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "email": {
+            "description": "Email",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "phone": {
+            "description": "Phone",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "taxCode": {
+            "description": "Tax code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "type": {
+            "description": "Provider type (organization / individual)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date range",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active flag"
+          },
+          "isCustomer": {
+            "type": "boolean",
+            "description": "Also-a-customer flag"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Exact supplier-group filter",
+            "format": "uuid"
+          }
+        }
+      },
+      "JobPositionSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "name": {
+            "description": "Position name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "code": {
+            "description": "Position code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date range",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active flag"
+          }
+        }
+      },
+      "AccountSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Account code",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Account name",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "type": {
+            "description": "Account type (ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date range",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active flag"
+          },
+          "parentAccountId": {
+            "type": "string",
+            "description": "Exact parent-account filter",
+            "format": "uuid"
+          }
+        }
+      },
+      "EmployeeSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Employee code (profile.code)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "fullName": {
+            "description": "Full name — matched over CONCAT(firstName, ' ', lastName)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "email": {
+            "description": "Email",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Creation date range",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active (login) flag — the \"status\" column"
+          },
+          "jobPositionId": {
+            "type": "string",
+            "description": "Exact job-position filter",
+            "format": "uuid"
+          }
+        }
+      },
+      "ItemCategorySearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "code": {
+            "description": "Mã nhóm hàng hóa (category code)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "name": {
+            "description": "Tên danh mục (category name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "description": "Ngày tạo (creation date range)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          }
+        }
       }
     }
   }

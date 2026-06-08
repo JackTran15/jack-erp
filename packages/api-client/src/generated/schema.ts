@@ -1996,6 +1996,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory-items/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Product-grouped inventory item search (server-side filters) */
+        post: operations["InventoryItemV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock/balances": {
         parameters: {
             query?: never;
@@ -3845,6 +3862,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/goods-issues/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsIssueV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/issue-reasons": {
         parameters: {
             query?: never;
@@ -3919,6 +3952,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsReceiptController_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["GoodsReceiptV2Controller_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4182,6 +4231,102 @@ export interface paths {
         get: operations["InventoryReportsController_transferByBranch"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/customers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchCustomers_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-providers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchProviders_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/job-positions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchJobPositions_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/accounts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchAccounts_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/employees/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchEmployees_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-item-categories/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchItemCategories_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5882,6 +6027,64 @@ export interface components {
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
         };
+        StringFilterDto: {
+            /** @enum {string} */
+            operator: "*" | "=" | "+" | "-" | "!";
+            value: string;
+        };
+        CompareFilterDto: {
+            /** @enum {string} */
+            operator: "=" | "<" | "<=" | ">" | ">=";
+            value: Record<string, never>;
+        };
+        InventoryItemSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Mã SKU */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Mã vạch — matches if any barcode of the group matches */
+            barcode?: components["schemas"]["StringFilterDto"];
+            /** @description Tên hàng hóa */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Đơn vị tính */
+            unit?: components["schemas"]["StringFilterDto"];
+            /** @description Thương hiệu */
+            brand?: components["schemas"]["StringFilterDto"];
+            /** @description Giá mua TB (average purchase price) */
+            purchasePrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Giá bán TB (average selling price) */
+            sellingPrice?: components["schemas"]["CompareFilterDto"];
+            /** @description Hiển thị trên MH bán hàng */
+            isPosVisible?: boolean;
+            /** @description Trạng thái (active) */
+            isActive?: boolean;
+        };
+        InventoryItemGroupRowDto: {
+            /** @enum {string} */
+            type: "product" | "orphan";
+            id: string;
+            code: string;
+            name: string;
+            /** @description All barcodes of the group, comma-joined ("" if none) */
+            barcode: string;
+            unit: string;
+            brand: string | null;
+            /** @description Average purchase price across the group */
+            purchasePrice: number;
+            /** @description Average selling price across the group */
+            sellingPrice: number;
+            isPosVisible: boolean;
+            isActive: boolean;
+            itemCount: number;
+        };
+        InventoryItemSearchV2ResponseDto: {
+            data: components["schemas"]["InventoryItemGroupRowDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
         StockBalanceEntity: {
             itemId: string;
             item?: components["schemas"]["ItemEntity"];
@@ -6890,22 +7093,12 @@ export interface components {
             payments?: components["schemas"]["InvoicePaymentLineDto"][];
             note?: string;
         };
-        StringFilterDto: {
-            /** @enum {string} */
-            operator: "*" | "=" | "+" | "-" | "!";
-            value: string;
-        };
         EnumFilterDto: {
             value: string | null;
         };
         DateRangeFilterDto: {
             from?: string;
             to?: string;
-        };
-        CompareFilterDto: {
-            /** @enum {string} */
-            operator: "=" | "<" | "<=" | ">" | ">=";
-            value: Record<string, never>;
         };
         InvoiceSearchV2Dto: {
             /** @default 1 */
@@ -7210,6 +7403,26 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
             location?: components["schemas"]["LocationEntity"];
         };
+        GoodsIssueSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Số phiếu xuất (document number) */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Đối tượng (counterparty — matches provider.name or targetBranch.name) */
+            party?: components["schemas"]["StringFilterDto"];
+            /** @description Diễn giải (notes) */
+            notes?: components["schemas"]["StringFilterDto"];
+            /** @description Lý do (reason) */
+            reason?: components["schemas"]["StringFilterDto"];
+            /** @description Loại chứng từ (purpose enum: OTHER | SALE | TRANSFER_OUT | DISPOSAL) */
+            purpose?: components["schemas"]["EnumFilterDto"];
+            /** @description Ngày (created date range — GoodsIssueEntity has no dedicated issue date) */
+            date?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
         CreateIssueReasonDto: {
             /**
              * @description Mã lý do (slug). Tự sinh từ name nếu không cung cấp.
@@ -7387,6 +7600,26 @@ export interface components {
             cashPayment?: components["schemas"]["CashSettlementDto"];
             cashReceipt?: components["schemas"]["CashSettlementDto"];
         };
+        GoodsReceiptSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Số phiếu nhập (document number) */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Đối tượng (counterparty — matches provider.name) */
+            party?: components["schemas"]["StringFilterDto"];
+            /** @description Diễn giải (description) */
+            description?: components["schemas"]["StringFilterDto"];
+            /** @description Lý do (reason) */
+            reason?: components["schemas"]["StringFilterDto"];
+            /** @description Loại chứng từ (purpose enum: OTHER | TRANSFER_IN) */
+            purpose?: components["schemas"]["EnumFilterDto"];
+            /** @description Ngày (received date range) */
+            date?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
         CreateStockTakeLineDto: {
             itemId: string;
             locationId?: string;
@@ -7537,6 +7770,126 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
         };
         MarkExecutedDto: Record<string, never>;
+        CustomerSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Customer code */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Customer name */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Email */
+            email?: components["schemas"]["StringFilterDto"];
+            /** @description Phone */
+            phone?: components["schemas"]["StringFilterDto"];
+            /** @description Lifecycle status (ACTIVE / INACTIVE / MERGED) */
+            status?: components["schemas"]["EnumFilterDto"];
+            /** @description Creation date range */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * Format: uuid
+             * @description Exact branch filter (entity is organization-scoped; this is a filter, not a scope)
+             */
+            branchId?: string;
+        };
+        ProviderSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Provider code */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Provider name */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Email */
+            email?: components["schemas"]["StringFilterDto"];
+            /** @description Phone */
+            phone?: components["schemas"]["StringFilterDto"];
+            /** @description Tax code */
+            taxCode?: components["schemas"]["StringFilterDto"];
+            /** @description Provider type (organization / individual) */
+            type?: components["schemas"]["EnumFilterDto"];
+            /** @description Creation date range */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Active flag */
+            isActive?: boolean;
+            /** @description Also-a-customer flag */
+            isCustomer?: boolean;
+            /**
+             * Format: uuid
+             * @description Exact supplier-group filter
+             */
+            groupId?: string;
+        };
+        JobPositionSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Position name */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Position code */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Creation date range */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Active flag */
+            isActive?: boolean;
+        };
+        AccountSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Account code */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Account name */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Account type (ASSET / LIABILITY / EQUITY / REVENUE / EXPENSE) */
+            type?: components["schemas"]["EnumFilterDto"];
+            /** @description Creation date range */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Active flag */
+            isActive?: boolean;
+            /**
+             * Format: uuid
+             * @description Exact parent-account filter
+             */
+            parentAccountId?: string;
+        };
+        EmployeeSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Employee code (profile.code) */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Full name — matched over CONCAT(firstName, ' ', lastName) */
+            fullName?: components["schemas"]["StringFilterDto"];
+            /** @description Email */
+            email?: components["schemas"]["StringFilterDto"];
+            /** @description Creation date range */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Active (login) flag — the "status" column */
+            isActive?: boolean;
+            /**
+             * Format: uuid
+             * @description Exact job-position filter
+             */
+            jobPositionId?: string;
+        };
+        ItemCategorySearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Mã nhóm hàng hóa (category code) */
+            code?: components["schemas"]["StringFilterDto"];
+            /** @description Tên danh mục (category name) */
+            name?: components["schemas"]["StringFilterDto"];
+            /** @description Ngày tạo (creation date range) */
+            createdAt?: components["schemas"]["DateRangeFilterDto"];
+        };
     };
     responses: never;
     parameters: never;
@@ -11534,6 +11887,29 @@ export interface operations {
             };
         };
     };
+    InventoryItemV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryItemSearchV2Dto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryItemSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
     StockLedgerController_listBalances: {
         parameters: {
             query?: {
@@ -14853,6 +15229,29 @@ export interface operations {
             };
         };
     };
+    GoodsIssueV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsIssueSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     IssueReasonController_list: {
         parameters: {
             query?: {
@@ -15094,6 +15493,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoodsReceiptEntity"];
+                };
+            };
+        };
+    };
+    GoodsReceiptV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -15451,6 +15873,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15481,6 +15907,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15511,6 +15941,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15541,6 +15975,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15571,6 +16009,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15601,6 +16043,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15631,6 +16077,10 @@ export interface operations {
                 branchIds?: string[];
                 /** @description Item category IDs to filter */
                 categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
                 /** @description Full-text search on item code/name */
                 search?: string;
                 page?: number;
@@ -15649,6 +16099,144 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AdminSearchV2Controller_searchCustomers_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchProviders_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchJobPositions_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobPositionSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchAccounts_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchEmployees_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchItemCategories_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemCategorySearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };

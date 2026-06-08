@@ -17,14 +17,16 @@ import {
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import {
-  applyColumnFilter,
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import {
+  columnToStringFilter,
+} from "../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { hasPermission } from "../../lib/permissions";
 import {
   draftToUserUpdatePayload,
@@ -34,11 +36,12 @@ import {
   joinFullName,
   useCreateUser,
   useDeactivateUser,
+  useEmployeeSearch,
   useRoles,
   useUpdateUser,
   useUser,
-  useUsers,
   userDisplayCode,
+  type EmployeeSearchBody,
 } from "../../hooks/iam";
 import type { EmployeeFormDraft, EmployeeFormMode } from "./employee.types";
 import { userDetailToEmployeeDraft } from "./employee.mappers";
@@ -67,26 +70,19 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   );
 }
 
-function resolveUserListQuery(
+function resolveEmployeeSearchBody(
   columnFilters: Record<FilterKey, ColumnFilter>,
   pagination: PaginationStateDto,
-) {
-  const search =
-    columnFilters.email.value.trim() ||
-    columnFilters.fullName.value.trim() ||
-    columnFilters.code.value.trim() ||
-    undefined;
-
-  let isActive: boolean | undefined;
+): EmployeeSearchBody {
   const status = columnFilters.status.value;
-  if (status === "true") isActive = true;
-  if (status === "false") isActive = false;
-
   return {
     page: pagination.page,
-    pageSize: pagination.pageSize,
-    search,
-    isActive,
+    limit: pagination.pageSize,
+    code: columnToStringFilter(columnFilters.code),
+    fullName: columnToStringFilter(columnFilters.fullName),
+    email: columnToStringFilter(columnFilters.email),
+    isActive:
+      status === "true" ? true : status === "false" ? false : undefined,
   };
 }
 
@@ -115,9 +111,12 @@ export function EmployeesPage() {
     label: string;
   } | null>(null);
 
-  const listFilters = useMemo(
-    () => resolveUserListQuery(columnFilters, pagination),
-    [columnFilters, pagination],
+  // Debounce only the filter inputs so typing doesn't fire a request per
+  // keystroke; page/pageSize changes still apply immediately.
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+  const searchBody = useMemo(
+    () => resolveEmployeeSearchBody(debouncedFilters, pagination),
+    [debouncedFilters, pagination],
   );
 
   const {
@@ -126,7 +125,7 @@ export function EmployeesPage() {
     isError,
     error,
     refetch,
-  } = useUsers(listFilters);
+  } = useEmployeeSearch(searchBody);
   const { data: roles = [] } = useRoles();
   const { data: userDetail } = useUser(selectedId ?? undefined);
 
@@ -134,23 +133,8 @@ export function EmployeesPage() {
   const updateUser = useUpdateUser(editingId ?? "");
   const deactivateUser = useDeactivateUser();
 
-  const listRows = useMemo(() => {
-    const rows = listData?.data ?? [];
-    return rows.filter((row) => {
-      const checks = [
-        applyColumnFilter(
-          toComparableText(userDisplayCode(row)),
-          columnFilters.code,
-        ),
-        applyColumnFilter(
-          toComparableText(joinFullName(row.firstName, row.lastName)),
-          columnFilters.fullName,
-        ),
-        applyColumnFilter(toComparableText(row.email), columnFilters.email),
-      ];
-      return checks.every(Boolean);
-    });
-  }, [columnFilters, listData?.data]);
+  // Server-side filtered — render rows as-is.
+  const listRows = useMemo(() => listData?.data ?? [], [listData?.data]);
 
   const selectedUser = useMemo((): UserDetail | UserSummary | null => {
     if (!selectedId) return null;
@@ -217,6 +201,7 @@ export function EmployeesPage() {
         ...prev,
         [key as FilterKey]: { ...prev[key as FilterKey], mode },
       }));
+      setPagination((p) => ({ ...p, page: 1 }));
     },
     [],
   );

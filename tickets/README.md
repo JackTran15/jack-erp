@@ -403,3 +403,120 @@ flowchart LR
   T3 --> T4
 ```
 
+## EPIC-03062026 Loyalty point rate change (earn ÷10000, redeem 1pt = 500đ)
+
+- [EPIC-03062026 Loyalty point rate change](./epics/EPIC-03062026-loyalty-point-rate-change.md)
+- Đổi giá trị chương trình tích điểm: 1.000.000đ mua hàng → **100 điểm** (10% ÷ 1.000), đổi **100 điểm = 50.000đ** (1 điểm = 500đ), cashback thực ~**5%** (giảm từ ~100%). Chỉ đổi **2 hằng số** `POINT_EARN_VND_PER_POINT` (1000 → **10000**) + `POINT_REDEMPTION_VALUE_VND` (1000 → **500**) + sửa số magic `1000` trong consumer hoàn điểm khi trả hàng → dùng hằng số. **Không** migration, **không** entity/endpoint/event mới. ⚠️ Yêu cầu gốc chỉ nói redemption, nhưng ví dụ (1tr → 100 điểm) buộc đổi cả earn — chốt ở Step 3.
+
+| Ticket                                                                       | Mô tả                                                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [TKT-LPR-01](./tickets/TKT-LPR-01-be-rate-constants-and-reversal-fix.md)      | BE: đổi 2 hằng số earn/redeem + thay magic `1000` ở reverse consumer + unit test |
+| [TKT-LPR-02](./tickets/TKT-LPR-02-fe-pos-redemption-mirror.md)               | FE: cập nhật mirror `POINT_REDEMPTION_VALUE_VND = 500` ở pos-web + copy hiển thị |
+| [TKT-LPR-03](./tickets/TKT-LPR-03-e2e-loyalty-rate-regression.md)            | E2E: regression earn 100 / redeem 50.000 / reverse 100 + re-baseline assertions |
+
+### Ticket dependency graph (EPIC-03062026 loyalty-rate)
+
+```mermaid
+flowchart LR
+  T1["TKT-LPR-01 BE constants + reversal fix"] --> T2["TKT-LPR-02 FE mirror"]
+  T1 --> T3["TKT-LPR-03 E2E regression"]
+  T2 --> T3
+```
+
+## EPIC-03062026 Backoffice admin list server-side CQRS search
+
+- [EPIC-03062026 Backoffice admin list server-side CQRS search](./epics/EPIC-03062026-admin-list-cqrs-search.md)
+- Thêm endpoint **CQRS v2 search** (theo skill `cqrs-search-endpoint`) cho 5 màn danh sách admin hiện do generic CRUD (`/admin/entities/:entityKey/records`) + `/admin/users` phục vụ: `customers`, `inventory-providers`, `job-positions`, `accounts`, `employees`. **Một controller chung** `AdminSearchV2Controller` (module mới `AdminSearchModule`) host cả 5 route `POST /v2/<entity>/search`; 4 module entity cũ KHÔNG đụng. Nâng filter lên **per-column operators** (contains/equals/range/compare) query toàn bộ dataset, phân trang. **Chỉ backend** — KHÔNG rewire FE, KHÔNG đụng `/records` hay `/admin/users`. Ràng buộc cứng: **dữ liệu từng dòng giống hệt hiện tại, không trả thiếu** — giữ `groupName` (NCC), `profile.jobPosition` (nhân viên), `parentAccountId` thô (COA), `code` (KH). Envelope đổi sang `{ data,total,page,limit }` (an toàn vì FE chưa nối). Tất cả scope theo `organizationId` (không branch-scope). Tái dùng permission cũ, không seed mới.
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-ACS-01](./tickets/TKT-ACS-01-be-customers-search.md)               | BE: scaffold `AdminSearchModule`/controller + `POST /v2/customers/search`       |
+| [TKT-ACS-02](./tickets/TKT-ACS-02-be-inventory-providers-search.md)     | BE: `POST /v2/inventory-providers/search` (giữ `groupName` flatten)            |
+| [TKT-ACS-03](./tickets/TKT-ACS-03-be-job-positions-search.md)           | BE: `POST /v2/job-positions/search` (đơn giản, soft-delete excluded)           |
+| [TKT-ACS-04](./tickets/TKT-ACS-04-be-accounts-search.md)                | BE: `POST /v2/accounts/search` (giữ `parentAccountId` thô, không join)         |
+| [TKT-ACS-05](./tickets/TKT-ACS-05-be-employees-search.md)               | BE: `POST /v2/employees/search` (giữ full `UserListItem`, tái dùng mapper)     |
+| [TKT-ACS-06](./tickets/TKT-ACS-06-openapi-regen.md)                      | OpenAPI regen + api-client snapshot cho FE epic sau                            |
+
+### Ticket dependency graph (EPIC-03062026 admin-list-cqrs-search)
+
+```mermaid
+flowchart LR
+  T1["TKT-ACS-01 Scaffold + customers"] --> T2["TKT-ACS-02 inventory-providers"]
+  T1 --> T3["TKT-ACS-03 job-positions"]
+  T1 --> T4["TKT-ACS-04 accounts"]
+  T1 --> T5["TKT-ACS-05 employees"]
+  T1 --> T6["TKT-ACS-06 OpenAPI regen"]
+  T2 --> T6
+  T3 --> T6
+  T4 --> T6
+  T5 --> T6
+```
+
+## EPIC-03062026 Backoffice admin list server-side search — FE wiring
+
+- [EPIC-03062026 Backoffice admin list server-side search — FE wiring](./epics/EPIC-03062026-admin-list-cqrs-search-fe.md)
+- Nối `backoffice-web` (5 màn admin) vào 5 endpoint CQRS `POST /v2/<entity>/search`: filter theo từng cột query **toàn bộ** dataset + phân trang server-side, bỏ lọc client-side (`applyColumnFilter` cũ chỉ lọc trang đã tải). **Mở rộng `CrudListPage` có cổng (registry 4 entity CRUD)** — entity khác KHÔNG đổi; `EmployeesPage` migrate riêng. Bỏ sort cột (createdAt DESC như POS v2). Thêm filter cell **date-range** cho `createdAt`. Chỉ FE.
+
+| Ticket                                                        | Mô tả                                                                  |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [TKT-ACSFE-01](./tickets/TKT-ACSFE-01-fe-data-layer.md)       | FE: registry + `ColumnFilter→v2 body` mapper + hooks (`useCrudV2Search`/employee) |
+| [TKT-ACSFE-02](./tickets/TKT-ACSFE-02-fe-datatable-date-range.md) | FE: thêm filter kind `date-range` vào `BaseDataTable`                |
+| [TKT-ACSFE-03](./tickets/TKT-ACSFE-03-fe-crudlistpage-wiring.md) | FE: `CrudListPage` server-side v2 search có cổng (4 entity CRUD)     |
+| [TKT-ACSFE-04](./tickets/TKT-ACSFE-04-fe-employees-page.md)   | FE: migrate `EmployeesPage` sang `POST /v2/employees/search`           |
+
+### Ticket dependency graph (EPIC-03062026 admin-list-cqrs-search-fe)
+
+```mermaid
+flowchart LR
+  T1["TKT-ACSFE-01 data layer"] --> T3["TKT-ACSFE-03 CrudListPage"]
+  T2["TKT-ACSFE-02 date-range cell"] --> T3
+  T1 --> T4["TKT-ACSFE-04 EmployeesPage"]
+  T2 --> T4
+```
+
+## EPIC-03062026 Inventory item server-side grouped search (v2)
+
+- [EPIC-03062026 Inventory item server-side grouped search (v2)](./epics/EPIC-03062026-inventory-item-search-v2.md)
+- Thêm endpoint **CQRS v2 search** (skill `cqrs-search-endpoint`) cho mặt hàng kho: `POST /v2/inventory-items/search`. Đẩy filter của trang `/admin/inventory-items` xuống backend (search toàn cục + `isActive`/`isPosVisible`/`categoryId`/`productId`/`brand`/`itemType`), **trả y hệt shape product-group** mà `listProductGroups` đang trả (`ProductGroupRow`, envelope `{ data,total,page,pageSize }`, sort `code ASC`, gom nhóm product+category, `AVG/bool_and/MIN/COUNT`). **Chỉ backend** — KHÔNG rewire FE (làm sau); chạy `openapi:generate` chuẩn bị cho FE. Scope `organizationId` (không branch-scope), permission `inventory.read`, không seed mới. Đề xuất **Hướng A** (mở rộng SQL `listProductGroups`) để bảo đảm byte-identical; Hướng B (in-memory) nêu kèm — chốt ở Step 3.
+
+| Ticket                                                                       | Mô tả                                                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-IIS-01](./tickets/TKT-IIS-01-be-extend-product-group-filters.md)        | BE: mở rộng `listProductGroups` + `ProductGroupsQueryDto` với 5 filter optional |
+| [TKT-IIS-02](./tickets/TKT-IIS-02-be-cqrs-grouped-search-endpoint.md)        | BE: DTO + Query + Handler + `@Version('2')` controller + wire `CqrsModule`      |
+| [TKT-IIS-03](./tickets/TKT-IIS-03-be-openapi-and-tests.md)                   | BE: `openapi:generate` + tests (parity/scope/filter) + DoD gate                |
+
+### Ticket dependency graph (EPIC-03062026 inventory-item-search-v2)
+
+```mermaid
+flowchart LR
+  T1["TKT-IIS-01 Extend listProductGroups filters"] --> T2["TKT-IIS-02 CQRS endpoint + wiring"]
+  T2 --> T3["TKT-IIS-03 openapi + tests + DoD"]
+```
+
+## EPIC-03062026 Inventory list server-side CQRS search (categories + Nhập/Xuất kho)
+
+- [EPIC-03062026 Inventory list server-side CQRS search](./epics/EPIC-03062026-inventory-list-cqrs-search.md)
+- Phase-2 of the admin-list CQRS search initiative. Add **CQRS v2 search endpoints** + FE wiring for three more list surfaces: Nhóm hàng hoá (`/admin/inventory-item-categories`), Nhập kho (`/inventory/purchase-orders` → goods-receipts), Xuất kho (`/inventory/goods-issues`). Reuses `FilterBuilder` + shared filter sub-DTOs, envelope `{ data, total, page, limit }`, sort = each page's current default. **Trả y chang** what the FE renders today (goods-receipt/issue keep nested `provider`/`targetBranch`; categories full entity) **plus** a computed `totalAmount` (SQL `SUM(qty×unitPrice)` subquery, filterable). categories search goes in `AdminSearchModule`; goods-receipt/issue in their own modules (`*-v2.controller.ts`, mirroring `inventory-item-v2.controller.ts`). FE: categories = one `CRUD_V2_SEARCH` registry entry; Nhập/Xuất kho = bespoke filter rows on the hand-built pages. No schema/migration/events; org-scope categories, org+branch goods-receipt/issue; reuse `inventory.read`.
+
+| Ticket                                                                | Mô tả                                                                                  |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [TKT-ILS-01](./tickets/TKT-ILS-01-be-goods-receipt-search.md)         | BE: `POST /v2/goods-receipts/search` (goods-receipt module) + computed `totalAmount`   |
+| [TKT-ILS-02](./tickets/TKT-ILS-02-be-goods-issue-search.md)           | BE: `POST /v2/inventory/goods-issues/search` + polymorphic party + `totalAmount`       |
+| [TKT-ILS-03](./tickets/TKT-ILS-03-be-item-categories-search.md)       | BE: `POST /v2/inventory-item-categories/search` (AdminSearch module)                   |
+| [TKT-ILS-04](./tickets/TKT-ILS-04-openapi-regen.md)                   | OpenAPI regen + api-client snapshot for the 3 endpoints                                 |
+| [TKT-ILS-05](./tickets/TKT-ILS-05-fe-goods-receipt-page.md)           | FE: Nhập kho (`PurchaseOrdersPage`) server-side per-column filters + pagination         |
+| [TKT-ILS-06](./tickets/TKT-ILS-06-fe-goods-issue-page.md)             | FE: Xuất kho (`GoodsIssuePage`) server-side per-column filters + pagination             |
+| [TKT-ILS-07](./tickets/TKT-ILS-07-fe-categories-registry.md)          | FE: add `inventory-item-categories` entry to `CRUD_V2_SEARCH`                            |
+
+### Ticket dependency graph (EPIC-03062026 inventory-list-cqrs-search)
+
+```mermaid
+flowchart LR
+  T1["TKT-ILS-01 BE goods-receipt"] --> T4["TKT-ILS-04 OpenAPI regen"]
+  T2["TKT-ILS-02 BE goods-issue"] --> T4
+  T3["TKT-ILS-03 BE item-categories"] --> T4
+  T4 --> T5["TKT-ILS-05 FE Nhập kho"]
+  T4 --> T6["TKT-ILS-06 FE Xuất kho"]
+  T4 --> T7["TKT-ILS-07 FE categories registry"]
+```
+

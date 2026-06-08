@@ -5,7 +5,14 @@ import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
 import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
 import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
 
-export type ColumnFilterKind = "symbol" | "select" | "date" | "time" | "none";
+export type ColumnFilterKind =
+  | "symbol"
+  | "select"
+  | "date"
+  | "time"
+  | "date-range"
+  | "number-range"
+  | "none";
 
 export interface ColumnFilterSelectOption {
   value: string;
@@ -60,6 +67,8 @@ interface ColumnFilterControl {
   filters: Record<string, ColumnFilter>;
   onModeChange: (fieldKey: string, mode: ColumnFilterMode) => void;
   onValueChange: (fieldKey: string, value: string) => void;
+  /** Required for columns with `filterKind: "date-range"`. */
+  onRangeChange?: (fieldKey: string, part: "from" | "to", value: string) => void;
 }
 
 interface BaseDataTableProps<T> {
@@ -457,6 +466,51 @@ export function BaseDataTable<T>({
                               columnFilterControl.onModeChange(column.key, "equals");
                               columnFilterControl.onValueChange(column.key, event.target.value);
                             }}
+                            aria-label={`Lọc ${column.label}`}
+                          />
+                        </div>
+                      ) : kind === "date-range" ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="date"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            value={activeFilter?.from ?? ""}
+                            onChange={(event) =>
+                              columnFilterControl.onRangeChange?.(
+                                column.key,
+                                "from",
+                                event.target.value,
+                              )
+                            }
+                            aria-label={`Lọc ${column.label} từ ngày`}
+                          />
+                          <span className="text-xs text-muted-foreground">–</span>
+                          <input
+                            type="date"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            value={activeFilter?.to ?? ""}
+                            onChange={(event) =>
+                              columnFilterControl.onRangeChange?.(
+                                column.key,
+                                "to",
+                                event.target.value,
+                              )
+                            }
+                            aria-label={`Lọc ${column.label} đến ngày`}
+                          />
+                        </div>
+                      ) : kind === "number-range" ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">≤</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs font-normal"
+                            placeholder="Giá trị..."
+                            value={activeFilter?.value ?? ""}
+                            onChange={(event) =>
+                              columnFilterControl.onValueChange(column.key, event.target.value)
+                            }
                             aria-label={`Lọc ${column.label}`}
                           />
                         </div>
