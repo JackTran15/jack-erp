@@ -11,6 +11,7 @@ import { LocationType } from "@erp/shared-interfaces";
 import {
   Copy,
   HelpCircle,
+  PackageOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -25,7 +26,8 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LocationStockItemsDialog } from "./LocationStockItemsDialog";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { ArrangeLocationDialog } from "../item-location-details/ArrangeLocationDialog";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -42,9 +44,11 @@ interface InventoryLocation {
   storageId: string;
   branchId: string;
   type: LocationType;
+  description?: string | null;
   isActive: boolean;
   /** Flattened storage name from the v2 search handler ("Thuộc kho"). */
   storageName?: string;
+  hasItems?: boolean;
 }
 
 interface InventoryStorage {
@@ -60,13 +64,6 @@ interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
-
-const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
-  [LocationType.SHELF]: "Kệ",
-  [LocationType.RACK]: "Giá",
-  [LocationType.BIN]: "Thùng",
-  [LocationType.ZONE]: "Khu vực",
-};
 
 const STATUS_LABEL = {
   ACTIVE: "Đang hoạt động",
@@ -85,6 +82,43 @@ const LOCATION_SEARCH: V2SearchConfig = {
     name: "string",
   },
 };
+
+function buildNextDuplicateText(base: string, existingValues: Iterable<string>) {
+  const normalizedExisting = new Set(
+    Array.from(existingValues, (v) => v.trim().toLowerCase()).filter(Boolean),
+  );
+  const trimmed = base.trim();
+  const match = trimmed.match(/^(.*?)(?:\.(\d+))?$/);
+  const root = match?.[1]?.trim() || "COPY";
+  const start = match?.[2] ? Number(match[2]) + 1 : 2;
+
+  for (let n = start; n < start + 1000; n += 1) {
+    const candidate = `${root}.${n}`;
+    if (!normalizedExisting.has(candidate.toLowerCase())) return candidate;
+  }
+
+  return `${root}.${Date.now()}`;
+}
+
+function buildDuplicateLocationDraft(
+  selected: InventoryLocation,
+  rows: InventoryLocation[],
+): Partial<InventoryLocation> {
+  return {
+    ...selected,
+    id: undefined,
+    code: buildNextDuplicateText(
+      selected.code,
+      rows
+        .filter((row) => row.storageId === selected.storageId)
+        .map((row) => row.code),
+    ),
+    name: buildNextDuplicateText(
+      selected.name || selected.code,
+      rows.map((row) => row.name),
+    ),
+  };
+}
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   return FILTER_KEYS.reduce(
@@ -125,11 +159,23 @@ export function ItemLocationsPage() {
   const [confirmDelete, setConfirmDelete] = useState<InventoryLocation | null>(null);
   const [saving, setSaving] = useState(false);
   const [stockDialogLoc, setStockDialogLoc] = useState<InventoryLocation | null>(null);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
 
   const loadStorages = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      setStorages([]);
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      return;
+    }
     try {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "200",
+        branchId,
+      });
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch (err) {
@@ -138,6 +184,12 @@ export function ItemLocationsPage() {
   }, []);
 
   const loadLocations = useCallback(async () => {
+    const branchId = getActiveBranchId();
+    if (!branchId) {
+      toast.error("Chưa chọn chi nhánh đang hoạt động.");
+      setLocations({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      return;
+    }
     setLoading(true);
     try {
       const body = buildV2Body(
@@ -212,7 +264,8 @@ export function ItemLocationsPage() {
           name: draft.name,
           storageId: draft.storageId,
           branchId,
-          type: draft.type,
+          description: draft.description || undefined,
+          isActive: draft.isActive,
         });
         toast.success("Đã tạo vị trí mới.");
         await loadLocations();
@@ -232,8 +285,11 @@ export function ItemLocationsPage() {
       setSaving(true);
       try {
         await apiClient.patch(`/inventory/locations/${id}`, {
+          code: draft.code,
           name: draft.name,
-          type: draft.type,
+          storageId: draft.storageId,
+          description: draft.description,
+          isActive: draft.isActive,
         });
         toast.success("Đã cập nhật vị trí.");
         await loadLocations();
@@ -268,6 +324,10 @@ export function ItemLocationsPage() {
     [loadLocations, selectedId],
   );
 
+  const openStockDialog = useCallback((loc: InventoryLocation) => {
+    setStockDialogLoc(loc);
+  }, []);
+
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -284,7 +344,7 @@ export function ItemLocationsPage() {
         if (!selected) return;
         setDialogState({
           mode: "create",
-          initial: { ...selected, id: undefined, code: "", name: "" },
+          initial: buildDuplicateLocationDraft(selected, locations?.data ?? []),
         });
       },
     },
@@ -297,7 +357,7 @@ export function ItemLocationsPage() {
     },
     {
       id: "delete",
-      label: "Ngừng hoạt động",
+      label: "Xóa",
       icon: Trash2,
       variant: "danger",
       disabled: !selected || !selected.isActive,
@@ -309,6 +369,12 @@ export function ItemLocationsPage() {
       icon: RefreshCw,
       onClick: () => void loadLocations(),
     },
+    {
+      id: "arrange",
+      label: "Xếp vị trí hàng hóa",
+      icon: PackageOpen,
+      onClick: () => setArrangeOpen(true),
+    },
   ];
 
   const columns: TableColumn<InventoryLocation>[] = [
@@ -319,8 +385,8 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          className="text-foreground"
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.code}
@@ -334,8 +400,8 @@ export function ItemLocationsPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
-          onClick={() => setStockDialogLoc(row)}
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+          onClick={() => openStockDialog(row)}
           title="Xem danh sách hàng hóa tại vị trí này"
         >
           {row.name}
@@ -351,10 +417,26 @@ export function ItemLocationsPage() {
         row.storageName || storageNameById.get(row.storageId) || row.storageId,
     },
     {
-      key: "type",
-      label: "Loại",
-      width: 120,
-      render: (row) => LOCATION_TYPE_LABEL[row.type] ?? row.type,
+      key: "description",
+      label: "Mô tả",
+      width: 280,
+      render: (row) =>
+        row.description?.trim() ? (
+          row.description
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "arrange",
+      label: "Xếp hàng hóa",
+      width: 140,
+      render: (row) =>
+        row.hasItems ? (
+          "Đã xếp"
+        ) : (
+          <span className="text-muted-foreground">Chưa xếp</span>
+        ),
     },
     {
       key: "status",
@@ -408,9 +490,15 @@ export function ItemLocationsPage() {
   return (
     <>
       <DocumentListShell
-        title="Vị trí hàng hóa"
+        title={<InventoryPageTitle>Vị trí hàng hóa</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="item-locations" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         pagination={
           <PaginationControls
             page={pagination.page}
@@ -431,6 +519,7 @@ export function ItemLocationsPage() {
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          onRowDoubleClick={(row) => setDialogState({ mode: "edit", initial: row })}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,
@@ -489,6 +578,12 @@ export function ItemLocationsPage() {
           onClose={() => setStockDialogLoc(null)}
         />
       )}
+
+      <ArrangeLocationDialog
+        open={arrangeOpen}
+        onOpenChange={setArrangeOpen}
+        onSaved={() => void loadLocations()}
+      />
     </>
   );
 }
@@ -497,7 +592,8 @@ interface LocationDraft {
   code: string;
   name: string;
   storageId: string;
-  type: LocationType;
+  description: string;
+  isActive: boolean;
 }
 
 function ItemLocationFormDialog({
@@ -518,7 +614,8 @@ function ItemLocationFormDialog({
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [storageId, setStorageId] = useState(initial?.storageId ?? storages[0]?.id ?? "");
-  const [type, setType] = useState<LocationType>(initial?.type ?? LocationType.SHELF);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (intent: "save" | "save-and-add") => {
@@ -532,13 +629,16 @@ function ItemLocationFormDialog({
         code: code.trim(),
         name: name.trim(),
         storageId,
-        type,
+        description: description.trim(),
+        isActive,
       },
       intent,
     );
     if (intent === "save-and-add") {
       setCode("");
       setName("");
+      setDescription("");
+      setIsActive(true);
     }
   };
 
@@ -557,7 +657,7 @@ function ItemLocationFormDialog({
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            className="flex items-center gap-1.5 text-sm text-primary-blue transition-colors hover:text-primary-blue-hover"
           >
             <HelpCircle className="h-4 w-4" />
             Trợ giúp
@@ -595,7 +695,6 @@ function ItemLocationFormDialog({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Vd: A01.01"
-            disabled={isEdit}
           />
         </FieldRow>
 
@@ -612,7 +711,6 @@ function ItemLocationFormDialog({
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
             value={storageId}
             onChange={(e) => setStorageId(e.target.value)}
-            disabled={isEdit}
           >
             {storages.length === 0 ? (
               <option value="">Chưa có kho — tạo kho trước</option>
@@ -625,18 +723,37 @@ function ItemLocationFormDialog({
           </select>
         </FieldRow>
 
-        <FieldRow label="Loại vị trí">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={type}
-            onChange={(e) => setType(e.target.value as LocationType)}
-          >
-            {Object.values(LocationType).map((t) => (
-              <option key={t} value={t}>
-                {LOCATION_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
+        <FieldRow label="Mô tả">
+          <textarea
+            className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ghi chú cho vị trí (không bắt buộc)"
+            maxLength={500}
+          />
+        </FieldRow>
+
+        <FieldRow label="Trạng thái">
+          <div className="flex items-center gap-6 pt-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="location-status"
+                checked={isActive}
+                onChange={() => setIsActive(true)}
+              />
+              Đang hoạt động
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="location-status"
+                checked={!isActive}
+                onChange={() => setIsActive(false)}
+              />
+              Ngừng hoạt động
+            </label>
+          </div>
         </FieldRow>
       </div>
     </AppModal>

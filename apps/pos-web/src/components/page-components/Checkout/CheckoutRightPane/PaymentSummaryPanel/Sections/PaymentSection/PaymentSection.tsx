@@ -43,8 +43,8 @@ export function PaymentSection({
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
 
-  // Mặc định số tiền dòng thanh toán đầu = số tiền cần thanh toán; tự đồng bộ khi
-  // tổng đổi cho tới khi nhân viên tự nhập (store tự guard theo `firstAmountAuto`).
+  // Dòng thanh toán đầu (khi chỉ có 1 dòng) luôn bám theo "số tiền cần thanh toán":
+  // mỗi khi tổng đổi, ghi đè lại số tiền. Số gõ tay chỉ giữ tới lần tổng đổi kế.
   useEffect(() => {
     setFirstLineAmountAuto(settlementAbs);
   }, [settlementAbs, setFirstLineAmountAuto]);

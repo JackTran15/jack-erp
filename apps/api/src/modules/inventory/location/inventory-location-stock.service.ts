@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -26,16 +27,24 @@ import {
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import {
+  IntraWarehouseMoveLine,
+  StockTransferService,
+} from '../transfer/stock-transfer.service';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemEntity } from './item.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
+import { ArrangeLocationDto } from './dto/arrange-location.dto';
 import { BatchAssignItemsDto } from './inventory-location-stock.controller';
+import { InventoryLocationService } from './inventory-location.service';
 
 @Injectable()
 export class InventoryLocationStockService {
+  private readonly logger = new Logger(InventoryLocationStockService.name);
+
   constructor(
     @InjectRepository(StockBalanceEntity)
     private readonly stockBalanceRepo: Repository<StockBalanceEntity>,
@@ -48,6 +57,8 @@ export class InventoryLocationStockService {
     @InjectRepository(ItemProviderEntity)
     private readonly itemProviderRepo: Repository<ItemProviderEntity>,
     private readonly pslService: ProductStorageLocationService,
+    private readonly locationService: InventoryLocationService,
+    private readonly stockTransferService: StockTransferService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -93,6 +104,128 @@ export class InventoryLocationStockService {
       }
     });
     return { created, skipped };
+  }
+
+  /**
+   * "Xếp vị trí": place each item's WHOLE "Chưa xếp" (unassigned) on-hand
+   * onto a real shelf, then record that shelf as the item's preferred location.
+   * There is no per-line quantity — xếp moves everything currently unplaced.
+   *
+   * The stock move is delegated to {@link StockTransferService.postIntraWarehouseMoves}
+   * (pessimistic lock on the source balance, same-storage check, immutable
+   * all-or-nothing posting). Source ("Chưa xếp") and destination shelf share the
+   * same storage by construction, so the same-storage check always passes.
+   *
+   * For an item with nothing unplaced, no transfer happens but the item is still
+   * bound to the shelf (empty balance row + preferred-shelf mapping) so it shows
+   * up there — matching MISA's "đã xếp" behaviour. PSL/bind run best-effort after
+   * the transfer commits and never fail the request.
+   */
+  async arrange(
+    dto: ArrangeLocationDto,
+    actor: ActorContext,
+  ): Promise<{ moved: number; transferId: string | null }> {
+    // Resolve each line's "Chưa xếp" source + its current on-hand (the amount to move).
+    const resolved: {
+      line: ArrangeLocationDto['lines'][number];
+      qty: number;
+      unassignedId: string;
+    }[] = [];
+    for (const line of dto.lines) {
+      const unassigned = await this.locationService.ensureUnassignedLocation(
+        line.storageId,
+        actor,
+      );
+      const balance = await this.stockBalanceRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          itemId: line.itemId,
+          locationId: unassigned.id,
+        },
+      });
+      resolved.push({
+        line,
+        qty: balance ? Number(balance.quantity) : 0,
+        unassignedId: unassigned.id,
+      });
+    }
+
+    // Move all unplaced stock onto the target shelves in one immutable transfer.
+    const moves: IntraWarehouseMoveLine[] = resolved
+      .filter((r) => r.qty > 0)
+      .map((r) => ({
+        itemId: r.line.itemId,
+        quantity: r.qty,
+        sourceLocationId: r.unassignedId,
+        destinationLocationId: r.line.destinationLocationId,
+      }));
+
+    let transferId: string | null = null;
+    if (moves.length > 0) {
+      const transfer = await this.stockTransferService.postIntraWarehouseMoves(
+        moves,
+        actor,
+      );
+      transferId = transfer.id;
+    }
+
+    // Record the preferred shelf ("đã xếp"); for items with nothing to move,
+    // also create an empty balance row so they appear at the shelf. Best-effort.
+    for (const r of resolved) {
+      try {
+        if (r.qty === 0) {
+          await this.dataSource.transaction((manager) =>
+            this.ensureShelfBalanceRow(
+              manager,
+              r.line.destinationLocationId,
+              r.line.itemId,
+              actor,
+            ),
+          );
+        }
+        await this.pslService.setLocationByItem(
+          r.line.itemId,
+          r.line.destinationLocationId,
+          actor,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Xếp vị trí: không ghi nhận được vị trí ưu tiên cho hàng ${r.line.itemId} ` +
+            `→ kệ ${r.line.destinationLocationId}: ` +
+            `${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    return { moved: dto.lines.length, transferId };
+  }
+
+  /** Insert a quantity-0 stock_balance row at a shelf if none exists (idempotent). */
+  private async ensureShelfBalanceRow(
+    manager: EntityManager,
+    locationId: string,
+    itemId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const location = await manager.findOne(LocationEntity, {
+      where: { id: locationId, organizationId: actor.organizationId },
+      relations: { storage: true },
+    });
+    if (!location) throw new NotFoundException('Vị trí không tồn tại');
+
+    const existing = await manager.findOne(StockBalanceEntity, {
+      where: { organizationId: actor.organizationId, itemId, locationId },
+    });
+    if (existing) return;
+
+    await manager.insert(StockBalanceEntity, {
+      organizationId: actor.organizationId,
+      branchId: location.branchId ?? location.storage?.branchId ?? actor.branchId,
+      itemId,
+      locationId,
+      quantity: 0,
+      createdBy: actor.userId,
+    });
   }
 
   /**

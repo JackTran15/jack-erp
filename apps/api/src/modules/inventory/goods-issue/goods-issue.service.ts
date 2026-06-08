@@ -31,7 +31,13 @@ export interface CreateGoodsIssueDto {
   targetBranchId?: string;
   reason?: string; // optional override / legacy
   notes?: string;
-  lines: { itemId: string; quantity: number; unitPrice?: number; notes?: string }[];
+  lines: {
+    itemId: string;
+    locationId?: string;
+    quantity: number;
+    unitPrice?: number;
+    notes?: string;
+  }[];
 }
 
 export interface GoodsIssueQuery extends PaginationQuery {
@@ -41,7 +47,7 @@ export interface GoodsIssueQuery extends PaginationQuery {
 }
 
 const VALID_TRANSITIONS: Record<GoodsIssueStatus, GoodsIssueStatus[]> = {
-  [GoodsIssueStatus.DRAFT]: [GoodsIssueStatus.APPROVED, GoodsIssueStatus.CANCELLED],
+  [GoodsIssueStatus.DRAFT]: [GoodsIssueStatus.POSTED, GoodsIssueStatus.CANCELLED],
   [GoodsIssueStatus.APPROVED]: [GoodsIssueStatus.POSTED, GoodsIssueStatus.CANCELLED],
   [GoodsIssueStatus.POSTED]: [],
   [GoodsIssueStatus.CANCELLED]: [],
@@ -103,6 +109,7 @@ export class GoodsIssueService {
       lines: dto.lines.map((l) => {
         const line = new GoodsIssueLineEntity();
         line.itemId = l.itemId;
+        line.locationId = dto.locationId;
         line.quantity = l.quantity;
 
         const unitPrice = Number(l.unitPrice ?? 0);
@@ -121,17 +128,34 @@ export class GoodsIssueService {
     return saved;
   }
 
-  async approve(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    const gi = await this.findOrFail(id, actor.organizationId);
-    this.validateTransition(gi.status, GoodsIssueStatus.APPROVED);
-
-    gi.status = GoodsIssueStatus.APPROVED;
-    gi.approvedBy = actor.userId;
-    gi.approvedAt = new Date();
-
-    const saved = await this.giRepo.save(gi);
-    this.logger.log(`Goods issue ${id} approved by ${actor.userId}`);
-    return saved;
+  /**
+   * Create + post in one atomic action: persist the
+   * DRAFT, then immediately post it (writes the stock ledger and flips status
+   * to POSTED). If posting fails — e.g. the ledger write rejects — the just
+   * created DRAFT is hard-deleted (its lines cascade away) so no orphan is
+   * left behind. End state is either POSTED (number + ledger) or nothing.
+   */
+  async createAndPost(
+    dto: CreateGoodsIssueDto,
+    actor: ActorContext,
+  ): Promise<GoodsIssueEntity> {
+    const draft = await this.create(dto, actor);
+    try {
+      return await this.post(draft.id, actor);
+    } catch (err) {
+      // Roll back the orphan DRAFT so the failed "Lưu" persists nothing.
+      // onDelete: CASCADE on goods_issue_lines removes the lines with it.
+      await this.giRepo.delete({ id: draft.id, organizationId: actor.organizationId });
+      this.logger.warn(
+        `createAndPost rolled back draft ${draft.id}: ${(err as Error).message}`,
+      );
+      if (err instanceof BadRequestException) {
+        throw err;
+      }
+      throw new BadRequestException(
+        'Không thể xuất kho phiếu này. Vui lòng kiểm tra tồn kho và thử lại.',
+      );
+    }
   }
 
   async post(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
@@ -154,7 +178,7 @@ export class GoodsIssueService {
     await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = gi.lines.map((line) => ({
         itemId: line.itemId,
-        locationId: gi.locationId,
+        locationId: line.locationId,
         branchId,
         organizationId: gi.organizationId,
         movementType: StockMovementType.GOODS_ISSUE,
@@ -163,6 +187,7 @@ export class GoodsIssueService {
         referenceId: gi.id,
         notes: `Xuất hàng: ${documentNumber}`,
         actorContext: actor,
+        unitCost: Number(line.unitPrice ?? 0),
       }));
 
       await this.ledgerService.recordBatchMovements(movements);
@@ -196,7 +221,7 @@ export class GoodsIssueService {
       await this.dataSource.transaction(async () => {
         const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
           itemId: line.itemId,
-          locationId: gi.locationId,
+          locationId: line.locationId,
           branchId,
           organizationId: gi.organizationId,
           movementType: StockMovementType.ADJUSTMENT_INCREASE,
@@ -205,6 +230,7 @@ export class GoodsIssueService {
           referenceId: gi.id,
           notes: `Huỷ phiếu xuất kho ${gi.documentNumber ?? gi.id}`,
           actorContext: actor,
+          unitCost: Number(line.unitPrice ?? 0),
         }));
         await this.ledgerService.recordBatchMovements(reversals);
       });
@@ -251,16 +277,18 @@ export class GoodsIssueService {
     switch (purpose) {
       case GoodsIssuePurpose.OTHER:
       case GoodsIssuePurpose.DISPOSAL: {
-        if (!dto.reasonId) {
-          throw new BadRequestException('Vui lòng chọn lý do xuất kho');
+        if (dto.reasonId) {
+          const reason = await this.reasonRepo.findOne({
+            where: { id: dto.reasonId, organizationId: actor.organizationId },
+          });
+          if (!reason) {
+            throw new BadRequestException(`Lý do xuất kho ${dto.reasonId} không tồn tại`);
+          }
+          return { reasonText: reason.name, reasonId: reason.id };
         }
-        const reason = await this.reasonRepo.findOne({
-          where: { id: dto.reasonId, organizationId: actor.organizationId },
-        });
-        if (!reason) {
-          throw new BadRequestException(`Lý do xuất kho ${dto.reasonId} không tồn tại`);
-        }
-        return { reasonText: reason.name, reasonId: reason.id };
+        const fallback =
+          purpose === GoodsIssuePurpose.DISPOSAL ? 'Xuất huỷ' : 'Xuất khác';
+        return { reasonText: dto.reason ?? fallback };
       }
       case GoodsIssuePurpose.TRANSFER_OUT: {
         if (!dto.targetBranchId) {

@@ -51,7 +51,8 @@ import {
   type QuickLocation,
   type QuickProvider,
 } from "../../components/forms/QuickCreateDialogs";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -60,6 +61,10 @@ import {
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -67,7 +72,8 @@ export type GoodsIssuePurposeUI =
   | "OTHER"
   | "SALE"
   | "TRANSFER_OUT"
-  | "DISPOSAL";
+  | "DISPOSAL"
+  | "STOCK_TAKE";
 
 interface GoodsIssueLine {
   id: string;
@@ -81,6 +87,8 @@ interface GoodsIssueLine {
   warehouse?: string;
   position?: string;
   unit?: string;
+  locationId?: string;
+  location?: { id: string; code: string; name: string; storageId?: string } | null;
   item?: { id: string; code: string; name: string; unit?: string; purchasePrice?: number | string | null } | null;
 }
 
@@ -99,6 +107,8 @@ interface GoodsIssue {
   reasonRef?: { id: string; code: string; name: string } | null;
   targetBranchId?: string;
   targetBranch?: { id: string; name: string } | null;
+  referenceId?: string | null;
+  referenceType?: string | null;
   status: GoodsIssueStatus;
   issueDate?: string;
   notes?: string;
@@ -144,6 +154,15 @@ interface InventoryStorage {
   id: string;
   name: string;
   branchId: string;
+  isMainStorage?: boolean;
+}
+
+/** Active branch id used as X-Branch-Id (set by api-axios from localStorage). */
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
+  );
 }
 
 /** Filter keys align 1:1 with the `GoodsIssueSearchV2Dto` body fields. */
@@ -194,6 +213,7 @@ const PURPOSE_LABELS: Record<GoodsIssuePurposeUI, string> = {
   SALE: "Phiếu xuất kho bán hàng",
   TRANSFER_OUT: "Điều chuyển đến cửa hàng khác",
   DISPOSAL: "Hủy hàng",
+  STOCK_TAKE: "Phiếu xuất kho kiểm kê",
 };
 
 const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
@@ -201,6 +221,13 @@ const MANUAL_PURPOSES: GoodsIssuePurposeUI[] = [
   "TRANSFER_OUT",
   "DISPOSAL",
 ];
+
+const STATUS_LABELS: Record<GoodsIssueStatus, string> = {
+  DRAFT: "Chưa thực hiện",
+  APPROVED: "Chưa thực hiện",
+  POSTED: "Đã thực hiện",
+  CANCELLED: "Đã hoãn",
+};
 
 interface BranchOption {
   id: string;
@@ -237,7 +264,7 @@ export function GoodsIssuePage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingIssue, setEditingIssue] = useState<GoodsIssue | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<GoodsIssue | null>(null);
-  const [confirmPost, setConfirmPost] = useState<GoodsIssue | null>(null);
+  const [confirmVoid, setConfirmVoid] = useState<GoodsIssue | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -281,8 +308,11 @@ export function GoodsIssuePage() {
 
   const loadStorages = useCallback(async () => {
     try {
+      const branchId = getActiveBranchId();
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch {
@@ -331,23 +361,14 @@ export function GoodsIssuePage() {
     await loadRecords();
   }, [loadRecords]);
 
-  const handleApprove = async (issue: GoodsIssue) => {
+  const handleVoid = async (issue: GoodsIssue) => {
     setActionLoading(issue.id);
     try {
-      await apiClient.post(`/inventory/goods-issues/${issue.id}/approve`);
-      await reloadAfterMutation();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handlePost = async (issue: GoodsIssue) => {
-    setActionLoading(issue.id);
-    try {
-      await apiClient.post(`/inventory/goods-issues/${issue.id}/post`);
-      setConfirmPost(null);
+      // Hoãn = đảo bút phiếu đã thực hiện. Cùng endpoint cancel() như "Xóa",
+      // nhưng với phiếu POSTED, BE sẽ đảo bút tồn kho trước khi đánh dấu huỷ.
+      await apiClient.post(`/inventory/goods-issues/${issue.id}/cancel`);
+      setConfirmVoid(null);
+      if (selectedId === issue.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -463,7 +484,7 @@ export function GoodsIssuePage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
@@ -522,6 +543,24 @@ export function GoodsIssuePage() {
         (value) => ({ value, label: PURPOSE_LABELS[value] }),
       ),
       render: (row) => PURPOSE_LABELS[row.purpose ?? "OTHER"],
+    },
+    {
+      key: "status",
+      label: "Trạng thái",
+      width: 130,
+      render: (row) => (
+        <span
+          className={
+            row.status === "POSTED"
+              ? "text-green-600"
+              : row.status === "CANCELLED"
+                ? "text-muted-foreground"
+                : "text-foreground"
+          }
+        >
+          {STATUS_LABELS[row.status]}
+        </span>
+      ),
     },
   ];
 
@@ -582,9 +621,15 @@ export function GoodsIssuePage() {
   return (
     <>
       <DocumentListShell
-        title="Xuất kho"
+        title={<InventoryPageTitle>Xuất kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="goods-issues" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}
@@ -654,8 +699,7 @@ export function GoodsIssuePage() {
             setEditingIssue(null);
             await loadRecords();
           }}
-          onApprove={editingIssue ? () => void handleApprove(editingIssue) : undefined}
-          onPost={editingIssue ? () => setConfirmPost(editingIssue) : undefined}
+          onVoid={editingIssue ? () => setConfirmVoid(editingIssue) : undefined}
           onRequestDelete={editingIssue ? () => setConfirmDelete(editingIssue) : undefined}
         />
       )}
@@ -672,15 +716,15 @@ export function GoodsIssuePage() {
         />
       )}
 
-      {confirmPost && (
+      {confirmVoid && (
         <ConfirmActionModal
-          title="Xác nhận xuất kho"
-          message={`Xuất hàng theo phiếu ${confirmPost.documentNumber ?? confirmPost.id}? Thao tác này sẽ trừ tồn kho ngay lập tức và không thể hoàn tác.`}
-          confirmLabel="Xuất kho"
+          title="Hoãn phiếu xuất kho"
+          message={`Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này sẽ đảo bút tồn kho đã xuất.`}
+          confirmLabel="Hoãn phiếu"
           cancelLabel="Quay lại"
-          loading={actionLoading === confirmPost.id}
-          onCancel={() => setConfirmPost(null)}
-          onConfirm={() => void handlePost(confirmPost)}
+          loading={actionLoading === confirmVoid.id}
+          onCancel={() => setConfirmVoid(null)}
+          onConfirm={() => void handleVoid(confirmVoid)}
         />
       )}
     </>
@@ -761,6 +805,8 @@ interface FormLine {
   itemId: string;
   itemLabel: string;
   unit: string;
+  storageId: string;
+  storageLabel: string;
   locationId: string;
   locationLabel: string;
   quantity: number;
@@ -772,12 +818,20 @@ const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
   unit: "",
+  storageId: "",
+  storageLabel: "",
   locationId: "",
   locationLabel: "",
   quantity: 1,
   unitPrice: 0,
   notes: "",
 });
+
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
 
 function GoodsIssueFormDialog({
   mode,
@@ -788,8 +842,7 @@ function GoodsIssueFormDialog({
   actionLoading,
   onClose,
   onSaved,
-  onApprove,
-  onPost,
+  onVoid,
   onRequestDelete,
 }: {
   mode: "create" | "edit" | "view";
@@ -800,8 +853,7 @@ function GoodsIssueFormDialog({
   actionLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
-  onApprove?: () => void;
-  onPost?: () => void;
+  onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
@@ -842,12 +894,17 @@ function GoodsIssueFormDialog({
   const [customerName, setCustomerName] = useState(initialCustomer.name);
   // Storage derived from the saved location's parent. Cached storages let us
   // resolve a name immediately on open; the picker will reset both if user
-  // changes warehouse later.
-  const initialStorageId = initial?.location?.storageId ?? "";
-  const initialStorageName =
-    initialStorageId
-      ? storages.find((s) => s.id === initialStorageId)?.name ?? ""
-      : "";
+  // changes warehouse later. For a new (create) phiếu, default to the active
+  // branch's main storage (list is main-first; fall back to the first kho).
+  const defaultStorage = useMemo(
+    () => storages.find((s) => s.isMainStorage) ?? storages[0],
+    [storages],
+  );
+  const initialStorageId =
+    initial?.location?.storageId ?? (initial ? "" : defaultStorage?.id ?? "");
+  const initialStorageName = initialStorageId
+    ? storages.find((s) => s.id === initialStorageId)?.name ?? ""
+    : "";
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageName);
   const [purpose, setPurpose] = useState<GoodsIssuePurposeUI>(
@@ -871,25 +928,28 @@ function GoodsIssueFormDialog({
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   });
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           // Prefer the eager-loaded item code; fall back to the legacy
           // flat itemCode field or a short id slice as last resort.
           itemLabel: l.item?.code ?? l.itemCode ?? l.itemId.slice(0, 8),
           unit: l.item?.unit ?? l.unit ?? "",
-          // Goods-issue lines all share the header bin — mirror it into each
-          // form row so the Vị trí column shows the actual bin instead of
-          // an empty placeholder.
-          locationId: initial.locationId,
-          locationLabel: initial.location?.code ?? "",
+          // Each line carries its own warehouse + bin (Misa parity).
+          locationId: l.locationId ?? "",
+          locationLabel: l.location?.code ?? "",
+          storageId: l.location?.storageId ?? "",
+          storageLabel:
+            storages.find((s) => s.id === l.location?.storageId)?.name ?? "",
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice ?? 0),
           notes: l.notes ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -898,6 +958,7 @@ function GoodsIssueFormDialog({
   dirtyRef.current = dirty;
 
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+  const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
@@ -908,13 +969,42 @@ function GoodsIssueFormDialog({
     Array<{ id: string; name: string; branchId: string }>
   >([]);
 
+  // "Tham chiếu": phiếu xuất kho kiểm kê được sinh tự động khi "Xử lý" một phiếu
+  // kiểm kê. API chỉ trả referenceId — resolve số phiếu KK gốc để hiển thị.
+  const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  const referenceStockTakeId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId ?? null : null;
+  useEffect(() => {
+    if (!referenceStockTakeId) {
+      setReferenceNumber(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${referenceStockTakeId}`,
+        );
+        if (!cancelled) setReferenceNumber(data.documentNumber ?? null);
+      } catch {
+        // best-effort — tham chiếu chỉ mang tính thông tin
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceStockTakeId]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
+        const branchId = getActiveBranchId();
+        const params = new URLSearchParams({ page: "1", pageSize: "200" });
+        if (branchId) params.set("branchId", branchId);
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
-        >("/inventory/storages?page=1&pageSize=200");
+        >(`/inventory/storages?${params}`);
         if (!cancelled) setStorageCache(data.data);
       } catch {
         // best-effort
@@ -979,14 +1069,14 @@ function GoodsIssueFormDialog({
   );
 
   const searchLocationsForStorage = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      if (!storageId) return { items: [], hasMore: false, total: 0 };
+    async (storageIdArg: string, query: string, page: number, pageSize?: number) => {
+      if (!storageIdArg) return { items: [], hasMore: false, total: 0 };
       const effectivePageSize = pageSize ?? 20;
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(effectivePageSize),
         search: query.trim(),
-        storageId,
+        storageId: storageIdArg,
       });
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
@@ -994,7 +1084,7 @@ function GoodsIssueFormDialog({
       const fetched = data.page * data.pageSize;
       return { items: data.data, hasMore: fetched < data.total, total: data.total };
     },
-    [storageId],
+    [],
   );
 
   const searchItems = useCallback(
@@ -1058,8 +1148,9 @@ function GoodsIssueFormDialog({
     [reasonBucket],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
-  const totalAmount = lines.reduce(
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.quantity || 0), 0);
+  const totalAmount = summaryLines.reduce(
     (s, l) => s + Number(l.quantity || 0) * Number(l.unitPrice || 0),
     0,
   );
@@ -1067,16 +1158,13 @@ function GoodsIssueFormDialog({
   const handleSave = useCallback(async (): Promise<boolean> => {
     // Toasts (not modal) — same reason as goods-receipt: AppModal validation
     // dialogs got stacked under the unsaved-changes confirm and disappeared.
-    if (!storageId) {
-      toast.error("Vui lòng chọn kho xuất.");
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
+      toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
-    if (lines.some((l) => !l.itemId)) {
-      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
-      return false;
-    }
-    if ((purpose === "OTHER" || purpose === "DISPOSAL") && !reasonId) {
-      toast.error("Vui lòng chọn lý do xuất kho.");
+    if (persistableLines.some((l) => !l.storageId)) {
+      toast.error("Mỗi dòng hàng phải chọn kho.");
       return false;
     }
     if (purpose === "TRANSFER_OUT" && !targetBranchId) {
@@ -1085,37 +1173,54 @@ function GoodsIssueFormDialog({
     }
     setSaving(true);
     try {
-      let headerLocationId = lines.find((l) => l.locationId)?.locationId ?? "";
-      if (!headerLocationId) {
-        const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-          `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
-        );
-        const first = data.data[0];
-        if (!first) {
-          toast.error("Kho đã chọn chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
-          setSaving(false);
-          return false;
+      // Resolve a fallback bin per warehouse for lines the user left empty.
+      const fallbackByStorage = new Map<string, string>();
+      const resolvedLines: typeof persistableLines = [];
+      for (const l of persistableLines) {
+        let locationId = l.locationId;
+        if (!locationId) {
+          let fb = fallbackByStorage.get(l.storageId);
+          if (fb === undefined) {
+            const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+              `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(l.storageId)}`,
+            );
+            const first = data.data[0];
+            if (!first) {
+              toast.error("Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+              setSaving(false);
+              return false;
+            }
+            fb = first.id;
+            fallbackByStorage.set(l.storageId, fb);
+          }
+          locationId = fb;
         }
-        headerLocationId = first.id;
+        resolvedLines.push({ ...l, locationId });
       }
+      const headerLocationId = resolvedLines[0]?.locationId ?? "";
 
       await apiClient.post("/inventory/goods-issues", {
         locationId: headerLocationId,
         providerId: customerId || undefined,
         purpose,
         reasonId:
-          purpose === "OTHER" || purpose === "DISPOSAL" ? reasonId : undefined,
+          (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
+            ? reasonId
+            : undefined,
         targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
         notes: notes || undefined,
-        lines: lines.map((l) => ({
+        lines: resolvedLines.map((l) => ({
           itemId: l.itemId,
+          locationId: l.locationId,
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice) || 0,
           notes: l.notes || undefined,
         })),
       });
       setDirty(false);
-      toast.success("Đã tạo phiếu xuất kho.");
+      // "Lưu" tạo + thực hiện luôn (giống MISA): phiếu trả về đã ở trạng thái
+      // đã xuất kho, đã ghi sổ tồn kho.
+      toast.success("Đã xuất kho.");
       await onSaved();
       return true;
     } catch (err) {
@@ -1124,7 +1229,7 @@ function GoodsIssueFormDialog({
     } finally {
       setSaving(false);
     }
-  }, [storageId, customerId, lines, notes, purpose, reasonId, targetBranchId, onSaved]);
+  }, [customerId, lines, notes, purpose, reasonId, targetBranchId, onSaved]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -1176,8 +1281,9 @@ function GoodsIssueFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      disabled: !onApprove || initial?.status !== "DRAFT",
-      onClick: () => onApprove?.(),
+      // Hoãn chỉ áp dụng cho phiếu đã thực hiện (POSTED) — đảo bút tồn kho.
+      disabled: !onVoid || initial?.status !== "POSTED",
+      onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
@@ -1210,17 +1316,33 @@ function GoodsIssueFormDialog({
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      unit: item.unit,
-                      // Auto-fill only if user hasn't already typed a price.
-                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+              normalizeFormLines(
+                prev.map((l, i) => {
+                  if (i !== idx) return l;
+                  // Inherit warehouse from the nearest line above that has one,
+                  // so adding items to a fresh row doesn't force re-picking kho.
+                  let storageId = l.storageId;
+                  let storageLabel = l.storageLabel;
+                  if (!storageId) {
+                    for (let j = i - 1; j >= 0; j--) {
+                      if (prev[j].storageId) {
+                        storageId = prev[j].storageId;
+                        storageLabel = prev[j].storageLabel;
+                        break;
+                      }
                     }
-                  : l,
+                  }
+                  return {
+                    ...l,
+                    itemId: item.id,
+                    itemLabel: item.code,
+                    unit: item.unit,
+                    storageId,
+                    storageLabel,
+                    // Auto-fill only if user hasn't already typed a price.
+                    unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  };
+                }),
               ),
             );
             markDirty();
@@ -1250,23 +1372,66 @@ function GoodsIssueFormDialog({
     {
       key: "warehouse",
       label: "Kho",
-      width: 140,
-      type: "readonly",
-      getValue: () => storageQuery,
+      width: 160,
+      placeholder: "Chọn kho",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn kho"
+          searchModalPlaceholder="Nhập tên kho"
+          dropdownMinWidth={320}
+          placeholder="Chọn kho"
+          value={row.storageLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, storageLabel: val, storageId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(s) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      storageId: s.id,
+                      storageLabel: s.name,
+                      // A bin belongs to one warehouse — clear it when the
+                      // line's warehouse changes.
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchStorages}
+          itemKey={(s) => s.id}
+          renderItem={(s) => s.name}
+          renderMeta={() => ""}
+          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          disabled={isView}
+          className="h-full"
+        />
+      ),
     },
     {
       key: "position",
       label: "Vị trí",
       width: 160,
-      placeholder: storageId ? "Chọn vị trí" : "Chọn kho trước",
+      placeholder: "Chọn vị trí",
       renderEditor: (row, idx) => (
-        <LookupField
+        <LookupField<InventoryLocation>
           portalToBody
           enableSearchModal
           searchModalTitle="Chọn vị trí"
           searchModalPlaceholder="Nhập mã hoặc tên vị trí"
           dropdownMinWidth={360}
-          placeholder={storageId ? "Chọn vị trí" : "Chọn kho trước"}
+          placeholder={row.storageId ? "Chọn vị trí" : "Chọn kho trước"}
           value={row.locationLabel}
           onValueChange={(val) => {
             setLines((prev) =>
@@ -1286,7 +1451,7 @@ function GoodsIssueFormDialog({
             );
             markDirty();
           }}
-          search={searchLocationsForStorage}
+          search={(q, p, ps) => searchLocationsForStorage(row.storageId, q, p, ps)}
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
           renderMeta={(loc) => loc.code}
@@ -1294,9 +1459,9 @@ function GoodsIssueFormDialog({
             { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
             { key: "name", label: "Tên vị trí", render: (l) => l.name },
           ]}
-          disabled={isView || !storageId}
+          disabled={isView || !row.storageId}
           onCreateNew={
-            isView || !storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
@@ -1514,7 +1679,13 @@ function GoodsIssueFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {referenceNumber ? (
+                <span className="font-mono text-sm font-medium text-foreground">
+                  {referenceNumber}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1558,36 +1729,6 @@ function GoodsIssueFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            <FieldRow label="Kho">
-              <LookupField
-                enableSearchModal
-                searchModalTitle="Chọn kho"
-                searchModalPlaceholder="Nhập tên kho"
-                placeholder="Chọn kho"
-                value={storageQuery}
-                onValueChange={(v) => {
-                  setStorageQuery(v);
-                  setStorageId("");
-                  markDirty();
-                }}
-                onSelect={(s) => {
-                  setStorageId(s.id);
-                  setStorageQuery(s.name);
-                  // Reset per-line bin selection — bins from a different
-                  // warehouse cannot move into the newly chosen warehouse.
-                  setLines((prev) =>
-                    prev.map((l) => ({ ...l, locationId: "", locationLabel: "" })),
-                  );
-                  markDirty();
-                }}
-                search={searchStorages}
-                itemKey={(s) => s.id}
-                renderItem={(s) => s.name}
-                renderMeta={() => ""}
-                columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
-                disabled={isView}
-              />
-            </FieldRow>
           </>
         }
         detailActions={
@@ -1598,25 +1739,17 @@ function GoodsIssueFormDialog({
             </label>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+              onClick={() => setChooseKhoOpen(true)}
             >
               Chọn kho
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
             >
               Nhập khẩu
             </button>
-            {onPost && initial?.status === "APPROVED" && (
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-green-600 hover:underline"
-                onClick={onPost}
-              >
-                Xuất kho
-              </button>
-            )}
           </>
         }
         detail={
@@ -1630,11 +1763,13 @@ function GoodsIssueFormDialog({
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+              setLines((prev) =>
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
+              );
               markDirty();
             }}
             showAddRow={!isView}
@@ -1681,9 +1816,19 @@ function GoodsIssueFormDialog({
         onCreated={(loc: QuickLocation) => {
           const idx = quickLocationLineIdx;
           if (idx === null) return;
+          const storageLabel =
+            storages.find((s) => s.id === loc.storageId)?.name ?? "";
           setLines((prev) =>
             prev.map((l, i) =>
-              i === idx ? { ...l, locationId: loc.id, locationLabel: loc.code } : l,
+              i === idx
+                ? {
+                    ...l,
+                    locationId: loc.id,
+                    locationLabel: loc.code,
+                    storageId: loc.storageId,
+                    storageLabel,
+                  }
+                : l,
             ),
           );
           setQuickLocationLineIdx(null);
@@ -1699,10 +1844,12 @@ function GoodsIssueFormDialog({
           const idx = quickItemLineIdx;
           if (idx === null) return;
           setLines((prev) =>
-            prev.map((l, i) =>
-              i === idx
-                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
-                : l,
+            normalizeFormLines(
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  : l,
+              ),
             ),
           );
           setQuickItemLineIdx(null);
@@ -1721,6 +1868,29 @@ function GoodsIssueFormDialog({
           markDirty();
         }}
       />
+
+      {chooseKhoOpen && (
+        <ChooseWarehouseDialog
+          storages={storages}
+          fieldLabel="Kho xuất"
+          defaultStorageId={
+            getPersistableFormLines(lines).find((l) => l.storageId)?.storageId
+          }
+          onClose={() => setChooseKhoOpen(false)}
+          onConfirm={(s) => {
+            setLines((prev) =>
+              prev.map((l) => ({
+                ...l,
+                storageId: s.id,
+                storageLabel: s.name,
+                locationId: "",
+                locationLabel: "",
+              })),
+            );
+            markDirty();
+          }}
+        />
+      )}
     </>
   );
 }

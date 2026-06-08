@@ -1,4 +1,5 @@
 import { apiClient } from "../lib/api-axios";
+import type { StockByLocationResponse } from "@erp/shared-interfaces";
 
 export type StringFilterMode =
   | "contains"
@@ -29,8 +30,6 @@ export interface StockBalanceRow {
     storageId: string;
     storageName: string;
   };
-  threshold: { minQty: number | null; maxQty: number | null };
-  belowMin: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -43,6 +42,16 @@ export interface PaginatedResponse<T> {
 export interface StockBalancesQuery {
   page: number;
   pageSize: number;
+  sortBy?:
+    | "createdAt"
+    | "itemCode"
+    | "itemName"
+    | "quantity"
+    | "lastMovementAt"
+    | "locationCode"
+    | "locationName"
+    | "storageName";
+  sortOrder?: "asc" | "desc";
   // Direct ID filters (backend pre-existing, not per-column)
   itemId?: string;
   locationId?: string;
@@ -81,6 +90,33 @@ export async function listStockBalances(
   return data;
 }
 
+export interface LocationStockItemsQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
+  sortOrder?: "asc" | "desc";
+}
+
+export async function listLocationStockItems(
+  locationId: string,
+  query: LocationStockItemsQuery,
+): Promise<StockByLocationResponse> {
+  const params: Record<string, string | number> = {
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+  if (query.search?.trim()) params.search = query.search.trim();
+  if (query.sortBy) params.sortBy = query.sortBy;
+  if (query.sortOrder) params.sortOrder = query.sortOrder;
+
+  const { data } = await apiClient.get<StockByLocationResponse>(
+    `/inventory/locations/${locationId}/stock-items`,
+    { params },
+  );
+  return data;
+}
+
 export interface AssignBatchRow {
   itemId: string;
   locationId: string;
@@ -97,6 +133,25 @@ export async function assignItemsBatch(
   const { data } = await apiClient.post<AssignBatchResult>(
     "/inventory/locations/stock-items/batch",
     { rows },
+  );
+  return data;
+}
+
+export interface ArrangeLine {
+  itemId: string;
+  storageId: string;
+  destinationLocationId: string;
+}
+
+export interface ArrangeResult {
+  moved: number;
+  transferId: string | null;
+}
+
+export async function assignArrange(lines: ArrangeLine[]): Promise<ArrangeResult> {
+  const { data } = await apiClient.post<ArrangeResult>(
+    "/inventory/locations/arrange",
+    { lines },
   );
   return data;
 }

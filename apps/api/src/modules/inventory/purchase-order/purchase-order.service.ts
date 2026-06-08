@@ -171,6 +171,7 @@ export class PurchaseOrderService {
           referenceId: po.id,
           notes: `Nhận hàng từ ${po.documentNumber ?? po.id}`,
           actorContext: actor,
+          unitCost: Number(line.unitPrice ?? 0),
         });
       }
 

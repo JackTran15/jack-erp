@@ -21,6 +21,21 @@ class IntraWarehouseTransferLineDto {
   @Min(0.000001)
   quantity!: number;
 
+  @ApiPropertyOptional({
+    description: 'Optional per-line source location (overrides the header source)',
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceLocationId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional per-line destination location (overrides the header destination; must be in same storage as source)',
+  })
+  @IsOptional()
+  @IsUUID()
+  destinationLocationId?: string;
+
   @ApiPropertyOptional({ description: 'Optional notes for this line' })
   @IsOptional()
   @IsString()
@@ -28,13 +43,20 @@ class IntraWarehouseTransferLineDto {
 }
 
 export class CreateIntraWarehouseTransferDto {
-  @ApiProperty({ description: 'UUID of the source location' })
+  @ApiPropertyOptional({
+    description: 'UUID of the source location (fallback when a line omits its own source)',
+  })
+  @IsOptional()
   @IsUUID()
-  sourceLocationId!: string;
+  sourceLocationId?: string;
 
-  @ApiProperty({ description: 'UUID of the destination location (must be in same storage as source)' })
+  @ApiPropertyOptional({
+    description:
+      'UUID of the destination location (fallback when a line omits its own destination; must be in same storage as source)',
+  })
+  @IsOptional()
   @IsUUID()
-  destinationLocationId!: string;
+  destinationLocationId?: string;
 
   @ApiProperty({ type: [IntraWarehouseTransferLineDto], description: 'Lines to transfer' })
   @ValidateNested({ each: true })

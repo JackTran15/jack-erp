@@ -1,5 +1,9 @@
 import { cn, formatVnd } from "@erp/ui";
 import type { DraftInvoice } from "@erp/pos/interfaces/checkout.interface";
+import {
+  formatLineDiscountLabel,
+  lineTotal,
+} from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { DRAFT_ZIGZAG_CLIP_PATH, draftLineDescription } from "@erp/pos/lib/page-libs/checkout/draftInvoices.viewUtils";
 
 interface InvoiceDetailPanelProps {
@@ -60,6 +64,17 @@ export function InvoiceDetailPanel({ draft }: InvoiceDetailPanelProps) {
                 <span className="text-[13px] text-[#4B5163]">
                   {draftLineDescription(line)}
                 </span>
+                {line.lineDiscount ? (
+                  <span className="text-[12px] italic text-[#E5403A]">
+                    {formatLineDiscountLabel(line)}
+                  </span>
+                ) : null}
+                {line.note ? (
+                  <span className="text-[12px] italic text-[#6B7280]">
+                    Ghi chú:{" "}
+                    <span className="text-[#9CA3AF]">{line.note}</span>
+                  </span>
+                ) : null}
               </div>
               <div role="gridcell" className="text-right tabular-nums">
                 {line.qty}
@@ -68,7 +83,7 @@ export function InvoiceDetailPanel({ draft }: InvoiceDetailPanelProps) {
                 {formatVnd(line.unitPrice)}
               </div>
               <div role="gridcell" className="text-right tabular-nums">
-                {formatVnd(line.unitPrice * line.qty)}
+                {formatVnd(lineTotal(line))}
               </div>
             </div>
           ))

@@ -49,7 +49,8 @@ import {
   type QuickLocation,
   type QuickProvider,
 } from "../../components/forms/QuickCreateDialogs";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -58,9 +59,13 @@ import {
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
-type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN";
+type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
 
 interface GoodsReceiptLine {
   id: string;
@@ -89,7 +94,7 @@ interface GoodsReceipt {
   reason?: string | null;
   description?: string | null;
   referenceId?: string | null;
-  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | null;
+  referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE" | null;
   sourceBranchId?: string | null;
   receivedAt: string;
   locationId: string;
@@ -133,12 +138,21 @@ interface InventoryLocation {
   name: string;
   code: string;
   storageId: string;
+  isUnassigned?: boolean;
 }
 
 interface InventoryStorage {
   id: string;
   name: string;
   branchId: string;
+  isMainStorage?: boolean;
+}
+
+/** Active branch — same source the axios client uses for the X-Branch-Id header. */
+function getActiveBranchId(): string | null {
+  return (
+    localStorage.getItem("active_branch_id") ?? localStorage.getItem("branch_id")
+  );
 }
 
 interface InventoryItem {
@@ -150,11 +164,13 @@ interface InventoryItem {
   purchasePrice?: number | string | null;
 }
 
+// MISA collapse labels: DRAFT = "Chưa thực hiện", POSTED = "Đã thực hiện" (xanh),
+// CANCELLED/REVERSED = "Đã hủy".
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "Chưa duyệt",
-  POSTED: "Đã duyệt",
-  CANCELLED: "Đã huỷ",
-  REVERSED: "Đã đảo bút",
+  DRAFT: "Chưa thực hiện",
+  POSTED: "Đã thực hiện",
+  CANCELLED: "Đã hủy",
+  REVERSED: "Đã hủy",
 };
 
 /** Filter keys align 1:1 with the `GoodsReceiptSearchV2Dto` body fields. */
@@ -218,6 +234,7 @@ export function PurchaseOrdersPage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PurchaseOrder | null>(null);
+  const [confirmVoid, setConfirmVoid] = useState<PurchaseOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -261,8 +278,13 @@ export function PurchaseOrdersPage() {
 
   const loadStorages = useCallback(async () => {
     try {
+      // Scope warehouses to the active branch (same id the axios client sends as
+      // X-Branch-Id) so the kho dropdown only lists this branch's warehouses.
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      const branchId = getActiveBranchId();
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
-        "/inventory/storages?page=1&pageSize=200",
+        `/inventory/storages?${params}`,
       );
       setStorages(data.data);
     } catch {
@@ -311,10 +333,16 @@ export function PurchaseOrdersPage() {
     await loadRecords();
   }, [loadRecords]);
 
-  const handleApprove = async (order: PurchaseOrder) => {
+  // Void/reverse a receipt ("Hoãn"). Calls the cancel endpoint, which reverses
+  // the stock ledger when the doc was POSTED before marking it cancelled.
+  const handleVoid = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
     try {
-      await apiClient.post(`/goods-receipts/${order.id}/post`);
+      await apiClient.delete(`/goods-receipts/${order.id}`);
+      setConfirmVoid(null);
+      setDialogMode(null);
+      setEditingOrder(null);
+      if (selectedId === order.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -426,7 +454,7 @@ export function PurchaseOrdersPage() {
       render: (row) => (
         <button
           type="button"
-          className="text-primary hover:underline"
+          className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(row.id);
@@ -481,7 +509,9 @@ export function PurchaseOrdersPage() {
       render: (row) =>
         row.purpose === "TRANSFER_IN"
           ? "Điều chuyển từ cửa hàng khác"
-          : "Phiếu nhập kho khác",
+          : row.purpose === "STOCK_TAKE"
+            ? "Phiếu nhập kho kiểm kê"
+            : "Phiếu nhập kho khác",
     },
   ];
 
@@ -544,9 +574,15 @@ export function PurchaseOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title="Nhập kho"
+        title={<InventoryPageTitle>Nhập kho</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="purchase-orders" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}
@@ -616,7 +652,7 @@ export function PurchaseOrdersPage() {
             setEditingOrder(null);
             await loadRecords();
           }}
-          onApprove={editingOrder ? () => void handleApprove(editingOrder) : undefined}
+          onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={editingOrder ? () => setConfirmDelete(editingOrder) : undefined}
         />
       )}
@@ -630,6 +666,22 @@ export function PurchaseOrdersPage() {
           loading={actionLoading === confirmDelete.id}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => void handleDelete(confirmDelete)}
+        />
+      )}
+
+      {confirmVoid && (
+        <ConfirmActionModal
+          title="Hoãn phiếu nhập kho"
+          message={
+            confirmVoid.status === "POSTED"
+              ? `Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này sẽ đảo bút tồn kho đã ghi và không thể hoàn tác.`
+              : `Hoãn phiếu ${confirmVoid.documentNumber ?? confirmVoid.id}? Thao tác này không thể hoàn tác.`
+          }
+          confirmLabel="Hoãn phiếu"
+          cancelLabel="Quay lại"
+          loading={actionLoading === confirmVoid.id}
+          onCancel={() => setConfirmVoid(null)}
+          onConfirm={() => void handleVoid(confirmVoid)}
         />
       )}
     </>
@@ -711,7 +763,10 @@ interface FormLine {
   itemId: string;
   itemLabel: string;
   unit: string;
-  /** Bin / shelf location ("Vị trí") within the receipt's warehouse. */
+  /** Warehouse ("Kho") this line is received into. */
+  storageId: string;
+  storageLabel: string;
+  /** Bin / shelf location ("Vị trí") within the line's warehouse. */
   locationId: string;
   locationLabel: string;
   orderedQuantity: number;
@@ -723,12 +778,20 @@ const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
   unit: "",
+  storageId: "",
+  storageLabel: "",
   locationId: "",
   locationLabel: "",
   orderedQuantity: 1,
   unitPrice: 0,
   notes: "",
 });
+
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
 
 function PurchaseOrderFormDialog({
   mode,
@@ -739,7 +802,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber,
   onClose,
   onSaved,
-  onApprove,
+  onVoid,
   onRequestDelete,
 }: {
   mode: "create" | "edit" | "view";
@@ -750,7 +813,8 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber?: string;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
-  onApprove?: () => void;
+  /** Void/reverse the receipt → "Hoãn" toolbar button. */
+  onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
@@ -772,12 +836,20 @@ function PurchaseOrderFormDialog({
    * derived from the first line's bin so the existing NOT NULL column stays
    * happy without a schema migration.
    */
-  const initialStorageId =
-    initial?.location?.storageId ?? "";
-  const initialStorageLabel =
-    initial && initial.location && initial.location.storageId
+  // On a fresh create, default the warehouse to the branch's main storage
+  // (fallback: first available) so the first line's Kho is pre-filled.
+  const defaultStorage = useMemo(
+    () => storages.find((s) => s.isMainStorage) ?? storages[0] ?? null,
+    [storages],
+  );
+  const initialStorageId = initial
+    ? initial.location?.storageId ?? ""
+    : defaultStorage?.id ?? "";
+  const initialStorageLabel = initial
+    ? initial.location?.storageId
       ? storages.find((s) => s.id === initial.location!.storageId)?.name ?? ""
-      : "";
+      : ""
+    : defaultStorage?.name ?? "";
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
   const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
@@ -796,20 +868,25 @@ function PurchaseOrderFormDialog({
   const [docTime, setDocTime] = useState(
     `${pad2(initialReceivedAt.getHours())}:${pad2(initialReceivedAt.getMinutes())}`,
   );
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
           unit: l.uomCode ?? "",
+          storageId: l.location?.storageId ?? "",
+          storageLabel:
+            storages.find((s) => s.id === l.location?.storageId)?.name ?? "",
           locationId: l.locationId,
           locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
           orderedQuantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice),
           notes: l.note ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -817,10 +894,39 @@ function PurchaseOrderFormDialog({
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
+  // "Tham chiếu": when this receipt was auto-generated from a stock-take
+  // ("Xử lý"), resolve the originating phiếu kiểm kê's document number (KK…).
+  const [stockTakeRefNumber, setStockTakeRefNumber] = useState<string | undefined>(
+    undefined,
+  );
+  const stockTakeRefId =
+    initial?.referenceType === "STOCK_TAKE" ? initial.referenceId : undefined;
+  useEffect(() => {
+    if (!stockTakeRefId) {
+      setStockTakeRefNumber(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ documentNumber?: string }>(
+          `/inventory/stock-takes/${stockTakeRefId}`,
+        );
+        if (!cancelled) setStockTakeRefNumber(data.documentNumber ?? undefined);
+      } catch {
+        // best-effort — the reference is informational only
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stockTakeRefId]);
+
   const [quickProviderOpen, setQuickProviderOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
+  const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
     Array<{ id: string; name: string; branchId: string }>
   >([]);
@@ -829,9 +935,12 @@ function PurchaseOrderFormDialog({
     let cancelled = false;
     void (async () => {
       try {
+        const params = new URLSearchParams({ page: "1", pageSize: "200" });
+        const branchId = getActiveBranchId();
+        if (branchId) params.set("branchId", branchId);
         const { data } = await apiClient.get<
           PaginatedResponse<{ id: string; name: string; branchId: string }>
-        >("/inventory/storages?page=1&pageSize=200");
+        >(`/inventory/storages?${params}`);
         if (!cancelled) setStorageCache(data.data);
       } catch {
         // best-effort — quick-create location modal will show empty list
@@ -841,6 +950,15 @@ function PurchaseOrderFormDialog({
       cancelled = true;
     };
   }, []);
+
+  // If the dialog opens for a new receipt before warehouses finished loading,
+  // back-fill the default (main) storage once it arrives — but never override a
+  // warehouse the user already picked or an existing receipt's saved warehouse.
+  useEffect(() => {
+    if (initial || storageId || !defaultStorage) return;
+    setStorageId(defaultStorage.id);
+    setStorageQuery(defaultStorage.name);
+  }, [initial, storageId, defaultStorage]);
 
   const markDirty = () => {
     if (!dirty) setDirty(true);
@@ -889,14 +1007,19 @@ function PurchaseOrderFormDialog({
   );
 
   const searchLocationsForStorage = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      if (!storageId) return { items: [], hasMore: false, total: 0 };
+    async (
+      storageIdArg: string,
+      query: string,
+      page: number,
+      pageSize?: number,
+    ) => {
+      if (!storageIdArg) return { items: [], hasMore: false, total: 0 };
       const effectivePageSize = pageSize ?? 20;
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(effectivePageSize),
         search: query.trim(),
-        storageId,
+        storageId: storageIdArg,
       });
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
@@ -908,7 +1031,7 @@ function PurchaseOrderFormDialog({
         total: data.total,
       };
     },
-    [storageId],
+    [],
   );
 
   const searchItems = useCallback(
@@ -953,8 +1076,9 @@ function PurchaseOrderFormDialog({
     [],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
-  const totalAmount = lines.reduce(
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
+  const totalAmount = summaryLines.reduce(
     (s, l) => s + Number(l.orderedQuantity || 0) * Number(l.unitPrice || 0),
     0,
   );
@@ -964,41 +1088,52 @@ function PurchaseOrderFormDialog({
       toast.error("Vui lòng chọn đối tượng (NCC).");
       return false;
     }
-    if (!storageId) {
-      toast.error("Vui lòng chọn kho nhập.");
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
+      toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
-    if (lines.some((l) => !l.itemId)) {
-      toast.error("Vui lòng chọn mặt hàng cho mọi dòng.");
+    if (persistableLines.some((l) => !l.storageId)) {
+      toast.error("Mỗi dòng hàng phải chọn kho.");
       return false;
     }
     setSaving(true);
     try {
-      const needsFallback = lines.some((l) => !l.locationId);
-      let fallbackLocationId = "";
-      if (needsFallback) {
-        const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-          `/inventory/locations?page=1&pageSize=1&storageId=${encodeURIComponent(storageId)}`,
-        );
-        const first = data.data[0];
-        if (!first) {
-          toast.error("Kho đã chọn chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
-          setSaving(false);
-          return false;
+      // Resolve a concrete bin per line. Lines may sit in different warehouses,
+      // so fall back to the first bin of each line's OWN warehouse (cached).
+      const fallbackByStorage = new Map<string, string>();
+      const resolvedLines: FormLine[] = [];
+      for (const l of persistableLines) {
+        let locationId = l.locationId;
+        if (!locationId) {
+          let fb = fallbackByStorage.get(l.storageId);
+          if (fb === undefined) {
+            const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+              `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true`,
+            );
+            const locations = data.data;
+            if (!locations || locations.length === 0) {
+              toast.error("Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+              setSaving(false);
+              return false;
+            }
+            const unassigned =
+              locations.find((loc) => loc.isUnassigned === true) ??
+              locations.find((loc) => loc.code === "__UNASSIGNED__") ??
+              locations[0];
+            fb = unassigned.id;
+            fallbackByStorage.set(l.storageId, fb);
+          }
+          locationId = fb;
         }
-        fallbackLocationId = first.id;
+        resolvedLines.push({ ...l, locationId });
       }
 
-      const resolvedLines = lines.map((l) => ({
-        ...l,
-        locationId: l.locationId || fallbackLocationId,
-      }));
-
       const receivedAtIso = combineDateTimeISO(docDate, docTime);
-      // The header.locationId is a legacy anchor — pick any concrete bin so
-      // the backend's NOT NULL stays satisfied. Lines carry the real bin per
-      // row (with fallback applied above).
-      const headerLocationId = resolvedLines[0]?.locationId ?? fallbackLocationId;
+      // The header.locationId is a legacy anchor — use the first line's bin so
+      // the backend's NOT NULL stays satisfied. Lines carry the real kho/bin
+      // per row (with fallback applied above).
+      const headerLocationId = resolvedLines[0]?.locationId ?? "";
       const payload = {
         purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
         providerId: providerId || undefined,
@@ -1020,10 +1155,12 @@ function PurchaseOrderFormDialog({
       if (initial && mode === "edit") {
         await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
       } else {
+        // Create now saves + posts atomically: the phiếu lands POSTED with the
+        // stock ledger written, so it appears in reports immediately.
         await apiClient.post("/goods-receipts", payload);
       }
       setDirty(false);
-      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã tạo phiếu nhập kho.");
+      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã nhập kho thành công.");
       await onSaved();
       return true;
     } catch (err) {
@@ -1035,7 +1172,6 @@ function PurchaseOrderFormDialog({
   }, [
     purpose,
     providerId,
-    storageId,
     lines,
     docDate,
     docTime,
@@ -1095,8 +1231,10 @@ function PurchaseOrderFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      disabled: !onApprove || initial?.status !== "DRAFT",
-      onClick: () => onApprove?.(),
+      // "Hoãn" = void/reverse a POSTED receipt (reverses the stock ledger).
+      // Never posts/approves.
+      disabled: !onVoid || initial?.status !== "POSTED",
+      onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
@@ -1129,17 +1267,32 @@ function PurchaseOrderFormDialog({
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
             setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      unit: item.unit,
-                      // Only overwrite if current price is 0 — preserve user's manual edits.
-                      unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+              normalizeFormLines(
+                prev.map((l, i) => {
+                  if (i !== idx) return l;
+                  // A fresh line inherits the warehouse of the nearest line above it.
+                  let storageId = l.storageId;
+                  let storageLabel = l.storageLabel;
+                  if (!storageId) {
+                    for (let j = i - 1; j >= 0; j--) {
+                      if (prev[j].storageId) {
+                        storageId = prev[j].storageId;
+                        storageLabel = prev[j].storageLabel;
+                        break;
+                      }
                     }
-                  : l,
+                  }
+                  return {
+                    ...l,
+                    itemId: item.id,
+                    itemLabel: item.code,
+                    unit: item.unit,
+                    storageId,
+                    storageLabel,
+                    // Only overwrite if current price is 0 — preserve user's manual edits.
+                    unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  };
+                }),
               ),
             );
             markDirty();
@@ -1169,23 +1322,64 @@ function PurchaseOrderFormDialog({
     {
       key: "warehouse",
       label: "Kho",
-      width: 140,
-      type: "readonly",
-      getValue: () => storageQuery,
+      width: 160,
+      placeholder: "Chọn kho",
+      renderEditor: (row, idx) => (
+        <LookupField
+          portalToBody
+          enableSearchModal
+          searchModalTitle="Chọn kho"
+          searchModalPlaceholder="Nhập tên kho"
+          dropdownMinWidth={320}
+          placeholder="Chọn kho"
+          value={row.storageLabel}
+          onValueChange={(val) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, storageLabel: val, storageId: "" } : l,
+              ),
+            );
+            markDirty();
+          }}
+          onSelect={(s) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      storageId: s.id,
+                      storageLabel: s.name,
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchStorages}
+          itemKey={(s) => s.id}
+          renderItem={(s) => s.name}
+          renderMeta={() => ""}
+          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          disabled={isView}
+          className="h-full"
+        />
+      ),
     },
     {
       key: "position",
       label: "Vị trí",
       width: 160,
-      placeholder: storageId ? "Chọn vị trí" : "Chọn kho trước",
+      placeholder: "Chọn vị trí",
       renderEditor: (row, idx) => (
-        <LookupField
+        <LookupField<InventoryLocation>
           portalToBody
           enableSearchModal
           searchModalTitle="Chọn vị trí"
           searchModalPlaceholder="Nhập mã hoặc tên vị trí"
           dropdownMinWidth={360}
-          placeholder={storageId ? "Chọn vị trí" : "Chọn kho trước"}
+          placeholder={row.storageId ? "Chọn vị trí" : "Chọn kho trước"}
           value={row.locationLabel}
           onValueChange={(val) => {
             setLines((prev) =>
@@ -1205,7 +1399,7 @@ function PurchaseOrderFormDialog({
             );
             markDirty();
           }}
-          search={searchLocationsForStorage}
+          search={(q, p, ps) => searchLocationsForStorage(row.storageId, q, p, ps)}
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
           renderMeta={(loc) => loc.code}
@@ -1213,9 +1407,9 @@ function PurchaseOrderFormDialog({
             { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
             { key: "name", label: "Tên vị trí", render: (l) => l.name },
           ]}
-          disabled={isView || !storageId}
+          disabled={isView || !row.storageId}
           onCreateNew={
-            isView || !storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
@@ -1417,7 +1611,11 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              <span className="text-sm text-muted-foreground">—</span>
+              {stockTakeRefNumber ? (
+                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1457,36 +1655,6 @@ function PurchaseOrderFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            <FieldRow label="Kho">
-              <LookupField
-                enableSearchModal
-                searchModalTitle="Chọn kho"
-                searchModalPlaceholder="Nhập tên kho"
-                placeholder="Chọn kho"
-                value={storageQuery}
-                onValueChange={(v) => {
-                  setStorageQuery(v);
-                  setStorageId("");
-                  markDirty();
-                }}
-                onSelect={(s) => {
-                  setStorageId(s.id);
-                  setStorageQuery(s.name);
-                  // Reset per-line bin selection — bins from a different
-                  // warehouse cannot move into the newly chosen warehouse.
-                  setLines((prev) =>
-                    prev.map((l) => ({ ...l, locationId: "", locationLabel: "" })),
-                  );
-                  markDirty();
-                }}
-                search={searchStorages}
-                itemKey={(s) => s.id}
-                renderItem={(s) => s.name}
-                renderMeta={() => ""}
-                columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
-                disabled={isView}
-              />
-            </FieldRow>
           </>
         }
         detailActions={
@@ -1495,10 +1663,14 @@ function PurchaseOrderFormDialog({
               <input type="checkbox" disabled />
               <span>Quét mã vạch</span>
             </label>
-            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+            <button
+              type="button"
+              onClick={() => setChooseKhoOpen(true)}
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+            >
               Chọn kho
             </button>
-            <button type="button" className="flex items-center gap-1.5 text-primary hover:underline">
+            <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
               Nhập khẩu
             </button>
           </>
@@ -1516,11 +1688,13 @@ function PurchaseOrderFormDialog({
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
             onDeleteRow={(idx) => {
-              setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+              setLines((prev) =>
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
+              );
               markDirty();
             }}
             showAddRow={!isView}
@@ -1584,16 +1758,41 @@ function PurchaseOrderFormDialog({
           const idx = quickItemLineIdx;
           if (idx === null) return;
           setLines((prev) =>
-            prev.map((l, i) =>
-              i === idx
-                ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
-                : l,
+            normalizeFormLines(
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  : l,
+              ),
             ),
           );
           setQuickItemLineIdx(null);
           markDirty();
         }}
       />
+
+      {chooseKhoOpen && (
+        <ChooseWarehouseDialog
+          storages={storages}
+          fieldLabel="Kho nhập"
+          defaultStorageId={
+            getPersistableFormLines(lines).find((l) => l.storageId)?.storageId
+          }
+          onClose={() => setChooseKhoOpen(false)}
+          onConfirm={(s) => {
+            setLines((prev) =>
+              prev.map((l) => ({
+                ...l,
+                storageId: s.id,
+                storageLabel: s.name,
+                locationId: "",
+                locationLabel: "",
+              })),
+            );
+            markDirty();
+          }}
+        />
+      )}
     </>
   );
 }

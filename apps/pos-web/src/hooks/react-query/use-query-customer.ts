@@ -20,6 +20,7 @@ import type {
   InvoiceSearchV2Response,
   SearchPurchaseHistoryBody,
 } from "@erp/pos/dtos/invoice.dto";
+import type { CustomerDebtRow } from "@erp/pos/interfaces/debt.interface";
 import type {
   CreateCustomerBody,
   IssueMembershipCardBody,
@@ -142,6 +143,23 @@ export function useCustomerPurchaseHistory(
     enabled: Boolean(customerId) && enabled,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Sổ công nợ của khách — `GET /invoices/customers/:id/debts`. Trả toàn bộ chứng
+ * từ công nợ (mọi trạng thái) của khách trong org. Truyền `customerId = undefined`
+ * (hoặc `enabled = false`) để tắt query khi dialog chưa mở / chưa ở tab "Công nợ".
+ */
+export function useCustomerDebts(
+  customerId: string | undefined,
+  enabled = true,
+): UseQueryResult<CustomerDebtRow[], Error> {
+  return useQuery<CustomerDebtRow[], Error>({
+    queryKey: CUSTOMER_KEYS.DEBTS(customerId ?? ""),
+    queryFn: () => invoiceService.getCustomerDebts(customerId as string),
+    enabled: Boolean(customerId) && enabled,
+    staleTime: 30_000,
   });
 }
 
@@ -279,4 +297,21 @@ export function useUpdateMembershipCard(): UseMutationResult<
       });
     },
   });
+}
+
+/**
+ * Trả về callback invalidate cache điểm tích lũy của 1 khách (summary +
+ * membership-card) để React Query refetch điểm mới nhất mà không cần reload
+ * trang. Dùng cho nút "Làm mới điểm tích lũy" trên `MembershipCard`.
+ * No-op khi chưa có `customerId`.
+ */
+export function useRefreshCustomerPoints(customerId?: string): () => void {
+  const qc = useQueryClient();
+  return useCallback(() => {
+    if (!customerId) return;
+    void qc.invalidateQueries({ queryKey: CUSTOMER_KEYS.SUMMARY(customerId) });
+    void qc.invalidateQueries({
+      queryKey: CUSTOMER_KEYS.MEMBERSHIP_CARD(customerId),
+    });
+  }, [qc, customerId]);
 }

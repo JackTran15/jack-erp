@@ -79,7 +79,35 @@ export class ProductStorageLocationService {
     });
     if (!location) return;
 
+    // The virtual "Chưa xếp" (unassigned) location is not a real shelf — stock
+    // resting there must never establish/conflict with a product's preferred
+    // shelf. Receipts into "Chưa xếp" therefore skip the PSL binding entirely.
+    if (location.isUnassigned) return;
+
     await this.validateAndAssign(itemId, location.storageId, locationId, actor);
+  }
+
+  /**
+   * Move (or create) a product's preferred shelf for an item, by itemId.
+   * Resolves the item's productId and the location's storageId, then upserts the
+   * mapping via {@link setLocation} (no "đã gán vị trí khác" throw — used by the
+   * "Xếp vị trí" flow which deliberately changes the preferred shelf).
+   * No-op for legacy items without a productId.
+   */
+  async setLocationByItem(
+    itemId: string,
+    locationId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const item = await this.itemRepo.findOne({ where: { id: itemId } });
+    if (!item?.productId) return;
+
+    const location = await this.locationRepo.findOne({
+      where: { id: locationId },
+    });
+    if (!location) return;
+
+    await this.setLocation(item.productId, location.storageId, locationId, actor);
   }
 
   async listByProduct(

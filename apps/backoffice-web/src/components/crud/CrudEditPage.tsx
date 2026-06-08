@@ -145,6 +145,9 @@ export function CrudEditPage() {
 
     try {
       await updateMutation.mutateAsync({ id, body: payload });
+      toast.success(`Đã cập nhật ${config.displayName}.`);
+      navigate(`/admin/${entityKey}/${id}`, { replace: true });
+
       // inventory-items has no standalone detail page — go back to the list.
       if (entityKey === "inventory-items") {
         navigate(`/admin/${entityKey}`, { replace: true });
@@ -202,23 +205,24 @@ export function CrudEditPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {editableFields.map((field) => (
-                <CrudFieldInput
-                  key={field.key}
-                  inputIdPrefix="edit"
-                  field={field}
-                  value={values[field.key]}
-                  error={errors[field.key]}
-                  entityKey={entityKey}
-                  currentRecordId={id}
-                  onChange={(nextValue) => {
-                    setValues((prev) => ({ ...prev, [field.key]: nextValue }));
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next[field.key];
-                      return next;
-                    });
-                  }}
-                />
+                <div key={field.key} className={field.key === "description" ? "md:col-span-2" : undefined}>
+                  <CrudFieldInput
+                    inputIdPrefix="edit"
+                    field={field}
+                    value={values[field.key]}
+                    error={errors[field.key]}
+                    entityKey={entityKey}
+                    currentRecordId={id}
+                    onChange={(nextValue) => {
+                      setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[field.key];
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -231,4 +235,3 @@ export function CrudEditPage() {
 function isBlank(value: unknown): boolean {
   return value === undefined || value === null || value === "";
 }
-

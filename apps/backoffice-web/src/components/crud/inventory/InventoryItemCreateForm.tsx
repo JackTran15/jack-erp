@@ -184,8 +184,8 @@ export function InventoryItemCreateForm({
     const rec = initialRecord;
     setExtras((prev) => ({
       ...prev,
-      initialStock: "0",
-      initialStockUnitPrice: "0",
+      initialStock: numToStr(rec.initialStock) || "0",
+      initialStockUnitPrice: numToStr(rec.initialStockUnitPrice) || "0",
       showOnPos: rec.isPosVisible !== false,
       manageBarcodePerUnit: Boolean(rec.manageBarcodePerUnit),
       isGoldSilver: Boolean(rec.isGoldSilver),
@@ -338,6 +338,8 @@ export function InventoryItemCreateForm({
               : sku;
           next.push({
             id: `variant-${key}`,
+            itemId:
+              saved && typeof saved.id === "string" ? String(saved.id) : undefined,
             color,
             size,
             name: variantName,
@@ -373,6 +375,7 @@ export function InventoryItemCreateForm({
       variants:
         variantRows.length > 0
           ? variantRows.map((r) => ({
+              itemId: r.itemId,
               name: r.name,
               color: r.color || undefined,
               size: r.size || undefined,
@@ -548,6 +551,11 @@ export function InventoryItemCreateForm({
     const skip = renderedDynamicKeys.current;
     const managedElsewhere = new Set([
       "description",
+      // Giá mua TB / Giá bán TB — rendered manually in the THÔNG TIN block and
+      // hidden on the edit/detail view; keep them out of the auto-rendered
+      // remainder so they never re-appear at the bottom.
+      "purchasePrice",
+      "sellingPrice",
       "packageWeightGram",
       "packageLengthCm",
       "packageWidthCm",
@@ -710,8 +718,15 @@ export function InventoryItemCreateForm({
               />
             </FormField>
 
-            {renderDynamicField("purchasePrice")}
-            {renderDynamicField("sellingPrice")}
+            {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
+                tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
+                khớp với cách MISA hiển thị chi tiết mặt hàng. */}
+            {!isEdit && (
+              <>
+                {renderDynamicField("purchasePrice")}
+                {renderDynamicField("sellingPrice")}
+              </>
+            )}
 
             {/* Đơn vị tính cơ bản — searchable unit picker + quick-create */}
             <FormField
@@ -959,12 +974,26 @@ export function InventoryItemCreateForm({
   const additionalTab = (
     <section className="rounded-md border border-border bg-background p-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
+        <div className="grid gap-3 md:col-span-2 md:grid-cols-4">
+          <FormField
+            label="Trọng lượng (g)"
+            htmlFor="extra-net-weight"
+            layout="horizontal"
+            labelWidth="7rem"
+          >
+            <Input
+              id="extra-net-weight"
+              type="number"
+              inputMode="decimal"
+              value={String(values.weightGram ?? "")}
+              onChange={numberFieldHandler("weightGram")}
+            />
+          </FormField>
           <FormField
             label="Dài (cm)"
             htmlFor="extra-net-length"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-length"
@@ -978,7 +1007,7 @@ export function InventoryItemCreateForm({
             label="Rộng (cm)"
             htmlFor="extra-net-width"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-width"
@@ -992,7 +1021,7 @@ export function InventoryItemCreateForm({
             label="Cao (cm)"
             htmlFor="extra-net-height"
             layout="horizontal"
-            labelWidth="6rem"
+            labelWidth="5rem"
           >
             <Input
               id="extra-net-height"

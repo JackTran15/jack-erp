@@ -170,6 +170,14 @@ export function useCheckoutCustomer() {
     // Khách bị xóa → không còn ai để dùng điểm; reset để right pane không
     // hiện row "Giảm giá (điểm)" mồ côi.
     updateDraftSlice("promotion", (p) => ({ ...p, pointsRedeemed: 0 }));
+    // Công nợ cần khách hàng → xóa khách thì bỏ tích nợ + reset hạn thanh toán
+    // (debt=false ⇒ debtAmount tự về 0, nút "Hạn thanh toán" tự ẩn).
+    updateDraftSlice("payment", (p) => ({
+      ...p,
+      debt: false,
+      paymentDueDate: null,
+      creditDays: null,
+    }));
     usePosCheckoutUiStore.getState().setCustomerFieldError("");
     usePosCheckoutUiStore
       .getState()

@@ -6,6 +6,7 @@ import {
   selectCustomerDraft,
   selectHasAnyCartLines,
   selectPaymentDraft,
+  selectPointsDiscountAmount,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 
@@ -28,6 +29,9 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
   );
 
   const grandTotal = useCheckoutGrandTotal();
+  const pointsDiscountAmount = usePosCheckoutSessionStore(
+    selectPointsDiscountAmount,
+  );
   const { deposit, returnFee, paymentLines, keepChange, debt } =
     usePosCheckoutSessionStore(selectPaymentDraft);
 
@@ -37,11 +41,20 @@ export function useCheckoutCollectState(): UseCheckoutCollectStateResult {
         grandTotal,
         deposit,
         returnFee,
+        pointsDiscountAmount,
         paymentLines,
         keepChange,
         debt,
       }),
-    [grandTotal, deposit, returnFee, paymentLines, keepChange, debt],
+    [
+      grandTotal,
+      deposit,
+      returnFee,
+      pointsDiscountAmount,
+      paymentLines,
+      keepChange,
+      debt,
+    ],
   );
 
   const blockedByShortPayment = (() => {

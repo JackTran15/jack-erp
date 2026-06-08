@@ -48,10 +48,10 @@ export class GoodsReceiptController {
   constructor(private readonly service: GoodsReceiptService) {}
 
   @Post()
-  @RequirePermission('goods_receipt.write')
+  @RequirePermission('goods_receipt.post')
   @RequireBranchScope()
   create(@Body() dto: CreateGoodsReceiptDto, @Actor() actor: ActorContext) {
-    return this.service.create(dto, actor);
+    return this.service.createAndPost(dto, actor);
   }
 
   @Get()

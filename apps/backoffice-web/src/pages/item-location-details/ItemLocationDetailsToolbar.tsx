@@ -52,8 +52,6 @@ export function buildItemLocationToolbarItems({
       label: "Chuyển vị trí hàng hóa",
       icon: ArrowRightLeft,
       onClick: onOpenTransfer,
-      disabled: true,
-      tooltip: "Tạm thời chưa khả dụng",
     },
     {
       id: "print-label",

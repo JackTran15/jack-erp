@@ -1,8 +1,10 @@
 import { formatVnd } from "@erp/ui";
 import { CountBadge } from "@erp/pos/components/page-components/Checkout/CheckoutRightPane/PaymentSummaryPanel/Sections/PaymentSection/PaymentSummaryBlock/CountBadge/CountBadge";
 import { PosSummaryRow } from "@erp/pos/components/common/PosSummaryRow/PosSummaryRow";
+import { CloseIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { useCheckoutGrandTotal } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-grand-total";
 import { useCheckoutPayment } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-payment";
+import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
 import {
   selectEffectivePointsRedeemed,
   selectIsReturnExchangeInvoice,
@@ -31,6 +33,7 @@ export function PaymentSummaryBlock({
   const pointsDiscountAmount = usePosCheckoutSessionStore(
     selectPointsDiscountAmount,
   );
+  const { clearRedeemedPoints } = useCheckoutPromotion();
   const { deposit, returnFee } = useCheckoutPayment();
 
   return (
@@ -44,12 +47,6 @@ export function PaymentSummaryBlock({
         value={formatVnd(total)}
         emphasis="strong"
       />
-      {pointsRedeemed > 0 ? (
-        <PosSummaryRow
-          label={`Giảm giá (${pointsRedeemed} điểm)`}
-          value={`-${formatVnd(pointsDiscountAmount)}`}
-        />
-      ) : null}
       <PosSummaryRow
         label={
           onDepositClick ? (
@@ -66,6 +63,24 @@ export function PaymentSummaryBlock({
         }
         value={formatVnd(deposit)}
       />
+      {pointsRedeemed > 0 ? (
+        <PosSummaryRow
+          label={
+            <span className="inline-flex items-center gap-1.5 text-amber-500">
+              {`Đổi điểm (${pointsRedeemed})`}
+              <button
+                type="button"
+                onClick={clearRedeemedPoints}
+                aria-label="Bỏ đổi điểm"
+                className="text-amber-500/80 transition-colors hover:text-amber-600"
+              >
+                <CloseIcon size={14} />
+              </button>
+            </span>
+          }
+          value={`-${formatVnd(pointsDiscountAmount)}`}
+        />
+      ) : null}
       {isReturnExchange ? (
         <PosSummaryRow
           label={

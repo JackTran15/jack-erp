@@ -37,7 +37,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
-import { InventoryTabBar } from "../../components/document/inventoryTabs";
+import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -46,6 +46,10 @@ import {
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  ensureTrailingBlankLine,
+  getPersistableLines,
+} from "../inventory-line-normalization";
 
 type TOStatus = "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
 
@@ -343,7 +347,7 @@ export function TransferOrdersPage() {
         row.documentNumber ? (
           <button
             type="button"
-            className="text-primary hover:underline"
+            className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
             onClick={(e) => {
               e.stopPropagation();
               setSelectedId(row.id);
@@ -434,9 +438,15 @@ export function TransferOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title="Lệnh điều chuyển"
+        title={<InventoryPageTitle>Lệnh điều chuyển</InventoryPageTitle>}
         tabs={<InventoryTabBar activeId="transfer-order" />}
-        toolbar={<PageToolbar items={toolbarItems} className="rounded-none" />}
+        toolbar={
+          <PageToolbar
+            items={toolbarItems}
+            tone="primary"
+            className="m-2 rounded-md"
+          />
+        }
         filters={
           <PeriodFilter
             value={period}
@@ -608,6 +618,12 @@ const emptyLine = (): FormLine => ({
   note: "",
 });
 
+const getPersistableFormLines = (nextLines: FormLine[]) =>
+  getPersistableLines(nextLines);
+
+const normalizeFormLines = (nextLines: FormLine[]) =>
+  ensureTrailingBlankLine(nextLines, emptyLine);
+
 function TransferOrderFormDialog({
   mode,
   initial,
@@ -658,18 +674,20 @@ function TransferOrderFormDialog({
   const [docDate, setDocDate] = useState(
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    initial
-      ? initial.lines.map((l) => ({
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (!initial) return [emptyLine()];
+
+    const initialLines = initial.lines.map((l) => ({
           itemId: l.itemId,
           itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
           itemName: l.item?.name ?? "",
           unit: l.item?.unit ?? "",
           requestedQty: Number(l.requestedQty),
           note: l.note ?? "",
-        }))
-      : [emptyLine()],
-  );
+        }));
+
+    return isView ? initialLines : normalizeFormLines(initialLines);
+  });
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -740,7 +758,8 @@ function TransferOrderFormDialog({
     [],
   );
 
-  const totalQty = lines.reduce((s, l) => s + Number(l.requestedQty || 0), 0);
+  const summaryLines = getPersistableFormLines(lines);
+  const totalQty = summaryLines.reduce((s, l) => s + Number(l.requestedQty || 0), 0);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     if (!sourceBranchId) {
@@ -755,12 +774,12 @@ function TransferOrderFormDialog({
       toast.error("Điều chuyển nội bộ phải chọn kho nguồn cụ thể.");
       return false;
     }
-    const validLines = lines.filter((l) => l.itemId);
-    if (validLines.length === 0) {
+    const persistableLines = getPersistableFormLines(lines);
+    if (persistableLines.length === 0) {
       toast.error("Cần ít nhất 1 dòng hàng hợp lệ.");
       return false;
     }
-    if (validLines.some((l) => Number(l.requestedQty) <= 0)) {
+    if (persistableLines.some((l) => Number(l.requestedQty) <= 0)) {
       toast.error("Số lượng phải lớn hơn 0.");
       return false;
     }
@@ -772,7 +791,7 @@ function TransferOrderFormDialog({
         sourceStorageId: sourceStorageId || undefined,
         requestedDate: docDate || undefined,
         notes: notes || undefined,
-        lines: validLines.map((l) => ({
+        lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           requestedQty: Number(l.requestedQty),
           note: l.note || undefined,
@@ -891,16 +910,18 @@ function TransferOrderFormDialog({
           }}
           onSelect={(item) => {
             setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      itemName: item.name,
-                      unit: item.unit,
-                    }
-                  : l,
+              normalizeFormLines(
+                prev.map((l, i) =>
+                  i === idx
+                    ? {
+                        ...l,
+                        itemId: item.id,
+                        itemLabel: item.code,
+                        itemName: item.name,
+                        unit: item.unit,
+                      }
+                    : l,
+                ),
               ),
             );
             markDirty();
@@ -1089,14 +1110,14 @@ function TransferOrderFormDialog({
             </label>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
               disabled
             >
               Chọn kho
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
               disabled
             >
               Nhập khẩu
@@ -1114,12 +1135,12 @@ function TransferOrderFormDialog({
               markDirty();
             }}
             onAddRow={() => {
-              setLines((prev) => [...prev, emptyLine()]);
+              setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
             }}
             onDeleteRow={(idx) => {
               setLines((prev) =>
-                prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev,
+                normalizeFormLines(prev.filter((_, i) => i !== idx)),
               );
               markDirty();
             }}

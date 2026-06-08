@@ -1,11 +1,23 @@
-import { useMemo } from "react";
-import { formatMoneyInteger } from "@erp/ui";
+import { useMemo, useState } from "react";
+import {
+  formatMoneyInteger,
+  resolvePeriodRange,
+  type PeriodValue,
+} from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
+  pickSourceBranchId,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { useTransferByBranchReport } from "../../../hooks/use-inventory-reports";
+import type {
+  TransferByBranchFilters,
+  TransferByBranchRow as ApiTransferByBranchRow,
+} from "../../../api/inventory-reports";
 
 const SOURCE_STORE_OPTIONS = [
   { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
@@ -29,7 +41,9 @@ const UNIT_OPTIONS = [
   { value: "Đôi", label: "Đôi" },
 ];
 
-interface TransferByBranchRow {
+interface ViewRow {
+  itemId: string;
+  destinationBranchId: string;
   sku: string;
   name: string;
   parentSku: string;
@@ -48,62 +62,28 @@ interface TransferByBranchRow {
   inValue: number;
 }
 
-const MOCK_ROWS: TransferByBranchRow[] = [
-  {
-    sku: "ABA2950-D-40",
-    name: "Giày nam ABA2950-D-40",
-    parentSku: "ABA2950",
-    parentName: "ABA2950",
-    color: "Đen",
-    size: "40",
-    unit: "Đôi",
-    group: "Giày nam",
-    brand: "Giày MT",
-    targetBranch: "Giày MT Đà Nẵng",
-    outQty: 3,
-    outAvgPrice: 340_000,
-    outValue: 1_020_000,
-    inQty: 0,
-    inAvgPrice: 0,
-    inValue: 0,
-  },
-  {
-    sku: "ABA3026-N-40",
-    name: "Giày nam ABA3026-N-40",
-    parentSku: "ABA3026",
-    parentName: "ABA3026",
-    color: "Nâu",
-    size: "40",
-    unit: "Đôi",
-    group: "Giày nam",
-    brand: "Giày MT",
-    targetBranch: "Giày MT Đà Nẵng",
-    outQty: 2,
-    outAvgPrice: 340_000,
-    outValue: 680_000,
-    inQty: 0,
-    inAvgPrice: 0,
-    inValue: 0,
-  },
-  {
-    sku: "MY63652-D-37",
-    name: "Sandal nữ MY63652-D-37",
-    parentSku: "MY63652",
-    parentName: "MY63652",
-    color: "Đen",
-    size: "37",
-    unit: "Đôi",
-    group: "Sandal nữ",
-    brand: "Giày MT",
-    targetBranch: "Giày MT Đà Nẵng",
-    outQty: 4,
-    outAvgPrice: 340_000,
-    outValue: 1_360_000,
-    inQty: 0,
-    inAvgPrice: 0,
-    inValue: 0,
-  },
-];
+function mapApiRow(row: ApiTransferByBranchRow): ViewRow {
+  return {
+    itemId: row.itemId,
+    destinationBranchId: row.destinationBranchId,
+    sku: row.sku,
+    name: row.itemName,
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    color: "",
+    size: "",
+    unit: row.unit,
+    group: "",
+    brand: "",
+    targetBranch: row.destinationBranchName,
+    outQty: row.outQty,
+    outAvgPrice: row.outAvgPrice,
+    outValue: row.outValue,
+    inQty: row.inQty,
+    inAvgPrice: row.inAvgPrice,
+    inValue: row.inValue,
+  };
+}
 
 export function TransferByBranchReportPage() {
   const filterFields: FilterField[] = [
@@ -122,8 +102,30 @@ export function TransferByBranchReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters: TransferByBranchFilters = useMemo(() => {
+    const base = buildApiFilters(filterValues, period, {
+      storeFieldKey: "targetStore",
+      categoryFieldKey: "group",
+    });
+    // sourceStore is a single select; only forward real UUIDs.
+    const sourceBranchId = pickSourceBranchId(filterValues, "sourceStore");
+    return { ...base, sourceBranchId };
+  }, [filterValues, period]);
+
+  const { data, isLoading } = useTransferByBranchReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map(mapApiRow),
+    [data],
+  );
+
   const num = "text-right tabular-nums";
-  const columns: TableColumn<TransferByBranchRow>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
     { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
     { key: "parentSku", label: "Mã SKU mẫu mã", width: 140, render: (r) => r.parentSku },
@@ -142,10 +144,8 @@ export function TransferByBranchReportPage() {
     { key: "inValue",     label: "Giá trị nhập",         width: 140, headerClassName: "text-right", className: num, render: (r) => formatMoneyInteger(r.inValue) },
   ];
 
-  const rows = useMemo(() => MOCK_ROWS, []);
-
   return (
-    <StorageReportShell<TransferByBranchRow>
+    <StorageReportShell<ViewRow>
       title="Tổng hợp hàng hóa điều chuyển theo cửa hàng"
       storageKey="reports/storage/transfer-by-branch"
       filterFields={filterFields}
@@ -157,8 +157,14 @@ export function TransferByBranchReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có dữ liệu điều chuyển theo cửa hàng."
-      getRowKey={(r) => r.sku}
+      getRowKey={(r, i) => `${r.itemId}-${r.destinationBranchId}-${i}`}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

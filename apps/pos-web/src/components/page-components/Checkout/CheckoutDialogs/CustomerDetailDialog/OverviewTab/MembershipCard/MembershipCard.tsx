@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { formatVnd } from "@erp/ui";
 import { RefreshIcon, ShoppingBagIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { LOYALTY_TEXT } from "@erp/pos/constants/checkout-messages.constant";
+import { POINT_REDEMPTION_VALUE_VND } from "@erp/pos/constants/loyalty.constant";
 import type { CustomerDetailData } from "@erp/pos/interfaces/customer-detail.interface";
 
 interface TierStyle { bg: string; shadow: string }
@@ -38,6 +41,10 @@ export interface MembershipCardProps {
   onRefreshPoints?: () => void;
   onChangeCard?: () => void;
   onIssueCard?: () => void;
+  /** Số điểm đang áp dụng cho đơn hiện tại — prefill ô nhập đổi điểm. */
+  appliedPoints?: number;
+  /** Áp dụng đổi điểm; parent ghi vào draft + đóng dialog. */
+  onRedeemPoints?: (points: number) => void;
 }
 
 /**
@@ -52,6 +59,8 @@ export function MembershipCard({
   onRefreshPoints,
   onChangeCard,
   onIssueCard,
+  appliedPoints = 0,
+  onRedeemPoints,
 }: MembershipCardProps) {
   const { name } = data;
   const hasCard = Boolean(data.cardCode);
@@ -61,13 +70,24 @@ export function MembershipCard({
   const cap = data.pointsCap ?? Math.max(used, points, 100);
   const fillPercent = cap > 0 ? Math.min(100, (used / cap) * 100) : 0;
 
+  // Đổi điểm — chỉ cho nhập tối đa bằng số điểm khả dụng (`points`).
+  const [redeemInput, setRedeemInput] = useState<number>(
+    Math.min(appliedPoints, points),
+  );
+  const handleRedeemChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "");
+    const parsed = digits === "" ? 0 : Number(digits);
+    setRedeemInput(Math.min(Math.max(0, parsed), points));
+  };
+  const redeemAmount = redeemInput * POINT_REDEMPTION_VALUE_VND;
+
   const style = hasCard
     ? (TIER_STYLE[data.tier ?? ""] ?? TIER_STYLE["none"]!)
     : NO_CARD_STYLE;
 
   return (
     <div
-      className="relative flex h-[280px] w-full flex-col gap-3 overflow-hidden rounded-xl px-6 py-5 text-white"
+      className="relative flex min-h-[280px] w-full flex-col gap-3 overflow-hidden rounded-xl px-6 py-5 text-white"
       style={{
         background: style.bg,
         boxShadow: `0 4px 16px ${style.shadow}`,
@@ -136,7 +156,18 @@ export function MembershipCard({
       <div className="space-y-1.5 text-[13px]">
         <div className="flex items-center justify-between">
           <span className="text-white/75">Sử dụng điểm</span>
-          <span className="font-medium text-white">{used}</span>
+          {points > 0 ? (
+            <input
+              type="text"
+              inputMode="numeric"
+              value={redeemInput === 0 ? "0" : String(redeemInput)}
+              onChange={(e) => handleRedeemChange(e.target.value)}
+              aria-label="Số điểm muốn đổi"
+              className="w-20 bg-transparent text-right font-medium text-white placeholder-white/50 focus:outline-none"
+            />
+          ) : (
+            <span className="font-medium text-white">{used}</span>
+          )}
         </div>
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
           <div
@@ -144,7 +175,25 @@ export function MembershipCard({
             style={{ width: `${fillPercent}%` }}
           />
         </div>
+        {redeemInput > 0 ? (
+          <div className="flex items-center justify-between pt-0.5">
+            <span className="text-white/75">Quy đổi</span>
+            <span className="font-semibold text-white">
+              {formatVnd(redeemAmount)}
+            </span>
+          </div>
+        ) : null}
       </div>
+
+      {redeemInput > 0 ? (
+        <button
+          type="button"
+          onClick={() => onRedeemPoints?.(redeemInput)}
+          className="inline-flex h-9 items-center justify-center rounded-md border border-white/80 bg-white/25 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-white/35"
+        >
+          Đổi điểm
+        </button>
+      ) : null}
     </div>
   );
 }

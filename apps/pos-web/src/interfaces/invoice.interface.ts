@@ -15,6 +15,11 @@ export interface InvoiceItemRow {
   quantity: number;
   unitPrice: number;
   lineDiscount: number;
+  /** KM thủ công per-line (null = legacy chỉ có `lineDiscount` amount). */
+  lineDiscountType?: "percent" | "amount";
+  /** Giá trị KM thô (numeric → API trả string, `Number()` khi dùng). */
+  lineDiscountValue?: number;
+  lineDiscountReason?: string;
   lineTotal: number;
   note?: string;
   sortOrder?: number;

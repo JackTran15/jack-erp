@@ -7,6 +7,8 @@ export interface OverviewTabProps {
   onChangeCard?: () => void;
   onRefreshPoints?: () => void;
   onIssueCard?: () => void;
+  appliedPoints?: number;
+  onRedeemPoints?: (points: number) => void;
 }
 
 /**
@@ -18,6 +20,8 @@ export function OverviewTab({
   onChangeCard,
   onRefreshPoints,
   onIssueCard,
+  appliedPoints,
+  onRedeemPoints,
 }: OverviewTabProps) {
   return (
     <div className="grid grid-cols-[460px_1fr] gap-5">
@@ -26,6 +30,8 @@ export function OverviewTab({
         onChangeCard={onChangeCard}
         onRefreshPoints={onRefreshPoints}
         onIssueCard={onIssueCard}
+        appliedPoints={appliedPoints}
+        onRedeemPoints={onRedeemPoints}
       />
       <CustomerStatsPanel stats={data.stats} />
     </div>

@@ -10,8 +10,8 @@ import type { MembershipTierEnum } from "@erp/pos/types/customer.type";
  *   - `groupName` / `staffName`  — resolved via lookup maps.
  *   - `cardCode`, `tier`, `loyaltyPoints`, `pointsUsed`, `pointsCap`
  *     — populated from `/customers/:id/membership-card`.
- *   - `stats`, `purchaseHistory`, `debts`  — populated from their own
- *     endpoints when the corresponding tabs need data.
+ *   - `stats`, `purchaseHistory`  — populated from their own endpoints when the
+ *     corresponding tabs need data. (`DebtTab` fetches its own data directly.)
  *
  * Only `name` is required because the dialog title shows "Khách hàng: {name}".
  * Everything else is optional — missing values render as muted "Chưa có thông
@@ -44,7 +44,6 @@ export interface CustomerDetailData
 
   stats?: CustomerStatsData;
   purchaseHistory?: PurchaseHistoryEntry[];
-  debts?: DebtEntry[];
 }
 
 export interface CustomerStatsData {
@@ -66,6 +65,8 @@ export interface PurchaseHistoryEntry {
 
 export interface DebtEntry {
   id: string;
+  /** Hóa đơn nguồn của công nợ — mở `InvoiceReceiptDialog` khi click số chứng từ. */
+  invoiceId: string;
   date: Date;
   documentNumber: string;
   documentType: string;

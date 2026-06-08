@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { FieldDefinition } from "@erp/shared-interfaces";
+import { toast } from "sonner";
 import {
   Button,
   Dialog,
@@ -40,11 +41,14 @@ import {
   useCrudRecords,
   useCrudCreate,
   useCrudDelete,
+  useCrudUpdate,
 } from "./useCrudApi";
 import { useCrudV2Search } from "./useCrudV2Search";
 import { CRUD_V2_SEARCH, buildV2Body } from "./crudV2Search";
 import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { CrudFormDialog } from "./CrudFormDialog";
+import { formatCrudFieldValue } from "../../lib/crud-display";
+import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { CrudRecordDialog } from "./CrudRecordDialog";
 import { formatCustomerStatus } from "../../lib/customer-display";
 
@@ -53,6 +57,8 @@ const DIALOG_MODE_ENTITIES = new Set([
   "inventory-item-units",
   "inventory-providers",
   "provider-groups",
+  "branches",
+  "inventory-storages",
 ]);
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
@@ -72,6 +78,7 @@ interface CrudListPageProps {
   entityKey?: string;
   initialSort?: { sortBy: string; sortOrder: "asc" | "desc" };
   disableRowClick?: boolean;
+  onRecordSaved?: () => void;
   inventoryConfig?: {
     exportOptions?: Array<{
       id: string;
@@ -91,6 +98,7 @@ export function CrudListPage({
   entityKey: entityKeyProp,
   initialSort,
   disableRowClick,
+  onRecordSaved,
   inventoryConfig,
 }: CrudListPageProps) {
   const params = useParams<{ entityKey: string }>();
@@ -113,6 +121,8 @@ export function CrudListPage({
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
     new Set(),
   );
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editSnapshot, setEditSnapshot] = useState<Record<string, unknown> | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<
     string,
@@ -170,6 +180,7 @@ export function CrudListPage({
   };
 
   const createMutation = useCrudCreate(entityKey ?? "");
+  const updateMutation = useCrudUpdate(entityKey ?? "");
   const deleteMutation = useCrudDelete(entityKey ?? "");
 
   useEffect(() => {
@@ -181,6 +192,8 @@ export function CrudListPage({
     setSearchInput("");
     setColumnFilters({});
     setSelectedRecordIds(new Set());
+    setCreateDialogOpen(false);
+    setEditSnapshot(null);
     setDuplicateSnapshot(null);
   }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -300,6 +313,26 @@ export function CrudListPage({
               ? `max-w-[${widthPx}px] text-right tabular-nums`
               : `max-w-[${widthPx}px]`,
             render: (row) => {
+              if (
+                entityKey === "inventory-item-categories" &&
+                field.key === "name"
+              ) {
+                return (
+                  <button
+                    type="button"
+                    className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setEditSnapshot({ ...row });
+                      setSelectedRecordIds(
+                        new Set([String(row[config?.idField ?? "id"])]),
+                      );
+                    }}
+                  >
+                    {formatCell(row[field.key], field, col.format)}
+                  </button>
+                );
+              }
               const content = formatCell(row[field.key], field, col.format);
               if (!opensEdit) return content;
               return (
@@ -427,6 +460,10 @@ export function CrudListPage({
   };
 
   const handleCreate = () => {
+    if (entityKey === "inventory-item-categories") {
+      setCreateDialogOpen(true);
+      return;
+    }
     if (useDialogMode) {
       openCreateDialog();
       return;
@@ -434,10 +471,19 @@ export function CrudListPage({
     navigate(`/admin/${entityKey}/new`);
   };
 
-  const handleColumnFilterModeChange = (
-    fieldKey: string,
-    mode: ColumnFilterMode,
-  ) => {
+  const handleCreateSubmit = async (data: Record<string, unknown>) => {
+    try {
+      await createMutation.mutateAsync(data);
+      setCreateDialogOpen(false);
+      toast.success(`Đã tạo ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
@@ -488,10 +534,47 @@ export function CrudListPage({
     setDuplicateSnapshot({ ...selectedRecord });
   };
 
+  const openCategoryEditDialog = () => {
+    if (!selectedRecord) return;
+    setEditSnapshot({ ...selectedRecord });
+  };
+
+  const handleRowClick = (row: Record<string, unknown>) => {
+    if (disableRowClick) return;
+    if (entityKey === "inventory-item-categories") {
+      setSelectedRecordIds(new Set([String(row[config.idField])]));
+      return;
+    }
+    navigate(`/admin/${entityKey}/${String(row[config.idField])}`);
+  };
+
   const handleDuplicateSubmit = async (data: Record<string, unknown>) => {
-    await createMutation.mutateAsync(data);
-    setDuplicateSnapshot(null);
-    void refetchRecords();
+    try {
+      await createMutation.mutateAsync(data);
+      setDuplicateSnapshot(null);
+      toast.success(`Đã nhân bản ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleEditSubmit = async (data: Record<string, unknown>) => {
+    if (!editSnapshot) return;
+    try {
+      await updateMutation.mutateAsync({
+        id: String(editSnapshot[config.idField]),
+        body: data,
+      });
+      setEditSnapshot(null);
+      setSelectedRecordIds(new Set());
+      toast.success(`Đã cập nhật ${config.displayName}.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -501,13 +584,19 @@ export function CrudListPage({
 
   const confirmBulkDelete = async () => {
     if (selectedRows.length === 0) return;
-    await Promise.all(
-      selectedRows.map((record) =>
-        deleteMutation.mutateAsync(String(record[config.idField])),
-      ),
-    );
-    setSelectedRecordIds(new Set());
-    setDeleteDialogOpen(false);
+    try {
+      await Promise.all(
+        selectedRows.map((record) =>
+          deleteMutation.mutateAsync(String(record[config.idField])),
+        ),
+      );
+      setSelectedRecordIds(new Set());
+      setDeleteDialogOpen(false);
+      toast.success(`Đã xoá ${selectedRows.length} bản ghi.`);
+      void refetchRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
   };
 
   const toolbarItems = buildListToolbar(
@@ -519,6 +608,10 @@ export function CrudListPage({
         handleEdit: () => {
           if (!selectedRecord) return;
           const id = String(selectedRecord[config.idField]);
+          if (entityKey === "inventory-item-categories") {
+            openCategoryEditDialog();
+            return;
+          }
           if (useDialogMode) {
             openEditDialog(id);
             return;
@@ -569,11 +662,7 @@ export function CrudListPage({
         loading={loading}
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
-        onRowClick={(row) => {
-          if (disableRowClick) return;
-          const id = String(row[config.idField]);
-          navigate(`/admin/${entityKey}/${id}`);
-        }}
+        onRowClick={handleRowClick}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={v2 ? undefined : handleSort}
@@ -642,6 +731,15 @@ export function CrudListPage({
         }
       />
 
+      {createDialogOpen && (
+        <CrudFormDialog
+          config={config}
+          record={null}
+          onSubmit={handleCreateSubmit}
+          onClose={() => setCreateDialogOpen(false)}
+        />
+      )}
+
       {duplicateSnapshot && (
         <CrudFormDialog
           key={String(duplicateSnapshot[config.idField] ?? "dup")}
@@ -650,6 +748,16 @@ export function CrudListPage({
           duplicateSource={duplicateSnapshot}
           onSubmit={handleDuplicateSubmit}
           onClose={() => setDuplicateSnapshot(null)}
+        />
+      )}
+
+      {editSnapshot && (
+        <CrudFormDialog
+          key={String(editSnapshot[config.idField] ?? "edit")}
+          config={config}
+          record={editSnapshot}
+          onSubmit={handleEditSubmit}
+          onClose={() => setEditSnapshot(null)}
         />
       )}
 
@@ -663,6 +771,7 @@ export function CrudListPage({
           onClose={() => setCrudDialogOpen(false)}
           onSuccess={() => {
             void refetchRecords();
+            onRecordSaved?.();
           }}
         />
       )}
@@ -716,6 +825,7 @@ function formatCell(
       />
     );
   }
+  if (field.type === "enum") return formatCrudFieldValue(value, field);
   if (format === "moneyVnd") {
     const n = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(n)) return "—";

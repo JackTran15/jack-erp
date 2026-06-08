@@ -6,8 +6,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
+import { Repository, EntityManager } from 'typeorm';
+import {
+  PaginationQuery,
+  PaginatedResponse,
+  LocationType,
+} from '@erp/shared-interfaces';
 import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
@@ -438,14 +442,86 @@ export class InventoryLocationService {
       );
     }
 
-    const storage = this.storageRepo.create({
-      name: dto.name,
-      branchId: dto.branchId,
-      isMainStorage: dto.isMainStorage ?? false,
-      organizationId: actor.organizationId,
-      createdBy: actor.userId,
+    return this.storageRepo.manager.transaction(async (manager) => {
+      const storage = await manager.save(
+        manager.create(StorageEntity, {
+          name: dto.name,
+          branchId: dto.branchId,
+          isMainStorage: dto.isMainStorage ?? false,
+          organizationId: actor.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
+      await this.ensureUnassignedLocation(storage.id, actor, manager);
+      return storage;
     });
-    return this.storageRepo.save(storage);
+  }
+
+  /**
+   * Get-or-create the virtual "Chưa xếp" (unassigned) location for a storage.
+   * Concurrency-safe via the partial unique index
+   * `UQ_locations_unassigned_per_storage` + `ON CONFLICT DO NOTHING`. Inherits
+   * organization/branch scope from the storage.
+   */
+  async ensureUnassignedLocation(
+    storageId: string,
+    actor: ActorContext,
+    manager?: EntityManager,
+  ): Promise<LocationEntity> {
+    const repo = manager
+      ? manager.getRepository(LocationEntity)
+      : this.locationRepo;
+
+    const existing = await repo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        storageId,
+        isUnassigned: true,
+      },
+    });
+    if (existing) return existing;
+
+    const storage = await (manager
+      ? manager.getRepository(StorageEntity)
+      : this.storageRepo
+    ).findOne({
+      where: { id: storageId, organizationId: actor.organizationId },
+    });
+    if (!storage) {
+      throw new NotFoundException(`Storage ${storageId} not found`);
+    }
+
+    await repo
+      .createQueryBuilder()
+      .insert()
+      .into(LocationEntity)
+      .values({
+        code: '__UNASSIGNED__',
+        name: 'Chưa xếp',
+        storageId,
+        type: LocationType.ZONE,
+        isActive: true,
+        isUnassigned: true,
+        organizationId: storage.organizationId,
+        branchId: storage.branchId,
+        createdBy: actor.userId,
+      })
+      .orIgnore()
+      .execute();
+
+    const location = await repo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        storageId,
+        isUnassigned: true,
+      },
+    });
+    if (!location) {
+      throw new NotFoundException(
+        `Không thể tạo vị trí "Chưa xếp" cho kho ${storageId}`,
+      );
+    }
+    return location;
   }
 
   async getBranchLocations(
@@ -654,8 +730,11 @@ export class InventoryLocationService {
       name: dto.name,
       storageId: dto.storageId,
       branchId: dto.branchId,
-      type: dto.type,
-      isActive: true,
+      // "Loại vị trí" is no longer surfaced in the UI (MISA has no such field);
+      // default to SHELF when omitted so the NOT NULL enum column is satisfied.
+      type: dto.type ?? LocationType.SHELF,
+      description: dto.description ?? null,
+      isActive: dto.isActive ?? true,
       organizationId: actor.organizationId,
       createdBy: actor.userId,
     });
@@ -663,7 +742,11 @@ export class InventoryLocationService {
   }
 
   async listLocations(
-    query: PaginationQuery & { storageId?: string; branchId?: string },
+    query: PaginationQuery & {
+      storageId?: string;
+      branchId?: string;
+      includeUnassigned?: boolean;
+    },
     actor: ActorContext,
   ): Promise<PaginatedResponse<LocationEntity>> {
     const where: Record<string, unknown> = {
@@ -675,6 +758,10 @@ export class InventoryLocationService {
     if (query.branchId) {
       where.branchId = query.branchId;
     }
+    // Hide the virtual "Chưa xếp" location from shelf pickers by default.
+    if (!query.includeUnassigned) {
+      where.isUnassigned = false;
+    }
 
     const [data, total] = await this.locationRepo.findAndCount({
       where,
@@ -682,8 +769,30 @@ export class InventoryLocationService {
       take: query.pageSize,
       order: query.sortBy
         ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
+        : query.sortOrder
+          ? { createdAt: query.sortOrder }
+          : { code: 'ASC', name: 'ASC' },
     });
+
+    // Mark which locations already hold items ("Đã xếp" vs "Chưa xếp"): a
+    // location is "đã xếp" when it has at least one stock_balance row.
+    if (data.length > 0) {
+      const rows = await this.locationRepo.manager
+        .createQueryBuilder()
+        .select('sb.location_id', 'locationId')
+        .from('stock_balances', 'sb')
+        .where('sb.organization_id = :org', { org: actor.organizationId })
+        .andWhere('sb.location_id IN (:...ids)', {
+          ids: data.map((l) => l.id),
+        })
+        .groupBy('sb.location_id')
+        .getRawMany<{ locationId: string }>();
+      const placed = new Set(rows.map((r) => r.locationId));
+      for (const loc of data) {
+        loc.hasItems = placed.has(loc.id);
+      }
+    }
+
     return { data, total, page: query.page, pageSize: query.pageSize };
   }
 
@@ -703,7 +812,63 @@ export class InventoryLocationService {
     actor: ActorContext,
   ): Promise<LocationEntity> {
     const location = await this.getLocationById(id, actor);
-    Object.assign(location, dto);
+
+    // The virtual "Chưa xếp" location is system-managed.
+    if (location.isUnassigned) {
+      throw new BadRequestException('Không thể sửa vị trí hệ thống "Chưa xếp".');
+    }
+
+    const codeChanged = dto.code != null && dto.code !== location.code;
+    const storageChanged =
+      dto.storageId != null && dto.storageId !== location.storageId;
+
+    // Re-homing a location that already holds stock would silently move that
+    // stock to another storage (and rewrite which storage its historical ledger
+    // entries belong to). Block it — move the stock with a transfer first.
+    if (storageChanged) {
+      const target = await this.getStorageById(dto.storageId!, actor);
+      if (target.branchId !== location.branchId) {
+        throw new BadRequestException(
+          'Không thể chuyển vị trí sang kho thuộc chi nhánh khác.',
+        );
+      }
+      const stockCount = await this.locationRepo.manager
+        .createQueryBuilder()
+        .from('stock_balances', 'sb')
+        .where('sb.location_id = :id', { id: location.id })
+        .getCount();
+      if (stockCount > 0) {
+        throw new BadRequestException(
+          'Vị trí đang có hàng nên không thể đổi kho. Hãy chuyển hàng sang vị trí khác trước.',
+        );
+      }
+    }
+
+    // Enforce (storage, code) uniqueness when either changes.
+    if (codeChanged || storageChanged) {
+      const nextStorageId = dto.storageId ?? location.storageId;
+      const nextCode = dto.code ?? location.code;
+      const duplicate = await this.locationRepo.findOne({
+        where: {
+          storageId: nextStorageId,
+          code: nextCode,
+          organizationId: actor.organizationId,
+        },
+      });
+      if (duplicate && duplicate.id !== location.id) {
+        throw new ConflictException(
+          `Vị trí với mã "${nextCode}" đã tồn tại trong kho này.`,
+        );
+      }
+    }
+
+    if (dto.code != null) location.code = dto.code;
+    if (dto.name != null) location.name = dto.name;
+    if (dto.storageId != null) location.storageId = dto.storageId;
+    if (dto.type != null) location.type = dto.type;
+    if (dto.isActive != null) location.isActive = dto.isActive;
+    if (dto.description !== undefined) location.description = dto.description ?? null;
+
     return this.locationRepo.save(location);
   }
 

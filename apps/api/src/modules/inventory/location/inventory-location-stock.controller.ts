@@ -28,6 +28,7 @@ import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { PermissionGuard } from '../../rbac/permission.guard';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockByLocationResponseDto } from './dto/stock-by-location.response.dto';
+import { ArrangeLocationDto } from './dto/arrange-location.dto';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 
 class AddItemToLocationDto {
@@ -112,6 +113,21 @@ export class InventoryLocationStockController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.assignBatch(dto, actor);
+  }
+
+  @Post('arrange')
+  @RequirePermission('inventory.write')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Xếp vị trí: chuyển số lượng hàng từ "Chưa xếp" của kho lên kệ thật + ghi vị trí ưu tiên (PSL).',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Kết quả: { moved, transferId }',
+  })
+  arrange(@Body() dto: ArrangeLocationDto, @Actor() actor: ActorContext) {
+    return this.service.arrange(dto, actor);
   }
 
   @Delete(':locationId/stock-items/:itemId')

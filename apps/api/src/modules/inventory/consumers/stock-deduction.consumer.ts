@@ -6,6 +6,7 @@ import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../events/decorators/on-event.decorator';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import {
   StockDeductionPayload,
 } from '../publishers/stock-deduction.publisher';
@@ -20,6 +21,7 @@ export class StockDeductionConsumer {
     @InjectRepository(StockLedgerEntryEntity)
     private readonly ledgerRepo: Repository<StockLedgerEntryEntity>,
     private readonly stockLedgerService: StockLedgerService,
+    private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.STOCK_DEDUCTION)
@@ -44,6 +46,15 @@ export class StockDeductionConsumer {
       return;
     }
 
+    // The event payload does not include a unit price (POS publishes a sparse
+    // movement). Snapshot `items.purchase_price` at consume time — same policy
+    // as the Task 1 backfill — so the ledger row carries a meaningful cost
+    // basis for downstream reporting.
+    const unitCost = await this.itemCostSnapshotService.snapshotOne(
+      organizationId,
+      itemId,
+    );
+
     await this.stockLedgerService.recordBatchMovements([
       {
         itemId,
@@ -60,6 +71,7 @@ export class StockDeductionConsumer {
           branchId,
           roles: [],
         },
+        unitCost,
       },
     ]);
 

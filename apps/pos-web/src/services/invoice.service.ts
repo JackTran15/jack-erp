@@ -17,6 +17,7 @@ import type {
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { EligibleReturnLine } from "@erp/pos/interfaces/return-goods.interface";
 import type { Paginated } from "@erp/pos/interfaces/paginated.interface";
+import type { CustomerDebtRow } from "@erp/pos/interfaces/debt.interface";
 
 export const invoiceService = {
   searchV2: (body: SearchInvoicesV2Body): Promise<InvoiceSearchV2Response> =>
@@ -35,6 +36,12 @@ export const invoiceService = {
     http.post<InvoiceSearchV2Response>(
       "/v2/invoices/purchase-history/search",
       body,
+    ),
+
+  /** `GET /invoices/customers/:customerId/debts` — sổ công nợ của một khách (#3). */
+  getCustomerDebts: (customerId: string): Promise<CustomerDebtRow[]> =>
+    http.get<CustomerDebtRow[]>(
+      `/invoices/customers/${encodeURIComponent(customerId)}/debts`,
     ),
 
   /** `POST /v2/invoices/drafts/search` — held draft invoices (#4). */

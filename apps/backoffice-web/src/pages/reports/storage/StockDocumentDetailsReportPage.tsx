@@ -1,12 +1,19 @@
-import { useMemo } from "react";
-import { formatMoneyInteger } from "@erp/ui";
+import { useMemo, useState } from "react";
+import {
+  formatMoneyInteger,
+  resolvePeriodRange,
+  type PeriodValue,
+} from "@erp/ui";
 import {
   StorageReportShell,
+  buildApiFilters,
   resolveLabel,
   type FilterField,
+  type FilterValues,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
-import { generateMockStockDocs, type MockStockDocLine } from "./_shared/mock";
+import { useStockDocumentDetailsReport } from "../../../hooks/use-inventory-reports";
+import type { DocumentDetailRow } from "../../../api/inventory-reports";
 
 const STORE_OPTIONS = [
   { value: "MTCANTHO", label: "Giày MT Cần Thơ" },
@@ -24,7 +31,85 @@ const DOC_TYPE_OPTIONS = [
   { value: "__all__", label: "Tất cả" },
   { value: "PNK", label: "Phiếu nhập kho mua hàng" },
   { value: "PXK", label: "Phiếu xuất kho bán hàng" },
+  { value: "PCC", label: "Phiếu điều chuyển kho" },
 ];
+
+const DATE_FMT = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+const DOC_KIND_LABEL: Record<DocumentDetailRow["docKind"], string> = {
+  GOODS_RECEIPT: "Phiếu nhập kho mua hàng",
+  GOODS_ISSUE: "Phiếu xuất kho bán hàng",
+  STOCK_TRANSFER: "Phiếu điều chuyển kho",
+};
+
+interface ViewRow {
+  id: string;
+  date: string;
+  documentType: string;
+  warehouse: string;
+  documentNumber: string;
+  reference: string;
+  sku: string;
+  name: string;
+  unit: string;
+  notes: string;
+  group: string;
+  parentSku: string;
+  parentName: string;
+  color: string;
+  size: string;
+  inQty: number;
+  inUnitPrice: number;
+  inValue: number;
+  inSalePrice: number;
+  outQty: number;
+  outUnitPrice: number;
+  outValue: number;
+  outSalePrice: number;
+  customer: string;
+  branchCode: string;
+  branchName: string;
+  receiverBranchCode: string;
+  receiverBranchName: string;
+}
+
+function mapApiRow(row: DocumentDetailRow, index: number): ViewRow {
+  const posted = new Date(row.postedAt);
+  return {
+    id: `${row.documentNumber}-${row.sku}-${index}`,
+    date: Number.isNaN(posted.valueOf()) ? "" : DATE_FMT.format(posted),
+    documentType: DOC_KIND_LABEL[row.docKind] ?? row.docKind,
+    warehouse: row.locationName ?? row.branchName ?? "",
+    documentNumber: row.documentNumber,
+    reference: row.referenceNumber ?? "",
+    sku: row.sku,
+    name: row.itemName,
+    unit: row.unit,
+    notes: row.notes ?? "",
+    group: row.categoryName ?? "",
+    parentSku: row.parentSku ?? "",
+    parentName: row.parentName ?? "",
+    color: "",
+    size: "",
+    inQty: row.inQty,
+    inUnitPrice: row.inUnitPrice,
+    inValue: row.inValue,
+    inSalePrice: 0,
+    outQty: row.outQty,
+    outUnitPrice: row.outUnitPrice,
+    outValue: row.outValue,
+    outSalePrice: 0,
+    customer: row.customerName ?? "",
+    branchCode: "",
+    branchName: row.branchName ?? "",
+    receiverBranchCode: "",
+    receiverBranchName: row.receiverBranchName ?? "",
+  };
+}
 
 export function StockDocumentDetailsReportPage() {
   const filterFields: FilterField[] = [
@@ -40,11 +125,30 @@ export function StockDocumentDetailsReportPage() {
     { key: "period", label: "Kỳ báo cáo", type: "period" },
   ];
 
-  const rows = useMemo(() => generateMockStockDocs(), []);
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
+  const [period, setPeriod] = useState<PeriodValue>(() => ({
+    preset: "this_month",
+    ...resolvePeriodRange("this_month"),
+  }));
+
+  const apiFilters = useMemo(
+    () =>
+      buildApiFilters(filterValues, period, {
+        storeFieldKey: "store",
+        categoryFieldKey: "group",
+      }),
+    [filterValues, period],
+  );
+
+  const { data, isLoading } = useStockDocumentDetailsReport(apiFilters);
+  const rows = useMemo<ViewRow[]>(
+    () => (data?.data ?? []).map((r, i) => mapApiRow(r, i)),
+    [data],
+  );
 
   const num = "text-right tabular-nums";
   const fmt = (v: number) => (v ? formatMoneyInteger(v) : "");
-  const columns: TableColumn<MockStockDocLine>[] = [
+  const columns: TableColumn<ViewRow>[] = [
     { key: "date", label: "Ngày chứng từ", width: 140, render: (r) => r.date, filterKind: "date" },
     { key: "documentType", label: "Loại chứng từ", width: 200, render: (r) => r.documentType, filterKind: "select", filterOptions: DOC_TYPE_OPTIONS.slice(1).map((o) => ({ value: o.label, label: o.label })) },
     { key: "warehouse", label: "Kho", width: 180, render: (r) => r.warehouse },
@@ -75,7 +179,7 @@ export function StockDocumentDetailsReportPage() {
   ];
 
   return (
-    <StorageReportShell<MockStockDocLine>
+    <StorageReportShell<ViewRow>
       title="Bảng kê chi tiết phiếu nhập xuất kho"
       storageKey="reports/storage/stock-document-details"
       filterFields={filterFields}
@@ -85,8 +189,14 @@ export function StockDocumentDetailsReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={isLoading}
       emptyLabel="Không có chứng từ trong kỳ."
-      getRowKey={(r, i) => `${r.documentNumber}-${r.sku}-${i}`}
+      getRowKey={(r) => r.id}
+      initialPeriod={period}
+      onApply={(next, nextPeriod) => {
+        setFilterValues(next);
+        setPeriod(nextPeriod);
+      }}
       columnSummary={(rs) => {
         const sum = rs.reduce(
           (a, r) => ({

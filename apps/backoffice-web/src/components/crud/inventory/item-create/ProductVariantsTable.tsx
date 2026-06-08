@@ -5,6 +5,7 @@ export const VARIANT_DEFAULT_UNIT = "Chiếc";
 
 export interface ProductVariantRow {
   id: string;
+  itemId?: string;
   color: string;
   size: string;
   name: string;

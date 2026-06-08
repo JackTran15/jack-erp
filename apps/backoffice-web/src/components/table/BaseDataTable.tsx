@@ -82,6 +82,7 @@ interface BaseDataTableProps<T> {
   className?: string;
   scrollContainerClassName?: string;
   onRowClick?: (row: T) => void;
+  onRowDoubleClick?: (row: T) => void;
   leadingColumn?: LeadingColumn<T>;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
@@ -149,6 +150,7 @@ export function BaseDataTable<T>({
   className,
   scrollContainerClassName,
   onRowClick,
+  onRowDoubleClick,
   leadingColumn,
   sortBy,
   sortOrder = "desc",
@@ -560,9 +562,10 @@ export function BaseDataTable<T>({
                   key={getRowKey(row, index)}
                   className={cn(
                     "border-b border-border",
-                    onRowClick ? "cursor-pointer hover:bg-accent/20" : null,
+                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-accent/20" : null,
                   )}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                 >
                   {leadingColumn ? (
                     <td className={cn("px-2 py-2.5 text-center align-middle", leadingColumn.cellClassName)}>

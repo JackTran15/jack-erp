@@ -7,12 +7,18 @@ import {
   useCustomerSummary,
   useIssueMembershipCard,
   useMembershipCard,
+  useRefreshCustomerPoints,
   useUpdateMembershipCard,
 } from "@erp/pos/hooks/react-query/use-query-customer";
 import { IssueMembershipCardDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/IssueMembershipCardDialog/IssueMembershipCardDialog";
 import { MembershipTierEnum } from "@erp/pos/types/customer.type";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
+import {
+  selectEffectivePointsRedeemed,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
+import { useCheckoutPromotion } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-promotion";
 import { CustomerForm } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerForm/CustomerForm";
 import { CustomerDetailTabs } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/CustomerDetailTabs/CustomerDetailTabs";
 import { DebtTab } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/DebtTab/DebtTab";
@@ -42,7 +48,6 @@ export interface CustomerDetailDialogProps {
   onCollectDebt?: () => void;
   /** Card-related callbacks for the membership card on the overview tab. */
   onChangeCard?: () => void;
-  onRefreshPoints?: () => void;
   /**
    * Fires after the user saves edits via the in-place `CustomerForm` on the
    * "Thông tin" tab. The parent typically forwards this to `pickCustomer` so
@@ -90,7 +95,6 @@ export function CustomerDetailDialog({
   onConfirm,
   onCollectDebt,
   onChangeCard,
-  onRefreshPoints,
   onCustomerUpdated,
 }: CustomerDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<CustomerDetailTabKey>(initialTab);
@@ -128,6 +132,10 @@ export function CustomerDetailDialog({
     summaryEnabled ? customerId : undefined,
   );
 
+  // Nút "Làm mới điểm tích lũy" — invalidate summary + membership-card để
+  // refetch điểm mới nhất mà không cần reload trang.
+  const handleRefreshPoints = useRefreshCustomerPoints(customerId);
+
   const groupNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const g of customerGroupsData ?? []) map.set(g.id, g.name);
@@ -151,6 +159,20 @@ export function CustomerDetailDialog({
   const branchName = usePosBranchStore((s) => s.branchName);
   const historyEnabled =
     open && activeTab === CustomerDetailTabKeyEnum.HISTORY;
+  // Công nợ — fetch lười trong chính `DebtTab`, chỉ khi dialog mở & đang ở tab này.
+  const debtEnabled = open && activeTab === CustomerDetailTabKeyEnum.DEBT;
+
+  // Đổi điểm — ghi vào draft checkout (mock FE) rồi đóng dialog để hiển thị ở
+  // payment summary. Prefill ô nhập bằng số điểm đang áp dụng cho đơn.
+  const appliedPoints = usePosCheckoutSessionStore(selectEffectivePointsRedeemed);
+  const { setRedeemedPoints } = useCheckoutPromotion();
+  const handleRedeemPoints = useCallback(
+    (points: number) => {
+      setRedeemedPoints(points);
+      onClose();
+    },
+    [setRedeemedPoints, onClose],
+  );
 
   const { mutate: issueCard, isPending: isIssuingCardPending } =
     useIssueMembershipCard();
@@ -229,8 +251,10 @@ export function CustomerDetailDialog({
             <OverviewTab
               data={data}
               onChangeCard={() => setIsIssuingCard(true)}
-              onRefreshPoints={onRefreshPoints}
+              onRefreshPoints={handleRefreshPoints}
               onIssueCard={() => setIsIssuingCard(true)}
+              appliedPoints={appliedPoints}
+              onRedeemPoints={handleRedeemPoints}
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.INFO ? (
@@ -256,7 +280,12 @@ export function CustomerDetailDialog({
             />
           ) : null}
           {activeTab === CustomerDetailTabKeyEnum.DEBT ? (
-            <DebtTab rows={data.debts ?? []} />
+            <DebtTab
+              customerId={customerId}
+              enabled={debtEnabled}
+              customerName={data.name}
+              customerPhone={data.phone}
+            />
           ) : null}
         </div>
       </PosDialog.Body>

@@ -333,7 +333,7 @@ export function TreasuryCashCountPage() {
           <div className="flex items-stretch">
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-none bg-[#1f2d8a] px-3 py-2 text-sm font-medium text-white hover:bg-[#1a266f]"
+              className="flex items-center gap-1.5 rounded-none bg-primary-blue px-3 py-2 text-sm font-medium text-white hover:bg-primary-blue-hover"
               onClick={() => setCreatePickerOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />

@@ -181,10 +181,12 @@ export interface CheckoutPaymentDraft {
    */
   returnFee: number;
   /**
-   * `true` khi số tiền dòng đầu vẫn tự đồng bộ theo "số tiền cần thanh toán".
-   * Chuyển `false` khi nhân viên tự nhập số / chọn gợi ý.
+   * Hạn thanh toán công nợ (ISO `YYYY-MM-DD`), chọn ở modal "Hạn thanh toán".
+   * Chỉ lưu frontend state — BE chưa có field tương ứng. `null` = chưa đặt.
    */
-  firstAmountAuto: boolean;
+  paymentDueDate: string | null;
+  /** Số ngày được nợ (đồng bộ 2 chiều với `paymentDueDate`). `null` = chưa đặt. */
+  creditDays: number | null;
 }
 
 export interface CheckoutPromotionDraft {
