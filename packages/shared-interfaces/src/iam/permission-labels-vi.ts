@@ -57,6 +57,8 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'goods_receipt.post': 'Ghi nhận nhập kho (hoàn tất phiếu nhập)',
   'inventory.transfer.read': 'Xem phiếu điều chuyển',
   'inventory.transfer.create': 'Tạo phiếu điều chuyển',
+  'inventory.transfer.export': 'Xác nhận xuất kho (điều chuyển)',
+  'inventory.transfer.import': 'Xác nhận nhập kho (điều chuyển)',
   'inventory.transfer.post': 'Ghi nhận điều chuyển (hoàn tất)',
   'inventory.transfer.cancel': 'Hủy phiếu điều chuyển',
   'inventory.adjustment.read': 'Xem phiếu điều chỉnh tồn',

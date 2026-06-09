@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -42,8 +43,134 @@ class TransferOrderLineDto {
   requestedQty: number;
 
   @IsOptional()
+  @IsUUID()
+  sourceStorageId?: string;
+
+  @IsOptional()
   @IsString()
   note?: string;
+}
+
+class ImportTransferOrderLineDto {
+  @IsUUID()
+  itemId: string;
+
+  @IsUUID()
+  locationId: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantity: number;
+
+  @IsOptional()
+  @IsNumber()
+  unitPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+class ImportTransferOrderDto {
+  /** Per-line received Kho/Vị trí from the goods-receipt form. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ImportTransferOrderLineDto)
+  lines?: ImportTransferOrderLineDto[];
+
+  /** Kho nhận — fallback destination warehouse when `lines` is omitted. */
+  @IsOptional()
+  @IsUUID()
+  destinationStorageId?: string;
+
+  /** Đối tượng (counterparty provider) carried onto the spawned receipt. */
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  /** Người giao (free-text deliverer name). */
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  /** Tham chiếu — FE-supplied reference codes. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  /** User-entered receive date+time (ISO). */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
+}
+
+class ExportTransferOrderLineDto {
+  @IsUUID()
+  itemId: string;
+
+  @IsUUID()
+  locationId: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantity: number;
+
+  @IsOptional()
+  @IsNumber()
+  unitPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+class ExportTransferOrderDto {
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExportTransferOrderLineDto)
+  lines?: ExportTransferOrderLineDto[];
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  /** Đối tượng (counterparty provider) selected on the goods-issue form. */
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  /** Người giao (free-text deliverer name). */
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  /** Tham chiếu — FE-supplied reference codes. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  /** User-entered issue date+time (ISO). */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
+}
+
+class IssuableTransferOrderQueryDto {
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }
 
 class CreateTransferOrderDto {
@@ -69,6 +196,11 @@ class CreateTransferOrderDto {
   @IsString()
   notes?: string;
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentIds?: string[];
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -76,15 +208,47 @@ class CreateTransferOrderDto {
   lines: TransferOrderLineDto[];
 }
 
+class UpdateTransferOrderDto {
+  @IsOptional()
+  @IsString()
+  sourceBranchId?: string;
+
+  @IsOptional()
+  @IsString()
+  destinationBranchId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sourceStorageId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  destinationStorageId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  requestedDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TransferOrderLineDto)
+  lines?: TransferOrderLineDto[];
+}
+
 class TransferOrderQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(TransferOrderStatus)
   status?: TransferOrderStatus;
-}
-
-class MarkExecutedDto {
-  @IsUUID()
-  stockTransferId: string;
 }
 
 @Controller('inventory/transfer-orders')
@@ -113,6 +277,36 @@ export class TransferOrderController {
     });
   }
 
+  @Get('issuable')
+  @RequirePermission('inventory.transfer.read')
+  listIssuable(
+    @Query() query: IssuableTransferOrderQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.listIssuable(
+      { from: query.from, to: query.to },
+      actor,
+    );
+  }
+
+  @Get('importable')
+  @RequirePermission('inventory.transfer.read')
+  listImportable(
+    @Query() query: IssuableTransferOrderQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.listImportable(
+      { from: query.from, to: query.to },
+      actor,
+    );
+  }
+
+  @Get('by-code/:code')
+  @RequirePermission('inventory.transfer.read')
+  getByCode(@Param('code') code: string, @Actor() actor: ActorContext) {
+    return this.service.getByCode(code, actor.organizationId);
+  }
+
   @Get(':id')
   @RequirePermission('inventory.transfer.read')
   getById(
@@ -122,24 +316,36 @@ export class TransferOrderController {
     return this.service.getById(id, actor.organizationId);
   }
 
-  @Post(':id/approve')
-  @RequirePermission('inventory.transfer.approve')
-  approve(
+  @Patch(':id')
+  @RequirePermission('inventory.transfer.create')
+  update(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTransferOrderDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.approve(id, actor);
+    return this.service.update(id, dto, actor);
   }
 
-  @Post(':id/execute')
-  @RequirePermission('inventory.transfer.create')
+  @Post(':id/export')
+  @RequirePermission('inventory.transfer.export')
   @RequireBranchScope()
-  markExecuted(
+  confirmExport(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: MarkExecutedDto,
+    @Body() dto: ExportTransferOrderDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.markExecuted(id, dto.stockTransferId, actor);
+    return this.service.confirmExport(id, actor, dto);
+  }
+
+  @Post(':id/import')
+  @RequirePermission('inventory.transfer.import')
+  @RequireBranchScope()
+  confirmImport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ImportTransferOrderDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.confirmImport(id, actor, dto);
   }
 
   @Delete(':id')

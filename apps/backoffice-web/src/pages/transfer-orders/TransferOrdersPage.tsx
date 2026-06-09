@@ -15,6 +15,8 @@ import {
   type UnsavedChangesChoice,
 } from "@erp/ui";
 import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
   ChevronLeft,
   ChevronRight,
   CloudUpload,
@@ -50,14 +52,14 @@ import {
   getPersistableLines,
 } from "../inventory-line-normalization";
 
-type TOStatus = "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
+// Two-phase transfer voucher: DRAFT → IN_PROGRESS (exported by source branch)
+// → COMPLETED (imported by destination branch). CANCELLED is terminal.
+type TOStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
-// Misa lumps DRAFT and APPROVED into "Chưa thực hiện" — internal granularity
-// is preserved on the row, but users only see two outcomes: not-yet vs done.
 const STATUS_LABEL: Record<TOStatus, string> = {
-  DRAFT: "Chưa thực hiện",
-  APPROVED: "Chưa thực hiện",
-  EXECUTED: "Đã thực hiện",
+  DRAFT: "Nháp",
+  IN_PROGRESS: "Đang điều chuyển",
+  COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
 };
 
@@ -65,6 +67,7 @@ interface TransferOrderLine {
   id: string;
   itemId: string;
   requestedQty: string | number;
+  sourceStorageId?: string | null;
   note?: string | null;
   item?: { id: string; code: string; name: string; unit?: string } | null;
 }
@@ -79,6 +82,8 @@ interface TransferOrder {
   destinationStorageId?: string | null;
   requestedDate?: string | null;
   notes?: string | null;
+  exportGoodsIssueId?: string | null;
+  importGoodsReceiptId?: string | null;
   lines: TransferOrderLine[];
   createdAt: string;
 }
@@ -151,6 +156,7 @@ export function TransferOrdersPage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingOrder, setEditingOrder] = useState<TransferOrder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TransferOrder | null>(null);
+  const [importTarget, setImportTarget] = useState<TransferOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -240,11 +246,52 @@ export function TransferOrdersPage() {
     }
   };
 
+  const handleExport = async (order: TransferOrder) => {
+    setActionLoading(order.id);
+    try {
+      await apiClient.post(`/inventory/transfer-orders/${order.id}/export`);
+      toast.success("Đã xác nhận xuất kho. Phiếu chuyển sang trạng thái Đang điều chuyển.");
+      await reloadAfterMutation();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleImport = async (
+    order: TransferOrder,
+    destinationStorageId: string,
+  ) => {
+    setActionLoading(order.id);
+    try {
+      await apiClient.post(`/inventory/transfer-orders/${order.id}/import`, {
+        destinationStorageId,
+      });
+      toast.success("Đã xác nhận nhập kho. Phiếu hoàn thành.");
+      setImportTarget(null);
+      await reloadAfterMutation();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const activeBranchId = getActiveBranchId();
   const editable = selectedOrder?.status === "DRAFT";
   const deletable =
     !!selectedOrder &&
-    selectedOrder.status !== "EXECUTED" &&
+    selectedOrder.status !== "COMPLETED" &&
     selectedOrder.status !== "CANCELLED";
+  // Export: only a DRAFT voucher, and only from its source branch.
+  const exportable =
+    selectedOrder?.status === "DRAFT" &&
+    activeBranchId === selectedOrder.sourceBranchId;
+  // Import: only an IN_PROGRESS voucher, and only from its destination branch.
+  const importable =
+    selectedOrder?.status === "IN_PROGRESS" &&
+    activeBranchId === selectedOrder.destinationBranchId;
 
   const toolbarItems: ToolbarItem[] = [
     {
@@ -285,10 +332,12 @@ export function TransferOrdersPage() {
       disabled: !selectedOrder || !editable,
       onClick: () => {
         if (!editable) {
-          toast.info("Chỉ sửa được lệnh ở trạng thái Chưa thực hiện (chưa duyệt).");
+          toast.info("Chỉ sửa được phiếu ở trạng thái Nháp.");
           return;
         }
-        toast.info("Tính năng sửa lệnh đang được cập nhật. Vui lòng nhân bản phiếu mới.");
+        if (!selectedOrder) return;
+        setEditingOrder(selectedOrder);
+        setDialogMode("edit");
       },
     },
     {
@@ -298,6 +347,39 @@ export function TransferOrdersPage() {
       variant: "danger",
       disabled: !deletable,
       onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
+    },
+    { id: "sep-flow", type: "separator" },
+    {
+      id: "export",
+      label: "Xuất kho",
+      icon: ArrowUpFromLine,
+      disabled: !exportable || !!actionLoading,
+      onClick: () => {
+        if (!selectedOrder) return;
+        if (!exportable) {
+          toast.info(
+            "Chỉ chi nhánh nguồn xác nhận xuất được, và phiếu phải ở trạng thái Nháp.",
+          );
+          return;
+        }
+        void handleExport(selectedOrder);
+      },
+    },
+    {
+      id: "import",
+      label: "Nhập kho",
+      icon: ArrowDownToLine,
+      disabled: !importable || !!actionLoading,
+      onClick: () => {
+        if (!selectedOrder) return;
+        if (!importable) {
+          toast.info(
+            "Chỉ chi nhánh đích xác nhận nhập được, và phiếu phải ở trạng thái Đang điều chuyển.",
+          );
+          return;
+        }
+        setImportTarget(selectedOrder);
+      },
     },
     { id: "sep1", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
@@ -466,18 +548,32 @@ export function TransferOrdersPage() {
             await loadRecords();
           }}
           onRequestDelete={
-            editingOrder && editingOrder.status !== "EXECUTED" && editingOrder.status !== "CANCELLED"
+            editingOrder && editingOrder.status !== "COMPLETED" && editingOrder.status !== "CANCELLED"
               ? () => setConfirmDelete(editingOrder)
               : undefined
           }
         />
       )}
 
+      {importTarget && (
+        <ImportWarehouseDialog
+          order={importTarget}
+          storages={storages}
+          loading={actionLoading === importTarget.id}
+          onCancel={() => setImportTarget(null)}
+          onConfirm={(storageId) => void handleImport(importTarget, storageId)}
+        />
+      )}
+
       {confirmDelete && (
         <ConfirmActionModal
-          title="Hủy lệnh điều chuyển"
-          message={`Xác nhận hủy lệnh ${confirmDelete.documentNumber ?? confirmDelete.id}? Lệnh sẽ chuyển sang trạng thái Đã hủy.`}
-          confirmLabel="Hủy lệnh"
+          title="Hủy phiếu điều chuyển"
+          message={
+            confirmDelete.status === "IN_PROGRESS"
+              ? `Phiếu ${confirmDelete.documentNumber ?? confirmDelete.id} đã xuất kho. Hủy sẽ đảo bút xuất, hoàn trả tồn về kho nguồn. Tiếp tục?`
+              : `Xác nhận hủy phiếu ${confirmDelete.documentNumber ?? confirmDelete.id}? Phiếu sẽ chuyển sang trạng thái Đã hủy.`
+          }
+          confirmLabel="Hủy phiếu"
           cancelLabel="Quay lại"
           loading={actionLoading === confirmDelete.id}
           onCancel={() => setConfirmDelete(null)}
@@ -502,6 +598,15 @@ function DetailPanel({
       <div className="mb-2 inline-block border-b-2 border-primary px-2 pb-1 text-sm font-semibold">
         Chi tiết
       </div>
+      {order?.destinationStorageId && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Kho nhập:{" "}
+          <strong className="text-foreground">
+            {storageNameById.get(order.destinationStorageId) ??
+              order.destinationStorageId}
+          </strong>
+        </p>
+      )}
       {!order ? (
         <p className="text-sm text-muted-foreground">
           Chọn một lệnh để xem chi tiết.
@@ -516,7 +621,7 @@ function DetailPanel({
             <tr className="border-b">
               <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
               <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">Kho nguồn</th>
               <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
               <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
@@ -527,14 +632,13 @@ function DetailPanel({
               const code = line.item?.code ?? line.itemId.slice(0, 8);
               const name = line.item?.name ?? "—";
               const unit = line.item?.unit ?? "—";
-              const storageName = order.sourceStorageId
-                ? storageNameById.get(order.sourceStorageId) ?? "—"
-                : "—";
+              const srcId = line.sourceStorageId ?? order.sourceStorageId;
+              const srcName = srcId ? storageNameById.get(srcId) ?? "—" : "—";
               return (
                 <tr key={line.id} className="border-b">
                   <td className="border-r px-2 py-1 font-mono text-xs">{code}</td>
                   <td className="border-r px-2 py-1">{name}</td>
-                  <td className="border-r px-2 py-1">{storageName}</td>
+                  <td className="border-r px-2 py-1">{srcName}</td>
                   <td className="border-r px-2 py-1">{unit}</td>
                   <td className="border-r px-2 py-1 text-right tabular-nums">
                     {Number(line.requestedQty).toLocaleString("vi-VN")}
@@ -558,6 +662,9 @@ interface FormLine {
   itemName: string;
   unit: string;
   requestedQty: number;
+  // Per-line source warehouse; empty falls back to the header source storage.
+  // The destination warehouse is chosen later, at import time.
+  sourceStorageId: string;
   note: string;
 }
 
@@ -567,6 +674,7 @@ const emptyLine = (): FormLine => ({
   itemName: "",
   unit: "",
   requestedQty: 1,
+  sourceStorageId: "",
   note: "",
 });
 
@@ -635,6 +743,7 @@ function TransferOrderFormDialog({
           itemName: l.item?.name ?? "",
           unit: l.item?.unit ?? "",
           requestedQty: Number(l.requestedQty),
+          sourceStorageId: l.sourceStorageId ?? "",
           note: l.note ?? "",
         }));
 
@@ -663,6 +772,11 @@ function TransferOrderFormDialog({
       setSourceStorageLabel(first.name);
     }
   }, [sourceBranchId, sourceStorageId, storages]);
+
+  const sourceStorageOptions = useMemo(
+    () => storages.filter((s) => s.branchId === sourceBranchId),
+    [storages, sourceBranchId],
+  );
 
   // Once branches finish loading, backfill the source branch label if we
   // started with just an active_branch_id from localStorage.
@@ -737,7 +851,7 @@ function TransferOrderFormDialog({
     }
     setSaving(true);
     try {
-      await apiClient.post("/inventory/transfer-orders", {
+      const payload = {
         sourceBranchId,
         destinationBranchId: destBranchId,
         sourceStorageId: sourceStorageId || undefined,
@@ -746,11 +860,18 @@ function TransferOrderFormDialog({
         lines: persistableLines.map((l) => ({
           itemId: l.itemId,
           requestedQty: Number(l.requestedQty),
+          sourceStorageId: l.sourceStorageId || sourceStorageId || undefined,
           note: l.note || undefined,
         })),
-      });
+      };
+      if (mode === "edit" && initial?.id) {
+        await apiClient.patch(`/inventory/transfer-orders/${initial.id}`, payload);
+        toast.success("Đã cập nhật phiếu điều chuyển.");
+      } else {
+        await apiClient.post("/inventory/transfer-orders", payload);
+        toast.success("Đã tạo phiếu điều chuyển.");
+      }
       setDirty(false);
-      toast.success("Đã tạo lệnh điều chuyển.");
       await onSaved();
       return true;
     } catch (err) {
@@ -766,6 +887,8 @@ function TransferOrderFormDialog({
     docDate,
     notes,
     lines,
+    mode,
+    initial,
     onSaved,
   ]);
 
@@ -819,7 +942,7 @@ function TransferOrderFormDialog({
       variant: "danger",
       disabled:
         !onRequestDelete ||
-        initial?.status === "EXECUTED" ||
+        initial?.status === "COMPLETED" ||
         initial?.status === "CANCELLED",
       onClick: () => onRequestDelete?.(),
     },
@@ -900,11 +1023,30 @@ function TransferOrderFormDialog({
       getValue: (row) => row.itemName,
     },
     {
-      key: "warehouse",
+      key: "sourceStorageId",
       label: "Kho",
-      width: 180,
-      type: "readonly",
-      getValue: () => sourceStorageLabel,
+      width: 200,
+      renderEditor: (row, idx) => (
+        <select
+          className="h-full w-full bg-transparent px-2 text-sm outline-none disabled:opacity-60"
+          value={row.sourceStorageId || sourceStorageId}
+          disabled={isView}
+          onChange={(e) => {
+            const v = e.target.value;
+            setLines((prev) =>
+              prev.map((l, i) => (i === idx ? { ...l, sourceStorageId: v } : l)),
+            );
+            markDirty();
+          }}
+        >
+          <option value="">— Chọn kho —</option>
+          {sourceStorageOptions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      ),
     },
     {
       key: "unit",
@@ -1125,6 +1267,64 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
     <div className="grid grid-cols-[120px_1fr] items-center gap-3">
       <label className="text-sm text-muted-foreground">{label}</label>
       <div>{children}</div>
+    </div>
+  );
+}
+
+// ─── Import dialog: choose the destination warehouse at receipt time ───────────
+
+interface ImportWarehouseDialogProps {
+  order: TransferOrder;
+  storages: InventoryStorage[];
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: (destinationStorageId: string) => void;
+}
+
+function ImportWarehouseDialog({
+  order,
+  storages,
+  loading,
+  onCancel,
+  onConfirm,
+}: ImportWarehouseDialogProps) {
+  const destStorages = useMemo(
+    () => storages.filter((s) => s.branchId === order.destinationBranchId),
+    [storages, order.destinationBranchId],
+  );
+  const [storageId, setStorageId] = useState(
+    order.destinationStorageId ?? destStorages[0]?.id ?? "",
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-[420px] rounded-md bg-background p-5 shadow-lg">
+        <h3 className="mb-1 text-base font-semibold">Xác nhận nhập kho</h3>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Chọn kho nhập cho phiếu{" "}
+          <strong className="text-foreground">{order.documentNumber}</strong>:
+        </p>
+        <select
+          className="mb-4 w-full rounded border px-2 py-1.5 text-sm"
+          value={storageId}
+          onChange={(e) => setStorageId(e.target.value)}
+        >
+          <option value="">— Chọn kho —</option>
+          {destStorages.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
+            Quay lại
+          </Button>
+          <Button onClick={() => onConfirm(storageId)} disabled={loading || !storageId}>
+            Xác nhận nhập
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -141,6 +141,31 @@ export class ProductStorageLocationService {
     });
   }
 
+  /**
+   * Resolve an item's arranged bin ("đã sắp") in a storage: item → productId →
+   * ProductStorageLocation(productId, storageId) → location. Null when the item
+   * has no product or no assignment yet. Used by the goods-receipt form to
+   * auto-fill Vị trí when a Kho is picked.
+   */
+  async resolveAssignedLocation(
+    itemId: string,
+    storageId: string,
+    organizationId: string,
+  ): Promise<{ locationId: string; code: string } | null> {
+    const item = await this.itemRepo.findOne({
+      where: { id: itemId, organizationId },
+    });
+    if (!item?.productId) return null;
+    const mapping = await this.pslRepo.findOne({
+      where: { productId: item.productId, storageId, organizationId },
+    });
+    if (!mapping) return null;
+    const location = await this.locationRepo.findOne({
+      where: { id: mapping.locationId, organizationId },
+    });
+    return location ? { locationId: location.id, code: location.code } : null;
+  }
+
   async setLocation(
     productId: string,
     storageId: string,

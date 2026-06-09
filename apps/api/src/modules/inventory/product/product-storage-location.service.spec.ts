@@ -238,4 +238,37 @@ describe('ProductStorageLocationService', () => {
       );
     });
   });
+
+  describe('resolveAssignedLocation', () => {
+    it('returns the arranged bin (id + code) for an item in a storage', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      pslRepo.findOne.mockResolvedValue({
+        productId: 'prod-1',
+        storageId: 'storage-1',
+        locationId: 'loc-A01',
+      });
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-A01', code: 'A-01' });
+
+      const res = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+      expect(res).toEqual({ locationId: 'loc-A01', code: 'A-01' });
+    });
+
+    it('returns null when the item has no product', async () => {
+      itemRepo.findOne.mockResolvedValue({ id: 'item-1', productId: null });
+      const res = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+      expect(res).toBeNull();
+      expect(pslRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the product is not arranged in the storage', async () => {
+      itemRepo.findOne.mockResolvedValue({ id: 'item-1', productId: 'prod-1' });
+      pslRepo.findOne.mockResolvedValue(null);
+      const res = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+      expect(res).toBeNull();
+    });
+  });
 });
