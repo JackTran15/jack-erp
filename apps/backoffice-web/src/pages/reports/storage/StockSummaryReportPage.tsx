@@ -5,6 +5,7 @@ import {
   type PeriodValue,
 } from "@erp/ui";
 import {
+  ALL_VALUE,
   StorageReportShell,
   buildApiFilters,
   resolveLabel,
@@ -90,14 +91,28 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
 
 export function StockSummaryReportPage() {
   const { data: branches } = useBranches();
-  const { options: warehouseOptions } = useReportStorages();
+  const { options: allWarehouseOptions } = useReportStorages();
   const { options: groupOptions } = useReportCategories();
   const { options: unitOptions } = useReportUnits();
+
+  const [filterValues, setFilterValues] = useState<FilterValues>({});
 
   const storeOptions = useMemo(
     () => (branches ?? []).map((b) => ({ value: b.id, label: b.name })),
     [branches],
   );
+
+  // Filter warehouse options by the applied store selection.
+  const warehouseOptions = useMemo(() => {
+    const mode = filterValues.store as string | undefined;
+    if (!mode || mode === ALL_VALUE) return allWarehouseOptions;
+    const branchIds = filterValues["store__values"] as string[] | undefined;
+    if (!branchIds || branchIds.length === 0) return allWarehouseOptions;
+    const branchSet = new Set(branchIds);
+    return allWarehouseOptions.filter(
+      (o) => o.value === ALL_VALUE || (o.branchId != null && branchSet.has(o.branchId)),
+    );
+  }, [allWarehouseOptions, filterValues]);
 
   const filterFields = useMemo<FilterField[]>(
     () => [
@@ -115,6 +130,13 @@ export function StockSummaryReportPage() {
         label: "Kho",
         type: "select",
         options: warehouseOptions,
+        dependsOn: "store",
+        visibleWhen: (draft) => {
+          const mode = draft.store as string | undefined;
+          if (!mode || mode === ALL_VALUE) return false;
+          const selected = draft["store__values"] as string[] | undefined;
+          return selected != null && selected.length > 0;
+        },
       },
       {
         key: "group",
@@ -138,8 +160,6 @@ export function StockSummaryReportPage() {
     ],
     [storeOptions, warehouseOptions, groupOptions, unitOptions],
   );
-
-  const [filterValues, setFilterValues] = useState<FilterValues>({});
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),

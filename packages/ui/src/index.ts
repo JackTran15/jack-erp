@@ -55,7 +55,27 @@ export { LargeTextInput, type LargeTextInputProps } from "./components/large-tex
 export { DateTimeField, type DateTimeFieldProps } from "./components/date-time-field";
 export { TagsInput, type TagsInputProps } from "./components/tags-input";
 export { MultiSelect, type MultiSelectOption, type MultiSelectProps } from "./components/multi-select";
+export { SingleSelect, type SingleSelectOption, type SingleSelectProps } from "./components/single-select";
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from "./components/select";
 export { AppModal, type AppModalProps } from "./components/app-modal";
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverClose,
+  PopoverPortal,
+  PopoverContent,
+} from "./components/popover";
 
 export {
   DropdownMenu,
