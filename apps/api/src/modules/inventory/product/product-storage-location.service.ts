@@ -40,12 +40,13 @@ export class ProductStorageLocationService {
     });
     if (!item?.productId) return;
 
+    // The database constraint is one mapping per product + storage. Legacy rows
+    // may have branch_id NULL, so branch access is enforced through locations.
     const existing = await this.pslRepo.findOne({
       where: {
         productId: item.productId,
         storageId,
         organizationId: actor.organizationId,
-        branchId: actor.branchId,
       },
     });
 
@@ -131,11 +132,11 @@ export class ProductStorageLocationService {
     productId: string,
     actor: ActorContext,
   ): Promise<ProductStorageLocationEntity[]> {
+    // Include legacy branch_id NULL rows; callers validate the resolved location.
     return this.pslRepo.find({
       where: {
         productId,
         organizationId: actor.organizationId,
-        branchId: actor.branchId,
       },
     });
   }
@@ -146,12 +147,12 @@ export class ProductStorageLocationService {
     locationId: string,
     actor: ActorContext,
   ): Promise<ProductStorageLocationEntity> {
+    // Match the database uniqueness key and reuse legacy branch_id NULL rows.
     const existing = await this.pslRepo.findOne({
       where: {
         productId,
         storageId,
         organizationId: actor.organizationId,
-        branchId: actor.branchId,
       },
     });
 

@@ -1306,42 +1306,58 @@ function PurchaseOrderFormDialog({
           value={row.itemLabel}
           onValueChange={(val) => {
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, itemLabel: val, itemId: "" } : l)),
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      itemLabel: val,
+                      itemId: "",
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
+              ),
             );
             markDirty();
           }}
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-            let storageId = "";
-            let storageLabel = "";
+            let selectedStorageId = "";
+            let selectedStorageLabel = "";
             setLines((prev) => {
               const updated = prev.map((l, i) => {
                 if (i !== idx) return l;
-                storageId = l.storageId;
-                storageLabel = l.storageLabel;
-                if (!storageId) {
+                selectedStorageId = l.storageId;
+                selectedStorageLabel = l.storageLabel;
+                if (!selectedStorageId) {
                   for (let j = i - 1; j >= 0; j--) {
                     if (prev[j].storageId) {
-                      storageId = prev[j].storageId;
-                      storageLabel = prev[j].storageLabel;
+                      selectedStorageId = prev[j].storageId;
+                      selectedStorageLabel = prev[j].storageLabel;
                       break;
                     }
                   }
+                }
+                if (!selectedStorageId) {
+                  selectedStorageId = storageId;
+                  selectedStorageLabel = storageQuery;
                 }
                 return {
                   ...l,
                   itemId: item.id,
                   itemLabel: item.code,
                   unit: item.unit,
-                  storageId,
-                  storageLabel,
+                  storageId: selectedStorageId,
+                  storageLabel: selectedStorageLabel,
+                  locationId: "",
+                  locationLabel: "",
                   // Only overwrite if current price is 0 — preserve user's manual edits.
                   unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
                 };
               });
 
-              if (storageId) {
-                fillPreferredShelf(idx, item.id, storageId);
+              if (selectedStorageId) {
+                fillPreferredShelf(idx, item.id, selectedStorageId);
               }
 
               return normalizeFormLines(updated);
@@ -1387,7 +1403,15 @@ function PurchaseOrderFormDialog({
           onValueChange={(val) => {
             setLines((prev) =>
               prev.map((l, i) =>
-                i === idx ? { ...l, storageLabel: val, storageId: "" } : l,
+                i === idx
+                  ? {
+                      ...l,
+                      storageLabel: val,
+                      storageId: "",
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
               ),
             );
             markDirty();

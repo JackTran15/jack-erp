@@ -693,6 +693,75 @@ describe('InventoryLocationStockService', () => {
   });
 
   describe('getPreferredShelf', () => {
+    it('falls back to an existing stock location for a legacy item', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: null,
+        organizationId: 'org-1',
+      });
+      stockBalanceRepo.find.mockResolvedValue([
+        {
+          itemId: 'item-1',
+          locationId: 'loc-stock',
+          quantity: 14,
+        },
+      ]);
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-stock',
+        code: 'HCM-B-01',
+        name: 'Kệ B-01',
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({
+        id: 'loc-stock',
+        code: 'HCM-B-01',
+        name: 'Kệ B-01',
+      });
+
+      expect(stockBalanceRepo.find).toHaveBeenCalledWith({
+        where: {
+          organizationId: 'org-1',
+          itemId: 'item-1',
+          branchId: 'branch-1',
+        },
+        order: {
+          quantity: 'DESC',
+          lastMovementAt: 'DESC',
+        },
+      });
+    });
+
+    it('returns a legacy preferred shelf mapping without a branch id', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      pslService.listByProduct.mockResolvedValue([
+        {
+          productId: 'prod-1',
+          storageId: 'storage-1',
+          locationId: 'loc-1',
+          branchId: null,
+        },
+      ]);
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-1',
+        code: 'A-01',
+        name: 'Kệ A-01',
+      });
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toEqual({
+        id: 'loc-1',
+        code: 'A-01',
+        name: 'Kệ A-01',
+      });
+    });
+
     it('returns null when the preferred shelf belongs to another branch', async () => {
       itemRepo.findOne.mockResolvedValue({
         id: 'item-1',
@@ -717,6 +786,7 @@ describe('InventoryLocationStockService', () => {
           id: 'loc-other-branch',
           organizationId: 'org-1',
           storageId: 'storage-1',
+          isUnassigned: false,
           storage: { branchId: 'branch-1' },
         },
         relations: { storage: true },
