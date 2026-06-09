@@ -187,7 +187,7 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
 
         <div className="max-h-[360px] overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-muted/60 text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-muted text-muted-foreground [&_th]:bg-muted">
               <tr>
                 <th className="w-10 p-2" />
                 <th className="p-2 text-left font-medium">Ngày</th>

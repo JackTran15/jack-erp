@@ -427,7 +427,7 @@ export function LookupField<T>({
               >
                 {columns && columns.length > 0 ? (
                   <table id={listboxId} role="listbox" className="w-full border-collapse text-sm">
-                    <thead className="sticky top-0 z-10 bg-muted/80 text-left backdrop-blur">
+                    <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
                       <tr>
                         {columns.map((col) => (
                           <th

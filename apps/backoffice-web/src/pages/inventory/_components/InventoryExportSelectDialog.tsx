@@ -323,7 +323,7 @@ export function InventoryExportSelectDialog({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground [&_th]:bg-muted">
               <tr>
                 <th className="w-8 px-2 py-2" />
                 <th className="w-8 px-2 py-2">
