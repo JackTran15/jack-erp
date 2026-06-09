@@ -1569,7 +1569,7 @@ export function StockTakeFormDialog({
         }
         detail={
           <div className="flex h-full min-h-0 flex-col">
-            <label className="flex shrink-0 items-center gap-2 px-3 py-1.5 text-sm text-foreground">
+            <label className="flex h-9 shrink-0 items-center gap-2 px-3 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={countByValue}
@@ -1581,18 +1581,18 @@ export function StockTakeFormDialog({
               />
               Kiểm kê theo giá trị
             </label>
-            <div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-2">
-              <div className="flex items-end gap-2">
+            <div className="flex h-9 shrink-0 items-center justify-between px-2">
+              <div className="flex h-full items-end gap-1">
                 <button
                   type="button"
-                  className={`border-b-2 px-3 py-2 text-sm font-semibold ${detailTab === "items" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+                  className={`h-full border-b-2 px-3 text-sm font-semibold ${detailTab === "items" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                   onClick={() => setDetailTab("items")}
                 >
                   Hàng hóa
                 </button>
                 <button
                   type="button"
-                  className={`border-b-2 px-3 py-2 text-sm font-semibold ${detailTab === "members" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+                  className={`h-full border-b-2 px-3 text-sm font-semibold ${detailTab === "members" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                   onClick={() => setDetailTab("members")}
                 >
                   Thành viên tham gia
@@ -1600,7 +1600,7 @@ export function StockTakeFormDialog({
               </div>
               {detailTab === "items" ? (
                 <div className="flex items-center gap-1 text-sm">
-                  <label className="flex items-center gap-1 whitespace-nowrap px-1 text-muted-foreground">
+                  <label className="flex h-8 items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-muted-foreground hover:bg-accent">
                     <input
                       type="checkbox"
                       checked={scanBarcode}
@@ -1613,6 +1613,7 @@ export function StockTakeFormDialog({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="h-8 rounded-sm px-2 text-primary-blue"
                     disabled={isNew}
                     onClick={() => void handleExportExcel()}
                   >
@@ -1623,6 +1624,7 @@ export function StockTakeFormDialog({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="h-8 rounded-sm px-2 text-primary-blue"
                     disabled={isLocked}
                     onClick={() => importInputRef.current?.click()}
                   >

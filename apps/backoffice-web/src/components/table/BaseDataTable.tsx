@@ -136,6 +136,7 @@ function computeFrozenOffsets<T>(
 }
 
 const FROZEN_BG = "bg-background";
+const HEADER_ROW_HEIGHT = 32;
 /** Box-shadow used to draw a clean right edge on the rightmost frozen column. */
 const FROZEN_EDGE_SHADOW = "1px 0 0 0 hsl(var(--border))";
 
@@ -284,10 +285,10 @@ export function BaseDataTable<T>({
   const hasGroups = groupSpans.some((g) => g.group);
   const leadingWidth = typeof leadingColumn?.width === "number" ? leadingColumn.width : 0;
   const { offsets: frozenOffsets, lastFrozenKey } = computeFrozenOffsets(columns, leadingWidth);
-  // Pixel offsets for the sticky-top rows. h-10 = 40px each.
+  // Pixel offsets for the compact sticky header rows.
   const TOP_TITLE = 0;
-  const TOP_SUB = hasGroups ? 40 : 0;
-  const TOP_FILTER = hasGroups ? 80 : 40;
+  const TOP_SUB = hasGroups ? HEADER_ROW_HEIGHT : 0;
+  const TOP_FILTER = hasGroups ? HEADER_ROW_HEIGHT * 2 : HEADER_ROW_HEIGHT;
 
   const frozenStyle = (col: TableColumn<T>): React.CSSProperties | undefined => {
     if (!col.frozen) return undefined;
@@ -299,9 +300,9 @@ export function BaseDataTable<T>({
   };
 
   return (
-    <div className={cn("isolate flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background", className)}>
+    <div className={cn("isolate flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-background", className)}>
       <div className={cn("min-h-0 flex-1 overflow-auto", scrollContainerClassName)}>
-        <table className="w-full border-collapse text-sm [&_td]:border [&_td]:border-border [&_th]:border [&_th]:border-border">
+        <table className="w-full border-separate border-spacing-0 text-sm [&_td]:border-b [&_td]:border-r [&_td]:border-border [&_th]:border-b [&_th]:border-r [&_th]:border-border">
           <colgroup>
             {leadingColumn ? <col style={leadingColumn.width ? { width: leadingColumn.width, minWidth: leadingColumn.width } : undefined} /> : null}
             {columns.map((column) => {
@@ -326,7 +327,7 @@ export function BaseDataTable<T>({
                 <th
                   rowSpan={hasGroups ? 2 : 1}
                   className={cn(
-                    "sticky top-0 h-10 border-b border-border bg-background px-2 py-0 text-center",
+                    "sticky top-0 h-8 bg-muted px-1 py-0 text-center",
                     leadingColumn.headerClassName,
                   )}
                   style={{ top: TOP_TITLE, zIndex: 25 }}
@@ -359,7 +360,7 @@ export function BaseDataTable<T>({
                   <th
                     key={`grp-${g.startIndex}`}
                     colSpan={g.span}
-                    className="group sticky h-10 border-b border-border bg-background px-3 py-0 text-center text-sm font-semibold relative"
+                    className="group sticky h-8 bg-muted px-2 py-0 text-center text-sm font-semibold relative"
                     style={{ top: TOP_TITLE, zIndex: 25 }}
                   >
                     {g.group}
@@ -378,7 +379,7 @@ export function BaseDataTable<T>({
               {renderActions ? (
                 <th
                   rowSpan={hasGroups ? 2 : 1}
-                  className="sticky top-0 h-10 border-b border-border bg-background px-3 py-0 text-left text-sm font-semibold whitespace-nowrap"
+                  className="sticky top-0 h-8 bg-muted px-2 py-0 text-center text-sm font-semibold whitespace-nowrap"
                   style={{ top: TOP_TITLE, zIndex: 25 }}
                 >
                   {actionsLabel}
@@ -410,7 +411,7 @@ export function BaseDataTable<T>({
               <tr>
                 {leadingColumn ? (
                   <th
-                    className="sticky z-20 h-10 border-b border-border bg-background px-2 py-0 text-left text-xs text-muted-foreground shadow-[0_1px_0_0_rgb(0_0_0_/_0.04)]"
+                    className="sticky z-20 h-8 bg-background p-0 text-left text-xs text-muted-foreground"
                     style={{ top: TOP_FILTER }}
                   >
                     {leadingColumn.filterHeader}
@@ -424,7 +425,7 @@ export function BaseDataTable<T>({
                     <th
                       key={`${column.key}-filter`}
                       className={cn(
-                        "z-20 h-10 border-b border-border bg-background px-2 py-0 align-middle shadow-[0_1px_0_0_rgb(0_0_0_/_0.04)]",
+                        "z-20 h-8 bg-background p-0 align-middle",
                         column.headerClassName,
                         column.frozen && FROZEN_BG,
                       )}
@@ -437,7 +438,7 @@ export function BaseDataTable<T>({
                     >
                       {kind === "none" ? null : kind === "select" ? (
                         <select
-                          className="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs font-normal"
+                          className="h-8 w-full min-w-0 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
                           value={activeFilter?.value ?? ""}
                           onChange={(event) => {
                             // Select filters always use exact-match semantics.
@@ -456,11 +457,11 @@ export function BaseDataTable<T>({
                           ))}
                         </select>
                       ) : kind === "date" || kind === "time" ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">=</span>
+                        <div className="flex h-8 min-w-0 items-stretch">
+                          <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 text-xs font-semibold text-muted-foreground">=</span>
                           <input
                             type={kind}
-                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs font-normal"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
                             value={activeFilter?.value ?? ""}
                             onChange={(event) => {
                               columnFilterControl.onModeChange(column.key, "equals");
@@ -470,10 +471,10 @@ export function BaseDataTable<T>({
                           />
                         </div>
                       ) : kind === "date-range" ? (
-                        <div className="flex items-center gap-1">
+                        <div className="flex h-8 min-w-0 items-stretch">
                           <input
                             type="date"
-                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
                             value={activeFilter?.from ?? ""}
                             onChange={(event) =>
                               columnFilterControl.onRangeChange?.(
@@ -484,10 +485,10 @@ export function BaseDataTable<T>({
                             }
                             aria-label={`Lọc ${column.label} từ ngày`}
                           />
-                          <span className="text-xs text-muted-foreground">–</span>
+                          <span className="inline-flex items-center border-x bg-muted/30 px-1 text-xs text-muted-foreground">–</span>
                           <input
                             type="date"
-                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-1 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
                             value={activeFilter?.to ?? ""}
                             onChange={(event) =>
                               columnFilterControl.onRangeChange?.(
@@ -500,12 +501,12 @@ export function BaseDataTable<T>({
                           />
                         </div>
                       ) : kind === "number-range" ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">≤</span>
+                        <div className="flex h-8 min-w-0 items-stretch">
+                          <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 text-xs font-semibold text-muted-foreground">≤</span>
                           <input
                             type="number"
                             inputMode="numeric"
-                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs font-normal"
+                            className="h-8 min-w-0 flex-1 border-0 bg-background px-2 text-xs font-normal outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
                             placeholder="Giá trị..."
                             value={activeFilter?.value ?? ""}
                             onChange={(event) =>
@@ -515,14 +516,15 @@ export function BaseDataTable<T>({
                           />
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1">
+                        <div className="flex h-8 min-w-0 items-stretch">
                           <ColumnFilterModeDropdown
                             fieldLabel={column.label}
                             value={activeFilter?.mode ?? DEFAULT_COLUMN_FILTER_MODE}
                             onChange={(mode) => columnFilterControl.onModeChange(column.key, mode)}
+                            triggerClassName="h-8 w-7 rounded-none border-0 border-r shadow-none"
                           />
                           <Input
-                            className="h-8 min-w-0 flex-1 text-xs font-normal"
+                            className="h-8 min-w-0 flex-1 rounded-none border-0 px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
                             placeholder="Giá trị..."
                             value={activeFilter?.value ?? ""}
                             onChange={(event) => columnFilterControl.onValueChange(column.key, event.target.value)}
@@ -534,7 +536,7 @@ export function BaseDataTable<T>({
                 })}
                 {renderActions ? (
                   <th
-                    className="z-20 border-b border-border bg-white px-2 py-1"
+                    className="z-20 h-8 bg-background p-0"
                     style={{ position: "sticky", top: TOP_FILTER }}
                   />
                 ) : null}
@@ -561,14 +563,14 @@ export function BaseDataTable<T>({
                 <tr
                   key={getRowKey(row, index)}
                   className={cn(
-                    "border-b border-border",
-                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-accent/20" : null,
+                    index % 2 === 0 ? "bg-background" : "bg-muted/20",
+                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-blue-50/70" : null,
                   )}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                 >
                   {leadingColumn ? (
-                    <td className={cn("px-2 py-2.5 text-center align-middle", leadingColumn.cellClassName)}>
+                    <td className={cn("h-8 px-1 py-0 text-center align-middle", leadingColumn.cellClassName)}>
                       {leadingColumn.cell(row, index)}
                     </td>
                   ) : null}
@@ -578,9 +580,10 @@ export function BaseDataTable<T>({
                       <td
                         key={column.key}
                         className={cn(
-                          "px-3 py-2.5 align-middle",
+                          "h-8 max-w-0 truncate px-2 py-0 align-middle",
                           column.className,
-                          column.frozen && FROZEN_BG,
+                          column.frozen &&
+                            (index % 2 === 0 ? FROZEN_BG : "bg-muted/20"),
                         )}
                         style={fStyle ? { ...fStyle, zIndex: 5 } : undefined}
                       >
@@ -589,7 +592,7 @@ export function BaseDataTable<T>({
                     );
                   })}
                   {renderActions ? (
-                    <td className="px-3 py-2.5 align-middle">{renderActions(row)}</td>
+                    <td className="h-8 px-2 py-0 align-middle">{renderActions(row)}</td>
                   ) : null}
                 </tr>
               ))
@@ -610,7 +613,7 @@ export function BaseDataTable<T>({
                     <td
                       key={`${column.key}-footer`}
                       className={cn(
-                        "border-t border-border bg-muted px-3 py-2 text-sm font-semibold",
+                        "h-8 border-t border-border bg-muted px-2 py-0 text-xs font-semibold",
                         column.className,
                         column.frozen && FROZEN_BG,
                       )}
@@ -670,8 +673,8 @@ function SortableHeader<T>({
     <th
       rowSpan={rowSpan}
       className={cn(
-        "group relative h-10 border-b border-border bg-background px-3 py-0 text-left text-sm font-semibold whitespace-nowrap",
-        column.frozen && FROZEN_BG,
+        "group relative h-8 bg-muted px-2 py-0 text-center text-sm font-semibold whitespace-nowrap",
+        column.frozen && "bg-muted",
         column.headerClassName,
       )}
       style={{
@@ -707,4 +710,3 @@ function SortableHeader<T>({
     </th>
   );
 }
-
