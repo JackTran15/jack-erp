@@ -36,6 +36,11 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import {
+  SelectTransferReceiptDialog,
+  type TransferReceiptDetail,
+} from "./SelectTransferReceiptDialog";
+import type { ImportableTransferOrderListItem } from "@erp/shared-interfaces";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
@@ -95,6 +100,7 @@ interface GoodsReceipt {
   description?: string | null;
   referenceId?: string | null;
   referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE" | null;
+  references?: string[];
   sourceBranchId?: string | null;
   receivedAt: string;
   locationId: string;
@@ -860,6 +866,18 @@ function PurchaseOrderFormDialog({
   const [reason, setReason] = useState(initial?.reason ?? "");
   const [deliveryPerson, setDeliveryPerson] = useState(initial?.deliveredBy ?? "");
   const [notes, setNotes] = useState(initial?.description ?? "");
+  // "Chọn chứng từ điều chuyển": when set, this receipt is the import leg of a
+  // transfer order — Save calls the transfer import endpoint instead of creating
+  // a standalone goods receipt, and the detail is locked.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sourceTransferOrderId, setSourceTransferOrderId] = useState<string | null>(
+    null,
+  );
+  const [references, setReferences] = useState<string[]>(initial?.references ?? []);
+  // Lines come from the transfer order — lock Mã SKU / Số lượng / Đơn giá and
+  // add/delete, but leave Kho + Vị trí editable so the user picks where to
+  // receive (Vị trí auto-fills from the product's arrangement).
+  const linesLocked = isView || sourceTransferOrderId !== null;
   const initialReceivedAt = initial?.receivedAt ? new Date(initial.receivedAt) : new Date();
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const [docDate, setDocDate] = useState(
@@ -922,6 +940,27 @@ function PurchaseOrderFormDialog({
     };
   }, [stockTakeRefId]);
 
+  // The read carries only source_branch_id (no name) — resolve the branch label
+  // so "Chọn cửa hàng nguồn" shows it when viewing/editing a transfer-in receipt.
+  useEffect(() => {
+    if (!initial?.sourceBranchId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ name?: string }>(
+          `/branches/${initial.sourceBranchId}`,
+        );
+        if (!cancelled) setSourceBranchLabel(data.name ?? "");
+      } catch {
+        // best-effort — the label is informational
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.sourceBranchId]);
+
   const [quickProviderOpen, setQuickProviderOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
@@ -963,6 +1002,75 @@ function PurchaseOrderFormDialog({
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
+
+  /** Load a picked transfer order into the form as the import leg (locked detail). */
+  const prefillFromTransferOrder = useCallback(
+    (detail: TransferReceiptDetail, row: ImportableTransferOrderListItem) => {
+      setPurpose("TRANSFER");
+      setSourceBranchId(detail.sourceBranchId);
+      setSourceBranchLabel(row.sourceBranchName);
+      const xk = row.exportGoodsIssueDocumentNumber ?? detail.documentNumber ?? "";
+      setReferences(xk ? [xk] : []);
+      setSourceTransferOrderId(detail.id);
+      setNotes(
+        `Nhập kho hàng hóa điều chuyển từ cửa hàng ${row.sourceBranchName}`,
+      );
+      // Lines come from the transfer order; the destination bin is resolved
+      // server-side from the chosen Kho nhận, so line Kho/Vị trí stay blank.
+      const mapped: FormLine[] = detail.lines.map((l) => ({
+        itemId: l.itemId,
+        itemLabel: l.item?.code ?? "",
+        unit: l.item?.unit ?? "",
+        storageId: "",
+        storageLabel: "",
+        locationId: "",
+        locationLabel: "",
+        orderedQuantity: Number(l.requestedQty),
+        unitPrice: Number(l.item?.purchasePrice ?? 0),
+        notes: l.note ?? "",
+      }));
+      setLines(mapped);
+      markDirty();
+    },
+    // markDirty/set* are stable closures over component scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  /** Unlink the transfer order — the form reverts to a plain goods receipt. */
+  const clearTransferSource = () => {
+    setSourceTransferOrderId(null);
+    setReferences([]);
+    markDirty();
+  };
+
+  /**
+   * Auto-fill a line's Vị trí from the product's arranged bin ("đã sắp") in the
+   * chosen Kho. No-op when the product isn't arranged there. Best-effort: only
+   * fills if the row still points at the same Kho with no bin picked meanwhile.
+   */
+  const autoFillAssignedLocation = useCallback(
+    async (idx: number, itemId: string, storageId: string) => {
+      try {
+        const { data } = await apiClient.get<
+          { locationId: string; code: string } | null
+        >(
+          `/products/storage-location?itemId=${encodeURIComponent(itemId)}&storageId=${encodeURIComponent(storageId)}`,
+        );
+        if (!data) return;
+        setLines((prev) =>
+          prev.map((l, i) =>
+            i === idx && l.storageId === storageId && !l.locationId
+              ? { ...l, locationId: data.locationId, locationLabel: data.code }
+              : l,
+          ),
+        );
+      } catch {
+        // best-effort — the user can still pick Vị trí manually
+      }
+    },
+    [],
+  );
 
   const searchProviders = useCallback(
     async (query: string, page: number, pageSize?: number) => {
@@ -1152,7 +1260,27 @@ function PurchaseOrderFormDialog({
           note: l.notes || undefined,
         })),
       };
-      if (initial && mode === "edit") {
+      if (sourceTransferOrderId) {
+        // Import leg of a transfer order: post via the two-phase import endpoint
+        // with the form's per-line Kho/Vị trí + header fields. Advances the
+        // order IN_PROGRESS → COMPLETED server-side.
+        await apiClient.post(
+          `/inventory/transfer-orders/${sourceTransferOrderId}/import`,
+          {
+            lines: resolvedLines.map((l) => ({
+              itemId: l.itemId,
+              locationId: l.locationId,
+              quantity: Number(l.orderedQuantity),
+              unitPrice: Number(l.unitPrice),
+              note: l.notes || undefined,
+            })),
+            providerId: providerId || undefined,
+            deliverer: deliveryPerson || undefined,
+            references: references.length ? references : undefined,
+            occurredAt: receivedAtIso,
+          },
+        );
+      } else if (initial && mode === "edit") {
         await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
       } else {
         // Create now saves + posts atomically: the phiếu lands POSTED with the
@@ -1179,6 +1307,8 @@ function PurchaseOrderFormDialog({
     reason,
     deliveryPerson,
     sourceBranchId,
+    sourceTransferOrderId,
+    references,
     initial,
     mode,
     onSaved,
@@ -1306,8 +1436,8 @@ function PurchaseOrderFormDialog({
             { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
             { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
           ]}
-          disabled={isView}
-          onCreateNew={isView ? undefined : () => setQuickItemLineIdx(idx)}
+          disabled={linesLocked}
+          onCreateNew={linesLocked ? undefined : () => setQuickItemLineIdx(idx)}
           className="h-full"
         />
       ),
@@ -1356,6 +1486,8 @@ function PurchaseOrderFormDialog({
               ),
             );
             markDirty();
+            // Auto-fill Vị trí from the product's arrangement ("đã sắp").
+            if (row.itemId) void autoFillAssignedLocation(idx, row.itemId, s.id);
           }}
           search={searchStorages}
           itemKey={(s) => s.id}
@@ -1409,7 +1541,9 @@ function PurchaseOrderFormDialog({
           ]}
           disabled={isView || !row.storageId}
           onCreateNew={
-            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            isView || !row.storageId
+              ? undefined
+              : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
@@ -1432,6 +1566,7 @@ function PurchaseOrderFormDialog({
       filterSymbol: "≤",
       renderEditor: (row, idx) => (
         <MoneyInput
+          disabled={linesLocked}
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none"
           value={row.unitPrice === 0 ? "" : row.unitPrice}
           onChange={(v) => {
@@ -1527,7 +1662,8 @@ function PurchaseOrderFormDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled
+                  onClick={() => setPickerOpen(true)}
+                  disabled={isView}
                 >
                   Chọn chứng từ điều chuyển
                 </Button>
@@ -1611,11 +1747,40 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              {stockTakeRefNumber ? (
-                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              {(() => {
+                // FE-supplied reference list (e.g. the source XK number), plus
+                // any resolved stock-take linkage not already in it.
+                const refs = [
+                  ...references,
+                  ...(stockTakeRefNumber && !references.includes(stockTakeRefNumber)
+                    ? [stockTakeRefNumber]
+                    : []),
+                ];
+                return refs.length ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {refs.map((r) => (
+                      <span
+                        key={r}
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
+                      >
+                        {r}
+                      </span>
+                    ))}
+                    {sourceTransferOrderId && !isView ? (
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-destructive hover:underline"
+                        title="Gỡ liên kết chứng từ điều chuyển"
+                        onClick={clearTransferSource}
+                      >
+                        (x)
+                      </button>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                );
+              })()}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1679,14 +1844,19 @@ function PurchaseOrderFormDialog({
           <LineItemGrid
             columns={lineColumns}
             rows={lines}
-            onChangeCell={(idx, key, value) => {
-              setLines((prev) =>
-                prev.map((l, i) =>
-                  i === idx ? { ...l, [key]: value } : l,
-                ),
-              );
-              markDirty();
-            }}
+            // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
+            onChangeCell={
+              linesLocked
+                ? undefined
+                : (idx, key, value) => {
+                    setLines((prev) =>
+                      prev.map((l, i) =>
+                        i === idx ? { ...l, [key]: value } : l,
+                      ),
+                    );
+                    markDirty();
+                  }
+            }
             onAddRow={() => {
               setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
@@ -1697,8 +1867,8 @@ function PurchaseOrderFormDialog({
               );
               markDirty();
             }}
-            showAddRow={!isView}
-            showRowActions={!isView}
+            showAddRow={!linesLocked}
+            showRowActions={!linesLocked}
           />
         }
         footerSummary={
@@ -1793,6 +1963,12 @@ function PurchaseOrderFormDialog({
           }}
         />
       )}
+
+      <SelectTransferReceiptDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={prefillFromTransferOrder}
+      />
     </>
   );
 }

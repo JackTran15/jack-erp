@@ -65,6 +65,15 @@ export class GoodsIssueEntity extends BaseEntity {
   @Column({ nullable: true, comment: 'Free-text notes' })
   notes?: string;
 
+  @Column({ type: 'varchar', nullable: true, comment: 'Free-text deliverer name (Người giao)' })
+  deliverer?: string | null;
+
+  @Column({ name: 'references', type: 'jsonb', default: () => "'[]'::jsonb", comment: 'FE-supplied reference codes shown as Tham chiếu' })
+  references: string[];
+
+  @Column({ name: 'occurred_at', type: 'timestamptz', nullable: true, comment: 'User-entered issue date+time; falls back to createdAt' })
+  occurredAt?: Date | null;
+
   @Column({ name: 'approved_by', type: 'uuid', nullable: true })
   approvedBy?: string;
 

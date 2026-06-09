@@ -100,6 +100,7 @@ export class GoodsReceiptService {
       paymentMethod: dto.paymentMethod,
       cashAccountId: dto.cashAccountId,
       attachmentIds: dto.attachmentIds ?? [],
+      references: dto.references ?? [],
       lines: dto.lines.map((l) =>
         this.makeLine(l, actor.organizationId, actor.branchId, actor.userId),
       ),

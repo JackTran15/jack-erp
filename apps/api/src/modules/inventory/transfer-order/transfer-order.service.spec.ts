@@ -16,6 +16,8 @@ import {
 import { TransferOrderService } from './transfer-order.service';
 import { TransferOrderEntity } from './transfer-order.entity';
 import { LocationEntity } from '../location/location.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
@@ -25,6 +27,9 @@ describe('TransferOrderService', () => {
   let service: TransferOrderService;
   let toRepo: Record<string, jest.Mock>;
   let locationRepo: Record<string, jest.Mock>;
+  let balanceRepo: Record<string, jest.Mock>;
+  let balanceQb: Record<string, jest.Mock>;
+  let giRepo: Record<string, jest.Mock>;
   let branchRepo: Record<string, jest.Mock>;
   let goodsIssueService: Record<string, jest.Mock>;
   let goodsReceiptService: Record<string, jest.Mock>;
@@ -71,6 +76,21 @@ describe('TransferOrderService', () => {
     };
     locationRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'loc-unassigned' }),
+      find: jest.fn().mockResolvedValue([]),
+    };
+    // Chainable query builder for the stock-balance source-bin resolver.
+    balanceQb = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    balanceRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
+    };
+    giRepo = {
+      find: jest.fn().mockResolvedValue([]),
     };
     branchRepo = {
       find: jest.fn().mockResolvedValue([]),
@@ -88,6 +108,11 @@ describe('TransferOrderService', () => {
         TransferOrderService,
         { provide: getRepositoryToken(TransferOrderEntity), useValue: toRepo },
         { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
+        {
+          provide: getRepositoryToken(StockBalanceEntity),
+          useValue: balanceRepo,
+        },
+        { provide: getRepositoryToken(GoodsIssueEntity), useValue: giRepo },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
         {
           provide: DataSource,
@@ -216,6 +241,28 @@ describe('TransferOrderService', () => {
       expect(locationRepo.findOne).not.toHaveBeenCalled();
     });
 
+    it('forwards the goods-issue header fields (đối tượng / người giao / tham chiếu / ngày) onto the spawned issue', async () => {
+      toRepo.findOne.mockResolvedValueOnce(baseOrder());
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+
+      await service.confirmExport('to-1', actorSource, {
+        notes: 'n',
+        providerId: 'prov-1',
+        deliverer: 'Jack Jack',
+        references: ['LDC000004'],
+        occurredAt: '2026-06-08T15:24:00.000Z',
+        lines: [{ itemId: 'item-1', locationId: 'loc-X', quantity: 1, unitPrice: 9 }],
+      });
+
+      const giDto = goodsIssueService.createAndPost.mock.calls[0][0];
+      expect(giDto.providerId).toBe('prov-1');
+      expect(giDto.deliverer).toBe('Jack Jack');
+      expect(giDto.references).toEqual(['LDC000004']);
+      expect(giDto.occurredAt).toBe('2026-06-08T15:24:00.000Z');
+    });
+
     it('rejects an edited line whose item is not on the transfer order', async () => {
       toRepo.findOne.mockResolvedValue(baseOrder());
       await expect(
@@ -256,6 +303,66 @@ describe('TransferOrderService', () => {
     });
   });
 
+  describe('getById', () => {
+    const orderWithBin = (sourceLocationId: string | null) =>
+      baseOrder({
+        lines: [
+          {
+            itemId: 'item-1',
+            requestedQty: '1',
+            sourceStorageId: 'storage-A',
+            sourceLocationId,
+            item: { unit: 'pcs', purchasePrice: 12 },
+          },
+        ],
+      } as unknown as Partial<TransferOrderEntity>);
+
+    it('resolves the display code for the persisted source bin', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithBin('loc-A01'));
+      locationRepo.find.mockResolvedValue([{ id: 'loc-A01', code: 'A-01' }]);
+
+      const to = await service.getById('to-1', 'org-1');
+
+      expect(to.lines[0].sourceLocationId).toBe('loc-A01');
+      expect(to.lines[0].sourceLocationCode).toBe('A-01');
+      // Persisted bin needs no stock lookup.
+      expect(balanceRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('falls back to live stock resolution for legacy null bins', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithBin(null));
+      balanceQb.getOne.mockResolvedValue({ locationId: 'loc-A01' });
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-A01', code: 'A-01' });
+
+      const to = await service.getById('to-1', 'org-1');
+
+      expect(balanceRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(to.lines[0].sourceLocationId).toBe('loc-A01');
+      expect(to.lines[0].sourceLocationCode).toBe('A-01');
+    });
+  });
+
+  describe('create — source bin', () => {
+    it('persists each line bin from current stock', async () => {
+      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
+      toRepo.findOne.mockResolvedValue(baseOrder());
+      balanceQb.getOne.mockResolvedValue({ locationId: 'loc-A01' });
+
+      await service.create(
+        {
+          sourceBranchId: 'branch-A',
+          destinationBranchId: 'branch-B',
+          sourceStorageId: 'storage-A',
+          lines: [{ itemId: 'item-1', requestedQty: 5 }],
+        },
+        actorSource,
+      );
+
+      const saved = toRepo.create.mock.calls[0][0];
+      expect(saved.lines[0].sourceLocationId).toBe('loc-A01');
+    });
+  });
+
   describe('confirmImport', () => {
     it('spawns a TRANSFER_IN receipt, stores import_reference and COMPLETES', async () => {
       toRepo.findOne.mockResolvedValueOnce(
@@ -291,6 +398,110 @@ describe('TransferOrderService', () => {
       await expect(service.confirmImport('to-1', actorSource)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('forwards the receipt header fields (đối tượng / người giao / tham chiếu / ngày) onto the spawned receipt', async () => {
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.COMPLETED }),
+      );
+
+      await service.confirmImport('to-1', actorDest, {
+        destinationStorageId: 'storage-B',
+        providerId: 'prov-1',
+        deliverer: 'Jack Jack',
+        references: ['XK000007'],
+        occurredAt: '2026-06-08T15:24:00.000Z',
+      });
+
+      const grDto = goodsReceiptService.createAndPost.mock.calls[0][0];
+      expect(grDto.providerId).toBe('prov-1');
+      expect(grDto.deliveredBy).toBe('Jack Jack');
+      expect(grDto.references).toEqual(['XK000007']);
+      expect(grDto.receivedAt).toBe('2026-06-08T15:24:00.000Z');
+    });
+
+    it('uses the form-submitted per-line Kho/Vị trí when provided', async () => {
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+      toRepo.findOne.mockResolvedValueOnce(
+        baseOrder({ status: TransferOrderStatus.COMPLETED }),
+      );
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-X', storageId: 'storage-Z' });
+
+      await service.confirmImport('to-1', actorDest, {
+        lines: [{ itemId: 'item-1', locationId: 'loc-X', quantity: 2, unitPrice: 5 }],
+      });
+
+      const grDto = goodsReceiptService.createAndPost.mock.calls[0][0];
+      expect(grDto.lines).toHaveLength(1);
+      expect(grDto.lines[0]).toMatchObject({
+        itemId: 'item-1',
+        locationId: 'loc-X',
+        quantity: 2,
+      });
+      expect(grDto.locationId).toBe('loc-X');
+      expect(toRepo.update).toHaveBeenCalledWith(
+        { id: 'to-1', organizationId: 'org-1' },
+        expect.objectContaining({ destinationStorageId: 'storage-Z' }),
+      );
+    });
+
+    it('rejects an imported line whose item is not on the transfer order', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+      await expect(
+        service.confirmImport('to-1', actorDest, {
+          lines: [{ itemId: 'item-99', locationId: 'loc-X', quantity: 1 }],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('listImportable', () => {
+    it('returns IN_PROGRESS destination-branch orders with source name + export XK number/total inlined', async () => {
+      toRepo.find.mockResolvedValue([
+        baseOrder({
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: 'gi-9',
+        }),
+      ]);
+      branchRepo.find.mockResolvedValue([{ id: 'branch-A', name: 'Cà Mau' }]);
+      giRepo.find.mockResolvedValue([
+        {
+          id: 'gi-9',
+          documentNumber: 'XK000007',
+          lines: [{ lineTotal: '350000' }, { lineTotal: '150000' }],
+        },
+      ]);
+
+      const rows = await service.listImportable(
+        { from: '2026-06-01', to: '2026-06-30' },
+        actorDest,
+      );
+
+      expect(toRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-1',
+            destinationBranchId: 'branch-B',
+            status: TransferOrderStatus.IN_PROGRESS,
+          }),
+        }),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: 'to-1',
+        sourceBranchId: 'branch-A',
+        sourceBranchName: 'Cà Mau',
+        exportGoodsIssueDocumentNumber: 'XK000007',
+        totalAmount: 500000,
+        status: TransferOrderStatus.IN_PROGRESS,
+      });
     });
   });
 

@@ -53,4 +53,16 @@ export class TransferOrderLineEntity {
   @ManyToOne(() => ItemEntity, { eager: true })
   @JoinColumn({ name: 'item_id' })
   item?: ItemEntity;
+
+  /**
+   * Source bin this line is issued from — resolved from stock (the bin holding
+   * the most of this item in the source storage) at create time, so the locked
+   * goods-issue form can display + submit it. Null for legacy rows / no stock.
+   */
+  @Column({ name: 'source_location_id', type: 'uuid', nullable: true })
+  sourceLocationId?: string | null;
+
+  // ── Transient (not persisted) ───────────────────────────────────────────────
+  /** Human code of {@link sourceLocationId}, resolved in getById for the form. */
+  sourceLocationCode?: string | null;
 }

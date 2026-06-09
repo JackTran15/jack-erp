@@ -10,18 +10,14 @@ import {
 } from "@erp/ui";
 import { Check, Download, Inbox, X } from "lucide-react";
 import { toast } from "sonner";
-import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
+import type { ImportableTransferOrderListItem } from "@erp/shared-interfaces";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 
-/** Full transfer-order detail (GET /inventory/transfer-orders/:id) used to prefill the form. */
-export interface TransferOrderDetailLine {
+/** Full transfer-order detail (GET /inventory/transfer-orders/:id) used to prefill the receipt. */
+export interface TransferReceiptDetailLine {
   itemId: string;
   requestedQty: string | number;
-  sourceStorageId?: string | null;
-  /** Source bin resolved by the backend (the source storage's default location). */
-  sourceLocationId?: string | null;
-  sourceLocationCode?: string | null;
   note?: string | null;
   item?: {
     id: string;
@@ -32,15 +28,13 @@ export interface TransferOrderDetailLine {
   } | null;
 }
 
-export interface TransferOrderDetail {
+export interface TransferReceiptDetail {
   id: string;
   documentNumber?: string;
   sourceBranchId: string;
   destinationBranchId: string;
-  sourceStorageId?: string | null;
-  destinationStorageId?: string | null;
   notes?: string | null;
-  lines: TransferOrderDetailLine[];
+  lines: TransferReceiptDetailLine[];
 }
 
 interface Props {
@@ -48,18 +42,12 @@ interface Props {
   onClose: () => void;
   /** Fired with the chosen transfer order detail + its picker row (for inlined names). */
   onSelect: (
-    detail: TransferOrderDetail,
-    row: IssuableTransferOrderListItem,
+    detail: TransferReceiptDetail,
+    row: ImportableTransferOrderListItem,
   ) => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Chưa thực hiện",
-  IN_PROGRESS: "Đang luân chuyển",
-  COMPLETED: "Hoàn thành",
-  CANCELLED: "Đã hủy",
-};
-
+const moneyFmt = new Intl.NumberFormat("vi-VN");
 const dateFmt = new Intl.DateTimeFormat("vi-VN");
 
 function formatDate(iso: string | null): string {
@@ -74,20 +62,14 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-function firstOfMonth(): string {
-  const d = new Date();
-  return ymd(new Date(d.getFullYear(), d.getMonth(), 1));
+function today(): string {
+  return ymd(new Date());
 }
 
-function lastOfMonth(): string {
-  const d = new Date();
-  return ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-}
-
-export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
-  const [from, setFrom] = useState(firstOfMonth);
-  const [to, setTo] = useState(lastOfMonth);
-  const [rows, setRows] = useState<IssuableTransferOrderListItem[] | null>(null);
+export function SelectTransferReceiptDialog({ open, onClose, onSelect }: Props) {
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [rows, setRows] = useState<ImportableTransferOrderListItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -98,8 +80,8 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
-      const { data } = await apiClient.get<IssuableTransferOrderListItem[]>(
-        `/inventory/transfer-orders/issuable?${params}`,
+      const { data } = await apiClient.get<ImportableTransferOrderListItem[]>(
+        `/inventory/transfer-orders/importable?${params}`,
       );
       setRows(data);
       setSelectedId(null);
@@ -111,7 +93,7 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
     }
   }, [from, to]);
 
-  // Load the current month's issuable orders when the picker opens; reset on close.
+  // Load today's importable docs when the picker opens; reset on close.
   useEffect(() => {
     if (open) {
       void load();
@@ -129,7 +111,7 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
     if (!row) return;
     setConfirming(true);
     try {
-      const { data } = await apiClient.get<TransferOrderDetail>(
+      const { data } = await apiClient.get<TransferReceiptDetail>(
         `/inventory/transfer-orders/${selectedId}`,
       );
       onSelect(data, row);
@@ -150,9 +132,9 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
         if (!o) onClose();
       }}
     >
-      <DialogContent className="max-w-[920px]">
+      <DialogContent className="max-w-[820px]">
         <DialogHeader>
-          <DialogTitle>Chọn lệnh điều chuyển</DialogTitle>
+          <DialogTitle>Chọn chứng từ xuất kho điều chuyển</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-wrap items-end gap-3">
@@ -192,25 +174,23 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
                 <th className="w-10 p-2" />
                 <th className="p-2 text-left font-medium">Ngày</th>
                 <th className="p-2 text-left font-medium">Số chứng từ</th>
-                <th className="p-2 text-left font-medium">Lý do</th>
-                <th className="p-2 text-left font-medium">Điều chuyển đến</th>
-                <th className="p-2 text-left font-medium">Trạng thái</th>
+                <th className="p-2 text-right font-medium">Tổng thành tiền</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={4} className="p-6 text-center text-muted-foreground">
                     Đang tải…
                   </td>
                 </tr>
               ) : !rows || rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-muted-foreground">
+                  <td colSpan={4} className="p-10 text-center text-muted-foreground">
                     <Inbox className="mx-auto mb-2 h-10 w-10 opacity-40" />
                     <div className="font-medium">KHÔNG CÓ DỮ LIỆU</div>
                     <div className="text-xs">
-                      Vui lòng tìm kiếm lệnh điều chuyển để xuất kho
+                      Vui lòng tìm kiếm chứng từ điều chuyển để nhập kho
                     </div>
                   </td>
                 </tr>
@@ -224,16 +204,18 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
                     <td className="p-2 text-center">
                       <input
                         type="radio"
-                        name="transfer-order-pick"
+                        name="transfer-receipt-pick"
                         checked={selectedId === r.id}
                         onChange={() => setSelectedId(r.id)}
                       />
                     </td>
                     <td className="p-2">{formatDate(r.requestedDate)}</td>
-                    <td className="p-2 font-mono">{r.documentNumber}</td>
-                    <td className="p-2">{r.notes ?? "—"}</td>
-                    <td className="p-2">{r.destinationBranchName}</td>
-                    <td className="p-2">{STATUS_LABELS[r.status] ?? r.status}</td>
+                    <td className="p-2 font-mono">
+                      {r.exportGoodsIssueDocumentNumber ?? r.documentNumber}
+                    </td>
+                    <td className="p-2 text-right tabular-nums">
+                      {moneyFmt.format(r.totalAmount)}
+                    </td>
                   </tr>
                 ))
               )}
@@ -248,7 +230,7 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
             disabled={!selectedId || confirming}
           >
             <Check className="mr-1 h-4 w-4" />
-            Chọn
+            Đồng ý
           </Button>
           <Button type="button" variant="outline" onClick={onClose}>
             <X className="mr-1 h-4 w-4" />

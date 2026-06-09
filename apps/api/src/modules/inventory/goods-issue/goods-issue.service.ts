@@ -36,6 +36,12 @@ export interface CreateGoodsIssueDto {
   /** Source document type — see GoodsIssueReferenceType. */
   referenceType?: GoodsIssueReferenceType;
   notes?: string;
+  /** Free-text deliverer name (Người giao). */
+  deliverer?: string;
+  /** FE-supplied reference codes shown as Tham chiếu. */
+  references?: string[];
+  /** User-entered issue date+time (ISO); falls back to createdAt when omitted. */
+  occurredAt?: string;
   lines: {
     itemId: string;
     locationId?: string;
@@ -112,6 +118,9 @@ export class GoodsIssueService {
       referenceId: dto.referenceId,
       referenceType: dto.referenceType,
       notes: dto.notes,
+      deliverer: dto.deliverer ?? null,
+      references: dto.references ?? [],
+      occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : null,
       status: GoodsIssueStatus.DRAFT,
       lines: dto.lines.map((l) => {
         const line = new GoodsIssueLineEntity();

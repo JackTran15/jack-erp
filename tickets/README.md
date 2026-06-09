@@ -581,3 +581,54 @@ flowchart LR
   T5 --> T6
 ```
 
+## EPIC-08062026 Phiếu xuất kho — round-trip đầy đủ trường
+
+- [EPIC-08062026 Phiếu xuất kho — round-trip đầy đủ trường](./epics/EPIC-08062026-goods-issue-form-roundtrip.md)
+- Form **Phiếu xuất kho** (`GoodsIssueFormDialog`, `backoffice-web`) mất dữ liệu giữa lúc tạo và xem lại: **Kho/Vị trí/Cửa hàng đích/Đối tượng/Tham chiếu** trống, **Người giao/Ngày-Giờ xuất** không lưu. Epic chuẩn hoá round-trip: **CÓ migration** thêm `goods_issues.deliverer` (varchar, Người giao text), `references` (jsonb `string[]`, danh sách mã tham chiếu FE gửi), `occurred_at` (timestamptz, ngày/giờ nhập). Fix read-path (v2 search thiếu `lines.location` → Kho/Vị trí trống) và FE map (`targetBranchLabel` không init; DetailPanel dùng location header cho mọi dòng). Provider giữ nguyên cho `TRANSFER_OUT`.
+
+| Ticket                                                     | Mô tả                                                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [TKT-GIR-01](./tickets/TKT-GIR-01-schema-entity.md)        | Migration + entity: `deliverer` / `references` (jsonb) / `occurred_at`                                         |
+| [TKT-GIR-02](./tickets/TKT-GIR-02-be-dto-service-read.md)  | BE: DTO + service persist 3 trường + read-path join `lines.location` (fix Kho/Vị trí)                         |
+| [TKT-GIR-03](./tickets/TKT-GIR-03-openapi.md)              | OpenAPI regen + api-client snapshot                                                                            |
+| [TKT-GIR-04](./tickets/TKT-GIR-04-fe-roundtrip.md)         | FE: gửi + load lại đủ trường; fix Cửa hàng đích label, Kho/Vị trí từng dòng, Tham chiếu list                  |
+| [TKT-GIR-05](./tickets/TKT-GIR-05-e2e.md)                  | E2E round-trip + test plan + DoD gate                                                                          |
+
+### Ticket dependency graph (EPIC-08062026 round-trip)
+
+```mermaid
+flowchart LR
+  T1["TKT-GIR-01 Migration + entity"] --> T2["TKT-GIR-02 BE DTO+service+read"]
+  T2 --> T3["TKT-GIR-03 OpenAPI"]
+  T3 --> T4["TKT-GIR-04 FE round-trip"]
+  T2 --> T5["TKT-GIR-05 E2E + DoD"]
+  T4 --> T5
+```
+
+## EPIC-08062026 Lập phiếu nhập kho từ chứng từ điều chuyển ("Chọn chứng từ điều chuyển")
+
+- [EPIC-08062026 Lập phiếu nhập kho từ chứng từ điều chuyển](./epics/EPIC-08062026-goods-receipt-from-transfer.md)
+- Chân **nhập** đối xứng chân xuất: trên form **Phiếu nhập kho** (`PurchaseOrderFormDialog`, `backoffice-web`), bật nút **"Chọn chứng từ điều chuyển"** (đang `disabled`) → dialog "Chọn chứng từ xuất kho điều chuyển" liệt kê lệnh `IN_PROGRESS` của **chi nhánh đích** (số phiếu **XK** + tổng tiền) → chọn → nạp dòng (khóa) + chọn **Kho nhận** → **Lưu = chân nhập** (`POST /:id/import`, lệnh `IN_PROGRESS→COMPLETED`, spawn GoodsReceipt `TRANSFER_IN`). **CÓ migration** `goods_receipts.references` jsonb (provider/deliveredBy/received_at đã có); mở rộng `confirmImport` nhận kho nhận + header round-trip. **Phụ thuộc EPIC-07062026 + goods-issue-from-transfer đã land.**
+
+| Ticket                                                       | Mô tả                                                                                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| [TKT-GRT-01](./tickets/TKT-GRT-01-schema-shared.md)          | Schema `goods_receipts.references` + `ImportableTransferOrderListItem` + `ImportTransferOrderRequest` ext         |
+| [TKT-GRT-02](./tickets/TKT-GRT-02-be-importable-import.md)   | BE: `GET /importable` (IN_PROGRESS + dest branch + XK số/tổng) + `confirmImport` nhận kho nhận + header           |
+| [TKT-GRT-03](./tickets/TKT-GRT-03-openapi.md)                | OpenAPI regen + api-client snapshot                                                                                |
+| [TKT-GRT-04](./tickets/TKT-GRT-04-fe-data-layer.md)          | FE: `useImportableTransferOrders` + transfer detail mapper                                                         |
+| [TKT-GRT-05](./tickets/TKT-GRT-05-fe-ui.md)                  | FE: `SelectTransferReceiptDialog` + bật nút + prefill khóa + Kho nhận + save-as-import                            |
+| [TKT-GRT-06](./tickets/TKT-GRT-06-e2e.md)                    | E2E: importable scope + import-from-form + no-double-receipt + idempotency + DoD gate                             |
+
+### Ticket dependency graph (EPIC-08062026 goods-receipt-from-transfer)
+
+```mermaid
+flowchart LR
+  ITV["EPIC-07062026 + goods-issue-from-transfer landed"] --> T2
+  T1["TKT-GRT-01 Schema + shared"] --> T2["TKT-GRT-02 BE importable + import"]
+  T2 --> T3["TKT-GRT-03 OpenAPI"]
+  T3 --> T4["TKT-GRT-04 FE data layer"]
+  T4 --> T5["TKT-GRT-05 FE UI"]
+  T2 --> T6["TKT-GRT-06 E2E + DoD"]
+  T5 --> T6
+```
+
