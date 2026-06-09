@@ -1927,6 +1927,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/preferred-shelf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa */
+        get: operations["InventoryLocationStockController_getPreferredShelf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/{locationId}/stock-items": {
         parameters: {
             query?: never;
@@ -5937,6 +5954,12 @@ export interface components {
             /** Format: uuid */
             storageId: string;
         };
+        PreferredShelfResponseDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
         StockByLocationProviderDto: {
             /** Format: uuid */
             providerId: string;
@@ -6023,6 +6046,8 @@ export interface components {
              * @description Vị trí kệ đích để xếp hàng lên
              */
             destinationLocationId: string;
+            /** @description Số lượng cần xếp */
+            quantity: number;
         };
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
@@ -11746,6 +11771,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_getPreferredShelf: {
+        parameters: {
+            query: {
+                itemId: string;
+                storageId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Vị trí ưu tiên hoặc null nếu chưa được cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferredShelfResponseDto"] | null;
+                };
             };
         };
     };

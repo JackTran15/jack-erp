@@ -106,21 +106,7 @@ export class InventoryLocationStockService {
     return { created, skipped };
   }
 
-  /**
-   * "Xếp vị trí": place each item's WHOLE "Chưa xếp" (unassigned) on-hand
-   * onto a real shelf, then record that shelf as the item's preferred location.
-   * There is no per-line quantity — xếp moves everything currently unplaced.
-   *
-   * The stock move is delegated to {@link StockTransferService.postIntraWarehouseMoves}
-   * (pessimistic lock on the source balance, same-storage check, immutable
-   * all-or-nothing posting). Source ("Chưa xếp") and destination shelf share the
-   * same storage by construction, so the same-storage check always passes.
-   *
-   * For an item with nothing unplaced, no transfer happens but the item is still
-   * bound to the shelf (empty balance row + preferred-shelf mapping) so it shows
-   * up there — matching MISA's "đã xếp" behaviour. PSL/bind run best-effort after
-   * the transfer commits and never fail the request.
-   */
+  /** Move the requested unassigned quantity onto a real shelf. */
   async arrange(
     dto: ArrangeLocationDto,
     actor: ActorContext,
@@ -136,23 +122,14 @@ export class InventoryLocationStockService {
         line.storageId,
         actor,
       );
-      const balance = await this.stockBalanceRepo.findOne({
-        where: {
-          organizationId: actor.organizationId,
-          itemId: line.itemId,
-          locationId: unassigned.id,
-        },
-      });
       resolved.push({
         line,
-        qty: balance ? Number(balance.quantity) : 0,
+        qty: line.quantity,
         unassignedId: unassigned.id,
       });
     }
 
-    // Move all unplaced stock onto the target shelves in one immutable transfer.
     const moves: IntraWarehouseMoveLine[] = resolved
-      .filter((r) => r.qty > 0)
       .map((r) => ({
         itemId: r.line.itemId,
         quantity: r.qty,
@@ -169,20 +146,9 @@ export class InventoryLocationStockService {
       transferId = transfer.id;
     }
 
-    // Record the preferred shelf ("đã xếp"); for items with nothing to move,
-    // also create an empty balance row so they appear at the shelf. Best-effort.
+    // Record the preferred shelf after the immutable transfer succeeds.
     for (const r of resolved) {
       try {
-        if (r.qty === 0) {
-          await this.dataSource.transaction((manager) =>
-            this.ensureShelfBalanceRow(
-              manager,
-              r.line.destinationLocationId,
-              r.line.itemId,
-              actor,
-            ),
-          );
-        }
         await this.pslService.setLocationByItem(
           r.line.itemId,
           r.line.destinationLocationId,
@@ -198,34 +164,6 @@ export class InventoryLocationStockService {
     }
 
     return { moved: dto.lines.length, transferId };
-  }
-
-  /** Insert a quantity-0 stock_balance row at a shelf if none exists (idempotent). */
-  private async ensureShelfBalanceRow(
-    manager: EntityManager,
-    locationId: string,
-    itemId: string,
-    actor: ActorContext,
-  ): Promise<void> {
-    const location = await manager.findOne(LocationEntity, {
-      where: { id: locationId, organizationId: actor.organizationId },
-      relations: { storage: true },
-    });
-    if (!location) throw new NotFoundException('Vị trí không tồn tại');
-
-    const existing = await manager.findOne(StockBalanceEntity, {
-      where: { organizationId: actor.organizationId, itemId, locationId },
-    });
-    if (existing) return;
-
-    await manager.insert(StockBalanceEntity, {
-      organizationId: actor.organizationId,
-      branchId: location.branchId ?? location.storage?.branchId ?? actor.branchId,
-      itemId,
-      locationId,
-      quantity: 0,
-      createdBy: actor.userId,
-    });
   }
 
   /**
@@ -640,6 +578,38 @@ export class InventoryLocationStockService {
       lastMovementAt: sb.lastMovementAt
         ? new Date(sb.lastMovementAt).toISOString()
         : null,
+    };
+  }
+
+  async getPreferredShelf(
+    itemId: string,
+    storageId: string,
+    actor: ActorContext,
+  ): Promise<{ id: string; code: string; name: string } | null> {
+    const item = await this.dataSource.getRepository(ItemEntity).findOne({
+      where: { id: itemId, organizationId: actor.organizationId },
+    });
+    if (!item?.productId) return null;
+
+    const psls = await this.pslService.listByProduct(item.productId, actor);
+    const psl = psls.find((p) => p.storageId === storageId);
+    if (!psl) return null;
+
+    const location = await this.locationRepo.findOne({
+      where: {
+        id: psl.locationId,
+        organizationId: actor.organizationId,
+        storageId,
+        storage: { branchId: actor.branchId },
+      },
+      relations: { storage: true },
+    });
+    if (!location) return null;
+
+    return {
+      id: location.id,
+      code: location.code,
+      name: location.name,
     };
   }
 }

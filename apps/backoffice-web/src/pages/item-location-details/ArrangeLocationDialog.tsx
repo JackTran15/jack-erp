@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 import { HelpCircle, Loader2, Plus, Trash2 } from "lucide-react";
-import { AppModal, Button } from "@erp/ui";
+import { AppModal, Button, Input } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -46,6 +46,7 @@ type ArrangeRow = {
   storageName: string;
   locationId: string | null;
   locationCode: string;
+  quantity: string;
 };
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -69,11 +70,18 @@ function emptyRow(): ArrangeRow {
     storageName: "",
     locationId: null,
     locationCode: "",
+    quantity: "1",
   };
 }
 
 function isRowComplete(row: ArrangeRow): boolean {
-  return Boolean(row.itemId && row.storageId && row.locationId);
+  return Boolean(
+    row.itemId &&
+      row.storageId &&
+      row.locationId &&
+      Number.isFinite(Number(row.quantity)) &&
+      Number(row.quantity) > 0,
+  );
 }
 
 // A row is "empty" (not yet started) until an item is selected.
@@ -86,7 +94,6 @@ function isRowEmpty(row: ArrangeRow): boolean {
 export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): ReactElement {
   const [rows, setRows] = useState<ArrangeRow[]>(() => [emptyRow()]);
   const [submitting, setSubmitting] = useState(false);
-
   // Reset when closed
   useEffect(() => {
     if (!open) {
@@ -158,6 +165,7 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
         itemId: row.itemId as string,
         storageId: row.storageId as string,
         destinationLocationId: row.locationId as string,
+        quantity: Number(row.quantity),
       }));
 
     if (lines.length === 0) {
@@ -212,6 +220,7 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
               <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
               <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Đơn vị tính</th>
               <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Vị trí</th>
+              <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Số lượng xếp</th>
               <th className="w-10 border-b px-2 py-2" />
             </tr>
           </thead>
@@ -326,6 +335,17 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                       { key: "name", label: "Tên vị trí", render: (loc) => loc.name },
                     ]}
                     className="w-full"
+                  />
+                </td>
+
+                <td className="border-b px-2 py-2">
+                  <Input
+                    type="number"
+                    min="0.000001"
+                    step="any"
+                    value={row.quantity}
+                    onChange={(e) => updateRow(row.uid, { quantity: e.target.value })}
+                    className="h-8 text-right"
                   />
                 </td>
 

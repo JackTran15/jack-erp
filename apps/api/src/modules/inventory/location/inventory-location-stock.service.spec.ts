@@ -7,11 +7,13 @@ import { InventoryLocationStockService } from './inventory-location-stock.servic
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { StockTransferService } from '../transfer/stock-transfer.service';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemEntity } from './item.entity';
 import { ItemProviderEntity } from './item-provider.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
+import { InventoryLocationService } from './inventory-location.service';
 import { DataSource } from 'typeorm';
 
 const locationEntity = {
@@ -92,6 +94,8 @@ describe('InventoryLocationStockService', () => {
   let itemProviderRepo: any;
   let itemRepo: any;
   let pslService: any;
+  let locationService: any;
+  let stockTransferService: any;
   /** EntityManager mock used by assignBatch / addItemToLocation tests. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let managerFindOne: any;
@@ -140,13 +144,26 @@ describe('InventoryLocationStockService', () => {
     itemProviderRepo = { find: jest.fn().mockResolvedValue([]) };
     itemRepo = { findOne: jest.fn().mockResolvedValue(null) };
     pslService = {
+      listByProduct: jest.fn().mockResolvedValue([]),
+      setLocationByItem: jest.fn().mockResolvedValue(undefined),
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
+    };
+    locationService = {
+      ensureUnassignedLocation: jest.fn().mockResolvedValue({
+        id: 'loc-unassigned',
+      }),
+    };
+    stockTransferService = {
+      postIntraWarehouseMoves: jest.fn().mockResolvedValue({
+        id: 'transfer-1',
+      }),
     };
 
     managerFindOne = jest.fn();
     managerInsert = jest.fn().mockResolvedValue(undefined);
     const manager = { findOne: managerFindOne, insert: managerInsert };
     dataSourceMock = {
+      getRepository: jest.fn().mockReturnValue(itemRepo),
       transaction: jest
         .fn()
         .mockImplementation((cb: (m: typeof manager) => Promise<unknown>) =>
@@ -181,6 +198,14 @@ describe('InventoryLocationStockService', () => {
         {
           provide: ProductStorageLocationService,
           useValue: pslService,
+        },
+        {
+          provide: InventoryLocationService,
+          useValue: locationService,
+        },
+        {
+          provide: StockTransferService,
+          useValue: stockTransferService,
         },
         {
           provide: DataSource,
@@ -664,6 +689,68 @@ describe('InventoryLocationStockService', () => {
       expect(barcodeRepo.find).not.toHaveBeenCalled();
       expect(itemProviderRepo.find).not.toHaveBeenCalled();
       expect(thresholdRepo.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPreferredShelf', () => {
+    it('returns null when the preferred shelf belongs to another branch', async () => {
+      itemRepo.findOne.mockResolvedValue({
+        id: 'item-1',
+        productId: 'prod-1',
+        organizationId: 'org-1',
+      });
+      pslService.listByProduct.mockResolvedValue([
+        {
+          productId: 'prod-1',
+          storageId: 'storage-1',
+          locationId: 'loc-other-branch',
+        },
+      ]);
+      locationRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getPreferredShelf('item-1', 'storage-1', actor),
+      ).resolves.toBeNull();
+
+      expect(locationRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          id: 'loc-other-branch',
+          organizationId: 'org-1',
+          storageId: 'storage-1',
+          storage: { branchId: 'branch-1' },
+        },
+        relations: { storage: true },
+      });
+    });
+  });
+
+  describe('arrange', () => {
+    it('moves only the requested quantity from the unassigned location', async () => {
+      await service.arrange(
+        {
+          lines: [
+            {
+              itemId: 'item-1',
+              storageId: 'storage-1',
+              destinationLocationId: 'loc-dest',
+              quantity: 3,
+            },
+          ],
+        },
+        actor,
+      );
+
+      expect(stockTransferService.postIntraWarehouseMoves).toHaveBeenCalledWith(
+        [
+          {
+            itemId: 'item-1',
+            quantity: 3,
+            sourceLocationId: 'loc-unassigned',
+            destinationLocationId: 'loc-dest',
+          },
+        ],
+        actor,
+      );
     });
   });
 });

@@ -1,7 +1,9 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsNumber,
   IsUUID,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -19,6 +21,11 @@ export class ArrangeLocationLineDto {
   @ApiProperty({ description: 'Vị trí kệ đích để xếp hàng lên' })
   @IsUUID()
   destinationLocationId!: string;
+
+  @ApiProperty({ description: 'Số lượng cần xếp', minimum: 0.000001 })
+  @IsNumber()
+  @Min(0.000001)
+  quantity!: number;
 }
 
 export class ArrangeLocationDto {
