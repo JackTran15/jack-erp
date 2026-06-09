@@ -88,6 +88,65 @@ export const CRUD_V2_SEARCH: Record<string, V2SearchConfig> = {
       createdAt: "date-range",
     },
   },
+  "inventory-item-units": {
+    path: "/v2/inventory-item-units/search",
+    fields: {
+      name: "string",
+      description: "string",
+      isActive: "boolean",
+    },
+  },
+  "inventory-stock-balances": {
+    path: "/v2/inventory-stock-balances/search",
+    fields: {
+      itemName: "string",
+      itemCode: "string",
+      itemVariants: "string",
+      productName: "string",
+      variantLabel: "string",
+      quantity: "compare",
+      lastMovementAt: "date-range",
+    },
+  },
+  payables: {
+    path: "/v2/payables/search",
+    fields: {
+      documentNumber: "string",
+      vendorName: "string",
+      amount: "compare",
+      currency: "string",
+      dueDate: "date-range",
+      status: "enum",
+      settledAmount: "compare",
+    },
+  },
+  receivables: {
+    path: "/v2/receivables/search",
+    fields: {
+      documentNumber: "string",
+      amount: "compare",
+      currency: "string",
+      dueDate: "date-range",
+      status: "enum",
+      settledAmount: "compare",
+    },
+  },
+  expenses: {
+    path: "/v2/expenses/search",
+    fields: {
+      description: "string",
+      amount: "compare",
+      status: "enum",
+    },
+  },
+  branches: {
+    path: "/v2/branches/search",
+    fields: {
+      name: "string",
+      address: "string",
+      status: "enum",
+    },
+  },
   // Kho lưu trữ. Branch-scoped server-side. `branchId` là bộ lọc scope dạng
   // dropdown (UUID chính xác) — không phải column-filter generic, nên xử lý ở
   // toolbar của page, không khai ở đây.

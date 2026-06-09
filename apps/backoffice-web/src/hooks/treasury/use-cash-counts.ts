@@ -6,6 +6,8 @@ import type {
   CashCountPostResult,
   CreateCashCountBody,
   PaginatedList,
+  PaginatedSearchResponse,
+  StringSearchFilter,
 } from "../../pages/treasury/cash-vouchers.types";
 import type { CashCountParticipant } from "../../pages/treasury/cash/cash-count/cash-count.types";
 import { treasuryQueryKeys } from "./treasury-query-keys";
@@ -20,6 +22,32 @@ export function useCashCountsList(query: CashCountListQuery, enabled = true) {
         }),
       ),
     enabled,
+    staleTime: 30_000,
+  });
+}
+
+export interface CashCountSearchBody {
+  page: number;
+  limit: number;
+  cashAccountId?: string;
+  countedAt?: { from?: string; to?: string };
+  documentNumber?: StringSearchFilter;
+  purpose?: StringSearchFilter;
+  status?: { value: CashCount["status"] };
+}
+
+export function useCashCountSearch(body: CashCountSearchBody, enabled = true) {
+  return useQuery({
+    queryKey: ["cash-counts", "search", body],
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.POST<PaginatedSearchResponse<CashCount>>(
+          "/v2/cash-counts/search",
+          { body },
+        ),
+      ),
+    enabled,
+    placeholderData: (previous) => previous,
     staleTime: 30_000,
   });
 }

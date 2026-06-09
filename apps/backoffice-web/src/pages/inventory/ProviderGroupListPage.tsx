@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Minus, Plus, RefreshCw } from "lucide-react";
-import type { ToolbarItem } from "@erp/ui";
+import { Input, type ToolbarItem } from "@erp/ui";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { TableActionHeader } from "../../components/layout/TableActionHeader";
 import { CrudRecordDialog } from "../../components/crud/CrudRecordDialog";
+import { columnToStringFilter } from "../../components/crud/crudV2Search";
+import { ColumnFilterModeDropdown } from "../../components/table/ColumnFilterModeControl";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
+  type ColumnFilter,
+  type ColumnFilterMode,
+} from "../../components/table/pagination.dto";
+import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
-import type { PaginatedResponse } from "@erp/shared-interfaces";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +29,26 @@ interface GroupRow {
 interface TreeNode extends GroupRow {
   children: TreeNode[];
   depth: number;
+}
+
+interface ProviderGroupSearchResponse {
+  data: GroupRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+const FILTER_KEYS = ["code", "name", "description"] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
+  return FILTER_KEYS.reduce(
+    (acc, key) => {
+      acc[key] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<FilterKey, ColumnFilter>,
+  );
 }
 
 // ─── Tree helpers ─────────────────────────────────────────────────────────────
@@ -83,7 +110,24 @@ export function ProviderGroupListPage() {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(STATUS_ALL);
+  const [columnFilters, setColumnFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+  const searchBody = useMemo(
+    () => ({
+      code: columnToStringFilter(debouncedFilters.code),
+      name: columnToStringFilter(debouncedFilters.name),
+      description: columnToStringFilter(debouncedFilters.description),
+      isActive:
+        statusFilter === STATUS_ACTIVE
+          ? true
+          : statusFilter === STATUS_INACTIVE
+            ? false
+            : undefined,
+    }),
+    [debouncedFilters, statusFilter],
+  );
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -91,19 +135,15 @@ export function ProviderGroupListPage() {
   const openCreate = () => { setDialogRecordId(null); setDialogOpen(true); };
   const openEdit = (id: string) => { setDialogRecordId(id); setDialogOpen(true); };
 
-  // Fetch flat list of all groups
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["crud", "provider-groups", "records-tree"],
+  // The search endpoint returns matching groups plus their ancestors so the
+  // existing tree can be rendered without loading/filtering the whole dataset.
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["crud", "provider-groups", "search-tree", searchBody],
     queryFn: async () =>
       requireErpData(
-        await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
-          "/admin/entities/{entityKey}/records",
-          {
-            params: {
-              path: { entityKey: "provider-groups" },
-              query: { page: 1, pageSize: 100 },
-            },
-          },
+        await erpApi.POST<ProviderGroupSearchResponse>(
+          "/v2/provider-groups/search",
+          { body: searchBody },
         ),
       ),
   });
@@ -121,27 +161,20 @@ export function ProviderGroupListPage() {
     [data],
   );
 
-  const filteredRows = useMemo(
-    () =>
-      statusFilter === STATUS_ALL
-        ? allRows
-        : allRows.filter((r) =>
-            statusFilter === STATUS_ACTIVE ? r.isActive : !r.isActive,
-          ),
-    [allRows, statusFilter],
-  );
-
-  const tree = useMemo(() => buildTree(filteredRows), [filteredRows]);
+  const tree = useMemo(() => buildTree(allRows), [allRows]);
   const allIds = useMemo(() => collectAllIds(tree), [tree]);
+  const hasActiveFilter =
+    statusFilter !== STATUS_ALL ||
+    FILTER_KEYS.some((key) => columnFilters[key].value.trim().length > 0);
 
   // Auto-expand all on first load — use a ref to avoid state mutation during render
   const didAutoExpand = useRef(false);
   useEffect(() => {
-    if (!didAutoExpand.current && allIds.length > 0) {
+    if ((!didAutoExpand.current || hasActiveFilter) && allIds.length > 0) {
       setExpanded(new Set(allIds));
       didAutoExpand.current = true;
     }
-  }, [allIds]);
+  }, [allIds, hasActiveFilter]);
 
   const visibleNodes = useMemo(
     () => flattenVisible(tree, expanded),
@@ -179,6 +212,22 @@ export function ProviderGroupListPage() {
     if (!selected) return;
     if (!confirm("Xoá nhóm nhà cung cấp này?")) return;
     deleteMutation.mutate(selected);
+  };
+
+  const handleModeChange = (key: FilterKey, mode: ColumnFilterMode) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], mode },
+    }));
+    setSelected(null);
+  };
+
+  const handleValueChange = (key: FilterKey, value: string) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], value },
+    }));
+    setSelected(null);
   };
 
   const toolbar: ToolbarItem[] = [
@@ -232,6 +281,11 @@ export function ProviderGroupListPage() {
       />
 
       <div className="mt-0 flex-1 overflow-auto">
+        {isError && (
+          <p className="border-b border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            Không tải được danh sách nhóm nhà cung cấp.
+          </p>
+        )}
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b bg-background">
@@ -245,18 +299,49 @@ export function ProviderGroupListPage() {
                 Mô tả
               </th>
               <th className="w-44 px-3 py-2 text-left font-medium text-foreground">
-                <div className="flex flex-col gap-1">
-                  <span>Trạng thái</span>
-                  <select
-                    className="w-full rounded border border-input bg-background px-1 py-0.5 text-xs font-normal"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value={STATUS_ALL}>Tất cả</option>
-                    <option value={STATUS_ACTIVE}>Đang theo dõi</option>
-                    <option value={STATUS_INACTIVE}>Ngừng theo dõi</option>
-                  </select>
-                </div>
+                Trạng thái
+              </th>
+            </tr>
+            <tr className="border-b bg-background">
+              {FILTER_KEYS.map((key) => (
+                <th key={key} className="px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <ColumnFilterModeDropdown
+                      fieldLabel={
+                        key === "code"
+                          ? "Mã nhóm NCC"
+                          : key === "name"
+                            ? "Tên nhóm NCC"
+                            : "Mô tả"
+                      }
+                      value={columnFilters[key].mode}
+                      onChange={(mode) => handleModeChange(key, mode)}
+                    />
+                    <Input
+                      className="h-8 min-w-0 flex-1 text-xs font-normal"
+                      placeholder="Giá trị..."
+                      value={columnFilters[key].value}
+                      onChange={(event) =>
+                        handleValueChange(key, event.target.value)
+                      }
+                    />
+                  </div>
+                </th>
+              ))}
+              <th className="px-2 py-1">
+                <select
+                  className="h-8 w-full rounded border border-input bg-background px-2 text-xs font-normal"
+                  value={statusFilter}
+                  onChange={(event) => {
+                    setStatusFilter(event.target.value);
+                    setSelected(null);
+                  }}
+                  aria-label="Lọc Trạng thái"
+                >
+                  <option value={STATUS_ALL}>Tất cả</option>
+                  <option value={STATUS_ACTIVE}>Đang theo dõi</option>
+                  <option value={STATUS_INACTIVE}>Ngừng theo dõi</option>
+                </select>
               </th>
             </tr>
           </thead>

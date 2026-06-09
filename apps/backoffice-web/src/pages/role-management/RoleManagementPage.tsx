@@ -18,13 +18,15 @@ import {
   type TableColumn,
 } from "../../components/table/BaseDataTable";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { PaginationControls } from "../../components/table/PaginationControls";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
-  applyColumnFilter,
-  toComparableText,
+  DEFAULT_PAGINATION,
   type ColumnFilter,
   type ColumnFilterMode,
+  type PaginationStateDto,
 } from "../../components/table/pagination.dto";
+import { columnToStringFilter } from "../../components/crud/crudV2Search";
 import {
   emptyRoleDraft,
   getIamErrorMessage,
@@ -34,11 +36,13 @@ import {
   useCreateRole,
   useDeleteRole,
   useRole,
-  useRoles,
+  useRoleSearch,
   useSetRolePermissions,
   useSyncRoleUsers,
   useUpdateRole,
+  type RoleSearchBody,
 } from "../../hooks/iam";
+import { useDebouncedValue } from "../../lib/use-debounced-value";
 import type { RoleFormDraft } from "../../lib/iam";
 import { hasPermission } from "../../lib/permissions";
 import { RoleDetailPanel } from "./components/RoleDetailPanel";
@@ -58,6 +62,18 @@ function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
   );
 }
 
+function resolveRoleSearchBody(
+  columnFilters: Record<FilterKey, ColumnFilter>,
+  pagination: PaginationStateDto,
+): RoleSearchBody {
+  return {
+    page: pagination.page,
+    limit: pagination.pageSize,
+    name: columnToStringFilter(columnFilters.name),
+    description: columnToStringFilter(columnFilters.description),
+  };
+}
+
 export function RoleManagementPage() {
   const qc = useQueryClient();
   const canRead = hasPermission(IAM_PERMISSION_KEYS.ROLE_READ);
@@ -65,13 +81,27 @@ export function RoleManagementPage() {
   const canDelete = hasPermission(IAM_PERMISSION_KEYS.ROLE_DELETE);
   const canAssignUsers = hasPermission(IAM_PERMISSION_KEYS.USER_ROLES_WRITE);
 
-  const { data: roles = [], isLoading, isError, error, refetch } = useRoles();
   const { data: allUserDetails = [], isLoading: usersLoading } =
     useAllUserDetails(canRead && canAssignUsers);
 
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [columnFilters, setColumnFilters] =
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const debouncedFilters = useDebouncedValue(columnFilters, 300);
+  const searchBody = useMemo(
+    () => resolveRoleSearchBody(debouncedFilters, pagination),
+    [debouncedFilters, pagination],
+  );
+  const {
+    data: listData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useRoleSearch(searchBody);
+  const roles = listData?.data ?? [];
 
   const [editOpen, setEditOpen] = useState(false);
   const [editMode, setEditMode] = useState<RoleEditMode>("edit");
@@ -94,19 +124,6 @@ export function RoleManagementPage() {
   const setPermissions = useSetRolePermissions(editRoleId ?? "");
   const deleteRole = useDeleteRole();
   const syncRoleUsers = useSyncRoleUsers();
-
-  const filteredRoles = useMemo(() => {
-    return roles.filter((row) => {
-      const checks = [
-        applyColumnFilter(toComparableText(row.name), columnFilters.name),
-        applyColumnFilter(
-          toComparableText(row.description ?? ""),
-          columnFilters.description,
-        ),
-      ];
-      return checks.every(Boolean);
-    });
-  }, [roles, columnFilters]);
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === selectedRoleId) ?? null,
@@ -156,6 +173,7 @@ export function RoleManagementPage() {
   const handleReload = useCallback(() => {
     void refetch();
     void qc.invalidateQueries({ queryKey: ["iam", "users"] });
+    setPagination((p) => ({ ...p, page: 1 }));
     setColumnFilters(emptyColumnFilters());
     toast.success("Đã nạp lại dữ liệu");
   }, [qc, refetch]);
@@ -310,16 +328,22 @@ export function RoleManagementPage() {
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], mode },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        setPagination((p) => ({ ...p, page: 1 }));
+        setSelectedRoleId(null);
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as FilterKey]: { ...prev[key as FilterKey], value },
-        })),
+        }));
+        setPagination((p) => ({ ...p, page: 1 }));
+        setSelectedRoleId(null);
+      },
     }),
     [columnFilters],
   );
@@ -338,6 +362,21 @@ export function RoleManagementPage() {
       <DocumentListShell
         toolbar={<PageToolbar items={toolbarItems} tone="primary" />}
         title="Quản lý vai trò"
+        pagination={
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={listData?.total ?? 0}
+            onPageChange={(page) => {
+              setPagination((prev) => ({ ...prev, page }));
+              setSelectedRoleId(null);
+            }}
+            onPageSizeChange={(pageSize) => {
+              setPagination((prev) => ({ ...prev, page: 1, pageSize }));
+              setSelectedRoleId(null);
+            }}
+          />
+        }
         detailPanel={
           <RoleDetailPanel
             role={selectedRole}
@@ -356,7 +395,7 @@ export function RoleManagementPage() {
         )}
         <BaseDataTable
           columns={columns}
-          rows={filteredRoles}
+          rows={roles}
           loading={isLoading}
           emptyLabel="Chưa có vai trò."
           getRowKey={(row) => row.id}

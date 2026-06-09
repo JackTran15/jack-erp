@@ -19,6 +19,7 @@ export function useReceiptCashTableColumns(
         key: "documentDate",
         label: "Ngày",
         width: 110,
+        filterKind: "date-range",
         render: (r) =>
           new Date(`${r.voucherDate}T12:00:00`).toLocaleDateString(
             "vi-VN",
@@ -53,6 +54,7 @@ export function useReceiptCashTableColumns(
         key: "totalAmount",
         label: "Tổng tiền",
         width: 130,
+        filterKind: "number-range",
         headerClassName: "text-right",
         className: TABLE_NUM_CLASS,
         render: (r) => formatMoneyInteger(r.totalAmount),

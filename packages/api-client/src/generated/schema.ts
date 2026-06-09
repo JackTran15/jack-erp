@@ -838,6 +838,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/cash-vouchers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashVoucherSearchController_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/cash-counts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashCountV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash/accounts": {
         parameters: {
             query?: never;
@@ -4398,6 +4430,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory-item-units/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchInventoryItemUnits_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-stock-balances/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchInventoryStockBalances_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/payables/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchPayables_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/receivables/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchReceivables_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/expenses/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchExpenses_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/branches/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchBranches_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/provider-groups/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchProviderGroups_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/roles/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchRoles_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5030,6 +5190,53 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        DateRangeFilterDto: {
+            from?: string;
+            to?: string;
+        };
+        StringFilterDto: {
+            /** @enum {string} */
+            operator: "*" | "=" | "+" | "-" | "!";
+            value: string;
+        };
+        CashVoucherDocumentTypeFilterDto: {
+            /** @enum {string} */
+            value: "cash_receipt" | "cash_payment" | "goods_receipt_payment";
+        };
+        CompareFilterDto: {
+            /** @enum {string} */
+            operator: "=" | "<" | "<=" | ">" | ">=";
+            value: Record<string, never>;
+        };
+        CashVoucherSearchDto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** Format: uuid */
+            cashAccountId?: string;
+            voucherDate?: components["schemas"]["DateRangeFilterDto"];
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            documentType?: components["schemas"]["CashVoucherDocumentTypeFilterDto"];
+            totalAmount?: components["schemas"]["CompareFilterDto"];
+            counterparty?: components["schemas"]["StringFilterDto"];
+            reason?: components["schemas"]["StringFilterDto"];
+        };
+        EnumFilterDto: {
+            value: string | null;
+        };
+        CashCountSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** Format: uuid */
+            cashAccountId?: string;
+            countedAt?: components["schemas"]["DateRangeFilterDto"];
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            purpose?: components["schemas"]["StringFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
         };
         CreateCashAccountDto: {
             name: string;
@@ -6092,16 +6299,6 @@ export interface components {
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
         };
-        StringFilterDto: {
-            /** @enum {string} */
-            operator: "*" | "=" | "+" | "-" | "!";
-            value: string;
-        };
-        CompareFilterDto: {
-            /** @enum {string} */
-            operator: "=" | "<" | "<=" | ">" | ">=";
-            value: Record<string, never>;
-        };
         InventoryItemSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -6350,13 +6547,6 @@ export interface components {
             destinationLocationId?: string;
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
-        };
-        EnumFilterDto: {
-            value: string | null;
-        };
-        DateRangeFilterDto: {
-            from?: string;
-            to?: string;
         };
         StockTransferSearchV2Dto: {
             /** @default 1 */
@@ -8088,6 +8278,93 @@ export interface components {
             /** @description Trạng thái hoạt động (active flag) */
             isActive?: boolean;
         };
+        InventoryItemUnitSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            name?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            isActive?: boolean;
+        };
+        InventoryStockBalanceSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            itemName?: components["schemas"]["StringFilterDto"];
+            itemCode?: components["schemas"]["StringFilterDto"];
+            itemVariants?: components["schemas"]["StringFilterDto"];
+            productName?: components["schemas"]["StringFilterDto"];
+            variantLabel?: components["schemas"]["StringFilterDto"];
+            /** Format: uuid */
+            itemId?: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: uuid */
+            branchId?: string;
+            /** Format: uuid */
+            productId?: string;
+            quantity?: components["schemas"]["CompareFilterDto"];
+            lastMovementAt?: components["schemas"]["DateRangeFilterDto"];
+        };
+        PayableSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            vendorName?: components["schemas"]["StringFilterDto"];
+            currency?: components["schemas"]["StringFilterDto"];
+            amount?: components["schemas"]["CompareFilterDto"];
+            settledAmount?: components["schemas"]["CompareFilterDto"];
+            dueDate?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+        };
+        ReceivableSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            currency?: components["schemas"]["StringFilterDto"];
+            amount?: components["schemas"]["CompareFilterDto"];
+            settledAmount?: components["schemas"]["CompareFilterDto"];
+            dueDate?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+        };
+        ExpenseSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            description?: components["schemas"]["StringFilterDto"];
+            amount?: components["schemas"]["CompareFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+        };
+        BranchSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            name?: components["schemas"]["StringFilterDto"];
+            address?: components["schemas"]["StringFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+        };
+        ProviderGroupSearchV2Dto: {
+            code?: components["schemas"]["StringFilterDto"];
+            name?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+            isActive?: boolean;
+        };
+        RoleSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            name?: components["schemas"]["StringFilterDto"];
+            description?: components["schemas"]["StringFilterDto"];
+        };
     };
     responses: never;
     parameters: never;
@@ -9802,6 +10079,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierDebtPaymentSagaEntity"];
+                };
+            };
+        };
+    };
+    CashVoucherSearchController_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashVoucherSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashCountV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -16497,6 +16820,190 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LocationSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchInventoryItemUnits_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryItemUnitSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchInventoryStockBalances_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryStockBalanceSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchPayables_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayableSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchReceivables_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceivableSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchExpenses_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchBranches_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchProviderGroups_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderGroupSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    AdminSearchV2Controller_searchRoles_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleSearchV2Dto"];
             };
         };
         responses: {

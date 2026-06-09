@@ -29,7 +29,12 @@ export {
   useSetRolePermissions,
   useUpdateRole,
 } from "./useRoleMutations";
-export { useRole, useRoles } from "./useRoles";
+export {
+  useRole,
+  useRoleSearch,
+  useRoles,
+  type RoleSearchBody,
+} from "./useRoles";
 export { useBranches } from "./useBranches";
 export {
   syncRoleUserAssignments,

@@ -148,6 +148,18 @@ export interface PaginatedList<T> {
   pageSize: number;
 }
 
+export interface PaginatedSearchResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface StringSearchFilter {
+  operator: "*" | "=" | "+" | "-" | "!";
+  value: string;
+}
+
 export interface CashCountDenomination {
   denom: number;
   count: number;

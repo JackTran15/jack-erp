@@ -2709,6 +2709,68 @@
         ]
       }
     },
+    "/v2/cash-vouchers/search": {
+      "post": {
+        "operationId": "CashVoucherSearchController_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashVoucherSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashVoucherSearch"
+        ]
+      }
+    },
+    "/v2/cash-counts/search": {
+      "post": {
+        "operationId": "CashCountV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashCountSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CashCountV2"
+        ]
+      }
+    },
     "/cash/accounts": {
       "post": {
         "operationId": "CashController_createAccount",
@@ -14344,6 +14406,254 @@
           "AdminSearchV2"
         ]
       }
+    },
+    "/v2/inventory-item-units/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchInventoryItemUnits_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryItemUnitSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/inventory-stock-balances/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchInventoryStockBalances_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStockBalanceSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/payables/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchPayables_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayableSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/receivables/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchReceivables_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceivableSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/expenses/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchExpenses_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/branches/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchBranches_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/provider-groups/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchProviderGroups_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderGroupSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/roles/search": {
+      "post": {
+        "operationId": "AdminSearchV2Controller_searchRoles_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "AdminSearchV2"
+        ]
+      }
     }
   },
   "info": {
@@ -16376,6 +16686,159 @@
           "updatedAt",
           "createdBy"
         ]
+      },
+      "DateRangeFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "StringFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "*",
+              "=",
+              "+",
+              "-",
+              "!"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "CashVoucherDocumentTypeFilterDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "cash_receipt",
+              "cash_payment",
+              "goods_receipt_payment"
+            ]
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "CompareFilterDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "=",
+              "<",
+              "<=",
+              ">",
+              ">="
+            ]
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "operator",
+          "value"
+        ]
+      },
+      "CashVoucherSearchDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "voucherDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "documentNumber": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "documentType": {
+            "$ref": "#/components/schemas/CashVoucherDocumentTypeFilterDto"
+          },
+          "totalAmount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "counterparty": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          }
+        }
+      },
+      "EnumFilterDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "CashCountSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "countedAt": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "documentNumber": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          }
+        }
       },
       "CreateCashAccountDto": {
         "type": "object",
@@ -19912,50 +20375,6 @@
           "lines"
         ]
       },
-      "StringFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "*",
-              "=",
-              "+",
-              "-",
-              "!"
-            ]
-          },
-          "value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
-      "CompareFilterDto": {
-        "type": "object",
-        "properties": {
-          "operator": {
-            "type": "string",
-            "enum": [
-              "=",
-              "<",
-              "<=",
-              ">",
-              ">="
-            ]
-          },
-          "value": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "operator",
-          "value"
-        ]
-      },
       "InventoryItemSearchV2Dto": {
         "type": "object",
         "properties": {
@@ -20720,29 +21139,6 @@
         "required": [
           "lines"
         ]
-      },
-      "EnumFilterDto": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "value"
-        ]
-      },
-      "DateRangeFilterDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          }
-        }
       },
       "StockTransferSearchV2Dto": {
         "type": "object",
@@ -26113,6 +26509,244 @@
           "isActive": {
             "type": "boolean",
             "description": "Trạng thái hoạt động (active flag)"
+          }
+        }
+      },
+      "InventoryItemUnitSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "name": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InventoryStockBalanceSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "itemName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemCode": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemVariants": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "productName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "variantLabel": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "lastMovementAt": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          }
+        }
+      },
+      "PayableSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "vendorName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "settledAmount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "dueDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          }
+        }
+      },
+      "ReceivableSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "settledAmount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "dueDate": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          }
+        }
+      },
+      "ExpenseSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          }
+        }
+      },
+      "BranchSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "name": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "address": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          }
+        }
+      },
+      "ProviderGroupSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "name": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RoleSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "name": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/StringFilterDto"
           }
         }
       }
