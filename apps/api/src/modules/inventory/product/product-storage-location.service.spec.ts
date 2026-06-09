@@ -117,7 +117,11 @@ describe('ProductStorageLocationService', () => {
       await service.validateAndAssignByLocation('item-1', 'loc-1', actor);
 
       expect(locationRepo.findOne).toHaveBeenCalledWith({
-        where: { id: 'loc-1' },
+        where: {
+          id: 'loc-1',
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+        },
       });
       expect(pslRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ storageId: 'storage-1' }),
@@ -147,7 +151,11 @@ describe('ProductStorageLocationService', () => {
 
       expect(result).toHaveLength(2);
       expect(pslRepo.find).toHaveBeenCalledWith({
-        where: { productId: 'prod-1' },
+        where: {
+          productId: 'prod-1',
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+        },
       });
     });
   });

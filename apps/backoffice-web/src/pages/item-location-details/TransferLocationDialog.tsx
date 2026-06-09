@@ -310,7 +310,6 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
     setRows((prev) => prev.filter((r) => r.uid !== uid));
   }, []);
 
-  // Copy this row's "Vị trí chuyển đến" down to every row below it.
   const copyDestToRowsBelow = useCallback((uid: string) => {
     setRows((prev) => {
       const idx = prev.findIndex((r) => r.uid === uid);
@@ -320,15 +319,16 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
         toast.error("Chọn vị trí chuyển đến cho dòng này trước");
         return prev;
       }
-      return prev.map((r, i) =>
-        i > idx
-          ? {
-              ...r,
-              destLocationId: src.destLocationId,
-              destLocationLabel: src.destLocationLabel,
-            }
-          : r,
-      );
+      return prev.map((r, i) => {
+        if (i <= idx) return r;
+        if (!r.itemId) return r; // Skip empty/unselected rows
+        if (r.sourceLocationId === src.destLocationId) return r; // Destination cannot equal source
+        return {
+          ...r,
+          destLocationId: src.destLocationId,
+          destLocationLabel: src.destLocationLabel,
+        };
+      });
     });
   }, []);
 
