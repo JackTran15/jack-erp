@@ -13,15 +13,34 @@ export type ColumnFilterMode =
   | "endsWith"
   | "notContains";
 
+/** Comparison operators for numeric/date `compare` cells — mirrors the backend `CompareOperator`. */
+export type ColumnCompareOp = "=" | "<" | "<=" | ">" | ">=";
+
 export interface ColumnFilter {
   mode: ColumnFilterMode;
   value: string;
   /** For `date-range` filter cells only: inclusive from/to (YYYY-MM-DD). */
   from?: string;
   to?: string;
+  /** For `date-compare` filter cells: the comparison operator (defaults to `=`). */
+  compareOp?: ColumnCompareOp;
 }
 
 export const DEFAULT_COLUMN_FILTER_MODE: ColumnFilterMode = "contains";
+
+export const DEFAULT_COLUMN_COMPARE_OP: ColumnCompareOp = "=";
+
+export const COLUMN_COMPARE_OP_OPTIONS: Array<{
+  value: ColumnCompareOp;
+  symbol: string;
+  label: string;
+}> = [
+  { value: "=", symbol: "=", label: "Bằng" },
+  { value: "<", symbol: "<", label: "Nhỏ hơn" },
+  { value: "<=", symbol: "≤", label: "Nhỏ hơn hoặc bằng" },
+  { value: ">", symbol: ">", label: "Lớn hơn" },
+  { value: ">=", symbol: "≥", label: "Lớn hơn hoặc bằng" },
+];
 
 export const COLUMN_FILTER_MODE_OPTIONS: Array<{
   value: ColumnFilterMode;

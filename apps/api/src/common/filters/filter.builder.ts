@@ -70,6 +70,37 @@ export class FilterBuilder<T extends ObjectLiteral> {
     return this;
   }
 
+  /**
+   * Compare a date/timestamp column against a single date with an operator
+   * (=, <, <=, >, >=) — both sides cast to `::date` so the time component is
+   * ignored. Mirrors the single-date "date-compare" filter cell on the FE.
+   */
+  applyDateCompare(col: string, filter?: CompareFilterDto): this {
+    if (
+      !filter ||
+      filter.value === undefined ||
+      filter.value === null ||
+      filter.value === ''
+    ) {
+      return this;
+    }
+
+    const key = this.key(col);
+
+    const opMap: Record<CompareOperator, string> = {
+      [CompareOperator.EQUALS]: '=',
+      [CompareOperator.LT]:     '<',
+      [CompareOperator.LTE]:    '<=',
+      [CompareOperator.GT]:     '>',
+      [CompareOperator.GTE]:    '>=',
+    };
+
+    this.qb.andWhere(`(${col})::date ${opMap[filter.operator]} :${key}::date`, {
+      [key]: filter.value,
+    });
+    return this;
+  }
+
   applyDateRange(col: string, filter?: DateRangeFilterDto): this {
     if (!filter) return this;
 

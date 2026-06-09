@@ -14,6 +14,7 @@ export type V2FieldKind =
   | "enum"
   | "boolean"
   | "date-range"
+  | "date-compare"
   | "compare";
 
 export interface V2SearchConfig {
@@ -136,6 +137,12 @@ export function buildV2Body(
       if (from || to) {
         body[key] = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
       }
+      continue;
+    }
+
+    if (kind === "date-compare") {
+      const date = f.value?.trim();
+      if (date) body[key] = { operator: f.compareOp ?? "=", value: date };
       continue;
     }
 

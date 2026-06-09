@@ -7,8 +7,13 @@ import {
   DropdownMenuTrigger,
   Input,
 } from "@erp/ui";
-import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
+import type {
+  ColumnCompareOp,
+  ColumnFilter,
+  ColumnFilterMode,
+} from "./pagination.dto";
 import {
+  COLUMN_COMPARE_OP_OPTIONS,
   COLUMN_FILTER_MODE_OPTIONS,
   DEFAULT_COLUMN_FILTER_MODE,
   describeFilterMode,
@@ -45,6 +50,51 @@ export function ColumnFilterModeDropdown({
         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Chọn kiểu lọc</div>
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ColumnFilterMode)}>
           {COLUMN_FILTER_MODE_OPTIONS.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              <span className="inline-flex w-6 justify-center font-mono text-sm">{option.symbol}</span>
+              <span className="ml-2 text-sm">{option.label}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Operator dropdown for numeric/date `compare` cells (=, <, ≤, >, ≥). */
+export function ColumnCompareOpDropdown({
+  fieldLabel,
+  value,
+  onChange,
+  triggerClassName,
+}: {
+  fieldLabel: string;
+  value: ColumnCompareOp;
+  onChange: (op: ColumnCompareOp) => void;
+  triggerClassName?: string;
+}) {
+  const current =
+    COLUMN_COMPARE_OP_OPTIONS.find((o) => o.value === value) ??
+    COLUMN_COMPARE_OP_OPTIONS[0];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "h-8 w-7 shrink-0 rounded border border-input bg-background px-1 text-center text-xs font-semibold text-foreground shadow-sm hover:bg-accent/30",
+            triggerClassName,
+          )}
+          aria-label={`Kiểu lọc cho ${fieldLabel}`}
+          title={`${current.symbol}: ${current.label}`}
+        >
+          {current.symbol}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[220px] p-1">
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Chọn kiểu lọc</div>
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as ColumnCompareOp)}>
+          {COLUMN_COMPARE_OP_OPTIONS.map((option) => (
             <DropdownMenuRadioItem key={option.value} value={option.value}>
               <span className="inline-flex w-6 justify-center font-mono text-sm">{option.symbol}</span>
               <span className="ml-2 text-sm">{option.label}</span>
