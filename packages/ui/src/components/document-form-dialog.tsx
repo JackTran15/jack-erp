@@ -155,12 +155,12 @@ export function DocumentFormDialog({
           onToggle={() => setCollapsed((c) => !c)}
         />
 
-        <div className="flex shrink-0 items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+        <div className="flex h-9 shrink-0 items-center justify-between border-b px-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Chi tiết
           </h3>
           {detailActions ? (
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex h-full items-center gap-1 text-sm [&_button]:h-8 [&_button]:rounded-sm [&_button]:px-2 [&_label]:h-8 [&_label]:px-2">
               {detailActions}
             </div>
           ) : null}

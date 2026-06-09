@@ -632,7 +632,7 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
           </div>
         ) : (
           <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/90 text-left backdrop-blur">
+            <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
                 <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>

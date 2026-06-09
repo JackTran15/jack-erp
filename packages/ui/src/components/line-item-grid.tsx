@@ -83,6 +83,8 @@ function buildHeaderGroups<R>(columns: LineColumn<R>[]) {
   return groups;
 }
 
+const HEADER_ROW_HEIGHT = 32;
+
 /**
  * Spreadsheet-style editor for document line items (Mã SKU, Tên hàng hóa,
  * Kho, Vị trí, Số lượng, Đơn giá, Thành tiền, ...). Supports per-column
@@ -111,6 +113,14 @@ export function LineItemGrid<R>({
     [columns],
   );
   const hasGroupedColumns = columns.some((col) => col.group);
+  const filterRowTop = hasGroupedColumns
+    ? HEADER_ROW_HEIGHT * 2
+    : HEADER_ROW_HEIGHT;
+  const stickyHeaderStyle = (top: number): React.CSSProperties => ({
+    position: "sticky",
+    top,
+    zIndex: 20,
+  });
 
   const handleFilter = (key: string, value: string) => {
     if (!onFilterChange) return;
@@ -121,16 +131,17 @@ export function LineItemGrid<R>({
     <div
       className={cn("flex h-full min-h-0 flex-col overflow-auto", className)}
     >
-      <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-muted/80">
-          <tr className="border-b">
+      <table className="w-full border-separate border-spacing-0 text-sm [&_td]:border-b [&_th]:border-b">
+        <thead>
+          <tr>
             {hasGroupedColumns
               ? headerGroups.map((group) =>
                   group.label ? (
                     <th
                       key={group.key}
                       colSpan={group.columns.length}
-                      className="border-r px-2 py-2 text-center font-medium text-foreground"
+                      className="h-8 border-r bg-muted px-2 text-center text-sm font-semibold text-foreground"
+                      style={stickyHeaderStyle(0)}
                     >
                       {group.label}
                     </th>
@@ -139,14 +150,16 @@ export function LineItemGrid<R>({
                       key={group.key}
                       rowSpan={2}
                       className={cn(
-                        "border-r px-2 py-2 font-medium text-muted-foreground",
-                        alignClass(group.columns[0].align),
+                        "h-16 border-r bg-muted px-2 text-center text-sm font-semibold text-foreground",
                         group.columns[0].className,
                       )}
                       style={
-                        group.columns[0].width
-                          ? { width: group.columns[0].width }
-                          : undefined
+                        {
+                          ...stickyHeaderStyle(0),
+                          ...(group.columns[0].width
+                            ? { width: group.columns[0].width }
+                            : {}),
+                        }
                       }
                     >
                       {group.columns[0].label}
@@ -157,35 +170,43 @@ export function LineItemGrid<R>({
                   <th
                     key={col.key}
                     className={cn(
-                      "border-r px-2 py-2 font-medium text-muted-foreground",
-                      alignClass(col.align),
+                      "h-8 border-r bg-muted px-2 text-center text-sm font-semibold text-foreground",
                       col.className,
                     )}
-                    style={col.width ? { width: col.width } : undefined}
+                    style={{
+                      ...stickyHeaderStyle(0),
+                      ...(col.width ? { width: col.width } : {}),
+                    }}
                   >
                     {col.label}
                   </th>
                 ))}
             {showRowActions ? (
               <th
-                className="w-8 border-r"
+                className={cn(
+                  "w-8 border-r bg-muted",
+                  hasGroupedColumns ? "h-16" : "h-8",
+                )}
                 rowSpan={hasGroupedColumns ? 2 : 1}
+                style={stickyHeaderStyle(0)}
               />
             ) : null}
           </tr>
           {hasGroupedColumns ? (
-            <tr className="border-b">
+            <tr>
               {headerGroups.flatMap((group) =>
                 group.label
                   ? group.columns.map((col) => (
                       <th
                         key={col.key}
                         className={cn(
-                          "border-r px-2 py-2 font-medium text-muted-foreground",
-                          alignClass(col.align),
+                          "h-8 border-r bg-muted px-2 text-center text-sm font-semibold text-foreground",
                           col.className,
                         )}
-                        style={col.width ? { width: col.width } : undefined}
+                        style={{
+                          ...stickyHeaderStyle(HEADER_ROW_HEIGHT),
+                          ...(col.width ? { width: col.width } : {}),
+                        }}
                       >
                         {col.label}
                       </th>
@@ -195,15 +216,20 @@ export function LineItemGrid<R>({
             </tr>
           ) : null}
           {/* Header filter row */}
-          <tr className="border-b bg-background">
+          <tr>
             {columns.map((col) => (
-              <th key={col.key} className="border-r px-1 py-1">
-                <div className="flex items-center gap-1">
-                  <span className="inline-flex w-5 justify-center font-mono text-xs text-muted-foreground">
-                    {col.filterSymbol ?? "*"}
+              <th
+                key={col.key}
+                className="h-8 border-r bg-background p-0"
+                style={stickyHeaderStyle(filterRowTop)}
+              >
+                <div className="flex h-8 min-w-0 items-stretch">
+                  <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
+                    {col.filterSymbol ??
+                      (col.type === "number" || col.align === "right" ? "≤" : "*")}
                   </span>
                   <Input
-                    className="h-7 flex-1 text-xs"
+                    className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs shadow-none focus-visible:ring-inset"
                     value={filters?.[col.key] ?? ""}
                     onChange={(e) => handleFilter(col.key, e.target.value)}
                     aria-label={`Lọc ${col.label}`}
@@ -211,7 +237,12 @@ export function LineItemGrid<R>({
                 </div>
               </th>
             ))}
-            {showRowActions ? <th className="w-8 border-r" /> : null}
+            {showRowActions ? (
+              <th
+                className="h-8 w-8 border-r bg-background"
+                style={stickyHeaderStyle(filterRowTop)}
+              />
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -228,7 +259,7 @@ export function LineItemGrid<R>({
             rows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-b hover:bg-accent/30"
+                className="odd:bg-background even:bg-muted/15 hover:bg-blue-50/60"
                 style={{ height: rowHeight }}
               >
                 {columns.map((col) => {
@@ -243,7 +274,7 @@ export function LineItemGrid<R>({
                     <td
                       key={col.key}
                       className={cn(
-                        "border-r px-1 py-0",
+                        "border-r p-0",
                         alignClass(col.align),
                         col.className,
                         col.onCellClick && "cursor-pointer",
@@ -259,13 +290,20 @@ export function LineItemGrid<R>({
                           onChangeCell?.(rowIndex, col.key, v),
                         )
                       ) : isReadonly ? (
-                        <span className="block px-1 py-1.5 text-foreground">
+                        <span
+                          className="block truncate px-2 py-1.5 text-foreground"
+                          title={
+                            typeof raw === "string" || typeof raw === "number"
+                              ? String(raw)
+                              : undefined
+                          }
+                        >
                           {raw ?? ""}
                         </span>
                       ) : (
                         <Input
                           className={cn(
-                            "h-full w-full rounded-none border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-1",
+                            "h-8 w-full rounded-none border-0 bg-transparent px-2 text-sm shadow-none focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-inset",
                             alignClass(col.align),
                           )}
                           value={raw ?? ""}
@@ -287,10 +325,10 @@ export function LineItemGrid<R>({
                   );
                 })}
                 {showRowActions ? (
-                  <td className="border-r text-center">
+                  <td className="w-8 border-r text-center">
                     <button
                       type="button"
-                      className="text-muted-foreground hover:text-destructive"
+                      className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => onDeleteRow?.(rowIndex)}
                       aria-label="Xoá dòng"
                     >
@@ -328,13 +366,14 @@ export function LineItemGrid<R>({
                 <td
                   key={`${col.key}-footer`}
                   className={cn(
-                    "border-t border-border bg-muted px-2 py-2 text-sm font-semibold",
+                    "h-8 border-t border-border bg-muted px-2 text-xs font-semibold",
                     alignClass(col.align),
                     col.className,
                   )}
                   style={{
                     position: "sticky",
                     bottom: 0,
+                    zIndex: 10,
                     ...(col.width ? { width: col.width } : {}),
                   }}
                 >
@@ -344,7 +383,7 @@ export function LineItemGrid<R>({
               {showRowActions ? (
                 <td
                   className="border-t border-border bg-muted"
-                  style={{ position: "sticky", bottom: 0 }}
+                  style={{ position: "sticky", bottom: 0, zIndex: 10 }}
                 />
               ) : null}
             </tr>

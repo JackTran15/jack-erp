@@ -257,7 +257,7 @@ export function LookupSearchModal<T>({
         {/* Table */}
         <div className="relative min-h-0 flex-1 overflow-auto">
           <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/80 text-left backdrop-blur">
+            <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 {columns.map((col) => (
                   <th
@@ -355,4 +355,3 @@ export function LookupSearchModal<T>({
     </AppModal>
   );
 }
-

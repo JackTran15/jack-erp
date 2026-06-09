@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   AppModal,
@@ -73,6 +73,7 @@ export function StockTakesPage() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<StockTake | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   /** New-mode draft from CreateStockTakeDialog. While set, FormDialog opens in "new" mode. */
@@ -208,18 +209,34 @@ export function StockTakesPage() {
     return `KK${String(max + 1).padStart(6, "0")}`;
   }, [records]);
 
-  /** Fetch a single stock-take (with full lines) when opening for view/edit. */
-  const openForEdit = useCallback(async (id: string) => {
+  const detailRequestId = useRef(0);
+
+  /** Fetch a full stock-take so the bottom panel always has lines and members. */
+  const selectStockTake = useCallback(async (id: string) => {
+    setSelectedId(id);
+    const requestId = ++detailRequestId.current;
     try {
       const { data } = await apiClient.get<StockTake>(
         `/inventory/stock-takes/${id}`,
       );
-      setEditing(data);
-      setSelectedId(id); // sync bottom panel to the row we just opened
+      if (requestId !== detailRequestId.current) return null;
+      setSelectedDetail(data);
+      return data;
     } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
+      if (requestId === detailRequestId.current) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      }
+      return null;
     }
   }, []);
+
+  /** Fetch a single stock-take (with full lines) when opening for view/edit. */
+  const openForEdit = useCallback(async (id: string) => {
+    const data = await selectStockTake(id);
+    if (data) {
+      setEditing(data);
+    }
+  }, [selectStockTake]);
 
   useEffect(() => {
     const openDocumentId = (
@@ -286,7 +303,10 @@ export function StockTakesPage() {
       await apiClient.delete(`/inventory/stock-takes/${st.id}`);
       toast.success("Đã huỷ phiếu kiểm kê.");
       setConfirmCancel(null);
-      if (selectedId === st.id) setSelectedId(null);
+      if (selectedId === st.id) {
+        setSelectedId(null);
+        setSelectedDetail(null);
+      }
       if (editing?.id === st.id) setEditing(null);
       await loadRecords();
     } catch (err) {
@@ -495,8 +515,14 @@ export function StockTakesPage() {
     [],
   );
 
-  /** What the bottom panel shows: prefer the currently-open form over the list selection. */
-  const panelStockTake = editing ?? selected;
+  /** What the bottom panel shows: prefer full records with lines and members. */
+  const panelStockTake =
+    editing ??
+    (selected
+      ? selectedDetail?.id === selectedId
+        ? selectedDetail
+        : selected
+      : null);
 
   return (
     <>
@@ -539,7 +565,7 @@ export function StockTakesPage() {
           loading={loading}
           emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
-          onRowClick={(r) => setSelectedId(r.id)}
+          onRowClick={(r) => void selectStockTake(r.id)}
           columnFilterControl={{
             filters: columnFilters,
             onModeChange: setColumnFilterMode,
@@ -567,7 +593,7 @@ export function StockTakesPage() {
                 aria-label="Chọn dòng"
                 checked={selectedIds.includes(r.id)}
                 onChange={() => {
-                  setSelectedId(r.id);
+                  void selectStockTake(r.id);
                   setSelectedIds((current) =>
                     current.includes(r.id)
                       ? current.filter((id) => id !== r.id)

@@ -63,7 +63,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
       ) : activeTab === "lines" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-muted/40">
+            <thead className="sticky top-0 z-10 bg-muted [&_th]:bg-muted">
               <tr>
                 <th className="border-b border-r px-3 py-2 text-left">Mã SKU</th>
                 <th className="border-b border-r px-3 py-2 text-left">
@@ -144,7 +144,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
               )}
             </tbody>
             {lines.length > 0 ? (
-              <tfoot className="bg-muted/30 font-medium">
+              <tfoot className="sticky bottom-0 z-10 bg-muted font-medium [&_td]:bg-muted">
                 <tr>
                   <td
                     colSpan={4}
@@ -178,7 +178,7 @@ export function StockTakeDetailPanel({ stockTake }: Props) {
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-muted/40">
+            <thead className="sticky top-0 z-10 bg-muted [&_th]:bg-muted">
               <tr>
                 <th className="border-b border-r px-3 py-2 text-left">
                   Họ tên

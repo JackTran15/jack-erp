@@ -74,7 +74,7 @@ export function ColumnConfigDialog({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border">
           <div className="max-h-[420px] overflow-auto">
             <table className="w-full border-collapse text-sm">
-              <thead className="sticky top-0 bg-muted">
+              <thead className="sticky top-0 z-10 bg-muted [&_th]:bg-muted">
                 <tr>
                   <th className="border-b border-r border-border px-3 py-2 text-left font-medium">
                     Tên cột dữ liệu
