@@ -589,18 +589,60 @@ export class InventoryLocationStockService {
     const item = await this.dataSource.getRepository(ItemEntity).findOne({
       where: { id: itemId, organizationId: actor.organizationId },
     });
-    if (!item?.productId) return null;
+    if (!item) return null;
 
-    const psls = await this.pslService.listByProduct(item.productId, actor);
-    const psl = psls.find((p) => p.storageId === storageId);
-    if (!psl) return null;
+    if (item.productId) {
+      const psls = await this.pslService.listByProduct(item.productId, actor);
+      const psl = psls.find((p) => p.storageId === storageId);
+      if (psl) {
+        const preferred = await this.findAccessibleShelf(
+          psl.locationId,
+          storageId,
+          actor,
+        );
+        if (preferred) return preferred;
+      }
+    }
 
+    // Legacy items and imported data may have real stock locations without a
+    // product-level preferred-shelf mapping. Fall back to the item's most-used
+    // accessible shelf in the selected storage so document forms can still
+    // auto-fill a valid location.
+    const balances = await this.stockBalanceRepo.find({
+      where: {
+        organizationId: actor.organizationId,
+        itemId,
+        ...(actor.branchId ? { branchId: actor.branchId } : {}),
+      },
+      order: {
+        quantity: 'DESC',
+        lastMovementAt: 'DESC',
+      },
+    });
+    for (const balance of balances) {
+      const location = await this.findAccessibleShelf(
+        balance.locationId,
+        storageId,
+        actor,
+      );
+      if (location) return location;
+    }
+
+    return null;
+  }
+
+  private async findAccessibleShelf(
+    locationId: string,
+    storageId: string,
+    actor: ActorContext,
+  ): Promise<{ id: string; code: string; name: string } | null> {
     const location = await this.locationRepo.findOne({
       where: {
-        id: psl.locationId,
+        id: locationId,
         organizationId: actor.organizationId,
         storageId,
-        storage: { branchId: actor.branchId },
+        isUnassigned: false,
+        ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
       },
       relations: { storage: true },
     });

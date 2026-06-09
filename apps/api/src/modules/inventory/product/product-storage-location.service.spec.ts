@@ -154,7 +154,28 @@ describe('ProductStorageLocationService', () => {
         where: {
           productId: 'prod-1',
           organizationId: 'org-1',
-          branchId: 'branch-1',
+        },
+      });
+    });
+
+    it('should include legacy mappings without a branch id', async () => {
+      const legacyMapping = {
+        productId: 'prod-1',
+        storageId: 's1',
+        locationId: 'l1',
+        organizationId: 'org-1',
+        branchId: null,
+      };
+      pslRepo.find.mockResolvedValue([legacyMapping]);
+
+      await expect(service.listByProduct('prod-1', actor)).resolves.toEqual([
+        legacyMapping,
+      ]);
+
+      expect(pslRepo.find).toHaveBeenCalledWith({
+        where: {
+          productId: 'prod-1',
+          organizationId: 'org-1',
         },
       });
     });
@@ -187,6 +208,31 @@ describe('ProductStorageLocationService', () => {
       await service.setLocation('prod-1', 'storage-1', 'loc-new', actor);
 
       expect(existing.locationId).toBe('loc-new');
+      expect(pslRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ locationId: 'loc-new' }),
+      );
+    });
+
+    it('should update a legacy mapping without creating a duplicate', async () => {
+      const existing = {
+        productId: 'prod-1',
+        storageId: 'storage-1',
+        locationId: 'loc-old',
+        organizationId: 'org-1',
+        branchId: null,
+      };
+      pslRepo.findOne.mockResolvedValue(existing);
+
+      await service.setLocation('prod-1', 'storage-1', 'loc-new', actor);
+
+      expect(pslRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          productId: 'prod-1',
+          storageId: 'storage-1',
+          organizationId: 'org-1',
+        },
+      });
+      expect(pslRepo.create).not.toHaveBeenCalled();
       expect(pslRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ locationId: 'loc-new' }),
       );

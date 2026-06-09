@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import type {
   PaginatedResponse,
+  StockTakeLine,
+  StockTakeMember,
   StorageOption,
 } from "./stock-takes.types";
 
@@ -12,6 +14,13 @@ export interface StockTakeDraft {
   storageId: string;
   storageName: string;
   plannedDate: string;
+  countedAt?: string;
+  purpose?: string;
+  conclusion?: string;
+  countByValue?: boolean;
+  mergeSourceIds?: string[];
+  lines?: StockTakeLine[];
+  members?: StockTakeMember[];
 }
 
 interface Props {

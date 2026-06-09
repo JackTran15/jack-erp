@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   DocumentFormDialog,
@@ -251,6 +252,8 @@ function orderTotal(o: PurchaseOrder): number {
 }
 
 export function PurchaseOrdersPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [records, setRecords] =
     useState<PaginatedResponse<PurchaseOrder> | null>(null);
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
@@ -350,6 +353,27 @@ export function PurchaseOrdersPage() {
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
+
+  useEffect(() => {
+    const openDocumentId = (
+      location.state as { openDocumentId?: string } | null
+    )?.openDocumentId;
+    if (!openDocumentId) return;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<PurchaseOrder>(
+          `/goods-receipts/${openDocumentId}`,
+        );
+        setSelectedId(data.id);
+        setEditingOrder(data);
+        setDialogMode("view");
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    })();
+  }, [location.pathname, location.state, navigate]);
 
   const storageNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -914,6 +938,7 @@ function PurchaseOrderFormDialog({
   onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
+  const navigate = useNavigate();
   const isView = mode === "view";
   const fillPreferredShelf = (
     idx: number,
@@ -1558,43 +1583,57 @@ function PurchaseOrderFormDialog({
           onValueChange={(val) => {
             setLines((prev) =>
               prev.map((l, i) =>
-                i === idx ? { ...l, itemLabel: val, itemId: "" } : l,
+                i === idx
+                  ? {
+                      ...l,
+                      itemLabel: val,
+                      itemId: "",
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
               ),
             );
             markDirty();
           }}
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-            let storageId = "";
-            let storageLabel = "";
+            let selectedStorageId = "";
+            let selectedStorageLabel = "";
             setLines((prev) => {
               const updated = prev.map((l, i) => {
                 if (i !== idx) return l;
-                storageId = l.storageId;
-                storageLabel = l.storageLabel;
-                if (!storageId) {
+                selectedStorageId = l.storageId;
+                selectedStorageLabel = l.storageLabel;
+                if (!selectedStorageId) {
                   for (let j = i - 1; j >= 0; j--) {
                     if (prev[j].storageId) {
-                      storageId = prev[j].storageId;
-                      storageLabel = prev[j].storageLabel;
+                      selectedStorageId = prev[j].storageId;
+                      selectedStorageLabel = prev[j].storageLabel;
                       break;
                     }
                   }
+                }
+                if (!selectedStorageId) {
+                  selectedStorageId = storageId;
+                  selectedStorageLabel = storageQuery;
                 }
                 return {
                   ...l,
                   itemId: item.id,
                   itemLabel: item.code,
                   unit: item.unit,
-                  storageId,
-                  storageLabel,
+                  storageId: selectedStorageId,
+                  storageLabel: selectedStorageLabel,
+                  locationId: "",
+                  locationLabel: "",
                   // Only overwrite if current price is 0 — preserve user's manual edits.
                   unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
                 };
               });
 
-              if (storageId) {
-                fillPreferredShelf(idx, item.id, storageId);
+              if (selectedStorageId) {
+                fillPreferredShelf(idx, item.id, selectedStorageId);
               }
 
               return normalizeFormLines(updated);
@@ -1650,7 +1689,15 @@ function PurchaseOrderFormDialog({
           onValueChange={(val) => {
             setLines((prev) =>
               prev.map((l, i) =>
-                i === idx ? { ...l, storageLabel: val, storageId: "" } : l,
+                i === idx
+                  ? {
+                      ...l,
+                      storageLabel: val,
+                      storageId: "",
+                      locationId: "",
+                      locationLabel: "",
+                    }
+                  : l,
               ),
             );
             markDirty();
@@ -1984,14 +2031,29 @@ function PurchaseOrderFormDialog({
                 ];
                 return refs.length ? (
                   <span className="inline-flex flex-wrap items-center gap-1.5">
-                    {refs.map((r) => (
-                      <span
-                        key={r}
-                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
-                      >
-                        {r}
-                      </span>
-                    ))}
+                    {refs.map((r) =>
+                      r === stockTakeRefNumber && stockTakeRefId ? (
+                        <button
+                          key={r}
+                          type="button"
+                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                          onClick={() =>
+                            navigate("/inventory/stock-takes", {
+                              state: { openDocumentId: stockTakeRefId },
+                            })
+                          }
+                        >
+                          {r}
+                        </button>
+                      ) : (
+                        <span
+                          key={r}
+                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
+                        >
+                          {r}
+                        </span>
+                      ),
+                    )}
                     {sourceTransferOrderId && !isView ? (
                       <button
                         type="button"
