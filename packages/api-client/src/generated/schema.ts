@@ -11,28 +11,41 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
+        /** Liveness probe */
+        get: operations["HealthController_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/db": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        /** Database connectivity check */
+        get: operations["HealthController_checkDb"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CrudController_listEntities"];
         put?: never;
         post?: never;
         delete?: never;
@@ -48,118 +61,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Entity metadata */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
+        get: operations["CrudController_getEntityConfig"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/entities/{entityKey}/records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: {
-                    page?: number;
-                    pageSize?: number;
-                    sortBy?: string;
-                    sortOrder?: "asc" | "desc";
-                    search?: string;
-                    filters?: string;
-                };
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Paginated records */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Created */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -173,7 +77,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-<<<<<<< HEAD
         get: operations["CrudController_getRecord"];
         put?: never;
         post?: never;
@@ -2207,6 +2110,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/storage-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve an item's arranged bin ("đã sắp") in a storage — lets the goods-
+         *     receipt form auto-fill Vị trí when a Kho is picked. Declared before
+         *     `@Get(':id')` so the static path is not parsed as a UUID.
+         */
+        get: operations["ProductController_resolveStorageLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products": {
         parameters: {
             query?: never;
@@ -4184,6 +4108,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/transfer-orders/issuable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_listIssuable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/importable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_listImportable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/by-code/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getByCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/{id}": {
         parameters: {
             query?: never;
@@ -4197,10 +4169,10 @@ export interface paths {
         delete: operations["TransferOrderController_cancel"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["TransferOrderController_update"];
         trace?: never;
     };
-    "/inventory/transfer-orders/{id}/approve": {
+    "/inventory/transfer-orders/{id}/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -4209,92 +4181,247 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["TransferOrderController_approve"];
+        post: operations["TransferOrderController_confirmExport"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/inventory/transfer-orders/{id}/execute": {
+    "/inventory/transfer-orders/{id}/import": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-=======
->>>>>>> 4c06ae1 (ttt)
         get?: never;
         put?: never;
-        post?: never;
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Deleted */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Deleted */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        post: operations["TransferOrderController_confirmImport"];
+        delete?: never;
         options?: never;
         head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    entityKey: string;
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Updated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        /** Tổng hợp nhập xuất tồn kho */
+        get: operations["InventoryReportsController_stockSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-document-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng kê chi tiết phiếu nhập xuất */
+        get: operations["InventoryReportsController_stockDocumentDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-quantity-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết số lượng nhập xuất tồn */
+        get: operations["InventoryReportsController_stockQuantityDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-summary-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp nhập xuất tồn theo cửa hàng */
+        get: operations["InventoryReportsController_stockSummaryByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/stock-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số lượng tồn theo cửa hàng (pivot) */
+        get: operations["InventoryReportsController_stockByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/transfer-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng hợp nhập xuất điều chuyển */
+        get: operations["InventoryReportsController_transferSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/inventory/transfer-by-branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hóa điều chuyển theo cửa hàng */
+        get: operations["InventoryReportsController_transferByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/customers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchCustomers_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-providers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchProviders_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/job-positions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchJobPositions_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/accounts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchAccounts_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/employees/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchEmployees_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory-item-categories/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminSearchV2Controller_searchItemCategories_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-<<<<<<< HEAD
     schemas: {
         EmployeeAddressDto: {
             /** @enum {string} */
@@ -7336,8 +7463,12 @@ export interface components {
             purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "STOCK_TAKE";
+            referenceType?: "STOCK_TAKE" | "TRANSFER_ORDER";
             notes?: string;
+            deliverer?: string | null;
+            references: string[];
+            /** Format: date-time */
+            occurredAt?: string | null;
             approvedBy?: string;
             /** Format: date-time */
             approvedAt?: string;
@@ -7465,6 +7596,8 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             attachmentIds?: string[];
+            /** @description FE-supplied reference codes shown as Tham chiếu. */
+            references?: string[];
             lines: components["schemas"]["GoodsReceiptLineDto"][];
             /**
              * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
@@ -7498,6 +7631,7 @@ export interface components {
             receivedAt: string;
             locationId: string;
             attachmentIds: string[];
+            references: string[];
             /** @enum {string} */
             paymentMethod?: "CASH" | "CREDIT";
             cashAccountId?: string;
@@ -7691,13 +7825,26 @@ export interface components {
         TransferOrderEntity: {
             documentNumber?: string;
             /** @enum {string} */
-            status: "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
+            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
             sourceBranchId: string;
             destinationBranchId: string;
             sourceStorageId?: string;
             destinationStorageId?: string;
             requestedDate?: string;
             notes?: string;
+            attachmentIds: string[];
+            exportGoodsIssueId?: string;
+            /** @description GoodsReceipt spawned when the destination branch confirms import — the import_reference. */
+            importGoodsReceiptId?: string;
+            /** Format: date-time */
+            exportedAt?: string;
+            exportedBy?: string;
+            /** Format: date-time */
+            completedAt?: string;
+            completedBy?: string;
+            /** Format: date-time */
+            cancelledAt?: string;
+            cancelledBy?: string;
             /** Format: date-time */
             approvedAt?: string;
             approvedBy?: string;
@@ -7727,6 +7874,8 @@ export interface components {
             transferOrderId: string;
             itemId: string;
             requestedQty: string;
+            /** @description Source warehouse (storage) to pull this line from at export; null falls back to the header source storage. */
+            sourceStorageId?: string;
             note?: string;
             /** Format: date-time */
             createdAt: string;
@@ -7735,8 +7884,17 @@ export interface components {
             createdBy: string;
             transferOrder: components["schemas"]["TransferOrderEntity"];
             item?: components["schemas"]["ItemEntity"];
+            /**
+             * @description Source bin this line is issued from — resolved from stock (the bin holding
+             *     the most of this item in the source storage) at create time, so the locked
+             *     goods-issue form can display + submit it. Null for legacy rows / no stock.
+             */
+            sourceLocationId?: string | null;
+            sourceLocationCode?: string | null;
         };
-        MarkExecutedDto: Record<string, never>;
+        UpdateTransferOrderDto: Record<string, never>;
+        ExportTransferOrderDto: Record<string, never>;
+        ImportTransferOrderDto: Record<string, never>;
         CustomerSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -7858,9 +8016,6 @@ export interface components {
             createdAt?: components["schemas"]["DateRangeFilterDto"];
         };
     };
-=======
-    schemas: never;
->>>>>>> 4c06ae1 (ttt)
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -7868,7 +8023,6 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-<<<<<<< HEAD
 export interface operations {
     HealthController_check: {
         parameters: {
@@ -12051,6 +12205,28 @@ export interface operations {
             };
         };
     };
+    ProductController_resolveStorageLocation: {
+        parameters: {
+            query: {
+                itemId: string;
+                storageId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     ProductController_list: {
         parameters: {
             query?: {
@@ -15770,6 +15946,65 @@ export interface operations {
             };
         };
     };
+    TransferOrderController_listIssuable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TransferOrderController_listImportable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TransferOrderController_getByCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
     TransferOrderController_getById: {
         parameters: {
             query?: never;
@@ -15810,7 +16045,7 @@ export interface operations {
             };
         };
     };
-    TransferOrderController_approve: {
+    TransferOrderController_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -15819,7 +16054,36 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTransferOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_confirmExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportTransferOrderDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -15831,7 +16095,7 @@ export interface operations {
             };
         };
     };
-    TransferOrderController_markExecuted: {
+    TransferOrderController_confirmImport: {
         parameters: {
             query?: never;
             header?: never;
@@ -15842,7 +16106,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MarkExecutedDto"];
+                "application/json": components["schemas"]["ImportTransferOrderDto"];
             };
         };
         responses: {
@@ -16235,6 +16499,3 @@ export interface operations {
         };
     };
 }
-=======
-export type operations = Record<string, never>;
->>>>>>> 4c06ae1 (ttt)

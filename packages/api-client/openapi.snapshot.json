@@ -6789,6 +6789,45 @@
         ]
       }
     },
+    "/products/storage-location": {
+      "get": {
+        "operationId": "ProductController_resolveStorageLocation",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve an item's arranged bin (\"đã sắp\") in a storage — lets the goods-\nreceipt form auto-fill Vị trí when a Kho is picked. Declared before\n`@Get(':id')` so the static path is not parsed as a UUID.",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
     "/products": {
       "get": {
         "operationId": "ProductController_list",
@@ -13177,6 +13216,30 @@
     "/inventory/transfer-orders/issuable": {
       "get": {
         "operationId": "TransferOrderController_listIssuable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/importable": {
+      "get": {
+        "operationId": "TransferOrderController_listImportable",
         "parameters": [],
         "responses": {
           "200": {
@@ -20085,7 +20148,6 @@
           "rows"
         ]
       },
-<<<<<<< HEAD
       "ArrangeLocationLineDto": {
         "type": "object",
         "properties": {
@@ -20345,8 +20407,6 @@
           "limit"
         ]
       },
-=======
->>>>>>> 4c06ae1 (ttt)
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -24358,14 +24418,29 @@
             "type": "string"
           },
           "referenceType": {
+            "type": "string",
             "enum": [
               "STOCK_TAKE",
               "TRANSFER_ORDER"
-            ],
-            "type": "string"
+            ]
           },
           "notes": {
             "type": "string"
+          },
+          "deliverer": {
+            "type": "string",
+            "nullable": true
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
           },
           "approvedBy": {
             "type": "string"
@@ -24416,6 +24491,7 @@
           "reason",
           "status",
           "purpose",
+          "references",
           "lines",
           "id",
           "organizationId",
@@ -24732,6 +24808,13 @@
               "format": "uuid"
             }
           },
+          "references": {
+            "description": "FE-supplied reference codes shown as Tham chiếu.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lines": {
             "minItems": 1,
             "type": "array",
@@ -24829,6 +24912,12 @@
               "type": "string"
             }
           },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "paymentMethod": {
             "enum": [
               "CASH",
@@ -24901,6 +24990,7 @@
           "receivedAt",
           "locationId",
           "attachmentIds",
+          "references",
           "lines",
           "id",
           "organizationId",
@@ -25584,6 +25674,15 @@
           },
           "item": {
             "$ref": "#/components/schemas/ItemEntity"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source bin this line is issued from — resolved from stock (the bin holding\nthe most of this item in the source storage) at create time, so the locked\ngoods-issue form can display + submit it. Null for legacy rows / no stock."
+          },
+          "sourceLocationCode": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [

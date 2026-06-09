@@ -51,10 +51,59 @@ class TransferOrderLineDto {
   note?: string;
 }
 
+class ImportTransferOrderLineDto {
+  @IsUUID()
+  itemId: string;
+
+  @IsUUID()
+  locationId: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantity: number;
+
+  @IsOptional()
+  @IsNumber()
+  unitPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
 class ImportTransferOrderDto {
+  /** Per-line received Kho/Vị trí from the goods-receipt form. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ImportTransferOrderLineDto)
+  lines?: ImportTransferOrderLineDto[];
+
+  /** Kho nhận — fallback destination warehouse when `lines` is omitted. */
   @IsOptional()
   @IsUUID()
   destinationStorageId?: string;
+
+  /** Đối tượng (counterparty provider) carried onto the spawned receipt. */
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  /** Người giao (free-text deliverer name). */
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  /** Tham chiếu — FE-supplied reference codes. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  /** User-entered receive date+time (ISO). */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
 }
 
 class ExportTransferOrderLineDto {
@@ -91,6 +140,27 @@ class ExportTransferOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** Đối tượng (counterparty provider) selected on the goods-issue form. */
+  @IsOptional()
+  @IsUUID()
+  providerId?: string;
+
+  /** Người giao (free-text deliverer name). */
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  /** Tham chiếu — FE-supplied reference codes. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  /** User-entered issue date+time (ISO). */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
 }
 
 class IssuableTransferOrderQueryDto {
@@ -214,6 +284,18 @@ export class TransferOrderController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.listIssuable(
+      { from: query.from, to: query.to },
+      actor,
+    );
+  }
+
+  @Get('importable')
+  @RequirePermission('inventory.transfer.read')
+  listImportable(
+    @Query() query: IssuableTransferOrderQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.listImportable(
       { from: query.from, to: query.to },
       actor,
     );

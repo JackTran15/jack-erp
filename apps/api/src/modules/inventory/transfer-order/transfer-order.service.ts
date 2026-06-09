@@ -19,10 +19,12 @@ import {
   DocumentType,
   ExportTransferOrderLine,
   ExportTransferOrderRequest,
+  ImportTransferOrderLine,
   GoodsIssuePurpose,
   GoodsIssueReferenceType,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
+  ImportableTransferOrderListItem,
   IssuableTransferOrderListItem,
   PaginatedResponse,
   PaginationQuery,
@@ -34,6 +36,8 @@ import { BranchEntity } from '../../branch/branch.entity';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
 import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
 import { LocationEntity } from '../location/location.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
 import { TransferOrderEntity } from './transfer-order.entity';
 import { TransferOrderLineEntity } from './transfer-order-line.entity';
 
@@ -47,8 +51,18 @@ export interface TransferOrderLineInput {
 }
 
 export interface ConfirmImportDto {
-  /** Destination warehouse to receive all lines into; falls back to the header. */
+  /** Per-line received Kho/Vị trí from the form; when present, used instead of derive. */
+  lines?: ImportTransferOrderLine[];
+  /** Destination warehouse (Kho nhận) — fallback when `lines` is omitted. */
   destinationStorageId?: string;
+  /** Đối tượng (counterparty provider) carried onto the spawned receipt. */
+  providerId?: string;
+  /** Người giao (free-text deliverer name). */
+  deliverer?: string;
+  /** Tham chiếu — FE-supplied reference codes. */
+  references?: string[];
+  /** User-entered receive date+time (ISO); falls back to now when omitted. */
+  occurredAt?: string;
 }
 
 export interface CreateTransferOrderDto {
@@ -87,6 +101,10 @@ export class TransferOrderService {
     private readonly toRepo: Repository<TransferOrderEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(StockBalanceEntity)
+    private readonly balanceRepo: Repository<StockBalanceEntity>,
+    @InjectRepository(GoodsIssueEntity)
+    private readonly giRepo: Repository<GoodsIssueEntity>,
     @InjectRepository(BranchEntity)
     private readonly branchRepo: Repository<BranchEntity>,
     private readonly dataSource: DataSource,
@@ -109,6 +127,13 @@ export class TransferOrderService {
       actor,
     );
 
+    const lines = dto.lines.map((l) => this.makeLine(l, actor));
+    await this.fillSourceLocations(
+      lines,
+      dto.sourceStorageId,
+      actor.organizationId,
+    );
+
     const to = this.toRepo.create({
       organizationId: actor.organizationId,
       branchId: actor.branchId,
@@ -122,7 +147,7 @@ export class TransferOrderService {
       requestedDate: dto.requestedDate,
       notes: dto.notes,
       attachmentIds: dto.attachmentIds ?? [],
-      lines: dto.lines.map((l) => this.makeLine(l, actor)),
+      lines,
     });
 
     const saved = await this.toRepo.save(to);
@@ -135,7 +160,89 @@ export class TransferOrderService {
   // ─── Read ───────────────────────────────────────────────────────────────────
 
   async getById(id: string, organizationId: string): Promise<TransferOrderEntity> {
-    return this.findOrFail(id, organizationId);
+    const to = await this.findOrFail(id, organizationId);
+    await this.attachSourceLocations(to, organizationId);
+    return to;
+  }
+
+  /**
+   * Fill in each line's display bin (Vị trí) for the goods-issue form. The bin
+   * is persisted on the line (source_location_id, resolved from stock at create
+   * time); here we just resolve its human code. Legacy lines created before the
+   * column existed have a null bin — fall back to live stock resolution so they
+   * still render. Batched location-code lookup; per-line fallback only on null.
+   */
+  private async attachSourceLocations(
+    to: TransferOrderEntity,
+    organizationId: string,
+  ): Promise<void> {
+    const lines = to.lines ?? [];
+
+    const locationIds = [
+      ...new Set(
+        lines.map((l) => l.sourceLocationId).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const locations = locationIds.length
+      ? await this.locationRepo.find({
+          where: { id: In(locationIds), organizationId },
+        })
+      : [];
+    const codeByLocId = new Map(locations.map((loc) => [loc.id, loc.code]));
+
+    for (const l of lines) {
+      if (l.sourceLocationId) {
+        l.sourceLocationCode = codeByLocId.get(l.sourceLocationId) ?? null;
+        continue;
+      }
+      // Legacy line (pre-column): resolve from current stock.
+      const storageId = l.sourceStorageId ?? to.sourceStorageId;
+      const locId = storageId
+        ? await this.resolveSourceLocation(l.itemId, storageId, organizationId)
+        : null;
+      l.sourceLocationId = locId;
+      l.sourceLocationCode = locId
+        ? (await this.locationRepo.findOne({ where: { id: locId, organizationId } }))
+            ?.code ?? null
+        : null;
+    }
+  }
+
+  /**
+   * Resolve the source bin to issue from: the location holding the most stock of
+   * the item within the given storage. Null when the item has no stock there.
+   */
+  private async resolveSourceLocation(
+    itemId: string,
+    storageId: string,
+    organizationId: string,
+  ): Promise<string | null> {
+    const sb = await this.balanceRepo
+      .createQueryBuilder('sb')
+      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
+      .where('sb.item_id = :itemId AND loc.storage_id = :storageId', {
+        itemId,
+        storageId,
+      })
+      .andWhere('sb.organization_id = :organizationId', { organizationId })
+      .andWhere('sb.quantity > 0')
+      .orderBy('sb.quantity', 'DESC')
+      .getOne();
+    return sb?.locationId ?? null;
+  }
+
+  /** Resolve + assign each line's persisted source bin from current stock. */
+  private async fillSourceLocations(
+    lines: TransferOrderLineEntity[],
+    headerStorageId: string | undefined,
+    organizationId: string,
+  ): Promise<void> {
+    for (const l of lines) {
+      const storageId = l.sourceStorageId ?? headerStorageId;
+      l.sourceLocationId = storageId
+        ? await this.resolveSourceLocation(l.itemId, storageId, organizationId)
+        : null;
+    }
   }
 
   /** Load a voucher by its code, org-scoped so either branch can find it. */
@@ -220,6 +327,84 @@ export class TransferOrderService {
     }));
   }
 
+  /**
+   * IN_PROGRESS transfer orders the actor's active branch (as destination) can
+   * import — feeds the "Chọn chứng từ xuất kho điều chuyển" picker on the
+   * goods-receipt form. Inlines the source branch name and the export goods
+   * issue's (XK) document number + total amount.
+   */
+  async listImportable(
+    params: { from?: string; to?: string },
+    actor: ActorContext,
+  ): Promise<ImportableTransferOrderListItem[]> {
+    const where: Record<string, unknown> = {
+      organizationId: actor.organizationId,
+      destinationBranchId: actor.branchId,
+      status: TransferOrderStatus.IN_PROGRESS,
+    };
+    const createdAtRange = this.buildDateRange(params.from, params.to);
+    if (createdAtRange) where.createdAt = createdAtRange;
+
+    const orders = await this.toRepo.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+
+    const srcIds = [
+      ...new Set(orders.map((o) => o.sourceBranchId).filter(Boolean)),
+    ];
+    const branches = srcIds.length
+      ? await this.branchRepo.find({
+          where: { id: In(srcIds), organizationId: actor.organizationId },
+        })
+      : [];
+    const branchName = new Map(branches.map((b) => [b.id, b.name]));
+
+    // Resolve the export goods-issue (XK) number + total per order, in memory.
+    const giIds = [
+      ...new Set(
+        orders
+          .map((o) => o.exportGoodsIssueId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const issues = giIds.length
+      ? await this.giRepo.find({
+          where: { id: In(giIds), organizationId: actor.organizationId },
+        })
+      : [];
+    const giById = new Map(
+      issues.map((gi) => [
+        gi.id,
+        {
+          documentNumber: gi.documentNumber ?? null,
+          total: (gi.lines ?? []).reduce(
+            (sum, l) => sum + Number(l.lineTotal ?? 0),
+            0,
+          ),
+        },
+      ]),
+    );
+
+    return orders.map((o) => {
+      const gi = o.exportGoodsIssueId ? giById.get(o.exportGoodsIssueId) : null;
+      return {
+        id: o.id,
+        documentNumber: o.documentNumber ?? '',
+        requestedDate:
+          (o.requestedDate as string | undefined) ??
+          (o.createdAt ? o.createdAt.toISOString() : null),
+        notes: o.notes ?? null,
+        sourceBranchId: o.sourceBranchId,
+        sourceBranchName: branchName.get(o.sourceBranchId) ?? '',
+        exportGoodsIssueId: o.exportGoodsIssueId ?? null,
+        exportGoodsIssueDocumentNumber: gi?.documentNumber ?? null,
+        totalAmount: gi?.total ?? 0,
+        status: o.status,
+      };
+    });
+  }
+
   // ─── Update (DRAFT: full; IN_PROGRESS: notes + attachments only) ─────────────
 
   async update(
@@ -271,6 +456,11 @@ export class TransferOrderService {
       if (dto.lines) {
         await manager.delete(TransferOrderLineEntity, { transferOrderId: to.id });
         to.lines = dto.lines.map((l) => this.makeLine(l, actor));
+        await this.fillSourceLocations(
+          to.lines,
+          to.sourceStorageId,
+          actor.organizationId,
+        );
       }
 
       await manager.save(to);
@@ -312,6 +502,12 @@ export class TransferOrderService {
         referenceId: to.id,
         reason: dto.reason ?? `Transfer order ${to.documentNumber}`,
         notes: dto.notes,
+        // Carry the goods-issue form's header fields onto the spawned issue so
+        // the export leg round-trips Đối tượng / Người giao / Tham chiếu / Ngày.
+        providerId: dto.providerId,
+        deliverer: dto.deliverer,
+        references: dto.references,
+        occurredAt: dto.occurredAt,
         lines,
       },
       actor,
@@ -390,6 +586,49 @@ export class TransferOrderService {
     });
   }
 
+  /**
+   * Use the goods-receipt form's per-line Kho/Vị trí for import. Every item must
+   * belong to the transfer order; quantities positive; each line carries its own
+   * destination bin. uomCode is resolved from the order line's item.
+   */
+  private buildImportLinesFromInput(
+    inputLines: ImportTransferOrderLine[],
+    to: TransferOrderEntity,
+  ): {
+    itemId: string;
+    locationId: string;
+    uomCode: string;
+    quantity: number;
+    unitPrice: number;
+    note?: string;
+  }[] {
+    const byItem = new Map(to.lines.map((l) => [l.itemId, l]));
+    return inputLines.map((l) => {
+      const orderLine = byItem.get(l.itemId);
+      if (!orderLine) {
+        throw new BadRequestException(
+          'Line item is not part of the transfer order',
+        );
+      }
+      if (Number(l.quantity) <= 0) {
+        throw new BadRequestException('Line quantity must be greater than 0');
+      }
+      if (!l.locationId) {
+        throw new BadRequestException(
+          'A destination location is required for every line',
+        );
+      }
+      return {
+        itemId: l.itemId,
+        locationId: l.locationId,
+        uomCode: orderLine.item?.unit ?? 'CAI',
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice ?? orderLine.item?.purchasePrice ?? 0),
+        note: l.note,
+      };
+    });
+  }
+
   // ─── Import (Store B): IN_PROGRESS → COMPLETED, spawn GoodsReceipt ───────────
 
   async confirmImport(
@@ -407,26 +646,42 @@ export class TransferOrderService {
       );
     }
 
-    // The destination warehouse is chosen at import time (or pre-set on the
-    // header); all lines are received into it.
-    const destStorageId = dto.destinationStorageId ?? to.destinationStorageId;
-    if (!destStorageId) {
-      throw new BadRequestException(
-        'A destination warehouse is required to import',
+    // When the goods-receipt form submits per-line Kho/Vị trí, receive into
+    // those bins; otherwise derive every line into the destination storage's
+    // default bin (legacy single-Kho path).
+    let destStorageId = dto.destinationStorageId ?? to.destinationStorageId;
+    let lines: {
+      itemId: string;
+      locationId: string;
+      uomCode: string;
+      quantity: number;
+      unitPrice: number;
+      note?: string;
+    }[];
+    if (dto.lines?.length) {
+      lines = this.buildImportLinesFromInput(dto.lines, to);
+      const firstLoc = await this.locationRepo.findOne({
+        where: { id: lines[0].locationId, organizationId: actor.organizationId },
+      });
+      destStorageId = firstLoc?.storageId ?? destStorageId;
+    } else {
+      if (!destStorageId) {
+        throw new BadRequestException(
+          'A destination warehouse is required to import',
+        );
+      }
+      const destLocationId = await this.resolveLocation(
+        destStorageId,
+        actor.organizationId,
       );
+      lines = to.lines.map((l) => ({
+        itemId: l.itemId,
+        locationId: destLocationId,
+        uomCode: l.item?.unit ?? 'CAI',
+        quantity: Number(l.requestedQty),
+        unitPrice: Number(l.item?.purchasePrice ?? 0),
+      }));
     }
-    const destLocationId = await this.resolveLocation(
-      destStorageId,
-      actor.organizationId,
-    );
-
-    const lines = to.lines.map((l) => ({
-      itemId: l.itemId,
-      locationId: destLocationId,
-      uomCode: l.item?.unit ?? 'CAI',
-      quantity: Number(l.requestedQty),
-      unitPrice: Number(l.item?.purchasePrice ?? 0),
-    }));
 
     const goodsReceipt = await this.goodsReceiptService.createAndPost(
       {
@@ -434,8 +689,13 @@ export class TransferOrderService {
         referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
         referenceId: to.id,
         sourceBranchId: to.sourceBranchId,
-        receivedAt: new Date().toISOString(),
-        locationId: destLocationId,
+        receivedAt: dto.occurredAt ?? new Date().toISOString(),
+        locationId: lines[0].locationId,
+        // Carry the goods-receipt form's header fields onto the spawned receipt
+        // so the import leg round-trips Đối tượng / Người giao / Tham chiếu.
+        providerId: dto.providerId,
+        deliveredBy: dto.deliverer,
+        references: dto.references,
         lines,
       },
       actor,
@@ -446,7 +706,7 @@ export class TransferOrderService {
       {
         status: TransferOrderStatus.COMPLETED,
         importGoodsReceiptId: goodsReceipt.id,
-        destinationStorageId: destStorageId,
+        destinationStorageId: destStorageId ?? to.destinationStorageId,
         completedAt: new Date(),
         completedBy: actor.userId,
       },

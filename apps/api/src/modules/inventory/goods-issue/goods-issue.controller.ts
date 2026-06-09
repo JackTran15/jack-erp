@@ -24,6 +24,7 @@ import {
   IsArray,
   ValidateNested,
   IsNumber,
+  IsDateString,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -82,6 +83,22 @@ class CreateGoodsIssueDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** Free-text deliverer name (Người giao). */
+  @IsOptional()
+  @IsString()
+  deliverer?: string;
+
+  /** FE-supplied reference codes shown as Tham chiếu. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
+  /** User-entered issue date+time; falls back to createdAt when omitted. */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

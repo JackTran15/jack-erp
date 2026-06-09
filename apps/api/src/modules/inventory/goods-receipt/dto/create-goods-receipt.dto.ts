@@ -115,6 +115,12 @@ export class CreateGoodsReceiptDto {
   @IsUUID('all', { each: true })
   attachmentIds?: string[];
 
+  /** FE-supplied reference codes shown as Tham chiếu. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  references?: string[];
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

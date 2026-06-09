@@ -43,6 +43,7 @@ export class SearchGoodsIssuesV2Handler
       .leftJoinAndSelect('gi.location', 'location')
       .leftJoinAndSelect('gi.lines', 'lines')
       .leftJoinAndSelect('lines.item', 'lineItem')
+      .leftJoinAndSelect('lines.location', 'lineLocation')
       .where('gi.organizationId = :orgId', { orgId: actor.organizationId })
       .andWhere('gi.status != :cancelled', {
         cancelled: GoodsIssueStatus.CANCELLED,
