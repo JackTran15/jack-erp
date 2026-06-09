@@ -5949,6 +5949,50 @@
         ]
       }
     },
+    "/inventory/locations/preferred-shelf": {
+      "get": {
+        "operationId": "InventoryLocationStockController_getPreferredShelf",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vị trí ưu tiên hoặc null nếu chưa được cấu hình",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PreferredShelfResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items": {
       "get": {
         "operationId": "InventoryLocationStockController_listStockByLocation",
@@ -19658,6 +19702,26 @@
           "storageId"
         ]
       },
+      "PreferredShelfResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
       "StockByLocationProviderDto": {
         "type": "object",
         "properties": {
@@ -19936,12 +20000,18 @@
             "type": "string",
             "format": "uuid",
             "description": "Vị trí kệ đích để xếp hàng lên"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Số lượng cần xếp"
           }
         },
         "required": [
           "itemId",
           "storageId",
-          "destinationLocationId"
+          "destinationLocationId",
+          "quantity"
         ]
       },
       "ArrangeLocationDto": {

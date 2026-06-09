@@ -11,7 +11,14 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiExtraModels,
+  ApiProperty,
+  ApiResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import {
   ArrayMinSize,
   IsUUID,
@@ -29,6 +36,7 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockByLocationResponseDto } from './dto/stock-by-location.response.dto';
 import { ArrangeLocationDto } from './dto/arrange-location.dto';
+import { PreferredShelfResponseDto } from './dto/preferred-shelf.response.dto';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 
 class AddItemToLocationDto {
@@ -55,11 +63,34 @@ export class BatchAssignItemsDto {
 }
 
 @ApiTags('inventory')
+@ApiExtraModels(PreferredShelfResponseDto)
 @Controller('inventory/locations')
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class InventoryLocationStockController {
   constructor(private readonly service: InventoryLocationStockService) {}
+
+  @Get('preferred-shelf')
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary: 'Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Vị trí ưu tiên hoặc null nếu chưa được cấu hình',
+    schema: {
+      nullable: true,
+      allOf: [{ $ref: getSchemaPath(PreferredShelfResponseDto) }],
+    },
+  })
+  getPreferredShelf(
+    @Query('itemId', ParseUUIDPipe) itemId: string,
+    @Query('storageId', ParseUUIDPipe) storageId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getPreferredShelf(itemId, storageId, actor);
+  }
 
   @Get(':locationId/stock-items')
   @RequirePermission('inventory.read')

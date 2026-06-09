@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { getPreferredShelf } from "../../api/inventory-location-preferences";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
@@ -882,6 +883,26 @@ function GoodsIssueFormDialog({
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
+  const fillPreferredShelf = (idx: number, itemId: string, storageId: string) => {
+    void getPreferredShelf(itemId, storageId)
+      .then((shelf) => {
+        if (!shelf) return;
+        setLines((currentLines) =>
+          currentLines.map((line, lineIdx) =>
+            lineIdx === idx &&
+            line.itemId === itemId &&
+            line.storageId === storageId
+              ? {
+                  ...line,
+                  locationId: shelf.id,
+                  locationLabel: shelf.code,
+                }
+              : line,
+          ),
+        );
+      })
+      .catch(() => {});
+  };
 
   // Resolve the eager-loaded provider first, then fall back to a customer lookup
   // for legacy rows that pre-date the provider column.
@@ -1340,36 +1361,40 @@ function GoodsIssueFormDialog({
           }}
           onSelect={(item) => {
             const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-            setLines((prev) =>
-              normalizeFormLines(
-                prev.map((l, i) => {
-                  if (i !== idx) return l;
-                  // Inherit warehouse from the nearest line above that has one,
-                  // so adding items to a fresh row doesn't force re-picking kho.
-                  let storageId = l.storageId;
-                  let storageLabel = l.storageLabel;
-                  if (!storageId) {
-                    for (let j = i - 1; j >= 0; j--) {
-                      if (prev[j].storageId) {
-                        storageId = prev[j].storageId;
-                        storageLabel = prev[j].storageLabel;
-                        break;
-                      }
+            let storageId = "";
+            let storageLabel = "";
+            setLines((prev) => {
+              const updated = prev.map((l, i) => {
+                if (i !== idx) return l;
+                storageId = l.storageId;
+                storageLabel = l.storageLabel;
+                if (!storageId) {
+                  for (let j = i - 1; j >= 0; j--) {
+                    if (prev[j].storageId) {
+                      storageId = prev[j].storageId;
+                      storageLabel = prev[j].storageLabel;
+                      break;
                     }
                   }
-                  return {
-                    ...l,
-                    itemId: item.id,
-                    itemLabel: item.code,
-                    unit: item.unit,
-                    storageId,
-                    storageLabel,
-                    // Auto-fill only if user hasn't already typed a price.
-                    unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
-                  };
-                }),
-              ),
-            );
+                }
+                return {
+                  ...l,
+                  itemId: item.id,
+                  itemLabel: item.code,
+                  unit: item.unit,
+                  storageId,
+                  storageLabel,
+                  // Auto-fill only if user hasn't already typed a price.
+                  unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                };
+              });
+
+              if (storageId) {
+                fillPreferredShelf(idx, item.id, storageId);
+              }
+
+              return normalizeFormLines(updated);
+            });
             markDirty();
           }}
           search={searchItems}
@@ -1432,6 +1457,9 @@ function GoodsIssueFormDialog({
                   : l,
               ),
             );
+            if (row.itemId) {
+              fillPreferredShelf(idx, row.itemId, s.id);
+            }
             markDirty();
           }}
           search={searchStorages}

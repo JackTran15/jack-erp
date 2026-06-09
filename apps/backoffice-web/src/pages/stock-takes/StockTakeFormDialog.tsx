@@ -1070,7 +1070,7 @@ export function StockTakeFormDialog({
           placeholder="Tìm mã hoặc tên"
           value={row.itemCode}
           onValueChange={() => {
-            /* free-text typing has no semantic meaning here — selection only */
+            /* selection only */
           }}
           onSelect={(item) =>
             void handlePickItem(item, sourceIndexForVisible(idx))
@@ -1120,7 +1120,16 @@ export function StockTakeFormDialog({
           dropdownMinWidth={360}
           placeholder="Vị trí"
           value={row.locationCode}
-          onValueChange={() => {}}
+          onValueChange={(val) => {
+            setRows((prev) =>
+              prev.map((r, i) =>
+                i === idx
+                  ? { ...r, locationCode: val, locationId: "" }
+                  : r,
+              ),
+            );
+            markDirty();
+          }}
           onSelect={(loc) => {
             const sourceIndex = sourceIndexForVisible(idx);
             setRows((prev) =>

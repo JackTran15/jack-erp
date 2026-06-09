@@ -35,11 +35,18 @@ export class ProductStorageLocationService {
     locationId: string,
     actor: ActorContext,
   ): Promise<void> {
-    const item = await this.itemRepo.findOne({ where: { id: itemId } });
+    const item = await this.itemRepo.findOne({
+      where: { id: itemId, organizationId: actor.organizationId },
+    });
     if (!item?.productId) return;
 
     const existing = await this.pslRepo.findOne({
-      where: { productId: item.productId, storageId },
+      where: {
+        productId: item.productId,
+        storageId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
 
     if (existing) {
@@ -75,7 +82,11 @@ export class ProductStorageLocationService {
     actor: ActorContext,
   ): Promise<void> {
     const location = await this.locationRepo.findOne({
-      where: { id: locationId },
+      where: {
+        id: locationId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!location) return;
 
@@ -99,11 +110,17 @@ export class ProductStorageLocationService {
     locationId: string,
     actor: ActorContext,
   ): Promise<void> {
-    const item = await this.itemRepo.findOne({ where: { id: itemId } });
+    const item = await this.itemRepo.findOne({
+      where: { id: itemId, organizationId: actor.organizationId },
+    });
     if (!item?.productId) return;
 
     const location = await this.locationRepo.findOne({
-      where: { id: locationId },
+      where: {
+        id: locationId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!location) return;
 
@@ -112,9 +129,15 @@ export class ProductStorageLocationService {
 
   async listByProduct(
     productId: string,
-    _actor: ActorContext,
+    actor: ActorContext,
   ): Promise<ProductStorageLocationEntity[]> {
-    return this.pslRepo.find({ where: { productId } });
+    return this.pslRepo.find({
+      where: {
+        productId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
+    });
   }
 
   async setLocation(
@@ -124,7 +147,12 @@ export class ProductStorageLocationService {
     actor: ActorContext,
   ): Promise<ProductStorageLocationEntity> {
     const existing = await this.pslRepo.findOne({
-      where: { productId, storageId },
+      where: {
+        productId,
+        storageId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
 
     if (existing) {

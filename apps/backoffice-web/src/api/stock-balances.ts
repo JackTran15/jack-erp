@@ -141,6 +141,7 @@ export interface ArrangeLine {
   itemId: string;
   storageId: string;
   destinationLocationId: string;
+  quantity: number;
 }
 
 export interface ArrangeResult {
