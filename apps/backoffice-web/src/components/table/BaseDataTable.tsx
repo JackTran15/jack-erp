@@ -1,9 +1,19 @@
 import React from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn, Input } from "@erp/ui";
-import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
-import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
-import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
+import type {
+  ColumnCompareOp,
+  ColumnFilter,
+  ColumnFilterMode,
+} from "./pagination.dto";
+import {
+  DEFAULT_COLUMN_COMPARE_OP,
+  DEFAULT_COLUMN_FILTER_MODE,
+} from "./pagination.dto";
+import {
+  ColumnCompareOpDropdown,
+  ColumnFilterModeDropdown,
+} from "./ColumnFilterModeControl";
 
 export type ColumnFilterKind =
   | "symbol"
@@ -11,6 +21,7 @@ export type ColumnFilterKind =
   | "date"
   | "time"
   | "date-range"
+  | "date-compare"
   | "number-range"
   | "none";
 
@@ -69,6 +80,8 @@ interface ColumnFilterControl {
   onValueChange: (fieldKey: string, value: string) => void;
   /** Required for columns with `filterKind: "date-range"`. */
   onRangeChange?: (fieldKey: string, part: "from" | "to", value: string) => void;
+  /** Required for columns with `filterKind: "date-compare"`. */
+  onCompareOpChange?: (fieldKey: string, op: ColumnCompareOp) => void;
 }
 
 interface BaseDataTableProps<T> {
@@ -497,6 +510,25 @@ export function BaseDataTable<T>({
                               )
                             }
                             aria-label={`Lọc ${column.label} đến ngày`}
+                          />
+                        </div>
+                      ) : kind === "date-compare" ? (
+                        <div className="flex items-center gap-1">
+                          <ColumnCompareOpDropdown
+                            fieldLabel={column.label}
+                            value={activeFilter?.compareOp ?? DEFAULT_COLUMN_COMPARE_OP}
+                            onChange={(op) =>
+                              columnFilterControl.onCompareOpChange?.(column.key, op)
+                            }
+                          />
+                          <input
+                            type="date"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            value={activeFilter?.value ?? ""}
+                            onChange={(event) =>
+                              columnFilterControl.onValueChange(column.key, event.target.value)
+                            }
+                            aria-label={`Lọc ${column.label}`}
                           />
                         </div>
                       ) : kind === "number-range" ? (

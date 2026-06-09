@@ -6,6 +6,9 @@ import { TransferStatus, StockMovementType, DocumentType } from '@erp/shared-int
 import { StockTransferService, CreateTransferDto } from './stock-transfer.service';
 import { StockTransferEntity } from './stock-transfer.entity';
 import { LocationEntity } from '../location/location.entity';
+import { StorageEntity } from '../location/storage.entity';
+import { UserEntity } from '../../auth/user.entity';
+import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -14,10 +17,14 @@ describe('StockTransferService', () => {
   let service: StockTransferService;
   let transferRepo: Record<string, jest.Mock>;
   let locationRepo: Record<string, jest.Mock>;
+  let storageRepo: Record<string, jest.Mock>;
+  let userRepo: Record<string, jest.Mock>;
+  let balanceRepo: Record<string, jest.Mock>;
   let itemCostSnapshotService: Record<string, jest.Mock>;
   let ledgerService: Record<string, jest.Mock>;
   let docNumbering: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
+  let balanceQb: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -41,9 +48,24 @@ describe('StockTransferService', () => {
       save: jest.fn().mockImplementation((data) => Promise.resolve(data)),
       findOne: jest.fn(),
       findAndCount: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
     };
 
     locationRepo = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    storageRepo = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    userRepo = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    balanceRepo = {
       findOne: jest.fn(),
     };
 
@@ -55,14 +77,32 @@ describe('StockTransferService', () => {
 
     ledgerService = {
       recordBatchMovements: jest.fn().mockResolvedValue([]),
+      publishMovementEvents: jest.fn().mockResolvedValue(undefined),
     };
 
     docNumbering = {
       generate: jest.fn().mockResolvedValue('TFR-2026-0001'),
     };
 
+    // Sufficient on-hand by default; individual tests override getOne().
+    balanceQb = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({ quantity: 100 }),
+    };
+
     const mockManager = {
       update: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+      createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
+      create: jest.fn().mockImplementation((_entity, data) => ({
+        id: 'xfer-1',
+        ...data,
+      })),
+      save: jest.fn().mockImplementation((_entity, data) =>
+        Promise.resolve({ id: 'xfer-1', ...data }),
+      ),
     };
 
     dataSource = {
@@ -74,6 +114,9 @@ describe('StockTransferService', () => {
         StockTransferService,
         { provide: getRepositoryToken(StockTransferEntity), useValue: transferRepo },
         { provide: getRepositoryToken(LocationEntity), useValue: locationRepo },
+        { provide: getRepositoryToken(StorageEntity), useValue: storageRepo },
+        { provide: getRepositoryToken(UserEntity), useValue: userRepo },
+        { provide: getRepositoryToken(StockBalanceEntity), useValue: balanceRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: StockLedgerService, useValue: ledgerService },
         { provide: DocumentNumberingService, useValue: docNumbering },
@@ -141,7 +184,10 @@ describe('StockTransferService', () => {
         destinationBranchId: 'branch-dst',
         lines: [{ itemId: 'item-1', quantity: 5 }],
       };
-      transferRepo.findOne.mockResolvedValue(transfer);
+      // post() loads the DRAFT, then reloads the POSTED row at the end.
+      transferRepo.findOne
+        .mockResolvedValueOnce(transfer)
+        .mockResolvedValueOnce({ ...transfer, status: TransferStatus.POSTED });
 
       const result = await service.post('xfer-1', actor);
 
@@ -199,15 +245,66 @@ describe('StockTransferService', () => {
       expect(transferRepo.save).toHaveBeenCalled();
     });
 
-    it('should fail cancelling a POSTED transfer', async () => {
-      const transfer = {
+    it('reverses both ledger legs and sets CANCELLED for a POSTED transfer', async () => {
+      const posted = {
         id: 'xfer-1',
         organizationId: 'org-1',
         status: TransferStatus.POSTED,
+        documentNumber: 'CK000001',
+        sourceBranchId: 'branch-1',
+        destinationBranchId: 'branch-1',
+        sourceLocationId: 'loc-src',
+        destinationLocationId: 'loc-dst',
+        lines: [
+          {
+            itemId: 'item-1',
+            quantity: 5,
+            sourceLocationId: 'loc-src',
+            destinationLocationId: 'loc-dst',
+            unitPrice: '8.00',
+          },
+        ],
       };
-      transferRepo.findOne.mockResolvedValue(transfer);
+      transferRepo.findOne
+        .mockResolvedValueOnce(posted)
+        .mockResolvedValueOnce({ ...posted, status: TransferStatus.CANCELLED });
 
-      await expect(service.cancel('xfer-1', actor)).rejects.toThrow(BadRequestException);
+      const result = await service.cancel('xfer-1', actor);
+
+      expect(result.status).toBe(TransferStatus.CANCELLED);
+      // Reversal: stock returns to source (+), leaves destination (−).
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_IN,
+            quantity: 5,
+            locationId: 'loc-src',
+            referenceType: 'TRANSFER_REVERSAL',
+          }),
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_OUT,
+            quantity: -5,
+            locationId: 'loc-dst',
+            referenceType: 'TRANSFER_REVERSAL',
+          }),
+        ]),
+        expect.anything(),
+      );
+      expect(ledgerService.publishMovementEvents).toHaveBeenCalled();
+    });
+
+    it('rejects cancelling an already CANCELLED transfer (no double reversal)', async () => {
+      transferRepo.findOne.mockResolvedValue({
+        id: 'xfer-1',
+        organizationId: 'org-1',
+        status: TransferStatus.CANCELLED,
+        lines: [],
+      });
+
+      await expect(service.cancel('xfer-1', actor)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
     });
   });
 
@@ -234,16 +331,12 @@ describe('StockTransferService', () => {
     };
 
     it('happy path: same storage → creates and posts transfer directly', async () => {
-      // locationRepo returns matching locations
-      locationRepo.findOne
-        .mockResolvedValueOnce(sourceLocation)  // source lookup
-        .mockResolvedValueOnce(destLocation);   // dest lookup
+      // postIntraWarehouseMoves batch-loads both locations via find().
+      locationRepo.find.mockResolvedValue([sourceLocation, destLocation]);
 
-      // transferRepo.findOne drives create() and post() reloads (no approve step)
-      // 1st findOne (create's reload): returns DRAFT transfer (with number)
-      // 2nd findOne (post): returns DRAFT transfer to post
-      // 3rd findOne (post's final reload): returns POSTED transfer
-      const draftTransfer = {
+      // The posted transfer is created inside the locked transaction (manager),
+      // then reloaded once via findOrFail at the end.
+      const postedTransfer = {
         id: 'xfer-1',
         organizationId: 'org-1',
         branchId: 'branch-1',
@@ -252,15 +345,10 @@ describe('StockTransferService', () => {
         sourceLocationId: 'loc-src',
         destinationLocationId: 'loc-dst',
         documentNumber: 'TFR-2026-0001',
-        status: TransferStatus.DRAFT,
+        status: TransferStatus.POSTED,
         lines: [{ itemId: 'item-1', quantity: 3 }],
       };
-      const postedTransfer = { ...draftTransfer, status: TransferStatus.POSTED };
-
-      transferRepo.findOne
-        .mockResolvedValueOnce(draftTransfer)   // create() → findOrFail reload
-        .mockResolvedValueOnce(draftTransfer)   // post() → findOrFail
-        .mockResolvedValueOnce(postedTransfer); // post() → final reload
+      transferRepo.findOne.mockResolvedValue(postedTransfer);
 
       const result = await service.createIntraWarehouseTransferAndPost(intraDto, actor);
 
@@ -270,13 +358,15 @@ describe('StockTransferService', () => {
           expect.objectContaining({ movementType: StockMovementType.TRANSFER_OUT }),
           expect.objectContaining({ movementType: StockMovementType.TRANSFER_IN }),
         ]),
+        expect.anything(),
       );
     });
 
     it('cross-storage rejection: throws BadRequestException', async () => {
-      locationRepo.findOne
-        .mockResolvedValueOnce({ ...sourceLocation, storageId: 'storage-A' })
-        .mockResolvedValueOnce({ ...destLocation, storageId: 'storage-B' });
+      locationRepo.find.mockResolvedValue([
+        { ...sourceLocation, storageId: 'storage-A' },
+        { ...destLocation, storageId: 'storage-B' },
+      ]);
 
       await expect(
         service.createIntraWarehouseTransferAndPost(intraDto, actor),
@@ -284,16 +374,263 @@ describe('StockTransferService', () => {
     });
 
     it('cross-org rejection: location belongs to another org → throws NotFoundException', async () => {
-      // Simulate locationRepo returning null for org-2 locations
-      locationRepo.findOne
-        .mockResolvedValueOnce(null) // source not found for org-2
-        .mockResolvedValueOnce(destLocation);
+      // Locations from another org are not returned by the org-scoped find().
+      locationRepo.find.mockResolvedValue([]);
 
       const orgBactor = { ...actor, organizationId: 'org-2' };
 
       await expect(
         service.createIntraWarehouseTransferAndPost(intraDto, orgBactor),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('createAndPost (Kho → Kho, same branch)', () => {
+    const storageA = {
+      id: 'storage-A',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      name: 'Kho A',
+    };
+    const storageB = {
+      id: 'storage-B',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      name: 'Kho B',
+    };
+
+    const khoToKhoDto = {
+      lines: [
+        {
+          itemId: 'item-1',
+          quantity: 3,
+          sourceStorageId: 'storage-A',
+          destinationStorageId: 'storage-B',
+        },
+      ],
+    };
+
+    const draftTransfer = {
+      id: 'xfer-1',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      sourceBranchId: 'branch-1',
+      destinationBranchId: 'branch-1',
+      sourceLocationId: 'loc-A',
+      destinationLocationId: 'loc-B',
+      documentNumber: 'TFR-2026-0001',
+      status: TransferStatus.DRAFT,
+      lines: [
+        {
+          itemId: 'item-1',
+          quantity: 3,
+          sourceLocationId: 'loc-A',
+          destinationLocationId: 'loc-B',
+          unitPrice: '8.00',
+        },
+      ],
+    };
+
+    function mockDefaultLocations() {
+      // resolveDefaultLocation: source storage first, then destination storage.
+      locationRepo.findOne
+        .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
+        .mockResolvedValueOnce({ id: 'loc-B', storageId: 'storage-B' });
+    }
+
+    it('happy path: posts both legs in one transaction against the source/dest defaults', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      transferRepo.findOne
+        .mockResolvedValueOnce(draftTransfer) // create() reload
+        .mockResolvedValueOnce(draftTransfer) // post() load
+        .mockResolvedValueOnce({ ...draftTransfer, status: TransferStatus.POSTED }); // post() reload
+
+      const result = await service.createAndPost(khoToKhoDto, actor);
+
+      expect(result.status).toBe(TransferStatus.POSTED);
+      // Both legs written on the caller's transaction (manager passed).
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_OUT,
+            quantity: -3,
+            locationId: 'loc-A',
+            unitCost: 8,
+          }),
+          expect.objectContaining({
+            movementType: StockMovementType.TRANSFER_IN,
+            quantity: 3,
+            locationId: 'loc-B',
+            unitCost: 8,
+          }),
+        ]),
+        expect.anything(),
+      );
+      expect(ledgerService.publishMovementEvents).toHaveBeenCalled();
+    });
+
+    it('rejects storages in a different branch', async () => {
+      storageRepo.find.mockResolvedValue([
+        storageA,
+        { ...storageB, branchId: 'branch-2' },
+      ]);
+
+      await expect(service.createAndPost(khoToKhoDto, actor)).rejects.toThrow(
+        /same branch/,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('rejects when a storage has no default location', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      locationRepo.findOne.mockResolvedValueOnce(null); // source storage default missing
+
+      await expect(service.createAndPost(khoToKhoDto, actor)).rejects.toThrow(
+        /no default location/,
+      );
+    });
+
+    it('rejects when on-hand at the source location is insufficient', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      balanceQb.getOne.mockResolvedValue({ quantity: 1 }); // need 3, have 1
+      transferRepo.findOne
+        .mockResolvedValueOnce(draftTransfer) // create() reload
+        .mockResolvedValueOnce(draftTransfer); // post() load (throws before reload)
+
+      await expect(service.createAndPost(khoToKhoDto, actor)).rejects.toThrow(
+        BadRequestException,
+      );
+      // The orphan DRAFT is cleaned up after the failed post.
+      expect(transferRepo.delete).toHaveBeenCalledWith({ id: 'xfer-1' });
+    });
+
+    it('rejects a transporter that does not belong to the organization', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      userRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createAndPost(
+          { ...khoToKhoDto, transporterUserId: 'ghost-user' },
+          actor,
+        ),
+      ).rejects.toThrow(/Transporter user not found/);
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — edit POSTED (reverse + repost)', () => {
+    const storageA = {
+      id: 'storage-A',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      name: 'Kho A',
+    };
+    const storageB = {
+      id: 'storage-B',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      name: 'Kho B',
+    };
+
+    // Edit moves the destination from the old bin to storage-B's default bin.
+    const editDto = {
+      lines: [
+        {
+          itemId: 'item-1',
+          quantity: 3,
+          sourceStorageId: 'storage-A',
+          destinationStorageId: 'storage-B',
+        },
+      ],
+    };
+
+    const postedTransfer = {
+      id: 'xfer-1',
+      organizationId: 'org-1',
+      status: TransferStatus.POSTED,
+      documentNumber: 'CK000001',
+      sourceBranchId: 'branch-1',
+      destinationBranchId: 'branch-1',
+      sourceLocationId: 'loc-A',
+      destinationLocationId: 'loc-old-dst',
+      lines: [
+        {
+          itemId: 'item-1',
+          quantity: 3,
+          sourceLocationId: 'loc-A',
+          destinationLocationId: 'loc-old-dst',
+          unitPrice: '8.00',
+        },
+      ],
+    };
+
+    function mockDefaultLocations() {
+      locationRepo.findOne
+        .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
+        .mockResolvedValueOnce({ id: 'loc-B', storageId: 'storage-B' });
+    }
+
+    it('reverses the original legs and posts the edited legs, keeping the document number', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      transferRepo.findOne
+        .mockResolvedValueOnce(postedTransfer)
+        .mockResolvedValueOnce(postedTransfer); // final reload (still POSTED, same number)
+
+      const result = await service.update('xfer-1', editDto, actor);
+
+      expect(result.status).toBe(TransferStatus.POSTED);
+      expect(result.documentNumber).toBe('CK000001');
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ referenceType: 'TRANSFER_EDIT_REVERSAL' }),
+          expect.objectContaining({ referenceType: 'TRANSFER' }),
+        ]),
+        expect.anything(),
+      );
+      expect(ledgerService.publishMovementEvents).toHaveBeenCalled();
+    });
+
+    it('blocks the edit when a location would go negative (insufficient stock)', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      balanceQb.getOne.mockResolvedValue({ quantity: 1 }); // old dest has 1, reversal needs 3
+      transferRepo.findOne.mockResolvedValueOnce(postedTransfer);
+
+      await expect(service.update('xfer-1', editDto, actor)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('rejects editing a CANCELLED transfer', async () => {
+      transferRepo.findOne.mockResolvedValue({
+        id: 'xfer-1',
+        organizationId: 'org-1',
+        status: TransferStatus.CANCELLED,
+        lines: [],
+      });
+
+      await expect(service.update('xfer-1', editDto, actor)).rejects.toThrow(
+        /cancelled/i,
+      );
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
+    });
+
+    it('edits a DRAFT without touching the ledger', async () => {
+      storageRepo.find.mockResolvedValue([storageA, storageB]);
+      mockDefaultLocations();
+      const draft = { ...postedTransfer, status: TransferStatus.DRAFT };
+      transferRepo.findOne
+        .mockResolvedValueOnce(draft)
+        .mockResolvedValueOnce(draft);
+
+      const result = await service.update('xfer-1', editDto, actor);
+
+      expect(result.status).toBe(TransferStatus.DRAFT);
+      expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
     });
   });
 });
