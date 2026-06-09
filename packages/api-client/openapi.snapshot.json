@@ -6789,6 +6789,45 @@
         ]
       }
     },
+    "/products/storage-location": {
+      "get": {
+        "operationId": "ProductController_resolveStorageLocation",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve an item's arranged bin (\"đã sắp\") in a storage — lets the goods-\nreceipt form auto-fill Vị trí when a Kho is picked. Declared before\n`@Get(':id')` so the static path is not parsed as a UUID.",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
     "/products": {
       "get": {
         "operationId": "ProductController_list",
@@ -13174,6 +13213,84 @@
         ]
       }
     },
+    "/inventory/transfer-orders/issuable": {
+      "get": {
+        "operationId": "TransferOrderController_listIssuable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/importable": {
+      "get": {
+        "operationId": "TransferOrderController_listImportable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
+    "/inventory/transfer-orders/by-code/{code}": {
+      "get": {
+        "operationId": "TransferOrderController_getByCode",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/{id}": {
       "get": {
         "operationId": "TransferOrderController_getById",
@@ -13187,6 +13304,44 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      },
+      "patch": {
+        "operationId": "TransferOrderController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransferOrderDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -13225,9 +13380,9 @@
         ]
       }
     },
-    "/inventory/transfer-orders/{id}/approve": {
+    "/inventory/transfer-orders/{id}/export": {
       "post": {
-        "operationId": "TransferOrderController_approve",
+        "operationId": "TransferOrderController_confirmExport",
         "parameters": [
           {
             "name": "id",
@@ -13238,6 +13393,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportTransferOrderDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "",
@@ -13255,9 +13420,9 @@
         ]
       }
     },
-    "/inventory/transfer-orders/{id}/execute": {
+    "/inventory/transfer-orders/{id}/import": {
       "post": {
-        "operationId": "TransferOrderController_markExecuted",
+        "operationId": "TransferOrderController_confirmImport",
         "parameters": [
           {
             "name": "id",
@@ -13273,7 +13438,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MarkExecutedDto"
+                "$ref": "#/components/schemas/ImportTransferOrderDto"
               }
             }
           }
@@ -24255,11 +24420,27 @@
           "referenceType": {
             "type": "string",
             "enum": [
-              "STOCK_TAKE"
+              "STOCK_TAKE",
+              "TRANSFER_ORDER"
             ]
           },
           "notes": {
             "type": "string"
+          },
+          "deliverer": {
+            "type": "string",
+            "nullable": true
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
           },
           "approvedBy": {
             "type": "string"
@@ -24310,6 +24491,7 @@
           "reason",
           "status",
           "purpose",
+          "references",
           "lines",
           "id",
           "organizationId",
@@ -24626,6 +24808,13 @@
               "format": "uuid"
             }
           },
+          "references": {
+            "description": "FE-supplied reference codes shown as Tham chiếu.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lines": {
             "minItems": 1,
             "type": "array",
@@ -24723,6 +24912,12 @@
               "type": "string"
             }
           },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "paymentMethod": {
             "enum": [
               "CASH",
@@ -24795,6 +24990,7 @@
           "receivedAt",
           "locationId",
           "attachmentIds",
+          "references",
           "lines",
           "id",
           "organizationId",
@@ -25312,8 +25508,8 @@
           "status": {
             "enum": [
               "DRAFT",
-              "APPROVED",
-              "EXECUTED",
+              "IN_PROGRESS",
+              "COMPLETED",
               "CANCELLED"
             ],
             "type": "string"
@@ -25334,6 +25530,40 @@
             "type": "string"
           },
           "notes": {
+            "type": "string"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exportGoodsIssueId": {
+            "type": "string"
+          },
+          "importGoodsReceiptId": {
+            "type": "string",
+            "description": "GoodsReceipt spawned when the destination branch confirms import — the import_reference."
+          },
+          "exportedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "exportedBy": {
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "completedBy": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cancelledBy": {
             "type": "string"
           },
           "approvedAt": {
@@ -25391,6 +25621,7 @@
           "status",
           "sourceBranchId",
           "destinationBranchId",
+          "attachmentIds",
           "lines",
           "id",
           "organizationId",
@@ -25420,6 +25651,10 @@
           "requestedQty": {
             "type": "string"
           },
+          "sourceStorageId": {
+            "type": "string",
+            "description": "Source warehouse (storage) to pull this line from at export; null falls back to the header source storage."
+          },
           "note": {
             "type": "string"
           },
@@ -25439,6 +25674,15 @@
           },
           "item": {
             "$ref": "#/components/schemas/ItemEntity"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source bin this line is issued from — resolved from stock (the bin holding\nthe most of this item in the source storage) at create time, so the locked\ngoods-issue form can display + submit it. Null for legacy rows / no stock."
+          },
+          "sourceLocationCode": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -25453,7 +25697,15 @@
           "transferOrder"
         ]
       },
-      "MarkExecutedDto": {
+      "UpdateTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ExportTransferOrderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ImportTransferOrderDto": {
         "type": "object",
         "properties": {}
       },

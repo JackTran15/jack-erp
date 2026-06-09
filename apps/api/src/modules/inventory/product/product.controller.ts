@@ -19,6 +19,7 @@ import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { ProductCrudService } from './product-crud.service';
 import { VariantGenerationService } from './variant-generation.service';
+import { ProductStorageLocationService } from './product-storage-location.service';
 import { CreateProductDto, UpdateProductDto, GenerateVariantsDto, ResolveVariantDto } from './dto';
 
 @Controller('products')
@@ -28,7 +29,27 @@ export class ProductController {
   constructor(
     private readonly productService: ProductCrudService,
     private readonly variantService: VariantGenerationService,
+    private readonly pslService: ProductStorageLocationService,
   ) {}
+
+  /**
+   * Resolve an item's arranged bin ("đã sắp") in a storage — lets the goods-
+   * receipt form auto-fill Vị trí when a Kho is picked. Declared before
+   * `@Get(':id')` so the static path is not parsed as a UUID.
+   */
+  @Get('storage-location')
+  @RequirePermission('inventory.read')
+  resolveStorageLocation(
+    @Query('itemId', ParseUUIDPipe) itemId: string,
+    @Query('storageId', ParseUUIDPipe) storageId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.pslService.resolveAssignedLocation(
+      itemId,
+      storageId,
+      actor.organizationId,
+    );
+  }
 
   @Get()
   @RequirePermission('product.read')

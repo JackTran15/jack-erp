@@ -72,6 +72,9 @@ export class GoodsReceiptEntity extends BaseEntity {
   @Column({ name: 'attachment_ids', type: 'jsonb', default: () => "'[]'::jsonb" })
   attachmentIds: string[];
 
+  @Column({ name: 'references', type: 'jsonb', default: () => "'[]'::jsonb", comment: 'FE-supplied reference codes shown as Tham chiếu' })
+  references: string[];
+
   @Column({
     name: 'payment_method',
     type: 'enum',

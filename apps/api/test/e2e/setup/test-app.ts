@@ -120,6 +120,7 @@ export async function seedBaseData(
     'customer.read', 'customer.write', 'customer.merge',
     'inventory.read', 'inventory.write', 'inventory.manage',
     'inventory.transfer.create', 'inventory.transfer.read',
+    'inventory.transfer.export', 'inventory.transfer.import',
     'inventory.transfer.approve', 'inventory.transfer.post', 'inventory.transfer.cancel',
     'inventory.adjustment.create', 'inventory.adjustment.read',
     'inventory.adjustment.submit', 'inventory.adjustment.approve',

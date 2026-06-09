@@ -44,6 +44,7 @@ export enum GoodsIssuePurpose {
 
 export enum GoodsIssueReferenceType {
   STOCK_TAKE = "STOCK_TAKE",
+  TRANSFER_ORDER = "TRANSFER_ORDER",
 }
 
 export enum IssueReasonPurpose {
@@ -59,8 +60,8 @@ export enum StockTakeStatus {
 
 export enum TransferOrderStatus {
   DRAFT = "DRAFT",
-  APPROVED = "APPROVED",
-  EXECUTED = "EXECUTED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }
 
@@ -393,4 +394,102 @@ export interface GoodsIssue {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+}
+
+/**
+ * A DRAFT transfer order that the active branch (as source) can issue stock
+ * from — the row shape returned by GET /inventory/transfer-orders/issuable and
+ * rendered in the "Chọn lệnh điều chuyển" picker on the goods-issue form.
+ */
+export interface IssuableTransferOrderListItem {
+  id: string;
+  documentNumber: string;
+  /** "Ngày" — requestedDate when set, otherwise the creation date. ISO string. */
+  requestedDate: string | null;
+  /** "Lý do" — the transfer order notes. */
+  notes: string | null;
+  destinationBranchId: string;
+  /** "Điều chuyển đến" — resolved destination branch name, inlined per row. */
+  destinationBranchName: string;
+  status: TransferOrderStatus;
+}
+
+/**
+ * One row in the "Chọn chứng từ xuất kho điều chuyển" import picker — an
+ * IN_PROGRESS transfer order whose destination branch is the active branch.
+ */
+export interface ImportableTransferOrderListItem {
+  id: string;
+  documentNumber: string;
+  /** "Ngày" — requestedDate when set, otherwise the creation date. ISO string. */
+  requestedDate: string | null;
+  notes: string | null;
+  sourceBranchId: string;
+  /** "Điều chuyển từ" — resolved source branch name, inlined per row. */
+  sourceBranchName: string;
+  exportGoodsIssueId: string | null;
+  /** "Số chứng từ" — the export goods-issue (XK) document number. */
+  exportGoodsIssueDocumentNumber: string | null;
+  /** "Tổng thành tiền" — sum of the export goods-issue line totals. */
+  totalAmount: number;
+  status: TransferOrderStatus;
+}
+
+/** One edited goods-issue line submitted when exporting from the form. */
+export interface ExportTransferOrderLine {
+  itemId: string;
+  locationId: string;
+  quantity: number;
+  unitPrice?: number;
+  notes?: string;
+}
+
+/**
+ * Optional body of POST /inventory/transfer-orders/:id/export. When `lines` is
+ * present the export uses the (possibly edited) form lines instead of deriving
+ * them from the transfer order; omitting it preserves the legacy derive path.
+ */
+export interface ExportTransferOrderRequest {
+  lines?: ExportTransferOrderLine[];
+  reason?: string;
+  notes?: string;
+  /** Đối tượng (counterparty provider) selected on the goods-issue form. */
+  providerId?: string;
+  /** Người giao (free-text deliverer name). */
+  deliverer?: string;
+  /** Tham chiếu — FE-supplied reference codes (e.g. the source LDC number). */
+  references?: string[];
+  /** User-entered issue date+time (ISO); falls back to createdAt when omitted. */
+  occurredAt?: string;
+}
+
+/** One received goods-receipt line submitted when importing from the form. */
+export interface ImportTransferOrderLine {
+  itemId: string;
+  /** Destination bin (Vị trí) the line is received into. */
+  locationId: string;
+  quantity: number;
+  unitPrice?: number;
+  note?: string;
+}
+
+/**
+ * Optional body of POST /inventory/transfer-orders/:id/import. When `lines` is
+ * present the receipt uses the form's per-line Kho/Vị trí; otherwise it derives
+ * every line into the destination storage's default bin (legacy). The header
+ * fields round-trip onto the spawned receipt (mirrors ExportTransferOrderRequest).
+ */
+export interface ImportTransferOrderRequest {
+  /** Per-line received Kho/Vị trí chosen on the form. */
+  lines?: ImportTransferOrderLine[];
+  /** Kho nhận — fallback destination warehouse when `lines` is omitted. */
+  destinationStorageId?: string;
+  /** Đối tượng (counterparty provider). */
+  providerId?: string;
+  /** Người giao (free-text deliverer name). */
+  deliverer?: string;
+  /** Tham chiếu — FE-supplied reference codes. */
+  references?: string[];
+  /** User-entered receive date+time (ISO); falls back to now when omitted. */
+  occurredAt?: string;
 }

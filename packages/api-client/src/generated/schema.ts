@@ -2110,6 +2110,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/storage-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve an item's arranged bin ("đã sắp") in a storage — lets the goods-
+         *     receipt form auto-fill Vị trí when a Kho is picked. Declared before
+         *     `@Get(':id')` so the static path is not parsed as a UUID.
+         */
+        get: operations["ProductController_resolveStorageLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products": {
         parameters: {
             query?: never;
@@ -4087,6 +4108,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/transfer-orders/issuable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_listIssuable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/importable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_listImportable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/transfer-orders/by-code/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getByCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/{id}": {
         parameters: {
             query?: never;
@@ -4100,10 +4169,10 @@ export interface paths {
         delete: operations["TransferOrderController_cancel"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["TransferOrderController_update"];
         trace?: never;
     };
-    "/inventory/transfer-orders/{id}/approve": {
+    "/inventory/transfer-orders/{id}/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -4112,14 +4181,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["TransferOrderController_approve"];
+        post: operations["TransferOrderController_confirmExport"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/inventory/transfer-orders/{id}/execute": {
+    "/inventory/transfer-orders/{id}/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -4128,7 +4197,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["TransferOrderController_markExecuted"];
+        post: operations["TransferOrderController_confirmImport"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7394,8 +7463,12 @@ export interface components {
             purpose: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
             referenceId?: string;
             /** @enum {string} */
-            referenceType?: "STOCK_TAKE";
+            referenceType?: "STOCK_TAKE" | "TRANSFER_ORDER";
             notes?: string;
+            deliverer?: string | null;
+            references: string[];
+            /** Format: date-time */
+            occurredAt?: string | null;
             approvedBy?: string;
             /** Format: date-time */
             approvedAt?: string;
@@ -7523,6 +7596,8 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             attachmentIds?: string[];
+            /** @description FE-supplied reference codes shown as Tham chiếu. */
+            references?: string[];
             lines: components["schemas"]["GoodsReceiptLineDto"][];
             /**
              * @description Settlement on post: CASH posts a cash movement + auto Phiếu chi; CREDIT posts a payable JE.
@@ -7556,6 +7631,7 @@ export interface components {
             receivedAt: string;
             locationId: string;
             attachmentIds: string[];
+            references: string[];
             /** @enum {string} */
             paymentMethod?: "CASH" | "CREDIT";
             cashAccountId?: string;
@@ -7749,13 +7825,26 @@ export interface components {
         TransferOrderEntity: {
             documentNumber?: string;
             /** @enum {string} */
-            status: "DRAFT" | "APPROVED" | "EXECUTED" | "CANCELLED";
+            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
             sourceBranchId: string;
             destinationBranchId: string;
             sourceStorageId?: string;
             destinationStorageId?: string;
             requestedDate?: string;
             notes?: string;
+            attachmentIds: string[];
+            exportGoodsIssueId?: string;
+            /** @description GoodsReceipt spawned when the destination branch confirms import — the import_reference. */
+            importGoodsReceiptId?: string;
+            /** Format: date-time */
+            exportedAt?: string;
+            exportedBy?: string;
+            /** Format: date-time */
+            completedAt?: string;
+            completedBy?: string;
+            /** Format: date-time */
+            cancelledAt?: string;
+            cancelledBy?: string;
             /** Format: date-time */
             approvedAt?: string;
             approvedBy?: string;
@@ -7785,6 +7874,8 @@ export interface components {
             transferOrderId: string;
             itemId: string;
             requestedQty: string;
+            /** @description Source warehouse (storage) to pull this line from at export; null falls back to the header source storage. */
+            sourceStorageId?: string;
             note?: string;
             /** Format: date-time */
             createdAt: string;
@@ -7793,8 +7884,17 @@ export interface components {
             createdBy: string;
             transferOrder: components["schemas"]["TransferOrderEntity"];
             item?: components["schemas"]["ItemEntity"];
+            /**
+             * @description Source bin this line is issued from — resolved from stock (the bin holding
+             *     the most of this item in the source storage) at create time, so the locked
+             *     goods-issue form can display + submit it. Null for legacy rows / no stock.
+             */
+            sourceLocationId?: string | null;
+            sourceLocationCode?: string | null;
         };
-        MarkExecutedDto: Record<string, never>;
+        UpdateTransferOrderDto: Record<string, never>;
+        ExportTransferOrderDto: Record<string, never>;
+        ImportTransferOrderDto: Record<string, never>;
         CustomerSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -12105,6 +12205,28 @@ export interface operations {
             };
         };
     };
+    ProductController_resolveStorageLocation: {
+        parameters: {
+            query: {
+                itemId: string;
+                storageId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     ProductController_list: {
         parameters: {
             query?: {
@@ -15824,6 +15946,65 @@ export interface operations {
             };
         };
     };
+    TransferOrderController_listIssuable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TransferOrderController_listImportable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    TransferOrderController_getByCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
     TransferOrderController_getById: {
         parameters: {
             query?: never;
@@ -15864,7 +16045,7 @@ export interface operations {
             };
         };
     };
-    TransferOrderController_approve: {
+    TransferOrderController_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -15873,7 +16054,36 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTransferOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_confirmExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportTransferOrderDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -15885,7 +16095,7 @@ export interface operations {
             };
         };
     };
-    TransferOrderController_markExecuted: {
+    TransferOrderController_confirmImport: {
         parameters: {
             query?: never;
             header?: never;
@@ -15896,7 +16106,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MarkExecutedDto"];
+                "application/json": components["schemas"]["ImportTransferOrderDto"];
             };
         };
         responses: {

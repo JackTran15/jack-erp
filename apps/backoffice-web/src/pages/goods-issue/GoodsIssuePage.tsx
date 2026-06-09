@@ -31,6 +31,7 @@ import {
   Save,
   Tags,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +67,11 @@ import {
   getPersistableLines,
 } from "../inventory-line-normalization";
 import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  SelectTransferOrderDialog,
+  type TransferOrderDetail,
+} from "./SelectTransferOrderDialog";
+import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -112,7 +118,10 @@ interface GoodsIssue {
   referenceType?: string | null;
   status: GoodsIssueStatus;
   issueDate?: string;
+  occurredAt?: string | null;
   notes?: string;
+  deliverer?: string | null;
+  references?: string[];
   documentType?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -770,11 +779,13 @@ function DetailPanel({
               const itemCode = line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
               const itemName = line.item?.name ?? line.itemName ?? "—";
               const unitLabel = line.item?.unit ?? line.unit ?? "—";
-              const storageId = issue.location?.storageId;
+              // Each line has its own bin — read from the line's location, not
+              // the header (lines can be issued from different warehouses).
+              const storageId = line.location?.storageId;
               const storageName = storageId
                 ? storageNameById.get(storageId) ?? storageId.slice(0, 8)
                 : "—";
-              const binCode = issue.location?.code ?? "—";
+              const binCode = line.location?.code ?? "—";
               return (
                 <tr key={line.id} className="border-b">
                   <td className="border-r px-2 py-1 font-mono text-xs">{itemCode}</td>
@@ -833,6 +844,13 @@ const getPersistableFormLines = (nextLines: FormLine[]) =>
 
 const normalizeFormLines = (nextLines: FormLine[]) =>
   ensureTrailingBlankLine(nextLines, emptyLine);
+
+/** Combine a date (YYYY-MM-DD) + time (HH:MM) into an ISO timestamp. */
+const combineDateTime = (date: string, time: string): string | undefined => {
+  if (!date) return undefined;
+  const dt = new Date(`${date}T${time || "00:00"}:00`);
+  return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
+};
 
 function GoodsIssueFormDialog({
   mode,
@@ -938,15 +956,23 @@ function GoodsIssueFormDialog({
     initial?.reasonId ? initial?.reason ?? "" : "",
   );
   const [targetBranchId, setTargetBranchId] = useState(initial?.targetBranchId ?? "");
-  const [targetBranchLabel, setTargetBranchLabel] = useState("");
-  const [deliveryPerson, setDeliveryPerson] = useState("");
+  const [targetBranchLabel, setTargetBranchLabel] = useState(
+    initial?.targetBranch?.name ?? "",
+  );
+  const [deliveryPerson, setDeliveryPerson] = useState(initial?.deliverer ?? "");
+  const [references, setReferences] = useState<string[]>(initial?.references ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const notesAutoFilledRef = useRef(false);
+  // Ngày/Giờ xuất come from the persisted occurredAt; fall back to now for a
+  // fresh form (or legacy rows where occurredAt is null).
+  const initialOccurred = initial?.occurredAt ? new Date(initial.occurredAt) : null;
   const [docDate, setDocDate] = useState(
-    initial?.issueDate ?? new Date().toISOString().slice(0, 10),
+    initialOccurred
+      ? `${initialOccurred.getFullYear()}-${String(initialOccurred.getMonth() + 1).padStart(2, "0")}-${String(initialOccurred.getDate()).padStart(2, "0")}`
+      : initial?.issueDate ?? new Date().toISOString().slice(0, 10),
   );
   const [docTime, setDocTime] = useState(() => {
-    const d = new Date();
+    const d = initialOccurred ?? new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   });
   const [lines, setLines] = useState<FormLine[]>(() => {
@@ -993,6 +1019,13 @@ function GoodsIssueFormDialog({
   // "Tham chiếu": phiếu xuất kho kiểm kê được sinh tự động khi "Xử lý" một phiếu
   // kiểm kê. API chỉ trả referenceId — resolve số phiếu KK gốc để hiển thị.
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  // "Lập từ lệnh điều chuyển": when set, this form represents the export leg of a
+  // transfer order — Save calls the transfer export endpoint instead of creating
+  // a standalone goods issue.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sourceTransferOrderId, setSourceTransferOrderId] = useState<string | null>(
+    null,
+  );
   const referenceStockTakeId =
     initial?.referenceType === "STOCK_TAKE" ? initial.referenceId ?? null : null;
   useEffect(() => {
@@ -1051,6 +1084,60 @@ function GoodsIssueFormDialog({
       setNotes("");
       notesAutoFilledRef.current = false;
     }
+    markDirty();
+  };
+
+  /** Load a picked transfer order into the form as the export leg. */
+  const prefillFromTransferOrder = useCallback(
+    (detail: TransferOrderDetail, row: IssuableTransferOrderListItem) => {
+      setPurpose("TRANSFER_OUT");
+      setReasonId("");
+      setReasonLabel("");
+      setTargetBranchId(detail.destinationBranchId);
+      setTargetBranchLabel(row.destinationBranchName);
+      const ldc = detail.documentNumber ?? row.documentNumber;
+      setReferenceNumber(ldc);
+      setReferences(ldc ? [ldc] : []);
+      setSourceTransferOrderId(detail.id);
+      const autoNotes =
+        detail.notes ||
+        `Xuất kho hàng hóa điều chuyển đến cửa hàng ${row.destinationBranchName}`;
+      setNotes(autoNotes);
+      notesAutoFilledRef.current = true;
+      // The detail grid is locked for transfer-sourced issues — the user can't
+      // pick a bin — so the Vị trí must come pre-resolved from the order. The
+      // backend resolves each line's source bin from the product's assigned
+      // location in the source storage ("Xếp vị trí"), the bin posting enforces.
+      const mapped: FormLine[] = detail.lines.map((l) => {
+        const storageId = l.sourceStorageId ?? detail.sourceStorageId ?? "";
+        const storageLabel = storageId
+          ? storages.find((s) => s.id === storageId)?.name ?? ""
+          : "";
+        return {
+          itemId: l.itemId,
+          itemLabel: l.item?.code ?? "",
+          unit: l.item?.unit ?? "",
+          storageId,
+          storageLabel,
+          locationId: l.sourceLocationId ?? "",
+          locationLabel: l.sourceLocationCode ?? "",
+          quantity: Number(l.requestedQty),
+          unitPrice: Number(l.item?.purchasePrice ?? 0),
+          notes: l.note ?? "",
+        };
+      });
+      // No trailing blank line — the locked detail must not render an empty row.
+      setLines(mapped);
+      setDirty(true);
+    },
+    [storages],
+  );
+
+  /** Unlink the transfer order — the form reverts to a plain goods issue. */
+  const clearTransferSource = () => {
+    setSourceTransferOrderId(null);
+    setReferenceNumber(null);
+    setReferences([]);
     markDirty();
   };
 
@@ -1219,25 +1306,46 @@ function GoodsIssueFormDialog({
         resolvedLines.push({ ...l, locationId });
       }
       const headerLocationId = resolvedLines[0]?.locationId ?? "";
+      const issueLines = resolvedLines.map((l) => ({
+        itemId: l.itemId,
+        locationId: l.locationId,
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unitPrice) || 0,
+        notes: l.notes || undefined,
+      }));
 
-      await apiClient.post("/inventory/goods-issues", {
-        locationId: headerLocationId,
-        providerId: customerId || undefined,
-        purpose,
-        reasonId:
-          (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
-            ? reasonId
-            : undefined,
-        targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
-        notes: notes || undefined,
-        lines: resolvedLines.map((l) => ({
-          itemId: l.itemId,
-          locationId: l.locationId,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice) || 0,
-          notes: l.notes || undefined,
-        })),
-      });
+      if (sourceTransferOrderId) {
+        // Saving the export leg of a transfer order: this posts the goods issue
+        // and advances the transfer order DRAFT → IN_PROGRESS server-side. Carry
+        // the form's header fields so the spawned issue round-trips them too.
+        await apiClient.post(
+          `/inventory/transfer-orders/${sourceTransferOrderId}/export`,
+          {
+            notes: notes || undefined,
+            providerId: customerId || undefined,
+            deliverer: deliveryPerson || undefined,
+            references: references.length ? references : undefined,
+            occurredAt: combineDateTime(docDate, docTime),
+            lines: issueLines,
+          },
+        );
+      } else {
+        await apiClient.post("/inventory/goods-issues", {
+          locationId: headerLocationId,
+          providerId: customerId || undefined,
+          purpose,
+          reasonId:
+            (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
+              ? reasonId
+              : undefined,
+          targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
+          notes: notes || undefined,
+          deliverer: deliveryPerson || undefined,
+          references: references.length ? references : undefined,
+          occurredAt: combineDateTime(docDate, docTime),
+          lines: issueLines,
+        });
+      }
       setDirty(false);
       // "Lưu" tạo + thực hiện luôn (giống MISA): phiếu trả về đã ở trạng thái
       // đã xuất kho, đã ghi sổ tồn kho.
@@ -1250,7 +1358,20 @@ function GoodsIssueFormDialog({
     } finally {
       setSaving(false);
     }
-  }, [customerId, lines, notes, purpose, reasonId, targetBranchId, onSaved]);
+  }, [
+    customerId,
+    lines,
+    notes,
+    deliveryPerson,
+    references,
+    docDate,
+    docTime,
+    purpose,
+    reasonId,
+    targetBranchId,
+    sourceTransferOrderId,
+    onSaved,
+  ]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -1306,12 +1427,33 @@ function GoodsIssueFormDialog({
       disabled: !onVoid || initial?.status !== "POSTED",
       onClick: () => onVoid?.(),
     },
+    ...(mode === "create"
+      ? [
+          {
+            id: "utilities",
+            label: "Tiện ích",
+            icon: Wrench,
+            onClick: () => {},
+            options: [
+              {
+                id: "from-transfer",
+                label: "Lập từ lệnh điều chuyển",
+                onClick: () => setPickerOpen(true),
+              },
+            ],
+          } as ToolbarItem,
+        ]
+      : []),
     { id: "sep2", type: "separator" },
     { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
     { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
+
+  // Lines sourced from a transfer order mirror the order exactly — lock the
+  // whole detail (add/delete row + every cell). View mode is read-only too.
+  const detailLocked = isView || sourceTransferOrderId !== null;
 
   const lineColumns: LineColumn<FormLine>[] = [
     {
@@ -1381,8 +1523,8 @@ function GoodsIssueFormDialog({
             { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
             { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
           ]}
-          disabled={isView}
-          onCreateNew={isView ? undefined : () => setQuickItemLineIdx(idx)}
+          disabled={detailLocked}
+          onCreateNew={detailLocked ? undefined : () => setQuickItemLineIdx(idx)}
           className="h-full"
         />
       ),
@@ -1442,7 +1584,7 @@ function GoodsIssueFormDialog({
           renderItem={(s) => s.name}
           renderMeta={() => ""}
           columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
-          disabled={isView}
+          disabled={detailLocked}
           className="h-full"
         />
       ),
@@ -1487,9 +1629,11 @@ function GoodsIssueFormDialog({
             { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
             { key: "name", label: "Tên vị trí", render: (l) => l.name },
           ]}
-          disabled={isView || !row.storageId}
+          disabled={detailLocked || !row.storageId}
           onCreateNew={
-            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            detailLocked || !row.storageId
+              ? undefined
+              : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
@@ -1518,6 +1662,7 @@ function GoodsIssueFormDialog({
       filterSymbol: "≤",
       renderEditor: (row, idx) => (
         <MoneyInput
+          disabled={detailLocked}
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none"
           value={row.unitPrice === 0 ? "" : row.unitPrice}
           onChange={(v) => {
@@ -1555,7 +1700,7 @@ function GoodsIssueFormDialog({
               onChange={(e) =>
                 handlePurposeChange(e.target.value as GoodsIssuePurposeUI)
               }
-              disabled={isView}
+              disabled={isView || sourceTransferOrderId !== null}
             >
               {MANUAL_PURPOSES.map((p) => (
                 <option key={p} value={p}>
@@ -1707,13 +1852,40 @@ function GoodsIssueFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              {referenceNumber ? (
-                <span className="font-mono text-sm font-medium text-foreground">
-                  {referenceNumber}
-                </span>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              {(() => {
+                // FE-supplied reference list, plus any resolved single-doc
+                // linkage (stock-take / transfer order) not already in it.
+                const refs = [
+                  ...references,
+                  ...(referenceNumber && !references.includes(referenceNumber)
+                    ? [referenceNumber]
+                    : []),
+                ];
+                return refs.length ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {refs.map((r) => (
+                      <span
+                        key={r}
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
+                      >
+                        {r}
+                      </span>
+                    ))}
+                    {sourceTransferOrderId && !isView ? (
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-destructive hover:underline"
+                        title="Gỡ liên kết lệnh điều chuyển"
+                        onClick={clearTransferSource}
+                      >
+                        (x)
+                      </button>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                );
+              })()}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1760,36 +1932,43 @@ function GoodsIssueFormDialog({
           </>
         }
         detailActions={
-          <>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" disabled />
-              <span>Quét mã vạch</span>
-            </label>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
-              onClick={() => setChooseKhoOpen(true)}
-            >
-              Chọn kho
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
-            >
-              Nhập khẩu
-            </button>
-          </>
+          detailLocked ? undefined : (
+            <>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" disabled />
+                <span>Quét mã vạch</span>
+              </label>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+                onClick={() => setChooseKhoOpen(true)}
+              >
+                Chọn kho
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+              >
+                Nhập khẩu
+              </button>
+            </>
+          )
         }
         detail={
           <LineItemGrid
             columns={lineColumns}
+            // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
+            onChangeCell={
+              detailLocked
+                ? undefined
+                : (idx, key, value) => {
+                    setLines((prev) =>
+                      prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
+                    );
+                    markDirty();
+                  }
+            }
             rows={lines}
-            onChangeCell={(idx, key, value) => {
-              setLines((prev) =>
-                prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
-              );
-              markDirty();
-            }}
             onAddRow={() => {
               setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
@@ -1800,8 +1979,8 @@ function GoodsIssueFormDialog({
               );
               markDirty();
             }}
-            showAddRow={!isView}
-            showRowActions={!isView}
+            showAddRow={!detailLocked}
+            showRowActions={!detailLocked}
           />
         }
         footerSummary={
@@ -1919,6 +2098,12 @@ function GoodsIssueFormDialog({
           }}
         />
       )}
+
+      <SelectTransferOrderDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={prefillFromTransferOrder}
+      />
     </>
   );
 }

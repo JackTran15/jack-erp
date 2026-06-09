@@ -37,7 +37,15 @@ import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { getPreferredShelf } from "../../api/inventory-location-preferences";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import {
+  SelectTransferReceiptDialog,
+  type TransferReceiptDetail,
+} from "./SelectTransferReceiptDialog";
+import type { ImportableTransferOrderListItem } from "@erp/shared-interfaces";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
@@ -50,7 +58,10 @@ import {
   type QuickLocation,
   type QuickProvider,
 } from "../../components/forms/QuickCreateDialogs";
-import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import {
+  InventoryPageTitle,
+  InventoryTabBar,
+} from "../../components/document/inventoryTabs";
 import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -63,7 +74,10 @@ import {
   ensureTrailingBlankLine,
   getPersistableLines,
 } from "../inventory-line-normalization";
-import { buildV2Body, type V2SearchConfig } from "../../components/crud/crudV2Search";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../components/crud/crudV2Search";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
@@ -80,7 +94,12 @@ interface GoodsReceiptLine {
   note?: string | null;
   /** Eager-loaded from BE — present on read endpoints. */
   item?: { id: string; code: string; name: string; unit?: string } | null;
-  location?: { id: string; code: string; name: string; storageId?: string } | null;
+  location?: {
+    id: string;
+    code: string;
+    name: string;
+    storageId?: string;
+  } | null;
 }
 
 interface GoodsReceipt {
@@ -96,10 +115,16 @@ interface GoodsReceipt {
   description?: string | null;
   referenceId?: string | null;
   referenceType?: "PURCHASE_ORDER" | "STOCK_TRANSFER" | "STOCK_TAKE" | null;
+  references?: string[];
   sourceBranchId?: string | null;
   receivedAt: string;
   locationId: string;
-  location?: { id: string; code: string; name: string; storageId?: string } | null;
+  location?: {
+    id: string;
+    code: string;
+    name: string;
+    storageId?: string;
+  } | null;
   attachmentIds?: string[];
   lines: GoodsReceiptLine[];
   cashPaymentId?: string | null;
@@ -152,7 +177,8 @@ interface InventoryStorage {
 /** Active branch — same source the axios client uses for the X-Branch-Id header. */
 function getActiveBranchId(): string | null {
   return (
-    localStorage.getItem("active_branch_id") ?? localStorage.getItem("branch_id")
+    localStorage.getItem("active_branch_id") ??
+    localStorage.getItem("branch_id")
   );
 }
 
@@ -201,13 +227,20 @@ const GR_SEARCH: V2SearchConfig = {
 };
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
-  return FILTER_KEYS.reduce((acc, k) => {
-    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
-    return acc;
-  }, {} as Record<FilterKey, ColumnFilter>);
+  return FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<FilterKey, ColumnFilter>,
+  );
 }
 
-function lineSubtotal(l: { quantity: number | string; unitPrice: number | string; lineTotal?: number | string }): number {
+function lineSubtotal(l: {
+  quantity: number | string;
+  unitPrice: number | string;
+  lineTotal?: number | string;
+}): number {
   if (l.lineTotal !== undefined && l.lineTotal !== null && l.lineTotal !== "")
     return Number(l.lineTotal);
   return Number(l.quantity) * Number(l.unitPrice);
@@ -218,11 +251,13 @@ function orderTotal(o: PurchaseOrder): number {
 }
 
 export function PurchaseOrdersPage() {
-  const [records, setRecords] = useState<PaginatedResponse<PurchaseOrder> | null>(null);
+  const [records, setRecords] =
+    useState<PaginatedResponse<PurchaseOrder> | null>(null);
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
     const range = resolvePeriodRange("this_month");
     return { preset: "this_month", ...range };
@@ -232,9 +267,13 @@ export function PurchaseOrdersPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
+  const [dialogMode, setDialogMode] = useState<
+    "create" | "edit" | "view" | null
+  >(null);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<PurchaseOrder | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<PurchaseOrder | null>(
+    null,
+  );
   const [confirmVoid, setConfirmVoid] = useState<PurchaseOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
@@ -260,7 +299,12 @@ export function PurchaseOrdersPage() {
       });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setRecords({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+      });
     } finally {
       setLoading(false);
     }
@@ -268,9 +312,9 @@ export function PurchaseOrdersPage() {
 
   const loadProviders = useCallback(async () => {
     try {
-      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-        "/inventory/providers?page=1&pageSize=200",
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<InventoryProvider>
+      >("/inventory/providers?page=1&pageSize=200");
       setProviders(data.data);
     } catch {
       // best-effort; row will fall back to id if name is missing
@@ -425,7 +469,12 @@ export function PurchaseOrdersPage() {
       onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
     },
     { id: "sep1", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => void loadRecords(),
+    },
     {
       id: "barcode",
       label: "In tem mã",
@@ -476,7 +525,9 @@ export function PurchaseOrdersPage() {
       width: 180,
       render: (row) =>
         row.provider?.name ??
-        (row.providerId ? providerNameById.get(row.providerId) ?? row.providerId : "—"),
+        (row.providerId
+          ? (providerNameById.get(row.providerId) ?? row.providerId)
+          : "—"),
     },
     {
       key: "totalAmount",
@@ -518,7 +569,8 @@ export function PurchaseOrdersPage() {
 
   // Any filter edit resets to page 1 so the server result starts from the top.
   const resetPage = useCallback(
-    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    () =>
+      setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
     [],
   );
 
@@ -594,7 +646,9 @@ export function PurchaseOrdersPage() {
         summary={
           <div className="flex items-center justify-end gap-6 px-2">
             <span className="text-muted-foreground">Tổng tiền:</span>
-            <span className="text-base font-semibold">{formatMoneyInteger(totalSum)}</span>
+            <span className="text-base font-semibold">
+              {formatMoneyInteger(totalSum)}
+            </span>
           </div>
         }
         pagination={
@@ -602,14 +656,23 @@ export function PurchaseOrdersPage() {
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={records?.total ?? 0}
-            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageChange={(p) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
             onPageSizeChange={(nextPageSize) =>
-              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+              setPagination((prev) => ({
+                ...prev,
+                page: 1,
+                pageSize: nextPageSize,
+              }))
             }
           />
         }
         detailPanel={
-          <DetailPanel order={selectedOrder} storageNameById={storageNameById} />
+          <DetailPanel
+            order={selectedOrder}
+            storageNameById={storageNameById}
+          />
         }
       >
         <BaseDataTable
@@ -627,7 +690,9 @@ export function PurchaseOrdersPage() {
                 type="checkbox"
                 aria-label="Chọn dòng"
                 checked={selectedId === row.id}
-                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
+                onChange={() =>
+                  setSelectedId(selectedId === row.id ? null : row.id)
+                }
                 onClick={(e) => e.stopPropagation()}
               />
             ),
@@ -654,7 +719,9 @@ export function PurchaseOrdersPage() {
             await loadRecords();
           }}
           onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
-          onRequestDelete={editingOrder ? () => setConfirmDelete(editingOrder) : undefined}
+          onRequestDelete={
+            editingOrder ? () => setConfirmDelete(editingOrder) : undefined
+          }
         />
       )}
 
@@ -704,51 +771,80 @@ function DetailPanel({
         Chi tiết
       </div>
       {!order ? (
-        <p className="text-sm text-muted-foreground">Chọn một phiếu để xem chi tiết.</p>
+        <p className="text-sm text-muted-foreground">
+          Chọn một phiếu để xem chi tiết.
+        </p>
       ) : order.lines.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Phiếu này chưa có dòng hàng.</p>
+        <p className="text-sm text-muted-foreground">
+          Phiếu này chưa có dòng hàng.
+        </p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
-              <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Vị trí</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Đơn giá</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Thành tiền</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Mã SKU
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Tên hàng hóa
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Kho
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Vị trí
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Đơn vị tính
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Số lượng
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Đơn giá
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Thành tiền
+              </th>
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
             </tr>
           </thead>
           <tbody>
             {order.lines.map((rawLine) => {
               const line = rawLine as PurchaseOrderLine;
-              const itemCode = line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
+              const itemCode =
+                line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
               const itemName = line.item?.name ?? line.itemName ?? "—";
-              const storageId = line.location?.storageId ?? order.location?.storageId;
+              const storageId =
+                line.location?.storageId ?? order.location?.storageId;
               const storageName = storageId
-                ? storageNameById.get(storageId) ?? storageId.slice(0, 8)
+                ? (storageNameById.get(storageId) ?? storageId.slice(0, 8))
                 : "—";
               const binCode = line.location?.code ?? line.location?.name ?? "—";
-              const unitLabel = line.item?.unit ?? line.unit ?? line.uomCode ?? "—";
+              const unitLabel =
+                line.item?.unit ?? line.unit ?? line.uomCode ?? "—";
               return (
-              <tr key={line.id} className="border-b">
-                <td className="border-r px-2 py-1 font-mono text-xs">{itemCode}</td>
-                <td className="border-r px-2 py-1">{itemName}</td>
-                <td className="border-r px-2 py-1">{storageName}</td>
-                <td className="border-r px-2 py-1 font-mono text-xs">{binCode}</td>
-                <td className="border-r px-2 py-1">{unitLabel}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">{Number(line.quantity)}</td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">
-                  {formatMoneyInteger(Number(line.unitPrice))}
-                </td>
-                <td className="border-r px-2 py-1 text-right tabular-nums">
-                  {formatMoneyInteger(lineSubtotal(line))}
-                </td>
-                <td className="px-2 py-1">{line.note ?? ""}</td>
-              </tr>
+                <tr key={line.id} className="border-b">
+                  <td className="border-r px-2 py-1 font-mono text-xs">
+                    {itemCode}
+                  </td>
+                  <td className="border-r px-2 py-1">{itemName}</td>
+                  <td className="border-r px-2 py-1">{storageName}</td>
+                  <td className="border-r px-2 py-1 font-mono text-xs">
+                    {binCode}
+                  </td>
+                  <td className="border-r px-2 py-1">{unitLabel}</td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {Number(line.quantity)}
+                  </td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {formatMoneyInteger(Number(line.unitPrice))}
+                  </td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {formatMoneyInteger(lineSubtotal(line))}
+                  </td>
+                  <td className="px-2 py-1">{line.note ?? ""}</td>
+                </tr>
               );
             })}
           </tbody>
@@ -819,7 +915,11 @@ function PurchaseOrderFormDialog({
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
-  const fillPreferredShelf = (idx: number, itemId: string, storageId: string) => {
+  const fillPreferredShelf = (
+    idx: number,
+    itemId: string,
+    storageId: string,
+  ) => {
     void getPreferredShelf(itemId, storageId)
       .then((shelf) => {
         if (!shelf) return;
@@ -842,9 +942,12 @@ function PurchaseOrderFormDialog({
 
   const initialProvider = useMemo(() => {
     if (!initial || !initial.providerId) return { code: "", name: "" };
-    if (initial.provider) return { code: initial.provider.code, name: initial.provider.name };
+    if (initial.provider)
+      return { code: initial.provider.code, name: initial.provider.name };
     const p = providers.find((x) => x.id === initial.providerId);
-    return p ? { code: p.code, name: p.name } : { code: initial.providerId ?? "", name: "" };
+    return p
+      ? { code: p.code, name: p.name }
+      : { code: initial.providerId ?? "", name: "" };
   }, [initial, providers]);
 
   const [providerId, setProviderId] = useState(initial?.providerId ?? "");
@@ -864,24 +967,44 @@ function PurchaseOrderFormDialog({
     [storages],
   );
   const initialStorageId = initial
-    ? initial.location?.storageId ?? ""
-    : defaultStorage?.id ?? "";
+    ? (initial.location?.storageId ?? "")
+    : (defaultStorage?.id ?? "");
   const initialStorageLabel = initial
     ? initial.location?.storageId
-      ? storages.find((s) => s.id === initial.location!.storageId)?.name ?? ""
+      ? (storages.find((s) => s.id === initial.location!.storageId)?.name ?? "")
       : ""
-    : defaultStorage?.name ?? "";
+    : (defaultStorage?.name ?? "");
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
   const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
     initial?.purpose === "TRANSFER_IN" ? "TRANSFER" : "OTHER",
   );
-  const [sourceBranchId, setSourceBranchId] = useState(initial?.sourceBranchId ?? "");
+  const [sourceBranchId, setSourceBranchId] = useState(
+    initial?.sourceBranchId ?? "",
+  );
   const [sourceBranchLabel, setSourceBranchLabel] = useState("");
   const [reason, setReason] = useState(initial?.reason ?? "");
-  const [deliveryPerson, setDeliveryPerson] = useState(initial?.deliveredBy ?? "");
+  const [deliveryPerson, setDeliveryPerson] = useState(
+    initial?.deliveredBy ?? "",
+  );
   const [notes, setNotes] = useState(initial?.description ?? "");
-  const initialReceivedAt = initial?.receivedAt ? new Date(initial.receivedAt) : new Date();
+  // "Chọn chứng từ điều chuyển": when set, this receipt is the import leg of a
+  // transfer order — Save calls the transfer import endpoint instead of creating
+  // a standalone goods receipt, and the detail is locked.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sourceTransferOrderId, setSourceTransferOrderId] = useState<
+    string | null
+  >(null);
+  const [references, setReferences] = useState<string[]>(
+    initial?.references ?? [],
+  );
+  // Lines come from the transfer order — lock Mã SKU / Số lượng / Đơn giá and
+  // add/delete, but leave Kho + Vị trí editable so the user picks where to
+  // receive (Vị trí auto-fills from the product's arrangement).
+  const linesLocked = isView || sourceTransferOrderId !== null;
+  const initialReceivedAt = initial?.receivedAt
+    ? new Date(initial.receivedAt)
+    : new Date();
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const [docDate, setDocDate] = useState(
     `${initialReceivedAt.getFullYear()}-${pad2(initialReceivedAt.getMonth() + 1)}-${pad2(initialReceivedAt.getDate())}`,
@@ -893,18 +1016,18 @@ function PurchaseOrderFormDialog({
     if (!initial) return [emptyLine()];
 
     const initialLines = initial.lines.map((l) => ({
-          itemId: l.itemId,
-          itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
-          unit: l.uomCode ?? "",
-          storageId: l.location?.storageId ?? "",
-          storageLabel:
-            storages.find((s) => s.id === l.location?.storageId)?.name ?? "",
-          locationId: l.locationId,
-          locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
-          orderedQuantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-          notes: l.note ?? "",
-        }));
+      itemId: l.itemId,
+      itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+      unit: l.uomCode ?? "",
+      storageId: l.location?.storageId ?? "",
+      storageLabel:
+        storages.find((s) => s.id === l.location?.storageId)?.name ?? "",
+      locationId: l.locationId,
+      locationLabel: l.location?.code ?? l.locationId.slice(0, 8),
+      orderedQuantity: Number(l.quantity),
+      unitPrice: Number(l.unitPrice),
+      notes: l.note ?? "",
+    }));
 
     return isView ? initialLines : normalizeFormLines(initialLines);
   });
@@ -917,9 +1040,9 @@ function PurchaseOrderFormDialog({
 
   // "Tham chiếu": when this receipt was auto-generated from a stock-take
   // ("Xử lý"), resolve the originating phiếu kiểm kê's document number (KK…).
-  const [stockTakeRefNumber, setStockTakeRefNumber] = useState<string | undefined>(
-    undefined,
-  );
+  const [stockTakeRefNumber, setStockTakeRefNumber] = useState<
+    string | undefined
+  >(undefined);
   const stockTakeRefId =
     initial?.referenceType === "STOCK_TAKE" ? initial.referenceId : undefined;
   useEffect(() => {
@@ -943,9 +1066,32 @@ function PurchaseOrderFormDialog({
     };
   }, [stockTakeRefId]);
 
+  // The read carries only source_branch_id (no name) — resolve the branch label
+  // so "Chọn cửa hàng nguồn" shows it when viewing/editing a transfer-in receipt.
+  useEffect(() => {
+    if (!initial?.sourceBranchId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ name?: string }>(
+          `/branches/${initial.sourceBranchId}`,
+        );
+        if (!cancelled) setSourceBranchLabel(data.name ?? "");
+      } catch {
+        // best-effort — the label is informational
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.sourceBranchId]);
+
   const [quickProviderOpen, setQuickProviderOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
-  const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
+  const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<
+    number | null
+  >(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
@@ -985,6 +1131,77 @@ function PurchaseOrderFormDialog({
     if (!dirty) setDirty(true);
   };
 
+  /** Load a picked transfer order into the form as the import leg (locked detail). */
+  const prefillFromTransferOrder = useCallback(
+    (detail: TransferReceiptDetail, row: ImportableTransferOrderListItem) => {
+      setPurpose("TRANSFER");
+      setSourceBranchId(detail.sourceBranchId);
+      setSourceBranchLabel(row.sourceBranchName);
+      const xk =
+        row.exportGoodsIssueDocumentNumber ?? detail.documentNumber ?? "";
+      setReferences(xk ? [xk] : []);
+      setSourceTransferOrderId(detail.id);
+      setNotes(
+        `Nhập kho hàng hóa điều chuyển từ cửa hàng ${row.sourceBranchName}`,
+      );
+      // Lines come from the transfer order; the destination bin is resolved
+      // server-side from the chosen Kho nhận, so line Kho/Vị trí stay blank.
+      const mapped: FormLine[] = detail.lines.map((l) => ({
+        itemId: l.itemId,
+        itemLabel: l.item?.code ?? "",
+        unit: l.item?.unit ?? "",
+        storageId: "",
+        storageLabel: "",
+        locationId: "",
+        locationLabel: "",
+        orderedQuantity: Number(l.requestedQty),
+        unitPrice: Number(l.item?.purchasePrice ?? 0),
+        notes: l.note ?? "",
+      }));
+      setLines(mapped);
+      markDirty();
+    },
+    // markDirty/set* are stable closures over component scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  /** Unlink the transfer order — the form reverts to a plain goods receipt. */
+  const clearTransferSource = () => {
+    setSourceTransferOrderId(null);
+    setReferences([]);
+    markDirty();
+  };
+
+  /**
+   * Auto-fill a line's Vị trí from the product's arranged bin ("đã sắp") in the
+   * chosen Kho. No-op when the product isn't arranged there. Best-effort: only
+   * fills if the row still points at the same Kho with no bin picked meanwhile.
+   */
+  const autoFillAssignedLocation = useCallback(
+    async (idx: number, itemId: string, storageId: string) => {
+      try {
+        const { data } = await apiClient.get<{
+          locationId: string;
+          code: string;
+        } | null>(
+          `/products/storage-location?itemId=${encodeURIComponent(itemId)}&storageId=${encodeURIComponent(storageId)}`,
+        );
+        if (!data) return;
+        setLines((prev) =>
+          prev.map((l, i) =>
+            i === idx && l.storageId === storageId && !l.locationId
+              ? { ...l, locationId: data.locationId, locationLabel: data.code }
+              : l,
+          ),
+        );
+      } catch {
+        // best-effort — the user can still pick Vị trí manually
+      }
+    },
+    [],
+  );
+
   const searchProviders = useCallback(
     async (query: string, page: number, pageSize?: number) => {
       const effectivePageSize = pageSize ?? 8;
@@ -993,9 +1210,9 @@ function PurchaseOrderFormDialog({
         pageSize: String(effectivePageSize),
         search: query.trim(),
       });
-      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-        `/inventory/providers?${params}`,
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<InventoryProvider>
+      >(`/inventory/providers?${params}`);
       const fetched = data.page * data.pageSize;
       return {
         items: data.data,
@@ -1042,9 +1259,9 @@ function PurchaseOrderFormDialog({
         search: query.trim(),
         storageId: storageIdArg,
       });
-      const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
-        `/inventory/locations?${params}`,
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<InventoryLocation>
+      >(`/inventory/locations?${params}`);
       const fetched = data.page * data.pageSize;
       return {
         items: data.data,
@@ -1098,7 +1315,10 @@ function PurchaseOrderFormDialog({
   );
 
   const summaryLines = getPersistableFormLines(lines);
-  const totalQty = summaryLines.reduce((s, l) => s + Number(l.orderedQuantity || 0), 0);
+  const totalQty = summaryLines.reduce(
+    (s, l) => s + Number(l.orderedQuantity || 0),
+    0,
+  );
   const totalAmount = summaryLines.reduce(
     (s, l) => s + Number(l.orderedQuantity || 0) * Number(l.unitPrice || 0),
     0,
@@ -1129,12 +1349,16 @@ function PurchaseOrderFormDialog({
         if (!locationId) {
           let fb = fallbackByStorage.get(l.storageId);
           if (fb === undefined) {
-            const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
+            const { data } = await apiClient.get<
+              PaginatedResponse<InventoryLocation>
+            >(
               `/inventory/locations?page=1&pageSize=50&storageId=${encodeURIComponent(l.storageId)}&includeUnassigned=true`,
             );
             const locations = data.data;
             if (!locations || locations.length === 0) {
-              toast.error("Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.");
+              toast.error(
+                "Có kho chưa có vị trí nào. Vui lòng tạo ít nhất 1 vị trí trước.",
+              );
               setSaving(false);
               return false;
             }
@@ -1161,7 +1385,8 @@ function PurchaseOrderFormDialog({
         deliveredBy: deliveryPerson || undefined,
         reason: reason || undefined,
         description: notes || undefined,
-        sourceBranchId: purpose === "TRANSFER" ? sourceBranchId || undefined : undefined,
+        sourceBranchId:
+          purpose === "TRANSFER" ? sourceBranchId || undefined : undefined,
         receivedAt: receivedAtIso,
         locationId: headerLocationId,
         lines: resolvedLines.map((l) => ({
@@ -1173,7 +1398,27 @@ function PurchaseOrderFormDialog({
           note: l.notes || undefined,
         })),
       };
-      if (initial && mode === "edit") {
+      if (sourceTransferOrderId) {
+        // Import leg of a transfer order: post via the two-phase import endpoint
+        // with the form's per-line Kho/Vị trí + header fields. Advances the
+        // order IN_PROGRESS → COMPLETED server-side.
+        await apiClient.post(
+          `/inventory/transfer-orders/${sourceTransferOrderId}/import`,
+          {
+            lines: resolvedLines.map((l) => ({
+              itemId: l.itemId,
+              locationId: l.locationId,
+              quantity: Number(l.orderedQuantity),
+              unitPrice: Number(l.unitPrice),
+              note: l.notes || undefined,
+            })),
+            providerId: providerId || undefined,
+            deliverer: deliveryPerson || undefined,
+            references: references.length ? references : undefined,
+            occurredAt: receivedAtIso,
+          },
+        );
+      } else if (initial && mode === "edit") {
         await apiClient.patch(`/goods-receipts/${initial.id}`, payload);
       } else {
         // Create now saves + posts atomically: the phiếu lands POSTED with the
@@ -1181,7 +1426,11 @@ function PurchaseOrderFormDialog({
         await apiClient.post("/goods-receipts", payload);
       }
       setDirty(false);
-      toast.success(mode === "edit" ? "Đã cập nhật phiếu nhập kho." : "Đã nhập kho thành công.");
+      toast.success(
+        mode === "edit"
+          ? "Đã cập nhật phiếu nhập kho."
+          : "Đã nhập kho thành công.",
+      );
       await onSaved();
       return true;
     } catch (err) {
@@ -1200,6 +1449,8 @@ function PurchaseOrderFormDialog({
     reason,
     deliveryPerson,
     sourceBranchId,
+    sourceTransferOrderId,
+    references,
     initial,
     mode,
     onSaved,
@@ -1223,15 +1474,28 @@ function PurchaseOrderFormDialog({
   };
 
   const dialogToolbar: ToolbarItem[] = [
-    { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
-    { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
+    {
+      id: "prev",
+      label: "Trước",
+      icon: ChevronLeft,
+      disabled: true,
+      onClick: () => {},
+    },
+    {
+      id: "next",
+      label: "Sau",
+      icon: ChevronRight,
+      disabled: true,
+      onClick: () => {},
+    },
     { id: "sep1", type: "separator" },
     {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
       disabled: !isView,
-      onClick: () => toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
+      onClick: () =>
+        toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
     },
     {
       id: "save",
@@ -1258,8 +1522,20 @@ function PurchaseOrderFormDialog({
       onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
-    { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
-    { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
+    {
+      id: "print",
+      label: "In",
+      icon: Printer,
+      disabled: true,
+      onClick: () => {},
+    },
+    {
+      id: "export",
+      label: "Xuất khẩu",
+      icon: CloudUpload,
+      disabled: true,
+      onClick: () => {},
+    },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
@@ -1281,7 +1557,9 @@ function PurchaseOrderFormDialog({
           value={row.itemLabel}
           onValueChange={(val) => {
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, itemLabel: val, itemId: "" } : l)),
+              prev.map((l, i) =>
+                i === idx ? { ...l, itemLabel: val, itemId: "" } : l,
+              ),
             );
             markDirty();
           }}
@@ -1328,12 +1606,22 @@ function PurchaseOrderFormDialog({
           renderItem={(item) => item.name}
           renderMeta={(item) => `${item.code} · ${item.unit}`}
           columns={[
-            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
+            {
+              key: "code",
+              label: "Mã",
+              className: "w-[120px] font-mono",
+              render: (it) => it.code,
+            },
             { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
-            { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
+            {
+              key: "unit",
+              label: "ĐVT",
+              className: "w-[80px]",
+              render: (it) => it.unit,
+            },
           ]}
-          disabled={isView}
-          onCreateNew={isView ? undefined : () => setQuickItemLineIdx(idx)}
+          disabled={linesLocked}
+          onCreateNew={linesLocked ? undefined : () => setQuickItemLineIdx(idx)}
           className="h-full"
         />
       ),
@@ -1385,6 +1673,9 @@ function PurchaseOrderFormDialog({
               fillPreferredShelf(idx, row.itemId, s.id);
             }
             markDirty();
+            // Auto-fill Vị trí from the product's arrangement ("đã sắp").
+            if (row.itemId)
+              void autoFillAssignedLocation(idx, row.itemId, s.id);
           }}
           search={searchStorages}
           itemKey={(s) => s.id}
@@ -1428,23 +1719,38 @@ function PurchaseOrderFormDialog({
             );
             markDirty();
           }}
-          search={(q, p, ps) => searchLocationsForStorage(row.storageId, q, p, ps)}
+          search={(q, p, ps) =>
+            searchLocationsForStorage(row.storageId, q, p, ps)
+          }
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
           renderMeta={(loc) => loc.code}
           columns={[
-            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (l) => l.code },
+            {
+              key: "code",
+              label: "Mã",
+              className: "w-[120px] font-mono",
+              render: (l) => l.code,
+            },
             { key: "name", label: "Tên vị trí", render: (l) => l.name },
           ]}
           disabled={isView || !row.storageId}
           onCreateNew={
-            isView || !row.storageId ? undefined : () => setQuickLocationLineIdx(idx)
+            isView || !row.storageId
+              ? undefined
+              : () => setQuickLocationLineIdx(idx)
           }
           className="h-full"
         />
       ),
     },
-    { key: "unit", label: "Đơn vị tính", width: 90, type: "readonly", getValue: (r) => r.unit || "Đôi" },
+    {
+      key: "unit",
+      label: "Đơn vị tính",
+      width: 90,
+      type: "readonly",
+      getValue: (r) => r.unit || "Đôi",
+    },
     {
       key: "orderedQuantity",
       label: "Số lượng",
@@ -1461,11 +1767,14 @@ function PurchaseOrderFormDialog({
       filterSymbol: "≤",
       renderEditor: (row, idx) => (
         <MoneyInput
+          disabled={linesLocked}
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none"
           value={row.unitPrice === 0 ? "" : row.unitPrice}
           onChange={(v) => {
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, unitPrice: v === "" ? 0 : Number(v) } : l)),
+              prev.map((l, i) =>
+                i === idx ? { ...l, unitPrice: v === "" ? 0 : Number(v) } : l,
+              ),
             );
             markDirty();
           }}
@@ -1479,7 +1788,8 @@ function PurchaseOrderFormDialog({
       type: "readonly",
       align: "right",
       filterSymbol: "≤",
-      getValue: (r) => formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
+      getValue: (r) =>
+        formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
     },
     { key: "notes", label: "Ghi chú", width: 160 },
   ];
@@ -1491,7 +1801,11 @@ function PurchaseOrderFormDialog({
         onOpenChange={(o) => {
           if (!o) requestClose();
         }}
-        title={mode === "create" ? "Thêm mới phiếu nhập kho" : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`}
+        title={
+          mode === "create"
+            ? "Thêm mới phiếu nhập kho"
+            : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`
+        }
         toolbarItems={dialogToolbar}
         purpose={
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
@@ -1538,7 +1852,9 @@ function PurchaseOrderFormDialog({
                     onSelect={(b) => {
                       setSourceBranchId(b.id);
                       setSourceBranchLabel(b.name);
-                      setNotes(`Nhập kho hàng hóa điều chuyển từ cửa hàng ${b.name}`);
+                      setNotes(
+                        `Nhập kho hàng hóa điều chuyển từ cửa hàng ${b.name}`,
+                      );
                       markDirty();
                     }}
                     search={searchBranches}
@@ -1546,8 +1862,16 @@ function PurchaseOrderFormDialog({
                     renderItem={(b) => b.name}
                     renderMeta={(b) => b.address ?? ""}
                     columns={[
-                      { key: "name", label: "Tên cửa hàng", render: (b) => b.name },
-                      { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                      {
+                        key: "name",
+                        label: "Tên cửa hàng",
+                        render: (b) => b.name,
+                      },
+                      {
+                        key: "address",
+                        label: "Địa chỉ",
+                        render: (b) => b.address ?? "—",
+                      },
                     ]}
                     disabled={isView}
                   />
@@ -1556,7 +1880,8 @@ function PurchaseOrderFormDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled
+                  onClick={() => setPickerOpen(true)}
+                  disabled={isView}
                 >
                   Chọn chứng từ điều chuyển
                 </Button>
@@ -1592,11 +1917,18 @@ function PurchaseOrderFormDialog({
                   renderItem={(p) => p.name}
                   renderMeta={(p) => p.code}
                   columns={[
-                    { key: "code", label: "Mã", className: "w-[160px] font-mono", render: (p) => p.code },
+                    {
+                      key: "code",
+                      label: "Mã",
+                      className: "w-[160px] font-mono",
+                      render: (p) => p.code,
+                    },
                     { key: "name", label: "Tên", render: (p) => p.name },
                   ]}
                   disabled={isView}
-                  onCreateNew={isView ? undefined : () => setQuickProviderOpen(true)}
+                  onCreateNew={
+                    isView ? undefined : () => setQuickProviderOpen(true)
+                  }
                 />
                 <Input
                   className="flex-1"
@@ -1640,11 +1972,41 @@ function PurchaseOrderFormDialog({
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
-              {stockTakeRefNumber ? (
-                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              {(() => {
+                // FE-supplied reference list (e.g. the source XK number), plus
+                // any resolved stock-take linkage not already in it.
+                const refs = [
+                  ...references,
+                  ...(stockTakeRefNumber &&
+                  !references.includes(stockTakeRefNumber)
+                    ? [stockTakeRefNumber]
+                    : []),
+                ];
+                return refs.length ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {refs.map((r) => (
+                      <span
+                        key={r}
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-medium text-foreground"
+                      >
+                        {r}
+                      </span>
+                    ))}
+                    {sourceTransferOrderId && !isView ? (
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-destructive hover:underline"
+                        title="Gỡ liên kết chứng từ điều chuyển"
+                        onClick={clearTransferSource}
+                      >
+                        (x)
+                      </button>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                );
+              })()}
             </FieldRow>
             <FieldRow label="Tài liệu đính kèm">
               <Button type="button" variant="outline" size="sm" disabled>
@@ -1659,7 +2021,11 @@ function PurchaseOrderFormDialog({
               <Input
                 value={initial?.documentNumber ?? previewDocumentNumber ?? ""}
                 readOnly
-                title={initial?.documentNumber ? undefined : "Số dự kiến — hệ thống sẽ chốt khi lưu"}
+                title={
+                  initial?.documentNumber
+                    ? undefined
+                    : "Số dự kiến — hệ thống sẽ chốt khi lưu"
+                }
               />
             </FieldRow>
             <FieldRow label="Ngày nhập">
@@ -1699,7 +2065,10 @@ function PurchaseOrderFormDialog({
             >
               Chọn kho
             </button>
-            <button type="button" className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+            >
               Nhập khẩu
             </button>
           </>
@@ -1708,14 +2077,19 @@ function PurchaseOrderFormDialog({
           <LineItemGrid
             columns={lineColumns}
             rows={lines}
-            onChangeCell={(idx, key, value) => {
-              setLines((prev) =>
-                prev.map((l, i) =>
-                  i === idx ? { ...l, [key]: value } : l,
-                ),
-              );
-              markDirty();
-            }}
+            // Omitting onChangeCell makes the built-in cells (Số lượng) read-only.
+            onChangeCell={
+              linesLocked
+                ? undefined
+                : (idx, key, value) => {
+                    setLines((prev) =>
+                      prev.map((l, i) =>
+                        i === idx ? { ...l, [key]: value } : l,
+                      ),
+                    );
+                    markDirty();
+                  }
+            }
             onAddRow={() => {
               setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
@@ -1726,8 +2100,8 @@ function PurchaseOrderFormDialog({
               );
               markDirty();
             }}
-            showAddRow={!isView}
-            showRowActions={!isView}
+            showAddRow={!linesLocked}
+            showRowActions={!linesLocked}
           />
         }
         footerSummary={
@@ -1738,7 +2112,10 @@ function PurchaseOrderFormDialog({
                 Số lượng: <strong className="ml-1">{totalQty}</strong>
               </span>
               <span>
-                Thành tiền: <strong className="ml-1">{formatMoneyInteger(totalAmount)}</strong>
+                Thành tiền:{" "}
+                <strong className="ml-1">
+                  {formatMoneyInteger(totalAmount)}
+                </strong>
               </span>
             </div>
           </div>
@@ -1771,7 +2148,9 @@ function PurchaseOrderFormDialog({
           if (idx === null) return;
           setLines((prev) =>
             prev.map((l, i) =>
-              i === idx ? { ...l, locationId: loc.id, locationLabel: loc.code } : l,
+              i === idx
+                ? { ...l, locationId: loc.id, locationLabel: loc.code }
+                : l,
             ),
           );
           setQuickLocationLineIdx(null);
@@ -1790,7 +2169,12 @@ function PurchaseOrderFormDialog({
             normalizeFormLines(
               prev.map((l, i) =>
                 i === idx
-                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  ? {
+                      ...l,
+                      itemId: item.id,
+                      itemLabel: item.code,
+                      unit: item.unit,
+                    }
                   : l,
               ),
             ),
@@ -1822,6 +2206,12 @@ function PurchaseOrderFormDialog({
           }}
         />
       )}
+
+      <SelectTransferReceiptDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={prefillFromTransferOrder}
+      />
     </>
   );
 }
@@ -1841,7 +2231,13 @@ function combineDateTimeISO(date: string, time: string): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00${sign}${offsetH}:${offsetM}`;
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-[120px_1fr] items-center gap-3">
       <label className="text-sm text-muted-foreground">{label}</label>

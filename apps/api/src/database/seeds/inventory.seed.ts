@@ -93,6 +93,33 @@ const IDS = {
   itemShoe40Den: 'A3000000-0000-4000-8000-000000000004',
   itemShoe43Nau: 'A3000000-0000-4000-8000-000000000005',
   itemShoe43Den: 'A3000000-0000-4000-8000-000000000006',
+  // ─── Extra sell-ready branches (Cà Mau, Cần Thơ) ─────────────────────────
+  // Each: 2 warehouses + 1 showroom storage + locations + showroom + a
+  // branch cash fund (REGISTER) + cash/bank/card payment accounts + shoe stock.
+  branchCaMau: '20000000-0000-4000-8000-000000000002',
+  branchCanTho: '20000000-0000-4000-8000-000000000003',
+  storageCaMauMain: '50000000-0000-4000-8000-000000000011',
+  storageCaMauReserve: '50000000-0000-4000-8000-000000000012',
+  storageCaMauShowroom: '50000000-0000-4000-8000-000000000013',
+  storageCanThoMain: '50000000-0000-4000-8000-000000000021',
+  storageCanThoReserve: '50000000-0000-4000-8000-000000000022',
+  storageCanThoShowroom: '50000000-0000-4000-8000-000000000023',
+  locationCaMauMain: '60000000-0000-4000-8000-000000000011',
+  locationCaMauReserve: '60000000-0000-4000-8000-000000000012',
+  locationCaMauShowroom: '60000000-0000-4000-8000-000000000013',
+  locationCanThoMain: '60000000-0000-4000-8000-000000000021',
+  locationCanThoReserve: '60000000-0000-4000-8000-000000000022',
+  locationCanThoShowroom: '60000000-0000-4000-8000-000000000023',
+  showroomCaMau: '55000000-0000-4000-8000-000000000002',
+  showroomCanTho: '55000000-0000-4000-8000-000000000003',
+  cashAccountCaMau: 'C0000000-0000-4000-8000-000000000002',
+  cashAccountCanTho: 'C0000000-0000-4000-8000-000000000003',
+  paymentAccountCashCaMau: 'E0000000-0000-4000-8000-000000000011',
+  paymentAccountBankCaMau: 'E0000000-0000-4000-8000-000000000012',
+  paymentAccountCardCaMau: 'E0000000-0000-4000-8000-000000000013',
+  paymentAccountCashCanTho: 'E0000000-0000-4000-8000-000000000021',
+  paymentAccountBankCanTho: 'E0000000-0000-4000-8000-000000000022',
+  paymentAccountCardCanTho: 'E0000000-0000-4000-8000-000000000023',
 };
 
 async function upsertPermissions(): Promise<void> {
@@ -163,6 +190,177 @@ async function upsertSeedRole(
       updated_at = NOW()
     `,
     [id, organizationId, name, description, isSystem],
+  );
+}
+
+interface SellReadyBranchSeed {
+  branchId: string;
+  branchName: string;
+  storageMainId: string;
+  storageReserveId: string;
+  storageShowroomId: string;
+  locationMainId: string;
+  locationReserveId: string;
+  locationShowroomId: string;
+  showroomId: string;
+  cashAccountId: string;
+  paymentCashId: string;
+  paymentBankId: string;
+  paymentCardId: string;
+}
+
+/** The 6 shoe variants (the only product these branches sell for now). */
+const SHOE_VARIANT_IDS = [
+  IDS.itemShoe39Nau,
+  IDS.itemShoe39Den,
+  IDS.itemShoe40Nau,
+  IDS.itemShoe40Den,
+  IDS.itemShoe43Nau,
+  IDS.itemShoe43Den,
+];
+
+/**
+ * Seed one additional branch ready to sell shoes via POS:
+ * branch + admin assignment, 2 warehouses + 1 showroom storage, a location per
+ * storage, a showroom, a REGISTER cash fund, cash/bank/card payment accounts,
+ * and shoe stock in both the main warehouse and the showroom floor.
+ *
+ * Depends on org-wide rows seeded earlier: the admin user, COA accounts
+ * (1111/1121), and the 6 shoe variant items.
+ */
+async function seedSellReadyBranch(opts: SellReadyBranchSeed): Promise<void> {
+  await AppDataSource.query(
+    `
+    INSERT INTO branches (id, organization_id, name, status, is_main_branch, created_by, created_at, updated_at)
+    VALUES ($1, $2, $3, 'ACTIVE', false, $4, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [opts.branchId, IDS.organization, opts.branchName, IDS.user],
+  );
+
+  await AppDataSource.query(
+    `
+    INSERT INTO user_branch_assignments (id, user_id, branch_id, organization_id, assigned_by, assigned_at)
+    VALUES (gen_random_uuid(), $1, $2, $3, $1, NOW())
+    ON CONFLICT (user_id, branch_id) DO NOTHING
+    `,
+    [IDS.user, opts.branchId, IDS.organization],
+  );
+
+  await AppDataSource.query(
+    `
+    INSERT INTO storages (id, organization_id, branch_id, name, is_main_storage, created_by, created_at, updated_at)
+    VALUES
+      ($1, $2, $3, 'Kho chính', true, $4, NOW(), NOW()),
+      ($5, $2, $3, 'Kho dự trữ', false, $4, NOW(), NOW()),
+      ($6, $2, $3, 'Kho showroom', false, $4, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [
+      opts.storageMainId,
+      IDS.organization,
+      opts.branchId,
+      IDS.user,
+      opts.storageReserveId,
+      opts.storageShowroomId,
+    ],
+  );
+
+  await AppDataSource.query(
+    `
+    INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type, is_active, created_by, created_at, updated_at)
+    VALUES
+      ($1, $2, $3, $4, 'A-01', 'Kệ A1', 'RACK', true, $5, NOW(), NOW()),
+      ($6, $2, $3, $7, 'B-01', 'Kệ B1', 'RACK', true, $5, NOW(), NOW()),
+      ($8, $2, $3, $9, 'SR-01', 'Sàn showroom', 'ZONE', true, $5, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [
+      opts.locationMainId,
+      IDS.organization,
+      opts.branchId,
+      opts.storageMainId,
+      IDS.user,
+      opts.locationReserveId,
+      opts.storageReserveId,
+      opts.locationShowroomId,
+      opts.storageShowroomId,
+    ],
+  );
+
+  await AppDataSource.query(
+    `
+    INSERT INTO showrooms (id, organization_id, branch_id, name, storage_id, is_main_showroom, created_by, created_at, updated_at)
+    VALUES ($1, $2, $3, 'Showroom', $4, true, $5, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [
+      opts.showroomId,
+      IDS.organization,
+      opts.branchId,
+      opts.storageShowroomId,
+      IDS.user,
+    ],
+  );
+
+  // Branch cash fund (REGISTER) tied to the 1111 ledger account.
+  await AppDataSource.query(
+    `
+    INSERT INTO cash_accounts (id, organization_id, branch_id, name, type, balance, account_id, created_by, created_at, updated_at)
+    VALUES ($1, $2, $3, 'Quỹ tiền mặt', 'REGISTER', 0, $4, $5, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [opts.cashAccountId, IDS.organization, opts.branchId, IDS.accountCash, IDS.user],
+  );
+
+  // Payment method → receiving COA account, branch-scoped (cash / bank / card).
+  await AppDataSource.query(
+    `
+    INSERT INTO payment_accounts
+      (id, organization_id, branch_id, payment_method, account_id, label, is_active, sort_order, created_by, created_at, updated_at)
+    VALUES
+      ($1, $7, $8, 'cash',          $4, 'Tiền mặt',     true, 0, $9, NOW(), NOW()),
+      ($2, $7, $8, 'bank_transfer', $5, 'Chuyển khoản', true, 0, $9, NOW(), NOW()),
+      ($3, $7, $8, 'card',          $6, 'Quẹt thẻ',     true, 0, $9, NOW(), NOW())
+    ON CONFLICT (id) DO NOTHING
+    `,
+    [
+      opts.paymentCashId,
+      opts.paymentBankId,
+      opts.paymentCardId,
+      IDS.accountCash,
+      IDS.accountBank,
+      IDS.accountBank,
+      IDS.organization,
+      opts.branchId,
+      IDS.user,
+    ],
+  );
+
+  // Shoe stock: all 6 variants in the main warehouse (20) and showroom floor (10).
+  const stockRows: string[] = [];
+  const stockParams: unknown[] = [IDS.organization, opts.branchId, IDS.user];
+  let p = stockParams.length;
+  for (const [locationId, quantity] of [
+    [opts.locationMainId, 20],
+    [opts.locationShowroomId, 10],
+  ] as const) {
+    for (const itemId of SHOE_VARIANT_IDS) {
+      stockParams.push(itemId, locationId, quantity);
+      stockRows.push(
+        `(gen_random_uuid(), $1, $2, $${p + 1}, $${p + 2}, $${p + 3}, NOW(), $3, NOW(), NOW())`,
+      );
+      p += 3;
+    }
+  }
+  await AppDataSource.query(
+    `
+    INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, last_movement_at, created_by, created_at, updated_at)
+    VALUES ${stockRows.join(', ')}
+    ON CONFLICT (organization_id, item_id, location_id)
+    DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW(), last_movement_at = NOW()
+    `,
+    stockParams,
   );
 }
 
@@ -819,6 +1017,38 @@ async function seedInventoryData() {
         IDS.user,           // $7
       ],
     );
+
+    // ─── Extra sell-ready branches (Cà Mau, Cần Thơ) ───────────────────────────
+    await seedSellReadyBranch({
+      branchId: IDS.branchCaMau,
+      branchName: 'Cà Mau',
+      storageMainId: IDS.storageCaMauMain,
+      storageReserveId: IDS.storageCaMauReserve,
+      storageShowroomId: IDS.storageCaMauShowroom,
+      locationMainId: IDS.locationCaMauMain,
+      locationReserveId: IDS.locationCaMauReserve,
+      locationShowroomId: IDS.locationCaMauShowroom,
+      showroomId: IDS.showroomCaMau,
+      cashAccountId: IDS.cashAccountCaMau,
+      paymentCashId: IDS.paymentAccountCashCaMau,
+      paymentBankId: IDS.paymentAccountBankCaMau,
+      paymentCardId: IDS.paymentAccountCardCaMau,
+    });
+    await seedSellReadyBranch({
+      branchId: IDS.branchCanTho,
+      branchName: 'Cần Thơ',
+      storageMainId: IDS.storageCanThoMain,
+      storageReserveId: IDS.storageCanThoReserve,
+      storageShowroomId: IDS.storageCanThoShowroom,
+      locationMainId: IDS.locationCanThoMain,
+      locationReserveId: IDS.locationCanThoReserve,
+      locationShowroomId: IDS.locationCanThoShowroom,
+      showroomId: IDS.showroomCanTho,
+      cashAccountId: IDS.cashAccountCanTho,
+      paymentCashId: IDS.paymentAccountCashCanTho,
+      paymentBankId: IDS.paymentAccountBankCanTho,
+      paymentCardId: IDS.paymentAccountCardCanTho,
+    });
 
     // Membership card types (default tiers per org)
     await AppDataSource.query(
