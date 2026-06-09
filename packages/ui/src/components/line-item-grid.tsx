@@ -9,12 +9,18 @@ export type LineColumnType = "text" | "number" | "readonly";
 export interface LineColumn<R> {
   key: string;
   label: string;
+  /** Optional grouped header shown above consecutive columns. */
+  group?: string;
   type?: LineColumnType;
   width?: number | string;
   /** Cell value to display (defaults to row[key]). */
   getValue?: (row: R) => string | number | undefined;
   /** Render the editor for this cell. If absent, an Input is used. */
-  renderEditor?: (row: R, rowIndex: number, onChange: (next: string | number) => void) => React.ReactNode;
+  renderEditor?: (
+    row: R,
+    rowIndex: number,
+    onChange: (next: string | number) => void,
+  ) => React.ReactNode;
   /** Optional click hook (e.g. open an item picker for the first column). */
   onCellClick?: (row: R, rowIndex: number) => void;
   /** Filter row symbol shown in the column-header filter cell (=, ≤, *, ...). */
@@ -30,7 +36,11 @@ export interface LineColumn<R> {
 export interface LineItemGridProps<R> {
   columns: LineColumn<R>[];
   rows: R[];
-  onChangeCell?: (rowIndex: number, key: string, value: string | number) => void;
+  onChangeCell?: (
+    rowIndex: number,
+    key: string,
+    value: string | number,
+  ) => void;
   onAddRow?: () => void;
   onDeleteRow?: (rowIndex: number) => void;
   /** Emits a filter map { [columnKey]: string } for header filters. */
@@ -50,6 +60,27 @@ function alignClass(a: LineColumn<unknown>["align"]) {
   if (a === "right") return "text-right";
   if (a === "center") return "text-center";
   return "text-left";
+}
+
+function buildHeaderGroups<R>(columns: LineColumn<R>[]) {
+  const groups: Array<{
+    key: string;
+    label?: string;
+    columns: LineColumn<R>[];
+  }> = [];
+  for (const col of columns) {
+    const previous = groups[groups.length - 1];
+    if (col.group && previous?.label === col.group) {
+      previous.columns.push(col);
+      continue;
+    }
+    groups.push({
+      key: col.group ? `${col.group}-${groups.length}` : col.key,
+      label: col.group,
+      columns: [col],
+    });
+  }
+  return groups;
 }
 
 /**
@@ -75,31 +106,94 @@ export function LineItemGrid<R>({
   emptyText = "Tìm mã hoặc tên",
   rowHeight = 32,
 }: LineItemGridProps<R>) {
+  const headerGroups = React.useMemo(
+    () => buildHeaderGroups(columns),
+    [columns],
+  );
+  const hasGroupedColumns = columns.some((col) => col.group);
+
   const handleFilter = (key: string, value: string) => {
     if (!onFilterChange) return;
     onFilterChange({ ...(filters ?? {}), [key]: value });
   };
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col overflow-auto", className)}>
+    <div
+      className={cn("flex h-full min-h-0 flex-col overflow-auto", className)}
+    >
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-muted/80">
           <tr className="border-b">
-            {columns.map((col) => (
+            {hasGroupedColumns
+              ? headerGroups.map((group) =>
+                  group.label ? (
+                    <th
+                      key={group.key}
+                      colSpan={group.columns.length}
+                      className="border-r px-2 py-2 text-center font-medium text-foreground"
+                    >
+                      {group.label}
+                    </th>
+                  ) : (
+                    <th
+                      key={group.key}
+                      rowSpan={2}
+                      className={cn(
+                        "border-r px-2 py-2 font-medium text-muted-foreground",
+                        alignClass(group.columns[0].align),
+                        group.columns[0].className,
+                      )}
+                      style={
+                        group.columns[0].width
+                          ? { width: group.columns[0].width }
+                          : undefined
+                      }
+                    >
+                      {group.columns[0].label}
+                    </th>
+                  ),
+                )
+              : columns.map((col) => (
+                  <th
+                    key={col.key}
+                    className={cn(
+                      "border-r px-2 py-2 font-medium text-muted-foreground",
+                      alignClass(col.align),
+                      col.className,
+                    )}
+                    style={col.width ? { width: col.width } : undefined}
+                  >
+                    {col.label}
+                  </th>
+                ))}
+            {showRowActions ? (
               <th
-                key={col.key}
-                className={cn(
-                  "border-r px-2 py-2 font-medium text-muted-foreground",
-                  alignClass(col.align),
-                  col.className,
-                )}
-                style={col.width ? { width: col.width } : undefined}
-              >
-                {col.label}
-              </th>
-            ))}
-            {showRowActions ? <th className="w-8 border-r" /> : null}
+                className="w-8 border-r"
+                rowSpan={hasGroupedColumns ? 2 : 1}
+              />
+            ) : null}
           </tr>
+          {hasGroupedColumns ? (
+            <tr className="border-b">
+              {headerGroups.flatMap((group) =>
+                group.label
+                  ? group.columns.map((col) => (
+                      <th
+                        key={col.key}
+                        className={cn(
+                          "border-r px-2 py-2 font-medium text-muted-foreground",
+                          alignClass(col.align),
+                          col.className,
+                        )}
+                        style={col.width ? { width: col.width } : undefined}
+                      >
+                        {col.label}
+                      </th>
+                    ))
+                  : [],
+              )}
+            </tr>
+          ) : null}
           {/* Header filter row */}
           <tr className="border-b bg-background">
             {columns.map((col) => (
@@ -132,11 +226,18 @@ export function LineItemGrid<R>({
             </tr>
           ) : (
             rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b hover:bg-accent/30" style={{ height: rowHeight }}>
+              <tr
+                key={rowIndex}
+                className="border-b hover:bg-accent/30"
+                style={{ height: rowHeight }}
+              >
                 {columns.map((col) => {
                   const raw = col.getValue
                     ? col.getValue(row)
-                    : ((row as Record<string, unknown>)[col.key] as string | number | undefined);
+                    : ((row as Record<string, unknown>)[col.key] as
+                        | string
+                        | number
+                        | undefined);
                   const isReadonly = col.type === "readonly";
                   return (
                     <td
@@ -147,12 +248,20 @@ export function LineItemGrid<R>({
                         col.className,
                         col.onCellClick && "cursor-pointer",
                       )}
-                      onClick={col.onCellClick ? () => col.onCellClick?.(row, rowIndex) : undefined}
+                      onClick={
+                        col.onCellClick
+                          ? () => col.onCellClick?.(row, rowIndex)
+                          : undefined
+                      }
                     >
                       {col.renderEditor ? (
-                        col.renderEditor(row, rowIndex, (v) => onChangeCell?.(rowIndex, col.key, v))
+                        col.renderEditor(row, rowIndex, (v) =>
+                          onChangeCell?.(rowIndex, col.key, v),
+                        )
                       ) : isReadonly ? (
-                        <span className="block px-1 py-1.5 text-foreground">{raw ?? ""}</span>
+                        <span className="block px-1 py-1.5 text-foreground">
+                          {raw ?? ""}
+                        </span>
                       ) : (
                         <Input
                           className={cn(
@@ -166,7 +275,9 @@ export function LineItemGrid<R>({
                             onChangeCell?.(
                               rowIndex,
                               col.key,
-                              col.type === "number" ? Number(e.target.value) : e.target.value,
+                              col.type === "number"
+                                ? Number(e.target.value)
+                                : e.target.value,
                             )
                           }
                           readOnly={!onChangeCell}

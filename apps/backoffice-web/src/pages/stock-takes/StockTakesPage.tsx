@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
+  AppModal,
+  Button,
   cn,
   DocumentListShell,
   PageToolbar,
@@ -8,16 +11,34 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Eye, Pencil, Plus, RefreshCw, Settings2, Trash2 } from "lucide-react";
+import {
+  Combine,
+  Eye,
+  Info,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
-import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  InventoryPageTitle,
+  InventoryTabBar,
+} from "../../components/document/inventoryTabs";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 import {
@@ -30,19 +51,29 @@ import {
   STATUS_LABEL,
   type PaginatedResponse,
   type StockTake,
+  type StockTakeMergePreview,
   type StorageOption,
 } from "./stock-takes.types";
 
 export function StockTakesPage() {
-  const [records, setRecords] = useState<PaginatedResponse<StockTake> | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [records, setRecords] = useState<PaginatedResponse<StockTake> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [columnFilters, setColumnFilters] = useState<
+    Record<string, ColumnFilter>
+  >({});
   const [period, setPeriod] = useState<PeriodValue>(() => {
     const range = resolvePeriodRange("this_month");
     return { preset: "this_month", ...range };
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   /** New-mode draft from CreateStockTakeDialog. While set, FormDialog opens in "new" mode. */
   const [newDraft, setNewDraft] = useState<StockTakeDraft | null>(null);
@@ -50,6 +81,13 @@ export function StockTakesPage() {
   const [editing, setEditing] = useState<StockTake | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<StockTake | null>(null);
   const [confirmProcess, setConfirmProcess] = useState<StockTake | null>(null);
+  const [processResult, setProcessResult] = useState<{
+    stockTakeNumber: string;
+    hasReceipt: boolean;
+    hasIssue: boolean;
+    receiptNumber?: string;
+    issueNumber?: string;
+  } | null>(null);
   const [storages, setStorages] = useState<StorageOption[]>([]);
 
   const loadStorages = useCallback(async () => {
@@ -69,20 +107,42 @@ export function StockTakesPage() {
       const params = new URLSearchParams({
         page: String(pagination.page),
         pageSize: String(pagination.pageSize),
-        fromDate: period.from,
-        toDate: period.to,
       });
+      const createdAt = columnFilters.createdAt?.value?.trim();
+      params.set("fromDate", createdAt || period.from);
+      params.set("toDate", createdAt || period.to);
+      const documentNumber = columnFilters.documentNumber?.value?.trim();
+      const storage = columnFilters.storage?.value?.trim();
+      const purpose = columnFilters.purpose?.value?.trim();
+      const status = columnFilters.status?.value?.trim();
+      const mergeStatus = columnFilters.mergeStatus?.value?.trim();
+      if (documentNumber) params.set("documentNumber", documentNumber);
+      if (storage) params.set("storage", storage);
+      if (purpose) params.set("purpose", purpose);
+      if (status) params.set("status", status);
+      if (mergeStatus) params.set("mergeStatus", mergeStatus);
       const { data } = await apiClient.get<PaginatedResponse<StockTake>>(
         `/inventory/stock-takes?${params}`,
       );
       setRecords(data);
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setRecords({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+      });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, period.from, period.to]);
+  }, [
+    columnFilters,
+    pagination.page,
+    pagination.pageSize,
+    period.from,
+    period.to,
+  ]);
 
   useEffect(() => {
     void loadStorages();
@@ -102,6 +162,33 @@ export function StockTakesPage() {
     () => records?.data.find((r) => r.id === selectedId) ?? null,
     [records, selectedId],
   );
+  const selectedRows = useMemo(
+    () =>
+      (records?.data ?? []).filter((record) => selectedIds.includes(record.id)),
+    [records, selectedIds],
+  );
+  const canMerge =
+    selectedRows.length >= 2 &&
+    selectedRows.every(
+      (record) =>
+        record.status !== "CANCELLED" &&
+        !record.mergedIntoId &&
+        record.status === selectedRows[0]?.status &&
+        record.storageId === selectedRows[0]?.storageId &&
+        record.countByValue === selectedRows[0]?.countByValue,
+    );
+  const mergeEligibleIds = useMemo(
+    () =>
+      (records?.data ?? [])
+        .filter(
+          (record) => record.status !== "CANCELLED" && !record.mergedIntoId,
+        )
+        .map((record) => record.id),
+    [records],
+  );
+  const allEligibleSelected =
+    mergeEligibleIds.length > 0 &&
+    mergeEligibleIds.every((id) => selectedIds.includes(id));
 
   /**
    * Preview the next "Số phiếu KK" based on the highest numeric suffix in the
@@ -134,21 +221,56 @@ export function StockTakesPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const openDocumentId = (
+      location.state as { openDocumentId?: string } | null
+    )?.openDocumentId;
+    if (!openDocumentId) return;
+    void openForEdit(openDocumentId).finally(() => {
+      navigate(location.pathname, { replace: true, state: null });
+    });
+  }, [location.pathname, location.state, navigate, openForEdit]);
+
+  const openStockTakeReference = useCallback(
+    async (id: string) => {
+      setEditing(null);
+      await openForEdit(id);
+    },
+    [openForEdit],
+  );
+
   const handleProcess = async (st: StockTake) => {
     setActionLoading(st.id);
     try {
       const { data } = await apiClient.post<StockTake>(
         `/inventory/stock-takes/${st.id}/process`,
       );
-      if (data.generatedReceiptId || data.generatedIssueId) {
-        toast.success(
-          "Đã xử lý phiếu kiểm kê — đã sinh phiếu nhập/xuất chênh lệch.",
-        );
-      } else {
-        toast.info(
-          "Đã xử lý phiếu kiểm kê — không có chênh lệch nên không sinh phiếu.",
-        );
-      }
+      const [receiptNumber, issueNumber] = await Promise.all([
+        data.generatedReceiptId
+          ? apiClient
+              .get<{ documentNumber?: string }>(
+                `/goods-receipts/${data.generatedReceiptId}`,
+              )
+              .then((response) => response.data.documentNumber)
+              .catch(() => undefined)
+          : Promise.resolve(undefined),
+        data.generatedIssueId
+          ? apiClient
+              .get<{ documentNumber?: string }>(
+                `/inventory/goods-issues/${data.generatedIssueId}`,
+              )
+              .then((response) => response.data.documentNumber)
+              .catch(() => undefined)
+          : Promise.resolve(undefined),
+      ]);
+      setProcessResult({
+        stockTakeNumber:
+          data.documentNumber ?? st.documentNumber ?? st.id.slice(0, 8),
+        hasReceipt: !!data.generatedReceiptId,
+        hasIssue: !!data.generatedIssueId,
+        receiptNumber,
+        issueNumber,
+      });
       setConfirmProcess(null);
       await loadRecords();
     } catch (err) {
@@ -167,6 +289,34 @@ export function StockTakesPage() {
       if (selectedId === st.id) setSelectedId(null);
       if (editing?.id === st.id) setEditing(null);
       await loadRecords();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMerge = async () => {
+    setActionLoading("merge");
+    try {
+      const { data } = await apiClient.post<StockTakeMergePreview>(
+        "/inventory/stock-takes/merge-preview",
+        { sourceIds: selectedIds },
+      );
+      setNewDraft({
+        storageId: data.storageId ?? "",
+        storageName: data.storageId
+          ? (storageNameById.get(data.storageId) ?? "")
+          : "",
+        plannedDate: data.plannedDate ?? period.to,
+        countedAt: data.countedAt,
+        purpose: data.purpose,
+        conclusion: data.conclusion,
+        countByValue: data.countByValue,
+        mergeSourceIds: data.mergeSourceIds,
+        lines: data.lines,
+        members: data.members,
+      });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     } finally {
@@ -193,14 +343,16 @@ export function StockTakesPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selected || selected.status !== "DRAFT",
+      disabled:
+        !selected || selected.status !== "DRAFT" || !!selected.mergedIntoId,
       onClick: () => selected && void openForEdit(selected.id),
     },
     {
       id: "process",
       label: "Xử lý",
       icon: Settings2,
-      disabled: !selected || selected.status !== "DRAFT",
+      disabled:
+        !selected || selected.status !== "DRAFT" || !!selected.mergedIntoId,
       onClick: () => selected && setConfirmProcess(selected),
     },
     {
@@ -208,8 +360,16 @@ export function StockTakesPage() {
       label: "Xoá",
       icon: Trash2,
       variant: "danger",
-      disabled: !selected || selected.status !== "DRAFT",
+      disabled:
+        !selected || selected.status !== "DRAFT" || !!selected.mergedIntoId,
       onClick: () => selected && setConfirmCancel(selected),
+    },
+    {
+      id: "merge",
+      label: "Gộp phiếu",
+      icon: Combine,
+      disabled: !canMerge || actionLoading === "merge",
+      onClick: () => void handleMerge(),
     },
     { id: "sep", type: "separator" },
     {
@@ -226,6 +386,7 @@ export function StockTakesPage() {
       key: "createdAt",
       label: "Ngày",
       width: 130,
+      filterKind: "date",
       render: (r) => new Date(r.createdAt).toLocaleDateString("vi-VN"),
     },
     {
@@ -235,7 +396,7 @@ export function StockTakesPage() {
       render: (r) => (
         <button
           type="button"
-          className="font-mono text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+          className="font-medium text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             void openForEdit(r.id);
@@ -251,7 +412,7 @@ export function StockTakesPage() {
       width: 220,
       render: (r) =>
         r.storageId
-          ? storageNameById.get(r.storageId) ?? r.storageId.slice(0, 8)
+          ? (storageNameById.get(r.storageId) ?? r.storageId.slice(0, 8))
           : "—",
     },
     {
@@ -263,30 +424,76 @@ export function StockTakesPage() {
       key: "status",
       label: "Trạng thái",
       width: 180,
-      render: (r) =>
-        r.status === "DRAFT" ? (
-          <span className="flex items-center gap-2">
-            <span>{STATUS_LABEL[r.status]}</span>
-            <button
-              type="button"
-              className="font-medium text-emerald-600 hover:underline"
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirmProcess(r);
-              }}
-            >
-              Xử lý
-            </button>
-          </span>
-        ) : (
+      filterKind: "select",
+      filterOptions: [
+        { value: "DRAFT", label: "Chưa xử lý" },
+        { value: "POSTED", label: "Đã xử lý" },
+        { value: "CANCELLED", label: "Đã huỷ" },
+      ],
+      filterPlaceholder: "Tất cả",
+      render: (r) => {
+        const noVariance =
+          r.status === "POSTED" &&
+          !r.generatedReceiptId &&
+          !r.generatedIssueId;
+        const label = r.mergedIntoId
+          ? "Đã gộp"
+          : noVariance
+            ? "Không có chênh lệch"
+            : STATUS_LABEL[r.status];
+        return (
           <span
-            className={cn(r.status === "POSTED" && "text-emerald-600")}
+            className={cn(
+              r.status === "POSTED" && !noVariance && "text-emerald-600",
+              r.mergedIntoId && "text-primary",
+            )}
           >
-            {STATUS_LABEL[r.status]}
+            {label}
           </span>
-        ),
+        );
+      },
+    },
+    {
+      key: "mergeStatus",
+      label: "Gộp",
+      width: 140,
+      filterKind: "select",
+      filterOptions: [
+        { value: "UNMERGED", label: "Chưa gộp" },
+        { value: "MERGED", label: "Đã gộp" },
+      ],
+      filterPlaceholder: "Tất cả",
+      render: (r) => (r.mergedIntoId ? "Đã gộp" : "Chưa gộp"),
     },
   ];
+
+  const setColumnFilterMode = useCallback(
+    (fieldKey: string, mode: ColumnFilterMode) => {
+      setColumnFilters((prev) => ({
+        ...prev,
+        [fieldKey]: {
+          mode,
+          value: prev[fieldKey]?.value ?? "",
+        },
+      }));
+      setPagination((prev) => ({ ...prev, page: 1 }));
+    },
+    [],
+  );
+
+  const setColumnFilterValue = useCallback(
+    (fieldKey: string, value: string) => {
+      setColumnFilters((prev) => ({
+        ...prev,
+        [fieldKey]: {
+          mode: prev[fieldKey]?.mode ?? DEFAULT_COLUMN_FILTER_MODE,
+          value,
+        },
+      }));
+      setPagination((prev) => ({ ...prev, page: 1 }));
+    },
+    [],
+  );
 
   /** What the bottom panel shows: prefer the currently-open form over the list selection. */
   const panelStockTake = editing ?? selected;
@@ -315,7 +522,9 @@ export function StockTakesPage() {
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={records?.total ?? 0}
-            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageChange={(p) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
             onPageSizeChange={(s) =>
               setPagination((prev) => ({ ...prev, page: 1, pageSize: s }))
             }
@@ -331,17 +540,40 @@ export function StockTakesPage() {
           emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id)}
+          columnFilterControl={{
+            filters: columnFilters,
+            onModeChange: setColumnFilterMode,
+            onValueChange: setColumnFilterValue,
+          }}
           leadingColumn={{
             width: 36,
-            header: <span className="sr-only">Chọn</span>,
+            header: (
+              <input
+                type="checkbox"
+                aria-label="Chọn tất cả phiếu có thể gộp"
+                checked={allEligibleSelected}
+                onChange={() =>
+                  setSelectedIds((current) =>
+                    allEligibleSelected
+                      ? current.filter((id) => !mergeEligibleIds.includes(id))
+                      : [...new Set([...current, ...mergeEligibleIds])],
+                  )
+                }
+              />
+            ),
             cell: (r) => (
               <input
                 type="checkbox"
                 aria-label="Chọn dòng"
-                checked={selectedId === r.id}
-                onChange={() =>
-                  setSelectedId(selectedId === r.id ? null : r.id)
-                }
+                checked={selectedIds.includes(r.id)}
+                onChange={() => {
+                  setSelectedId(r.id);
+                  setSelectedIds((current) =>
+                    current.includes(r.id)
+                      ? current.filter((id) => id !== r.id)
+                      : [...current, r.id],
+                  );
+                }}
                 onClick={(e) => e.stopPropagation()}
               />
             ),
@@ -359,7 +591,7 @@ export function StockTakesPage() {
         />
       ) : null}
 
-      {newDraft ? (
+      {newDraft && !editing ? (
         <StockTakeFormDialog
           initialDraft={newDraft}
           storageName={newDraft.storageName}
@@ -369,15 +601,19 @@ export function StockTakesPage() {
             void loadRecords();
           }}
           onSaved={async () => {
+            setSelectedIds([]);
             await loadRecords();
           }}
+          onOpenStockTakeReference={(id) =>
+            void openStockTakeReference(id)
+          }
         />
       ) : editing ? (
         <StockTakeFormDialog
           initialStockTake={editing}
           storageName={
             editing.storageId
-              ? storageNameById.get(editing.storageId) ?? undefined
+              ? (storageNameById.get(editing.storageId) ?? undefined)
               : undefined
           }
           onClose={() => {
@@ -388,14 +624,21 @@ export function StockTakesPage() {
             await loadRecords();
           }}
           onRequestDelete={
-            editing.status === "DRAFT"
+            editing.status === "DRAFT" && !editing.mergedIntoId
               ? () => setConfirmCancel(editing)
               : undefined
           }
-          onRequestProcess={(st) => {
-            setEditing(null);
-            setConfirmProcess(st);
-          }}
+          onRequestProcess={
+            editing.mergedIntoId
+              ? undefined
+              : (st) => {
+                  setEditing(null);
+                  setConfirmProcess(st);
+              }
+          }
+          onOpenStockTakeReference={(id) =>
+            void openStockTakeReference(id)
+          }
         />
       ) : null}
 
@@ -421,6 +664,68 @@ export function StockTakesPage() {
           onCancel={() => setConfirmProcess(null)}
           onConfirm={() => void handleProcess(confirmProcess)}
         />
+      ) : null}
+
+      {processResult ? (
+        <AppModal
+          open
+          onOpenChange={(open) => {
+            if (!open) setProcessResult(null);
+          }}
+          title="MISA eShop"
+          defaultWidth={420}
+          defaultHeight={210}
+          minWidth={360}
+          minHeight={190}
+          showFooter={false}
+          preventOutsideClose
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex flex-1 items-start gap-3 border-b px-1 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white">
+                <Info className="h-6 w-6" />
+              </span>
+              <div className="space-y-1 pt-1 text-sm leading-5 text-foreground">
+                {processResult.hasReceipt ? (
+                  <p>
+                    Đã sinh thành công phiếu nhập{" "}
+                    {processResult.receiptNumber ? (
+                      <strong>{processResult.receiptNumber}</strong>
+                    ) : (
+                      "kho"
+                    )}{" "}
+                    xử lý chênh lệch theo Phiếu kiểm kê{" "}
+                    <strong>{processResult.stockTakeNumber}</strong>.
+                  </p>
+                ) : null}
+                {processResult.hasIssue ? (
+                  <p>
+                    Đã sinh thành công phiếu xuất{" "}
+                    {processResult.issueNumber ? (
+                      <strong>{processResult.issueNumber}</strong>
+                    ) : (
+                      "kho"
+                    )}{" "}
+                    xử lý chênh lệch theo Phiếu kiểm kê{" "}
+                    <strong>{processResult.stockTakeNumber}</strong>.
+                  </p>
+                ) : null}
+                {!processResult.hasReceipt && !processResult.hasIssue ? (
+                  <p>
+                    Phiếu kiểm kê{" "}
+                    <strong>{processResult.stockTakeNumber}</strong> không có
+                    chênh lệch cần xử lý.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex shrink-0 justify-end py-2">
+              <Button type="button" onClick={() => setProcessResult(null)}>
+                Đồng ý
+              </Button>
+            </div>
+          </div>
+        </AppModal>
       ) : null}
     </>
   );

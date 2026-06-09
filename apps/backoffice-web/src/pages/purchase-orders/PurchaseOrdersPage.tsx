@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   DocumentFormDialog,
@@ -217,6 +218,8 @@ function orderTotal(o: PurchaseOrder): number {
 }
 
 export function PurchaseOrdersPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [records, setRecords] = useState<PaginatedResponse<PurchaseOrder> | null>(null);
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
@@ -305,6 +308,27 @@ export function PurchaseOrdersPage() {
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
+
+  useEffect(() => {
+    const openDocumentId = (
+      location.state as { openDocumentId?: string } | null
+    )?.openDocumentId;
+    if (!openDocumentId) return;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<PurchaseOrder>(
+          `/goods-receipts/${openDocumentId}`,
+        );
+        setSelectedId(data.id);
+        setEditingOrder(data);
+        setDialogMode("view");
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    })();
+  }, [location.pathname, location.state, navigate]);
 
   const storageNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -817,6 +841,7 @@ function PurchaseOrderFormDialog({
   onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
+  const navigate = useNavigate();
   const isView = mode === "view";
 
   const initialProvider = useMemo(() => {
@@ -1612,7 +1637,17 @@ function PurchaseOrderFormDialog({
             </FieldRow>
             <FieldRow label="Tham chiếu">
               {stockTakeRefNumber ? (
-                <span className="font-mono text-sm">{stockTakeRefNumber}</span>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                  onClick={() =>
+                    navigate("/inventory/stock-takes", {
+                      state: { openDocumentId: stockTakeRefId },
+                    })
+                  }
+                >
+                  {stockTakeRefNumber}
+                </button>
               ) : (
                 <span className="text-sm text-muted-foreground">—</span>
               )}

@@ -4,9 +4,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
+} from "@nestjs/common";
+import * as ExcelJS from "exceljs";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, In, IsNull, Repository } from "typeorm";
 import {
   DocumentType,
   GoodsIssuePurpose,
@@ -19,23 +20,25 @@ import {
   PaginationQuery,
   StockMovementType,
   StockTakeStatus,
-} from '@erp/shared-interfaces';
-import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
-import { GoodsIssueLineEntity } from '../goods-issue/goods-issue-line.entity';
-import { GoodsReceiptEntity } from '../goods-receipt/goods-receipt.entity';
-import { GoodsReceiptLineEntity } from '../goods-receipt/goods-receipt-line.entity';
-import { LocationEntity } from '../location/location.entity';
-import { ItemEntity } from '../location/item.entity';
-import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
-import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
+import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
+import { GoodsIssueLineEntity } from "../goods-issue/goods-issue-line.entity";
+import { GoodsReceiptEntity } from "../goods-receipt/goods-receipt.entity";
+import { GoodsReceiptLineEntity } from "../goods-receipt/goods-receipt-line.entity";
+import { LocationEntity } from "../location/location.entity";
+import { StorageEntity } from "../location/storage.entity";
+import { ItemEntity } from "../location/item.entity";
+import { ItemCostSnapshotService } from "../location/item-cost-snapshot.service";
+import { StockBalanceEntity } from "../ledger/stock-balance.entity";
 import {
   RecordMovementParams,
   StockLedgerService,
-} from '../ledger/stock-ledger.service';
-import { StockTakeEntity } from './stock-take.entity';
-import { StockTakeLineEntity } from './stock-take-line.entity';
+} from "../ledger/stock-ledger.service";
+import { StockTakeEntity } from "./stock-take.entity";
+import { StockTakeLineEntity } from "./stock-take-line.entity";
+import { StockTakeMemberEntity } from "./stock-take-member.entity";
 
 export interface CreateStockTakeDto {
   storageId?: string;
@@ -45,6 +48,7 @@ export interface CreateStockTakeDto {
   purpose?: string;
   notes?: string;
   conclusion?: string;
+  countByValue?: boolean;
   /** Optional ISO datetime — combined "Ngày + Giờ kiểm kê". Defaults to now() on server. */
   countedAt?: string;
   /**
@@ -52,6 +56,8 @@ export interface CreateStockTakeDto {
    * so creation is atomic — no DB row exists until the user clicks Lưu.
    */
   lines?: CreateStockTakeLinePayload[];
+  members?: StockTakeMemberPayload[];
+  mergeSourceIds?: string[];
 }
 
 export interface CreateStockTakeLinePayload {
@@ -59,19 +65,28 @@ export interface CreateStockTakeLinePayload {
   /** If omitted, server picks the location holding the largest balance for this item. */
   locationId?: string;
   countedQty?: number | null;
+  countedValue?: number | null;
   reason?: string;
+}
+
+export interface StockTakeMemberPayload {
+  fullName: string;
+  title?: string | null;
+  representative?: string | null;
 }
 
 export interface UpdateStockTakeHeaderDto {
   purpose?: string;
   notes?: string;
   conclusion?: string;
+  countByValue?: boolean;
   /** ISO datetime — combined "Ngày + Giờ kiểm kê". */
   countedAt?: string;
 }
 
 export interface UpdateLineCountDto {
   countedQty?: number | null;
+  countedValue?: number | null;
   note?: string;
   reason?: string;
 }
@@ -89,6 +104,22 @@ export interface StockTakeQuery extends PaginationQuery {
   fromDate?: string;
   /** Filter on createdAt ≤ toDate (inclusive, YYYY-MM-DD). */
   toDate?: string;
+  documentNumber?: string;
+  storage?: string;
+  purpose?: string;
+  mergeStatus?: "MERGED" | "UNMERGED";
+}
+
+export interface StockTakeMergePreview {
+  storageId?: string;
+  plannedDate?: string;
+  countedAt: string;
+  purpose: string;
+  conclusion?: string;
+  countByValue: boolean;
+  mergeSourceIds: string[];
+  lines: StockTakeLineEntity[];
+  members: StockTakeMemberPayload[];
 }
 
 @Injectable()
@@ -100,10 +131,14 @@ export class StockTakeService {
     private readonly stRepo: Repository<StockTakeEntity>,
     @InjectRepository(StockTakeLineEntity)
     private readonly lineRepo: Repository<StockTakeLineEntity>,
+    @InjectRepository(StockTakeMemberEntity)
+    private readonly memberRepo: Repository<StockTakeMemberEntity>,
     @InjectRepository(StockBalanceEntity)
     private readonly balanceRepo: Repository<StockBalanceEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
+    @InjectRepository(StorageEntity)
+    private readonly storageRepo: Repository<StorageEntity>,
     @InjectRepository(GoodsReceiptEntity)
     private readonly receiptRepo: Repository<GoodsReceiptEntity>,
     @InjectRepository(GoodsIssueEntity)
@@ -126,9 +161,24 @@ export class StockTakeService {
     dto: CreateStockTakeDto,
     actor: ActorContext,
   ): Promise<StockTakeEntity> {
-    if (!dto.storageId && !dto.locationId) {
+    const mergeSources = dto.mergeSourceIds?.length
+      ? await this.loadMergeSources(dto.mergeSourceIds, actor.organizationId)
+      : [];
+    const storageId = mergeSources[0]?.storageId ?? dto.storageId;
+    const mergedLocationIds = new Set(
+      mergeSources.map((source) => source.locationId).filter(Boolean),
+    );
+    const locationId = mergeSources.length
+      ? mergedLocationIds.size === 1
+        ? mergeSources[0].locationId
+        : undefined
+      : dto.locationId;
+    const countByValue = mergeSources[0]?.countByValue ?? dto.countByValue;
+    const mergedStatus = mergeSources[0]?.status ?? StockTakeStatus.DRAFT;
+
+    if (!storageId && !locationId) {
       throw new BadRequestException(
-        'Cần chọn kho hoặc vị trí để khởi tạo phiếu kiểm kê',
+        "Cần chọn kho hoặc vị trí để khởi tạo phiếu kiểm kê",
       );
     }
 
@@ -138,14 +188,18 @@ export class StockTakeService {
       actor,
     );
 
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      actor.organizationId,
+      [...new Set((dto.lines ?? []).map((line) => line.itemId))],
+    );
     const lines: StockTakeLineEntity[] = [];
     for (const lineDto of dto.lines ?? []) {
       const resolved = await this.resolveLineLocation(
         actor.organizationId,
         lineDto.itemId,
         lineDto.locationId,
-        dto.storageId,
-        dto.locationId,
+        storageId,
+        locationId,
       );
       const line = this.buildLine(
         actor,
@@ -153,12 +207,32 @@ export class StockTakeService {
         resolved.locationId,
         resolved.expectedQty,
       );
+      line.expectedValue = String(
+        resolved.expectedQty * (itemCostByItemId.get(lineDto.itemId) ?? 0),
+      );
       if (lineDto.countedQty != null) {
         line.countedQty = String(lineDto.countedQty);
+      }
+      if (lineDto.countedValue != null) {
+        line.countedValue = String(lineDto.countedValue);
       }
       if (lineDto.reason !== undefined) line.reason = lineDto.reason;
       lines.push(line);
     }
+
+    const members = (dto.members ?? [])
+      .filter((member) => member.fullName?.trim())
+      .map((member, index) =>
+        this.memberRepo.create({
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+          fullName: member.fullName.trim(),
+          title: member.title ?? null,
+          representative: member.representative ?? null,
+          sortOrder: index,
+        }),
+      );
 
     const now = new Date();
     const st = this.stRepo.create({
@@ -166,23 +240,155 @@ export class StockTakeService {
       branchId: actor.branchId,
       createdBy: actor.userId,
       documentNumber,
-      status: StockTakeStatus.DRAFT,
-      storageId: dto.storageId,
-      locationId: dto.locationId,
+      status: mergedStatus,
+      storageId,
+      locationId,
       purpose: dto.purpose,
+      countByValue: countByValue ?? false,
       plannedDate: dto.plannedDate,
       countedAt: dto.countedAt ? new Date(dto.countedAt) : now,
       snapshotAt: now,
       notes: dto.notes,
       conclusion: dto.conclusion,
       lines,
+      members,
+      mergeSourceIds: mergeSources.length
+        ? mergeSources.map((source) => source.id)
+        : null,
+      postedAt: mergedStatus === StockTakeStatus.POSTED ? now : undefined,
+      postedBy:
+        mergedStatus === StockTakeStatus.POSTED ? actor.userId : undefined,
     });
 
-    const saved = await this.stRepo.save(st);
+    const saved = mergeSources.length
+      ? await this.dataSource.transaction(async (manager) => {
+          const savedMerged = await manager.save(StockTakeEntity, st);
+          const result = await manager.update(
+            StockTakeEntity,
+            {
+              id: In(mergeSources.map((source) => source.id)),
+              organizationId: actor.organizationId,
+              status: mergedStatus,
+              mergedIntoId: IsNull(),
+            },
+            { mergedIntoId: savedMerged.id, mergedAt: now },
+          );
+          if (result.affected !== mergeSources.length) {
+            throw new ConflictException(
+              "Một hoặc nhiều phiếu nguồn đã thay đổi, vui lòng gộp lại",
+            );
+          }
+          return savedMerged;
+        })
+      : await this.stRepo.save(st);
     this.logger.log(
       `Stock-take ${saved.id} (${documentNumber}) created with ${lines.length} line(s)`,
     );
     return this.findOrFail(saved.id, actor.organizationId);
+  }
+
+  async previewMerge(
+    sourceIds: string[],
+    actor: ActorContext,
+  ): Promise<StockTakeMergePreview> {
+    const sources = await this.loadMergeSources(
+      sourceIds,
+      actor.organizationId,
+    );
+    const first = sources[0];
+    const lineMap = new Map<string, StockTakeLineEntity>();
+    const itemCostByItemId = await this.itemCostSnapshotService.snapshotCosts(
+      actor.organizationId,
+      [
+        ...new Set(
+          sources.flatMap((source) =>
+            (source.lines ?? []).map((line) => line.itemId),
+          ),
+        ),
+      ],
+    );
+
+    for (const source of sources) {
+      for (const sourceLine of source.lines ?? []) {
+        const key = `${sourceLine.itemId}:${sourceLine.locationId}`;
+        const existing = lineMap.get(key);
+        if (existing) {
+          existing.countedQty = String(
+            Number(existing.countedQty ?? 0) +
+              Number(sourceLine.countedQty ?? 0),
+          );
+          existing.countedValue = String(
+            Number(existing.countedValue ?? 0) +
+              Number(sourceLine.countedValue ?? 0),
+          );
+          existing.reason = this.joinUniqueText([
+            existing.reason,
+            sourceLine.reason,
+          ]);
+          continue;
+        }
+
+        const resolved = await this.resolveLineLocation(
+          actor.organizationId,
+          sourceLine.itemId,
+          sourceLine.locationId,
+          first.storageId,
+          first.locationId,
+        );
+        const line = this.buildLine(
+          actor,
+          sourceLine.itemId,
+          resolved.locationId,
+          resolved.expectedQty,
+        );
+        line.expectedValue = String(
+          resolved.expectedQty *
+            (itemCostByItemId.get(sourceLine.itemId) ?? 0),
+        );
+        line.item = sourceLine.item;
+        line.location = sourceLine.location;
+        line.countedQty = String(Number(sourceLine.countedQty ?? 0));
+        line.countedValue = String(Number(sourceLine.countedValue ?? 0));
+        line.reason = sourceLine.reason;
+        lineMap.set(key, line);
+      }
+    }
+
+    const memberMap = new Map<string, StockTakeMemberPayload>();
+    for (const member of sources.flatMap((source) => source.members ?? [])) {
+      const key = [
+        member.fullName.trim().toLowerCase(),
+        member.title?.trim().toLowerCase() ?? "",
+        member.representative?.trim().toLowerCase() ?? "",
+      ].join("|");
+      if (!memberMap.has(key)) {
+        memberMap.set(key, {
+          fullName: member.fullName,
+          title: member.title,
+          representative: member.representative,
+        });
+      }
+    }
+
+    return {
+      storageId: first.storageId,
+      plannedDate: sources
+        .map((source) => source.plannedDate)
+        .filter((date): date is string => !!date)
+        .sort()
+        .at(-1),
+      countedAt: new Date().toISOString(),
+      purpose: `Gộp phiếu ${sources
+        .map((source) => source.documentNumber ?? source.id.slice(0, 8))
+        .join(", ")}`,
+      conclusion: this.joinUniqueText(
+        sources.map((source) => source.conclusion),
+      ),
+      countByValue: first.countByValue,
+      mergeSourceIds: sources.map((source) => source.id),
+      lines: [...lineMap.values()],
+      members: [...memberMap.values()],
+    };
   }
 
   /** Update header fields while still DRAFT. */
@@ -197,6 +403,7 @@ export class StockTakeService {
     if (dto.purpose !== undefined) st.purpose = dto.purpose;
     if (dto.notes !== undefined) st.notes = dto.notes;
     if (dto.conclusion !== undefined) st.conclusion = dto.conclusion;
+    if (dto.countByValue !== undefined) st.countByValue = dto.countByValue;
     if (dto.countedAt !== undefined) st.countedAt = new Date(dto.countedAt);
 
     await this.stRepo.save(st);
@@ -232,9 +439,9 @@ export class StockTakeService {
     );
     line.stockTakeId = st.id;
     const saved = await this.lineRepo.save(line);
-    return this.lineRepo.findOne({ where: { id: saved.id } }) as Promise<
-      StockTakeLineEntity
-    >;
+    return this.lineRepo.findOne({
+      where: { id: saved.id },
+    }) as Promise<StockTakeLineEntity>;
   }
 
   /**
@@ -272,7 +479,10 @@ export class StockTakeService {
       scopeLocationId,
     );
     if (found) {
-      return { locationId: found.locationId, expectedQty: Number(found.quantity) };
+      return {
+        locationId: found.locationId,
+        expectedQty: Number(found.quantity),
+      };
     }
 
     if (scopeLocationId) {
@@ -281,16 +491,16 @@ export class StockTakeService {
     if (storageId) {
       const firstLoc = await this.locationRepo.findOne({
         where: { organizationId, storageId, isActive: true },
-        order: { code: 'ASC' },
+        order: { code: "ASC" },
       });
       if (!firstLoc) {
         throw new BadRequestException(
-          'Kho được chọn chưa có vị trí — tạo vị trí trước khi kiểm kê',
+          "Kho được chọn chưa có vị trí — tạo vị trí trước khi kiểm kê",
         );
       }
       return { locationId: firstLoc.id, expectedQty: 0 };
     }
-    throw new BadRequestException('Không xác định được vị trí cho dòng');
+    throw new BadRequestException("Không xác định được vị trí cho dòng");
   }
 
   async removeLine(
@@ -319,6 +529,10 @@ export class StockTakeService {
     if (dto.countedQty !== undefined) {
       line.countedQty = dto.countedQty == null ? null : String(dto.countedQty);
     }
+    if (dto.countedValue !== undefined) {
+      line.countedValue =
+        dto.countedValue == null ? null : String(dto.countedValue);
+    }
     if (dto.note !== undefined) line.note = dto.note;
     if (dto.reason !== undefined) line.reason = dto.reason;
     return this.lineRepo.save(line);
@@ -326,12 +540,36 @@ export class StockTakeService {
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
     const st = await this.findOrFail(id, actor.organizationId);
-    if (st.status !== StockTakeStatus.DRAFT) {
-      throw new ConflictException('Chỉ huỷ được phiếu DRAFT');
-    }
+    this.assertDraft(st);
     st.status = StockTakeStatus.CANCELLED;
     await this.stRepo.save(st);
     await this.stRepo.softDelete(st.id);
+  }
+
+  async replaceMembers(
+    stockTakeId: string,
+    members: StockTakeMemberPayload[],
+    actor: ActorContext,
+  ): Promise<StockTakeEntity> {
+    const st = await this.findOrFail(stockTakeId, actor.organizationId);
+    this.assertDraft(st);
+    await this.memberRepo.delete({ stockTakeId });
+    const rows = members
+      .filter((member) => member.fullName?.trim())
+      .map((member, index) =>
+        this.memberRepo.create({
+          organizationId: actor.organizationId,
+          branchId: actor.branchId,
+          createdBy: actor.userId,
+          stockTakeId,
+          fullName: member.fullName.trim(),
+          title: member.title ?? null,
+          representative: member.representative ?? null,
+          sortOrder: index,
+        }),
+      );
+    if (rows.length) await this.memberRepo.save(rows);
+    return this.findOrFail(stockTakeId, actor.organizationId);
   }
 
   /**
@@ -346,13 +584,13 @@ export class StockTakeService {
     const st = await this.findOrFail(id, actor.organizationId);
     this.assertDraft(st);
     if (!st.lines || st.lines.length === 0) {
-      throw new BadRequestException('Phiếu kiểm kê không có dòng');
+      throw new BadRequestException("Phiếu kiểm kê không có dòng");
     }
 
     const branchId = st.branchId ?? actor.branchId;
     if (!branchId) {
       throw new BadRequestException(
-        'Không xác định được chi nhánh để hạch toán điều chỉnh',
+        "Không xác định được chi nhánh để hạch toán điều chỉnh",
       );
     }
 
@@ -444,7 +682,7 @@ export class StockTakeService {
             ? StockMovementType.ADJUSTMENT_INCREASE
             : StockMovementType.ADJUSTMENT_DECREASE,
         quantity: v.variance,
-        referenceType: 'STOCK_TAKE',
+        referenceType: "STOCK_TAKE",
         referenceId: st.id,
         notes: description,
         actorContext: actor,
@@ -454,7 +692,7 @@ export class StockTakeService {
     });
 
     this.logger.log(
-      `Stock-take ${id} processed: receipt=${generatedReceiptId ?? '-'} issue=${generatedIssueId ?? '-'}`,
+      `Stock-take ${id} processed: receipt=${generatedReceiptId ?? "-"} issue=${generatedIssueId ?? "-"}`,
     );
     return this.findOrFail(id, actor.organizationId);
   }
@@ -463,32 +701,342 @@ export class StockTakeService {
     return this.findOrFail(id, organizationId);
   }
 
+  async exportExcelBuffer(id: string, actor: ActorContext): Promise<Buffer> {
+    const st = await this.findOrFail(id, actor.organizationId);
+    const storage = st.storageId
+      ? await this.storageRepo.findOne({
+          where: { id: st.storageId, organizationId: actor.organizationId },
+        })
+      : null;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Jack ERP";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet("Phiếu kiểm kê kho", {
+      views: [{ showGridLines: true }],
+    });
+    const valueMode = !!st.countByValue;
+    const lastCol = valueMode ? 13 : 10;
+    const lastColLetter = valueMode ? "M" : "J";
+
+    sheet.columns = valueMode
+      ? [
+          { width: 6 },
+          { width: 18 },
+          { width: 24 },
+          { width: 14 },
+          { width: 18 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 18 },
+          { width: 18 },
+        ]
+      : [
+          { width: 6 },
+          { width: 18 },
+          { width: 24 },
+          { width: 14 },
+          { width: 18 },
+          { width: 16 },
+          { width: 16 },
+          { width: 16 },
+          { width: 18 },
+          { width: 18 },
+        ];
+
+    const plannedDate = this.formatDate(st.plannedDate);
+    const countedDate = this.formatDate(st.countedAt);
+    const countedTime = this.formatTime(st.countedAt);
+    const documentNumber = st.documentNumber ?? "";
+    const storageName =
+      storage?.name ?? st.lines?.[0]?.location?.storage?.name ?? "";
+
+    sheet.mergeCells(`A1:${lastColLetter}1`);
+    sheet.getCell("A1").value =
+      `Ngày ${this.formatLongVietnameseDate(st.countedAt ?? new Date())}`;
+    sheet.getCell("A1").alignment = { horizontal: "center" };
+    sheet.getCell("A1").font = { bold: true, italic: true };
+
+    sheet.mergeCells(`A2:${lastColLetter}2`);
+    sheet.getCell("A2").value = `Số: ${documentNumber}`;
+    sheet.getCell("A2").alignment = { horizontal: "center" };
+    sheet.getCell("A2").font = { bold: true };
+
+    const infoRows = [
+      [`Kho kiểm kê: ${storageName}`],
+      [`Kiểm kê đến ngày: ${plannedDate}`],
+      [
+        `Ngày giờ kiểm kê: ${countedTime ? `${countedTime} - ` : ""}${countedDate}`,
+      ],
+      [`Mục đích: ${st.purpose ?? ""}`],
+    ];
+    infoRows.forEach((values, index) => {
+      const rowNo = 3 + index;
+      sheet.mergeCells(rowNo, 2, rowNo, 4);
+      sheet.getCell(rowNo, 2).value = values[0];
+      sheet.getCell(rowNo, 2).font = { bold: true };
+    });
+
+    sheet.getCell("A8").value = "I. Danh sách hàng hóa kiểm kê";
+    sheet.getCell("A8").font = { bold: true };
+
+    sheet.mergeCells("A9:A10");
+    sheet.mergeCells("B9:B10");
+    sheet.mergeCells("C9:C10");
+    sheet.mergeCells("D9:D10");
+    sheet.mergeCells("E9:E10");
+    sheet.mergeCells("F9:H9");
+    if (valueMode) {
+      sheet.mergeCells("I9:K9");
+      sheet.mergeCells("L9:L10");
+      sheet.mergeCells("M9:M10");
+    } else {
+      sheet.mergeCells("I9:I10");
+      sheet.mergeCells("J9:J10");
+    }
+    const headerValues: Array<[string, string | number]> = [
+      ["A9", "STT"],
+      ["B9", "Mã SKU"],
+      ["C9", "Tên hàng hóa"],
+      ["D9", "ĐVT"],
+      ["E9", "Vị trí"],
+      ["F9", "Số lượng"],
+      ["F10", "Theo sổ"],
+      ["G10", "Kiểm kê"],
+      ["H10", "Chênh lệch"],
+      ...(valueMode
+        ? ([
+            ["I9", "Giá trị"],
+            ["I10", "Theo sổ"],
+            ["J10", "Kiểm kê"],
+            ["K10", "Chênh lệch"],
+            ["L9", "Nguyên nhân"],
+            ["M9", "Xử lý"],
+          ] as Array<[string, string | number]>)
+        : ([
+            ["I9", "Nguyên nhân"],
+            ["J9", "Xử lý"],
+          ] as Array<[string, string | number]>)),
+    ];
+    headerValues.forEach(([cell, value]) => {
+      sheet.getCell(cell).value = value;
+    });
+
+    const lines = st.lines ?? [];
+    let expectedTotal = 0;
+    let countedTotal = 0;
+    let expectedValueTotal = 0;
+    let countedValueTotal = 0;
+    lines.forEach((line, index) => {
+      const expected = Number(line.expectedQty || 0);
+      const counted = line.countedQty == null ? 0 : Number(line.countedQty);
+      const variance = counted - expected;
+      const expectedValue = Number(line.expectedValue || 0);
+      const countedValue =
+        line.countedValue == null ? 0 : Number(line.countedValue);
+      const valueVariance = countedValue - expectedValue;
+      expectedTotal += expected;
+      countedTotal += counted;
+      expectedValueTotal += expectedValue;
+      countedValueTotal += countedValue;
+      const row = sheet.getRow(11 + index);
+      const rowValues = valueMode
+        ? [
+            index + 1,
+            line.item?.code ?? "",
+            line.item?.name ?? "",
+            line.item?.unit ?? "",
+            line.location?.code ?? "",
+            expected,
+            counted,
+            variance,
+            expectedValue,
+            countedValue,
+            valueVariance,
+            line.reason ?? "",
+            variance > 0 ? "Nhập kho" : variance < 0 ? "Xuất kho" : "",
+          ]
+        : [
+            index + 1,
+            line.item?.code ?? "",
+            line.item?.name ?? "",
+            line.item?.unit ?? "",
+            line.location?.code ?? "",
+            expected,
+            counted,
+            variance,
+            line.reason ?? "",
+            variance > 0 ? "Nhập kho" : variance < 0 ? "Xuất kho" : "",
+          ];
+      rowValues.forEach((value, valueIndex) => {
+        row.getCell(valueIndex + 1).value = value;
+      });
+    });
+
+    const totalRowNo = 11 + lines.length;
+    sheet.mergeCells(totalRowNo, 1, totalRowNo, 5);
+    sheet.getCell(totalRowNo, 1).value = "Tổng";
+    sheet.getCell(totalRowNo, 1).alignment = { horizontal: "right" };
+    sheet.getCell(totalRowNo, 6).value = expectedTotal;
+    sheet.getCell(totalRowNo, 7).value = countedTotal;
+    sheet.getCell(totalRowNo, 8).value = countedTotal - expectedTotal;
+    if (valueMode) {
+      sheet.getCell(totalRowNo, 9).value = expectedValueTotal;
+      sheet.getCell(totalRowNo, 10).value = countedValueTotal;
+      sheet.getCell(totalRowNo, 11).value =
+        countedValueTotal - expectedValueTotal;
+    }
+
+    const memberTitleRow = totalRowNo + 2;
+    sheet.getCell(memberTitleRow, 1).value =
+      "II. Các thành viên tham gia kiểm kê";
+    sheet.getCell(memberTitleRow, 1).font = { bold: true };
+    const memberHeaderRow = memberTitleRow + 1;
+    sheet.getRow(memberHeaderRow).values = [
+      "STT",
+      "Họ tên",
+      "",
+      "Chức danh",
+      "",
+      "Đại diện",
+      "",
+      "Ký tên",
+    ];
+    sheet.mergeCells(memberHeaderRow, 2, memberHeaderRow, 3);
+    sheet.mergeCells(memberHeaderRow, 4, memberHeaderRow, 5);
+    sheet.mergeCells(memberHeaderRow, 6, memberHeaderRow, 7);
+    sheet.mergeCells(memberHeaderRow, 8, memberHeaderRow, 9);
+
+    const members = st.members ?? [];
+    const memberRowCount = Math.max(members.length, 3);
+    for (let index = 0; index < memberRowCount; index += 1) {
+      const member = members[index];
+      const row = sheet.getRow(memberHeaderRow + 1 + index);
+      row.getCell(1).value = member ? index + 1 : "";
+      row.getCell(2).value = member?.fullName ?? "";
+      row.getCell(4).value = member?.title ?? "";
+      row.getCell(6).value = member?.representative ?? "";
+    }
+
+    const conclusionRow = memberHeaderRow + memberRowCount + 2;
+    sheet.mergeCells(conclusionRow, 1, conclusionRow, lastCol);
+    sheet.getCell(conclusionRow, 1).value = `Kết luận: ${st.conclusion ?? ""}`;
+    sheet.getCell(conclusionRow, 1).font = { bold: true };
+
+    const signDateRow = conclusionRow + 4;
+    sheet.mergeCells(
+      signDateRow,
+      Math.max(7, lastCol - 3),
+      signDateRow,
+      lastCol,
+    );
+    sheet.getCell(signDateRow, Math.max(7, lastCol - 3)).value =
+      "Ngày.......tháng.......năm..........";
+    sheet.getCell(signDateRow, Math.max(7, lastCol - 3)).alignment = {
+      horizontal: "center",
+    };
+    const signTitleRow = signDateRow + 1;
+    const signNoteRow = signDateRow + 2;
+    const signers = [
+      { col: 1, title: "Người lập phiếu" },
+      { col: 3, title: "Người nhận hàng" },
+      { col: 5, title: "Thủ kho" },
+      { col: 7, title: "Kế toán trưởng" },
+      { col: 9, title: "Giám đốc" },
+    ];
+    signers.forEach(({ col, title }) => {
+      sheet.mergeCells(signTitleRow, col, signTitleRow, col + 1);
+      sheet.mergeCells(signNoteRow, col, signNoteRow, col + 1);
+      sheet.getCell(signTitleRow, col).value = title;
+      sheet.getCell(signTitleRow, col).alignment = { horizontal: "center" };
+      sheet.getCell(signTitleRow, col).font = { bold: true };
+      sheet.getCell(signNoteRow, col).value = "(Ký, họ tên)";
+      sheet.getCell(signNoteRow, col).alignment = { horizontal: "center" };
+      sheet.getCell(signNoteRow, col).font = { italic: true };
+    });
+
+    const borderedRanges = [
+      { from: 9, to: totalRowNo },
+      { from: memberHeaderRow, to: memberHeaderRow + memberRowCount },
+    ];
+    borderedRanges.forEach(({ from, to }) => {
+      for (let rowNo = from; rowNo <= to; rowNo += 1) {
+        for (let col = 1; col <= lastCol; col += 1) {
+          const cell = sheet.getCell(rowNo, col);
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+        }
+      }
+    });
+    sheet.getRow(9).font = { bold: true };
+    sheet.getRow(10).font = { bold: true };
+    sheet.getRow(totalRowNo).font = { bold: true };
+    sheet.getRow(totalRowNo).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE6E6E6" },
+    };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
   async list(
     query: StockTakeQuery,
   ): Promise<PaginatedResponse<StockTakeEntity>> {
-    const where: FindOptionsWhere<StockTakeEntity> = {
-      organizationId: query.organizationId,
-    };
-    if (query.status) where.status = query.status;
-    if (query.fromDate || query.toDate) {
-      const from = query.fromDate
-        ? new Date(`${query.fromDate}T00:00:00.000Z`)
-        : new Date('1970-01-01T00:00:00.000Z');
-      const to = query.toDate
-        ? new Date(`${query.toDate}T23:59:59.999Z`)
-        : new Date('2999-12-31T23:59:59.999Z');
-      where.createdAt = Between(from, to);
-    }
-
     const page = Math.max(1, Number(query.page ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize ?? 20)));
 
-    const [data, total] = await this.stRepo.findAndCount({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      order: { createdAt: 'DESC' },
-    });
+    const qb = this.stRepo
+      .createQueryBuilder("st")
+      .leftJoin("storages", "storage", "storage.id = st.storage_id")
+      .where("st.organization_id = :orgId", { orgId: query.organizationId });
+    if (query.status) {
+      qb.andWhere("st.status = :status", { status: query.status });
+    }
+    if (query.fromDate) {
+      qb.andWhere("st.created_at >= :fromDate", {
+        fromDate: `${query.fromDate}T00:00:00.000Z`,
+      });
+    }
+    if (query.toDate) {
+      qb.andWhere("st.created_at <= :toDate", {
+        toDate: `${query.toDate}T23:59:59.999Z`,
+      });
+    }
+    if (query.documentNumber) {
+      qb.andWhere("LOWER(st.document_number) LIKE :documentNumber", {
+        documentNumber: `%${query.documentNumber.toLowerCase()}%`,
+      });
+    }
+    if (query.storage) {
+      qb.andWhere("LOWER(storage.name) LIKE :storage", {
+        storage: `%${query.storage.toLowerCase()}%`,
+      });
+    }
+    if (query.purpose) {
+      qb.andWhere(
+        "(LOWER(COALESCE(st.purpose, '')) LIKE :purpose OR LOWER(COALESCE(st.conclusion, '')) LIKE :purpose OR LOWER(COALESCE(st.notes, '')) LIKE :purpose)",
+        { purpose: `%${query.purpose.toLowerCase()}%` },
+      );
+    }
+    if (query.mergeStatus === "MERGED") {
+      qb.andWhere("st.merged_into_id IS NOT NULL");
+    } else if (query.mergeStatus === "UNMERGED") {
+      qb.andWhere("st.merged_into_id IS NULL");
+    }
+    qb.orderBy("st.createdAt", "DESC")
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
+    const [data, total] = await qb.getManyAndCount();
 
     return { data, total, page, pageSize };
   }
@@ -497,8 +1045,71 @@ export class StockTakeService {
 
   private assertDraft(st: StockTakeEntity): void {
     if (st.status !== StockTakeStatus.DRAFT) {
-      throw new ConflictException('Chỉ thao tác được khi phiếu kiểm kê đang ở DRAFT');
+      throw new ConflictException(
+        "Chỉ thao tác được khi phiếu kiểm kê đang ở DRAFT",
+      );
     }
+    if (st.mergedIntoId) {
+      throw new ConflictException(
+        "Phiếu kiểm kê đã gộp không thể sửa, xoá hoặc xử lý",
+      );
+    }
+  }
+
+  private async loadMergeSources(
+    sourceIds: string[],
+    organizationId: string,
+  ): Promise<StockTakeEntity[]> {
+    const uniqueIds = [...new Set(sourceIds)];
+    if (uniqueIds.length < 2) {
+      throw new BadRequestException("Cần chọn ít nhất 2 phiếu để gộp");
+    }
+    const sources = await this.stRepo.find({
+      where: { id: In(uniqueIds), organizationId },
+      order: { createdAt: "ASC" },
+    });
+    if (sources.length !== uniqueIds.length) {
+      throw new NotFoundException("Không tìm thấy đầy đủ các phiếu cần gộp");
+    }
+    if (
+      sources.some(
+        (source) =>
+          source.status === StockTakeStatus.CANCELLED || !!source.mergedIntoId,
+      )
+    ) {
+      throw new ConflictException(
+        "Không thể gộp phiếu đã huỷ hoặc phiếu đã gộp",
+      );
+    }
+    const first = sources[0];
+    if (sources.some((source) => source.status !== first.status)) {
+      throw new BadRequestException(
+        "Các phiếu gộp phải cùng trạng thái xử lý",
+      );
+    }
+    if (
+      sources.some(
+        (source) =>
+          source.storageId !== first.storageId ||
+          source.branchId !== first.branchId,
+      )
+    ) {
+      throw new BadRequestException(
+        "Các phiếu gộp phải cùng kho và chi nhánh",
+      );
+    }
+    if (sources.some((source) => source.countByValue !== first.countByValue)) {
+      throw new BadRequestException(
+        "Không thể gộp phiếu có chế độ kiểm kê khác nhau",
+      );
+    }
+    return sources;
+  }
+
+  private joinUniqueText(values: Array<string | null | undefined>): string {
+    return [
+      ...new Set(values.map((value) => value?.trim()).filter(Boolean)),
+    ].join("\n");
   }
 
   private buildLine(
@@ -515,6 +1126,8 @@ export class StockTakeService {
     line.locationId = locationId;
     line.expectedQty = String(expectedQty);
     line.countedQty = null;
+    line.expectedValue = "0";
+    line.countedValue = null;
     return line;
   }
 
@@ -525,22 +1138,22 @@ export class StockTakeService {
     locationId?: string,
   ): Promise<StockBalanceEntity | null> {
     const qb = this.balanceRepo
-      .createQueryBuilder('sb')
-      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
-      .where('sb.organization_id = :orgId', { orgId: organizationId })
-      .andWhere('sb.item_id = :itemId', { itemId })
-      .orderBy('sb.quantity', 'DESC');
+      .createQueryBuilder("sb")
+      .innerJoin("locations", "loc", "loc.id = sb.location_id")
+      .where("sb.organization_id = :orgId", { orgId: organizationId })
+      .andWhere("sb.item_id = :itemId", { itemId })
+      .orderBy("sb.quantity", "DESC");
 
     if (locationId) {
-      qb.andWhere('sb.location_id = :locId', { locId: locationId });
+      qb.andWhere("sb.location_id = :locId", { locId: locationId });
     } else if (storageId) {
-      qb.andWhere('loc.storage_id = :sid', { sid: storageId });
+      qb.andWhere("loc.storage_id = :sid", { sid: storageId });
     }
     return qb.getOne();
   }
 
   private async createGeneratedReceipt(
-    manager: import('typeorm').EntityManager,
+    manager: import("typeorm").EntityManager,
     actor: ActorContext,
     branchId: string,
     st: StockTakeEntity,
@@ -584,7 +1197,7 @@ export class StockTakeService {
       line.itemId = p.line.itemId;
       line.locationId = p.line.locationId;
       const cost = costByItemId.get(p.line.itemId) ?? 0;
-      line.uomCode = unitByItemId.get(p.line.itemId) ?? 'Cái';
+      line.uomCode = unitByItemId.get(p.line.itemId) ?? "Cái";
       line.quantity = String(p.variance);
       line.unitPrice = cost.toFixed(2);
       line.lineTotal = (p.variance * cost).toFixed(2);
@@ -596,7 +1209,7 @@ export class StockTakeService {
   }
 
   private async createGeneratedIssue(
-    manager: import('typeorm').EntityManager,
+    manager: import("typeorm").EntityManager,
     actor: ActorContext,
     branchId: string,
     st: StockTakeEntity,
@@ -654,4 +1267,23 @@ export class StockTakeService {
     return st;
   }
 
+  private formatDate(value: Date | string | null | undefined): string {
+    if (!value) return "";
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  }
+
+  private formatTime(value: Date | string | null | undefined): string {
+    if (!value) return "";
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  private formatLongVietnameseDate(value: Date | string): string {
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}`;
+  }
 }

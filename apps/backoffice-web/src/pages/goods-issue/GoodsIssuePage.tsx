@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Button,
   DocumentFormDialog,
@@ -247,6 +248,8 @@ function issueTotal(o: GoodsIssue): number {
 }
 
 export function GoodsIssuePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [records, setRecords] = useState<PaginatedResponse<GoodsIssue> | null>(null);
   const [customers, setCustomers] = useState<InventoryProvider[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
@@ -333,6 +336,27 @@ export function GoodsIssuePage() {
   useEffect(() => {
     void loadStorages();
   }, [loadStorages]);
+
+  useEffect(() => {
+    const openDocumentId = (
+      location.state as { openDocumentId?: string } | null
+    )?.openDocumentId;
+    if (!openDocumentId) return;
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<GoodsIssue>(
+          `/inventory/goods-issues/${openDocumentId}`,
+        );
+        setSelectedId(data.id);
+        setEditingIssue(data);
+        setDialogMode("view");
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      } finally {
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    })();
+  }, [location.pathname, location.state, navigate]);
 
   const customerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -856,6 +880,7 @@ function GoodsIssueFormDialog({
   onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
+  const navigate = useNavigate();
   const isView = mode === "view";
 
   // Resolve the eager-loaded provider first, then fall back to a customer lookup
@@ -1680,9 +1705,17 @@ function GoodsIssueFormDialog({
             </FieldRow>
             <FieldRow label="Tham chiếu">
               {referenceNumber ? (
-                <span className="font-mono text-sm font-medium text-foreground">
+                <button
+                  type="button"
+                  className="text-sm font-medium text-primary-blue hover:text-primary-blue-hover hover:underline"
+                  onClick={() =>
+                    navigate("/inventory/stock-takes", {
+                      state: { openDocumentId: referenceStockTakeId },
+                    })
+                  }
+                >
                   {referenceNumber}
-                </span>
+                </button>
               ) : (
                 <span className="text-sm text-muted-foreground">—</span>
               )}
