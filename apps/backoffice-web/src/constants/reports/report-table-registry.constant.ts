@@ -1,7 +1,7 @@
-import { ReportTableColumn, ReportTableColumnGroup, ReportTableColumnLabel } from "../../../../constants/reports/report-column.constant";
-import { ReportColumnConfig } from "../../../../constants/reports/report.interface";
+import { ReportTableColumn, ReportTableColumnGroup, ReportTableColumnLabel } from "./report-column.constant";
+import { ReportColumnConfig } from "./report.interface";
 
-export const DailySalesSummaryRegistry: ReportColumnConfig[] = [
+export const ReportDailySalesSummaryRegistry: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.DATE,
     label: ReportTableColumnLabel[ReportTableColumn.DATE],
@@ -14,7 +14,6 @@ export const DailySalesSummaryRegistry: ReportColumnConfig[] = [
     group: ReportTableColumnGroup.REVENUE,
     column: ReportTableColumn.REVENUE_TOTAL,
     label: ReportTableColumnLabel[ReportTableColumn.REVENUE_TOTAL],
-    backendField: 'revenue_total',
     order: 2,
     visible: true,
     fixed: false,
@@ -43,7 +42,6 @@ export const DailySalesSummaryRegistry: ReportColumnConfig[] = [
     group: ReportTableColumnGroup.REVENUE,
     column: ReportTableColumn.REVENUE_PROMOTION,
     label: ReportTableColumnLabel[ReportTableColumn.REVENUE_PROMOTION],
-    backendField: 'revenue_promotion',
     order: 5,
     visible: true,
     fixed: false,
@@ -53,7 +51,6 @@ export const DailySalesSummaryRegistry: ReportColumnConfig[] = [
     group: ReportTableColumnGroup.REVENUE,
     column: ReportTableColumn.REVENUE_DISCOUNT_POINT,
     label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_POINT],
-    backendField: 'revenue_discount_point',
     order: 6,
     visible: true,
     fixed: false,
@@ -62,7 +59,6 @@ export const DailySalesSummaryRegistry: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.REVENUE_DISCOUNT_RATE,
     label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_RATE],
-    backendField: 'revenue_discount_rate',
     order: 7,
     visible: true,
     fixed: false,
