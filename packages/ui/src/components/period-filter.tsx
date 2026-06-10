@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Filter } from "lucide-react";
 import { Button } from "./button";
+import { SingleSelect } from "./single-select";
 import { cn } from "../lib/utils";
 
 export type PeriodPreset =
@@ -129,18 +130,12 @@ export function PeriodFilter({ value, onChange, onApply, className, hideApply }:
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2 text-sm", className)}>
-      <select
-        className="h-8 rounded border border-input bg-background px-2 text-sm"
+      <SingleSelect
+        options={PERIOD_PRESET_OPTIONS}
         value={value.preset}
-        onChange={(e) => handlePreset(e.target.value as PeriodPreset)}
-        aria-label="Khoảng thời gian"
-      >
-        {PERIOD_PRESET_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => handlePreset(v as PeriodPreset)}
+        className="h-8 w-36 text-sm"
+      />
       <label className="flex items-center gap-1.5">
         <span className="text-muted-foreground">Từ ngày</span>
         <input
