@@ -3,23 +3,44 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@erp/ui";
 import { ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 import { useMyBranches } from "../../hooks/iam/useBranches";
-import { getActiveBranch, setActiveBranch } from "../../lib/auth-storage";
+import { CHAIN_OPTION_VALUE, useBranchStore, useIsChainSelected } from "../../store/branch.store";
 
 export function BranchSelector() {
   const { data: branches } = useMyBranches();
+  const isChain = useIsChainSelected();
+  const branchId = useBranchStore((s) => s.branchId);
+  const branchName = useBranchStore((s) => s.branchName);
+  const selectBranch = useBranchStore((s) => s.selectBranch);
+  const selectChain = useBranchStore((s) => s.selectChain);
+
+  useEffect(() => {
+    if (isChain || !branchId || branchName) return;
+    const branch = branches?.find((b) => b.id === branchId);
+    if (branch) selectBranch(branch.id, branch.name);
+  }, [isChain, branchId, branchName, branches, selectBranch]);
 
   if (!branches?.length) return null;
 
-  const activeBranchId = getActiveBranch();
-  const activeBranch = branches.find((b) => b.id === activeBranchId);
-  const displayName = activeBranch?.name ?? "Chọn cửa hàng";
+  const displayName = isChain
+    ? "Chuỗi cửa hàng"
+    : (branchName ??
+      branches.find((b) => b.id === branchId)?.name ??
+      "Chọn cửa hàng");
+  const selectedValue = isChain ? CHAIN_OPTION_VALUE : (branchId ?? "");
 
-  const handleSelect = (id: string) => {
-    setActiveBranch(id);
+  const handleSelect = (value: string) => {
+    if (value === CHAIN_OPTION_VALUE) {
+      selectChain();
+      return;
+    }
+    const branch = branches.find((b) => b.id === value);
+    if (branch) selectBranch(branch.id, branch.name);
     window.location.reload();
   };
 
@@ -35,10 +56,11 @@ export function BranchSelector() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" className="min-w-[180px]">
-        <DropdownMenuRadioGroup
-          value={activeBranchId ?? ""}
-          onValueChange={handleSelect}
-        >
+        <DropdownMenuRadioGroup value={selectedValue} onValueChange={handleSelect}>
+          <DropdownMenuRadioItem value={CHAIN_OPTION_VALUE}>
+            Chuỗi cửa hàng
+          </DropdownMenuRadioItem>
+          <DropdownMenuSeparator />
           {branches.map((branch) => (
             <DropdownMenuRadioItem key={branch.id} value={branch.id}>
               {branch.name}
