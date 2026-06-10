@@ -9,7 +9,11 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useEffect } from "react";
 import { useMyBranches } from "../../hooks/iam/useBranches";
-import { CHAIN_OPTION_VALUE, useBranchStore, useIsChainSelected } from "../../store/branch.store";
+import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
+import {
+  useBranchStore,
+  useIsChainSelected,
+} from "../../store/common/branch/branch.store";
 
 export function BranchSelector() {
   const { data: branches } = useMyBranches();

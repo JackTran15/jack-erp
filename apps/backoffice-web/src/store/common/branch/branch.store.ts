@@ -1,17 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getActiveBranch, setActiveBranch } from "../lib/auth-storage";
-
-export const CHAIN_OPTION_VALUE = "__CHAIN__";
-
-interface BranchState {
-  branchId: string | null;
-  branchName: string | null;
-  isChain: boolean;
-  selectBranch: (id: string, name: string) => void;
-  selectChain: () => void;
-  clear: () => void;
-}
+import { getActiveBranch, setActiveBranch } from "../../../lib/auth-storage";
+import type { BranchState } from "./branch.interface";
 
 
 export const useBranchStore = create<BranchState>()(
