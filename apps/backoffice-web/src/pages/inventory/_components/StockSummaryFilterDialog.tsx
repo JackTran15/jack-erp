@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { AppModal } from "@erp/ui";
-import { apiClient } from "../../../lib/api-axios";
+import { useQuery } from "@tanstack/react-query";
 import {
   getStockSummaryFilterOptions,
   type StockStateFilter,
 } from "../../../api/stock-summary";
 
 export interface StockSummaryAdvancedFilters {
-  storageId: string;
-  categoryId: string;
   brand: string;
   unit: string;
   isActive: "ALL" | "TRUE" | "FALSE";
@@ -17,32 +15,12 @@ export interface StockSummaryAdvancedFilters {
 }
 
 export const DEFAULT_ADVANCED_FILTERS: StockSummaryAdvancedFilters = {
-  storageId: "",
-  categoryId: "",
   brand: "",
   unit: "",
   isActive: "ALL",
   isPosVisible: "ALL",
   stockState: "ALL",
 };
-
-interface StorageOption {
-  id: string;
-  name: string;
-  branchId: string;
-}
-
-interface CategoryOption {
-  id: string;
-  name: string;
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
 
 interface Props {
   open: boolean;
@@ -53,46 +31,20 @@ interface Props {
 
 export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: Props) {
   const [draft, setDraft] = useState<StockSummaryAdvancedFilters>(initial);
-  const [storages, setStorages] = useState<StorageOption[]>([]);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
-  const [units, setUnits] = useState<string[]>([]);
 
-  // Reset draft each time the dialog re-opens so cancelling a prior session
-  // doesn't bleed into a fresh open.
   useEffect(() => {
     if (open) setDraft(initial);
   }, [open, initial]);
 
-  useEffect(() => {
-    if (!open) return;
-    void (async () => {
-      try {
-        // Scope warehouse options to the active branch (same as the document
-        // pages) — the X-Branch-Id source used by api-axios.ts.
-        const activeBranchId =
-          localStorage.getItem("active_branch_id") ??
-          localStorage.getItem("branch_id");
-        const [storagesRes, categoriesRes, options] = await Promise.all([
-          apiClient.get<PaginatedResponse<StorageOption>>(
-            `/inventory/storages?page=1&pageSize=200${
-              activeBranchId ? `&branchId=${encodeURIComponent(activeBranchId)}` : ""
-            }`,
-          ),
-          apiClient.get<PaginatedResponse<CategoryOption>>(
-            "/admin/entities/inventory-item-categories/records?page=1&pageSize=200",
-          ),
-          getStockSummaryFilterOptions(),
-        ]);
-        setStorages(storagesRes.data.data);
-        setCategories(categoriesRes.data.data);
-        setBrands(options.brands);
-        setUnits(options.units);
-      } catch {
-        // best-effort — empty options just collapse the dropdowns
-      }
-    })();
-  }, [open]);
+  const optionsQuery = useQuery({
+    queryKey: ["stock-summary", "filter-options"],
+    queryFn: getStockSummaryFilterOptions,
+    enabled: open,
+    staleTime: 5 * 60_000,
+  });
+
+  const brands = optionsQuery.data?.brands ?? [];
+  const units = optionsQuery.data?.units ?? [];
 
   const handleSave = () => {
     onApply(draft);
@@ -104,13 +56,12 @@ export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: P
       onOpenChange={(o) => {
         if (!o) onCancel();
       }}
-      title="Bộ lọc"
+      title="Bộ lọc bổ sung"
       saveLabel="Đồng ý"
       cancelLabel="Huỷ bỏ"
       onSave={handleSave}
       onCancel={onCancel}
       defaultWidth={560}
-      defaultHeight={520}
     >
       <div className="grid grid-cols-[160px_1fr] items-center gap-x-4 gap-y-3 pb-4 text-sm">
         <label htmlFor="ssfd-isActive" className="text-foreground">
@@ -163,40 +114,6 @@ export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: P
           <option value="IN_STOCK">Còn tồn</option>
           <option value="OUT_OF_STOCK">Hết tồn</option>
           <option value="NEGATIVE">Tồn âm</option>
-        </select>
-
-        <label htmlFor="ssfd-storage" className="text-foreground">
-          Kho
-        </label>
-        <select
-          id="ssfd-storage"
-          className="h-9 rounded border border-input bg-background px-2"
-          value={draft.storageId}
-          onChange={(e) => setDraft({ ...draft, storageId: e.target.value })}
-        >
-          <option value="">Tất cả kho</option>
-          {storages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="ssfd-category" className="text-foreground">
-          Nhóm
-        </label>
-        <select
-          id="ssfd-category"
-          className="h-9 rounded border border-input bg-background px-2"
-          value={draft.categoryId}
-          onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
-        >
-          <option value="">Tất cả nhóm</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
         </select>
 
         <label htmlFor="ssfd-brand" className="text-foreground">

@@ -21,6 +21,10 @@ export interface StockSummaryQuery {
   movementFrom?: string;
   /** YYYY-MM-DD inclusive (end of day) */
   movementTo?: string;
+  /** YYYY-MM-DD inclusive */
+  startDate?: string;
+  /** YYYY-MM-DD inclusive (end of day) */
+  endDate?: string;
 }
 
 export interface StockSummaryRow {
@@ -42,6 +46,14 @@ export interface StockSummaryRow {
   };
   quantity: number;
   lastMovementAt: string | null;
+  openingQty: number;
+  openingValue: number;
+  inQty: number;
+  inValue: number;
+  outQty: number;
+  outValue: number;
+  closingQty: number;
+  closingValue: number;
 }
 
 export interface StockSummaryResponse {
@@ -57,6 +69,34 @@ export interface StockSummaryFilterOptions {
   units: string[];
 }
 
+export interface StockSummaryDetailsQuery {
+  organizationId: string;
+  branchId: string;
+  itemId: string;
+  storageId: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface StockSummaryDetailRow {
+  referenceType: string;
+  referenceId: string;
+  postedAt: string;
+  quantity: number;
+  unitCost: number;
+  lineValue: number;
+  notes: string | null;
+}
+
+export interface StockSummaryDetailsResponse {
+  data: StockSummaryDetailRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 interface RawPageRow {
   item_id: string;
   item_code: string;
@@ -70,6 +110,27 @@ interface RawPageRow {
   branch_id: string;
   quantity: string;
   last_movement_at: Date | null;
+}
+
+interface RawPeriodRow {
+  item_id: string;
+  storage_id: string;
+  opening_qty: string | number | null;
+  opening_value: string | number | null;
+  in_qty: string | number | null;
+  in_value: string | number | null;
+  out_qty: string | number | null;
+  out_value: string | number | null;
+}
+
+interface RawDetailRow {
+  reference_type: string;
+  reference_id: string;
+  posted_at: Date;
+  quantity: string | number;
+  unit_cost: string | number | null;
+  line_value: string | number | null;
+  notes: string | null;
 }
 
 @Injectable()
@@ -92,12 +153,7 @@ export class StockSummaryService {
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
-    // Count + totalQuantity over the *aggregated* set (respects HAVING).
-    // We wrap the grouped query in a subquery so SUM-over-subquery gives the
-    // correct total quantity across all aggregated rows.
     const aggQb = this.applyHaving(this.buildGroupedQuery(query), query.stockState);
-    // getQueryAndParameters returns [sql_with_$1_$2, parameters_array] which
-    // is exactly what `manager.query` expects.
     const [aggSql, aggParams] = aggQb.getQueryAndParameters();
     const aggregateSql = `SELECT COUNT(*)::int AS total, COALESCE(SUM(sub.quantity), 0)::numeric AS total_quantity FROM (${aggSql}) sub`;
 
@@ -111,30 +167,153 @@ export class StockSummaryService {
     const total = Number(aggResult?.[0]?.total ?? 0);
     const totalQuantity = Number(aggResult?.[0]?.total_quantity ?? 0);
 
-    const data: StockSummaryRow[] = rows.map((r) => ({
-      itemId: r.item_id,
-      storageId: r.storage_id,
-      item: {
-        id: r.item_id,
-        code: r.item_code,
-        name: r.item_name,
-        unit: r.item_unit,
-        brand: r.item_brand,
-        isActive: r.item_is_active,
-        categoryName: r.category_name,
-      },
-      storage: {
-        id: r.storage_id,
-        name: r.storage_name,
-        branchId: r.branch_id,
-      },
-      quantity: Number(r.quantity),
-      lastMovementAt: r.last_movement_at
-        ? r.last_movement_at.toISOString()
-        : null,
-    }));
+    const periodDataMap = new Map<string, RawPeriodRow>();
+    if (rows.length > 0 && (query.startDate || query.endDate)) {
+      const startDate = query.startDate || '1970-01-01';
+      const endDate = query.endDate ? addOneDay(query.endDate) : '2999-12-31';
+      const itemIds = rows.map((r) => r.item_id);
+      const storageIds = rows.map((r) => r.storage_id);
+
+      const periodQuery = `
+        SELECT
+          sle.item_id,
+          loc.storage_id,
+          SUM(CASE WHEN sle.posted_at < $1 THEN sle.quantity ELSE 0 END)::numeric AS opening_qty,
+          SUM(CASE WHEN sle.posted_at < $1 THEN sle.line_value ELSE 0 END)::numeric AS opening_value,
+          SUM(CASE WHEN sle.posted_at >= $1 AND sle.posted_at < $2 AND sle.quantity > 0 THEN sle.quantity ELSE 0 END)::numeric AS in_qty,
+          SUM(CASE WHEN sle.posted_at >= $1 AND sle.posted_at < $2 AND sle.quantity > 0 THEN sle.line_value ELSE 0 END)::numeric AS in_value,
+          SUM(CASE WHEN sle.posted_at >= $1 AND sle.posted_at < $2 AND sle.quantity < 0 THEN ABS(sle.quantity) ELSE 0 END)::numeric AS out_qty,
+          SUM(CASE WHEN sle.posted_at >= $1 AND sle.posted_at < $2 AND sle.quantity < 0 THEN ABS(sle.line_value) ELSE 0 END)::numeric AS out_value
+        FROM stock_ledger_entries sle
+        INNER JOIN locations loc ON loc.id = sle.location_id
+        INNER JOIN unnest($4::uuid[], $5::uuid[]) AS pair(item_id, storage_id)
+          ON pair.item_id = sle.item_id
+         AND pair.storage_id = loc.storage_id
+        WHERE sle.organization_id = $3
+        GROUP BY sle.item_id, loc.storage_id
+      `;
+      const periodResult = await this.balanceRepo.manager.query<RawPeriodRow[]>(
+        periodQuery,
+        [startDate, endDate, query.organizationId, itemIds, storageIds],
+      );
+      for (const row of periodResult) {
+        periodDataMap.set(`${row.item_id}:${row.storage_id}`, row);
+      }
+    }
+
+    const data: StockSummaryRow[] = rows.map((r) => {
+      const pd = periodDataMap.get(`${r.item_id}:${r.storage_id}`);
+      const openingQty = Number(pd?.opening_qty ?? 0);
+      const openingValue = Number(pd?.opening_value ?? 0);
+      const inQty = Number(pd?.in_qty ?? 0);
+      const inValue = Number(pd?.in_value ?? 0);
+      const outQty = Number(pd?.out_qty ?? 0);
+      const outValue = Number(pd?.out_value ?? 0);
+      const hasPeriod = query.startDate || query.endDate;
+      const closingQty = hasPeriod ? openingQty + inQty - outQty : Number(r.quantity);
+      const closingValue = hasPeriod ? openingValue + inValue - outValue : 0;
+
+      return {
+        itemId: r.item_id,
+        storageId: r.storage_id,
+        item: {
+          id: r.item_id,
+          code: r.item_code,
+          name: r.item_name,
+          unit: r.item_unit,
+          brand: r.item_brand,
+          isActive: r.item_is_active,
+          categoryName: r.category_name,
+        },
+        storage: {
+          id: r.storage_id,
+          name: r.storage_name,
+          branchId: r.branch_id,
+        },
+        quantity: Number(r.quantity),
+        lastMovementAt: r.last_movement_at ? r.last_movement_at.toISOString() : null,
+        openingQty,
+        openingValue,
+        inQty,
+        inValue,
+        outQty,
+        outValue,
+        closingQty,
+        closingValue,
+      };
+    });
 
     return { data, total, page, pageSize, totalQuantity };
+  }
+
+  async getDetails(
+    query: StockSummaryDetailsQuery,
+  ): Promise<StockSummaryDetailsResponse> {
+    const page = Math.max(1, Number(query.page ?? 1));
+    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 20)));
+    const offset = (page - 1) * pageSize;
+    const startDate = query.startDate || '1970-01-01';
+    const endDate = query.endDate ? addOneDay(query.endDate) : '2999-12-31';
+    const params = [
+      query.organizationId,
+      query.itemId,
+      query.storageId,
+      query.branchId,
+      startDate,
+      endDate,
+    ];
+
+    const baseSql = `
+      FROM stock_ledger_entries sle
+      INNER JOIN locations loc ON loc.id = sle.location_id
+      WHERE sle.organization_id = $1
+        AND sle.item_id = $2
+        AND loc.storage_id = $3
+        AND sle.branch_id = $4
+        AND sle.posted_at >= $5
+        AND sle.posted_at < $6
+    `;
+    const dataSql = `
+      SELECT
+        sle.reference_type,
+        sle.reference_id,
+        sle.posted_at,
+        sle.quantity,
+        sle.unit_cost,
+        sle.line_value,
+        sle.notes
+      ${baseSql}
+      ORDER BY sle.posted_at DESC, sle.id DESC
+      LIMIT $7 OFFSET $8
+    `;
+    const countSql = `SELECT COUNT(*)::int AS total ${baseSql}`;
+
+    const [rows, countRows] = await Promise.all([
+      this.balanceRepo.manager.query<RawDetailRow[]>(dataSql, [
+        ...params,
+        pageSize,
+        offset,
+      ]),
+      this.balanceRepo.manager.query<Array<{ total: number | string }>>(
+        countSql,
+        params,
+      ),
+    ]);
+
+    return {
+      data: rows.map((row) => ({
+        referenceType: row.reference_type,
+        referenceId: row.reference_id,
+        postedAt: row.posted_at.toISOString(),
+        quantity: Number(row.quantity),
+        unitCost: Number(row.unit_cost ?? 0),
+        lineValue: Number(row.line_value ?? 0),
+        notes: row.notes ?? null,
+      })),
+      total: Number(countRows[0]?.total ?? 0),
+      page,
+      pageSize,
+    };
   }
 
   async getFilterOptions(organizationId: string): Promise<StockSummaryFilterOptions> {

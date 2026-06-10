@@ -1,4 +1,4 @@
-import { apiClient } from "../lib/api-axios";
+import { erpApi, requireErpData } from "../lib/erp-api";
 
 export interface StockSummaryRow {
   itemId: string;
@@ -19,6 +19,14 @@ export interface StockSummaryRow {
   };
   quantity: number;
   lastMovementAt: string | null;
+  openingQty: number;
+  openingValue: number;
+  inQty: number;
+  inValue: number;
+  outQty: number;
+  outValue: number;
+  closingQty: number;
+  closingValue: number;
 }
 
 export interface StockSummaryResponse {
@@ -51,6 +59,10 @@ export interface StockSummaryQuery {
   movementFrom?: string;
   /** YYYY-MM-DD */
   movementTo?: string;
+  /** YYYY-MM-DD */
+  startDate?: string;
+  /** YYYY-MM-DD */
+  endDate?: string;
 }
 
 export async function listStockSummary(
@@ -61,11 +73,11 @@ export async function listStockSummary(
     if (value === undefined || value === null || value === "") continue;
     params[key] = value as string | number | boolean;
   }
-  const { data } = await apiClient.get<StockSummaryResponse>(
-    "/inventory/stock/summary",
-    { params },
+  return requireErpData(
+    await erpApi.GET<StockSummaryResponse>("/inventory/stock/summary", {
+      params: { query: params },
+    }),
   );
-  return data;
 }
 
 export interface StockSummaryFilterOptions {
@@ -74,8 +86,42 @@ export interface StockSummaryFilterOptions {
 }
 
 export async function getStockSummaryFilterOptions(): Promise<StockSummaryFilterOptions> {
-  const { data } = await apiClient.get<StockSummaryFilterOptions>(
-    "/inventory/stock/summary/filter-options",
+  return requireErpData(
+    await erpApi.GET<StockSummaryFilterOptions>(
+      "/inventory/stock/summary/filter-options",
+    ),
   );
-  return data;
+}
+
+export interface StockSummaryDetailRow {
+  referenceType: string;
+  referenceId: string;
+  postedAt: string;
+  quantity: number;
+  unitCost: number;
+  lineValue: number;
+  notes: string | null;
+}
+
+export interface StockSummaryDetailsResponse {
+  data: StockSummaryDetailRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function listStockSummaryDetails(params: {
+  itemId: string;
+  storageId: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<StockSummaryDetailsResponse> {
+  return requireErpData(
+    await erpApi.GET<StockSummaryDetailsResponse>(
+      "/inventory/stock/summary/details",
+      { params: { query: params } },
+    ),
+  );
 }

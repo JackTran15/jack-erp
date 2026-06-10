@@ -116,4 +116,20 @@ export class StockSummaryQueryDto {
   @IsOptional()
   @IsDateString()
   movementTo?: string;
+
+  @ApiPropertyOptional({
+    format: 'date',
+    description: 'Period start date used to calculate opening/in/out/closing.',
+  })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({
+    format: 'date',
+    description: 'Inclusive period end date used to calculate in/out/closing.',
+  })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }
