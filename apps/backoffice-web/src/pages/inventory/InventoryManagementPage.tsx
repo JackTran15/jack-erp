@@ -9,22 +9,36 @@ import {
   type PeriodValue,
 } from "@erp/ui";
 import { useQuery } from "@tanstack/react-query";
-import { Filter, Search } from "lucide-react";
+import { ChevronDown, CloudDownload, Filter, Search } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
-import { PaginationControls } from "../../components/table/PaginationControls";
-import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
+import { PaginationControls } from "../../components/table/PaginationControls";
+import {
+  InventoryPageTitle,
+  InventoryTabBar,
+} from "../../components/document/inventoryTabs";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
+  type ColumnFilter,
+  type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
 import {
-  listStockSummary,
+  searchStockSummary,
   type StockStateFilter,
   type StockSummaryQuery,
   type StockSummaryRow,
 } from "../../api/stock-summary";
+import {
+  buildV2Body,
+  type V2SearchConfig,
+} from "../../components/crud/crudV2Search";
+import { useDebouncedValue } from "../../lib/use-debounced-value";
 import {
   useItemCategoryOptions,
   useStorageOptions,
@@ -52,6 +66,51 @@ interface SelectedStockItem {
   storageId: string;
 }
 
+const STOCK_SUMMARY_FILTER_KEYS = [
+  "itemCode",
+  "itemName",
+  "unit",
+  "category",
+  "brand",
+  "storage",
+  "quantity",
+  "openingQty",
+  "inQty",
+  "outQty",
+  "transferOutQty",
+  "incomingQty",
+] as const;
+
+type StockSummaryFilterKey = (typeof STOCK_SUMMARY_FILTER_KEYS)[number];
+
+const STOCK_SUMMARY_SEARCH: V2SearchConfig = {
+  path: "/v2/inventory/stock/summary/search",
+  fields: {
+    itemCode: "string",
+    itemName: "string",
+    unit: "string",
+    category: "string",
+    brand: "string",
+    storage: "string",
+    quantity: "compare",
+    openingQty: "compare",
+    inQty: "compare",
+    outQty: "compare",
+    transferOutQty: "compare",
+    incomingQty: "compare",
+  },
+};
+
+function createColumnFilters(): Record<StockSummaryFilterKey, ColumnFilter> {
+  return STOCK_SUMMARY_FILTER_KEYS.reduce(
+    (filters, key) => {
+      filters[key] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return filters;
+    },
+    {} as Record<StockSummaryFilterKey, ColumnFilter>,
+  );
+}
+
 function toBoolParam(
   value: StockSummaryAdvancedFilters["isActive"],
 ): boolean | undefined {
@@ -60,9 +119,7 @@ function toBoolParam(
   return undefined;
 }
 
-function toStockState(
-  value: StockStateFilter,
-): StockStateFilter | undefined {
+function toStockState(value: StockStateFilter): StockStateFilter | undefined {
   return value === "ALL" ? undefined : value;
 }
 
@@ -90,12 +147,16 @@ export function InventoryManagementPage() {
   });
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [excludeReservations, setExcludeReservations] = useState(false);
+  const [columnFilters, setColumnFilters] = useState(createColumnFilters);
+  const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
   const [selectedItem, setSelectedItem] = useState<SelectedStockItem | null>(
     null,
   );
 
   const { options: storageOptions } = useStorageOptions({ withAll: false });
-  const { options: categoryOptions } = useItemCategoryOptions({ withAll: false });
+  const { options: categoryOptions } = useItemCategoryOptions({
+    withAll: false,
+  });
 
   const query = useMemo<StockSummaryQuery>(
     () => ({
@@ -111,13 +172,41 @@ export function InventoryManagementPage() {
       stockState: toStockState(applied.advanced.stockState),
       startDate: applied.period.from || undefined,
       endDate: applied.period.to || undefined,
+      excludeReservations,
     }),
-    [applied, pagination.page, pagination.pageSize],
+    [applied, excludeReservations, pagination.page, pagination.pageSize],
   );
 
+  const searchBody = useMemo(() => {
+    const body = buildV2Body(
+      STOCK_SUMMARY_SEARCH,
+      debouncedColumnFilters,
+      pagination.page,
+      pagination.pageSize,
+    );
+    return {
+      ...body,
+      search: query.search,
+      storageId: query.storageId,
+      categoryId: query.categoryId,
+      brand:
+        body.brand ??
+        (query.brand ? { operator: "=", value: query.brand } : undefined),
+      unit:
+        body.unit ??
+        (query.unit ? { operator: "=", value: query.unit } : undefined),
+      isActive: query.isActive,
+      isPosVisible: query.isPosVisible,
+      stockState: query.stockState,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      excludeReservations: query.excludeReservations,
+    };
+  }, [debouncedColumnFilters, pagination.page, pagination.pageSize, query]);
+
   const summaryQuery = useQuery({
-    queryKey: ["stock-summary", query, applied.requestVersion],
-    queryFn: () => listStockSummary(query),
+    queryKey: ["stock-summary-v2", searchBody, applied.requestVersion],
+    queryFn: () => searchStockSummary(searchBody),
     placeholderData: (previous) => previous,
   });
 
@@ -128,9 +217,7 @@ export function InventoryManagementPage() {
   }, [summaryQuery.error]);
 
   const dateInvalid = Boolean(
-    draftPeriod.from &&
-      draftPeriod.to &&
-      draftPeriod.from > draftPeriod.to,
+    draftPeriod.from && draftPeriod.to && draftPeriod.from > draftPeriod.to,
   );
 
   const applyFilters = () => {
@@ -156,13 +243,43 @@ export function InventoryManagementPage() {
     setFilterDialogOpen(false);
   };
 
-  const baseColumns = useMemo<TableColumn<StockSummaryRow>[]>(
+  const response = summaryQuery.isError ? undefined : summaryQuery.data;
+  const rows = response?.data ?? [];
+  const total = response?.total ?? 0;
+
+  const visibleTotals = useMemo(
+    () =>
+      rows.reduce(
+        (sum, row) => ({
+          quantity:
+            sum.quantity + displayStockQuantity(row, excludeReservations),
+          openingQty: sum.openingQty + row.openingQty,
+          inQty: sum.inQty + row.inQty,
+          outQty: sum.outQty + row.outQty,
+          transferOutQty: sum.transferOutQty + row.transferOutQty,
+          incomingQty: sum.incomingQty + row.incomingQty,
+        }),
+        {
+          quantity: 0,
+          openingQty: 0,
+          inQty: 0,
+          outQty: 0,
+          transferOutQty: 0,
+          incomingQty: 0,
+        },
+      ),
+    [excludeReservations, rows],
+  );
+
+  const columns = useMemo<TableColumn<StockSummaryRow>[]>(
     () => [
       {
         key: "itemCode",
-        label: "Mã hàng",
-        width: 120,
-        render: (row) => <span className="font-mono text-xs">{row.item.code}</span>,
+        label: "Mã SKU",
+        width: 160,
+        render: (row) => (
+          <span className="font-mono text-xs">{row.item.code}</span>
+        ),
       },
       {
         key: "itemName",
@@ -186,48 +303,38 @@ export function InventoryManagementPage() {
         render: (row) => row.item.unit,
       },
       {
-        key: "storageName",
+        key: "category",
+        label: "Nhóm hàng hóa",
+        width: 180,
+        render: (row) => row.item.categoryName ?? "",
+      },
+      {
+        key: "brand",
+        label: "Thương hiệu",
+        width: 160,
+        render: (row) => row.item.brand ?? "",
+      },
+      {
+        key: "storage",
         label: "Kho",
-        width: 150,
+        width: 200,
         render: (row) => row.storage.name,
       },
-      ...createPeriodColumns("opening", "Đầu kỳ"),
-      ...createPeriodColumns("in", "Nhập trong kỳ"),
-      ...createPeriodColumns("out", "Xuất trong kỳ"),
-      ...createPeriodColumns("closing", "Cuối kỳ"),
+      quantityColumn("quantity", "SL tồn", visibleTotals.quantity, (row) =>
+        displayStockQuantity(row, excludeReservations),
+      ),
+      quantityColumn("openingQty", "Tồn đầu kỳ", visibleTotals.openingQty),
+      quantityColumn("inQty", "SL nhập", visibleTotals.inQty),
+      quantityColumn("outQty", "SL xuất", visibleTotals.outQty),
+      quantityColumn(
+        "transferOutQty",
+        "Đang chuyển đi",
+        visibleTotals.transferOutQty,
+      ),
+      quantityColumn("incomingQty", "Sắp nhận về", visibleTotals.incomingQty),
     ],
-    [],
+    [excludeReservations, visibleTotals],
   );
-
-  const columns = useMemo<TableColumn<StockSummaryRow>[]>(() => {
-    if (!excludeReservations) return baseColumns;
-    return [
-      ...baseColumns,
-      {
-        key: "reservedQty",
-        label: "Khách đặt",
-        width: 110,
-        headerClassName: "text-right",
-        className: "text-right tabular-nums",
-        render: (row) =>
-          formatMoneyInteger(
-            Math.max(0, Math.floor((row.closingQty ?? row.quantity) * 0.05)),
-          ),
-      },
-      {
-        key: "availableQty",
-        label: "Tồn khả dụng",
-        width: 120,
-        headerClassName: "text-right",
-        className: "text-right tabular-nums font-semibold",
-        render: (row) => {
-          const closing = row.closingQty ?? row.quantity;
-          const reserved = Math.max(0, Math.floor(closing * 0.05));
-          return formatMoneyInteger(closing - reserved);
-        },
-      },
-    ];
-  }, [baseColumns, excludeReservations]);
 
   const activeAdvancedCount = [
     applied.advanced.brand,
@@ -237,10 +344,70 @@ export function InventoryManagementPage() {
     applied.advanced.stockState !== "ALL" ? "x" : "",
   ].filter(Boolean).length;
 
-  const response = summaryQuery.isError ? undefined : summaryQuery.data;
-  const rows = response?.data ?? [];
-  const total = response?.total ?? 0;
-  const totalQuantity = response?.totalQuantity ?? 0;
+  const columnFilterControl = useMemo(
+    () => ({
+      filters: columnFilters as Record<string, ColumnFilter>,
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
+        setPagination((previous) => ({ ...previous, page: 1 }));
+        setColumnFilters((previous) => ({
+          ...previous,
+          [key]: { ...previous[key as StockSummaryFilterKey], mode },
+        }));
+      },
+      onValueChange: (key: string, value: string) => {
+        setPagination((previous) => ({ ...previous, page: 1 }));
+        setColumnFilters((previous) => ({
+          ...previous,
+          [key]: { ...previous[key as StockSummaryFilterKey], value },
+        }));
+      },
+    }),
+    [columnFilters],
+  );
+
+  const exportVisibleRows = () => {
+    const header = [
+      "Mã SKU",
+      "Tên hàng hóa",
+      "Đơn vị tính",
+      "Nhóm hàng hóa",
+      "Thương hiệu",
+      "Kho",
+      "SL tồn",
+      "Tồn đầu kỳ",
+      "SL nhập",
+      "SL xuất",
+      "Đang chuyển đi",
+      "Sắp nhận về",
+    ];
+    const csv = [
+      header,
+      ...rows.map((row) => [
+        row.item.code,
+        row.item.name,
+        row.item.unit,
+        row.item.categoryName ?? "",
+        row.item.brand ?? "",
+        row.storage.name,
+        displayStockQuantity(row, excludeReservations),
+        row.openingQty,
+        row.inQty,
+        row.outQty,
+        row.transferOutQty,
+        row.incomingQty,
+      ]),
+    ]
+      .map((line) => line.map(csvCell).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "tong-hop-ton-kho.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <DocumentListShell
@@ -314,6 +481,17 @@ export function InventoryManagementPage() {
               <Search className="mr-1.5 h-3.5 w-3.5" />
               Lấy dữ liệu
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={exportVisibleRows}
+              disabled={rows.length === 0}
+            >
+              <CloudDownload className="mr-1.5 h-3.5 w-3.5" />
+              Xuất khẩu
+              <ChevronDown className="ml-2 h-3.5 w-3.5" />
+            </Button>
           </form>
 
           <div className="flex items-center gap-2 pb-1">
@@ -321,7 +499,10 @@ export function InventoryManagementPage() {
               type="checkbox"
               id="exclude-reservations"
               checked={excludeReservations}
-              onChange={(event) => setExcludeReservations(event.target.checked)}
+              onChange={(event) => {
+                setPagination((previous) => ({ ...previous, page: 1 }));
+                setExcludeReservations(event.target.checked);
+              }}
               className="h-4 w-4 cursor-pointer rounded border-border text-primary focus:ring-primary"
             />
             <label
@@ -336,18 +517,6 @@ export function InventoryManagementPage() {
               </span>
             ) : null}
           </div>
-        </div>
-      }
-      summary={
-        <div className="flex items-center justify-end gap-6 px-2">
-          <span className="text-muted-foreground">Tổng số mặt hàng:</span>
-          <span className="text-base font-semibold tabular-nums">
-            {total.toLocaleString("vi-VN")}
-          </span>
-          <span className="text-muted-foreground">Tổng SL tồn:</span>
-          <span className="text-base font-semibold tabular-nums">
-            {formatMoneyInteger(totalQuantity)}
-          </span>
         </div>
       }
       pagination={
@@ -378,6 +547,7 @@ export function InventoryManagementPage() {
             : "Chưa có dữ liệu tồn kho."
         }
         getRowKey={(row) => `${row.itemId}:${row.storageId}`}
+        columnFilterControl={columnFilterControl}
         onRowClick={(row) =>
           setSelectedItem({
             id: row.item.id,
@@ -402,33 +572,36 @@ export function InventoryManagementPage() {
   );
 }
 
-type PeriodColumnPrefix = "opening" | "in" | "out" | "closing";
+function quantityColumn(
+  key: keyof StockSummaryRow,
+  label: string,
+  total: number,
+  valueOf: (row: StockSummaryRow) => number = (row) => Number(row[key] ?? 0),
+): TableColumn<StockSummaryRow> {
+  return {
+    key,
+    label,
+    width: 130,
+    filterKind: "number-range",
+    headerClassName: "text-right",
+    className: "text-right tabular-nums",
+    render: (row) => formatMoneyInteger(valueOf(row)),
+    footer: (
+      <span className="block text-right font-semibold tabular-nums">
+        {formatMoneyInteger(total)}
+      </span>
+    ),
+  };
+}
 
-function createPeriodColumns(
-  prefix: PeriodColumnPrefix,
-  group: string,
-): TableColumn<StockSummaryRow>[] {
-  const quantityKey = `${prefix}Qty` as keyof StockSummaryRow;
-  const valueKey = `${prefix}Value` as keyof StockSummaryRow;
+function displayStockQuantity(
+  row: StockSummaryRow,
+  excludeReservations: boolean,
+): number {
+  return row.quantity - (excludeReservations ? row.reservedQty : 0);
+}
 
-  return [
-    {
-      key: quantityKey,
-      group,
-      label: "Số lượng",
-      width: 100,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (row) => formatMoneyInteger(Number(row[quantityKey] ?? 0)),
-    },
-    {
-      key: valueKey,
-      group,
-      label: "Giá trị",
-      width: 130,
-      headerClassName: "text-right",
-      className: "text-right tabular-nums",
-      render: (row) => formatMoneyInteger(Number(row[valueKey] ?? 0)),
-    },
-  ];
+function csvCell(value: string | number): string {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
 }

@@ -27,6 +27,9 @@ export interface StockSummaryRow {
   outValue: number;
   closingQty: number;
   closingValue: number;
+  transferOutQty: number;
+  incomingQty: number;
+  reservedQty: number;
 }
 
 export interface StockSummaryResponse {
@@ -37,11 +40,7 @@ export interface StockSummaryResponse {
   totalQuantity: number;
 }
 
-export type StockStateFilter =
-  | "ALL"
-  | "IN_STOCK"
-  | "OUT_OF_STOCK"
-  | "NEGATIVE";
+export type StockStateFilter = "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
 
 export interface StockSummaryQuery {
   page: number;
@@ -63,6 +62,7 @@ export interface StockSummaryQuery {
   startDate?: string;
   /** YYYY-MM-DD */
   endDate?: string;
+  excludeReservations?: boolean;
 }
 
 export async function listStockSummary(
@@ -77,6 +77,17 @@ export async function listStockSummary(
     await erpApi.GET<StockSummaryResponse>("/inventory/stock/summary", {
       params: { query: params },
     }),
+  );
+}
+
+export async function searchStockSummary(
+  body: Record<string, unknown>,
+): Promise<StockSummaryResponse> {
+  return requireErpData(
+    await erpApi.POST<StockSummaryResponse>(
+      "/v2/inventory/stock/summary/search",
+      { body },
+    ),
   );
 }
 
