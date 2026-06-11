@@ -17,7 +17,7 @@ const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.line_value), 0)
 
 /** Đối tượng (party) — the transporter user's full name, via correlated subquery. */
 const TRANSPORTER_NAME_SUBQUERY = `(SELECT (u.first_name || ' ' || u.last_name)
-   FROM users u WHERE u.id = st.transporter_user_id)`;
+   FROM users u WHERE u.id = st.transporter_user_id AND u.organization_id = st.organization_id)`;
 
 /** Ngày — transfer date, falling back to created date for legacy rows. */
 const DATE_COLUMN = `COALESCE(st.transferred_at, st.created_at)`;
