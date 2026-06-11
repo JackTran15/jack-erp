@@ -296,12 +296,38 @@ export class StockTransferService {
     );
 
     const lines: CreateTransferDto['lines'] = [];
-    for (const [idx, l] of dto.lines.entries()) {
       const sourceLocationId =
         l.sourceLocationId ?? (await resolveDefaultLocation(l.sourceStorageId!));
+      if (l.sourceLocationId) {
+        const srcLoc = await this.locationRepo.findOne({
+          where: {
+            id: l.sourceLocationId,
+            organizationId: actor.organizationId,
+            branchId: actor.branchId,
+          },
+          select: { id: true },
+        });
+        if (!srcLoc)
+          throw new NotFoundException(`Line ${idx + 1}: source location not found`);
+      }
+
       const destinationLocationId =
         l.destinationLocationId ??
         (await resolveDefaultLocation(l.destinationStorageId!));
+      if (l.destinationLocationId) {
+        const dstLoc = await this.locationRepo.findOne({
+          where: {
+            id: l.destinationLocationId,
+            organizationId: actor.organizationId,
+            branchId: actor.branchId,
+          },
+          select: { id: true },
+        });
+        if (!dstLoc)
+          throw new NotFoundException(
+            `Line ${idx + 1}: destination location not found`,
+          );
+      }
       if (sourceLocationId === destinationLocationId) {
         throw new BadRequestException(
           `Line ${idx + 1}: source and destination must be different`,
