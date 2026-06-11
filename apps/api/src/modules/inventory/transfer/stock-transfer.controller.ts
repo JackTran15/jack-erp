@@ -23,6 +23,7 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
+  IsISO8601,
   ValidateNested,
   IsNumber,
   Min,
@@ -34,6 +35,12 @@ import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transf
 class TransferLineDto {
   @IsUUID()
   itemId: string;
+
+  @IsUUID()
+  sourceStorageId: string;
+
+  @IsUUID()
+  destinationStorageId: string;
 
   @IsOptional()
   @IsUUID()
@@ -48,26 +55,32 @@ class TransferLineDto {
   quantity: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 }
 
 class CreateTransferDto {
-  @IsUUID()
-  sourceLocationId: string;
-
-  @IsUUID()
-  destinationLocationId: string;
-
-  @IsUUID()
-  sourceBranchId: string;
-
-  @IsUUID()
-  destinationBranchId: string;
-
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsUUID()
+  transporterUserId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  attachmentIds?: string[];
+
+  @IsOptional()
+  @IsISO8601()
+  transferredAt?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
