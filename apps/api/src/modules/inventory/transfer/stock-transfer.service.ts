@@ -296,6 +296,7 @@ export class StockTransferService {
     );
 
     const lines: CreateTransferDto['lines'] = [];
+    for (const [idx, l] of dto.lines.entries()) {
       const sourceLocationId =
         l.sourceLocationId ?? (await resolveDefaultLocation(l.sourceStorageId!));
       if (l.sourceLocationId) {
