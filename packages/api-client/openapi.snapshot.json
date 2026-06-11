@@ -6749,6 +6749,26 @@
               "format": "date",
               "type": "string"
             }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "Period start date used to calculate opening/in/out/closing.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive period end date used to calculate in/out/closing.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6786,6 +6806,116 @@
         },
         "tags": [
           "inventory"
+        ]
+      }
+    },
+    "/inventory/stock/summary/details": {
+      "get": {
+        "operationId": "StockSummaryController_getDetails",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/v2/inventory/stock/summary/search": {
+      "post": {
+        "operationId": "StockSummaryV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockSummarySearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockSummaryV2"
         ]
       }
     },
@@ -7639,6 +7769,37 @@
         },
         "tags": [
           "StockTransfer"
+        ]
+      }
+    },
+    "/v2/inventory/stock/transfers/search": {
+      "post": {
+        "operationId": "StockTransferV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockTransferSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransferV2"
         ]
       }
     },
@@ -12863,6 +13024,96 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "documentNumber",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MERGED",
+                "UNMERGED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/merge-preview": {
+      "post": {
+        "operationId": "StockTakeController_previewMerge",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeStockTakesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/export.xlsx": {
+      "get": {
+        "operationId": "StockTakeController_exportExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13071,6 +13322,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StockTakeLineEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/members": {
+      "put": {
+        "operationId": "StockTakeController_replaceMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceMembersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
                 }
               }
             }
@@ -20461,6 +20752,93 @@
           "createdBy"
         ]
       },
+      "StockSummarySearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "search": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "excludeReservations": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isPosVisible": {
+            "type": "boolean"
+          },
+          "stockState": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "IN_STOCK",
+              "OUT_OF_STOCK",
+              "NEGATIVE"
+            ]
+          },
+          "itemCode": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "category": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "brand": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "quantity": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "openingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "inQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "outQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "transferOutQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "incomingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          }
+        }
+      },
       "CreateProductDto": {
         "type": "object",
         "properties": {
@@ -20710,6 +21088,19 @@
             "format": "date-time",
             "type": "string"
           },
+          "transporterUserId": {
+            "type": "string"
+          },
+          "transferredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "notes": {
             "type": "string"
           },
@@ -20718,6 +21109,25 @@
             "items": {
               "$ref": "#/components/schemas/StockTransferLineEntity"
             }
+          },
+          "transporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "fullName"
+            ]
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Transient (not a column): sum of line_value across the transfer's lines,\ninlined by the v2 search handler so the FE can render Tổng tiền + footer."
           },
           "id": {
             "type": "string"
@@ -20744,11 +21154,10 @@
           }
         },
         "required": [
-          "sourceLocationId",
-          "destinationLocationId",
           "sourceBranchId",
           "destinationBranchId",
           "status",
+          "attachmentIds",
           "lines",
           "id",
           "organizationId",
@@ -20769,6 +21178,12 @@
           "itemId": {
             "type": "string"
           },
+          "sourceStorageId": {
+            "type": "string"
+          },
+          "destinationStorageId": {
+            "type": "string"
+          },
           "sourceLocationId": {
             "type": "string"
           },
@@ -20777,6 +21192,14 @@
           },
           "quantity": {
             "type": "number"
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineValue": {
+            "type": "string",
+            "nullable": true
           },
           "notes": {
             "type": "string"
@@ -20792,6 +21215,12 @@
           },
           "destinationLocation": {
             "$ref": "#/components/schemas/LocationEntity"
+          },
+          "sourceStorage": {
+            "$ref": "#/components/schemas/StorageEntity"
+          },
+          "destinationStorage": {
+            "$ref": "#/components/schemas/StorageEntity"
           }
         },
         "required": [
@@ -20859,6 +21288,81 @@
         "required": [
           "lines"
         ]
+      },
+      "DateRangeFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "StockTransferSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "description": "Số phiếu chuyển (document number)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "party": {
+            "description": "Đối tượng (counterparty — matches the transporter user's full name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "notes": {
+            "description": "Diễn giải (notes)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "date": {
+            "description": "Ngày (transfer date — single date + compare operator =/<\\/<=/>/>=)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "dateRange": {
+            "description": "Khoảng thời gian (Từ ngày / Đến ngày từ thanh PeriodFilter) — inclusive.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Tổng tiền (computed line total: SUM(line_value))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
       },
       "CreatePayableDto": {
         "type": "object",
@@ -23520,17 +24024,6 @@
           "value"
         ]
       },
-      "DateRangeFilterDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          }
-        }
-      },
       "InvoiceSearchV2Dto": {
         "type": "object",
         "properties": {
@@ -24418,11 +24911,11 @@
             "type": "string"
           },
           "referenceType": {
-            "type": "string",
             "enum": [
               "STOCK_TAKE",
               "TRANSFER_ORDER"
-            ]
+            ],
+            "type": "string"
           },
           "notes": {
             "type": "string"
@@ -25230,12 +25723,33 @@
             "type": "object",
             "nullable": true
           },
+          "countedValue": {
+            "type": "object",
+            "nullable": true
+          },
           "reason": {
             "type": "string"
           }
         },
         "required": [
           "itemId"
+        ]
+      },
+      "StockTakeMemberDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "representative": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName"
         ]
       },
       "CreateStockTakeDto": {
@@ -25262,6 +25776,9 @@
             "type": "string",
             "description": "Kết luận sau kiểm kê"
           },
+          "countByValue": {
+            "type": "boolean"
+          },
           "countedAt": {
             "type": "string",
             "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
@@ -25271,8 +25788,76 @@
             "items": {
               "$ref": "#/components/schemas/CreateStockTakeLineDto"
             }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberDto"
+            }
+          },
+          "mergeSourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
+      },
+      "StockTakeMemberEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "stockTakeId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "representative": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "stockTake": {
+            "$ref": "#/components/schemas/StockTakeEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "stockTakeId",
+          "fullName",
+          "sortOrder",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "stockTake"
+        ]
       },
       "StockTakeEntity": {
         "type": "object",
@@ -25297,6 +25882,9 @@
           "purpose": {
             "type": "string",
             "description": "Mục đích — free-text purpose written by user on the form."
+          },
+          "countByValue": {
+            "type": "boolean"
           },
           "plannedDate": {
             "type": "string",
@@ -25332,6 +25920,24 @@
           "generatedIssueId": {
             "type": "string"
           },
+          "mergedIntoId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set on source vouchers after they are saved into a merged stock-take."
+          },
+          "mergeSourceIds": {
+            "nullable": true,
+            "description": "Audit trail retained on the merged voucher.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
           "deletedAt": {
             "format": "date-time",
             "type": "string"
@@ -25340,6 +25946,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StockTakeLineEntity"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberEntity"
             }
           },
           "id": {
@@ -25368,8 +25980,10 @@
         },
         "required": [
           "status",
+          "countByValue",
           "snapshotAt",
           "lines",
+          "members",
           "id",
           "organizationId",
           "createdAt",
@@ -25402,6 +26016,13 @@
             "type": "string"
           },
           "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedValue": {
+            "type": "string"
+          },
+          "countedValue": {
             "type": "string",
             "nullable": true
           },
@@ -25440,10 +26061,26 @@
           "itemId",
           "locationId",
           "expectedQty",
+          "expectedValue",
           "createdAt",
           "updatedAt",
           "createdBy",
           "stockTake"
+        ]
+      },
+      "MergeStockTakesDto": {
+        "type": "object",
+        "properties": {
+          "sourceIds": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sourceIds"
         ]
       },
       "UpdateStockTakeHeaderDto": {
@@ -25458,6 +26095,9 @@
           "conclusion": {
             "type": "string",
             "description": "Kết luận sau kiểm kê"
+          },
+          "countByValue": {
+            "type": "boolean"
           },
           "countedAt": {
             "type": "string",
@@ -25486,6 +26126,10 @@
             "type": "object",
             "nullable": true
           },
+          "countedValue": {
+            "type": "object",
+            "nullable": true
+          },
           "note": {
             "type": "string"
           },
@@ -25494,6 +26138,20 @@
             "description": "Nguyên nhân chênh lệch"
           }
         }
+      },
+      "ReplaceMembersDto": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberDto"
+            }
+          }
+        },
+        "required": [
+          "members"
+        ]
       },
       "CreateTransferOrderDto": {
         "type": "object",
