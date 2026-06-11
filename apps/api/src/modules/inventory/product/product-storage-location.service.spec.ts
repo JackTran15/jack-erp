@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
 import { ProductStorageLocationService } from './product-storage-location.service';
 import { ProductStorageLocationEntity } from './product-storage-location.entity';
 import { ItemEntity } from '../location/item.entity';
@@ -97,16 +96,21 @@ describe('ProductStorageLocationService', () => {
       expect(pslRepo.save).not.toHaveBeenCalled();
     });
 
-    it('should throw when mapping exists but location differs (same storage)', async () => {
-      pslRepo.findOne.mockResolvedValue({
+    it('should allow stock posting to another location without changing the preferred shelf', async () => {
+      const preferredMapping = {
         productId: 'prod-1',
         storageId: 'storage-1',
         locationId: 'loc-other',
-      });
+      };
+      pslRepo.findOne.mockResolvedValue(preferredMapping);
 
       await expect(
         service.validateAndAssign('item-1', 'storage-1', 'loc-1', actor),
-      ).rejects.toThrow(BadRequestException);
+      ).resolves.not.toThrow();
+
+      expect(preferredMapping.locationId).toBe('loc-other');
+      expect(pslRepo.create).not.toHaveBeenCalled();
+      expect(pslRepo.save).not.toHaveBeenCalled();
     });
   });
 

@@ -13,6 +13,7 @@ import { WebSocketEmitterService } from '../../websocket/websocket-emitter.servi
 import { ExcelParserService } from './excel-parser.service';
 import { ExcelImportItemService } from './excel-import-item.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
+import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
 
 /**
  * These tests lock in the append-only behavior of commitItemRow():
@@ -91,6 +92,7 @@ describe('CsvImportService.commitItemRow', () => {
           provide: InventoryImportWorkbookService,
           useValue: { buildItemsWorkbookBuffer: jest.fn() },
         },
+        { provide: ExcelImportStockTakeService, useValue: noopService },
       ],
     }).compile();
 

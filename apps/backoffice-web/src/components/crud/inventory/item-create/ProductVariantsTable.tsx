@@ -11,7 +11,6 @@ export interface ProductVariantRow {
   name: string;
   unit: string;
   sku: string;
-  barcode: string;
   purchasePrice: string;
   sellPrice: string;
   initialStock: string;
@@ -57,7 +56,6 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
             <th className="px-2 py-2 text-left font-semibold">Tên hàng hóa</th>
             <th className="w-24 px-2 py-2 text-left font-semibold">Đơn vị tính</th>
             <th className="w-28 px-2 py-2 text-left font-semibold">Mã SKU</th>
-            <th className="w-32 px-2 py-2 text-left font-semibold">Mã vạch</th>
             <th className="w-28 px-2 py-2 text-right font-semibold">Giá mua</th>
             <th className="w-40 px-2 py-2 text-right font-semibold">Giá bán</th>
             <th className="w-32 px-2 py-2 text-right font-semibold">Tồn kho ban đầu</th>
@@ -98,12 +96,6 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
                   <Input
                     value={row.sku}
                     onChange={(e) => updateRow(row.id, { sku: e.target.value })}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <Input
-                    value={row.barcode}
-                    onChange={(e) => updateRow(row.id, { barcode: e.target.value })}
                   />
                 </td>
                 <td className="px-2 py-1.5">

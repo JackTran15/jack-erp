@@ -314,6 +314,11 @@ export class GoodsIssueService {
             'Vui lòng chọn cửa hàng đích để điều chuyển',
           );
         }
+        if (actor.branchId && dto.targetBranchId === actor.branchId) {
+          throw new BadRequestException(
+            'Cửa hàng đích phải khác cửa hàng hiện tại',
+          );
+        }
         const branch = await this.branchRepo.findOne({
           where: { id: dto.targetBranchId, organizationId: actor.organizationId },
         });

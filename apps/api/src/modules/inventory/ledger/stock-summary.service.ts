@@ -10,6 +10,26 @@ import { FilterBuilder } from "../../../common/filters/filter.builder";
 import { StockBalanceEntity } from "./stock-balance.entity";
 import { StockStateFilter } from "./dto/stock-summary-query.dto";
 
+/**
+ * Loại bút toán của phiếu đã xoá khỏi báo cáo nhập-xuất-tồn (parity MISA):
+ * phiếu nhập bị huỷ (deleted_at / status CANCELLED) và phiếu xuất bị huỷ
+ * (status CANCELLED). Bút toán gốc + bút toán đảo dùng chung reference nên cả
+ * hai cùng bị loại. Dùng alias `sle` cho stock_ledger_entries.
+ */
+const EXCLUDE_VOIDED_DOCS_SQL = `
+        AND NOT EXISTS (
+          SELECT 1 FROM goods_receipts grx
+          WHERE grx.id = sle.reference_id
+            AND sle.reference_type = 'GOODS_RECEIPT'
+            AND (grx.deleted_at IS NOT NULL OR grx.status = 'CANCELLED')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM goods_issues gix
+          WHERE gix.id = sle.reference_id
+            AND sle.reference_type = 'GOODS_ISSUE'
+            AND gix.status = 'CANCELLED'
+        )`;
+
 export interface StockSummaryQuery {
   organizationId: string;
   page?: number;
@@ -230,6 +250,7 @@ export class StockSummaryService {
           ON pair.item_id = sle.item_id
          AND pair.storage_id = loc.storage_id
         WHERE sle.organization_id = $3
+        ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY sle.item_id, loc.storage_id
       `;
       const periodResult = await this.balanceRepo.manager.query<RawPeriodRow[]>(
@@ -392,6 +413,7 @@ export class StockSummaryService {
         AND sle.branch_id = $4
         AND sle.posted_at >= $5
         AND sle.posted_at < $6
+        ${EXCLUDE_VOIDED_DOCS_SQL}
     `;
     const dataSql = `
       SELECT

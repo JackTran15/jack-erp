@@ -197,6 +197,11 @@ class AddStockTakeLineDto {
 }
 
 class UpdateLineCountDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  locationId?: string;
+
   @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   @IsNumber()
@@ -315,6 +320,26 @@ export class StockTakeController {
   @RequireBranchScope()
   previewMerge(@Body() dto: MergeStockTakesDto, @Actor() actor: ActorContext) {
     return this.service.previewMerge(dto.sourceIds, actor);
+  }
+
+  @Get("import-template.xlsx")
+  @RequirePermission("inventory.read")
+  async importTemplate(
+    @Query("countByValue") countByValue: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.service.buildImportTemplateBuffer(
+      countByValue === "true",
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="DanhSachHangHoaKiemKe.xlsx"',
+    );
+    res.send(buffer);
   }
 
   @Get(":id/export.xlsx")

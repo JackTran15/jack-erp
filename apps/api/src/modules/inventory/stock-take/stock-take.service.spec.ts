@@ -56,7 +56,10 @@ describe("StockTakeService", () => {
   };
   let locationRepo: { findOne: jest.Mock };
   let storageRepo: { findOne: jest.Mock };
-  let itemCostSnapshotService: { snapshotCosts: jest.Mock };
+  let itemCostSnapshotService: {
+    snapshotCosts: jest.Mock;
+    snapshotOne: jest.Mock;
+  };
   let receiptRepo: object;
   let issueRepo: object;
   let documentNumbering: { generate: jest.Mock };
@@ -113,6 +116,7 @@ describe("StockTakeService", () => {
           ["item-3", 6],
         ]),
       ),
+      snapshotOne: jest.fn().mockResolvedValue(3),
     };
     receiptRepo = {};
     issueRepo = {};
@@ -267,6 +271,7 @@ describe("StockTakeService", () => {
           itemId: "item-1",
           locationId: "loc-A",
           expectedQty: "7",
+          expectedValue: "21",
           countedQty: null,
           stockTakeId: "st-1",
         }),
@@ -297,6 +302,53 @@ describe("StockTakeService", () => {
       await expect(
         service.addLine("st-1", { itemId: "item-1" }, actor),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe("updateLineCount", () => {
+    it("refreshes expected quantity and value when a DRAFT line changes location", async () => {
+      const line = {
+        id: "line-1",
+        itemId: "item-1",
+        locationId: "loc-A",
+        expectedQty: "7",
+        expectedValue: "21",
+      } as StockTakeLineEntity;
+      stRepo.findOne.mockResolvedValue({
+        id: "st-1",
+        organizationId: actor.organizationId,
+        status: StockTakeStatus.DRAFT,
+        storageId: "storage-1",
+        lines: [line],
+      } as unknown as StockTakeEntity);
+      locationRepo.findOne.mockResolvedValue({
+        id: "loc-B",
+        storageId: "storage-1",
+      });
+      balanceRepo.findOne.mockResolvedValue({ quantity: "4" });
+
+      await service.updateLineCount(
+        "st-1",
+        "line-1",
+        { locationId: "loc-B" },
+        actor,
+      );
+
+      expect(locationRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          id: "loc-B",
+          organizationId: actor.organizationId,
+          isActive: true,
+          storageId: "storage-1",
+        },
+      });
+      expect(lineRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          locationId: "loc-B",
+          expectedQty: "4",
+          expectedValue: "12",
+        }),
+      );
     });
   });
 
@@ -462,11 +514,14 @@ describe("StockTakeService", () => {
   });
 
   describe("previewMerge", () => {
-    const source = (
-      id: string,
-      countedQty: string,
-      conclusion: string,
-    ) =>
+    beforeEach(() => {
+      locationRepo.findOne.mockResolvedValue({
+        id: "loc-1",
+        storageId: "storage-1",
+      });
+    });
+
+    const source = (id: string, countedQty: string, conclusion: string) =>
       ({
         id,
         organizationId: "org-1",
@@ -498,9 +553,9 @@ describe("StockTakeService", () => {
       }) as unknown as StockTakeEntity;
 
     it("requires at least two vouchers", async () => {
-      await expect(service.previewMerge(["st-1"], actor)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.previewMerge(["st-1"], actor),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("aggregates matching lines, conclusions and members", async () => {

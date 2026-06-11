@@ -95,5 +95,22 @@ describe('GoodsIssueService', () => {
       expect(created.deliverer).toBeNull();
       expect(created.occurredAt).toBeNull();
     });
+
+    it('rejects a transfer to the active branch', async () => {
+      await expect(
+        service.create(
+          {
+            locationId: 'loc-A01',
+            purpose: GoodsIssuePurpose.TRANSFER_OUT,
+            targetBranchId: actor.branchId,
+            lines: [{ itemId: 'item-1', quantity: 1 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Cửa hàng đích phải khác cửa hàng hiện tại');
+
+      expect(branchRepo.findOne).not.toHaveBeenCalled();
+      expect(giRepo.save).not.toHaveBeenCalled();
+    });
   });
 });

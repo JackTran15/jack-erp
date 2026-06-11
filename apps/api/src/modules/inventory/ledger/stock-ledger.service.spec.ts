@@ -14,6 +14,7 @@ describe('StockLedgerService', () => {
   let balanceRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let eventPublisher: Record<string, jest.Mock>;
+  let pslService: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -63,7 +64,7 @@ describe('StockLedgerService', () => {
       publishBatch: jest.fn().mockResolvedValue(undefined),
     };
 
-    const pslService = {
+    pslService = {
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -182,6 +183,44 @@ describe('StockLedgerService', () => {
           expect.objectContaining({ key: 'item-1' }),
           expect.objectContaining({ key: 'item-2' }),
         ]),
+      );
+    });
+
+    it('should preserve separate balances when the same item is posted to multiple locations', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      await service.recordBatchMovements([
+        { ...baseParams, locationId: 'loc-A01', quantity: 4 },
+        { ...baseParams, locationId: 'loc-B01', quantity: 6 },
+      ]);
+
+      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
+        1,
+        'item-1',
+        'loc-A01',
+        actor,
+      );
+      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
+        2,
+        'item-1',
+        'loc-B01',
+        actor,
+      );
+      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
+        StockBalanceEntity,
+        expect.objectContaining({
+          itemId: 'item-1',
+          locationId: 'loc-A01',
+          quantity: 4,
+        }),
+      );
+      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
+        StockBalanceEntity,
+        expect.objectContaining({
+          itemId: 'item-1',
+          locationId: 'loc-B01',
+          quantity: 6,
+        }),
       );
     });
 

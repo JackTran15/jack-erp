@@ -742,6 +742,7 @@ export function PurchaseOrdersPage() {
             setEditingOrder(null);
             await loadRecords();
           }}
+          onEdit={() => setDialogMode("edit")}
           onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={
             editingOrder ? () => setConfirmDelete(editingOrder) : undefined
@@ -883,6 +884,7 @@ function DetailPanel({
 interface FormLine {
   itemId: string;
   itemLabel: string;
+  itemName: string;
   unit: string;
   /** Warehouse ("Kho") this line is received into. */
   storageId: string;
@@ -898,6 +900,7 @@ interface FormLine {
 const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
+  itemName: "",
   unit: "",
   storageId: "",
   storageLabel: "",
@@ -923,6 +926,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber,
   onClose,
   onSaved,
+  onEdit,
   onVoid,
   onRequestDelete,
 }: {
@@ -934,6 +938,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber?: string;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
+  onEdit: () => void;
   /** Void/reverse the receipt → "Hoãn" toolbar button. */
   onVoid?: () => void;
   onRequestDelete?: () => void;
@@ -1043,6 +1048,7 @@ function PurchaseOrderFormDialog({
     const initialLines = initial.lines.map((l) => ({
       itemId: l.itemId,
       itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+      itemName: l.item?.name ?? "",
       unit: l.uomCode ?? "",
       storageId: l.location?.storageId ?? "",
       storageLabel:
@@ -1174,6 +1180,7 @@ function PurchaseOrderFormDialog({
       const mapped: FormLine[] = detail.lines.map((l) => ({
         itemId: l.itemId,
         itemLabel: l.item?.code ?? "",
+        itemName: l.item?.name ?? "",
         unit: l.item?.unit ?? "",
         storageId: "",
         storageLabel: "",
@@ -1329,11 +1336,18 @@ function PurchaseOrderFormDialog({
       const { data } = await apiClient.get<
         PaginatedResponse<{ id: string; name: string; address?: string | null }>
       >(`/branches?${params}`);
+      const activeBranchId = getActiveBranchId();
+      const items = activeBranchId
+        ? data.data.filter((branch) => branch.id !== activeBranchId)
+        : data.data;
       const fetched = data.page * data.pageSize;
       return {
-        items: data.data,
+        items,
         hasMore: fetched < data.total,
-        total: data.total,
+        total: Math.max(
+          0,
+          data.total - (items.length < data.data.length ? 1 : 0),
+        ),
       };
     },
     [],
@@ -1518,9 +1532,8 @@ function PurchaseOrderFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView,
-      onClick: () =>
-        toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
+      disabled: !isView || initial?.status !== "DRAFT",
+      onClick: onEdit,
     },
     {
       id: "save",
@@ -1541,9 +1554,7 @@ function PurchaseOrderFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      // "Hoãn" = void/reverse a POSTED receipt (reverses the stock ledger).
-      // Never posts/approves.
-      disabled: !onVoid || initial?.status !== "POSTED",
+      disabled: true,
       onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
@@ -1587,6 +1598,7 @@ function PurchaseOrderFormDialog({
                   ? {
                       ...l,
                       itemLabel: val,
+                      itemName: "",
                       itemId: "",
                       locationId: "",
                       locationLabel: "",
@@ -1622,13 +1634,13 @@ function PurchaseOrderFormDialog({
                   ...l,
                   itemId: item.id,
                   itemLabel: item.code,
+                  itemName: item.name,
                   unit: item.unit,
                   storageId: selectedStorageId,
                   storageLabel: selectedStorageLabel,
                   locationId: "",
                   locationLabel: "",
-                  // Only overwrite if current price is 0 — preserve user's manual edits.
-                  unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  unitPrice: defaultUnitPrice,
                 };
               });
 
@@ -1670,7 +1682,7 @@ function PurchaseOrderFormDialog({
       label: "Tên hàng hóa",
       width: 220,
       type: "readonly",
-      getValue: (row) => row.itemLabel,
+      getValue: (row) => row.itemName,
     },
     {
       key: "warehouse",
@@ -2235,7 +2247,9 @@ function PurchaseOrderFormDialog({
                       ...l,
                       itemId: item.id,
                       itemLabel: item.code,
+                      itemName: item.name,
                       unit: item.unit,
+                      unitPrice: Number(item.purchasePrice ?? 0),
                     }
                   : l,
               ),

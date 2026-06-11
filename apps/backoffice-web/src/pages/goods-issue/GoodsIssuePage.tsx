@@ -72,6 +72,10 @@ import {
   SelectTransferOrderDialog,
   type TransferOrderDetail,
 } from "./SelectTransferOrderDialog";
+import {
+  OverstockConfirmDialog,
+  type OverstockWarningRow,
+} from "./OverstockConfirmDialog";
 import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -733,6 +737,7 @@ export function GoodsIssuePage() {
             setEditingIssue(null);
             await loadRecords();
           }}
+          onEdit={() => setDialogMode("edit")}
           onVoid={editingIssue ? () => setConfirmVoid(editingIssue) : undefined}
           onRequestDelete={editingIssue ? () => setConfirmDelete(editingIssue) : undefined}
         />
@@ -840,6 +845,7 @@ function DetailPanel({
 interface FormLine {
   itemId: string;
   itemLabel: string;
+  itemName: string;
   unit: string;
   storageId: string;
   storageLabel: string;
@@ -853,6 +859,7 @@ interface FormLine {
 const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
+  itemName: "",
   unit: "",
   storageId: "",
   storageLabel: "",
@@ -885,6 +892,7 @@ function GoodsIssueFormDialog({
   actionLoading,
   onClose,
   onSaved,
+  onEdit,
   onVoid,
   onRequestDelete,
 }: {
@@ -896,6 +904,7 @@ function GoodsIssueFormDialog({
   actionLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
+  onEdit: () => void;
   onVoid?: () => void;
   onRequestDelete?: () => void;
 }) {
@@ -1008,6 +1017,7 @@ function GoodsIssueFormDialog({
           // Prefer the eager-loaded item code; fall back to the legacy
           // flat itemCode field or a short id slice as last resort.
           itemLabel: l.item?.code ?? l.itemCode ?? l.itemId.slice(0, 8),
+          itemName: l.item?.name ?? l.itemName ?? "",
           unit: l.item?.unit ?? l.unit ?? "",
           // Each line carries its own warehouse + bin (Misa parity).
           locationId: l.locationId ?? "",
@@ -1024,6 +1034,9 @@ function GoodsIssueFormDialog({
   });
 
   const [saving, setSaving] = useState(false);
+  const [overstockWarnings, setOverstockWarnings] = useState<
+    OverstockWarningRow[] | null
+  >(null);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
@@ -1141,6 +1154,7 @@ function GoodsIssueFormDialog({
         return {
           itemId: l.itemId,
           itemLabel: l.item?.code ?? "",
+          itemName: l.item?.name ?? "",
           unit: l.item?.unit ?? "",
           storageId,
           storageLabel,
@@ -1252,8 +1266,19 @@ function GoodsIssueFormDialog({
       const { data } = await apiClient.get<PaginatedResponse<BranchOption>>(
         `/branches?${params}`,
       );
+      const activeBranchId = getActiveBranchId();
+      const items = activeBranchId
+        ? data.data.filter((branch) => branch.id !== activeBranchId)
+        : data.data;
       const fetched = data.page * data.pageSize;
-      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+      return {
+        items,
+        hasMore: fetched < data.total,
+        total: Math.max(
+          0,
+          data.total - (items.length < data.data.length ? 1 : 0),
+        ),
+      };
     },
     [],
   );
@@ -1288,7 +1313,7 @@ function GoodsIssueFormDialog({
     0,
   );
 
-  const handleSave = useCallback(async (): Promise<boolean> => {
+  const handleSave = useCallback(async (skipOverstockConfirm = false): Promise<boolean> => {
     // Toasts (not modal) — same reason as goods-receipt: AppModal validation
     // dialogs got stacked under the unsaved-changes confirm and disappeared.
     const persistableLines = getPersistableFormLines(lines);
@@ -1338,6 +1363,51 @@ function GoodsIssueFormDialog({
         unitPrice: Number(l.unitPrice) || 0,
         notes: l.notes || undefined,
       }));
+
+      if (!skipOverstockConfirm) {
+        const requestedByStockKey = new Map<
+          string,
+          { line: (typeof resolvedLines)[number]; quantity: number }
+        >();
+        for (const line of resolvedLines) {
+          const key = `${line.itemId}:${line.locationId}`;
+          const current = requestedByStockKey.get(key);
+          requestedByStockKey.set(key, {
+            line,
+            quantity: (current?.quantity ?? 0) + Number(line.quantity),
+          });
+        }
+
+        const warnings = (
+          await Promise.all(
+            [...requestedByStockKey.values()].map(async ({ line, quantity }) => {
+              const params = new URLSearchParams({
+                page: "1",
+                pageSize: "1",
+                itemId: line.itemId,
+                locationId: line.locationId,
+              });
+              const { data } = await apiClient.get<
+                PaginatedResponse<{ quantity: number | string }>
+              >(`/inventory/stock/balances?${params}`);
+              const availableQuantity = Number(data.data[0]?.quantity ?? 0);
+              if (quantity <= availableQuantity) return null;
+              return {
+                itemId: line.itemId,
+                itemName: line.itemName || line.itemLabel,
+                availableQuantity,
+                unit: line.unit,
+                storageName: line.storageLabel,
+              } satisfies OverstockWarningRow;
+            }),
+          )
+        ).filter((row): row is OverstockWarningRow => row !== null);
+
+        if (warnings.length > 0) {
+          setOverstockWarnings(warnings);
+          return false;
+        }
+      }
 
       if (sourceTransferOrderId) {
         // Saving the export leg of a transfer order: this posts the goods issue
@@ -1426,8 +1496,8 @@ function GoodsIssueFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView,
-      onClick: () => toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
+      disabled: !isView || initial?.status !== "DRAFT",
+      onClick: onEdit,
     },
     {
       id: "save",
@@ -1448,8 +1518,7 @@ function GoodsIssueFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      // Hoãn chỉ áp dụng cho phiếu đã thực hiện (POSTED) — đảo bút tồn kho.
-      disabled: !onVoid || initial?.status !== "POSTED",
+      disabled: true,
       onClick: () => onVoid?.(),
     },
     ...(mode === "create"
@@ -1502,6 +1571,7 @@ function GoodsIssueFormDialog({
                   ? {
                       ...l,
                       itemLabel: val,
+                      itemName: "",
                       itemId: "",
                       locationId: "",
                       locationLabel: "",
@@ -1537,13 +1607,13 @@ function GoodsIssueFormDialog({
                   ...l,
                   itemId: item.id,
                   itemLabel: item.code,
+                  itemName: item.name,
                   unit: item.unit,
                   storageId: selectedStorageId,
                   storageLabel: selectedStorageLabel,
                   locationId: "",
                   locationLabel: "",
-                  // Auto-fill only if user hasn't already typed a price.
-                  unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  unitPrice: defaultUnitPrice,
                 };
               });
 
@@ -1575,7 +1645,7 @@ function GoodsIssueFormDialog({
       label: "Tên hàng hóa",
       width: 220,
       type: "readonly",
-      getValue: (row) => row.itemLabel,
+      getValue: (row) => row.itemName,
     },
     {
       key: "warehouse",
@@ -2118,7 +2188,14 @@ function GoodsIssueFormDialog({
             normalizeFormLines(
               prev.map((l, i) =>
                 i === idx
-                  ? { ...l, itemId: item.id, itemLabel: item.code, unit: item.unit }
+                  ? {
+                      ...l,
+                      itemId: item.id,
+                      itemLabel: item.code,
+                      itemName: item.name,
+                      unit: item.unit,
+                      unitPrice: Number(item.purchasePrice ?? 0),
+                    }
                   : l,
               ),
             ),
@@ -2168,6 +2245,18 @@ function GoodsIssueFormDialog({
         onClose={() => setPickerOpen(false)}
         onSelect={prefillFromTransferOrder}
       />
+
+      {overstockWarnings && (
+        <OverstockConfirmDialog
+          rows={overstockWarnings}
+          loading={saving}
+          onCancel={() => setOverstockWarnings(null)}
+          onConfirm={() => {
+            setOverstockWarnings(null);
+            void handleSave(true);
+          }}
+        />
+      )}
     </>
   );
 }

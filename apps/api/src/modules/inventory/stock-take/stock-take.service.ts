@@ -85,6 +85,7 @@ export interface UpdateStockTakeHeaderDto {
 }
 
 export interface UpdateLineCountDto {
+  locationId?: string;
   countedQty?: number | null;
   countedValue?: number | null;
   note?: string;
@@ -120,6 +121,19 @@ export interface StockTakeMergePreview {
   mergeSourceIds: string[];
   lines: StockTakeLineEntity[];
   members: StockTakeMemberPayload[];
+}
+
+interface StockTakeWorkbookSource {
+  documentNumber?: string;
+  plannedDate?: string;
+  countedAt?: Date;
+  purpose?: string;
+  conclusion?: string;
+  countByValue: boolean;
+  storageName?: string;
+  useCurrentDateInHeader?: boolean;
+  lines: StockTakeLineEntity[];
+  members: StockTakeMemberEntity[];
 }
 
 @Injectable()
@@ -342,8 +356,7 @@ export class StockTakeService {
           resolved.expectedQty,
         );
         line.expectedValue = String(
-          resolved.expectedQty *
-            (itemCostByItemId.get(sourceLine.itemId) ?? 0),
+          resolved.expectedQty * (itemCostByItemId.get(sourceLine.itemId) ?? 0),
         );
         line.item = sourceLine.item;
         line.location = sourceLine.location;
@@ -437,6 +450,11 @@ export class StockTakeService {
       resolved.locationId,
       resolved.expectedQty,
     );
+    const itemCost = await this.itemCostSnapshotService.snapshotOne(
+      actor.organizationId,
+      dto.itemId,
+    );
+    line.expectedValue = String(resolved.expectedQty * itemCost);
     line.stockTakeId = st.id;
     const saved = await this.lineRepo.save(line);
     return this.lineRepo.findOne({
@@ -447,9 +465,9 @@ export class StockTakeService {
   /**
    * Resolve (locationId, expectedQty) for a single line. Shared by create()
    * (batched lines) and addLine() (incremental). When the caller specifies a
-   * location we trust it; otherwise we pick the location with the largest
-   * balance for the item, falling back to the first active location of the
-   * storage so the line still has a valid FK (expectedQty = 0).
+   * location we validate it against the stock-take scope; otherwise we pick
+   * the location with the largest balance for the item, falling back to the
+   * first active location of the storage so the line still has a valid FK.
    */
   private async resolveLineLocation(
     organizationId: string,
@@ -459,6 +477,19 @@ export class StockTakeService {
     scopeLocationId: string | undefined,
   ): Promise<{ locationId: string; expectedQty: number }> {
     if (explicitLocationId) {
+      const location = await this.locationRepo.findOne({
+        where: {
+          id: explicitLocationId,
+          organizationId,
+          isActive: true,
+          ...(storageId ? { storageId } : {}),
+        },
+      });
+      if (!location || (scopeLocationId && location.id !== scopeLocationId)) {
+        throw new BadRequestException(
+          "Vị trí được chọn không thuộc phạm vi kiểm kê",
+        );
+      }
       const bal = await this.balanceRepo.findOne({
         where: {
           organizationId,
@@ -526,6 +557,22 @@ export class StockTakeService {
     const line = st.lines.find((l) => l.id === lineId);
     if (!line) throw new NotFoundException(`Dòng ${lineId} không tìm thấy`);
 
+    if (dto.locationId !== undefined && dto.locationId !== line.locationId) {
+      const resolved = await this.resolveLineLocation(
+        actor.organizationId,
+        line.itemId,
+        dto.locationId,
+        st.storageId,
+        st.locationId,
+      );
+      const itemCost = await this.itemCostSnapshotService.snapshotOne(
+        actor.organizationId,
+        line.itemId,
+      );
+      line.locationId = resolved.locationId;
+      line.expectedQty = String(resolved.expectedQty);
+      line.expectedValue = String(resolved.expectedQty * itemCost);
+    }
     if (dto.countedQty !== undefined) {
       line.countedQty = dto.countedQty == null ? null : String(dto.countedQty);
     }
@@ -708,13 +755,333 @@ export class StockTakeService {
           where: { id: st.storageId, organizationId: actor.organizationId },
         })
       : null;
+    return this.buildWorkbookBuffer({
+      documentNumber: st.documentNumber,
+      plannedDate: st.plannedDate,
+      countedAt: st.countedAt,
+      purpose: st.purpose,
+      conclusion: st.conclusion,
+      countByValue: !!st.countByValue,
+      storageName:
+        storage?.name ?? st.lines?.[0]?.location?.storage?.name ?? "",
+      useCurrentDateInHeader: true,
+      lines: st.lines ?? [],
+      members: st.members ?? [],
+    });
+  }
+
+  /**
+   * Sinh file mẫu nhập khẩu kiểm kê theo đúng layout MISA (không gửi file gốc của MISA).
+   * Header 2 tầng, gợi ý nhập (data validation) từng cột y MISA, dữ liệu nhập từ dòng 9.
+   * `countByValue=false` → ẩn nhóm cột "Giá trị" (M:O) giống bản tải mặc định của MISA.
+   */
+  async buildImportTemplateBuffer(countByValue: boolean): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Jack ERP";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet("Danh sách hàng hóa kiểm kê");
+
+    // Toàn sheet dùng Times New Roman như MISA; đặt style mặc định cho cột để
+    // dữ liệu người dùng nhập sau cũng đúng font (đồng thời ô info có style cụ thể,
+    // tránh cảnh báo "number stored as text" của Excel trên ô không định dạng).
+    const FONT = "Times New Roman";
+    const baseStyle = { font: { name: FONT, size: 11 } } as const;
+    const col = (width: number, hidden = false) => ({
+      width,
+      hidden,
+      style: baseStyle,
+    });
+    sheet.columns = [
+      col(16), // A Mã SKU
+      col(16), // B Mã vạch
+      col(28), // C Tên hàng hóa
+      col(12), // D Đơn vị tính
+      col(14), // E Vị trí
+      col(12), // F Số lô
+      col(14), // G Hạn sử dụng
+      col(16), // H Serial/IMEI
+      col(16), // I Nhóm hàng hóa
+      col(12), // J Số lượng - Theo sổ
+      col(12), // K Số lượng - Kiểm kê
+      col(12), // L Số lượng - Chênh lệch
+      col(14, !countByValue), // M Giá trị - Theo sổ
+      col(14, !countByValue), // N Giá trị - Kiểm kê
+      col(14, !countByValue), // O Giá trị - Chênh lệch
+      col(22), // P Nguyên nhân
+    ];
+
+    // Khối thông tin đầu trang (chỉ để hiển thị, parser bỏ qua).
+    const a1 = sheet.getCell("A1");
+    a1.value = "Tên cửa hàng";
+    a1.font = { bold: true, italic: true, name: FONT, size: 11 };
+    const a2 = sheet.getCell("A2");
+    a2.value = "Địa chỉ: ";
+    a2.font = { bold: true, name: FONT, size: 11 };
+    const title = sheet.getCell("A3");
+    title.value = "DANH SÁCH HÀNG HÓA KIỂM KÊ";
+    title.font = { bold: true, size: 14, name: FONT };
+    title.alignment = { horizontal: "center", vertical: "middle" };
+    sheet.mergeCells("A3:P3");
+    const b4 = sheet.getCell("B4");
+    b4.value = "Kho kiểm kê: ";
+    b4.font = { bold: true, name: FONT, size: 11 };
+    const b5 = sheet.getCell("B5");
+    b5.value = "Kiểm kê đến ngày: ";
+    b5.font = { bold: true, name: FONT, size: 11 };
+
+    const HEADER_ROW = 7;
+    const SUB_ROW = 8;
+    const mainHeaders: Record<string, string> = {
+      A: "Mã SKU (*)",
+      B: "Mã vạch (*)",
+      C: "Tên hàng hóa",
+      D: "Đơn vị tính",
+      E: "Vị trí",
+      F: "Số lô",
+      G: "Hạn sử dụng",
+      H: "Serial/IMEI",
+      I: "Nhóm hàng hóa",
+      J: "Số lượng",
+      M: "Giá trị",
+      P: "Nguyên nhân",
+    };
+    // Dấu (*) bắt buộc tô đỏ như MISA; phần còn lại in đậm đen.
+    const headerValue = (
+      label: string,
+    ): string | ExcelJS.CellRichTextValue => {
+      const idx = label.indexOf(" (*)");
+      if (idx < 0) return label;
+      return {
+        richText: [
+          { text: label.slice(0, idx + 1), font: { bold: true, name: FONT } },
+          {
+            text: "(*)",
+            font: { bold: true, name: FONT, color: { argb: "FFFF0000" } },
+          },
+        ],
+      };
+    };
+    for (const [col, label] of Object.entries(mainHeaders)) {
+      sheet.getCell(`${col}${HEADER_ROW}`).value = headerValue(label);
+    }
+
+    const subHeaders: Record<string, string> = {
+      J: "Theo sổ",
+      K: "Kiểm kê (*)",
+      L: "Chênh lệch",
+      M: "Theo sổ",
+      N: "Kiểm kê (*)",
+      O: "Chênh lệch",
+    };
+    for (const [col, label] of Object.entries(subHeaders)) {
+      sheet.getCell(`${col}${SUB_ROW}`).value = headerValue(label);
+    }
+
+    // Gộp dọc cho cột header 1 tầng; gộp ngang cho nhóm Số lượng / Giá trị.
+    for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "P"]) {
+      sheet.mergeCells(`${col}${HEADER_ROW}:${col}${SUB_ROW}`);
+    }
+    sheet.mergeCells(`J${HEADER_ROW}:L${HEADER_ROW}`);
+    sheet.mergeCells(`M${HEADER_ROW}:O${HEADER_ROW}`);
+
+    for (const rowNum of [HEADER_ROW, SUB_ROW]) {
+      const row = sheet.getRow(rowNum);
+      for (let c = 1; c <= 16; c++) {
+        const cell = row.getCell(c);
+        cell.font = { bold: true, name: FONT };
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
+        };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFCE4D6" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+    }
+
+    // Khối hướng dẫn luôn hiển thị (nền vàng).
+    // Đặt ở dòng 6 (trên header) nên parser bỏ qua nhờ khớp header theo startsWith("ma sku").
+    sheet.mergeCells("A6:I6");
+    const noteFont = { size: 9, name: FONT } as const;
+    const guide = sheet.getCell("A6");
+    guide.value = {
+      richText: [
+        { text: "Shop:", font: { bold: true, ...noteFont } },
+        { text: "\n", font: noteFont },
+        { text: "Không bắt buộc ", font: { bold: true, ...noteFont } },
+        { text: "nhập đồng thời cột ", font: noteFont },
+        { text: "Mã vạch", font: { bold: true, ...noteFont } },
+        { text: " và cột ", font: noteFont },
+        { text: "Mã SKU", font: { bold: true, ...noteFont } },
+        {
+          text:
+            ".\n+ Bỏ trống cột Mã SKU nếu nhập cột Mã vạch\n" +
+            "+ Bỏ trống cột Mã vạch nếu nhập cột Mã SKU\n" +
+            "Nếu muốn nhập hàng hóa quản lý theo lô, Serial/IMEI, vui lòng chọn từ cột E đến cột G, nhấn chuột phải, chọn Unhide",
+          font: noteFont,
+        },
+      ],
+    };
+    guide.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+    sheet.getRow(6).height = 90;
+    // Nền vàng + viền cho cả vùng merge (ExcelJS cần set từng ô).
+    for (let c = 1; c <= 9; c++) {
+      const cell = sheet.getRow(6).getCell(c);
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFFFCC" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "thin" },
+        left: { style: "thin" },
+        right: { style: "thin" },
+      };
+    }
+
+    // Tô xám vùng dữ liệu của các cột chương trình không nhập khẩu (chỉ hiển thị),
+    // giống MISA: Tên hàng hóa(C), Nhóm hàng hóa(I), Theo sổ + Chênh lệch của
+    // Số lượng(J,L) và Giá trị(M,O).
+    const DATA_START = 9;
+    const DATA_END = 1001;
+    const GRAY_COLS = [3, 9, 10, 12, 13, 15];
+    for (let r = DATA_START; r <= DATA_END; r++) {
+      for (const c of GRAY_COLS) {
+        sheet.getRow(r).getCell(c).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFD9D9D9" },
+        };
+      }
+    }
+
+    // Gợi ý nhập từng cột (data validation input message) — nguyên văn từ mẫu MISA.
+    const prompts: Array<{ range: string; title?: string; prompt: string }> = [
+      {
+        range: "A7:A1001",
+        title: "Mã SKU",
+        prompt:
+          "Mã SKU phải tồn tại ở danh mục hàng hóa trên chương trình.\nBỏ trống cột này nếu nhập khẩu theo Mã vạch.",
+      },
+      {
+        range: "B7:B1001",
+        title: "Mã vạch",
+        prompt:
+          "Mã vạch của hàng hóa trong danh mục.\nBỏ trống cột này nếu nhập khẩu theo Mã SKU.",
+      },
+      {
+        range: "C7:C1001",
+        title: "Tên hàng hóa",
+        prompt: "Chương trình không nhập khẩu tên hàng hóa.",
+      },
+      {
+        range: "D7:D65536",
+        title: "Đơn vị tính kiểm kê",
+        prompt:
+          "Nhập đơn vị tính kiểm kê.\nNếu để trống, chương trình sẽ lấy đơn vị tính cơ bản.",
+      },
+      {
+        range: "E7:E65536",
+        title: "Vị trí",
+        prompt:
+          "Nhập mã vị trí của hàng hóa. Nếu để trống thì chương trình mặc định là không có vị trí.",
+      },
+      { range: "F7:F65536", prompt: "Nhập số lô hàng hóa" },
+      {
+        range: "G7:G65536",
+        prompt:
+          "Nhập hạn sử dụng của hàng hóa trong lô\nNếu hàng hóa đã ghi nhận trong lô và có hạn sử dụng thì không cần nhập trường này",
+      },
+      {
+        range: "H7:H65536",
+        prompt:
+          'Nhập Serial/IMEI tương ứng với số lượng hàng hóa\nMỗi Serial/IMEI cách nhau bởi dấu phẩy ","\nVD: 353013093418952, 256892453125465',
+      },
+      {
+        range: "I7:I65536",
+        title: "Nhóm hàng hóa",
+        prompt: "Chương trình không nhập khẩu nhóm hàng hóa",
+      },
+      {
+        range: "J8:J65536",
+        title: "Số lượng theo sổ",
+        prompt: "Chương trình không nhập khẩu số lượng theo sổ.",
+      },
+      {
+        range: "K8:K1001",
+        title: "Số lượng kiểm kê",
+        prompt:
+          "Nhập số lượng kiểm kê thực tế của hàng hóa.\nKhông được nhập số âm. Nếu bỏ trống thì phần mềm sẽ nhập số 0",
+      },
+      {
+        range: "L8:L65536",
+        title: "Số lượng chênh lệch",
+        prompt:
+          "Chương trình không nhập khẩu số lượng chênh lệch và sẽ tự động tính toán.",
+      },
+      {
+        range: "M8:M65536",
+        title: "Giá trị theo sổ",
+        prompt: "Chương trình không nhập khẩu giá trị theo sổ.",
+      },
+      {
+        range: "N8:N65536",
+        title: "Giá trị kiểm kê",
+        prompt:
+          "Nhập giá trị kiểm kê thực tế của hàng hóa.\nKhông được nhập số âm. Nếu bỏ trống thì phần mềm sẽ nhập giá trị = 0",
+      },
+      {
+        range: "O8:O65536",
+        title: "Giá trị chênh lệch",
+        prompt:
+          "Chương trình không nhập khẩu giá trị chênh lệch và sẽ tự động tính toán.",
+      },
+      {
+        range: "P7:P65536",
+        prompt:
+          "Điền nguyên nhân chênh lệch số lượng kiểm kê và số theo sổ (nếu có).",
+      },
+    ];
+    // `dataValidations` tồn tại runtime nhưng thiếu trong typings của exceljs.
+    const dataValidations = (
+      sheet as unknown as {
+        dataValidations: { add(range: string, validation: unknown): void };
+      }
+    ).dataValidations;
+    for (const { range, title, prompt } of prompts) {
+      // Bỏ `type` để giữ allowBlank và chỉ hiện gợi ý nhập (giống MISA), không ràng buộc giá trị.
+      dataValidations.add(range, {
+        allowBlank: true,
+        showInputMessage: true,
+        promptTitle: title,
+        prompt,
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  private async buildWorkbookBuffer(
+    source: StockTakeWorkbookSource,
+  ): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Jack ERP";
     workbook.created = new Date();
     const sheet = workbook.addWorksheet("Phiếu kiểm kê kho", {
       views: [{ showGridLines: true }],
     });
-    const valueMode = !!st.countByValue;
+    const valueMode = source.countByValue;
     const lastCol = valueMode ? 13 : 10;
     const lastColLetter = valueMode ? "M" : "J";
 
@@ -747,16 +1114,19 @@ export class StockTakeService {
           { width: 18 },
         ];
 
-    const plannedDate = this.formatDate(st.plannedDate);
-    const countedDate = this.formatDate(st.countedAt);
-    const countedTime = this.formatTime(st.countedAt);
-    const documentNumber = st.documentNumber ?? "";
-    const storageName =
-      storage?.name ?? st.lines?.[0]?.location?.storage?.name ?? "";
+    const plannedDate = this.formatDate(source.plannedDate);
+    const countedDate = this.formatDate(source.countedAt);
+    const countedTime = this.formatTime(source.countedAt);
+    const documentNumber = source.documentNumber ?? "";
+    const storageName = source.storageName ?? "";
 
     sheet.mergeCells(`A1:${lastColLetter}1`);
-    sheet.getCell("A1").value =
-      `Ngày ${this.formatLongVietnameseDate(st.countedAt ?? new Date())}`;
+    const headerDate =
+      source.countedAt ??
+      (source.useCurrentDateInHeader ? new Date() : undefined);
+    sheet.getCell("A1").value = headerDate
+      ? `Ngày ${this.formatLongVietnameseDate(headerDate)}`
+      : "Ngày.......tháng.......năm..........";
     sheet.getCell("A1").alignment = { horizontal: "center" };
     sheet.getCell("A1").font = { bold: true, italic: true };
 
@@ -771,7 +1141,7 @@ export class StockTakeService {
       [
         `Ngày giờ kiểm kê: ${countedTime ? `${countedTime} - ` : ""}${countedDate}`,
       ],
-      [`Mục đích: ${st.purpose ?? ""}`],
+      [`Mục đích: ${source.purpose ?? ""}`],
     ];
     infoRows.forEach((values, index) => {
       const rowNo = 3 + index;
@@ -825,7 +1195,7 @@ export class StockTakeService {
       sheet.getCell(cell).value = value;
     });
 
-    const lines = st.lines ?? [];
+    const lines = source.lines;
     let expectedTotal = 0;
     let countedTotal = 0;
     let expectedValueTotal = 0;
@@ -910,7 +1280,7 @@ export class StockTakeService {
     sheet.mergeCells(memberHeaderRow, 6, memberHeaderRow, 7);
     sheet.mergeCells(memberHeaderRow, 8, memberHeaderRow, 9);
 
-    const members = st.members ?? [];
+    const members = source.members;
     const memberRowCount = Math.max(members.length, 3);
     for (let index = 0; index < memberRowCount; index += 1) {
       const member = members[index];
@@ -923,7 +1293,8 @@ export class StockTakeService {
 
     const conclusionRow = memberHeaderRow + memberRowCount + 2;
     sheet.mergeCells(conclusionRow, 1, conclusionRow, lastCol);
-    sheet.getCell(conclusionRow, 1).value = `Kết luận: ${st.conclusion ?? ""}`;
+    sheet.getCell(conclusionRow, 1).value =
+      `Kết luận: ${source.conclusion ?? ""}`;
     sheet.getCell(conclusionRow, 1).font = { bold: true };
 
     const signDateRow = conclusionRow + 4;
@@ -1083,9 +1454,7 @@ export class StockTakeService {
     }
     const first = sources[0];
     if (sources.some((source) => source.status !== first.status)) {
-      throw new BadRequestException(
-        "Các phiếu gộp phải cùng trạng thái xử lý",
-      );
+      throw new BadRequestException("Các phiếu gộp phải cùng trạng thái xử lý");
     }
     if (
       sources.some(
@@ -1094,9 +1463,7 @@ export class StockTakeService {
           source.branchId !== first.branchId,
       )
     ) {
-      throw new BadRequestException(
-        "Các phiếu gộp phải cùng kho và chi nhánh",
-      );
+      throw new BadRequestException("Các phiếu gộp phải cùng kho và chi nhánh");
     }
     if (sources.some((source) => source.countByValue !== first.countByValue)) {
       throw new BadRequestException(

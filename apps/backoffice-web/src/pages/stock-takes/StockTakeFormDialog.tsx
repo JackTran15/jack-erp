@@ -34,6 +34,7 @@ import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { LookupField } from "../../components/forms/LookupField";
 import type { StockTakeDraft } from "./CreateStockTakeDialog";
+import { StockTakeImportDialog } from "./_components/import/StockTakeImportDialog";
 import type {
   ItemOption,
   LocationOption,
@@ -71,6 +72,7 @@ interface LineRow {
   itemCode: string;
   itemName: string;
   unit: string;
+  purchasePrice: number;
   locationId: string;
   locationCode: string;
   expectedQty: number;
@@ -93,7 +95,7 @@ interface BalanceRow {
   locationId: string;
   quantity: number | string;
   location?: { code: string; name: string };
-  item?: { unit: string };
+  item?: { unit: string; purchasePrice?: string | number | null };
 }
 
 type DetailTab = "items" | "members";
@@ -124,6 +126,7 @@ function emptyRow(): LineRow {
     itemCode: "",
     itemName: "",
     unit: "",
+    purchasePrice: 0,
     locationId: "",
     locationCode: "",
     expectedQty: 0,
@@ -144,6 +147,23 @@ function normalizeText(value: string | number | null | undefined): string {
     .toLowerCase();
 }
 
+function parseLocalizedNumber(value: string): number | null {
+  const normalized = value
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatEditableNumber(value: number | null): string {
+  return value == null
+    ? ""
+    : value.toLocaleString("vi-VN", { maximumFractionDigits: 6 });
+}
+
 function triggerBlobDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -153,28 +173,6 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-}
-
-function parseCsvLine(line: string): string[] {
-  const cells: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"' && quoted && line[i + 1] === '"') {
-      cell += '"';
-      i += 1;
-    } else if (ch === '"') {
-      quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      cells.push(cell.trim());
-      cell = "";
-    } else {
-      cell += ch;
-    }
-  }
-  cells.push(cell.trim());
-  return cells;
 }
 
 function ensureTrailingEmptyRow(rows: LineRow[], locked: boolean): LineRow[] {
@@ -212,42 +210,6 @@ function ensureTrailingEmptyMember(
     : [...withoutExtraEmpty, emptyMemberRow()];
 }
 
-function parseStockTakeCsv(text: string): Array<{
-  itemCode: string;
-  countedQty: number | null;
-  reason: string;
-}> {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length <= 1) return [];
-  const headers = parseCsvLine(lines[0]).map((h) => normalizeText(h));
-  const codeIdx = headers.findIndex(
-    (h) => h.includes("mã sku") || h.includes("ma sku") || h === "sku",
-  );
-  const countedIdx = headers.findIndex(
-    (h) => h.includes("kiểm kê") || h.includes("kiem ke"),
-  );
-  const reasonIdx = headers.findIndex(
-    (h) => h.includes("nguyên nhân") || h.includes("nguyen nhan"),
-  );
-  if (codeIdx < 0 || countedIdx < 0) return [];
-  return lines
-    .slice(1)
-    .map((line) => {
-      const cells = parseCsvLine(line);
-      const rawQty = cells[countedIdx]?.replace(/\./g, "").replace(",", ".");
-      const qty = rawQty === "" || rawQty == null ? null : Number(rawQty);
-      return {
-        itemCode: cells[codeIdx] ?? "",
-        countedQty: Number.isFinite(qty) ? qty : null,
-        reason: reasonIdx >= 0 ? (cells[reasonIdx] ?? "") : "",
-      };
-    })
-    .filter((row) => row.itemCode);
-}
-
 function toLineRow(l: StockTakeLine): LineRow {
   return {
     id: l.id,
@@ -255,6 +217,7 @@ function toLineRow(l: StockTakeLine): LineRow {
     itemCode: l.item?.code ?? l.itemId.slice(0, 8),
     itemName: l.item?.name ?? "",
     unit: l.item?.unit ?? "",
+    purchasePrice: Number(l.item?.purchasePrice ?? 0),
     locationId: l.locationId,
     locationCode: l.location?.code ?? l.locationId.slice(0, 8),
     expectedQty: Number(l.expectedQty || 0),
@@ -334,8 +297,8 @@ export function StockTakeFormDialog({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   // "Tham chiếu": the NK/XK documents auto-generated when this stock-take was
   // processed. The API stores only their ids, so resolve the document numbers.
@@ -396,8 +359,7 @@ export function StockTakeFormDialog({
           const { data } = await apiClient.get<{ documentNumber?: string }>(
             `/inventory/stock-takes/${refMergedIntoId}`,
           );
-          next.mergedInto =
-            data.documentNumber ?? refMergedIntoId.slice(0, 8);
+          next.mergedInto = data.documentNumber ?? refMergedIntoId.slice(0, 8);
         }
       } catch {
         // best-effort — the reference is informational only
@@ -475,6 +437,32 @@ export function StockTakeFormDialog({
     [effectiveStorageId],
   );
 
+  const fetchBalanceAtLocation = useCallback(
+    async (itemId: string, locationId: string): Promise<BalanceRow | null> => {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "1",
+        itemId,
+        locationId,
+      });
+      const { data } = await apiClient.get<PaginatedResponse<BalanceRow>>(
+        `/inventory/stock/balances?${params}`,
+      );
+      return data.data[0] ?? null;
+    },
+    [],
+  );
+
+  const fetchLocationById = useCallback(
+    async (locationId: string): Promise<LocationOption> => {
+      const { data } = await apiClient.get<LocationOption>(
+        `/inventory/locations/${locationId}`,
+      );
+      return data;
+    },
+    [],
+  );
+
   /** Fallback when item has no balance — use first location of the storage. */
   const fetchFirstLocation =
     useCallback(async (): Promise<LocationOption | null> => {
@@ -503,6 +491,9 @@ export function StockTakeFormDialog({
       let locationId = balance?.locationId ?? "";
       let locationCode = balance?.location?.code ?? "";
       let expectedQty = balance ? Number(balance.quantity) : 0;
+      const purchasePrice = Number(
+        balance?.item?.purchasePrice ?? item.purchasePrice ?? 0,
+      );
 
       if (!locationId) {
         const fallback = await fetchFirstLocation();
@@ -514,10 +505,17 @@ export function StockTakeFormDialog({
         locationId = fallback.id;
         locationCode = fallback.code;
         expectedQty = 0;
+      } else if (!locationCode) {
+        locationCode = (await fetchLocationById(locationId)).code;
       }
-      return { locationId, locationCode, expectedQty };
+      return {
+        locationId,
+        locationCode,
+        expectedQty,
+        expectedValue: expectedQty * purchasePrice,
+      };
     },
-    [fetchFirstBalance, fetchFirstLocation],
+    [fetchFirstBalance, fetchFirstLocation, fetchLocationById],
   );
 
   /** Triggered when user picks an item in the row's SKU lookup. */
@@ -556,10 +554,11 @@ export function StockTakeFormDialog({
                     itemCode: item.code,
                     itemName: item.name,
                     unit: item.unit,
+                    purchasePrice: Number(item.purchasePrice ?? 0),
                     locationId: defaults.locationId,
                     locationCode: defaults.locationCode,
                     expectedQty: defaults.expectedQty,
-                    expectedValue: 0,
+                    expectedValue: defaults.expectedValue,
                     countedValue: null,
                   }
                 : r,
@@ -595,6 +594,7 @@ export function StockTakeFormDialog({
                     itemCode: data.item?.code ?? item.code,
                     itemName: data.item?.name ?? item.name,
                     unit: data.item?.unit ?? item.unit,
+                    purchasePrice: Number(item.purchasePrice ?? 0),
                     locationId: data.locationId,
                     locationCode:
                       data.location?.code ?? data.locationId.slice(0, 8),
@@ -646,6 +646,54 @@ export function StockTakeFormDialog({
     [rows, stockTake, markDirty],
   );
 
+  const handlePickLocation = useCallback(
+    async (location: LocationOption, rowIndex: number) => {
+      const row = rows[rowIndex];
+      if (!row?.itemId) return;
+      try {
+        if (stockTake && row.id) {
+          const { data } = await apiClient.patch<StockTakeLine>(
+            `/inventory/stock-takes/${stockTake.id}/lines/${row.id}`,
+            { locationId: location.id },
+          );
+          setRows((prev) =>
+            prev.map((current, index) =>
+              index === rowIndex
+                ? {
+                    ...current,
+                    locationId: data.locationId,
+                    locationCode: data.location?.code ?? location.code,
+                    expectedQty: Number(data.expectedQty || 0),
+                    expectedValue: Number(data.expectedValue || 0),
+                  }
+                : current,
+            ),
+          );
+        } else {
+          const balance = await fetchBalanceAtLocation(row.itemId, location.id);
+          const expectedQty = Number(balance?.quantity ?? 0);
+          setRows((prev) =>
+            prev.map((current, index) =>
+              index === rowIndex
+                ? {
+                    ...current,
+                    locationId: location.id,
+                    locationCode: location.code,
+                    expectedQty,
+                    expectedValue: expectedQty * row.purchasePrice,
+                  }
+                : current,
+            ),
+          );
+        }
+        markDirty();
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+      }
+    },
+    [fetchBalanceAtLocation, markDirty, rows, stockTake],
+  );
+
   const visibleRowEntries = useMemo(() => {
     const active = Object.entries(filters).filter(([, value]) => value.trim());
     const entries = rows.map((row, sourceIndex) => ({ row, sourceIndex }));
@@ -690,141 +738,171 @@ export function StockTakeFormDialog({
     }
   }, [stockTake]);
 
-  const handleImportFile = useCallback(
-    async (file: File) => {
-      if (!effectiveStorageId) {
-        toast.error("Chưa chọn kho kiểm kê — không thể nhập khẩu.");
-        return;
-      }
-      const parsed = parseStockTakeCsv(await file.text());
-      if (parsed.length === 0) {
-        toast.error("File nhập khẩu cần có cột Mã SKU và Kiểm kê.");
-        return;
-      }
-      try {
-        const importedRows: LineRow[] = [];
-        for (const line of parsed) {
-          const found = await searchItems(line.itemCode, 1, 10);
-          const item =
-            found.items.find((it) => it.code === line.itemCode) ??
-            found.items[0];
-          if (!item) continue;
-          const defaults = await resolveItemDefaults(item);
-          importedRows.push({
-            ...emptyRow(),
-            itemId: item.id,
-            itemCode: item.code,
-            itemName: item.name,
-            unit: item.unit,
-            locationId: defaults.locationId,
-            locationCode: defaults.locationCode,
-            expectedQty: defaults.expectedQty,
-            expectedValue: 0,
-            countedValue: null,
-            countedQty: line.countedQty,
-            reason: line.reason,
-          });
-        }
-        if (importedRows.length === 0) {
-          toast.error("Không tìm thấy hàng hóa nào trong file nhập khẩu.");
-          return;
-        }
-        if (stockTake) {
-          const persistedRows: LineRow[] = [];
-          for (const row of importedRows) {
-            const existing = rows.find((r) => r.itemId === row.itemId && r.id);
-            if (existing?.id) {
-              await apiClient.patch(
-                `/inventory/stock-takes/${stockTake.id}/lines/${existing.id}`,
-                {
-                  countedQty: row.countedQty,
-                  countedValue: row.countedValue,
-                  reason: row.reason || undefined,
-                },
-              );
-              persistedRows.push({ ...existing, ...row, id: existing.id });
-              continue;
-            }
-            const { data } = await apiClient.post<{
-              id: string;
-              itemId: string;
-              locationId: string;
-              expectedQty: string | number;
-              expectedValue?: string | number;
-              item?: { code: string; name: string; unit: string };
-              location?: { code: string };
-            }>(`/inventory/stock-takes/${stockTake.id}/lines`, {
-              itemId: row.itemId,
-              locationId: row.locationId,
-            });
-            await apiClient.patch(
-              `/inventory/stock-takes/${stockTake.id}/lines/${data.id}`,
-              {
-                countedQty: row.countedQty,
-                countedValue: row.countedValue,
-                reason: row.reason || undefined,
-              },
-            );
-            persistedRows.push({
-              ...row,
-              id: data.id,
-              expectedQty: Number(data.expectedQty || row.expectedQty),
-              expectedValue: Number(data.expectedValue || row.expectedValue),
-              locationId: data.locationId,
-              locationCode: data.location?.code ?? row.locationCode,
-            });
-          }
-          setRows((prev) => {
-            const keyed = new Map(
-              prev.filter((r) => r.itemId).map((r) => [r.itemId, r]),
-            );
-            persistedRows.forEach((row) => {
-              keyed.set(row.itemId, {
-                ...(keyed.get(row.itemId) ?? row),
-                ...row,
-              });
-            });
-            return ensureTrailingEmptyRow([...keyed.values()], false);
-          });
-          setDirty(false);
-          await onSaved();
-          toast.success(`Đã nhập ${persistedRows.length} dòng kiểm kê.`);
-          return;
-        }
-        setRows((prev) => {
-          const keyed = new Map(
-            prev.filter((r) => r.itemId).map((r) => [r.itemId, r]),
-          );
-          importedRows.forEach((row) => {
-            keyed.set(row.itemId, {
-              ...(keyed.get(row.itemId) ?? row),
-              ...row,
-            });
-          });
-          return ensureTrailingEmptyRow([...keyed.values()], false);
-        });
-        markDirty();
-        toast.success(`Đã nhập ${importedRows.length} dòng kiểm kê.`);
-      } catch (err) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : getUserFacingApiErrorMessage(err),
+  const handleImportCommitted = useCallback(async () => {
+    if (!stockTake) return;
+    try {
+      const { data } = await apiClient.get<StockTake>(
+        `/inventory/stock-takes/${stockTake.id}`,
+      );
+      setStockTake(data);
+      setRows(ensureTrailingEmptyRow(data.lines.map(toLineRow), false));
+      setDirty(false);
+      await onSaved();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    }
+  }, [onSaved, stockTake]);
+
+  const handleApplyDraftImport = useCallback(
+    async (
+      importedRows: Array<{
+        rawData: Record<string, unknown>;
+      }>,
+    ) => {
+      const resolvedRows: LineRow[] = [];
+      for (const imported of importedRows) {
+        const sku = String(imported.rawData["Mã SKU"] ?? "").trim();
+        const locationCode = String(imported.rawData["Vị trí"] ?? "").trim();
+        const itemResult = await searchItems(sku, 1, 100);
+        const item = itemResult.items.find(
+          (candidate) =>
+            candidate.code.trim().toLocaleLowerCase("vi") ===
+            sku.toLocaleLowerCase("vi"),
         );
+        if (!item) continue;
+
+        let location: LocationOption | null = null;
+        let expectedQty = 0;
+        let expectedValue = 0;
+        if (locationCode) {
+          const locationResult = await searchLocationsForStorage(
+            locationCode,
+            1,
+            100,
+          );
+          location =
+            locationResult.items.find(
+              (candidate) =>
+                candidate.code.trim().toLocaleLowerCase("vi") ===
+                locationCode.toLocaleLowerCase("vi"),
+            ) ?? null;
+          if (!location) continue;
+          const balance = await fetchBalanceAtLocation(item.id, location.id);
+          expectedQty = Number(balance?.quantity ?? 0);
+          expectedValue =
+            expectedQty * Number(item.purchasePrice ?? 0);
+        } else {
+          const defaults = await resolveItemDefaults(item);
+          location = {
+            id: defaults.locationId,
+            code: defaults.locationCode,
+            name: defaults.locationCode,
+            storageId: effectiveStorageId,
+          };
+          expectedQty = defaults.expectedQty;
+          expectedValue = defaults.expectedValue;
+        }
+
+        resolvedRows.push({
+          ...emptyRow(),
+          itemId: item.id,
+          itemCode: item.code,
+          itemName: item.name,
+          unit: item.unit,
+          purchasePrice: Number(item.purchasePrice ?? 0),
+          locationId: location.id,
+          locationCode: location.code,
+          expectedQty,
+          expectedValue,
+          countedQty: parseLocalizedNumber(
+            String(imported.rawData["Số lượng kiểm kê"] ?? ""),
+          ),
+          countedValue: countByValue
+            ? parseLocalizedNumber(
+                String(imported.rawData["Giá trị kiểm kê"] ?? ""),
+              )
+            : null,
+          reason: String(imported.rawData["Nguyên nhân"] ?? "").trim(),
+        });
       }
+
+      setRows((previous) => {
+        const merged = previous.filter((row) => row.itemId);
+        for (const imported of resolvedRows) {
+          const index = merged.findIndex(
+            (row) =>
+              row.itemId === imported.itemId &&
+              row.locationId === imported.locationId,
+          );
+          if (index >= 0) merged[index] = { ...merged[index], ...imported };
+          else merged.push(imported);
+        }
+        return ensureTrailingEmptyRow(merged, false);
+      });
+      markDirty();
     },
     [
+      countByValue,
       effectiveStorageId,
+      fetchBalanceAtLocation,
       markDirty,
-      onSaved,
       resolveItemDefaults,
-      rows,
       searchItems,
-      stockTake,
+      searchLocationsForStorage,
     ],
   );
 
   // ─── Save ────────────────────────────────────────────────────────────────
+
+  const createStockTake = useCallback(async (): Promise<StockTake | null> => {
+    if (!initialDraft) {
+      toast.error("Thiếu thông tin kho — không thể lưu.");
+      return null;
+    }
+    const validRows = rows.filter((r) => r.itemId);
+    const payload = {
+      storageId: initialDraft.storageId,
+      plannedDate: initialDraft.plannedDate,
+      purpose: purpose || undefined,
+      countByValue,
+      conclusion: conclusion || undefined,
+      countedAt: combineDateTime(countDate, countTime),
+      mergeSourceIds: initialDraft.mergeSourceIds,
+      lines: validRows.map((r) => ({
+        itemId: r.itemId,
+        locationId: r.locationId || undefined,
+        countedQty: r.countedQty,
+        countedValue: r.countedValue,
+        reason: r.reason || undefined,
+      })),
+      members: members
+        .filter((m) => m.fullName || m.title || m.representative)
+        .map((m) => ({
+          fullName: m.fullName,
+          title: m.title || undefined,
+          representative: m.representative || undefined,
+        })),
+    };
+    const { data } = await apiClient.post<StockTake>(
+      "/inventory/stock-takes",
+      payload,
+    );
+    setStockTake(data);
+    setRows(ensureTrailingEmptyRow(data.lines.map(toLineRow), false));
+    setDirty(false);
+    await onSaved();
+    return data;
+  }, [
+    conclusion,
+    countByValue,
+    countDate,
+    countTime,
+    initialDraft,
+    members,
+    onSaved,
+    purpose,
+    rows,
+  ]);
 
   /**
    * "Lưu" — saves the form.
@@ -837,47 +915,11 @@ export function StockTakeFormDialog({
     setSaving(true);
     try {
       if (!stockTake) {
-        // New mode — must have a draft.
-        if (!initialDraft) {
-          toast.error("Thiếu thông tin kho — không thể lưu.");
-          return false;
-        }
-        const validRows = rows.filter((r) => r.itemId);
-        const payload = {
-          storageId: initialDraft.storageId,
-          plannedDate: initialDraft.plannedDate,
-          purpose: purpose || undefined,
-          countByValue,
-          conclusion: conclusion || undefined,
-          countedAt: combineDateTime(countDate, countTime),
-          mergeSourceIds: initialDraft.mergeSourceIds,
-          lines: validRows.map((r) => ({
-            itemId: r.itemId,
-            locationId: r.locationId || undefined,
-            countedQty: r.countedQty,
-            countedValue: r.countedValue,
-            reason: r.reason || undefined,
-          })),
-          members: members
-            .filter((m) => m.fullName || m.title || m.representative)
-            .map((m) => ({
-              fullName: m.fullName,
-              title: m.title || undefined,
-              representative: m.representative || undefined,
-            })),
-        };
-        const { data } = await apiClient.post<StockTake>(
-          "/inventory/stock-takes",
-          payload,
-        );
-        // Reflect the saved entity locally before any callbacks read state.
-        setStockTake(data);
-        setRows(data.lines.map(toLineRow));
-        setDirty(false);
-        toast.success(`Đã tạo phiếu ${data.documentNumber ?? ""}.`);
+        const created = await createStockTake();
+        if (!created) return false;
+        toast.success(`Đã tạo phiếu ${created.documentNumber ?? ""}.`);
         // New phiếu is persisted — close back to the list so the user can
         // process it from the toolbar / inline "Xử lý". onClose reloads.
-        await onSaved();
         onClose();
         return true;
       }
@@ -903,6 +945,7 @@ export function StockTakeFormDialog({
         await apiClient.patch(
           `/inventory/stock-takes/${stockTake.id}/lines/${r.id}`,
           {
+            locationId: r.locationId,
             countedQty: r.countedQty,
             countedValue: r.countedValue,
             reason: r.reason || undefined,
@@ -922,7 +965,6 @@ export function StockTakeFormDialog({
   }, [
     isLocked,
     stockTake,
-    initialDraft,
     rows,
     purpose,
     countByValue,
@@ -930,8 +972,8 @@ export function StockTakeFormDialog({
     members,
     countDate,
     countTime,
-    onSaved,
     onClose,
+    createStockTake,
   ]);
 
   // ─── Close handling ──────────────────────────────────────────────────────
@@ -1069,8 +1111,28 @@ export function StockTakeFormDialog({
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemCode}
-          onValueChange={() => {
-            /* selection only */
+          onValueChange={(value) => {
+            const sourceIndex = sourceIndexForVisible(idx);
+            // Gõ lại mã = tìm hàng khác → xoá định danh cũ để chọn lại;
+            // giữ số liệu kiểm kê người dùng đã nhập (gắn theo hàng khi chọn).
+            setRows((prev) =>
+              prev.map((current, index) =>
+                index === sourceIndex
+                  ? {
+                      ...current,
+                      itemCode: value,
+                      itemId: "",
+                      itemName: "",
+                      unit: "",
+                      purchasePrice: 0,
+                      locationId: "",
+                      locationCode: "",
+                      expectedQty: 0,
+                      expectedValue: 0,
+                    }
+                  : current,
+              ),
+            );
           }}
           onSelect={(item) =>
             void handlePickItem(item, sourceIndexForVisible(idx))
@@ -1094,7 +1156,7 @@ export function StockTakeFormDialog({
               render: (it) => it.unit,
             },
           ]}
-          disabled={isLocked || !!row.itemId}
+          disabled={isLocked}
           className="h-full"
         />
       ),
@@ -1121,26 +1183,19 @@ export function StockTakeFormDialog({
           placeholder="Vị trí"
           value={row.locationCode}
           onValueChange={(val) => {
+            const sourceIndex = sourceIndexForVisible(idx);
             setRows((prev) =>
               prev.map((r, i) =>
-                i === idx
+                i === sourceIndex
                   ? { ...r, locationCode: val, locationId: "" }
                   : r,
               ),
             );
             markDirty();
           }}
-          onSelect={(loc) => {
-            const sourceIndex = sourceIndexForVisible(idx);
-            setRows((prev) =>
-              prev.map((r, i) =>
-                i === sourceIndex
-                  ? { ...r, locationId: loc.id, locationCode: loc.code }
-                  : r,
-              ),
-            );
-            markDirty();
-          }}
+          onSelect={(loc) =>
+            void handlePickLocation(loc, sourceIndexForVisible(idx))
+          }
           search={searchLocationsForStorage}
           itemKey={(loc) => loc.id}
           renderItem={(loc) => loc.name}
@@ -1185,12 +1240,12 @@ export function StockTakeFormDialog({
       footer: totalCounted.toLocaleString("vi-VN"),
       renderEditor: (row, idx) => (
         <Input
-          type="number"
-          min={0}
+          type="text"
+          inputMode="decimal"
           className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none focus-visible:ring-0"
-          value={row.countedQty == null ? "" : String(row.countedQty)}
+          value={formatEditableNumber(row.countedQty)}
           onChange={(e) => {
-            const next = e.target.value === "" ? null : Number(e.target.value);
+            const next = parseLocalizedNumber(e.target.value);
             const sourceIndex = sourceIndexForVisible(idx);
             setRows((prev) =>
               prev.map((r, i) =>
@@ -1276,13 +1331,12 @@ export function StockTakeFormDialog({
         footer: totalCountedValue.toLocaleString("vi-VN"),
         renderEditor: (row, idx) => (
           <Input
-            type="number"
-            min={0}
+            type="text"
+            inputMode="decimal"
             className="h-full w-full rounded-none border-0 bg-transparent px-1 text-right shadow-none focus-visible:ring-0"
-            value={row.countedValue == null ? "" : String(row.countedValue)}
+            value={formatEditableNumber(row.countedValue)}
             onChange={(e) => {
-              const next =
-                e.target.value === "" ? null : Number(e.target.value);
+              const next = parseLocalizedNumber(e.target.value);
               const sourceIndex = sourceIndexForVisible(idx);
               setRows((prev) =>
                 prev.map((r, i) =>
@@ -1324,20 +1378,19 @@ export function StockTakeFormDialog({
       : `Sửa phiếu kiểm kê ${stockTake?.documentNumber ?? ""}`;
 
   // MISA shows the processing outcome next to the "CHỨNG TỪ" block.
-  const processStatusBadge =
-    stockTake?.mergedIntoId ? (
-      <span className="text-lg font-bold uppercase text-primary">ĐÃ GỘP</span>
-    ) : stockTake?.status === "POSTED" ? (
-      <span className="inline-flex items-center gap-2 text-lg font-bold uppercase text-green-600">
-        <CheckCircle2 className="h-6 w-6 fill-green-500 text-white" /> ĐÃ XỬ LÝ
-      </span>
-    ) : stockTake?.status === "CANCELLED" ? (
-      <span className="text-sm font-semibold text-destructive">Đã huỷ</span>
-    ) : (
-      <span className="text-sm font-semibold text-muted-foreground">
-        Chưa xử lý
-      </span>
-    );
+  const processStatusBadge = stockTake?.mergedIntoId ? (
+    <span className="text-lg font-bold uppercase text-primary">ĐÃ GỘP</span>
+  ) : stockTake?.status === "POSTED" ? (
+    <span className="inline-flex items-center gap-2 text-lg font-bold uppercase text-green-600">
+      <CheckCircle2 className="h-6 w-6 fill-green-500 text-white" /> ĐÃ XỬ LÝ
+    </span>
+  ) : stockTake?.status === "CANCELLED" ? (
+    <span className="text-sm font-semibold text-destructive">Đã huỷ</span>
+  ) : (
+    <span className="text-sm font-semibold text-muted-foreground">
+      Chưa xử lý
+    </span>
+  );
 
   const referenceLinks = [
     ...(refDocs.receipt
@@ -1569,7 +1622,7 @@ export function StockTakeFormDialog({
         }
         detail={
           <div className="flex h-full min-h-0 flex-col">
-            <label className="flex h-9 shrink-0 items-center gap-2 px-3 text-sm text-foreground">
+            <label className="flex h-9 w-fit shrink-0 items-center gap-2 px-3 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={countByValue}
@@ -1625,23 +1678,12 @@ export function StockTakeFormDialog({
                     variant="ghost"
                     size="sm"
                     className="h-8 rounded-sm px-2 text-primary-blue"
-                    disabled={isLocked}
-                    onClick={() => importInputRef.current?.click()}
+                    disabled={isLocked || !effectiveStorageId || saving}
+                    onClick={() => setImportOpen(true)}
                   >
                     <Upload className="mr-1 h-4 w-4" />
                     Nhập khẩu
                   </Button>
-                  <input
-                    ref={importInputRef}
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (file) void handleImportFile(file);
-                    }}
-                  />
                 </div>
               ) : null}
             </div>
@@ -1780,6 +1822,18 @@ export function StockTakeFormDialog({
           onOpenChange={(o) => {
             if (!o) setUnsavedOpen(false);
           }}
+        />
+      ) : null}
+
+      {effectiveStorageId ? (
+        <StockTakeImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          stockTakeId={stockTake?.id}
+          storageId={effectiveStorageId}
+          countByValue={countByValue}
+          onCommitted={() => void handleImportCommitted()}
+          onApplyDraft={handleApplyDraftImport}
         />
       ) : null}
     </>

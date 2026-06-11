@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductStorageLocationEntity } from './product-storage-location.entity';
@@ -20,14 +20,17 @@ export class ProductStorageLocationService {
   ) {}
 
   /**
-   * Validates and auto-assigns product → location mapping for a storage.
+   * Ensures a product has a preferred/default location for a storage.
    * Called before any stock posting that involves a location.
    *
    * 1. If item has no productId → skip (legacy item, no constraint)
    * 2. Look up existing mapping for (productId, storageId)
-   * 3. If mapping exists and locationId matches → OK
-   * 4. If mapping exists and locationId differs → throw BadRequestException
-   * 5. If no mapping exists → auto-insert the mapping
+   * 3. If mapping exists → keep it unchanged as the deterministic preferred shelf
+   * 4. If no mapping exists → use the posted location as the initial preferred shelf
+   *
+   * Stock may exist at multiple locations in the same storage. Actual stock is
+   * tracked by the ledger/balance using itemId + locationId; this mapping only
+   * supplies a default location for entry forms.
    */
   async validateAndAssign(
     itemId: string,
@@ -50,13 +53,7 @@ export class ProductStorageLocationService {
       },
     });
 
-    if (existing) {
-      if (existing.locationId === locationId) return;
-
-      throw new BadRequestException(
-        'Sản phẩm này đã được gán vị trí khác trong kho. Vui lòng sử dụng vị trí đã cấu hình.',
-      );
-    }
+    if (existing) return;
 
     const mapping = this.pslRepo.create({
       productId: item.productId,

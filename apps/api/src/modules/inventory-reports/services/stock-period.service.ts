@@ -1,6 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+/**
+ * Loại bỏ bút toán của phiếu đã xoá khỏi báo cáo (parity MISA): phiếu nhập bị
+ * huỷ (deleted_at hoặc status CANCELLED) và phiếu xuất bị huỷ (status CANCELLED)
+ * không còn xuất hiện. Bút toán gốc và bút toán đảo dùng chung reference_type +
+ * reference_id nên cả hai cùng bị loại. Dùng alias `le` cho stock_ledger_entries.
+ */
+const EXCLUDE_VOIDED_DOCS_SQL = `
+          AND NOT EXISTS (
+            SELECT 1 FROM goods_receipts grx
+            WHERE grx.id = le.reference_id
+              AND le.reference_type = 'GOODS_RECEIPT'
+              AND (grx.deleted_at IS NOT NULL OR grx.status = 'CANCELLED')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM goods_issues gix
+            WHERE gix.id = le.reference_id
+              AND le.reference_type = 'GOODS_ISSUE'
+              AND gix.status = 'CANCELLED'
+          )`;
+
 export type StockPeriodGroupBy = 'item_location' | 'item_branch';
 
 /** How the result rows are aggregated along the item dimension. */
@@ -362,6 +382,7 @@ export class StockPeriodService {
           AND le.posted_at < $2
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       in_period AS (
@@ -380,6 +401,7 @@ export class StockPeriodService {
           AND le.posted_at <  $3
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       out_period AS (
@@ -397,6 +419,7 @@ export class StockPeriodService {
           AND le.posted_at <  $3
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       combined AS (

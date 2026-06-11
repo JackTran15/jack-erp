@@ -35,6 +35,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ImportJobStatus, ImportRowStatus } from "@erp/shared-interfaces";
+import { ApiQuery } from "@nestjs/swagger";
 import { CsvImportService } from "./csv-import.service";
 import { ImportJobType } from "./inventory-import-job.entity";
 
@@ -137,6 +138,44 @@ export class CsvImportController {
   @Post("adjustments/commit")
   @RequirePermission("inventory.write")
   commitAdjustments(
+    @Query("jobId", ParseUUIDPipe) jobId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.commit(jobId, actor);
+  }
+
+  // ─── Stock Takes ──────────────────────────────────────────────────
+
+  @Post("stock-takes/validate")
+  @RequirePermission("inventory.adjustment.create")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiQuery({ name: "stockTakeId", required: false, type: String })
+  @ApiQuery({ name: "storageId", required: false, type: String })
+  @ApiQuery({ name: "countByValue", required: false, type: Boolean })
+  validateStockTake(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("stockTakeId", new ParseUUIDPipe({ optional: true }))
+    stockTakeId: string | undefined,
+    @Query("storageId", new ParseUUIDPipe({ optional: true }))
+    storageId: string | undefined,
+    @Query("countByValue") countByValue: string | undefined,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.STOCK_TAKE,
+      file,
+      actor,
+      undefined,
+      stockTakeId,
+      storageId
+        ? { storageId, countByValue: countByValue === "true" }
+        : undefined,
+    );
+  }
+
+  @Post("stock-takes/commit")
+  @RequirePermission("inventory.adjustment.create")
+  commitStockTake(
     @Query("jobId", ParseUUIDPipe) jobId: string,
     @Actor() actor: ActorContext,
   ) {

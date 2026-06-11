@@ -698,7 +698,7 @@ export function StockTakesPage() {
           onOpenChange={(open) => {
             if (!open) setProcessResult(null);
           }}
-          title="MISA eShop"
+          title="Thông báo"
           defaultWidth={420}
           defaultHeight={210}
           minWidth={360}

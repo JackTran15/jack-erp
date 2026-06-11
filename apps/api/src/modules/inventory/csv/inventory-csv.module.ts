@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryLocationModule } from '../location/inventory-location.module';
 import { ProductModule } from '../product/product.module';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
+import { StockTakeModule } from '../stock-take/stock-take.module';
 import { WebSocketModule } from '../../websocket/websocket.module';
 import { InventoryImportJobEntity } from './inventory-import-job.entity';
 import { InventoryImportJobRowEntity } from './inventory-import-job-row.entity';
@@ -10,6 +11,7 @@ import { CsvImportService } from './csv-import.service';
 import { CsvExportService } from './csv-export.service';
 import { ExcelParserService } from './excel-parser.service';
 import { ExcelImportItemService } from './excel-import-item.service';
+import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 import { CsvImportController } from './csv-import.controller';
 import { CsvExportController } from './csv-export.controller';
@@ -23,6 +25,7 @@ import { ProductAttributeOptionEntity } from '../product/product-attribute-optio
 import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
+import { LocationEntity } from '../location/location.entity';
 
 @Module({
   imports: [
@@ -39,10 +42,12 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
       ItemAttributeValueEntity,
       StockBalanceEntity,
       StockLedgerEntryEntity,
+      LocationEntity,
     ]),
     InventoryLocationModule,
     ProductModule,
     StockLedgerModule,
+    StockTakeModule,
     WebSocketModule,
   ],
   controllers: [CsvImportController, CsvExportController],
@@ -51,6 +56,7 @@ import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
     CsvExportService,
     ExcelParserService,
     ExcelImportItemService,
+    ExcelImportStockTakeService,
     InventoryImportWorkbookService,
   ],
   exports: [CsvImportService, CsvExportService],

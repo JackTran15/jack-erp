@@ -74,7 +74,7 @@ export class GoodsReceiptService {
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
 
   async create(dto: CreateGoodsReceiptDto, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    this.validateBusinessRules(dto);
+    this.validateBusinessRules(dto, actor.branchId);
     const documentNumber = await this.documentNumberingService.generate(
       DocumentType.GOODS_RECEIPT,
       actor.branchId,
@@ -177,14 +177,17 @@ export class GoodsReceiptService {
     if (dto.attachmentIds !== undefined) receipt.attachmentIds = dto.attachmentIds;
 
     // Re-validate combined state
-    this.validateBusinessRules({
-      ...receipt,
-      purpose: receipt.purpose,
-      providerId: receipt.providerId,
-      referenceId: receipt.referenceId,
-      referenceType: receipt.referenceType,
-      lines: dto.lines ?? (receipt.lines as unknown as GoodsReceiptLineDto[]),
-    } as unknown as CreateGoodsReceiptDto);
+    this.validateBusinessRules(
+      {
+        ...receipt,
+        purpose: receipt.purpose,
+        providerId: receipt.providerId,
+        referenceId: receipt.referenceId,
+        referenceType: receipt.referenceType,
+        lines: dto.lines ?? (receipt.lines as unknown as GoodsReceiptLineDto[]),
+      } as unknown as CreateGoodsReceiptDto,
+      actor.branchId,
+    );
 
     if (dto.lines) {
       await this.lineRepo.delete({ goodsReceiptId: receipt.id });
@@ -533,11 +536,19 @@ export class GoodsReceiptService {
     return receipt;
   }
 
-  private validateBusinessRules(dto: CreateGoodsReceiptDto): void {
+  private validateBusinessRules(
+    dto: CreateGoodsReceiptDto,
+    currentBranchId?: string,
+  ): void {
     if (dto.purpose === GoodsReceiptPurpose.OTHER && !dto.providerId) {
       throw new BadRequestException('Cần chọn đối tượng (NCC) khi mục đích là "Khác"');
     }
     if (dto.purpose === GoodsReceiptPurpose.TRANSFER_IN) {
+      if (currentBranchId && dto.sourceBranchId === currentBranchId) {
+        throw new BadRequestException(
+          'Cửa hàng nguồn phải khác cửa hàng hiện tại',
+        );
+      }
       // referenceId / referenceType strictly required per design doc when a transfer doc exists;
       // we relax this to "warn-but-allow" while stock-transfer module isn't wired to UI.
       if (!dto.sourceBranchId && !dto.referenceId) {

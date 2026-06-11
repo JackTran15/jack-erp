@@ -13,6 +13,7 @@ import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { ExcelParserService } from './excel-parser.service';
 import { ExcelImportItemService } from './excel-import-item.service';
+import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 
 describe('CsvImportService.cancelJob', () => {
@@ -48,6 +49,7 @@ describe('CsvImportService.cancelJob', () => {
         { provide: WebSocketEmitterService, useValue: {} },
         { provide: ExcelParserService, useValue: {} },
         { provide: ExcelImportItemService, useValue: {} },
+        { provide: ExcelImportStockTakeService, useValue: {} },
         {
           provide: InventoryImportWorkbookService,
           useValue: { buildItemsWorkbookBuffer: jest.fn() },
