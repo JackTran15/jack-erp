@@ -153,6 +153,11 @@ const HEADER_ROW_HEIGHT = 32;
 /** Box-shadow used to draw a clean right edge on the rightmost frozen column. */
 const FROZEN_EDGE_SHADOW = "1px 0 0 0 hsl(var(--border))";
 
+const frozenBodyBackground = (striped: boolean): string =>
+  striped
+    ? "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))"
+    : "hsl(var(--background))";
+
 export function BaseDataTable<T>({
   columns,
   rows,
@@ -614,10 +619,17 @@ export function BaseDataTable<T>({
                         className={cn(
                           "h-8 max-w-0 truncate px-2 py-0 align-middle",
                           column.className,
-                          column.frozen &&
-                            (index % 2 === 0 ? FROZEN_BG : "bg-muted/20"),
+                          column.frozen && FROZEN_BG,
                         )}
-                        style={fStyle ? { ...fStyle, zIndex: 5 } : undefined}
+                        style={
+                          fStyle
+                            ? {
+                                ...fStyle,
+                                zIndex: 5,
+                                backgroundColor: frozenBodyBackground(index % 2 !== 0),
+                              }
+                            : undefined
+                        }
                       >
                         {column.render(row)}
                       </td>

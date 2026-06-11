@@ -46,10 +46,20 @@ export function PaginationControls({
   const canPrev = !disabled && page > 1;
   const canNext = !disabled && (page < totalPages || (totalEstimated && hasMore));
   const canLast = !disabled && !totalEstimated && page < totalPages;
+  const resultLabel =
+    total === 0
+      ? "Không có kết quả"
+      : totalEstimated
+        ? pageEnd === 0
+          ? "Không có kết quả"
+          : `Hiển thị ${pageStart} - ${pageEnd}${hasMore ? "+" : ""}`
+        : `Hiển thị ${pageStart} - ${pageEnd} trên ${total.toLocaleString("vi-VN")} kết quả`;
 
   return (
-    <div className={`flex flex-col gap-1.5 border-t border-border bg-background px-3 py-2.5 ${className ?? ""}`}>
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div
+      className={`flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border bg-background px-2 py-1.5 ${className ?? ""}`}
+    >
+      <div className="flex flex-wrap items-center gap-1">
         <div className="flex items-center gap-0.5">
           <Button
             type="button"
@@ -133,7 +143,7 @@ export function PaginationControls({
           </Button>
         ) : null}
         {onPageSizeChange ? (
-          <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <label className="ml-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className="sr-only">Số dòng mỗi trang</span>
             <select
               className="h-8 rounded-sm border border-input bg-background px-2 text-sm font-medium tabular-nums"
@@ -150,14 +160,8 @@ export function PaginationControls({
           </label>
         ) : null}
       </div>
-      <p className="text-right text-sm text-muted-foreground">
-        {total === 0
-          ? "Không có kết quả"
-          : totalEstimated
-            ? pageEnd === 0
-              ? "Không có kết quả"
-              : `Hiển thị ${pageStart} - ${pageEnd}${hasMore ? "+" : ""}`
-            : `Hiển thị ${pageStart} - ${pageEnd} trên ${total.toLocaleString("vi-VN")} kết quả`}
+      <p className="ml-auto whitespace-nowrap text-right text-sm text-muted-foreground">
+        {resultLabel}
       </p>
     </div>
   );
