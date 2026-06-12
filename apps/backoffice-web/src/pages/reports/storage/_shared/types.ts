@@ -3,12 +3,15 @@ import type { PeriodValue } from "@erp/ui";
 export interface FilterFieldOption {
   value: string;
   label: string;
+  branchId?: string;
 }
 
 interface BaseField {
   key: string;
   label: string;
   required?: boolean;
+  /** Return false to hide this field (and reset its value) when the popover submits. */
+  visibleWhen?: (draft: FilterValues) => boolean;
 }
 
 export type FilterField =
@@ -16,6 +19,8 @@ export type FilterField =
       type: "select";
       options: FilterFieldOption[];
       placeholder?: string;
+      /** Key of a radio-scope field; filters options to branches selected in that field. */
+      dependsOn?: string;
     })
   | (BaseField & {
       type: "multi-select";

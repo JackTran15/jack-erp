@@ -28,6 +28,9 @@ export interface StockBalancePivotRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   totalQty: number;
   totalValue: number;
   perBranch: Record<string, StockBalancePivotBranchCell>;
@@ -135,6 +138,17 @@ export class StockBalancePivotService {
         i.unit           AS unit,
         ic.id            AS category_id,
         ic.name          AS category_name,
+        i.brand          AS brand,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1) AS color,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1) AS size,
         b.id             AS branch_id,
         b.name           AS branch_name,
         SUM(sb.quantity)::numeric                                AS qty,
@@ -241,6 +255,9 @@ export class StockBalancePivotService {
           NULL::text                                             AS unit,
           NULL::uuid                                             AS category_id,
           NULL::text                                             AS category_name,
+          NULL::text                                             AS brand,
+          NULL::text                                             AS color,
+          NULL::text                                             AS size,
           b.id                                                   AS branch_id,
           b.name                                                 AS branch_name,
           SUM(sb.quantity)::numeric                               AS qty,
@@ -265,6 +282,9 @@ export class StockBalancePivotService {
           NULL::text                                             AS unit,
           i.category_id::text                                    AS category_id,
           COALESCE(ic.name, 'Không phân nhóm')                   AS category_name,
+          NULL::text                                             AS brand,
+          NULL::text                                             AS color,
+          NULL::text                                             AS size,
           b.id                                                   AS branch_id,
           b.name                                                 AS branch_name,
           SUM(sb.quantity)::numeric                               AS qty,
@@ -311,6 +331,9 @@ export class StockBalancePivotService {
           unit: cell.unit ?? '',
           categoryId: cell.category_id ?? null,
           categoryName: cell.category_name ?? null,
+          brand: cell.brand ?? null,
+          color: cell.color ?? null,
+          size: cell.size ?? null,
           totalQty: 0,
           totalValue: 0,
           perBranch: {},
@@ -361,6 +384,9 @@ interface RawPivotCell {
   unit: string | null;
   category_id: string | null;
   category_name: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   branch_id: string | null;
   branch_name: string | null;
   qty: string | number | null;

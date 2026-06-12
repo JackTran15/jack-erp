@@ -68,6 +68,9 @@ export interface TransferByBranchRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   destinationBranchId: string;
   destinationBranchName: string;
   outQty: number;
@@ -276,6 +279,17 @@ export class TransferReportService {
           i.unit  AS unit,
           ic.id   AS category_id,
           ic.name AS category_name,
+          i.brand AS brand,
+          (SELECT pao.value_label FROM item_attribute_values iav
+           JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+           JOIN product_attribute_options pao ON pao.id = iav.option_id
+           WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+           LIMIT 1) AS color,
+          (SELECT pao.value_label FROM item_attribute_values iav
+           JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+           JOIN product_attribute_options pao ON pao.id = iav.option_id
+           WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+           LIMIT 1) AS size,
           b.id    AS dest_branch_id,
           b.name  AS dest_branch_name,
           c.out_qty, c.out_value, c.in_qty, c.in_value
@@ -327,7 +341,8 @@ export class TransferReportService {
           COALESCE(p.code, ia.fallback_sku)     AS sku,
           COALESCE(p.name, ia.fallback_name)    AS item_name,
           NULL::text AS parent_sku, NULL::text AS parent_name,
-          NULL::text AS unit, NULL::uuid AS category_id, NULL::text AS category_name`
+          NULL::text AS unit, NULL::uuid AS category_id, NULL::text AS category_name,
+          NULL::text AS brand, NULL::text AS color, NULL::text AS size`
         : `
           ia.agg_key                                    AS item_id,
           COALESCE(ic.name, 'Không phân nhóm')          AS sku,
@@ -335,7 +350,8 @@ export class TransferReportService {
           NULL::text AS parent_sku, NULL::text AS parent_name,
           NULL::text AS unit,
           ia.agg_key                                    AS category_id,
-          COALESCE(ic.name, 'Không phân nhóm')          AS category_name`;
+          COALESCE(ic.name, 'Không phân nhóm')          AS category_name,
+          NULL::text AS brand, NULL::text AS color, NULL::text AS size`;
 
       const joinLookup = itemGroupBy === 'parent'
         ? `LEFT JOIN products p ON p.id::text = ia.agg_key AND p.organization_id = $1`
@@ -397,6 +413,9 @@ export class TransferReportService {
         unit: r.unit ?? '',
         categoryId: r.category_id ?? null,
         categoryName: r.category_name ?? null,
+        brand: r.brand ?? null,
+        color: r.color ?? null,
+        size: r.size ?? null,
         destinationBranchId: r.dest_branch_id,
         destinationBranchName: r.dest_branch_name ?? '',
         outQty,
@@ -430,6 +449,9 @@ interface RawTransferByBranchRow {
   unit: string | null;
   category_id: string | null;
   category_name: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   dest_branch_id: string;
   dest_branch_name: string | null;
   out_qty: string | number | null;
