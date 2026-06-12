@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ConflictException,
 } from "@nestjs/common";
+import * as ExcelJS from "exceljs";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository, In, Not } from "typeorm";
 import { createHash } from "crypto";
@@ -44,6 +45,11 @@ import {
 import { ExcelParserService } from "./excel-parser.service";
 import { ExcelImportItemService } from "./excel-import-item.service";
 import { InventoryImportWorkbookService } from "./import-workbook/inventory-import-workbook.service";
+import {
+  ExcelImportStockTakeService,
+  StockTakeImportRow,
+} from "./excel-import-stock-take.service";
+import { StockTakeEntity } from "../stock-take/stock-take.entity";
 import { parseInventoryItemsFromDelimitedText } from "./inventory-import-delimited.parser";
 import {
   getExcelField,
@@ -92,6 +98,7 @@ export class CsvImportService {
     private readonly excelParser: ExcelParserService,
     private readonly excelImportItemService: ExcelImportItemService,
     private readonly workbookService: InventoryImportWorkbookService,
+    private readonly excelImportStockTakeService: ExcelImportStockTakeService,
   ) {}
 
   async validate(
@@ -99,6 +106,8 @@ export class CsvImportService {
     file: Express.Multer.File | undefined,
     actor: ActorContext,
     duplicateModeInput?: string,
+    referenceId?: string,
+    stockTakeDraftContext?: { storageId: string; countByValue: boolean },
   ): Promise<ImportValidateResult> {
     if (!file?.buffer?.length) {
       throw new BadRequestException(
@@ -107,12 +116,24 @@ export class CsvImportService {
     }
 
     const duplicateMode = parseImportDuplicateMode(duplicateModeInput);
+    const stockTake =
+      type === ImportJobType.STOCK_TAKE
+        ? referenceId
+          ? await this.stockTakeImporter().loadDraftTarget(referenceId, actor)
+          : this.stockTakeImporter().createDraftTarget(stockTakeDraftContext)
+        : undefined;
     const checksum = createHash("sha256").update(file.buffer).digest("hex");
-    const idempotencyKey = `${actor.organizationId}:${type}:${checksum}:${duplicateMode}`;
+    const targetKey =
+      referenceId ??
+      (stockTakeDraftContext
+        ? `${stockTakeDraftContext.storageId}:${stockTakeDraftContext.countByValue}`
+        : "");
+    const idempotencyKey = `${actor.organizationId}:${actor.branchId ?? ""}:${type}:${targetKey}:${checksum}:${duplicateMode}`;
 
     const existing = await this.jobRepo.findOne({
       where: {
         organizationId: actor.organizationId,
+        branchId: actor.branchId,
         type,
         idempotencyKey,
       },
@@ -140,6 +161,7 @@ export class CsvImportService {
 
     const job = this.jobRepo.create({
       type,
+      referenceId: type === ImportJobType.STOCK_TAKE ? referenceId : undefined,
       fileName: file.originalname,
       fileChecksum: checksum,
       idempotencyKey,
@@ -184,7 +206,18 @@ export class CsvImportService {
           duplicateMode,
           false,
           existingSkuCodes,
+          stockTake,
         );
+        if (
+          stockTake &&
+          errors.length === 0 &&
+          this.stockTakeImporter().isEmptyCountRow(
+            rawData as StockTakeImportRow,
+            stockTake,
+          )
+        ) {
+          continue;
+        }
         const status =
           errors.length === 0 ? ImportRowStatus.VALID : ImportRowStatus.ERROR;
 
@@ -207,6 +240,7 @@ export class CsvImportService {
 
     savedJob.validRows = validCount;
     savedJob.errorRows = errorCount;
+    savedJob.totalRows = validCount + errorCount;
     savedJob.status =
       validCount > 0 ? ImportJobStatus.VALIDATED : ImportJobStatus.FAILED;
     await this.jobRepo.save(savedJob);
@@ -224,7 +258,11 @@ export class CsvImportService {
     ImportValidateResult & { productsCreated: number; itemsCommitted: number }
   > {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -300,7 +338,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<InventoryImportJobEntity> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -313,7 +355,11 @@ export class CsvImportService {
    */
   async cancelJob(jobId: string, actor: ActorContext): Promise<void> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -337,7 +383,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<PaginatedResponse<InventoryImportJobRowEntity>> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -361,7 +411,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<Buffer> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -371,6 +425,10 @@ export class CsvImportService {
       where: { jobId, status: ImportRowStatus.ERROR },
       order: { rowNumber: "ASC" },
     });
+
+    if (job.type === ImportJobType.STOCK_TAKE) {
+      return this.buildGenericErrorRowsWorkbook(errorRows);
+    }
 
     const dataRows = errorRows.map((row) => ({
       ...(row.rawData as InventoryImportExcelRow),
@@ -393,6 +451,7 @@ export class CsvImportService {
   ): Promise<PaginatedResponse<InventoryImportJobEntity>> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
+      branchId: actor.branchId,
     };
     if (query.type) where.type = query.type;
     if (query.status) where.status = query.status;
@@ -416,6 +475,9 @@ export class CsvImportService {
     file: { originalname: string; buffer: Buffer },
   ): Promise<Array<InventoryImportExcelRow | CsvRow>> {
     if (isExcelFile(file.originalname)) {
+      if (type === ImportJobType.STOCK_TAKE) {
+        return this.stockTakeImporter().parseWorkbook(file.buffer);
+      }
       // Canonical Excel grid is shared for all ITEMS import.
       return this.excelParser.parseInventoryItemsWorkbook(file.buffer);
     }
@@ -424,6 +486,9 @@ export class CsvImportService {
       const csvText = file.buffer.toString("utf-8");
       if (type === ImportJobType.ITEMS) {
         return parseInventoryItemsFromDelimitedText(csvText);
+      }
+      if (type === ImportJobType.STOCK_TAKE) {
+        return this.stockTakeImporter().parseCsv(csvText);
       }
       // Opening balances / adjustments keep legacy CSV parsers.
       return this.parseCsv(csvText);
@@ -586,6 +651,7 @@ export class CsvImportService {
     duplicateMode: ImportDuplicateMode,
     isExcel: boolean,
     existingSkuCodes?: Set<string>,
+    stockTake?: StockTakeEntity,
   ): Promise<RowError[]> {
     switch (type) {
       case ImportJobType.ITEMS:
@@ -599,6 +665,15 @@ export class CsvImportService {
         return this.validateOpeningBalanceRow(row as CsvRow, actor);
       case ImportJobType.ADJUSTMENTS:
         return this.validateAdjustmentRow(row as CsvRow, actor);
+      case ImportJobType.STOCK_TAKE:
+        if (!stockTake) {
+          throw new BadRequestException("Không xác định được phiếu kiểm kê");
+        }
+        return this.stockTakeImporter().validateRow(
+          row as StockTakeImportRow,
+          stockTake,
+          actor,
+        );
       default:
         return [];
     }
@@ -834,6 +909,13 @@ export class CsvImportService {
     rows: InventoryImportJobRowEntity[],
     actor: ActorContext,
   ): Promise<void> {
+    const stockTake =
+      job.type === ImportJobType.STOCK_TAKE
+        ? await this.stockTakeImporter().loadDraftTarget(
+            job.referenceId ?? undefined,
+            actor,
+          )
+        : undefined;
     await this.dataSource.transaction(async (manager) => {
       for (const row of rows) {
         switch (job.type) {
@@ -846,6 +928,13 @@ export class CsvImportService {
           case ImportJobType.ADJUSTMENTS:
             await this.commitAdjustmentRow(row, job, actor);
             break;
+          case ImportJobType.STOCK_TAKE:
+            await this.stockTakeImporter().commitRow(
+              row.rawData as StockTakeImportRow,
+              stockTake as StockTakeEntity,
+              actor,
+            );
+            break;
         }
 
         await manager.update(
@@ -855,6 +944,34 @@ export class CsvImportService {
         );
       }
     });
+  }
+
+  private stockTakeImporter(): ExcelImportStockTakeService {
+    return this.excelImportStockTakeService;
+  }
+
+  private async buildGenericErrorRowsWorkbook(
+    rows: InventoryImportJobRowEntity[],
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Dòng lỗi");
+    const keys = Array.from(
+      new Set(rows.flatMap((row) => Object.keys(row.rawData ?? {}))),
+    );
+    const headers = [...keys, IMPORT_ERROR_STATUS_COLUMN_LABEL];
+    sheet.addRow(headers);
+    for (const row of rows) {
+      sheet.addRow([
+        ...keys.map((key) => String(row.rawData?.[key] ?? "")),
+        this.formatImportRowErrors(row.errorMessages),
+      ]);
+    }
+    sheet.getRow(1).font = { bold: true };
+    sheet.columns.forEach((column) => {
+      column.width = 24;
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   private async commitItemRow(

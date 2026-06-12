@@ -9,7 +9,7 @@ import { ActorContext } from '../../../../common/decorators/actor-context.decora
 const actor: ActorContext = {
   userId: 'admin-1',
   organizationId: 'org-1',
-  branchId: undefined,
+  branchId: 'branch-1',
   roles: [],
 };
 
@@ -43,12 +43,15 @@ describe('SearchGoodsReceiptsV2Handler', () => {
     handler = module.get(SearchGoodsReceiptsV2Handler);
   }
 
-  it('scopes by organizationId and joins provider + lines (full row shape)', async () => {
+  it('scopes by organizationId and active branch, and joins provider + lines', async () => {
     await build([]);
     await handler.execute(new SearchGoodsReceiptsV2Query({}, actor));
 
     expect(qb.where).toHaveBeenCalledWith('gr.organizationId = :orgId', {
       orgId: 'org-1',
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('gr.branchId = :branchId', {
+      branchId: 'branch-1',
     });
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gr.provider', 'provider');
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gr.lines', 'lines');

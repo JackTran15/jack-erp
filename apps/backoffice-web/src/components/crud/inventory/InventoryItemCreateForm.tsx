@@ -107,8 +107,6 @@ export function InventoryItemCreateForm({
   const [addedBrands, setAddedBrands] = useState<Option[]>([]);
   const [addedUnits, setAddedUnits] = useState<string[]>([]);
 
-  const [barcodeInput, setBarcodeInput] = useState("");
-
   const [productImages, setProductImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -121,6 +119,9 @@ export function InventoryItemCreateForm({
 
   const [variantRows, setVariantRows] = useState<ProductVariantRow[]>([]);
   const removedVariantKeys = useRef<Set<string>>(new Set());
+
+  // SKU tự sinh từ tên hàng hóa cho đến khi user sửa tay. Xóa trống → sinh lại.
+  const skuTouchedRef = useRef(false);
 
   const editableFieldsByKey = useMemo(
     () => new Map(editableFields.map((f) => [f.key, f])),
@@ -187,7 +188,6 @@ export function InventoryItemCreateForm({
       initialStock: numToStr(rec.initialStock) || "0",
       initialStockUnitPrice: numToStr(rec.initialStockUnitPrice) || "0",
       showOnPos: rec.isPosVisible !== false,
-      manageBarcodePerUnit: Boolean(rec.manageBarcodePerUnit),
       isGoldSilver: Boolean(rec.isGoldSilver),
       oddSize: numToStr(rec.oddSize),
       weightG: numToStr(rec.packageWeightGram),
@@ -245,12 +245,9 @@ export function InventoryItemCreateForm({
         ? { minQty, maxQty }
         : undefined;
 
-    const trimmedBarcode = barcodeInput.trim();
-
     setValues((prev) => ({
       ...prev,
       isPosVisible: extras.showOnPos,
-      manageBarcodePerUnit: extras.manageBarcodePerUnit,
       isGoldSilver: extras.isGoldSilver,
       oddSize: extras.oddSize || undefined,
       packageWeightGram: toNumberOrUndef(extras.weightG),
@@ -258,7 +255,6 @@ export function InventoryItemCreateForm({
       packageWidthCm: toNumberOrUndef(extras.pkgWidth),
       packageHeightCm: toNumberOrUndef(extras.pkgHeight),
       units: units.length > 0 ? units : isEdit ? [] : undefined,
-      barcodes: trimmedBarcode ? [{ code: trimmedBarcode }] : undefined,
       threshold,
       initialStock: isEdit ? undefined : toNumberOrUndef(extras.initialStock),
       initialStockUnitPrice: isEdit
@@ -266,7 +262,7 @@ export function InventoryItemCreateForm({
         : toNumberOrUndef(extras.initialStockUnitPrice),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extras, unitRows, barcodeInput]);
+  }, [extras, unitRows]);
 
   // ─── Sync the multi-provider table into `providers[]` ──────────────────────
   useEffect(() => {
@@ -276,6 +272,17 @@ export function InventoryItemCreateForm({
     setValues((prev) => ({ ...prev, providers }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerRows]);
+
+  // ─── Auto-fill SKU (live) from the product name until edited manually ──────
+  // Edit mode keeps the saved SKU; clearing the SKU field resumes auto-fill.
+  useEffect(() => {
+    if (isEdit || skuTouchedRef.current) return;
+    const auto = variantSlug(String(values.name ?? ""));
+    setValues((prev) =>
+      String(prev.code ?? "") === auto ? prev : { ...prev, code: auto },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.name, isEdit]);
 
   // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ─────
   useEffect(() => {
@@ -300,6 +307,8 @@ export function InventoryItemCreateForm({
     const baseName = String(values.name ?? "").trim();
     const categoryName = String(values.categoryName ?? "").trim();
     const baseUnit = String(values.unit ?? "").trim() || VARIANT_DEFAULT_UNIT;
+    const basePurchasePrice = numToStr(values.purchasePrice) || "0";
+    const baseSellingPrice = numToStr(values.sellingPrice) || "0";
 
     setVariantRows((prev) => {
       const byKey = new Map(
@@ -317,20 +326,14 @@ export function InventoryItemCreateForm({
         const sku = autoVariantSku(baseSku, color, size);
         const existing = byKey.get(key);
         if (existing) {
-          // Mã vạch defaults to (clones) the SKU; keep it if the user customized it.
-          const keepBarcode =
-            existing.barcode && existing.barcode !== existing.sku
-              ? existing.barcode
-              : sku;
           next.push({
             ...existing,
             name: variantName,
             unit: baseUnit,
             sku,
-            barcode: keepBarcode,
           });
         } else {
-          // Edit mode: seed the row from the saved variant (price/SKU/barcode).
+          // Edit mode: seed the row from the saved variant prices and SKU.
           const saved = savedVariantsByKey.get(key);
           const savedSku =
             saved && typeof saved.code === "string" && saved.code
@@ -345,13 +348,14 @@ export function InventoryItemCreateForm({
             name: variantName,
             unit: baseUnit,
             sku: savedSku,
-            barcode: saved && saved.barcode ? String(saved.barcode) : savedSku,
             purchasePrice:
               saved && saved.purchasePrice != null
                 ? String(saved.purchasePrice)
-                : "0",
+                : basePurchasePrice,
             sellPrice:
-              saved && saved.sellPrice != null ? String(saved.sellPrice) : "0",
+              saved && saved.sellPrice != null
+                ? String(saved.sellPrice)
+                : baseSellingPrice,
             initialStock: "0",
           });
         }
@@ -366,6 +370,8 @@ export function InventoryItemCreateForm({
     values.unit,
     values.name,
     values.categoryName,
+    values.purchasePrice,
+    values.sellingPrice,
     savedVariantsByKey,
   ]);
 
@@ -381,7 +387,6 @@ export function InventoryItemCreateForm({
               size: r.size || undefined,
               unit: r.unit,
               sku: r.sku,
-              barcode: r.barcode || undefined,
               purchasePrice: toNumberOrUndef(r.purchasePrice) ?? 0,
               sellPrice: toNumberOrUndef(r.sellPrice) ?? 0,
               initialStock: toNumberOrUndef(r.initialStock) ?? 0,
@@ -522,11 +527,15 @@ export function InventoryItemCreateForm({
 
   const renderedDynamicKeys = useRef(new Set<string>());
 
-  const renderDynamicField = (key: string) => {
+  const renderDynamicField = (
+    key: string,
+    disabled = false,
+    onValueChange?: (next: unknown) => void,
+  ) => {
     const field = editableFieldsByKey.get(key);
     if (!field) return null;
     renderedDynamicKeys.current.add(key);
-    return (
+    const input = (
       <CrudFieldInput
         key={field.key}
         inputIdPrefix="create"
@@ -535,8 +544,10 @@ export function InventoryItemCreateForm({
         error={errors[field.key]}
         layout="horizontal"
         labelWidth="10rem"
+        disabled={disabled}
         onChange={(nextValue) => {
-          setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+          if (onValueChange) onValueChange(nextValue);
+          else setValues((prev) => ({ ...prev, [field.key]: nextValue }));
           setErrors((prev) => {
             const next = { ...prev };
             delete next[field.key];
@@ -544,6 +555,18 @@ export function InventoryItemCreateForm({
           });
         }}
       />
+    );
+    if (!disabled) return input;
+
+    return (
+      <fieldset
+        key={field.key}
+        disabled
+        className="min-w-0 disabled:cursor-not-allowed disabled:opacity-60"
+        title="Giá của hàng hóa có phiên bản được chỉnh sửa tại bảng phiên bản."
+      >
+        {input}
+      </fieldset>
     );
   };
 
@@ -702,29 +725,20 @@ export function InventoryItemCreateForm({
               />
             </FormField>
 
-            {renderDynamicField("code")}
-
-            <FormField
-              label="Mã vạch"
-              htmlFor="create-barcode"
-              layout="horizontal"
-              labelWidth="10rem"
-            >
-              <Input
-                id="create-barcode"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Hệ thống tự sinh khi bỏ trống"
-              />
-            </FormField>
+            {renderDynamicField("code", false, (next) => {
+              const text = typeof next === "string" ? next : String(next ?? "");
+              // Khi user gõ/sửa SKU thì ngừng auto theo tên; xóa trống → auto lại.
+              skuTouchedRef.current = text.trim().length > 0;
+              setValues((prev) => ({ ...prev, code: text }));
+            })}
 
             {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
                 tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
                 khớp với cách MISA hiển thị chi tiết mặt hàng. */}
             {!isEdit && (
               <>
-                {renderDynamicField("purchasePrice")}
-                {renderDynamicField("sellingPrice")}
+                {renderDynamicField("purchasePrice", variantRows.length > 0)}
+                {renderDynamicField("sellingPrice", variantRows.length > 0)}
               </>
             )}
 
@@ -774,9 +788,13 @@ export function InventoryItemCreateForm({
                 value={extras.initialStock}
                 onChange={(e) => updateExtras("initialStock", e.target.value)}
                 inputMode="decimal"
-                disabled={isEdit}
+                disabled={isEdit || variantRows.length > 0}
               />
-              {isEdit ? (
+              {variantRows.length > 0 ? (
+                <p className="mt-1 text-xs italic text-muted-foreground">
+                  (Hàng hóa có phiên bản: nhập tồn kho ban đầu tại từng phiên bản.)
+                </p>
+              ) : isEdit ? (
                 <p className="mt-1 text-xs italic text-muted-foreground">
                   (Tồn kho ban đầu chỉ được nhập khi thêm mới hàng hóa.)
                 </p>
@@ -936,18 +954,6 @@ export function InventoryItemCreateForm({
             />
           </FormField>
         </div>
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={extras.manageBarcodePerUnit}
-            onChange={(e) =>
-              updateExtras("manageBarcodePerUnit", e.target.checked)
-            }
-            className="h-4 w-4 rounded border border-input accent-primary"
-          />
-          Quản lý mã vạch theo từng đơn vị tính
-        </label>
-
         {variantRows.length > 0 && (
           <div className="mt-4 border-t pt-4">
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

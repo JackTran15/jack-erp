@@ -2046,6 +2046,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/items/{itemId}/average-cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockLedgerController_getInstantAverageCost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock/balances/{itemId}/{locationId}": {
         parameters: {
             query?: never;
@@ -2940,6 +2956,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/stock-takes/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateStockTake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-takes/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitStockTake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/locations/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateLocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/locations/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitLocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/locations/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportLocationErrorRowsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/jobs": {
         parameters: {
             query?: never;
@@ -3078,6 +3174,182 @@ export interface paths {
         get: operations["CsvExportController_exportLedger"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/locations/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportLocationsTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/locations/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportLocationsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_list"];
+        put?: never;
+        post: operations["StockTakeController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_previewMerge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/import-template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_importTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_exportExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_getById"];
+        put?: never;
+        post?: never;
+        delete: operations["StockTakeController_cancel"];
+        options?: never;
+        head?: never;
+        patch: operations["StockTakeController_updateHeader"];
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["StockTakeController_removeLine"];
+        options?: never;
+        head?: never;
+        patch: operations["StockTakeController_updateLine"];
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["StockTakeController_replaceMembers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_process"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4054,134 +4326,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsReceiptV2Controller_search_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockTakeController_list"];
-        put?: never;
-        post: operations["StockTakeController_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes/merge-preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTakeController_previewMerge"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}/export.xlsx": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockTakeController_exportExcel"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["StockTakeController_getById"];
-        put?: never;
-        post?: never;
-        delete: operations["StockTakeController_cancel"];
-        options?: never;
-        head?: never;
-        patch: operations["StockTakeController_updateHeader"];
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTakeController_addLine"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}/lines/{lineId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["StockTakeController_removeLine"];
-        options?: never;
-        head?: never;
-        patch: operations["StockTakeController_updateLine"];
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["StockTakeController_replaceMembers"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/stock-takes/{id}/process": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["StockTakeController_process"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6275,6 +6419,17 @@ export interface components {
             page: number;
             limit: number;
         };
+        InstantAverageCostDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            branchId: string;
+            quantity: number;
+            inventoryValue: number;
+            unitCost: number;
+            /** @enum {string} */
+            source: "LEDGER" | "PURCHASE_PRICE_FALLBACK";
+        };
         StockBalanceEntity: {
             itemId: string;
             item?: components["schemas"]["ItemEntity"];
@@ -6816,7 +6971,8 @@ export interface components {
         };
         InventoryImportJobEntity: {
             /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS";
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS";
+            referenceId?: string | null;
             fileName: string;
             fileChecksum: string;
             idempotencyKey: string;
@@ -6855,6 +7011,150 @@ export interface components {
             job?: components["schemas"]["InventoryImportJobEntity"];
         };
         ExportItemsBodyDto: Record<string, never>;
+        CreateStockTakeLineDto: {
+            itemId: string;
+            locationId?: string;
+            countedQty?: Record<string, never> | null;
+            countedValue?: Record<string, never> | null;
+            reason?: string;
+        };
+        StockTakeMemberDto: {
+            fullName: string;
+            title?: string;
+            representative?: string;
+        };
+        CreateStockTakeDto: {
+            storageId?: string;
+            locationId?: string;
+            /** @description Kiểm kê đến ngày (YYYY-MM-DD) */
+            plannedDate?: string;
+            /** @description Mục đích kiểm kê */
+            purpose?: string;
+            notes?: string;
+            /** @description Kết luận sau kiểm kê */
+            conclusion?: string;
+            countByValue?: boolean;
+            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
+            countedAt?: string;
+            lines?: components["schemas"]["CreateStockTakeLineDto"][];
+            members?: components["schemas"]["StockTakeMemberDto"][];
+            mergeSourceIds?: string[];
+        };
+        StockTakeMemberEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            stockTakeId: string;
+            fullName: string;
+            title?: string | null;
+            representative?: string | null;
+            sortOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            stockTake: components["schemas"]["StockTakeEntity"];
+        };
+        StockTakeEntity: {
+            documentNumber?: string;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED";
+            storageId?: string;
+            locationId?: string;
+            /** @description Mục đích — free-text purpose written by user on the form. */
+            purpose?: string;
+            countByValue: boolean;
+            /** @description Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time). */
+            plannedDate?: string;
+            /**
+             * Format: date-time
+             * @description Ngày + giờ kiểm kê thực tế — defaults to now() on create.
+             */
+            countedAt?: string;
+            /** @description Kết luận — conclusion text shown at the bottom of the form. */
+            conclusion?: string;
+            /** Format: date-time */
+            snapshotAt: string;
+            notes?: string;
+            /** Format: date-time */
+            postedAt?: string;
+            postedBy?: string;
+            /** @description IDs of the goods-receipt/goods-issue documents auto-generated by process(). */
+            generatedReceiptId?: string;
+            generatedIssueId?: string;
+            /** @description Set on source vouchers after they are saved into a merged stock-take. */
+            mergedIntoId?: string | null;
+            /** @description Audit trail retained on the merged voucher. */
+            mergeSourceIds?: string[] | null;
+            /** Format: date-time */
+            mergedAt?: string | null;
+            /** Format: date-time */
+            deletedAt?: string;
+            lines: components["schemas"]["StockTakeLineEntity"][];
+            members: components["schemas"]["StockTakeMemberEntity"][];
+            id: string;
+            /** @description Tenant isolation key — every row belongs to exactly one organization. */
+            organizationId: string;
+            /** @description Optional branch scope; null for org-wide records. */
+            branchId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description UUID of the user who created this record. */
+            createdBy: string;
+        };
+        StockTakeLineEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            stockTakeId: string;
+            itemId: string;
+            locationId: string;
+            expectedQty: string;
+            countedQty?: string | null;
+            expectedValue: string;
+            countedValue?: string | null;
+            note?: string;
+            /** @description Nguyên nhân — reason text for the variance on this line. */
+            reason?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            stockTake: components["schemas"]["StockTakeEntity"];
+            item?: components["schemas"]["ItemEntity"];
+            location?: components["schemas"]["LocationEntity"];
+        };
+        MergeStockTakesDto: {
+            sourceIds: string[];
+        };
+        UpdateStockTakeHeaderDto: {
+            purpose?: string;
+            notes?: string;
+            /** @description Kết luận sau kiểm kê */
+            conclusion?: string;
+            countByValue?: boolean;
+            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
+            countedAt?: string;
+        };
+        AddStockTakeLineDto: {
+            itemId: string;
+            locationId?: string;
+        };
+        UpdateLineCountDto: {
+            locationId?: string;
+            countedQty?: Record<string, never> | null;
+            countedValue?: Record<string, never> | null;
+            note?: string;
+            /** @description Nguyên nhân chênh lệch */
+            reason?: string;
+        };
+        ReplaceMembersDto: {
+            members: components["schemas"]["StockTakeMemberDto"][];
+        };
         PosProductCardDto: {
             /**
              * @description PRODUCT = parent product grouping variants; ITEM = standalone item without a parent product.
@@ -7883,149 +8183,6 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
-        };
-        CreateStockTakeLineDto: {
-            itemId: string;
-            locationId?: string;
-            countedQty?: Record<string, never> | null;
-            countedValue?: Record<string, never> | null;
-            reason?: string;
-        };
-        StockTakeMemberDto: {
-            fullName: string;
-            title?: string;
-            representative?: string;
-        };
-        CreateStockTakeDto: {
-            storageId?: string;
-            locationId?: string;
-            /** @description Kiểm kê đến ngày (YYYY-MM-DD) */
-            plannedDate?: string;
-            /** @description Mục đích kiểm kê */
-            purpose?: string;
-            notes?: string;
-            /** @description Kết luận sau kiểm kê */
-            conclusion?: string;
-            countByValue?: boolean;
-            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
-            countedAt?: string;
-            lines?: components["schemas"]["CreateStockTakeLineDto"][];
-            members?: components["schemas"]["StockTakeMemberDto"][];
-            mergeSourceIds?: string[];
-        };
-        StockTakeMemberEntity: {
-            id: string;
-            organizationId: string;
-            branchId?: string;
-            stockTakeId: string;
-            fullName: string;
-            title?: string | null;
-            representative?: string | null;
-            sortOrder: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            createdBy: string;
-            stockTake: components["schemas"]["StockTakeEntity"];
-        };
-        StockTakeEntity: {
-            documentNumber?: string;
-            /** @enum {string} */
-            status: "DRAFT" | "POSTED" | "CANCELLED";
-            storageId?: string;
-            locationId?: string;
-            /** @description Mục đích — free-text purpose written by user on the form. */
-            purpose?: string;
-            countByValue: boolean;
-            /** @description Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time). */
-            plannedDate?: string;
-            /**
-             * Format: date-time
-             * @description Ngày + giờ kiểm kê thực tế — defaults to now() on create.
-             */
-            countedAt?: string;
-            /** @description Kết luận — conclusion text shown at the bottom of the form. */
-            conclusion?: string;
-            /** Format: date-time */
-            snapshotAt: string;
-            notes?: string;
-            /** Format: date-time */
-            postedAt?: string;
-            postedBy?: string;
-            /** @description IDs of the goods-receipt/goods-issue documents auto-generated by process(). */
-            generatedReceiptId?: string;
-            generatedIssueId?: string;
-            /** @description Set on source vouchers after they are saved into a merged stock-take. */
-            mergedIntoId?: string | null;
-            /** @description Audit trail retained on the merged voucher. */
-            mergeSourceIds?: string[] | null;
-            /** Format: date-time */
-            mergedAt?: string | null;
-            /** Format: date-time */
-            deletedAt?: string;
-            lines: components["schemas"]["StockTakeLineEntity"][];
-            members: components["schemas"]["StockTakeMemberEntity"][];
-            id: string;
-            /** @description Tenant isolation key — every row belongs to exactly one organization. */
-            organizationId: string;
-            /** @description Optional branch scope; null for org-wide records. */
-            branchId?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            /** @description UUID of the user who created this record. */
-            createdBy: string;
-        };
-        StockTakeLineEntity: {
-            id: string;
-            organizationId: string;
-            branchId?: string;
-            stockTakeId: string;
-            itemId: string;
-            locationId: string;
-            expectedQty: string;
-            countedQty?: string | null;
-            expectedValue: string;
-            countedValue?: string | null;
-            note?: string;
-            /** @description Nguyên nhân — reason text for the variance on this line. */
-            reason?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            createdBy: string;
-            stockTake: components["schemas"]["StockTakeEntity"];
-            item?: components["schemas"]["ItemEntity"];
-            location?: components["schemas"]["LocationEntity"];
-        };
-        MergeStockTakesDto: {
-            sourceIds: string[];
-        };
-        UpdateStockTakeHeaderDto: {
-            purpose?: string;
-            notes?: string;
-            /** @description Kết luận sau kiểm kê */
-            conclusion?: string;
-            countByValue?: boolean;
-            /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
-            countedAt?: string;
-        };
-        AddStockTakeLineDto: {
-            itemId: string;
-            locationId?: string;
-        };
-        UpdateLineCountDto: {
-            countedQty?: Record<string, never> | null;
-            countedValue?: Record<string, never> | null;
-            note?: string;
-            /** @description Nguyên nhân chênh lệch */
-            reason?: string;
-        };
-        ReplaceMembersDto: {
-            members: components["schemas"]["StockTakeMemberDto"][];
         };
         CreateTransferOrderDto: Record<string, never>;
         TransferOrderEntity: {
@@ -12305,6 +12462,27 @@ export interface operations {
             };
         };
     };
+    StockLedgerController_getInstantAverageCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstantAverageCostDto"];
+                };
+            };
+        };
+    };
     StockLedgerController_getBalance: {
         parameters: {
             query?: never;
@@ -13913,6 +14091,107 @@ export interface operations {
             };
         };
     };
+    CsvImportController_validateStockTake: {
+        parameters: {
+            query?: {
+                countByValue?: boolean;
+                storageId?: string;
+                stockTakeId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_commitStockTake: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_validateLocations: {
+        parameters: {
+            query?: {
+                duplicateMode?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_commitLocations: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportLocationErrorRowsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CsvImportController_listJobs: {
         parameters: {
             query?: {
@@ -14153,6 +14432,339 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CsvExportController_exportLocationsTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportLocationsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+                status?: "DRAFT" | "POSTED" | "CANCELLED";
+                /** @description Lọc createdAt >= (YYYY-MM-DD) */
+                fromDate?: string;
+                /** @description Lọc createdAt <= (YYYY-MM-DD) */
+                toDate?: string;
+                documentNumber?: string;
+                storage?: string;
+                purpose?: string;
+                mergeStatus?: "MERGED" | "UNMERGED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStockTakeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_previewMerge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeStockTakesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockTakeController_importTemplate: {
+        parameters: {
+            query?: {
+                countByValue?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_exportExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_getById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_updateHeader: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStockTakeHeaderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_addLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddStockTakeLineDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeLineEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_removeLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StockTakeController_updateLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLineCountDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeLineEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_replaceMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceMembersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_process: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
+                };
             };
         };
     };
@@ -15968,286 +16580,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    StockTakeController_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                sortBy?: string;
-                sortOrder?: "asc" | "desc";
-                search?: string;
-                filters?: string;
-                status?: "DRAFT" | "POSTED" | "CANCELLED";
-                /** @description Lọc createdAt >= (YYYY-MM-DD) */
-                fromDate?: string;
-                /** @description Lọc createdAt <= (YYYY-MM-DD) */
-                toDate?: string;
-                documentNumber?: string;
-                storage?: string;
-                purpose?: string;
-                mergeStatus?: "MERGED" | "UNMERGED";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StockTakeController_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateStockTakeDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_previewMerge: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MergeStockTakesDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
-    };
-    StockTakeController_exportExcel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StockTakeController_getById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_cancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StockTakeController_updateHeader: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateStockTakeHeaderDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_addLine: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddStockTakeLineDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeLineEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_removeLine: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                lineId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    StockTakeController_updateLine: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                lineId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLineCountDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeLineEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_replaceMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReplaceMembersDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeEntity"];
-                };
-            };
-        };
-    };
-    StockTakeController_process: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockTakeEntity"];
                 };
             };
         };

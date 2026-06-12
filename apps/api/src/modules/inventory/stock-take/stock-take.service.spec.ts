@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import * as ExcelJS from "exceljs";
 import {
   BadRequestException,
   ConflictException,
@@ -56,7 +57,10 @@ describe("StockTakeService", () => {
   };
   let locationRepo: { findOne: jest.Mock };
   let storageRepo: { findOne: jest.Mock };
-  let itemCostSnapshotService: { snapshotCosts: jest.Mock };
+  let itemCostSnapshotService: {
+    snapshotCosts: jest.Mock;
+    snapshotOne: jest.Mock;
+  };
   let receiptRepo: object;
   let issueRepo: object;
   let documentNumbering: { generate: jest.Mock };
@@ -113,6 +117,7 @@ describe("StockTakeService", () => {
           ["item-3", 6],
         ]),
       ),
+      snapshotOne: jest.fn().mockResolvedValue(3),
     };
     receiptRepo = {};
     issueRepo = {};
@@ -267,6 +272,7 @@ describe("StockTakeService", () => {
           itemId: "item-1",
           locationId: "loc-A",
           expectedQty: "7",
+          expectedValue: "21",
           countedQty: null,
           stockTakeId: "st-1",
         }),
@@ -297,6 +303,53 @@ describe("StockTakeService", () => {
       await expect(
         service.addLine("st-1", { itemId: "item-1" }, actor),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe("updateLineCount", () => {
+    it("refreshes expected quantity and value when a DRAFT line changes location", async () => {
+      const line = {
+        id: "line-1",
+        itemId: "item-1",
+        locationId: "loc-A",
+        expectedQty: "7",
+        expectedValue: "21",
+      } as StockTakeLineEntity;
+      stRepo.findOne.mockResolvedValue({
+        id: "st-1",
+        organizationId: actor.organizationId,
+        status: StockTakeStatus.DRAFT,
+        storageId: "storage-1",
+        lines: [line],
+      } as unknown as StockTakeEntity);
+      locationRepo.findOne.mockResolvedValue({
+        id: "loc-B",
+        storageId: "storage-1",
+      });
+      balanceRepo.findOne.mockResolvedValue({ quantity: "4" });
+
+      await service.updateLineCount(
+        "st-1",
+        "line-1",
+        { locationId: "loc-B" },
+        actor,
+      );
+
+      expect(locationRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          id: "loc-B",
+          organizationId: actor.organizationId,
+          isActive: true,
+          storageId: "storage-1",
+        },
+      });
+      expect(lineRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          locationId: "loc-B",
+          expectedQty: "4",
+          expectedValue: "12",
+        }),
+      );
     });
   });
 
@@ -429,6 +482,7 @@ describe("StockTakeService", () => {
 
       await service.list({
         organizationId: "org-1",
+        branchId: "branch-1",
         page: 1,
         pageSize: 20,
         fromDate: "2026-05-01",
@@ -440,6 +494,9 @@ describe("StockTakeService", () => {
 
       expect(qb.where).toHaveBeenCalledWith("st.organization_id = :orgId", {
         orgId: "org-1",
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith("st.branch_id = :branchId", {
+        branchId: "branch-1",
       });
       expect(qb.andWhere).toHaveBeenCalledWith("st.created_at >= :fromDate", {
         fromDate: "2026-05-01T00:00:00.000Z",
@@ -462,11 +519,14 @@ describe("StockTakeService", () => {
   });
 
   describe("previewMerge", () => {
-    const source = (
-      id: string,
-      countedQty: string,
-      conclusion: string,
-    ) =>
+    beforeEach(() => {
+      locationRepo.findOne.mockResolvedValue({
+        id: "loc-1",
+        storageId: "storage-1",
+      });
+    });
+
+    const source = (id: string, countedQty: string, conclusion: string) =>
       ({
         id,
         organizationId: "org-1",
@@ -498,9 +558,9 @@ describe("StockTakeService", () => {
       }) as unknown as StockTakeEntity;
 
     it("requires at least two vouchers", async () => {
-      await expect(service.previewMerge(["st-1"], actor)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.previewMerge(["st-1"], actor),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it("aggregates matching lines, conclusions and members", async () => {
@@ -558,17 +618,37 @@ describe("StockTakeService", () => {
   describe("getById", () => {
     it("throws NotFoundException when missing", async () => {
       stRepo.findOne.mockResolvedValue(null);
-      await expect(service.getById("missing", "org-1")).rejects.toBeInstanceOf(
+      await expect(service.getById("missing", actor)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
 
     it("enforces organizationId in lookup (cross-org isolation)", async () => {
       stRepo.findOne.mockResolvedValue(null);
-      await expect(service.getById("st-1", "org-foreign")).rejects.toThrow();
+      await expect(
+        service.getById("st-1", { ...actor, organizationId: "org-foreign" }),
+      ).rejects.toThrow();
       expect(stRepo.findOne).toHaveBeenCalledWith({
-        where: { id: "st-1", organizationId: "org-foreign" },
+        where: {
+          id: "st-1",
+          organizationId: "org-foreign",
+          branchId: actor.branchId,
+        },
       });
+    });
+  });
+
+  describe("buildImportTemplateBuffer", () => {
+    it("adds MISA-compatible comments and number/date formats", async () => {
+      const buffer = await service.buildImportTemplateBuffer(true);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as never);
+      const sheet = workbook.worksheets[0];
+
+      expect(sheet.getCell("A7").note).toBeTruthy();
+      expect(sheet.getCell("G9").numFmt).toBe("dd/mm/yyyy");
+      expect(sheet.getCell("K9").numFmt).toBe("#,##0.###");
+      expect(sheet.getCell("N9").numFmt).toBe("#,##0.00");
     });
   });
 });

@@ -27,8 +27,7 @@ export class SearchGoodsReceiptsV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // Org-scoped only — mirrors GoodsReceiptService.list() (the FE list never
-    // passes a branchId filter). Eager relations are joined explicitly so the
+    // Scope the list to the actor's active branch. Eager relations are joined explicitly so the
     // row shape is identical to the current find()-based list (provider,
     // location, lines + line item/location); the detail panel and view dialog
     // rely on `lines`.
@@ -40,6 +39,10 @@ export class SearchGoodsReceiptsV2Handler
       .leftJoinAndSelect('lines.item', 'lineItem')
       .leftJoinAndSelect('lines.location', 'lineLocation')
       .where('gr.organizationId = :orgId', { orgId: actor.organizationId });
+
+    if (actor.branchId) {
+      qb.andWhere('gr.branchId = :branchId', { branchId: actor.branchId });
+    }
 
     new FilterBuilder(qb)
       .applyString('gr.documentNumber', dto.documentNumber)

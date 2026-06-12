@@ -6507,6 +6507,36 @@
         ]
       }
     },
+    "/inventory/stock/items/{itemId}/average-cost": {
+      "get": {
+        "operationId": "StockLedgerController_getInstantAverageCost",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstantAverageCostDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockLedger"
+        ]
+      }
+    },
     "/inventory/stock/balances/{itemId}/{locationId}": {
       "get": {
         "operationId": "StockLedgerController_getBalance",
@@ -9387,6 +9417,149 @@
         ]
       }
     },
+    "/inventory/imports/stock-takes/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateStockTake",
+        "parameters": [
+          {
+            "name": "countByValue",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stockTakeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-takes/commit": {
+      "post": {
+        "operationId": "CsvImportController_commitStockTake",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/locations/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateLocations",
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/locations/commit": {
+      "post": {
+        "operationId": "CsvImportController_commitLocations",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/locations/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportLocationErrorRowsExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/jobs": {
       "get": {
         "operationId": "CsvImportController_listJobs",
@@ -9940,6 +10113,554 @@
         },
         "tags": [
           "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/locations/template": {
+      "get": {
+        "operationId": "CsvExportController_exportLocationsTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/locations/excel": {
+      "get": {
+        "operationId": "CsvExportController_exportLocationsExcel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/stock-takes": {
+      "post": {
+        "operationId": "StockTakeController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockTakeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
+      "get": {
+        "operationId": "StockTakeController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Lọc createdAt >= (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Lọc createdAt <= (YYYY-MM-DD)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentNumber",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "purpose",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MERGED",
+                "UNMERGED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/merge-preview": {
+      "post": {
+        "operationId": "StockTakeController_previewMerge",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeStockTakesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/import-template.xlsx": {
+      "get": {
+        "operationId": "StockTakeController_importTemplate",
+        "parameters": [
+          {
+            "name": "countByValue",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/export.xlsx": {
+      "get": {
+        "operationId": "StockTakeController_exportExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}": {
+      "get": {
+        "operationId": "StockTakeController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
+      "patch": {
+        "operationId": "StockTakeController_updateHeader",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStockTakeHeaderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
+      "delete": {
+        "operationId": "StockTakeController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/lines": {
+      "post": {
+        "operationId": "StockTakeController_addLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddStockTakeLineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeLineEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/lines/{lineId}": {
+      "delete": {
+        "operationId": "StockTakeController_removeLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      },
+      "patch": {
+        "operationId": "StockTakeController_updateLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLineCountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeLineEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/members": {
+      "put": {
+        "operationId": "StockTakeController_replaceMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceMembersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
+        ]
+      }
+    },
+    "/inventory/stock-takes/{id}/process": {
+      "post": {
+        "operationId": "StockTakeController_process",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockTakeEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTake"
         ]
       }
     },
@@ -12900,505 +13621,6 @@
         },
         "tags": [
           "GoodsReceiptV2"
-        ]
-      }
-    },
-    "/inventory/stock-takes": {
-      "post": {
-        "operationId": "StockTakeController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateStockTakeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      },
-      "get": {
-        "operationId": "StockTakeController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "filters",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "DRAFT",
-                "POSTED",
-                "CANCELLED"
-              ]
-            }
-          },
-          {
-            "name": "fromDate",
-            "required": false,
-            "in": "query",
-            "description": "Lọc createdAt >= (YYYY-MM-DD)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toDate",
-            "required": false,
-            "in": "query",
-            "description": "Lọc createdAt <= (YYYY-MM-DD)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "documentNumber",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "storage",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "purpose",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "mergeStatus",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "MERGED",
-                "UNMERGED"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/merge-preview": {
-      "post": {
-        "operationId": "StockTakeController_previewMerge",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MergeStockTakesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}/export.xlsx": {
-      "get": {
-        "operationId": "StockTakeController_exportExcel",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}": {
-      "get": {
-        "operationId": "StockTakeController_getById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      },
-      "patch": {
-        "operationId": "StockTakeController_updateHeader",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateStockTakeHeaderDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      },
-      "delete": {
-        "operationId": "StockTakeController_cancel",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}/lines": {
-      "post": {
-        "operationId": "StockTakeController_addLine",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddStockTakeLineDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeLineEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}/lines/{lineId}": {
-      "delete": {
-        "operationId": "StockTakeController_removeLine",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lineId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      },
-      "patch": {
-        "operationId": "StockTakeController_updateLine",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lineId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateLineCountDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeLineEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}/members": {
-      "put": {
-        "operationId": "StockTakeController_replaceMembers",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReplaceMembersDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
-        ]
-      }
-    },
-    "/inventory/stock-takes/{id}/process": {
-      "post": {
-        "operationId": "StockTakeController_process",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockTakeEntity"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "StockTake"
         ]
       }
     },
@@ -20698,6 +20920,43 @@
           "limit"
         ]
       },
+      "InstantAverageCostDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "inventoryValue": {
+            "type": "number"
+          },
+          "unitCost": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "LEDGER",
+              "PURCHASE_PRICE_FALLBACK"
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "branchId",
+          "quantity",
+          "inventoryValue",
+          "unitCost",
+          "source"
+        ]
+      },
       "StockBalanceEntity": {
         "type": "object",
         "properties": {
@@ -22324,8 +22583,14 @@
             "enum": [
               "ITEMS",
               "OPENING_BALANCES",
-              "ADJUSTMENTS"
+              "ADJUSTMENTS",
+              "STOCK_TAKE",
+              "LOCATIONS"
             ]
+          },
+          "referenceId": {
+            "type": "string",
+            "nullable": true
           },
           "fileName": {
             "type": "string"
@@ -22466,6 +22731,452 @@
       "ExportItemsBodyDto": {
         "type": "object",
         "properties": {}
+      },
+      "CreateStockTakeLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "countedQty": {
+            "type": "object",
+            "nullable": true
+          },
+          "countedValue": {
+            "type": "object",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "StockTakeMemberDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "representative": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName"
+        ]
+      },
+      "CreateStockTakeDto": {
+        "type": "object",
+        "properties": {
+          "storageId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "plannedDate": {
+            "type": "string",
+            "description": "Kiểm kê đến ngày (YYYY-MM-DD)"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Mục đích kiểm kê"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận sau kiểm kê"
+          },
+          "countByValue": {
+            "type": "boolean"
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateStockTakeLineDto"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberDto"
+            }
+          },
+          "mergeSourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StockTakeMemberEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "stockTakeId": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "representative": {
+            "type": "string",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "stockTake": {
+            "$ref": "#/components/schemas/StockTakeEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "stockTakeId",
+          "fullName",
+          "sortOrder",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "stockTake"
+        ]
+      },
+      "StockTakeEntity": {
+        "type": "object",
+        "properties": {
+          "documentNumber": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "storageId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Mục đích — free-text purpose written by user on the form."
+          },
+          "countByValue": {
+            "type": "boolean"
+          },
+          "plannedDate": {
+            "type": "string",
+            "description": "Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time)."
+          },
+          "countedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế — defaults to now() on create."
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận — conclusion text shown at the bottom of the form."
+          },
+          "snapshotAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "string"
+          },
+          "generatedReceiptId": {
+            "type": "string",
+            "description": "IDs of the goods-receipt/goods-issue documents auto-generated by process()."
+          },
+          "generatedIssueId": {
+            "type": "string"
+          },
+          "mergedIntoId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set on source vouchers after they are saved into a merged stock-take."
+          },
+          "mergeSourceIds": {
+            "nullable": true,
+            "description": "Audit trail retained on the merged voucher.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeLineEntity"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberEntity"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Tenant isolation key — every row belongs to exactly one organization."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Optional branch scope; null for org-wide records."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "UUID of the user who created this record."
+          }
+        },
+        "required": [
+          "status",
+          "countByValue",
+          "snapshotAt",
+          "lines",
+          "members",
+          "id",
+          "organizationId",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "StockTakeLineEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "stockTakeId": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          },
+          "expectedQty": {
+            "type": "string"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedValue": {
+            "type": "string"
+          },
+          "countedValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Nguyên nhân — reason text for the variance on this line."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "stockTake": {
+            "$ref": "#/components/schemas/StockTakeEntity"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemEntity"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationEntity"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "stockTakeId",
+          "itemId",
+          "locationId",
+          "expectedQty",
+          "expectedValue",
+          "createdAt",
+          "updatedAt",
+          "createdBy",
+          "stockTake"
+        ]
+      },
+      "MergeStockTakesDto": {
+        "type": "object",
+        "properties": {
+          "sourceIds": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sourceIds"
+        ]
+      },
+      "UpdateStockTakeHeaderDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "Kết luận sau kiểm kê"
+          },
+          "countByValue": {
+            "type": "boolean"
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
+          }
+        }
+      },
+      "AddStockTakeLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "UpdateLineCountDto": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string"
+          },
+          "countedQty": {
+            "type": "object",
+            "nullable": true
+          },
+          "countedValue": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Nguyên nhân chênh lệch"
+          }
+        }
+      },
+      "ReplaceMembersDto": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTakeMemberDto"
+            }
+          }
+        },
+        "required": [
+          "members"
+        ]
       },
       "PosProductCardDto": {
         "type": "object",
@@ -25709,449 +26420,6 @@
             ]
           }
         }
-      },
-      "CreateStockTakeLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "countedQty": {
-            "type": "object",
-            "nullable": true
-          },
-          "countedValue": {
-            "type": "object",
-            "nullable": true
-          },
-          "reason": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "itemId"
-        ]
-      },
-      "StockTakeMemberDto": {
-        "type": "object",
-        "properties": {
-          "fullName": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "representative": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "fullName"
-        ]
-      },
-      "CreateStockTakeDto": {
-        "type": "object",
-        "properties": {
-          "storageId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "plannedDate": {
-            "type": "string",
-            "description": "Kiểm kê đến ngày (YYYY-MM-DD)"
-          },
-          "purpose": {
-            "type": "string",
-            "description": "Mục đích kiểm kê"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "conclusion": {
-            "type": "string",
-            "description": "Kết luận sau kiểm kê"
-          },
-          "countByValue": {
-            "type": "boolean"
-          },
-          "countedAt": {
-            "type": "string",
-            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CreateStockTakeLineDto"
-            }
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockTakeMemberDto"
-            }
-          },
-          "mergeSourceIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "StockTakeMemberEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "stockTakeId": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "representative": {
-            "type": "string",
-            "nullable": true
-          },
-          "sortOrder": {
-            "type": "number"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "stockTake": {
-            "$ref": "#/components/schemas/StockTakeEntity"
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "stockTakeId",
-          "fullName",
-          "sortOrder",
-          "createdAt",
-          "updatedAt",
-          "createdBy",
-          "stockTake"
-        ]
-      },
-      "StockTakeEntity": {
-        "type": "object",
-        "properties": {
-          "documentNumber": {
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "DRAFT",
-              "POSTED",
-              "CANCELLED"
-            ],
-            "type": "string"
-          },
-          "storageId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "purpose": {
-            "type": "string",
-            "description": "Mục đích — free-text purpose written by user on the form."
-          },
-          "countByValue": {
-            "type": "boolean"
-          },
-          "plannedDate": {
-            "type": "string",
-            "description": "Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time)."
-          },
-          "countedAt": {
-            "format": "date-time",
-            "type": "string",
-            "description": "Ngày + giờ kiểm kê thực tế — defaults to now() on create."
-          },
-          "conclusion": {
-            "type": "string",
-            "description": "Kết luận — conclusion text shown at the bottom of the form."
-          },
-          "snapshotAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "postedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "postedBy": {
-            "type": "string"
-          },
-          "generatedReceiptId": {
-            "type": "string",
-            "description": "IDs of the goods-receipt/goods-issue documents auto-generated by process()."
-          },
-          "generatedIssueId": {
-            "type": "string"
-          },
-          "mergedIntoId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Set on source vouchers after they are saved into a merged stock-take."
-          },
-          "mergeSourceIds": {
-            "nullable": true,
-            "description": "Audit trail retained on the merged voucher.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "mergedAt": {
-            "format": "date-time",
-            "type": "string",
-            "nullable": true
-          },
-          "deletedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockTakeLineEntity"
-            }
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockTakeMemberEntity"
-            }
-          },
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Tenant isolation key — every row belongs to exactly one organization."
-          },
-          "branchId": {
-            "type": "string",
-            "description": "Optional branch scope; null for org-wide records."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string",
-            "description": "UUID of the user who created this record."
-          }
-        },
-        "required": [
-          "status",
-          "countByValue",
-          "snapshotAt",
-          "lines",
-          "members",
-          "id",
-          "organizationId",
-          "createdAt",
-          "updatedAt",
-          "createdBy"
-        ]
-      },
-      "StockTakeLineEntity": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "stockTakeId": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          },
-          "expectedQty": {
-            "type": "string"
-          },
-          "countedQty": {
-            "type": "string",
-            "nullable": true
-          },
-          "expectedValue": {
-            "type": "string"
-          },
-          "countedValue": {
-            "type": "string",
-            "nullable": true
-          },
-          "note": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string",
-            "description": "Nguyên nhân — reason text for the variance on this line."
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "stockTake": {
-            "$ref": "#/components/schemas/StockTakeEntity"
-          },
-          "item": {
-            "$ref": "#/components/schemas/ItemEntity"
-          },
-          "location": {
-            "$ref": "#/components/schemas/LocationEntity"
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "stockTakeId",
-          "itemId",
-          "locationId",
-          "expectedQty",
-          "expectedValue",
-          "createdAt",
-          "updatedAt",
-          "createdBy",
-          "stockTake"
-        ]
-      },
-      "MergeStockTakesDto": {
-        "type": "object",
-        "properties": {
-          "sourceIds": {
-            "minItems": 2,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "sourceIds"
-        ]
-      },
-      "UpdateStockTakeHeaderDto": {
-        "type": "object",
-        "properties": {
-          "purpose": {
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "conclusion": {
-            "type": "string",
-            "description": "Kết luận sau kiểm kê"
-          },
-          "countByValue": {
-            "type": "boolean"
-          },
-          "countedAt": {
-            "type": "string",
-            "description": "Ngày + giờ kiểm kê thực tế (ISO 8601)"
-          }
-        }
-      },
-      "AddStockTakeLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "itemId"
-        ]
-      },
-      "UpdateLineCountDto": {
-        "type": "object",
-        "properties": {
-          "countedQty": {
-            "type": "object",
-            "nullable": true
-          },
-          "countedValue": {
-            "type": "object",
-            "nullable": true
-          },
-          "note": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string",
-            "description": "Nguyên nhân chênh lệch"
-          }
-        }
-      },
-      "ReplaceMembersDto": {
-        "type": "object",
-        "properties": {
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockTakeMemberDto"
-            }
-          }
-        },
-        "required": [
-          "members"
-        ]
       },
       "CreateTransferOrderDto": {
         "type": "object",

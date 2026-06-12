@@ -13,13 +13,14 @@ import { ProductAttributeOptionEntity } from '../product/product-attribute-optio
 import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 
-/** Proves createProductWithVariants persists the per-variant price/SKU/barcode
- *  sent in variants[], instead of applying the top-level price to every row. */
+/** Proves createProductWithVariants persists per-variant price/SKU without
+ * creating barcode records. */
 describe('InventoryItemCrudService.create (product with variants)', () => {
   let service: InventoryItemCrudService;
   let itemRepo: Record<string, jest.Mock>;
   let productRepo: Record<string, jest.Mock>;
   let barcodeRepo: Record<string, jest.Mock>;
+  let stockLedger: { recordMovement: jest.Mock };
 
   const actor = {
     userId: 'u1',
@@ -40,6 +41,8 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
       'groupBy',
       'having',
       'distinct',
+      'orderBy',
+      'limit',
     ].forEach(
       (m) => (qb[m] = jest.fn().mockReturnValue(qb)),
     );
@@ -78,6 +81,7 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
       save: idGen('bc'),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
+    stockLedger = { recordMovement: jest.fn().mockResolvedValue({}) };
     const attrRepo = () => ({
       createQueryBuilder: jest.fn().mockImplementation(() => qbNull()),
       create: jest.fn().mockImplementation((d) => ({ ...d })),
@@ -108,13 +112,19 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         },
         {
           provide: getRepositoryToken(LocationEntity),
-          useValue: { createQueryBuilder: jest.fn().mockImplementation(() => qbNull()) },
+          useValue: {
+            createQueryBuilder: jest.fn().mockImplementation(() => {
+              const qb = qbNull();
+              qb.getOne.mockResolvedValue({ id: 'location-1' });
+              return qb;
+            }),
+          },
         },
         { provide: getRepositoryToken(ProductAttributeDefinitionEntity), useValue: attrRepo() },
         { provide: getRepositoryToken(ProductAttributeOptionEntity), useValue: attrRepo() },
         { provide: getRepositoryToken(ItemAttributeValueEntity), useValue: attrRepo() },
         { provide: DataSource, useValue: dataSource },
-        { provide: StockLedgerService, useValue: { recordMovement: jest.fn() } },
+        { provide: StockLedgerService, useValue: stockLedger },
       ],
     }).compile();
 
@@ -151,10 +161,7 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
     // No variant kept the top-level price.
     expect(savedItems.every((i) => i.purchasePrice !== 100)).toBe(true);
 
-    // Barcodes: explicit one used, otherwise cloned from SKU.
-    const savedBarcodes = barcodeRepo.save.mock.calls.map((c) => c[0].code);
-    expect(savedBarcodes).toContain('BC-1');
-    expect(savedBarcodes).toContain('P1-DEN-39');
+    expect(barcodeRepo.save).not.toHaveBeenCalled();
   });
 
   it('copies shared item fields to every created variant item', async () => {
@@ -210,6 +217,42 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         oddSize: '33-35',
         isGoldSilver: true,
         manageBarcodePerUnit: true,
+      }),
+    );
+  });
+
+  it('records opening stock for each variant using the shared opening unit price', async () => {
+    await service.create(
+      {
+        code: 'P3',
+        name: 'Prod 3',
+        unit: 'Đôi',
+        initialStockUnitPrice: 45000,
+        colors: ['Den'],
+        sizes: ['38', '39'],
+        variants: [
+          { color: 'Den', size: '38', sku: 'P3-DEN-38', initialStock: 2 },
+          { color: 'Den', size: '39', sku: 'P3-DEN-39', initialStock: 3 },
+        ],
+      },
+      actor,
+    );
+
+    expect(stockLedger.recordMovement).toHaveBeenCalledTimes(2);
+    expect(stockLedger.recordMovement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-1',
+        locationId: 'location-1',
+        quantity: 2,
+        unitCost: 45000,
+        referenceType: 'INITIAL_STOCK',
+      }),
+    );
+    expect(stockLedger.recordMovement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item-2',
+        quantity: 3,
+        unitCost: 45000,
       }),
     );
   });
@@ -310,9 +353,6 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         sellingPrice: 255,
       }),
     );
-    expect(barcodeRepo.update).toHaveBeenCalledWith(
-      { itemId: 'item-1', organizationId: 'org-1' },
-      { code: 'BC-NEW' },
-    );
+    expect(barcodeRepo.update).not.toHaveBeenCalled();
   });
 });

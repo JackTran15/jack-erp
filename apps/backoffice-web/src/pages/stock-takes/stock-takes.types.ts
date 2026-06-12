@@ -16,7 +16,13 @@ export interface StockTakeLine {
   countedValue?: string | number | null;
   note?: string | null;
   reason?: string | null;
-  item?: { id: string; code: string; name: string; unit: string };
+  item?: {
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    purchasePrice?: string | number | null;
+  };
   location?: { id: string; code: string; name: string };
 }
 
@@ -88,4 +94,5 @@ export interface ItemOption {
   name: string;
   code: string;
   unit: string;
+  purchasePrice?: string | number | null;
 }

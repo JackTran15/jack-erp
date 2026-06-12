@@ -229,7 +229,7 @@ export function LineItemGrid<R>({
                       (col.type === "number" || col.align === "right" ? "≤" : "*")}
                   </span>
                   <Input
-                    className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs shadow-none focus-visible:ring-inset"
+                    className="h-8 min-w-0 flex-1 rounded-none border-0 bg-background px-2 text-xs font-normal shadow-none focus-visible:ring-inset"
                     value={filters?.[col.key] ?? ""}
                     onChange={(e) => handleFilter(col.key, e.target.value)}
                     aria-label={`Lọc ${col.label}`}

@@ -7,6 +7,7 @@ export enum ImportJobType {
   ITEMS = "ITEMS",
   OPENING_BALANCES = "OPENING_BALANCES",
   ADJUSTMENTS = "ADJUSTMENTS",
+  STOCK_TAKE = "STOCK_TAKE",
   LOCATIONS = "LOCATIONS",
 }
 
@@ -19,9 +20,18 @@ export class InventoryImportJobEntity extends BaseEntity {
     type: "enum",
     enum: ImportJobType,
     comment:
-      "What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS, LOCATIONS)",
+      "What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS, STOCK_TAKE, LOCATIONS)",
   })
   type: ImportJobType;
+
+  @Column({
+    name: "reference_id",
+    type: "uuid",
+    nullable: true,
+    comment:
+      "Optional source record this job targets (e.g. stockTakeId for STOCK_TAKE imports)",
+  })
+  referenceId?: string | null;
 
   @Column({ name: "file_name", comment: "Original uploaded CSV file name" })
   fileName: string;

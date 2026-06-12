@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import {
   DocumentType,
@@ -74,7 +74,7 @@ export class GoodsReceiptService {
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
 
   async create(dto: CreateGoodsReceiptDto, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    this.validateBusinessRules(dto);
+    this.validateBusinessRules(dto, actor.branchId);
     const documentNumber = await this.documentNumberingService.generate(
       DocumentType.GOODS_RECEIPT,
       actor.branchId,
@@ -110,7 +110,7 @@ export class GoodsReceiptService {
     this.logger.log(
       `Goods receipt ${saved.id} created as DRAFT ${documentNumber} by ${actor.userId}`,
     );
-    return this.findOrFail(saved.id, actor.organizationId);
+    return this.findOrFail(saved.id, actor.organizationId, actor.branchId);
   }
 
   // ─── Create + Post (single user action — clone MISA) ──────────────────────
@@ -157,7 +157,7 @@ export class GoodsReceiptService {
     dto: UpdateGoodsReceiptDto,
     actor: ActorContext,
   ): Promise<GoodsReceiptEntity> {
-    const receipt = await this.findOrFail(id, actor.organizationId);
+    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
     if (receipt.status !== GoodsReceiptStatus.DRAFT) {
       throw new ConflictException(
         `Chỉ có thể sửa phiếu ở trạng thái DRAFT (hiện tại: ${receipt.status})`,
@@ -177,14 +177,17 @@ export class GoodsReceiptService {
     if (dto.attachmentIds !== undefined) receipt.attachmentIds = dto.attachmentIds;
 
     // Re-validate combined state
-    this.validateBusinessRules({
-      ...receipt,
-      purpose: receipt.purpose,
-      providerId: receipt.providerId,
-      referenceId: receipt.referenceId,
-      referenceType: receipt.referenceType,
-      lines: dto.lines ?? (receipt.lines as unknown as GoodsReceiptLineDto[]),
-    } as unknown as CreateGoodsReceiptDto);
+    this.validateBusinessRules(
+      {
+        ...receipt,
+        purpose: receipt.purpose,
+        providerId: receipt.providerId,
+        referenceId: receipt.referenceId,
+        referenceType: receipt.referenceType,
+        lines: dto.lines ?? (receipt.lines as unknown as GoodsReceiptLineDto[]),
+      } as unknown as CreateGoodsReceiptDto,
+      actor.branchId,
+    );
 
     if (dto.lines) {
       await this.lineRepo.delete({ goodsReceiptId: receipt.id });
@@ -195,13 +198,13 @@ export class GoodsReceiptService {
 
     const saved = await this.receiptRepo.save(receipt);
     this.logger.log(`Goods receipt ${id} updated (DRAFT) by ${actor.userId}`);
-    return this.findOrFail(saved.id, actor.organizationId);
+    return this.findOrFail(saved.id, actor.organizationId, actor.branchId);
   }
 
   // ─── Soft cancel (DRAFT only) ─────────────────────────────────────────────
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
-    const receipt = await this.findOrFail(id, actor.organizationId);
+    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
     if (
       receipt.status === GoodsReceiptStatus.CANCELLED ||
       receipt.status === GoodsReceiptStatus.REVERSED
@@ -218,7 +221,7 @@ export class GoodsReceiptService {
           'Không xác định được chi nhánh để đảo bút tồn kho',
         );
       }
-      await this.dataSource.transaction(async (manager) => {
+      const entries = await this.dataSource.transaction(async (manager) => {
         const reversals: RecordMovementParams[] = receipt.lines.map((line) => ({
           itemId: line.itemId,
           locationId: line.locationId,
@@ -232,7 +235,10 @@ export class GoodsReceiptService {
           actorContext: actor,
           unitCost: Number(line.unitPrice),
         }));
-        await this.stockLedger.recordBatchMovements(reversals);
+        const reversalEntries = await this.stockLedger.recordBatchMovements(
+          reversals,
+          manager,
+        );
 
         // Void the supplier-debt ledger row (nợ NCC) for a CREDIT receipt.
         // Refuse if it has already received any payment (partially settled).
@@ -254,7 +260,9 @@ export class GoodsReceiptService {
             await manager.delete(SupplierDebtEntity, debtRows[0].id);
           }
         }
+        return reversalEntries;
       });
+      await this.stockLedger.publishMovementEvents(entries);
     }
 
     receipt.status = GoodsReceiptStatus.CANCELLED;
@@ -266,7 +274,7 @@ export class GoodsReceiptService {
   // ─── Post (DRAFT → POSTED, atomic) ────────────────────────────────────────
 
   async post(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    const receipt = await this.findOrFail(id, actor.organizationId);
+    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
     if (receipt.status !== GoodsReceiptStatus.DRAFT) {
       throw new ConflictException(
         `Chỉ có thể duyệt phiếu DRAFT (hiện tại: ${receipt.status})`,
@@ -303,7 +311,7 @@ export class GoodsReceiptService {
     );
     const isCash = receipt.paymentMethod === GoodsReceiptPaymentMethod.CASH;
 
-    await this.dataSource.transaction(async (manager) => {
+    const ledgerEntries = await this.dataSource.transaction(async (manager) => {
       let journalEntryId: string | undefined;
       let cashMovementId: string | undefined;
       let cashContraAccountId: string | undefined;
@@ -427,7 +435,10 @@ export class GoodsReceiptService {
         actorContext: actor,
         unitCost: Number(line.unitPrice),
       }));
-      await this.stockLedger.recordBatchMovements(movements);
+      const savedLedgerEntries = await this.stockLedger.recordBatchMovements(
+        movements,
+        manager,
+      );
 
       if (isCash && cashMovementId && journalEntryId) {
         await this.outboxService.enqueue(
@@ -452,7 +463,9 @@ export class GoodsReceiptService {
           }),
         );
       }
+      return savedLedgerEntries;
     });
+    await this.stockLedger.publishMovementEvents(ledgerEntries);
 
     await this.eventPublisher.publish(ERP_TOPICS.GOODS_RECEIPT_POSTED, {
       eventId: randomUUID(),
@@ -477,7 +490,7 @@ export class GoodsReceiptService {
     });
 
     this.logger.log(`Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`);
-    return this.findOrFail(id, actor.organizationId);
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   /** Resolve an account id by code within an org (for inventory/payable contra). */
@@ -500,13 +513,19 @@ export class GoodsReceiptService {
 
   // ─── Read ─────────────────────────────────────────────────────────────────
 
-  async getById(id: string, organizationId: string): Promise<GoodsReceiptEntity> {
-    return this.findOrFail(id, organizationId);
+  async getById(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   async list(query: GoodsReceiptQuery): Promise<PaginatedResponse<GoodsReceiptEntity>> {
     const where: Record<string, unknown> = { organizationId: query.organizationId };
-    if (query.status) where.status = query.status;
+    if (query.status) {
+      where.status = query.status;
+    } else {
+      where.status = Not(
+        In([GoodsReceiptStatus.CANCELLED, GoodsReceiptStatus.REVERSED]),
+      );
+    }
     if (query.purpose) where.purpose = query.purpose;
     if (query.branchId) where.branchId = query.branchId;
 
@@ -527,17 +546,31 @@ export class GoodsReceiptService {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private async findOrFail(id: string, organizationId: string): Promise<GoodsReceiptEntity> {
-    const receipt = await this.receiptRepo.findOne({ where: { id, organizationId } });
+  private async findOrFail(
+    id: string,
+    organizationId: string,
+    branchId?: string,
+  ): Promise<GoodsReceiptEntity> {
+    const receipt = await this.receiptRepo.findOne({
+      where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+    });
     if (!receipt) throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
     return receipt;
   }
 
-  private validateBusinessRules(dto: CreateGoodsReceiptDto): void {
+  private validateBusinessRules(
+    dto: CreateGoodsReceiptDto,
+    currentBranchId?: string,
+  ): void {
     if (dto.purpose === GoodsReceiptPurpose.OTHER && !dto.providerId) {
       throw new BadRequestException('Cần chọn đối tượng (NCC) khi mục đích là "Khác"');
     }
     if (dto.purpose === GoodsReceiptPurpose.TRANSFER_IN) {
+      if (currentBranchId && dto.sourceBranchId === currentBranchId) {
+        throw new BadRequestException(
+          'Cửa hàng nguồn phải khác cửa hàng hiện tại',
+        );
+      }
       // referenceId / referenceType strictly required per design doc when a transfer doc exists;
       // we relax this to "warn-but-allow" while stock-transfer module isn't wired to UI.
       if (!dto.sourceBranchId && !dto.referenceId) {

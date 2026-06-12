@@ -133,8 +133,18 @@ export function isCsvFile(fileName: string): boolean {
 export function cellToString(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object' && 'text' in (value as object)) {
-    return String((value as { text?: string }).text ?? '').trim();
+  if (typeof value === 'object') {
+    if ('text' in value) {
+      return String((value as { text?: string }).text ?? '').trim();
+    }
+    if ('richText' in value) {
+      const richText = (value as { richText?: Array<{ text?: string }> })
+        .richText;
+      return (richText ?? [])
+        .map((part) => String(part.text ?? ''))
+        .join('')
+        .trim();
+    }
   }
   if (typeof value === 'number') return String(value);
   return String(value).trim();

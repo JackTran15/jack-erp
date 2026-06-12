@@ -30,8 +30,7 @@ export class SearchGoodsIssuesV2Handler
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    // Org-scoped, hiding CANCELLED — mirrors GoodsIssueService.list() (no
-    // soft-delete column, FE list never passes a branchId/status filter).
+    // Scope to the actor's active branch and hide CANCELLED (no soft-delete column).
     // Eager relations are joined explicitly so the row shape matches the
     // current find()-based list (provider, targetBranch, reasonRef, location,
     // lines + line item); the detail panel and view dialog rely on `lines`.
@@ -48,6 +47,10 @@ export class SearchGoodsIssuesV2Handler
       .andWhere('gi.status != :cancelled', {
         cancelled: GoodsIssueStatus.CANCELLED,
       });
+
+    if (actor.branchId) {
+      qb.andWhere('gi.branchId = :branchId', { branchId: actor.branchId });
+    }
 
     new FilterBuilder(qb)
       .applyString('gi.documentNumber', dto.documentNumber)

@@ -119,6 +119,15 @@ export interface StockBalanceSummaryRow {
   belowMin: boolean;
 }
 
+export interface InstantAverageCost {
+  itemId: string;
+  branchId: string;
+  quantity: number;
+  inventoryValue: number;
+  unitCost: number;
+  source: 'LEDGER' | 'PURCHASE_PRICE_FALLBACK';
+}
+
 @Injectable()
 export class StockLedgerService {
   private readonly logger = new Logger(StockLedgerService.name);
@@ -145,6 +154,7 @@ export class StockLedgerService {
     }
 
     const entry = await this.dataSource.transaction(async (manager) => {
+      const { unitCost, lineValue } = this.deriveCostFields(params);
       const ledgerEntry = manager.create(StockLedgerEntryEntity, {
         itemId: params.itemId,
         locationId: params.locationId,
@@ -157,6 +167,8 @@ export class StockLedgerService {
         notes: params.notes,
         postedAt: new Date(),
         createdBy: params.actorContext.userId,
+        unitCost,
+        lineValue,
       });
       const savedEntry = await manager.save(StockLedgerEntryEntity, ledgerEntry);
 
@@ -168,6 +180,58 @@ export class StockLedgerService {
     await this.publishMovementEvent(entry);
 
     return entry;
+  }
+
+  async getInstantAverageCost(
+    itemId: string,
+    organizationId: string,
+    branchId: string,
+  ): Promise<InstantAverageCost> {
+    const [row] = await this.ledgerRepo.query(
+      `
+        SELECT
+          COALESCE(SUM(sle.quantity), 0)::numeric AS quantity,
+          COALESCE(SUM(sle.line_value), 0)::numeric AS inventory_value,
+          COUNT(*) FILTER (WHERE sle.line_value IS NULL)::int AS missing_value_count,
+          COALESCE(i.purchase_price, 0)::numeric AS purchase_price
+        FROM items i
+        LEFT JOIN stock_ledger_entries sle
+          ON sle.item_id = i.id
+         AND sle.organization_id = i.organization_id
+         AND sle.branch_id = $3
+        WHERE i.id = $1
+          AND i.organization_id = $2
+        GROUP BY i.purchase_price
+      `,
+      [itemId, organizationId, branchId],
+    );
+
+    const quantity = Number(row?.quantity ?? 0);
+    const inventoryValue = Number(row?.inventory_value ?? 0);
+    const missingValueCount = Number(row?.missing_value_count ?? 0);
+    const ledgerCost =
+      quantity > 0 && missingValueCount === 0
+        ? Number((inventoryValue / quantity).toFixed(2))
+        : Number.NaN;
+    const useLedger = Number.isFinite(ledgerCost);
+    const unitCost = useLedger
+      ? ledgerCost
+      : Number(Number(row?.purchase_price ?? 0).toFixed(2));
+
+    if (!useLedger) {
+      this.logger.warn(
+        `Average cost fallback: item=${itemId} branch=${branchId} quantity=${quantity} missingValues=${missingValueCount}`,
+      );
+    }
+
+    return {
+      itemId,
+      branchId,
+      quantity,
+      inventoryValue,
+      unitCost,
+      source: useLedger ? 'LEDGER' : 'PURCHASE_PRICE_FALLBACK',
+    };
   }
 
   /**
