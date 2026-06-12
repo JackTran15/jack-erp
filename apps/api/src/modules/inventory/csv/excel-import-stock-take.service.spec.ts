@@ -1,6 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
 import { StockTakeStatus } from "@erp/shared-interfaces";
 import * as ExcelJS from "exceljs";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import { StockTakeEntity } from "../stock-take/stock-take.entity";
 import {
@@ -23,6 +25,8 @@ describe("ExcelImportStockTakeService", () => {
   } as unknown as StockTakeEntity;
 
   const itemRepo = { findOne: jest.fn() };
+  const barcodeRepo = { findOne: jest.fn() };
+  const itemUnitRepo = { findOne: jest.fn() };
   const locationRepo = { findOne: jest.fn() };
   const stockTakeService = {
     getById: jest.fn(),
@@ -31,6 +35,8 @@ describe("ExcelImportStockTakeService", () => {
   };
   const service = new ExcelImportStockTakeService(
     itemRepo as never,
+    barcodeRepo as never,
+    itemUnitRepo as never,
     locationRepo as never,
     stockTakeService as never,
   );
@@ -96,13 +102,72 @@ describe("ExcelImportStockTakeService", () => {
     ]);
   });
 
-  it("parses flat CSV headers and silently identifies empty counts", () => {
+  it("parses the checked-in MISA stock-take golden fixture", async () => {
+    const fixture = readFileSync(
+      resolve(process.cwd(), "../../docs/DanhSachHangHoaKiemKe.xlsx"),
+    );
+
+    const rows = await service.parseWorkbook(fixture);
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toEqual(
+      expect.objectContaining({
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]: expect.any(String),
+      }),
+    );
+  });
+
+  it("treats a blank count as zero instead of skipping the row", () => {
     const rows = service.parseCsv(
       "Mã SKU,Vị trí,Số lượng kiểm kê,Giá trị kiểm kê,Nguyên nhân\nSKU-1,A01,,,",
     );
 
     expect(rows).toHaveLength(1);
-    expect(service.isEmptyCountRow(rows[0], stockTake)).toBe(true);
+    expect(service.isEmptyCountRow(rows[0], stockTake)).toBe(false);
+  });
+
+  it("resolves an item by barcode, converts its unit, and uses the unassigned location", async () => {
+    barcodeRepo.findOne.mockResolvedValue({ itemId: "item-1" });
+    itemRepo.findOne.mockResolvedValue({
+      id: "item-1",
+      code: "SKU-1",
+      unit: "Cái",
+    });
+    itemUnitRepo.findOne.mockResolvedValue({ ratio: "12" });
+    locationRepo.findOne.mockResolvedValue({
+      id: "loc-unassigned",
+      storageId: "storage-1",
+      isUnassigned: true,
+    });
+    stockTakeService.addLine.mockResolvedValue({
+      id: "line-new",
+      itemId: "item-1",
+      locationId: "loc-unassigned",
+    });
+
+    await service.commitRow(
+      {
+        [STOCK_TAKE_IMPORT_FIELDS.BARCODE]: "8930001",
+        [STOCK_TAKE_IMPORT_FIELDS.UNIT]: "Hộp",
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]: "2",
+        [STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE]: "",
+        [STOCK_TAKE_IMPORT_FIELDS.REASON]: "",
+      },
+      stockTake,
+      actor,
+    );
+
+    expect(stockTakeService.addLine).toHaveBeenCalledWith(
+      "stock-take-1",
+      { itemId: "item-1", locationId: "loc-unassigned" },
+      actor,
+    );
+    expect(stockTakeService.updateLineCount).toHaveBeenCalledWith(
+      "stock-take-1",
+      "line-new",
+      expect.objectContaining({ countedQty: 24, countedValue: 0 }),
+      actor,
+    );
   });
 
   it("validates SKU, storage location, and non-negative counts", async () => {
@@ -122,7 +187,7 @@ describe("ExcelImportStockTakeService", () => {
       ),
     ).resolves.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "SKU_NOT_FOUND" }),
+        expect.objectContaining({ code: "ITEM_NOT_FOUND" }),
         expect.objectContaining({ code: "LOCATION_NOT_IN_STORAGE" }),
         expect.objectContaining({ code: "INVALID_QUANTITY" }),
         expect.objectContaining({ code: "INVALID_VALUE" }),

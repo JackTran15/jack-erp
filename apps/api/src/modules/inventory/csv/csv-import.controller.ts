@@ -19,7 +19,7 @@ import {
   Actor,
   ActorContext,
 } from "../../../common/decorators/actor-context.decorator";
-import { RequirePermission } from "../../auth/decorators";
+import { RequireBranchScope, RequirePermission } from "../../auth/decorators";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { AuditInterceptor } from "../../crud/audit.interceptor";
@@ -148,6 +148,7 @@ export class CsvImportController {
 
   @Post("stock-takes/validate")
   @RequirePermission("inventory.adjustment.create")
+  @RequireBranchScope()
   @UseInterceptors(FileInterceptor("file"))
   @ApiQuery({ name: "stockTakeId", required: false, type: String })
   @ApiQuery({ name: "storageId", required: false, type: String })
@@ -175,6 +176,7 @@ export class CsvImportController {
 
   @Post("stock-takes/commit")
   @RequirePermission("inventory.adjustment.create")
+  @RequireBranchScope()
   commitStockTake(
     @Query("jobId", ParseUUIDPipe) jobId: string,
     @Actor() actor: ActorContext,

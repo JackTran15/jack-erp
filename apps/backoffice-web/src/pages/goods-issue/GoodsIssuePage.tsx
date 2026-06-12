@@ -104,6 +104,17 @@ interface GoodsIssueLine {
   item?: { id: string; code: string; name: string; unit?: string; purchasePrice?: number | string | null } | null;
 }
 
+interface InstantAverageCost {
+  unitCost: number;
+}
+
+async function getInstantAverageCost(itemId: string): Promise<number> {
+  const { data } = await apiClient.get<InstantAverageCost>(
+    `/inventory/stock/items/${itemId}/average-cost`,
+  );
+  return Number(data.unitCost ?? 0);
+}
+
 interface GoodsIssue {
   id: string;
   documentNumber?: string;
@@ -467,7 +478,7 @@ export function GoodsIssuePage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedIssue || selectedIssue.status !== "DRAFT",
+      disabled: true,
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);
@@ -1496,7 +1507,7 @@ function GoodsIssueFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView || initial?.status !== "DRAFT",
+      disabled: true,
       onClick: onEdit,
     },
     {
@@ -1623,6 +1634,19 @@ function GoodsIssueFormDialog({
 
               return normalizeFormLines(updated);
             });
+            void getInstantAverageCost(item.id)
+              .then((unitCost) => {
+                setLines((current) =>
+                  current.map((line, lineIdx) =>
+                    lineIdx === idx && line.itemId === item.id
+                      ? { ...line, unitPrice: unitCost }
+                      : line,
+                  ),
+                );
+              })
+              .catch(() => {
+                // Keep purchase price fallback already shown in the row.
+              });
             markDirty();
           }}
           search={searchItems}

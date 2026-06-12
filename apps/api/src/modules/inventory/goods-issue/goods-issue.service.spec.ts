@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { GoodsIssuePurpose } from '@erp/shared-interfaces';
+import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
 import { GoodsIssueService } from './goods-issue.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
@@ -13,6 +13,8 @@ describe('GoodsIssueService', () => {
   let service: GoodsIssueService;
   let giRepo: Record<string, jest.Mock>;
   let branchRepo: Record<string, jest.Mock>;
+  let dataSource: Record<string, any>;
+  let ledgerService: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -32,6 +34,18 @@ describe('GoodsIssueService', () => {
     branchRepo = {
       findOne: jest.fn().mockResolvedValue({ id: 'branch-B', name: 'Cần Thơ' }),
     };
+    const manager = {
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    dataSource = {
+      transaction: jest.fn().mockImplementation((cb) => cb(manager)),
+      _manager: manager,
+    };
+    ledgerService = {
+      getInstantAverageCost: jest.fn(),
+      recordBatchMovements: jest.fn().mockResolvedValue([{ id: 'ledger-1' }]),
+      publishMovementEvents: jest.fn().mockResolvedValue(undefined),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,8 +56,8 @@ describe('GoodsIssueService', () => {
           useValue: { findOne: jest.fn() },
         },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
-        { provide: DataSource, useValue: {} },
-        { provide: StockLedgerService, useValue: {} },
+        { provide: DataSource, useValue: dataSource },
+        { provide: StockLedgerService, useValue: ledgerService },
         {
           provide: DocumentNumberingService,
           useValue: { generate: jest.fn().mockResolvedValue('XK000001') },
@@ -111,6 +125,62 @@ describe('GoodsIssueService', () => {
 
       expect(branchRepo.findOne).not.toHaveBeenCalled();
       expect(giRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('post — instantaneous average cost', () => {
+    it('overrides client prices per SKU and writes the ledger in the posting transaction', async () => {
+      const issue = {
+        id: 'gi-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        documentNumber: 'XK000001',
+        status: GoodsIssueStatus.DRAFT,
+        lines: [
+          { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 2, unitPrice: '1' },
+          { id: 'line-2', itemId: 'item-1', locationId: 'loc-B', quantity: 3, unitPrice: '2' },
+        ],
+      };
+      giRepo.findOne.mockResolvedValue(issue);
+      ledgerService.getInstantAverageCost.mockResolvedValue({ unitCost: 215000 });
+
+      await service.post(issue.id, actor);
+
+      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledTimes(1);
+      expect(ledgerService.getInstantAverageCost).toHaveBeenCalledWith(
+        'item-1',
+        actor.organizationId,
+        actor.branchId,
+      );
+      expect((dataSource._manager as any).update).toHaveBeenCalledWith(
+        expect.anything(),
+        { id: 'line-1' },
+        { unitPrice: '215000.00', lineTotal: '430000.00' },
+      );
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ itemId: 'item-1', quantity: -2, unitCost: 215000 }),
+          expect.objectContaining({ itemId: 'item-1', quantity: -3, unitCost: 215000 }),
+        ]),
+        dataSource._manager,
+      );
+      expect(ledgerService.publishMovementEvents).toHaveBeenCalledWith([
+        { id: 'ledger-1' },
+      ]);
+    });
+  });
+
+  it('scopes detail lookup to the active branch', async () => {
+    giRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.getById('gi-1', actor)).rejects.toThrow();
+
+    expect(giRepo.findOne).toHaveBeenCalledWith({
+      where: {
+        id: 'gi-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
   });
 });

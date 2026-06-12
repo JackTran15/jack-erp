@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import * as ExcelJS from "exceljs";
 import {
   BadRequestException,
   ConflictException,
@@ -481,6 +482,7 @@ describe("StockTakeService", () => {
 
       await service.list({
         organizationId: "org-1",
+        branchId: "branch-1",
         page: 1,
         pageSize: 20,
         fromDate: "2026-05-01",
@@ -492,6 +494,9 @@ describe("StockTakeService", () => {
 
       expect(qb.where).toHaveBeenCalledWith("st.organization_id = :orgId", {
         orgId: "org-1",
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith("st.branch_id = :branchId", {
+        branchId: "branch-1",
       });
       expect(qb.andWhere).toHaveBeenCalledWith("st.created_at >= :fromDate", {
         fromDate: "2026-05-01T00:00:00.000Z",
@@ -613,17 +618,37 @@ describe("StockTakeService", () => {
   describe("getById", () => {
     it("throws NotFoundException when missing", async () => {
       stRepo.findOne.mockResolvedValue(null);
-      await expect(service.getById("missing", "org-1")).rejects.toBeInstanceOf(
+      await expect(service.getById("missing", actor)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
 
     it("enforces organizationId in lookup (cross-org isolation)", async () => {
       stRepo.findOne.mockResolvedValue(null);
-      await expect(service.getById("st-1", "org-foreign")).rejects.toThrow();
+      await expect(
+        service.getById("st-1", { ...actor, organizationId: "org-foreign" }),
+      ).rejects.toThrow();
       expect(stRepo.findOne).toHaveBeenCalledWith({
-        where: { id: "st-1", organizationId: "org-foreign" },
+        where: {
+          id: "st-1",
+          organizationId: "org-foreign",
+          branchId: actor.branchId,
+        },
       });
+    });
+  });
+
+  describe("buildImportTemplateBuffer", () => {
+    it("adds MISA-compatible comments and number/date formats", async () => {
+      const buffer = await service.buildImportTemplateBuffer(true);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as never);
+      const sheet = workbook.worksheets[0];
+
+      expect(sheet.getCell("A7").note).toBeTruthy();
+      expect(sheet.getCell("G9").numFmt).toBe("dd/mm/yyyy");
+      expect(sheet.getCell("K9").numFmt).toBe("#,##0.###");
+      expect(sheet.getCell("N9").numFmt).toBe("#,##0.00");
     });
   });
 });

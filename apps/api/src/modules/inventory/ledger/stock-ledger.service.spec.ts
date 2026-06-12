@@ -39,6 +39,7 @@ describe('StockLedgerService', () => {
   beforeEach(async () => {
     ledgerRepo = {
       createQueryBuilder: jest.fn(),
+      query: jest.fn(),
     };
 
     balanceRepo = {
@@ -228,6 +229,52 @@ describe('StockLedgerService', () => {
       const result = await service.recordBatchMovements([]);
       expect(result).toEqual([]);
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getInstantAverageCost', () => {
+    it('calculates the branch-wide instantaneous weighted average from signed ledger values', async () => {
+      ledgerRepo.query.mockResolvedValue([
+        {
+          quantity: '10',
+          inventory_value: '2150000',
+          missing_value_count: '0',
+          purchase_price: '250000',
+        },
+      ]);
+
+      await expect(
+        service.getInstantAverageCost('item-1', 'org-1', 'branch-1'),
+      ).resolves.toEqual({
+        itemId: 'item-1',
+        branchId: 'branch-1',
+        quantity: 10,
+        inventoryValue: 2150000,
+        unitCost: 215000,
+        source: 'LEDGER',
+      });
+    });
+
+    it('falls back to the current purchase price when historical ledger values are incomplete', async () => {
+      ledgerRepo.query.mockResolvedValue([
+        {
+          quantity: '10',
+          inventory_value: '1400000',
+          missing_value_count: '1',
+          purchase_price: '250000',
+        },
+      ]);
+
+      await expect(
+        service.getInstantAverageCost('item-1', 'org-1', 'branch-1'),
+      ).resolves.toEqual({
+        itemId: 'item-1',
+        branchId: 'branch-1',
+        quantity: 10,
+        inventoryValue: 1400000,
+        unitCost: 250000,
+        source: 'PURCHASE_PRICE_FALLBACK',
+      });
     });
   });
 

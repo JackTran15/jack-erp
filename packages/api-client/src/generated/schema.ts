@@ -2046,6 +2046,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/items/{itemId}/average-cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockLedgerController_getInstantAverageCost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock/balances/{itemId}/{locationId}": {
         parameters: {
             query?: never;
@@ -6306,6 +6322,17 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        InstantAverageCostDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            branchId: string;
+            quantity: number;
+            inventoryValue: number;
+            unitCost: number;
+            /** @enum {string} */
+            source: "LEDGER" | "PURCHASE_PRICE_FALLBACK";
         };
         StockBalanceEntity: {
             itemId: string;
@@ -12302,6 +12329,27 @@ export interface operations {
             };
         };
     };
+    StockLedgerController_getInstantAverageCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstantAverageCostDto"];
+                };
+            };
+        };
+    };
     StockLedgerController_getBalance: {
         parameters: {
             query?: never;
@@ -14256,7 +14304,7 @@ export interface operations {
     StockTakeController_importTemplate: {
         parameters: {
             query?: {
-                countByValue?: boolean;
+                countByValue?: unknown;
             };
             header?: never;
             path?: never;

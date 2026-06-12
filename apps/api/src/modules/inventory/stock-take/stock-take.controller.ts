@@ -298,6 +298,7 @@ export class StockTakeController {
 
   @Get()
   @RequirePermission("inventory.read")
+  @RequireBranchScope()
   list(@Query() query: StockTakeQueryDto, @Actor() actor: ActorContext) {
     return this.service.list({
       page: query.page ?? 1,
@@ -312,6 +313,7 @@ export class StockTakeController {
       purpose: query.purpose,
       mergeStatus: query.mergeStatus,
       organizationId: actor.organizationId,
+      branchId: actor.branchId,
     });
   }
 
@@ -344,6 +346,7 @@ export class StockTakeController {
 
   @Get(":id/export.xlsx")
   @RequirePermission("inventory.read")
+  @RequireBranchScope()
   async exportExcel(
     @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
@@ -363,11 +366,12 @@ export class StockTakeController {
 
   @Get(":id")
   @RequirePermission("inventory.read")
+  @RequireBranchScope()
   getById(
     @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor.organizationId);
+    return this.service.getById(id, actor);
   }
 
   @Patch(":id")
@@ -440,6 +444,7 @@ export class StockTakeController {
   @Delete(":id")
   @HttpCode(204)
   @RequirePermission("inventory.adjustment.create")
+  @RequireBranchScope()
   async cancel(
     @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,

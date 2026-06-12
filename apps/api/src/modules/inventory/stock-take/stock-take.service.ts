@@ -101,6 +101,7 @@ export interface AddLineDto {
 export interface StockTakeQuery extends PaginationQuery {
   status?: StockTakeStatus;
   organizationId: string;
+  branchId?: string;
   /** Filter on createdAt ≥ fromDate (inclusive, YYYY-MM-DD). */
   fromDate?: string;
   /** Filter on createdAt ≤ toDate (inclusive, YYYY-MM-DD). */
@@ -176,7 +177,11 @@ export class StockTakeService {
     actor: ActorContext,
   ): Promise<StockTakeEntity> {
     const mergeSources = dto.mergeSourceIds?.length
-      ? await this.loadMergeSources(dto.mergeSourceIds, actor.organizationId)
+      ? await this.loadMergeSources(
+          dto.mergeSourceIds,
+          actor.organizationId,
+          actor.branchId,
+        )
       : [];
     const storageId = mergeSources[0]?.storageId ?? dto.storageId;
     const mergedLocationIds = new Set(
@@ -298,7 +303,7 @@ export class StockTakeService {
     this.logger.log(
       `Stock-take ${saved.id} (${documentNumber}) created with ${lines.length} line(s)`,
     );
-    return this.findOrFail(saved.id, actor.organizationId);
+    return this.findOrFail(saved.id, actor.organizationId, actor.branchId);
   }
 
   async previewMerge(
@@ -308,6 +313,7 @@ export class StockTakeService {
     const sources = await this.loadMergeSources(
       sourceIds,
       actor.organizationId,
+      actor.branchId,
     );
     const first = sources[0];
     const lineMap = new Map<string, StockTakeLineEntity>();
@@ -410,7 +416,7 @@ export class StockTakeService {
     dto: UpdateStockTakeHeaderDto,
     actor: ActorContext,
   ): Promise<StockTakeEntity> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.assertDraft(st);
 
     if (dto.purpose !== undefined) st.purpose = dto.purpose;
@@ -420,7 +426,7 @@ export class StockTakeService {
     if (dto.countedAt !== undefined) st.countedAt = new Date(dto.countedAt);
 
     await this.stRepo.save(st);
-    return this.findOrFail(id, actor.organizationId);
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   /**
@@ -433,7 +439,7 @@ export class StockTakeService {
     dto: AddLineDto,
     actor: ActorContext,
   ): Promise<StockTakeLineEntity> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.assertDraft(st);
 
     const resolved = await this.resolveLineLocation(
@@ -539,7 +545,7 @@ export class StockTakeService {
     lineId: string,
     actor: ActorContext,
   ): Promise<void> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.assertDraft(st);
     const line = st.lines.find((l) => l.id === lineId);
     if (!line) throw new NotFoundException(`Dòng ${lineId} không tìm thấy`);
@@ -552,7 +558,7 @@ export class StockTakeService {
     dto: UpdateLineCountDto,
     actor: ActorContext,
   ): Promise<StockTakeLineEntity> {
-    const st = await this.findOrFail(stockTakeId, actor.organizationId);
+    const st = await this.findOrFail(stockTakeId, actor.organizationId, actor.branchId);
     this.assertDraft(st);
     const line = st.lines.find((l) => l.id === lineId);
     if (!line) throw new NotFoundException(`Dòng ${lineId} không tìm thấy`);
@@ -586,7 +592,7 @@ export class StockTakeService {
   }
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.assertDraft(st);
     st.status = StockTakeStatus.CANCELLED;
     await this.stRepo.save(st);
@@ -598,7 +604,7 @@ export class StockTakeService {
     members: StockTakeMemberPayload[],
     actor: ActorContext,
   ): Promise<StockTakeEntity> {
-    const st = await this.findOrFail(stockTakeId, actor.organizationId);
+    const st = await this.findOrFail(stockTakeId, actor.organizationId, actor.branchId);
     this.assertDraft(st);
     await this.memberRepo.delete({ stockTakeId });
     const rows = members
@@ -616,7 +622,7 @@ export class StockTakeService {
         }),
       );
     if (rows.length) await this.memberRepo.save(rows);
-    return this.findOrFail(stockTakeId, actor.organizationId);
+    return this.findOrFail(stockTakeId, actor.organizationId, actor.branchId);
   }
 
   /**
@@ -628,7 +634,7 @@ export class StockTakeService {
    * Stock balances are updated via the ledger as part of the same transaction.
    */
   async process(id: string, actor: ActorContext): Promise<StockTakeEntity> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.assertDraft(st);
     if (!st.lines || st.lines.length === 0) {
       throw new BadRequestException("Phiếu kiểm kê không có dòng");
@@ -741,15 +747,15 @@ export class StockTakeService {
     this.logger.log(
       `Stock-take ${id} processed: receipt=${generatedReceiptId ?? "-"} issue=${generatedIssueId ?? "-"}`,
     );
-    return this.findOrFail(id, actor.organizationId);
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
-  async getById(id: string, organizationId: string): Promise<StockTakeEntity> {
-    return this.findOrFail(id, organizationId);
+  async getById(id: string, actor: ActorContext): Promise<StockTakeEntity> {
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   async exportExcelBuffer(id: string, actor: ActorContext): Promise<Buffer> {
-    const st = await this.findOrFail(id, actor.organizationId);
+    const st = await this.findOrFail(id, actor.organizationId, actor.branchId);
     const storage = st.storageId
       ? await this.storageRepo.findOne({
           where: { id: st.storageId, organizationId: actor.organizationId },
@@ -1066,6 +1072,20 @@ export class StockTakeService {
         promptTitle: title,
         prompt,
       });
+      const firstCell = range.split(":")[0];
+      sheet.getCell(firstCell).note = {
+        texts: [{ text: prompt, font: { name: FONT, size: 10 } }],
+      };
+    }
+
+    for (let row = DATA_START; row <= DATA_END; row++) {
+      sheet.getCell(`G${row}`).numFmt = "dd/mm/yyyy";
+      for (const column of ["J", "K", "L"]) {
+        sheet.getCell(`${column}${row}`).numFmt = "#,##0.###";
+      }
+      for (const column of ["M", "N", "O"]) {
+        sheet.getCell(`${column}${row}`).numFmt = "#,##0.00";
+      }
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1244,6 +1264,10 @@ export class StockTakeService {
       rowValues.forEach((value, valueIndex) => {
         row.getCell(valueIndex + 1).value = value;
       });
+      for (const column of [6, 7, 8]) row.getCell(column).numFmt = "#,##0.###";
+      if (valueMode) {
+        for (const column of [9, 10, 11]) row.getCell(column).numFmt = "#,##0.00";
+      }
     });
 
     const totalRowNo = 11 + lines.length;
@@ -1370,6 +1394,9 @@ export class StockTakeService {
       .createQueryBuilder("st")
       .leftJoin("storages", "storage", "storage.id = st.storage_id")
       .where("st.organization_id = :orgId", { orgId: query.organizationId });
+    if (query.branchId) {
+      qb.andWhere("st.branch_id = :branchId", { branchId: query.branchId });
+    }
     if (query.status) {
       qb.andWhere("st.status = :status", { status: query.status });
     }
@@ -1430,13 +1457,14 @@ export class StockTakeService {
   private async loadMergeSources(
     sourceIds: string[],
     organizationId: string,
+    branchId?: string,
   ): Promise<StockTakeEntity[]> {
     const uniqueIds = [...new Set(sourceIds)];
     if (uniqueIds.length < 2) {
       throw new BadRequestException("Cần chọn ít nhất 2 phiếu để gộp");
     }
     const sources = await this.stRepo.find({
-      where: { id: In(uniqueIds), organizationId },
+      where: { id: In(uniqueIds), organizationId, ...(branchId ? { branchId } : {}) },
       order: { createdAt: "ASC" },
     });
     if (sources.length !== uniqueIds.length) {
@@ -1628,8 +1656,11 @@ export class StockTakeService {
   private async findOrFail(
     id: string,
     organizationId: string,
+    branchId?: string,
   ): Promise<StockTakeEntity> {
-    const st = await this.stRepo.findOne({ where: { id, organizationId } });
+    const st = await this.stRepo.findOne({
+      where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+    });
     if (!st) throw new NotFoundException(`Phiếu kiểm kê ${id} không tìm thấy`);
     return st;
   }

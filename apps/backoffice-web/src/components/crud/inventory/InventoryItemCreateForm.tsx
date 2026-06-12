@@ -526,6 +526,7 @@ export function InventoryItemCreateForm({
         error={errors[field.key]}
         layout="horizontal"
         labelWidth="10rem"
+        disabled={disabled}
         onChange={(nextValue) => {
           setValues((prev) => ({ ...prev, [field.key]: nextValue }));
           setErrors((prev) => {

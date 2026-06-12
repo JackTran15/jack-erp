@@ -91,4 +91,18 @@ describe('GoodsReceiptService', () => {
 
     expect(receiptRepo.save).not.toHaveBeenCalled();
   });
+
+  it('scopes detail lookup to the active branch', async () => {
+    receiptRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.getById('receipt-1', actor)).rejects.toThrow();
+
+    expect(receiptRepo.findOne).toHaveBeenCalledWith({
+      where: {
+        id: 'receipt-1',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
+    });
+  });
 });

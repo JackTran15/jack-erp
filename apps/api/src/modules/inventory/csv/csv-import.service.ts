@@ -128,11 +128,12 @@ export class CsvImportService {
       (stockTakeDraftContext
         ? `${stockTakeDraftContext.storageId}:${stockTakeDraftContext.countByValue}`
         : "");
-    const idempotencyKey = `${actor.organizationId}:${type}:${targetKey}:${checksum}:${duplicateMode}`;
+    const idempotencyKey = `${actor.organizationId}:${actor.branchId ?? ""}:${type}:${targetKey}:${checksum}:${duplicateMode}`;
 
     const existing = await this.jobRepo.findOne({
       where: {
         organizationId: actor.organizationId,
+        branchId: actor.branchId,
         type,
         idempotencyKey,
       },
@@ -257,7 +258,7 @@ export class CsvImportService {
     ImportValidateResult & { productsCreated: number; itemsCommitted: number }
   > {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -333,7 +334,7 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<InventoryImportJobEntity> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -346,7 +347,7 @@ export class CsvImportService {
    */
   async cancelJob(jobId: string, actor: ActorContext): Promise<void> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -370,7 +371,7 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<PaginatedResponse<InventoryImportJobRowEntity>> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -394,7 +395,7 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<Buffer> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId },
+      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -430,6 +431,7 @@ export class CsvImportService {
   ): Promise<PaginatedResponse<InventoryImportJobEntity>> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
+      branchId: actor.branchId,
     };
     if (query.type) where.type = query.type;
     if (query.status) where.status = query.status;

@@ -6,6 +6,8 @@ import * as XLSX from "xlsx";
 import { Repository } from "typeorm";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import { ItemEntity } from "../location/item.entity";
+import { ItemBarcodeEntity } from "../location/item-barcode.entity";
+import { ItemUnitEntity } from "../location/item-unit.entity";
 import { LocationEntity } from "../location/location.entity";
 import { StockTakeEntity } from "../stock-take/stock-take.entity";
 import { StockTakeService } from "../stock-take/stock-take.service";
@@ -18,7 +20,12 @@ import {
 
 export const STOCK_TAKE_IMPORT_FIELDS = {
   SKU: "Mã SKU",
+  BARCODE: "Mã vạch",
+  UNIT: "Đơn vị tính",
   LOCATION: "Vị trí",
+  LOT: "Số lô",
+  EXPIRY_DATE: "Hạn sử dụng",
+  SERIAL_IMEI: "Serial/IMEI",
   COUNTED_QTY: "Số lượng kiểm kê",
   COUNTED_VALUE: "Giá trị kiểm kê",
   REASON: "Nguyên nhân",
@@ -37,6 +44,10 @@ export class ExcelImportStockTakeService {
   constructor(
     @InjectRepository(ItemEntity)
     private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(ItemBarcodeEntity)
+    private readonly barcodeRepo: Repository<ItemBarcodeEntity>,
+    @InjectRepository(ItemUnitEntity)
+    private readonly itemUnitRepo: Repository<ItemUnitEntity>,
     @InjectRepository(LocationEntity)
     private readonly locationRepo: Repository<LocationEntity>,
     private readonly stockTakeService: StockTakeService,
@@ -70,7 +81,7 @@ export class ExcelImportStockTakeService {
     }
     const stockTake = await this.stockTakeService.getById(
       referenceId,
-      actor.organizationId,
+      actor,
     );
     if (stockTake.status !== StockTakeStatus.DRAFT) {
       throw new BadRequestException(
@@ -163,9 +174,7 @@ export class ExcelImportStockTakeService {
     row: StockTakeImportRow,
     stockTake: StockTakeEntity,
   ): boolean {
-    const qty = row[STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]?.trim();
-    const value = row[STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE]?.trim();
-    return !qty && (!stockTake.countByValue || !value);
+    return false;
   }
 
   async validateRow(
@@ -175,22 +184,27 @@ export class ExcelImportStockTakeService {
   ): Promise<StockTakeImportRowError[]> {
     const errors: StockTakeImportRowError[] = [];
     const sku = row[STOCK_TAKE_IMPORT_FIELDS.SKU]?.trim();
+    const barcode = row[STOCK_TAKE_IMPORT_FIELDS.BARCODE]?.trim();
     const locationCode = row[STOCK_TAKE_IMPORT_FIELDS.LOCATION]?.trim();
 
-    if (!sku) {
+    if (!sku && !barcode) {
       errors.push({
         column: STOCK_TAKE_IMPORT_FIELDS.SKU,
         code: "REQUIRED",
-        message: "Mã SKU không được để trống",
+        message: "Cần nhập Mã SKU hoặc Mã vạch",
       });
     } else {
-      const item = await this.findItem(sku, actor.organizationId);
+      const item = await this.resolveItem(row, actor.organizationId);
       if (!item) {
         errors.push({
-          column: STOCK_TAKE_IMPORT_FIELDS.SKU,
-          code: "SKU_NOT_FOUND",
-          message: `Không tìm thấy hàng hóa có mã SKU "${sku}"`,
+          column: sku
+            ? STOCK_TAKE_IMPORT_FIELDS.SKU
+            : STOCK_TAKE_IMPORT_FIELDS.BARCODE,
+          code: "ITEM_NOT_FOUND",
+          message: `Không tìm thấy hàng hóa "${sku || barcode}"`,
         });
+      } else {
+        await this.validateUnit(row, item, actor.organizationId, errors);
       }
     }
 
@@ -234,18 +248,26 @@ export class ExcelImportStockTakeService {
     actor: ActorContext,
   ): Promise<void> {
     const sku = row[STOCK_TAKE_IMPORT_FIELDS.SKU]?.trim();
-    const item = sku ? await this.findItem(sku, actor.organizationId) : null;
+    const barcode = row[STOCK_TAKE_IMPORT_FIELDS.BARCODE]?.trim();
+    const item = await this.resolveItem(row, actor.organizationId);
     if (!item) {
-      throw new BadRequestException(`Không tìm thấy hàng hóa có mã SKU "${sku}"`);
+      throw new BadRequestException(
+        `Không tìm thấy hàng hóa "${sku || barcode || ""}"`,
+      );
     }
 
     const locationCode = row[STOCK_TAKE_IMPORT_FIELDS.LOCATION]?.trim();
     const explicitLocation = locationCode
       ? await this.findLocation(locationCode, stockTake, actor.organizationId)
-      : undefined;
+      : await this.findUnassignedLocation(stockTake, actor.organizationId);
     if (locationCode && !explicitLocation) {
       throw new BadRequestException(
         `Vị trí "${locationCode}" không thuộc kho kiểm kê`,
+      );
+    }
+    if (!locationCode && !explicitLocation) {
+      throw new BadRequestException(
+        'Kho kiểm kê chưa có vị trí "Chưa xếp"',
       );
     }
 
@@ -267,13 +289,15 @@ export class ExcelImportStockTakeService {
       stockTake.id,
       line.id,
       {
-        countedQty: this.parseOptionalNumber(
-          row[STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY],
-        ),
+        countedQty:
+          (this.parseOptionalNumber(
+            row[STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY],
+          ) ?? 0) *
+          (await this.resolveUnitRatio(row, item, actor.organizationId)),
         countedValue: stockTake.countByValue
-          ? this.parseOptionalNumber(
+          ? (this.parseOptionalNumber(
               row[STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE],
-            )
+            ) ?? 0)
           : undefined,
         reason: row[STOCK_TAKE_IMPORT_FIELDS.REASON]?.trim() || undefined,
       },
@@ -298,7 +322,12 @@ export class ExcelImportStockTakeService {
     const secondary = normalized[headerIndex + 1] ?? [];
     let activeGroup = "";
     let skuIndex = -1;
+    let barcodeIndex = -1;
+    let unitIndex = -1;
     let locationIndex = -1;
+    let lotIndex = -1;
+    let expiryIndex = -1;
+    let serialIndex = -1;
     let reasonIndex = -1;
     let countedQtyIndex = -1;
     let countedValueIndex = -1;
@@ -310,7 +339,12 @@ export class ExcelImportStockTakeService {
       const bottom = this.normalizeHeader(secondary[index] ?? "");
       if (top) activeGroup = top;
       if (top.includes("ma sku")) skuIndex = index;
+      if (top === "ma vach") barcodeIndex = index;
+      if (top === "don vi tinh" || top === "dvt") unitIndex = index;
       if (top === "vi tri") locationIndex = index;
+      if (top === "so lo") lotIndex = index;
+      if (top === "han su dung") expiryIndex = index;
+      if (top.includes("serial/imei")) serialIndex = index;
       if (top === "nguyen nhan") reasonIndex = index;
       if (top.includes("so luong kiem ke")) countedQtyIndex = index;
       if (top.includes("gia tri kiem ke")) countedValueIndex = index;
@@ -340,12 +374,34 @@ export class ExcelImportStockTakeService {
       if (normalizedFirstValue.startsWith("tong")) continue;
 
       const sku = source[skuIndex]?.trim() ?? "";
-      if (!sku || this.normalizeHeader(sku).startsWith("tong")) continue;
+      const barcode = barcodeIndex >= 0 ? source[barcodeIndex]?.trim() ?? "" : "";
+      if ((!sku && !barcode) || this.normalizeHeader(sku).startsWith("tong")) continue;
 
       rows.push({
         [STOCK_TAKE_IMPORT_FIELDS.SKU]: sku,
+        ...(barcodeIndex >= 0
+          ? { [STOCK_TAKE_IMPORT_FIELDS.BARCODE]: barcode }
+          : {}),
+        ...(unitIndex >= 0
+          ? { [STOCK_TAKE_IMPORT_FIELDS.UNIT]: source[unitIndex]?.trim() ?? "" }
+          : {}),
         [STOCK_TAKE_IMPORT_FIELDS.LOCATION]:
           locationIndex >= 0 ? source[locationIndex]?.trim() ?? "" : "",
+        ...(lotIndex >= 0
+          ? { [STOCK_TAKE_IMPORT_FIELDS.LOT]: source[lotIndex]?.trim() ?? "" }
+          : {}),
+        ...(expiryIndex >= 0
+          ? {
+              [STOCK_TAKE_IMPORT_FIELDS.EXPIRY_DATE]:
+                source[expiryIndex]?.trim() ?? "",
+            }
+          : {}),
+        ...(serialIndex >= 0
+          ? {
+              [STOCK_TAKE_IMPORT_FIELDS.SERIAL_IMEI]:
+                source[serialIndex]?.trim() ?? "",
+            }
+          : {}),
         [STOCK_TAKE_IMPORT_FIELDS.COUNTED_QTY]:
           source[countedQtyIndex]?.trim() ?? "",
         [STOCK_TAKE_IMPORT_FIELDS.COUNTED_VALUE]:
@@ -375,6 +431,62 @@ export class ExcelImportStockTakeService {
     });
   }
 
+  private async resolveItem(
+    row: StockTakeImportRow,
+    organizationId: string,
+  ): Promise<ItemEntity | null> {
+    const sku = row[STOCK_TAKE_IMPORT_FIELDS.SKU]?.trim();
+    if (sku) return this.findItem(sku, organizationId);
+
+    const barcode = row[STOCK_TAKE_IMPORT_FIELDS.BARCODE]?.trim();
+    if (!barcode) return null;
+    const match = await this.barcodeRepo.findOne({
+      where: { code: barcode, organizationId },
+    });
+    if (!match) return null;
+    return this.itemRepo.findOne({
+      where: { id: match.itemId, organizationId, isActive: true },
+    });
+  }
+
+  private async validateUnit(
+    row: StockTakeImportRow,
+    item: ItemEntity,
+    organizationId: string,
+    errors: StockTakeImportRowError[],
+  ): Promise<void> {
+    const unit = row[STOCK_TAKE_IMPORT_FIELDS.UNIT]?.trim();
+    if (!unit || unit === item.unit) return;
+    const itemUnit = await this.itemUnitRepo.findOne({
+      where: { itemId: item.id, unitName: unit, organizationId },
+    });
+    if (!itemUnit) {
+      errors.push({
+        column: STOCK_TAKE_IMPORT_FIELDS.UNIT,
+        code: "UNIT_NOT_FOUND",
+        message: `Đơn vị tính "${unit}" không tồn tại cho hàng hóa "${item.code}"`,
+      });
+    }
+  }
+
+  private async resolveUnitRatio(
+    row: StockTakeImportRow,
+    item: ItemEntity,
+    organizationId: string,
+  ): Promise<number> {
+    const unit = row[STOCK_TAKE_IMPORT_FIELDS.UNIT]?.trim();
+    if (!unit || unit === item.unit) return 1;
+    const itemUnit = await this.itemUnitRepo.findOne({
+      where: { itemId: item.id, unitName: unit, organizationId },
+    });
+    if (!itemUnit) {
+      throw new BadRequestException(
+        `Đơn vị tính "${unit}" không tồn tại cho hàng hóa "${item.code}"`,
+      );
+    }
+    return Number(itemUnit.ratio);
+  }
+
   private async findLocation(
     code: string,
     stockTake: StockTakeEntity,
@@ -392,6 +504,20 @@ export class ExcelImportStockTakeService {
       return null;
     }
     return location;
+  }
+
+  private findUnassignedLocation(
+    stockTake: StockTakeEntity,
+    organizationId: string,
+  ): Promise<LocationEntity | null> {
+    return this.locationRepo.findOne({
+      where: {
+        organizationId,
+        storageId: stockTake.storageId,
+        isActive: true,
+        isUnassigned: true,
+      },
+    });
   }
 
   private validateNumber(

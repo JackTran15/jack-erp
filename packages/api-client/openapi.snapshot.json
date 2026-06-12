@@ -6507,6 +6507,36 @@
         ]
       }
     },
+    "/inventory/stock/items/{itemId}/average-cost": {
+      "get": {
+        "operationId": "StockLedgerController_getInstantAverageCost",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstantAverageCostDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockLedger"
+        ]
+      }
+    },
     "/inventory/stock/balances/{itemId}/{locationId}": {
       "get": {
         "operationId": "StockLedgerController_getBalance",
@@ -10196,10 +10226,7 @@
             "name": "countByValue",
             "required": false,
             "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
+            "schema": {}
           }
         ],
         "responses": {
@@ -20765,6 +20792,43 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "InstantAverageCostDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "inventoryValue": {
+            "type": "number"
+          },
+          "unitCost": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "LEDGER",
+              "PURCHASE_PRICE_FALLBACK"
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "branchId",
+          "quantity",
+          "inventoryValue",
+          "unitCost",
+          "source"
         ]
       },
       "StockBalanceEntity": {

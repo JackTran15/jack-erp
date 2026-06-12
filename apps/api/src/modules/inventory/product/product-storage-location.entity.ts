@@ -3,8 +3,8 @@ import { BaseEntity } from '../../../database/entities/base.entity';
 import { ProductEntity } from './product.entity';
 
 /**
- * Maps a product to exactly one location within a storage.
- * Constraint: one product can only be stored in one location per storage (warehouse).
+ * Stores the preferred/default shelf for a product within a storage.
+ * Actual stock may exist at many locations and is tracked by stock_balances.
  */
 @Entity('product_storage_locations')
 @Unique(['productId', 'storageId'])
