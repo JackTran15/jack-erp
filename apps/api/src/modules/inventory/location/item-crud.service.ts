@@ -1405,13 +1405,13 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   idField: 'id',
   fields: [
     // ── List-visible fields (shown in table, order matches the UI) ────────
-    { key: 'code', label: 'Mã SKU', type: 'string', required: true },
+    { key: 'code', label: 'Mã SKU', type: 'string' },
     { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true, hideInList: true },
     { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
     { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
-    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money', required: true },
-    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money', required: true },
+    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
+    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money' },
     { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
     { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
     // ── Display fields removed from the table (kept for form/back-compat) ──

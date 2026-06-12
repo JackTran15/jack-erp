@@ -120,6 +120,9 @@ export function InventoryItemCreateForm({
   const [variantRows, setVariantRows] = useState<ProductVariantRow[]>([]);
   const removedVariantKeys = useRef<Set<string>>(new Set());
 
+  // SKU tự sinh từ tên hàng hóa cho đến khi user sửa tay. Xóa trống → sinh lại.
+  const skuTouchedRef = useRef(false);
+
   const editableFieldsByKey = useMemo(
     () => new Map(editableFields.map((f) => [f.key, f])),
     [editableFields],
@@ -269,6 +272,17 @@ export function InventoryItemCreateForm({
     setValues((prev) => ({ ...prev, providers }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerRows]);
+
+  // ─── Auto-fill SKU (live) from the product name until edited manually ──────
+  // Edit mode keeps the saved SKU; clearing the SKU field resumes auto-fill.
+  useEffect(() => {
+    if (isEdit || skuTouchedRef.current) return;
+    const auto = variantSlug(String(values.name ?? ""));
+    setValues((prev) =>
+      String(prev.code ?? "") === auto ? prev : { ...prev, code: auto },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.name, isEdit]);
 
   // ─── Auto-generate variant rows from the "Thông tin thuộc tính" inputs ─────
   useEffect(() => {
@@ -513,7 +527,11 @@ export function InventoryItemCreateForm({
 
   const renderedDynamicKeys = useRef(new Set<string>());
 
-  const renderDynamicField = (key: string, disabled = false) => {
+  const renderDynamicField = (
+    key: string,
+    disabled = false,
+    onValueChange?: (next: unknown) => void,
+  ) => {
     const field = editableFieldsByKey.get(key);
     if (!field) return null;
     renderedDynamicKeys.current.add(key);
@@ -528,7 +546,8 @@ export function InventoryItemCreateForm({
         labelWidth="10rem"
         disabled={disabled}
         onChange={(nextValue) => {
-          setValues((prev) => ({ ...prev, [field.key]: nextValue }));
+          if (onValueChange) onValueChange(nextValue);
+          else setValues((prev) => ({ ...prev, [field.key]: nextValue }));
           setErrors((prev) => {
             const next = { ...prev };
             delete next[field.key];
@@ -706,7 +725,12 @@ export function InventoryItemCreateForm({
               />
             </FormField>
 
-            {renderDynamicField("code")}
+            {renderDynamicField("code", false, (next) => {
+              const text = typeof next === "string" ? next : String(next ?? "");
+              // Khi user gõ/sửa SKU thì ngừng auto theo tên; xóa trống → auto lại.
+              skuTouchedRef.current = text.trim().length > 0;
+              setValues((prev) => ({ ...prev, code: text }));
+            })}
 
             {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
                 tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
