@@ -258,7 +258,11 @@ export class CsvImportService {
     ImportValidateResult & { productsCreated: number; itemsCommitted: number }
   > {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -334,7 +338,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<InventoryImportJobEntity> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -347,7 +355,11 @@ export class CsvImportService {
    */
   async cancelJob(jobId: string, actor: ActorContext): Promise<void> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -371,7 +383,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<PaginatedResponse<InventoryImportJobRowEntity>> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -395,7 +411,11 @@ export class CsvImportService {
     actor: ActorContext,
   ): Promise<Buffer> {
     const job = await this.jobRepo.findOne({
-      where: { id: jobId, organizationId: actor.organizationId, branchId: actor.branchId },
+      where: {
+        id: jobId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+      },
     });
     if (!job) {
       throw new NotFoundException(`Import job ${jobId} not found`);
@@ -654,6 +674,8 @@ export class CsvImportService {
           stockTake,
           actor,
         );
+      default:
+        return [];
     }
   }
 

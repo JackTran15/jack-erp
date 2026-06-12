@@ -5,7 +5,7 @@ import {
   resolvePeriodRange,
   type PeriodValue,
 } from "@erp/ui";
-import { CloudUpload, Filter, Printer, Settings2 } from "lucide-react";
+import { CloudUpload, Printer, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   BaseDataTable,
@@ -113,7 +113,6 @@ export function StorageReportShell<T>({
   initialPeriod,
   onApply,
 }: StorageReportShellProps<T>) {
-  const [filterOpen, setFilterOpen] = useState(false);
   const [columnConfigOpen, setColumnConfigOpen] = useState(false);
   const [filterValues, setFilterValues] = useState<FilterValues>(() =>
     withDefaults(filterFields, {}),
@@ -265,20 +264,8 @@ export function StorageReportShell<T>({
     <div className="flex h-full min-h-0 flex-col bg-background">
       {/* Top bar: filter button (left) — title + subtitle (center) */}
       <div className="grid shrink-0 grid-cols-[auto_1fr_auto] items-start gap-4 border-b px-4 py-3">
-        <div className="relative">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-9"
-            data-report-filter-trigger
-            onClick={() => setFilterOpen((o) => !o)}
-          >
-            <Filter className="mr-1.5 h-4 w-4" />
-            Chọn bộ lọc
-          </Button>
+        <div>
           <ReportFilterPopover
-            open={filterOpen}
-            onOpenChange={setFilterOpen}
             fields={filterFields}
             value={filterValues}
             onSubmit={(next) => {

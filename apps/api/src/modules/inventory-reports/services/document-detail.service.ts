@@ -44,6 +44,9 @@ export interface DocumentDetailRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   branchId: string | null;
   branchName: string | null;
   receiverBranchId: string | null;
@@ -214,6 +217,17 @@ export class DocumentDetailService {
         i.unit AS unit,
         ic.id AS category_id,
         ic.name AS category_name,
+        i.brand AS brand,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1) AS color,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1) AS size,
         bs.id AS branch_id,
         bs.name AS branch_name,
         br.id AS receiver_branch_id,
@@ -284,6 +298,9 @@ export class DocumentDetailService {
         unit: r.unit ?? '',
         categoryId: r.category_id ?? null,
         categoryName: r.category_name ?? null,
+        brand: r.brand ?? null,
+        color: r.color ?? null,
+        size: r.size ?? null,
         branchId: r.branch_id ?? null,
         branchName: r.branch_name ?? null,
         receiverBranchId: r.receiver_branch_id ?? null,
@@ -320,6 +337,9 @@ interface RawDocumentDetailRow {
   unit: string | null;
   category_id: string | null;
   category_name: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   branch_id: string | null;
   branch_name: string | null;
   receiver_branch_id: string | null;

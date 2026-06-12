@@ -59,6 +59,9 @@ export interface StockPeriodRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   locationId: string | null;
   locationCode: string | null;
   locationName: string | null;
@@ -98,6 +101,9 @@ export interface StockByBranchRow {
   parentName?: string | null;
   unit: string;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   totalQty: number;
   totalValue: number;
   perBranch: Record<string, StockByBranchPerBranchValue>;
@@ -124,6 +130,9 @@ export interface TransferByBranchRow {
   parentSku?: string | null;
   parentName?: string | null;
   unit: string;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   destinationBranchId: string;
   destinationBranchName: string;
   outQty: number;
@@ -146,6 +155,9 @@ export interface DocumentDetailRow {
   parentName?: string | null;
   unit: string;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   branchId: string | null;
   branchName: string | null;
   receiverBranchId: string | null;

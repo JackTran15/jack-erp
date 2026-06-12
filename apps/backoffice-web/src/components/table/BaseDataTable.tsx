@@ -1,9 +1,19 @@
 import React from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn, Input } from "@erp/ui";
-import type { ColumnFilter, ColumnFilterMode } from "./pagination.dto";
-import { DEFAULT_COLUMN_FILTER_MODE } from "./pagination.dto";
-import { ColumnFilterModeDropdown } from "./ColumnFilterModeControl";
+import type {
+  ColumnCompareOp,
+  ColumnFilter,
+  ColumnFilterMode,
+} from "./pagination.dto";
+import {
+  DEFAULT_COLUMN_COMPARE_OP,
+  DEFAULT_COLUMN_FILTER_MODE,
+} from "./pagination.dto";
+import {
+  ColumnCompareOpDropdown,
+  ColumnFilterModeDropdown,
+} from "./ColumnFilterModeControl";
 
 export type ColumnFilterKind =
   | "symbol"
@@ -11,6 +21,7 @@ export type ColumnFilterKind =
   | "date"
   | "time"
   | "date-range"
+  | "date-compare"
   | "number-range"
   | "none";
 
@@ -69,6 +80,8 @@ interface ColumnFilterControl {
   onValueChange: (fieldKey: string, value: string) => void;
   /** Required for columns with `filterKind: "date-range"`. */
   onRangeChange?: (fieldKey: string, part: "from" | "to", value: string) => void;
+  /** Required for columns with `filterKind: "date-compare"`. */
+  onCompareOpChange?: (fieldKey: string, op: ColumnCompareOp) => void;
 }
 
 interface BaseDataTableProps<T> {
@@ -139,6 +152,11 @@ const FROZEN_BG = "bg-background";
 const HEADER_ROW_HEIGHT = 32;
 /** Box-shadow used to draw a clean right edge on the rightmost frozen column. */
 const FROZEN_EDGE_SHADOW = "1px 0 0 0 hsl(var(--border))";
+
+const frozenBodyBackground = (striped: boolean): string =>
+  striped
+    ? "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))"
+    : "hsl(var(--background))";
 
 export function BaseDataTable<T>({
   columns,
@@ -500,6 +518,25 @@ export function BaseDataTable<T>({
                             aria-label={`Lọc ${column.label} đến ngày`}
                           />
                         </div>
+                      ) : kind === "date-compare" ? (
+                        <div className="flex items-center gap-1">
+                          <ColumnCompareOpDropdown
+                            fieldLabel={column.label}
+                            value={activeFilter?.compareOp ?? DEFAULT_COLUMN_COMPARE_OP}
+                            onChange={(op) =>
+                              columnFilterControl.onCompareOpChange?.(column.key, op)
+                            }
+                          />
+                          <input
+                            type="date"
+                            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs font-normal"
+                            value={activeFilter?.value ?? ""}
+                            onChange={(event) =>
+                              columnFilterControl.onValueChange(column.key, event.target.value)
+                            }
+                            aria-label={`Lọc ${column.label}`}
+                          />
+                        </div>
                       ) : kind === "number-range" ? (
                         <div className="flex h-8 min-w-0 items-stretch">
                           <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 text-xs font-semibold text-muted-foreground">≤</span>
@@ -582,10 +619,17 @@ export function BaseDataTable<T>({
                         className={cn(
                           "h-8 max-w-0 truncate px-2 py-0 align-middle",
                           column.className,
-                          column.frozen &&
-                            (index % 2 === 0 ? FROZEN_BG : "bg-muted/20"),
+                          column.frozen && FROZEN_BG,
                         )}
-                        style={fStyle ? { ...fStyle, zIndex: 5 } : undefined}
+                        style={
+                          fStyle
+                            ? {
+                                ...fStyle,
+                                zIndex: 5,
+                                backgroundColor: frozenBodyBackground(index % 2 !== 0),
+                              }
+                            : undefined
+                        }
                       >
                         {column.render(row)}
                       </td>

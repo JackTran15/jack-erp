@@ -1,31 +1,35 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { InventoryLocationModule } from '../location/inventory-location.module';
-import { ProductModule } from '../product/product.module';
-import { StockLedgerModule } from '../ledger/stock-ledger.module';
-import { StockTakeModule } from '../stock-take/stock-take.module';
-import { WebSocketModule } from '../../websocket/websocket.module';
-import { InventoryImportJobEntity } from './inventory-import-job.entity';
-import { InventoryImportJobRowEntity } from './inventory-import-job-row.entity';
-import { CsvImportService } from './csv-import.service';
-import { CsvExportService } from './csv-export.service';
-import { ExcelParserService } from './excel-parser.service';
-import { ExcelImportItemService } from './excel-import-item.service';
-import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
-import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
-import { CsvImportController } from './csv-import.controller';
-import { CsvExportController } from './csv-export.controller';
-import { ItemEntity } from '../location/item.entity';
-import { ItemProviderEntity } from '../location/item-provider.entity';
-import { ItemBarcodeEntity } from '../location/item-barcode.entity';
-import { ItemUnitEntity } from '../location/item-unit.entity';
-import { ProductEntity } from '../product/product.entity';
-import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
-import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
-import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
-import { StockBalanceEntity } from '../ledger/stock-balance.entity';
-import { StockLedgerEntryEntity } from '../ledger/stock-ledger-entry.entity';
-import { LocationEntity } from '../location/location.entity';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { InventoryLocationModule } from "../location/inventory-location.module";
+import { ProductModule } from "../product/product.module";
+import { StockLedgerModule } from "../ledger/stock-ledger.module";
+import { StockTakeModule } from "../stock-take/stock-take.module";
+import { WebSocketModule } from "../../websocket/websocket.module";
+import { InventoryImportJobEntity } from "./inventory-import-job.entity";
+import { InventoryImportJobRowEntity } from "./inventory-import-job-row.entity";
+import { CsvImportService } from "./csv-import.service";
+import { CsvExportService } from "./csv-export.service";
+import { ExcelParserService } from "./excel-parser.service";
+import { ExcelImportItemService } from "./excel-import-item.service";
+import { ExcelImportStockTakeService } from "./excel-import-stock-take.service";
+import { InventoryImportWorkbookService } from "./import-workbook/inventory-import-workbook.service";
+import { CsvImportController } from "./csv-import.controller";
+import { CsvExportController } from "./csv-export.controller";
+import { LocationImportService } from "./location-import.service";
+import { LocationExportService } from "./location-export.service";
+import { LocationImportWorkbookService } from "./location-import-workbook.service";
+import { ItemEntity } from "../location/item.entity";
+import { StorageEntity } from "../location/storage.entity";
+import { LocationEntity } from "../location/location.entity";
+import { ItemProviderEntity } from "../location/item-provider.entity";
+import { ItemBarcodeEntity } from "../location/item-barcode.entity";
+import { ItemUnitEntity } from "../location/item-unit.entity";
+import { ProductEntity } from "../product/product.entity";
+import { ProductAttributeDefinitionEntity } from "../product/product-attribute-definition.entity";
+import { ProductAttributeOptionEntity } from "../product/product-attribute-option.entity";
+import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
+import { StockBalanceEntity } from "../ledger/stock-balance.entity";
+import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
 
 @Module({
   imports: [
@@ -42,6 +46,7 @@ import { LocationEntity } from '../location/location.entity';
       ItemAttributeValueEntity,
       StockBalanceEntity,
       StockLedgerEntryEntity,
+      StorageEntity,
       LocationEntity,
     ]),
     InventoryLocationModule,
@@ -58,6 +63,9 @@ import { LocationEntity } from '../location/location.entity';
     ExcelImportItemService,
     ExcelImportStockTakeService,
     InventoryImportWorkbookService,
+    LocationImportWorkbookService,
+    LocationImportService,
+    LocationExportService,
   ],
   exports: [CsvImportService, CsvExportService],
 })

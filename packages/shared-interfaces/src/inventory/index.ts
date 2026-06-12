@@ -118,6 +118,13 @@ export enum LocationType {
   ZONE = "ZONE",
 }
 
+export const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
+  [LocationType.SHELF]: "Kệ",
+  [LocationType.RACK]: "Giá",
+  [LocationType.BIN]: "Thùng",
+  [LocationType.ZONE]: "Khu vực",
+};
+
 export * from "./temp-warehouse";
 
 import { TempWarehouseDirection } from "./temp-warehouse";

@@ -4,6 +4,7 @@ import { erpApi, requireErpData } from "../lib/erp-api";
 interface NamedItem {
   id: string;
   name: string;
+  branchId?: string;
 }
 
 interface PaginatedResult<T> {
@@ -14,12 +15,13 @@ interface PaginatedResult<T> {
 interface FilterOption {
   value: string;
   label: string;
+  branchId?: string;
 }
 
 function toIdOptions(items: NamedItem[], allLabel: string): FilterOption[] {
   return [
     { value: "__all__", label: allLabel },
-    ...items.map((i) => ({ value: i.id, label: i.name })),
+    ...items.map((i) => ({ value: i.id, label: i.name, branchId: i.branchId })),
   ];
 }
 

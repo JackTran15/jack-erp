@@ -2387,6 +2387,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/stock/transfers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/payables": {
         parameters: {
             query?: never;
@@ -2972,6 +2988,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/locations/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateLocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/locations/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_commitLocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/locations/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportLocationErrorRowsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/jobs": {
         parameters: {
             query?: never;
@@ -3108,6 +3172,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["CsvExportController_exportLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/locations/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportLocationsTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/exports/locations/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvExportController_exportLocationsExcel"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6451,8 +6547,8 @@ export interface components {
         CreateTransferDto: Record<string, never>;
         StockTransferEntity: {
             documentNumber?: string;
-            sourceLocationId: string;
-            destinationLocationId: string;
+            sourceLocationId?: string;
+            destinationLocationId?: string;
             sourceBranchId: string;
             destinationBranchId: string;
             /** @enum {string} */
@@ -6463,8 +6559,21 @@ export interface components {
             postedBy?: string;
             /** Format: date-time */
             postedAt?: string;
+            transporterUserId?: string;
+            /** Format: date-time */
+            transferredAt?: string;
+            attachmentIds: string[];
             notes?: string;
             lines: components["schemas"]["StockTransferLineEntity"][];
+            transporter?: {
+                id: string;
+                fullName: string;
+            };
+            /**
+             * @description Transient (not a column): sum of line_value across the transfer's lines,
+             *     inlined by the v2 search handler so the FE can render Tổng tiền + footer.
+             */
+            totalAmount?: number;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -6481,14 +6590,20 @@ export interface components {
             id: string;
             transferId: string;
             itemId: string;
+            sourceStorageId?: string;
+            destinationStorageId?: string;
             sourceLocationId?: string;
             destinationLocationId?: string;
             quantity: number;
+            unitPrice?: string | null;
+            lineValue?: string | null;
             notes?: string;
             transfer?: components["schemas"]["StockTransferEntity"];
             item?: components["schemas"]["ItemEntity"];
             sourceLocation?: components["schemas"]["LocationEntity"];
             destinationLocation?: components["schemas"]["LocationEntity"];
+            sourceStorage?: components["schemas"]["StorageEntity"];
+            destinationStorage?: components["schemas"]["StorageEntity"];
         };
         IntraWarehouseTransferLineDto: {
             /**
@@ -6524,6 +6639,28 @@ export interface components {
             destinationLocationId?: string;
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
+        };
+        DateRangeFilterDto: {
+            from?: string;
+            to?: string;
+        };
+        StockTransferSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Số phiếu chuyển (document number) */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Đối tượng (counterparty — matches the transporter user's full name) */
+            party?: components["schemas"]["StringFilterDto"];
+            /** @description Diễn giải (notes) */
+            notes?: components["schemas"]["StringFilterDto"];
+            /** @description Ngày (transfer date — single date + compare operator =/<\/<=/>/>=) */
+            date?: components["schemas"]["CompareFilterDto"];
+            /** @description Khoảng thời gian (Từ ngày / Đến ngày từ thanh PeriodFilter) — inclusive. */
+            dateRange?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Tổng tiền (computed line total: SUM(line_value)) */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
         };
         CreatePayableDto: {
             vendorName: string;
@@ -6834,7 +6971,7 @@ export interface components {
         };
         InventoryImportJobEntity: {
             /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE";
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS";
             referenceId?: string | null;
             fileName: string;
             fileChecksum: string;
@@ -7519,10 +7656,6 @@ export interface components {
         };
         EnumFilterDto: {
             value: string | null;
-        };
-        DateRangeFilterDto: {
-            from?: string;
-            to?: string;
         };
         InvoiceSearchV2Dto: {
             /** @default 1 */
@@ -13015,6 +13148,29 @@ export interface operations {
             };
         };
     };
+    StockTransferV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTransferSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     PayablesController_list: {
         parameters: {
             query?: {
@@ -13979,6 +14135,63 @@ export interface operations {
             };
         };
     };
+    CsvImportController_validateLocations: {
+        parameters: {
+            query?: {
+                duplicateMode?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_commitLocations: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportLocationErrorRowsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CsvImportController_listJobs: {
         parameters: {
             query?: {
@@ -14208,6 +14421,40 @@ export interface operations {
                 search?: string;
                 filters?: string;
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportLocationsTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvExportController_exportLocationsExcel: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;

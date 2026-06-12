@@ -7802,6 +7802,37 @@
         ]
       }
     },
+    "/v2/inventory/stock/transfers/search": {
+      "post": {
+        "operationId": "StockTransferV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockTransferSearchV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "StockTransferV2"
+        ]
+      }
+    },
     "/payables": {
       "post": {
         "operationId": "PayablesController_create",
@@ -9462,6 +9493,73 @@
         ]
       }
     },
+    "/inventory/imports/locations/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateLocations",
+        "parameters": [
+          {
+            "name": "duplicateMode",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/locations/commit": {
+      "post": {
+        "operationId": "CsvImportController_commitLocations",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/locations/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportLocationErrorRowsExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/jobs": {
       "get": {
         "operationId": "CsvImportController_listJobs",
@@ -10008,6 +10106,34 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/locations/template": {
+      "get": {
+        "operationId": "CsvExportController_exportLocationsTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvExport"
+        ]
+      }
+    },
+    "/inventory/exports/locations/excel": {
+      "get": {
+        "operationId": "CsvExportController_exportLocationsExcel",
+        "parameters": [],
         "responses": {
           "200": {
             "description": ""
@@ -21221,6 +21347,19 @@
             "format": "date-time",
             "type": "string"
           },
+          "transporterUserId": {
+            "type": "string"
+          },
+          "transferredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "notes": {
             "type": "string"
           },
@@ -21229,6 +21368,25 @@
             "items": {
               "$ref": "#/components/schemas/StockTransferLineEntity"
             }
+          },
+          "transporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "fullName"
+            ]
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Transient (not a column): sum of line_value across the transfer's lines,\ninlined by the v2 search handler so the FE can render Tổng tiền + footer."
           },
           "id": {
             "type": "string"
@@ -21255,11 +21413,10 @@
           }
         },
         "required": [
-          "sourceLocationId",
-          "destinationLocationId",
           "sourceBranchId",
           "destinationBranchId",
           "status",
+          "attachmentIds",
           "lines",
           "id",
           "organizationId",
@@ -21280,6 +21437,12 @@
           "itemId": {
             "type": "string"
           },
+          "sourceStorageId": {
+            "type": "string"
+          },
+          "destinationStorageId": {
+            "type": "string"
+          },
           "sourceLocationId": {
             "type": "string"
           },
@@ -21288,6 +21451,14 @@
           },
           "quantity": {
             "type": "number"
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineValue": {
+            "type": "string",
+            "nullable": true
           },
           "notes": {
             "type": "string"
@@ -21303,6 +21474,12 @@
           },
           "destinationLocation": {
             "$ref": "#/components/schemas/LocationEntity"
+          },
+          "sourceStorage": {
+            "$ref": "#/components/schemas/StorageEntity"
+          },
+          "destinationStorage": {
+            "$ref": "#/components/schemas/StorageEntity"
           }
         },
         "required": [
@@ -21370,6 +21547,81 @@
         "required": [
           "lines"
         ]
+      },
+      "DateRangeFilterDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "StockTransferSearchV2Dto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "documentNumber": {
+            "description": "Số phiếu chuyển (document number)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "party": {
+            "description": "Đối tượng (counterparty — matches the transporter user's full name)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "notes": {
+            "description": "Diễn giải (notes)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "date": {
+            "description": "Ngày (transfer date — single date + compare operator =/<\\/<=/>/>=)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "dateRange": {
+            "description": "Khoảng thời gian (Từ ngày / Đến ngày từ thanh PeriodFilter) — inclusive.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "totalAmount": {
+            "description": "Tổng tiền (computed line total: SUM(line_value))",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
       },
       "CreatePayableDto": {
         "type": "object",
@@ -22332,7 +22584,8 @@
               "ITEMS",
               "OPENING_BALANCES",
               "ADJUSTMENTS",
-              "STOCK_TAKE"
+              "STOCK_TAKE",
+              "LOCATIONS"
             ]
           },
           "referenceId": {
@@ -24481,17 +24734,6 @@
         "required": [
           "value"
         ]
-      },
-      "DateRangeFilterDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          }
-        }
       },
       "InvoiceSearchV2Dto": {
         "type": "object",

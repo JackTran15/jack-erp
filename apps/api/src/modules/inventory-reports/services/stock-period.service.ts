@@ -66,6 +66,9 @@ export interface StockPeriodRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   // Either location-level OR branch-level identity, depending on groupBy.
   locationId?: string;
   locationCode?: string;
@@ -205,6 +208,7 @@ export class StockPeriodService {
         i.unit        AS unit,
         ic.id         AS category_id,
         ic.name       AS category_name,
+        i.brand       AS brand,
         ${locCols}
         ${branchCols}
         c.opening_qty, c.opening_value,
@@ -213,7 +217,17 @@ export class StockPeriodService {
         c.opening_qty + c.in_qty - c.out_qty     AS closing_qty,
         c.opening_value + c.in_value - c.out_value AS closing_value,
         c.in_qty_purchase, c.in_qty_transfer_in, c.in_qty_return, c.in_qty_adjust_in,
-        c.out_qty_sale,    c.out_qty_transfer_out, c.out_qty_adjust_out
+        c.out_qty_sale,    c.out_qty_transfer_out, c.out_qty_adjust_out,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1) AS color,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1) AS size
       FROM combined c
       JOIN  items i                     ON i.id  = c.item_id AND i.organization_id = $1
       LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
@@ -298,7 +312,10 @@ export class StockPeriodService {
       NULL::text AS location_name,
       NULL::uuid AS branch_id,
       NULL::text AS branch_code,
-      NULL::text AS branch_name,`;
+      NULL::text AS branch_name,
+      NULL::text AS brand,
+      NULL::text AS color,
+      NULL::text AS size,`;
 
     const displayCols =
       itemGroupBy === 'parent'
@@ -465,6 +482,9 @@ export class StockPeriodService {
       unit: raw.unit ?? '',
       categoryId: raw.category_id ?? null,
       categoryName: raw.category_name ?? null,
+      brand: raw.brand ?? null,
+      color: raw.color ?? null,
+      size: raw.size ?? null,
       branchId: raw.branch_id ?? null,
       branchCode: raw.branch_code ?? null,
       branchName: raw.branch_name ?? null,
@@ -508,6 +528,9 @@ interface RawStockPeriodRow {
   unit: string | null;
   category_id: string | null;
   category_name: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   location_id?: string | null;
   location_code?: string | null;
   location_name?: string | null;

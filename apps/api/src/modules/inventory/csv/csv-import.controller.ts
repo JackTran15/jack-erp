@@ -37,6 +37,7 @@ import { Type } from "class-transformer";
 import { ImportJobStatus, ImportRowStatus } from "@erp/shared-interfaces";
 import { ApiQuery } from "@nestjs/swagger";
 import { CsvImportService } from "./csv-import.service";
+import { LocationImportService } from "./location-import.service";
 import { ImportJobType } from "./inventory-import-job.entity";
 
 class ImportJobQueryDto extends PaginationQueryDto {
@@ -65,7 +66,10 @@ class ImportJobRowsQueryDto extends PaginationQueryDto {
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class CsvImportController {
-  constructor(private readonly csvImportService: CsvImportService) {}
+  constructor(
+    private readonly csvImportService: CsvImportService,
+    private readonly locationImportService: LocationImportService,
+  ) {}
 
   // ─── Items ─────────────────────────────────────────────────────────
 
@@ -182,6 +186,50 @@ export class CsvImportController {
     @Actor() actor: ActorContext,
   ) {
     return this.csvImportService.commit(jobId, actor);
+  }
+
+  // ─── Locations ────────────────────────────────────────────────────
+
+  @Post("locations/validate")
+  @RequirePermission("inventory.write")
+  @UseInterceptors(FileInterceptor("file"))
+  validateLocations(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("duplicateMode") duplicateMode: string | undefined,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.locationImportService.validate(file, actor, duplicateMode);
+  }
+
+  @Post("locations/commit")
+  @RequirePermission("inventory.write")
+  commitLocations(
+    @Query("jobId", ParseUUIDPipe) jobId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.locationImportService.commit(jobId, actor);
+  }
+
+  @Get("locations/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.read")
+  async exportLocationErrorRowsExcel(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.locationImportService.exportErrorRowsBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="vi-tri-loi-nhap-khau.xlsx"',
+    );
+    res.send(buffer);
   }
 
   // ─── Job queries ──────────────────────────────────────────────────
