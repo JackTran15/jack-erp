@@ -39,33 +39,12 @@ import {
   LocationImportWorkbookService,
 } from "./location-import-workbook.service";
 
-const LOCATION_TYPE_VI_MAP: Record<string, LocationType> = {
-  kệ: LocationType.SHELF,
-  ke: LocationType.SHELF,
-  giá: LocationType.RACK,
-  gia: LocationType.RACK,
-  thùng: LocationType.BIN,
-  thung: LocationType.BIN,
-  "khu vực": LocationType.ZONE,
-  "khu vuc": LocationType.ZONE,
-  shelf: LocationType.SHELF,
-  rack: LocationType.RACK,
-  bin: LocationType.BIN,
-  zone: LocationType.ZONE,
-};
-
-function parseLocationType(label: string | undefined): LocationType {
-  if (!label) return LocationType.SHELF;
-  const key = label.trim().toLowerCase();
-  return LOCATION_TYPE_VI_MAP[key] ?? LocationType.SHELF;
-}
-
 interface ParsedRow {
   rowNumber: number;
   code: string;
   name: string;
   storageName: string;
-  typeLabel: string;
+  description: string;
 }
 
 @Injectable()
@@ -150,7 +129,7 @@ export class LocationImportService {
             LocationCode: parsed.code,
             LocationName: parsed.name,
             StorageName: parsed.storageName,
-            LocationType: parsed.typeLabel,
+            Description: parsed.description,
           },
           status,
           errorMessages: errors.length > 0 ? errors : undefined,
@@ -224,7 +203,7 @@ export class LocationImportService {
             const code = (raw["LocationCode"] ?? "").trim();
             const name = (raw["LocationName"] ?? "").trim();
             const storageName = (raw["StorageName"] ?? "").trim();
-            const type = parseLocationType(raw["LocationType"]);
+            const description = (raw["Description"] ?? "").trim() || null;
 
             const storage = await storageRepo
               .createQueryBuilder("s")
@@ -251,7 +230,7 @@ export class LocationImportService {
             });
 
             if (existing) {
-              await locationRepo.update(existing.id, { name, type });
+              await locationRepo.update(existing.id, { name, description });
             } else {
               await locationRepo.save(
                 locationRepo.create({
@@ -259,7 +238,8 @@ export class LocationImportService {
                   name,
                   storageId: storage.id,
                   branchId: storage.branchId,
-                  type,
+                  type: LocationType.SHELF,
+                  description,
                   isActive: true,
                   organizationId: actor.organizationId,
                   createdBy: actor.userId,
@@ -311,7 +291,7 @@ export class LocationImportService {
         code: raw["LocationCode"] ?? "",
         name: raw["LocationName"] ?? "",
         storageName: raw["StorageName"] ?? "",
-        typeLabel: raw["LocationType"] ?? "",
+        description: raw["Description"] ?? "",
         statusMessage: (r.errorMessages ?? []).map((e) => e.message).join("; "),
       };
     });
@@ -347,7 +327,7 @@ export class LocationImportService {
         code: cols[0] ?? "",
         name: cols[1] ?? "",
         storageName: cols[2] ?? "",
-        typeLabel: cols[3] ?? "",
+        description: cols[3] ?? "",
       }));
   }
 
@@ -370,7 +350,7 @@ export class LocationImportService {
         code,
         name: String(cols[1] ?? "").trim(),
         storageName: String(cols[2] ?? "").trim(),
-        typeLabel: String(cols[3] ?? "").trim(),
+        description: String(cols[3] ?? "").trim(),
       });
     }
     return rows;

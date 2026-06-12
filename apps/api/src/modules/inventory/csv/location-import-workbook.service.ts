@@ -5,7 +5,7 @@ export interface LocationImportRow {
   code: string;
   name: string;
   storageName: string;
-  typeLabel: string;
+  description: string;
   statusMessage?: string;
 }
 
@@ -13,7 +13,7 @@ const HEADERS = [
   "Mã vị trí (*)",
   "Tên vị trí (*)",
   "Thuộc kho (*)",
-  "Loại vị trí",
+  "Mô tả",
 ];
 const HEADER_ORANGE = "FFC8A0";
 const TITLE_FILL = "F0F0F0";
@@ -85,7 +85,7 @@ export class LocationImportWorkbookService {
         row.code,
         row.name,
         row.storageName,
-        row.typeLabel,
+        row.description,
       ]);
       if (withStatusCol) {
         r.getCell(5).value = row.statusMessage ?? "";

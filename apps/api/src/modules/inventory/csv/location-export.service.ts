@@ -1,4 +1,3 @@
-import { LOCATION_TYPE_LABEL } from "@erp/shared-interfaces";
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -33,7 +32,7 @@ export class LocationExportService {
       code: loc.code,
       name: loc.name,
       storageName: loc.storage?.name ?? "",
-      typeLabel: LOCATION_TYPE_LABEL[loc.type] ?? loc.type,
+      description: loc.description ?? "",
     }));
 
     return this.workbookService.buildWorkbookBuffer(rows);

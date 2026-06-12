@@ -7,7 +7,7 @@ export interface LocationImportRow {
   LocationCode: string;
   LocationName: string;
   StorageName: string;
-  LocationType?: string;
+  Description?: string;
 }
 
 export interface ImportRowError {

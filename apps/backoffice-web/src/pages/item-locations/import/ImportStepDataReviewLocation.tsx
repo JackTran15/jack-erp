@@ -41,10 +41,10 @@ function buildColumns(): TableColumn<ReviewRow>[] {
       render: (r) => r.rawData.StorageName,
     },
     {
-      key: "type",
-      label: "Loại vị trí",
-      width: 110,
-      render: (r) => r.rawData.LocationType ?? "",
+      key: "description",
+      label: "Mô tả",
+      width: 180,
+      render: (r) => r.rawData.Description ?? "",
     },
     {
       key: "status",
