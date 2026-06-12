@@ -703,3 +703,41 @@ flowchart LR
   T2 --> T3
 ```
 
+## EPIC-11062026 Báo cáo tổng hợp bán hàng theo ngày (cột động theo phương thức thanh toán + template, full CQRS)
+
+- [EPIC-11062026 Báo cáo tổng hợp bán hàng theo ngày](./epics/EPIC-11062026-invoice-report-builder.md)
+- Trang **Tổng hợp bán hàng theo ngày** (`backoffice-web`) tự dựng (KiotViet-style), **2 API tách biệt**: **(1)** `GET /reports/invoices/columns` → **chỉ** `{ headers }` = toàn bộ catalog cột — cột **cố định** whitelist trong registry server (`INVOICE_REPORT_SUMMARY_COLUMNS`: Tiền hàng/Tiền phí/Khuyến mại/Tổng/Tỷ lệ KM %/Thực thu… có cột **computed**) **+ cột động** sinh runtime từ `PaymentAccountEntity` (một cột / một phương thức thanh toán của org/branch), dưới 2 band "Doanh thu" / "Khách hàng thanh toán"; header `{ col, name, desc, type, group }`. **(2)** `POST /reports/invoices/search` → **chỉ** `{ dataRaw: ReportCell[][], totals, total, page, limit }` (cell tự mô tả `{col,type,value}`, **không** kèm headers) = **aggregate một dòng/một ngày** + **dòng tổng**, lọc theo cửa hàng (branch) hoặc toàn chuỗi (consolidated). Filter 2 tầng (giống search hiện tại): **scope** `issuedAt`(bắt buộc)/`status`/`type`/`branch` (pre-aggregate, SQL `FilterBuilder`) + **per-column** `columnFilters[]` widget `=`/`≤` dưới mỗi header (post-aggregate, JS — áp cả cột computed/động). Aggregate **tính trên RAM (JS), không `GROUP BY` SQL** (feedback `prefer_in_memory_aggregation`). **Template** = entity org-shared mang **bộ cột riêng + bộ filter riêng** (`columns` jsonb gồm key động + `filters` jsonb gồm `columnFilters`). **TOÀN BỘ theo chuẩn CQRS** trên **1 controller riêng** `InvoiceReportController`. Export Excel = ngoài scope v1.
+
+| Ticket                                                            | Mô tả                                                                              |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-IRB-01](./tickets/TKT-IRB-01-be-schema-entity-module.md)     | BE: migration `invoice_report_templates` (columns+filters jsonb) + entity + module CQRS skeleton + controller shell |
+| [TKT-IRB-02](./tickets/TKT-IRB-02-shared-interfaces.md)           | Shared: contract descriptor+cell (`ReportColumnHeader`/`ReportCell`/`dataRaw[][]`/`totals`) + rich `ReportColumnDataType` + `INVOICE_REPORT_COLUMN_LABELS_VI` + shape search/template |
+| [TKT-IRB-03](./tickets/TKT-IRB-03-be-column-registry-catalog.md)  | BE: registry cố định `INVOICE_REPORT_SUMMARY_COLUMNS` + cột động (pivot `PaymentAccountEntity`) + `GetInvoiceReportColumnsQuery` + `GET columns` |
+| [TKT-IRB-04](./tickets/TKT-IRB-04-be-cqrs-report-search.md)       | BE: `SearchInvoiceReportQuery` + handler (validate cột, aggregate theo ngày trong JS, pivot payment-account, computed, scope, totals) |
+| [TKT-IRB-05](./tickets/TKT-IRB-05-be-template-cqrs-crud.md)       | BE: template queries (List/Get) + commands (Create/Update/Delete) + handlers, org-scope, soft-delete |
+| [TKT-IRB-06](./tickets/TKT-IRB-06-be-permissions-openapi.md)      | BE: seed 3 permission (`reporting.invoice.branch.read`/`.consolidated.read`/`invoice-template.manage`) + VI labels + openapi:generate |
+| [TKT-IRB-07](./tickets/TKT-IRB-07-fe-data-layer.md)               | FE: api wrapper + hooks (columns/search/template) + `formatCell`(theo type)/`groupHeaders` |
+| [TKT-IRB-08](./tickets/TKT-IRB-08-fe-report-page.md)              | FE: trang báo cáo (bảng 2 tầng header band + cột động + dòng tổng + khoảng ngày + save/load template) + Route + Nav |
+| [TKT-IRB-09](./tickets/TKT-IRB-09-tests-e2e.md)                   | Tests handler/command + spec đối chiếu registry cố định⟷label + E2E round-trip aggregate + DoD gate  |
+
+### Ticket dependency graph (EPIC-11062026 invoice-report-builder)
+
+```mermaid
+flowchart LR
+  T1["TKT-IRB-01 Schema + entity + module"] --> T3["TKT-IRB-03 Registry cố định + động + columns query"]
+  T1 --> T4["TKT-IRB-04 Aggregate search query"]
+  T1 --> T5["TKT-IRB-05 Template CQRS CRUD"]
+  T2["TKT-IRB-02 shared-interfaces (contract)"] --> T3
+  T2 --> T4
+  T2 --> T5
+  T2 --> T7["TKT-IRB-07 FE data layer"]
+  T3 --> T4
+  T4 --> T6["TKT-IRB-06 Permissions + openapi"]
+  T5 --> T6
+  T6 --> T7
+  T7 --> T8["TKT-IRB-08 FE page + nav"]
+  T4 --> T9["TKT-IRB-09 Tests + E2E + DoD"]
+  T5 --> T9
+  T8 --> T9
+```
+
