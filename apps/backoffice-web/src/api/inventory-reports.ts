@@ -76,6 +76,10 @@ export interface StockPeriodRow {
   outValue: number;
   closingQty: number;
   closingValue: number;
+  transferOutQty: number;
+  transferOutValue: number;
+  incomingQty: number;
+  incomingValue: number;
   // Breakdown — populated only by stockQuantityDetails
   inQtyPurchase?: number;
   inQtyTransferIn?: number;

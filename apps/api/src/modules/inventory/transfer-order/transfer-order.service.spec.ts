@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
@@ -162,6 +163,98 @@ describe('TransferOrderService', () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('forces the source branch to the active branch and rejects the active branch as destination', async () => {
+      await expect(
+        service.create(
+          {
+            sourceBranchId: 'branch-other',
+            destinationBranchId: actorSource.branchId,
+            lines: [{ itemId: 'item-1', requestedQty: 5 }],
+          },
+          actorSource,
+        ),
+      ).rejects.toThrow('Cửa hàng đích phải khác cửa hàng hiện tại');
+
+      expect(toRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('creates and exports a transfer order from a direct transfer-out request', async () => {
+      locationRepo.findOne
+        .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
+        .mockResolvedValue({ id: 'loc-unassigned', storageId: 'storage-A' });
+      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
+      toRepo.findOne
+        .mockResolvedValueOnce(baseOrder())
+        .mockResolvedValueOnce(baseOrder())
+        .mockResolvedValueOnce(
+          baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+        );
+
+      const result = await service.createAndConfirmExport(
+        {
+          locationId: 'loc-A',
+          targetBranchId: 'branch-B',
+          notes: 'Điều chuyển trực tiếp',
+          occurredAt: '2026-06-13T01:00:00.000Z',
+          lines: [
+            {
+              itemId: 'item-1',
+              locationId: 'loc-A',
+              quantity: 5,
+              unitPrice: 12,
+            },
+          ],
+        },
+        actorSource,
+      );
+
+      expect(toRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceBranchId: actorSource.branchId,
+          destinationBranchId: 'branch-B',
+          sourceStorageId: 'storage-A',
+          status: TransferOrderStatus.DRAFT,
+        }),
+      );
+      expect(goodsIssueService.createAndPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: GoodsIssuePurpose.TRANSFER_OUT,
+          targetBranchId: 'branch-B',
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: 'to-1',
+        }),
+        actorSource,
+      );
+      expect(result.status).toBe(TransferOrderStatus.IN_PROGRESS);
+    });
+
+    it('keeps the draft transfer order visible when direct export fails', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-A',
+        storageId: 'storage-A',
+      });
+      toRepo.save.mockResolvedValueOnce({ id: 'to-1' });
+      toRepo.findOne
+        .mockResolvedValueOnce(baseOrder())
+        .mockResolvedValueOnce(baseOrder());
+      goodsIssueService.createAndPost.mockRejectedValueOnce(
+        new Error('posting failed'),
+      );
+
+      await expect(
+        service.createAndConfirmExport(
+          {
+            locationId: 'loc-A',
+            targetBranchId: 'branch-B',
+            lines: [{ itemId: 'item-1', quantity: 5 }],
+          },
+          actorSource,
+        ),
+      ).rejects.toThrow('posting failed');
+
+      expect(toRepo.softDelete).not.toHaveBeenCalled();
+    });
   });
 
   describe('confirmExport', () => {
@@ -271,6 +364,20 @@ describe('TransferOrderService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('reverses the posted issue when updating the transfer order fails', async () => {
+      toRepo.findOne.mockResolvedValueOnce(baseOrder());
+      toRepo.update.mockRejectedValueOnce(new Error('update failed'));
+
+      await expect(service.confirmExport('to-1', actorSource)).rejects.toThrow(
+        'update failed',
+      );
+
+      expect(goodsIssueService.cancel).toHaveBeenCalledWith(
+        'gi-1',
+        actorSource,
+      );
+    });
   });
 
   describe('listIssuable', () => {
@@ -321,7 +428,7 @@ describe('TransferOrderService', () => {
       toRepo.findOne.mockResolvedValue(orderWithBin('loc-A01'));
       locationRepo.find.mockResolvedValue([{ id: 'loc-A01', code: 'A-01' }]);
 
-      const to = await service.getById('to-1', 'org-1');
+      const to = await service.getById('to-1', actorSource);
 
       expect(to.lines[0].sourceLocationId).toBe('loc-A01');
       expect(to.lines[0].sourceLocationCode).toBe('A-01');
@@ -334,11 +441,19 @@ describe('TransferOrderService', () => {
       balanceQb.getOne.mockResolvedValue({ locationId: 'loc-A01' });
       locationRepo.findOne.mockResolvedValue({ id: 'loc-A01', code: 'A-01' });
 
-      const to = await service.getById('to-1', 'org-1');
+      const to = await service.getById('to-1', actorSource);
 
       expect(balanceRepo.createQueryBuilder).toHaveBeenCalled();
       expect(to.lines[0].sourceLocationId).toBe('loc-A01');
       expect(to.lines[0].sourceLocationCode).toBe('A-01');
+    });
+
+    it('hides an order from a branch that is neither source nor destination', async () => {
+      toRepo.findOne.mockResolvedValue(orderWithBin('loc-A01'));
+
+      await expect(
+        service.getById('to-1', { ...actorSource, branchId: 'branch-C' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -522,6 +637,14 @@ describe('TransferOrderService', () => {
       await service.update('to-1', { notes: 'updated' }, actorSource);
       expect(toRepo.save).toHaveBeenCalled();
     });
+
+    it('rejects edits from the destination branch', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await expect(
+        service.update('to-1', { notes: 'updated' }, actorDest),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('cancel', () => {
@@ -543,6 +666,14 @@ describe('TransferOrderService', () => {
       );
       await expect(service.cancel('to-1', actorSource)).rejects.toBeInstanceOf(
         ConflictException,
+      );
+    });
+
+    it('rejects cancelling from the destination branch', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder());
+
+      await expect(service.cancel('to-1', actorDest)).rejects.toBeInstanceOf(
+        ForbiddenException,
       );
     });
   });

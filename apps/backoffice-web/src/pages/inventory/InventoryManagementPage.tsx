@@ -146,7 +146,6 @@ export function InventoryManagementPage() {
     requestVersion: 0,
   });
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
-  const [excludeReservations, setExcludeReservations] = useState(false);
   const [columnFilters, setColumnFilters] = useState(createColumnFilters);
   const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
   const [selectedItem, setSelectedItem] = useState<SelectedStockItem | null>(
@@ -163,8 +162,8 @@ export function InventoryManagementPage() {
       page: pagination.page,
       pageSize: pagination.pageSize,
       search: applied.search.trim() || undefined,
-      storageId: applied.storageId || undefined,
-      categoryId: applied.categoryId || undefined,
+      storageId: applied.advanced.storageId || applied.storageId || undefined,
+      categoryId: applied.advanced.categoryId || applied.categoryId || undefined,
       brand: applied.advanced.brand || undefined,
       unit: applied.advanced.unit || undefined,
       isActive: toBoolParam(applied.advanced.isActive),
@@ -172,9 +171,11 @@ export function InventoryManagementPage() {
       stockState: toStockState(applied.advanced.stockState),
       startDate: applied.period.from || undefined,
       endDate: applied.period.to || undefined,
-      excludeReservations,
+      movementFrom: applied.advanced.movementFrom || undefined,
+      movementTo: applied.advanced.movementTo || undefined,
+      excludeReservations: applied.advanced.excludeReservations,
     }),
-    [applied, excludeReservations, pagination.page, pagination.pageSize],
+    [applied, pagination.page, pagination.pageSize],
   );
 
   const searchBody = useMemo(() => {
@@ -200,6 +201,8 @@ export function InventoryManagementPage() {
       stockState: query.stockState,
       startDate: query.startDate,
       endDate: query.endDate,
+      movementFrom: query.movementFrom,
+      movementTo: query.movementTo,
       excludeReservations: query.excludeReservations,
     };
   }, [debouncedColumnFilters, pagination.page, pagination.pageSize, query]);
@@ -252,7 +255,8 @@ export function InventoryManagementPage() {
       rows.reduce(
         (sum, row) => ({
           quantity:
-            sum.quantity + displayStockQuantity(row, excludeReservations),
+            sum.quantity +
+            displayStockQuantity(row, applied.advanced.excludeReservations),
           openingQty: sum.openingQty + row.openingQty,
           inQty: sum.inQty + row.inQty,
           outQty: sum.outQty + row.outQty,
@@ -268,7 +272,7 @@ export function InventoryManagementPage() {
           incomingQty: 0,
         },
       ),
-    [excludeReservations, rows],
+    [applied.advanced.excludeReservations, rows],
   );
 
   const columns = useMemo<TableColumn<StockSummaryRow>[]>(
@@ -320,8 +324,13 @@ export function InventoryManagementPage() {
         width: 200,
         render: (row) => row.storage.name,
       },
-      quantityColumn("quantity", "SL tồn", visibleTotals.quantity, (row) =>
-        displayStockQuantity(row, excludeReservations),
+      quantityColumn(
+        "quantity",
+        "SL tồn",
+        applied.advanced.excludeReservations
+          ? visibleTotals.quantity
+          : (response?.totalQuantity ?? visibleTotals.quantity),
+        (row) => displayStockQuantity(row, applied.advanced.excludeReservations),
       ),
       quantityColumn("openingQty", "Tồn đầu kỳ", visibleTotals.openingQty),
       quantityColumn("inQty", "SL nhập", visibleTotals.inQty),
@@ -333,7 +342,7 @@ export function InventoryManagementPage() {
       ),
       quantityColumn("incomingQty", "Sắp nhận về", visibleTotals.incomingQty),
     ],
-    [excludeReservations, visibleTotals],
+    [applied.advanced.excludeReservations, response?.totalQuantity, visibleTotals],
   );
 
   const activeAdvancedCount = [
@@ -342,6 +351,11 @@ export function InventoryManagementPage() {
     applied.advanced.isActive !== "ALL" ? "x" : "",
     applied.advanced.isPosVisible !== "ALL" ? "x" : "",
     applied.advanced.stockState !== "ALL" ? "x" : "",
+    applied.advanced.storageId,
+    applied.advanced.categoryId,
+    applied.advanced.movementFrom,
+    applied.advanced.movementTo,
+    applied.advanced.excludeReservations ? "x" : "",
   ].filter(Boolean).length;
 
   const columnFilterControl = useMemo(
@@ -389,7 +403,7 @@ export function InventoryManagementPage() {
         row.item.categoryName ?? "",
         row.item.brand ?? "",
         row.storage.name,
-        displayStockQuantity(row, excludeReservations),
+        displayStockQuantity(row, applied.advanced.excludeReservations),
         row.openingQty,
         row.inQty,
         row.outQty,
@@ -495,22 +509,6 @@ export function InventoryManagementPage() {
           </form>
 
           <div className="flex items-center gap-2 pb-1">
-            <input
-              type="checkbox"
-              id="exclude-reservations"
-              checked={excludeReservations}
-              onChange={(event) => {
-                setPagination((previous) => ({ ...previous, page: 1 }));
-                setExcludeReservations(event.target.checked);
-              }}
-              className="h-4 w-4 cursor-pointer rounded border-border text-primary focus:ring-primary"
-            />
-            <label
-              htmlFor="exclude-reservations"
-              className="cursor-pointer select-none text-sm"
-            >
-              Trừ số lượng hàng hóa khách đặt vào tồn kho
-            </label>
             {dateInvalid ? (
               <span className="ml-auto text-xs text-destructive">
                 Ngày bắt đầu phải trước ngày kết thúc.
@@ -548,20 +546,23 @@ export function InventoryManagementPage() {
         }
         getRowKey={(row) => `${row.itemId}:${row.storageId}`}
         columnFilterControl={columnFilterControl}
-        onRowClick={(row) =>
+        onRowClick={(row) => {
+          if (row.storageId.startsWith("pending:")) return;
           setSelectedItem({
             id: row.item.id,
             code: row.item.code,
             name: row.item.name,
             storageId: row.storageId,
-          })
-        }
+          });
+        }}
       />
       <StockSummaryFilterDialog
         open={filterDialogOpen}
         initial={applied.advanced}
         onCancel={() => setFilterDialogOpen(false)}
         onApply={applyAdvanced}
+        storageOptions={storageOptions}
+        categoryOptions={categoryOptions}
       />
       <StockDetailDrawer
         item={selectedItem}

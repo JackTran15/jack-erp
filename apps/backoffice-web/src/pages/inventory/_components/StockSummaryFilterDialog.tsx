@@ -7,6 +7,11 @@ import {
 } from "../../../api/stock-summary";
 
 export interface StockSummaryAdvancedFilters {
+  storageId: string;
+  categoryId: string;
+  movementFrom: string;
+  movementTo: string;
+  excludeReservations: boolean;
   brand: string;
   unit: string;
   isActive: "ALL" | "TRUE" | "FALSE";
@@ -15,6 +20,11 @@ export interface StockSummaryAdvancedFilters {
 }
 
 export const DEFAULT_ADVANCED_FILTERS: StockSummaryAdvancedFilters = {
+  storageId: "",
+  categoryId: "",
+  movementFrom: "",
+  movementTo: "",
+  excludeReservations: false,
   brand: "",
   unit: "",
   isActive: "ALL",
@@ -27,9 +37,18 @@ interface Props {
   initial: StockSummaryAdvancedFilters;
   onCancel: () => void;
   onApply: (next: StockSummaryAdvancedFilters) => void;
+  storageOptions: { value: string; label: string }[];
+  categoryOptions: { value: string; label: string }[];
 }
 
-export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: Props) {
+export function StockSummaryFilterDialog({
+  open,
+  initial,
+  onCancel,
+  onApply,
+  storageOptions,
+  categoryOptions,
+}: Props) {
   const [draft, setDraft] = useState<StockSummaryAdvancedFilters>(initial);
 
   useEffect(() => {
@@ -64,6 +83,62 @@ export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: P
       defaultWidth={560}
     >
       <div className="grid grid-cols-[160px_1fr] items-center gap-x-4 gap-y-3 pb-4 text-sm">
+        <label htmlFor="ssfd-storage" className="text-foreground">
+          Kho
+        </label>
+        <select
+          id="ssfd-storage"
+          className="h-9 rounded border border-input bg-background px-2"
+          value={draft.storageId}
+          onChange={(e) => setDraft({ ...draft, storageId: e.target.value })}
+        >
+          <option value="">Tất cả kho</option>
+          {storageOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="ssfd-category" className="text-foreground">
+          Nhóm hàng hóa
+        </label>
+        <select
+          id="ssfd-category"
+          className="h-9 rounded border border-input bg-background px-2"
+          value={draft.categoryId}
+          onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
+        >
+          <option value="">Tất cả nhóm hàng</option>
+          {categoryOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="ssfd-movementFrom" className="text-foreground">
+          Phát sinh tồn từ ngày
+        </label>
+        <input
+          id="ssfd-movementFrom"
+          type="date"
+          className="h-9 rounded border border-input bg-background px-2"
+          value={draft.movementFrom}
+          onChange={(e) => setDraft({ ...draft, movementFrom: e.target.value })}
+        />
+
+        <label htmlFor="ssfd-movementTo" className="text-foreground">
+          Phát sinh tồn đến ngày
+        </label>
+        <input
+          id="ssfd-movementTo"
+          type="date"
+          className="h-9 rounded border border-input bg-background px-2"
+          value={draft.movementTo}
+          onChange={(e) => setDraft({ ...draft, movementTo: e.target.value })}
+        />
+
         <label htmlFor="ssfd-isActive" className="text-foreground">
           Trạng thái kinh doanh
         </label>
@@ -149,6 +224,18 @@ export function StockSummaryFilterDialog({ open, initial, onCancel, onApply }: P
             </option>
           ))}
         </select>
+
+        <span className="text-foreground">Hàng khách đặt</span>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={draft.excludeReservations}
+            onChange={(e) =>
+              setDraft({ ...draft, excludeReservations: e.target.checked })
+            }
+          />
+          Trừ số lượng hàng hóa khách đặt vào tồn kho
+        </label>
       </div>
     </AppModal>
   );
