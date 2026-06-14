@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { BranchStatus } from '@erp/shared-interfaces';
 import { BranchEntity } from './branch.entity';
 import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
@@ -12,6 +13,8 @@ import { BranchService } from './branch.service';
 import { OrganizationService } from '../organization/organization.service';
 import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
+import { StorageEntity } from '../inventory/location/storage.entity';
+import { ShowroomEntity } from '../inventory/location/showroom.entity';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -49,6 +52,12 @@ describe('BranchService', () => {
     remove: jest.Mock;
   };
   let orgService: { setMainBranch: jest.Mock };
+  let manager: {
+    getRepository: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+  };
+  let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
     branchRepo = {
@@ -67,6 +76,26 @@ describe('BranchService', () => {
     };
     orgService = { setMainBranch: jest.fn() };
 
+    // Fake EntityManager: create() tags rows with their entity class so tests can
+    // find the StorageEntity/ShowroomEntity payloads; save() stamps a per-class id.
+    manager = {
+      getRepository: jest.fn(() => ({
+        create: (dto: Record<string, unknown>) => ({ ...dto }),
+        save: (entity: Record<string, unknown>) =>
+          Promise.resolve({ id: 'branch-new', ...entity }),
+      })),
+      create: jest.fn((Entity: { name: string }, dto: Record<string, unknown>) => ({
+        __type: Entity,
+        ...dto,
+      })),
+      save: jest.fn((entity: { __type?: { name: string } }) =>
+        Promise.resolve({ id: `${entity.__type?.name ?? 'row'}-id`, ...entity }),
+      ),
+    };
+    dataSource = {
+      transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BranchService,
@@ -80,6 +109,7 @@ describe('BranchService', () => {
           provide: BranchCashProvisioningService,
           useValue: { ensureBranchCashFund: jest.fn() },
         },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -120,6 +150,32 @@ describe('BranchService', () => {
       await expect(
         service.create({ name: 'Main HQ' }, actor),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('auto-creates the branch showroom backed by a main storage', async () => {
+      branchRepo.findOne.mockResolvedValue(null);
+      branchRepo.count.mockResolvedValue(1);
+
+      await service.create({ name: 'HQ' }, actor);
+
+      const storageCall = manager.create.mock.calls.find(
+        (c) => c[0] === StorageEntity,
+      );
+      expect(storageCall?.[1]).toMatchObject({
+        name: 'HQ - Showroom',
+        isMainStorage: true,
+        branchId: 'branch-new',
+      });
+
+      const showroomCall = manager.create.mock.calls.find(
+        (c) => c[0] === ShowroomEntity,
+      );
+      expect(showroomCall?.[1]).toMatchObject({
+        name: 'HQ - Showroom',
+        isMainShowroom: true,
+        branchId: 'branch-new',
+        storageId: 'StorageEntity-id',
+      });
     });
   });
 

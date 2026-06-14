@@ -19,6 +19,7 @@ import { BranchEntity } from "./branch.entity";
 import { UserBranchAssignmentEntity } from "./user-branch-assignment.entity";
 import { CreateBranchDto, UpdateBranchDto } from "./dto";
 import { StorageEntity } from "../inventory/location/storage.entity";
+import { ShowroomEntity } from "../inventory/location/showroom.entity";
 
 @Injectable()
 export class BranchService {
@@ -82,11 +83,26 @@ export class BranchService {
         }),
       );
 
-      await manager.save(
+      // Each branch's default warehouse is its sales showroom ("Kho bán hàng").
+      // The storage is the showroom's backing inventory (kept isMainStorage so
+      // stock flows can still target it); it is hidden from the warehouses list.
+      const showroomName = `${branch.name} - Showroom`;
+      const storage = await manager.save(
         manager.create(StorageEntity, {
-          name: branch.name,
+          name: showroomName,
           isMainStorage: true,
           branchId: branch.id,
+          organizationId: branch.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
+
+      await manager.save(
+        manager.create(ShowroomEntity, {
+          name: showroomName,
+          storageId: storage.id,
+          branchId: branch.id,
+          isMainShowroom: true,
           organizationId: branch.organizationId,
           createdBy: actor.userId,
         }),
