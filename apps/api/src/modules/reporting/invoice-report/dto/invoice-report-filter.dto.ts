@@ -30,4 +30,19 @@ export class InvoiceReportFilterDto {
   @IsOptional()
   @IsUUID()
   branchId?: string;
+
+  /** Optional person filters (used by per-line reports; absent = all). */
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
+
+  /** Cashier — matches invoice.staffId. */
+  @IsOptional()
+  @IsUUID()
+  cashierId?: string;
+
+  /** Salesperson — matches invoice.salespersonId. */
+  @IsOptional()
+  @IsUUID()
+  salespersonId?: string;
 }

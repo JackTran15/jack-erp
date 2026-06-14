@@ -7641,6 +7641,21 @@ export interface components {
             type?: components["schemas"]["EnumFilterDto"];
             /** Format: uuid */
             branchId?: string;
+            /**
+             * Format: uuid
+             * @description Optional person filters (used by per-line reports; absent = all).
+             */
+            customerId?: string;
+            /**
+             * Format: uuid
+             * @description Cashier — matches invoice.staffId.
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Salesperson — matches invoice.salespersonId.
+             */
+            salespersonId?: string;
         };
         ColumnFilterDto: {
             col: string;

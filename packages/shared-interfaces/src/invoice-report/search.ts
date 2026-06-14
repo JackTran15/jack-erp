@@ -17,6 +17,12 @@ export interface InvoiceReportFilterPayload {
   status?: ReportEnumFilter;
   type?: ReportEnumFilter;
   branchId?: string;
+  /** Optional person filters (used by per-line reports; null/absent = all). */
+  customerId?: string;
+  /** Cashier — matches invoice.staffId. */
+  cashierId?: string;
+  /** Salesperson — matches invoice.salespersonId. */
+  salespersonId?: string;
 }
 
 /** Per-column filter applied POST-aggregate on a day's value (the "=" / "≤" widget row). */

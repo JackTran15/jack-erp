@@ -17,6 +17,8 @@ type ReportTypeDefinition = Pick<ReportTypeSeed, 'key' | 'sortOrder'>;
  */
 const REPORT_TYPE_DEFINITIONS: ReportTypeDefinition[] = [
   { key: 'daily-sales-summary', sortOrder: 10 },
+  { key: 'invoice-order-listing', sortOrder: 20 },
+  { key: 'invoice-item-revenue-detail', sortOrder: 30 },
 ];
 
 export const REPORT_TYPE_SEEDS: ReportTypeSeed[] = REPORT_TYPE_DEFINITIONS.map(

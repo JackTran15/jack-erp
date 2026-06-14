@@ -24931,6 +24931,21 @@
           "branchId": {
             "type": "string",
             "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Optional person filters (used by per-line reports; absent = all).",
+            "format": "uuid"
+          },
+          "cashierId": {
+            "type": "string",
+            "description": "Cashier — matches invoice.staffId.",
+            "format": "uuid"
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "Salesperson — matches invoice.salespersonId.",
+            "format": "uuid"
           }
         }
       },
