@@ -4348,6 +4348,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/transfer-orders/direct-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TransferOrderController_createAndConfirmExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/transfer-orders/issuable": {
         parameters: {
             query?: never;
@@ -6461,6 +6477,8 @@ export interface components {
             search?: string;
             startDate?: string;
             endDate?: string;
+            movementFrom?: string;
+            movementTo?: string;
             excludeReservations?: boolean;
             isActive?: boolean;
             isPosVisible?: boolean;
@@ -8255,8 +8273,42 @@ export interface components {
             sourceLocationId?: string | null;
             sourceLocationCode?: string | null;
         };
+        ExportTransferOrderLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: number;
+            unitPrice?: number;
+            notes?: string;
+        };
+        CreateAndExportTransferOrderDto: {
+            lines?: components["schemas"]["ExportTransferOrderLineDto"][];
+            reason?: string;
+            notes?: string;
+            /** Format: uuid */
+            providerId?: string;
+            deliverer?: string;
+            references?: string[];
+            /** Format: date-time */
+            occurredAt?: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            targetBranchId: string;
+        };
         UpdateTransferOrderDto: Record<string, never>;
-        ExportTransferOrderDto: Record<string, never>;
+        ExportTransferOrderDto: {
+            lines?: components["schemas"]["ExportTransferOrderLineDto"][];
+            reason?: string;
+            notes?: string;
+            /** Format: uuid */
+            providerId?: string;
+            deliverer?: string;
+            references?: string[];
+            /** Format: date-time */
+            occurredAt?: string;
+        };
         ImportTransferOrderDto: Record<string, never>;
         CustomerSearchV2Dto: {
             /** @default 1 */
@@ -16618,6 +16670,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateTransferOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_createAndConfirmExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAndExportTransferOrderDto"];
             };
         };
         responses: {

@@ -76,6 +76,24 @@ export interface CreateTransferOrderDto {
   lines: TransferOrderLineInput[];
 }
 
+export interface CreateAndConfirmTransferExportDto {
+  locationId: string;
+  targetBranchId: string;
+  providerId?: string;
+  reason?: string;
+  notes?: string;
+  deliverer?: string;
+  references?: string[];
+  occurredAt?: string;
+  lines: {
+    itemId: string;
+    locationId?: string;
+    quantity: number;
+    unitPrice?: number;
+    notes?: string;
+  }[];
+}
+
 export interface UpdateTransferOrderDto {
   sourceBranchId?: string;
   destinationBranchId?: string;
@@ -90,6 +108,7 @@ export interface UpdateTransferOrderDto {
 export interface TransferOrderQuery extends PaginationQuery {
   status?: TransferOrderStatus;
   organizationId: string;
+  branchId?: string;
 }
 
 @Injectable()
@@ -120,6 +139,16 @@ export class TransferOrderService {
     actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     this.validateLines(dto.lines);
+    if (!actor.branchId) {
+      throw new BadRequestException(
+        'Cần chọn cửa hàng hiện tại để lập lệnh điều chuyển',
+      );
+    }
+    if (dto.destinationBranchId === actor.branchId) {
+      throw new BadRequestException(
+        'Cửa hàng đích phải khác cửa hàng hiện tại',
+      );
+    }
 
     const documentNumber = await this.documentNumberingService.generate(
       DocumentType.TRANSFER_ORDER,
@@ -140,7 +169,7 @@ export class TransferOrderService {
       createdBy: actor.userId,
       documentNumber,
       status: TransferOrderStatus.DRAFT,
-      sourceBranchId: dto.sourceBranchId,
+      sourceBranchId: actor.branchId,
       destinationBranchId: dto.destinationBranchId,
       sourceStorageId: dto.sourceStorageId,
       destinationStorageId: dto.destinationStorageId,
@@ -157,11 +186,71 @@ export class TransferOrderService {
     return this.findOrFail(saved.id, actor.organizationId);
   }
 
+  async createAndConfirmExport(
+    dto: CreateAndConfirmTransferExportDto,
+    actor: ActorContext,
+  ): Promise<TransferOrderEntity> {
+    if (!dto.targetBranchId) {
+      throw new BadRequestException(
+        'Cần chọn cửa hàng nhận hàng điều chuyển',
+      );
+    }
+
+    const sourceLocations = await Promise.all(
+      dto.lines.map(async (line) => {
+        const locationId = line.locationId ?? dto.locationId;
+        const location = await this.locationRepo.findOne({
+          where: { id: locationId, organizationId: actor.organizationId },
+        });
+        if (!location?.storageId) {
+          throw new BadRequestException(
+            `Không xác định được kho nguồn của vị trí ${locationId}`,
+          );
+        }
+        return { line, locationId, storageId: location.storageId };
+      }),
+    );
+
+    const order = await this.create(
+      {
+        sourceBranchId: actor.branchId!,
+        destinationBranchId: dto.targetBranchId,
+        sourceStorageId: sourceLocations[0]?.storageId,
+        requestedDate: dto.occurredAt?.slice(0, 10),
+        notes: dto.notes ?? dto.reason,
+        lines: sourceLocations.map(({ line, storageId }) => ({
+          itemId: line.itemId,
+          requestedQty: Number(line.quantity),
+          sourceStorageId: storageId,
+          note: line.notes,
+        })),
+      },
+      actor,
+    );
+
+    return this.confirmExport(order.id, actor, {
+      reason: dto.reason,
+      notes: dto.notes,
+      providerId: dto.providerId,
+      deliverer: dto.deliverer,
+      references: dto.references,
+      occurredAt: dto.occurredAt,
+      lines: sourceLocations.map(({ line, locationId }) => ({
+        itemId: line.itemId,
+        locationId,
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice ?? 0),
+        notes: line.notes,
+      })),
+    });
+  }
+
   // ─── Read ───────────────────────────────────────────────────────────────────
 
-  async getById(id: string, organizationId: string): Promise<TransferOrderEntity> {
-    const to = await this.findOrFail(id, organizationId);
-    await this.attachSourceLocations(to, organizationId);
+  async getById(id: string, actor: ActorContext): Promise<TransferOrderEntity> {
+    const to = await this.findOrFail(id, actor.organizationId);
+    this.assertParticipantBranch(to, actor);
+    await this.attachSourceLocations(to, actor.organizationId);
     return to;
   }
 
@@ -248,26 +337,33 @@ export class TransferOrderService {
   /** Load a voucher by its code, org-scoped so either branch can find it. */
   async getByCode(
     documentNumber: string,
-    organizationId: string,
+    actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     const to = await this.toRepo.findOne({
-      where: { documentNumber, organizationId },
+      where: { documentNumber, organizationId: actor.organizationId },
     });
     if (!to) {
       throw new NotFoundException(
         `Transfer order ${documentNumber} not found`,
       );
     }
+    this.assertParticipantBranch(to, actor);
     return to;
   }
 
   async list(
     query: TransferOrderQuery,
   ): Promise<PaginatedResponse<TransferOrderEntity>> {
-    const where: Record<string, unknown> = {
+    const baseWhere: Record<string, unknown> = {
       organizationId: query.organizationId,
     };
-    if (query.status) where.status = query.status;
+    if (query.status) baseWhere.status = query.status;
+    const where = query.branchId
+      ? [
+          { ...baseWhere, sourceBranchId: query.branchId },
+          { ...baseWhere, destinationBranchId: query.branchId },
+        ]
+      : baseWhere;
 
     const page = Math.max(1, Number(query.page ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize ?? 20)));
@@ -413,6 +509,7 @@ export class TransferOrderService {
     actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
+    this.assertSourceBranch(to, actor, 'Chỉ cửa hàng nguồn được sửa lệnh điều chuyển');
 
     if (to.status === TransferOrderStatus.IN_PROGRESS) {
       const touchesLocked =
@@ -440,9 +537,22 @@ export class TransferOrderService {
     }
 
     if (dto.lines) this.validateLines(dto.lines);
+    if (
+      dto.sourceBranchId !== undefined &&
+      dto.sourceBranchId !== actor.branchId
+    ) {
+      throw new BadRequestException(
+        'Cửa hàng nguồn phải là cửa hàng hiện tại',
+      );
+    }
+    if (dto.destinationBranchId === actor.branchId) {
+      throw new BadRequestException(
+        'Cửa hàng đích phải khác cửa hàng hiện tại',
+      );
+    }
 
     return this.dataSource.transaction(async (manager) => {
-      if (dto.sourceBranchId !== undefined) to.sourceBranchId = dto.sourceBranchId;
+      if (dto.sourceBranchId !== undefined) to.sourceBranchId = actor.branchId!;
       if (dto.destinationBranchId !== undefined)
         to.destinationBranchId = dto.destinationBranchId;
       if (dto.sourceStorageId !== undefined)
@@ -513,15 +623,27 @@ export class TransferOrderService {
       actor,
     );
 
-    await this.toRepo.update(
-      { id: to.id, organizationId: actor.organizationId },
-      {
-        status: TransferOrderStatus.IN_PROGRESS,
-        exportGoodsIssueId: goodsIssue.id,
-        exportedAt: new Date(),
-        exportedBy: actor.userId,
-      },
-    );
+    try {
+      await this.toRepo.update(
+        { id: to.id, organizationId: actor.organizationId },
+        {
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: goodsIssue.id,
+          exportedAt: new Date(),
+          exportedBy: actor.userId,
+        },
+      );
+    } catch (error) {
+      try {
+        await this.goodsIssueService.cancel(goodsIssue.id, actor);
+      } catch (rollbackError) {
+        this.logger.error(
+          `Could not reverse goods issue ${goodsIssue.id} after transfer order ${to.id} update failed`,
+          rollbackError instanceof Error ? rollbackError.stack : undefined,
+        );
+      }
+      throw error;
+    }
     this.logger.log(
       `Transfer order ${to.id} exported (goods issue ${goodsIssue.id})`,
     );
@@ -721,6 +843,7 @@ export class TransferOrderService {
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
     const to = await this.findOrFail(id, actor.organizationId);
+    this.assertSourceBranch(to, actor, 'Chỉ cửa hàng nguồn được hủy lệnh điều chuyển');
     if (
       to.status === TransferOrderStatus.COMPLETED ||
       to.status === TransferOrderStatus.CANCELLED
@@ -818,5 +941,28 @@ export class TransferOrderService {
     const to = await this.toRepo.findOne({ where: { id, organizationId } });
     if (!to) throw new NotFoundException(`Transfer order ${id} not found`);
     return to;
+  }
+
+  private assertParticipantBranch(
+    to: TransferOrderEntity,
+    actor: ActorContext,
+  ): void {
+    if (
+      !actor.branchId ||
+      (to.sourceBranchId !== actor.branchId &&
+        to.destinationBranchId !== actor.branchId)
+    ) {
+      throw new NotFoundException(`Transfer order ${to.id} not found`);
+    }
+  }
+
+  private assertSourceBranch(
+    to: TransferOrderEntity,
+    actor: ActorContext,
+    message: string,
+  ): void {
+    if (!actor.branchId || to.sourceBranchId !== actor.branchId) {
+      throw new ForbiddenException(message);
+    }
   }
 }

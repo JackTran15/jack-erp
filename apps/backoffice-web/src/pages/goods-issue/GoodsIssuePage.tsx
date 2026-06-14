@@ -1435,6 +1435,17 @@ function GoodsIssueFormDialog({
             lines: issueLines,
           },
         );
+      } else if (purpose === "TRANSFER_OUT") {
+        await apiClient.post("/inventory/transfer-orders/direct-export", {
+          locationId: headerLocationId,
+          targetBranchId,
+          providerId: customerId || undefined,
+          notes: notes || undefined,
+          deliverer: deliveryPerson || undefined,
+          references: references.length ? references : undefined,
+          occurredAt: combineDateTime(docDate, docTime),
+          lines: issueLines,
+        });
       } else {
         await apiClient.post("/inventory/goods-issues", {
           locationId: headerLocationId,
@@ -1444,7 +1455,6 @@ function GoodsIssueFormDialog({
             (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
               ? reasonId
               : undefined,
-          targetBranchId: purpose === "TRANSFER_OUT" ? targetBranchId : undefined,
           notes: notes || undefined,
           deliverer: deliveryPerson || undefined,
           references: references.length ? references : undefined,

@@ -82,10 +82,10 @@ function mapApiRow(row: StockPeriodRow): ViewRow {
     inValue: row.inValue,
     outQty: row.outQty,
     outValue: row.outValue,
-    transferOutQty: 0,
-    transferOutValue: 0,
-    incomingQty: 0,
-    incomingValue: 0,
+    transferOutQty: row.transferOutQty,
+    transferOutValue: row.transferOutValue,
+    incomingQty: row.incomingQty,
+    incomingValue: row.incomingValue,
   };
 }
 

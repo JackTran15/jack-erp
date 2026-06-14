@@ -13726,6 +13726,37 @@
         ]
       }
     },
+    "/inventory/transfer-orders/direct-export": {
+      "post": {
+        "operationId": "TransferOrderController_createAndConfirmExport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAndExportTransferOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferOrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/issuable": {
       "get": {
         "operationId": "TransferOrderController_listIssuable",
@@ -21042,6 +21073,12 @@
           "endDate": {
             "type": "string"
           },
+          "movementFrom": {
+            "type": "string"
+          },
+          "movementTo": {
+            "type": "string"
+          },
           "excludeReservations": {
             "type": "boolean"
           },
@@ -26623,13 +26660,117 @@
           "transferOrder"
         ]
       },
+      "ExportTransferOrderLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId",
+          "quantity"
+        ]
+      },
+      "CreateAndExportTransferOrderDto": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportTransferOrderLineDto"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliverer": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetBranchId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "locationId",
+          "targetBranchId"
+        ]
+      },
       "UpdateTransferOrderDto": {
         "type": "object",
         "properties": {}
       },
       "ExportTransferOrderDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportTransferOrderLineDto"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliverer": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "ImportTransferOrderDto": {
         "type": "object",

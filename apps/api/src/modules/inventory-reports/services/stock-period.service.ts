@@ -85,6 +85,10 @@ export interface StockPeriodRow {
   outValue: number;
   closingQty: number;
   closingValue: number;
+  transferOutQty: number;
+  transferOutValue: number;
+  incomingQty: number;
+  incomingValue: number;
   // Optional breakdown (only if includeBreakdown=true)
   inQtyPurchase?: number;
   inQtyTransferIn?: number;
@@ -158,17 +162,111 @@ export class StockPeriodService {
       hideZeroRows,         // $8
     ];
 
-    const [rows, countRows] = await Promise.all([
+    const [rows, countRows, pendingRows] = await Promise.all([
       this.dataSource.query(dataSql, [...baseParams, pageSize, offset]),
       this.dataSource.query(countSql, baseParams),
+      this.loadPendingTransfers(query),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
     const data = (rows as RawStockPeriodRow[]).map((r) =>
       this.mapRow(r, query.includeBreakdown === true, isLocation),
     );
+    this.applyPendingTransfers(data, pendingRows, isLocation);
 
     return { data, total };
+  }
+
+  private async loadPendingTransfers(
+    query: StockPeriodQuery,
+  ): Promise<RawPendingTransferRow[]> {
+    return this.dataSource.query(
+      `
+        SELECT
+          transfer_line.item_id,
+          transfer_line.source_location_id,
+          transfer_order.source_branch_id,
+          transfer_order.destination_branch_id,
+          SUM(transfer_line.requested_qty)::numeric AS quantity,
+          SUM(
+            transfer_line.requested_qty *
+            COALESCE(export_price.unit_price, item.purchase_price, 0)
+          )::numeric AS value
+        FROM transfer_orders transfer_order
+        INNER JOIN transfer_order_lines transfer_line
+          ON transfer_line.transfer_order_id = transfer_order.id
+         AND transfer_line.organization_id = transfer_order.organization_id
+        INNER JOIN items item
+          ON item.id = transfer_line.item_id
+         AND item.organization_id = transfer_order.organization_id
+        LEFT JOIN (
+          SELECT goods_issue_line.item_id,
+                 goods_issue_line.goods_issue_id,
+                 MAX(goods_issue_line.unit_price)::numeric AS unit_price
+          FROM goods_issue_lines goods_issue_line
+          GROUP BY goods_issue_line.item_id, goods_issue_line.goods_issue_id
+        ) export_price
+          ON export_price.goods_issue_id = transfer_order.export_goods_issue_id
+         AND export_price.item_id = transfer_line.item_id
+        WHERE transfer_order.organization_id = $1
+          AND transfer_order.status = 'IN_PROGRESS'
+          AND transfer_order.deleted_at IS NULL
+          AND (
+            $2::text[] IS NULL
+            OR transfer_order.source_branch_id = ANY($2)
+            OR transfer_order.destination_branch_id = ANY($2)
+          )
+          AND ($3::uuid[] IS NULL OR item.category_id = ANY($3))
+          AND ($4::text IS NULL OR item.code ILIKE '%' || $4 || '%' OR item.name ILIKE '%' || $4 || '%')
+        GROUP BY transfer_line.item_id,
+                 transfer_line.source_location_id,
+                 transfer_order.source_branch_id,
+                 transfer_order.destination_branch_id
+      `,
+      [
+        query.organizationId,
+        query.branchIds?.length ? query.branchIds : null,
+        query.categoryIds?.length ? query.categoryIds : null,
+        query.search?.trim() || null,
+      ],
+    );
+  }
+
+  private applyPendingTransfers(
+    data: StockPeriodRow[],
+    pendingRows: RawPendingTransferRow[],
+    isLocation: boolean,
+  ): void {
+    const incomingAssigned = new Set<string>();
+    for (const row of data) {
+      row.transferOutQty = 0;
+      row.transferOutValue = 0;
+      row.incomingQty = 0;
+      row.incomingValue = 0;
+
+      for (const pending of pendingRows) {
+        if (pending.item_id !== row.itemId) continue;
+        const quantity = Number(pending.quantity ?? 0);
+        const value = Number(pending.value ?? 0);
+        const isSource = isLocation
+          ? Boolean(row.locationId && row.locationId === pending.source_location_id)
+          : row.branchId === pending.source_branch_id;
+        if (isSource) {
+          row.transferOutQty += quantity;
+          row.transferOutValue += value;
+        }
+
+        const incomingKey = `${pending.item_id}:${pending.destination_branch_id}`;
+        if (
+          row.branchId === pending.destination_branch_id &&
+          !incomingAssigned.has(incomingKey)
+        ) {
+          row.incomingQty += quantity;
+          row.incomingValue += value;
+          incomingAssigned.add(incomingKey);
+        }
+      }
+    }
   }
 
   // ─── SQL builders ────────────────────────────────────────────────────────────
@@ -185,10 +283,12 @@ export class StockPeriodService {
       ? `loc.id AS location_id, loc.code AS location_code, loc.name AS location_name,`
       : '';
     const branchCols = isLocation
-      ? `NULL::uuid AS branch_id, NULL::text AS branch_code, NULL::text AS branch_name,`
+      ? `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`
       : `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`;
     const joinLoc = isLocation
-      ? 'LEFT JOIN locations loc ON loc.id = c.group_key'
+      ? `LEFT JOIN locations loc ON loc.id = c.group_key
+         LEFT JOIN storages storage ON storage.id = loc.storage_id
+         LEFT JOIN branches b ON b.id = storage.branch_id`
       : '';
     const joinBranch = isLocation
       ? ''
@@ -496,6 +596,10 @@ export class StockPeriodService {
       outValue: Number(raw.out_value ?? 0),
       closingQty: Number(raw.closing_qty ?? 0),
       closingValue: Number(raw.closing_value ?? 0),
+      transferOutQty: 0,
+      transferOutValue: 0,
+      incomingQty: 0,
+      incomingValue: 0,
     };
 
     if (isLocation) {
@@ -516,6 +620,15 @@ export class StockPeriodService {
 
     return row;
   }
+}
+
+interface RawPendingTransferRow {
+  item_id: string;
+  source_location_id: string | null;
+  source_branch_id: string;
+  destination_branch_id: string;
+  quantity: string | number | null;
+  value: string | number | null;
 }
 
 /** Raw row shape returned by pg — NUMERIC columns come back as strings. */

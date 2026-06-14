@@ -52,6 +52,14 @@ export class StockSummarySearchV2Dto {
   endDate?: string;
 
   @IsOptional()
+  @IsDateString()
+  movementFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  movementTo?: string;
+
+  @IsOptional()
   @IsBoolean()
   excludeReservations?: boolean;
 
