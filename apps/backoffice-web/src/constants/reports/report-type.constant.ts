@@ -1,7 +1,7 @@
 import { REPORT_BRANCH } from "./report-branch.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
-import { chain_tableRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
-import type { ReportTypeMetadata } from "./report.interface";
+import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
+import type { ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
   DAILY_SALES_SUMMARY = 'daily_sales_summary',
@@ -29,42 +29,38 @@ export const REPORT_TYPE_SALES_METADATA = {
   [REPORT_TYPE_SALES.DAILY_SALES_SUMMARY]: {
     label: 'Tổng hợp bán hàng theo ngày',
     filterConfig: {
-      [REPORT_BRANCH.SINGLE]: [
-        REPORT_FILTERS_LINE.STORE,
-        REPORT_FILTERS_LINE.REPORT_PERIOD,
-        REPORT_FILTERS_LINE.RANGE_DATE,
-        REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
-      ],
-      [REPORT_BRANCH.CHAIN]: [
-        REPORT_FILTERS_LINE.STORE,
-        REPORT_FILTERS_LINE.REPORT_PERIOD,
-        REPORT_FILTERS_LINE.RANGE_DATE,
-        REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
-      ]
+      [REPORT_BRANCH.SINGLE]: single_filterRegistryReportDailySaleSummary,
+      [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportDailySaleSummary
     },
     tableConfig: {
       [REPORT_BRANCH.SINGLE]: single_tableRegistryReportDailySaleSummary,
       [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportDailySaleSummary
     },
-    filterLines: [
-      REPORT_FILTERS_LINE.STORE,
-      REPORT_FILTERS_LINE.REPORT_PERIOD,
-      REPORT_FILTERS_LINE.RANGE_DATE,
-      REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
-    ],
   },
   [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: {
     label: 'Bảng kê hóa đơn và đơn hàng',
-    filterLines: [
-      REPORT_FILTERS_LINE.STORE,
-      REPORT_FILTERS_LINE.INVOICE_STATUS,
-      REPORT_FILTERS_LINE.STAT_DATE_TYPE,
-      REPORT_FILTERS_LINE.REPORT_PERIOD,
-      REPORT_FILTERS_LINE.RANGE_DATE,
-      REPORT_FILTERS_LINE.CASHIER,
-      REPORT_FILTERS_LINE.SALESPERSON,
-      REPORT_FILTERS_LINE.CUSTOMER,
-    ]
+    filterConfig: {
+      [REPORT_BRANCH.SINGLE]: [
+        REPORT_FILTERS_LINE.STORE,
+        REPORT_FILTERS_LINE.INVOICE_STATUS,
+        REPORT_FILTERS_LINE.STAT_DATE_TYPE,
+        REPORT_FILTERS_LINE.REPORT_PERIOD,
+        REPORT_FILTERS_LINE.RANGE_DATE,
+        REPORT_FILTERS_LINE.CASHIER,
+        REPORT_FILTERS_LINE.SALESPERSON,
+        REPORT_FILTERS_LINE.CUSTOMER,
+      ],
+      [REPORT_BRANCH.CHAIN]: [
+        REPORT_FILTERS_LINE.STORE,
+        REPORT_FILTERS_LINE.INVOICE_STATUS,
+        REPORT_FILTERS_LINE.STAT_DATE_TYPE,
+        REPORT_FILTERS_LINE.REPORT_PERIOD,
+        REPORT_FILTERS_LINE.RANGE_DATE,
+        REPORT_FILTERS_LINE.CASHIER,
+        REPORT_FILTERS_LINE.SALESPERSON,
+        REPORT_FILTERS_LINE.CUSTOMER,
+      ],
+    },
   },
   [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng' },
   [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng' },
@@ -141,56 +137,56 @@ export enum REPORT_TYPE_PROFIT {
 
 
 export const REPORT_TYPE_PROFIT_METADATA = {
-  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS]: { label: 'Kết quả kinh doanh', filterLines: [] },
-  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS_BY_BRANCH]: { label: 'Kết quả kinh doanh theo chi nhánh', filterLines: [] },
-  [REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT]: { label: 'Lợi nhuận theo mặt hàng', filterLines: [] },
-  [REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE]: { label: 'Lợi nhuận gộp theo hóa đơn', filterLines: [] },
+  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS]: { label: 'Kết quả kinh doanh' },
+  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS_BY_BRANCH]: { label: 'Kết quả kinh doanh theo chi nhánh' },
+  [REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT]: { label: 'Lợi nhuận theo mặt hàng' },
+  [REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE]: { label: 'Lợi nhuận gộp theo hóa đơn' },
 };
 
 export const REPORT_TYPE_MULTI_CHANNEL_SALES_METADATA = {
-  [REPORT_TYPE_MULTI_CHANNEL_SALES.REVENUE_PROFIT_BY_CHANNEL]: { label: 'Doanh thu, lợi nhuận theo kênh bán', filterLines: [] },
-  [REPORT_TYPE_MULTI_CHANNEL_SALES.PRODUCT_REVENUE_COMPARISON_BY_CHANNEL]: { label: 'So sánh doanh thu mặt hàng theo kênh bán', filterLines: [] },
-  [REPORT_TYPE_MULTI_CHANNEL_SALES.CHANNEL_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu theo kênh bán và thời gian', filterLines: [] },
-  [REPORT_TYPE_MULTI_CHANNEL_SALES.REVENUE_PROFIT_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu, lợi nhuận theo hóa đơn và mặt hàng', filterLines: [] },
+  [REPORT_TYPE_MULTI_CHANNEL_SALES.REVENUE_PROFIT_BY_CHANNEL]: { label: 'Doanh thu, lợi nhuận theo kênh bán' },
+  [REPORT_TYPE_MULTI_CHANNEL_SALES.PRODUCT_REVENUE_COMPARISON_BY_CHANNEL]: { label: 'So sánh doanh thu mặt hàng theo kênh bán' },
+  [REPORT_TYPE_MULTI_CHANNEL_SALES.CHANNEL_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu theo kênh bán và thời gian' },
+  [REPORT_TYPE_MULTI_CHANNEL_SALES.REVENUE_PROFIT_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu, lợi nhuận theo hóa đơn và mặt hàng' },
 };
 
 export const REPORT_TYPE_PURCHASES_METADATA = {
-  [REPORT_TYPE_PURCHASES.PURCHASES_BY_PRODUCT]: { label: 'Mua hàng theo mặt hàng', filterLines: [] },
-  [REPORT_TYPE_PURCHASES.PURCHASES_BY_SUPPLIER]: { label: 'Mua hàng theo nhà cung cấp', filterLines: [] },
-  [REPORT_TYPE_PURCHASES.PURCHASE_DETAIL_LEDGER]: { label: 'Sổ chi tiết mua hàng', filterLines: [] },
+  [REPORT_TYPE_PURCHASES.PURCHASES_BY_PRODUCT]: { label: 'Mua hàng theo mặt hàng' },
+  [REPORT_TYPE_PURCHASES.PURCHASES_BY_SUPPLIER]: { label: 'Mua hàng theo nhà cung cấp' },
+  [REPORT_TYPE_PURCHASES.PURCHASE_DETAIL_LEDGER]: { label: 'Sổ chi tiết mua hàng' },
 };
 
 export const REPORT_TYPE_INVENTORY_METADATA = {
-  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: { label: 'Bảng kê chi tiết phiếu kho', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: { label: 'Chi tiết số lượng nhập xuất tồn kho', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: { label: 'Số lượng tồn kho theo cửa hàng', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_WAREHOUSE]: { label: 'Số lượng tồn kho theo kho', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: { label: 'Tổng hợp nhập xuất điều chuyển', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: { label: 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: { label: 'Hàng hóa xuất kho tạm', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.GOODS_STORAGE_TIME]: { label: 'Thời gian lưu kho hàng hóa', filterLines: [] },
-  [REPORT_TYPE_INVENTORY.GOODS_OUT_BY_REASON]: { label: 'Hàng hóa xuất kho theo lý do', filterLines: [] },
+  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho' },
+  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: { label: 'Bảng kê chi tiết phiếu kho' },
+  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: { label: 'Chi tiết số lượng nhập xuất tồn kho' },
+  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng' },
+  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: { label: 'Số lượng tồn kho theo cửa hàng' },
+  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_WAREHOUSE]: { label: 'Số lượng tồn kho theo kho' },
+  [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu' },
+  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: { label: 'Tổng hợp nhập xuất điều chuyển' },
+  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: { label: 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng' },
+  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm' },
+  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: { label: 'Hàng hóa xuất kho tạm' },
+  [REPORT_TYPE_INVENTORY.GOODS_STORAGE_TIME]: { label: 'Thời gian lưu kho hàng hóa' },
+  [REPORT_TYPE_INVENTORY.GOODS_OUT_BY_REASON]: { label: 'Hàng hóa xuất kho theo lý do' },
 };
 
 export const REPORT_TYPE_DEBTS_METADATA = {
-  [REPORT_TYPE_DEBTS.RECEIVABLES_DETAIL_BY_PRODUCT]: { label: 'Chi tiết công nợ phải thu theo mặt hàng', filterLines: [] },
-  [REPORT_TYPE_DEBTS.AGING_RECEIVABLES_SUMMARY]: { label: 'Tổng hợp công nợ phải thu theo độ tuổi', filterLines: [] },
-  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS]: { label: 'Công nợ nhà cung cấp', filterLines: [] },
-  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS_DETAIL_BY_DOCUMENT_AND_PRODUCT]: { label: 'Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng', filterLines: [] },
-  [REPORT_TYPE_DEBTS.DELIVERY_PARTNER_DEBTS]: { label: 'Công nợ đối tác giao hàng', filterLines: [] },
+  [REPORT_TYPE_DEBTS.RECEIVABLES_DETAIL_BY_PRODUCT]: { label: 'Chi tiết công nợ phải thu theo mặt hàng' },
+  [REPORT_TYPE_DEBTS.AGING_RECEIVABLES_SUMMARY]: { label: 'Tổng hợp công nợ phải thu theo độ tuổi' },
+  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS]: { label: 'Công nợ nhà cung cấp' },
+  [REPORT_TYPE_DEBTS.SUPPLIER_DEBTS_DETAIL_BY_DOCUMENT_AND_PRODUCT]: { label: 'Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng' },
+  [REPORT_TYPE_DEBTS.DELIVERY_PARTNER_DEBTS]: { label: 'Công nợ đối tác giao hàng' },
 };
 
 export const REPORT_TYPE_CASH_FUND_METADATA = {
-  [REPORT_TYPE_CASH_FUND.SHIFT_HANDOVER_MINUTES_LIST]: { label: 'Biên bản bàn giao ca', filterLines: [] },
-  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_SITUATION]: { label: 'Tình hình thu chi quỹ tiền mặt', filterLines: [] },
-  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: { label: 'Danh sách thu chi quỹ tiền mặt', filterLines: [] },
-  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY]: { label: 'Chi phí theo loại', filterLines: [] },
-  [REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY]: { label: 'Danh sách chi phí theo loại', filterLines: [] },
-  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME]: { label: 'Chi phí theo thời gian', filterLines: [] },
+  [REPORT_TYPE_CASH_FUND.SHIFT_HANDOVER_MINUTES_LIST]: { label: 'Biên bản bàn giao ca' },
+  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_SITUATION]: { label: 'Tình hình thu chi quỹ tiền mặt' },
+  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: { label: 'Danh sách thu chi quỹ tiền mặt' },
+  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY]: { label: 'Chi phí theo loại' },
+  [REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY]: { label: 'Danh sách chi phí theo loại' },
+  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME]: { label: 'Chi phí theo thời gian' },
 };
 
 // Gộp metadata của mọi category để tra cứu theo giá trị report type (string).
@@ -210,8 +206,21 @@ export function getReportTypeLabel(reportType: string): string {
   return REPORT_TYPE_METADATA[reportType]?.label ?? reportType;
 }
 
-// Các dòng filter của report type đang chọn (dòng chọn báo cáo "TYPE" được render
-// riêng, luôn hiển thị, ở ReportFilterForm — không nằm trong danh sách này).
-export function getReportFormLines(reportType: string): REPORT_FILTERS_LINE[] {
-  return REPORT_TYPE_METADATA[reportType]?.filterLines ?? [];
+// Các dòng filter của report type đang chọn theo loại view (dòng chọn báo cáo "TYPE"
+// được render riêng, luôn hiển thị, ở ReportFilterForm — không nằm trong danh sách này).
+export function getReportFormLines(
+  reportType: string,
+  branch: REPORT_BRANCH,
+): REPORT_FILTERS_LINE[] {
+  return REPORT_TYPE_METADATA[reportType]?.filterConfig?.[branch] ?? [];
+}
+
+const EMPTY_TABLE_CONFIG: ReportTableConfig = { columns: [] };
+
+// Table config theo report type + loại view; rỗng nếu report chưa cấu hình bảng.
+export function getReportTableConfig(
+  reportType: string,
+  branch: REPORT_BRANCH,
+): ReportTableConfig {
+  return REPORT_TYPE_METADATA[reportType]?.tableConfig?.[branch] ?? EMPTY_TABLE_CONFIG;
 }

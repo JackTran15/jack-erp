@@ -1,5 +1,6 @@
 import { createStore, type StoreApi } from "zustand";
 import type { PaginationState, Updater } from "@tanstack/react-table";
+import { buildTableColumnsState } from "./table.factory";
 import type { TableInitialState, TableState } from "./table.interface";
 
 export type TableStoreApi = StoreApi<TableState>;
@@ -12,6 +13,14 @@ function applyUpdater<T>(updater: Updater<T>, prev: T): T {
 export function createTableStore(initialState: TableInitialState): TableStoreApi {
   return createStore<TableState>((set) => ({
     ...initialState,
+
+    setConfig: (config) =>
+      set((s) => ({
+        config,
+        columns: buildTableColumnsState(config),
+        sorting: { items: [] },
+        pagination: { ...s.pagination, pageIndex: 0 },
+      })),
 
     columnsActions: {
       setVisibility: (updater) =>

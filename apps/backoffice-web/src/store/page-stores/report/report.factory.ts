@@ -18,9 +18,7 @@ export function buildInitialReportState({
     category,
     branch,
     listReport: configs.listReport,
-    tableConfig: configs.tableConfig,
     reportType: configs.listReport[0] ?? "",
-    // filters/columnFilters đều sparse — chỉ chứa giá trị khi người dùng thao tác.
     filters: {},
     columnFilters: {},
   };

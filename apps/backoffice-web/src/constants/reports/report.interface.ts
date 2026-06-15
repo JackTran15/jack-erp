@@ -33,16 +33,17 @@ export interface ReportTableConfig {
   summaryLabel?: string;            // nhãn ô đầu dòng footer, vd "Tổng"
 }
 
-// Metadata của một loại report: nhãn + các dòng filter của riêng report đó.
+// Metadata của một loại report: nhãn + filter + table config (theo từng loại view).
 export interface ReportTypeMetadata {
   label?: string;
-  filterLines?: REPORT_FILTERS_LINE[];
+  filterConfig?: Partial<Record<REPORT_BRANCH, REPORT_FILTERS_LINE[]>>;
+  tableConfig?: Partial<Record<REPORT_BRANCH, ReportTableConfig>>;
 }
 
 // Config của một báo cáo theo loại cửa hàng (chi nhánh / chuỗi).
+// tableConfig đã chuyển sang metadata từng report type (xem REPORT_TYPE_*_METADATA).
 export interface ReportBranchConfig {
   listReport: string[];
-  tableConfig: ReportTableConfig;
 }
 
 // Metadata của một category báo cáo (gắn với route), kèm config theo từng branch.

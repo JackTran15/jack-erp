@@ -1,7 +1,6 @@
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
 import { REPORT_BRANCH } from "../../../constants/reports/report.constant";
-import type { ReportTableConfig } from "../../../constants/reports/report.interface";
 
 export interface StoreScopeValue {
   scope: "all" | "group";
@@ -37,7 +36,6 @@ export interface ReportInitialState {
   category: REPORT_CATEGORY;
   branch: REPORT_BRANCH;
   listReport: string[];
-  tableConfig: ReportTableConfig;
   reportType: string;
   // Sparse như columnFilters: chỉ chứa line đã được set (không default dư thừa theo report type).
   filters: Partial<ReportFilterValues>;

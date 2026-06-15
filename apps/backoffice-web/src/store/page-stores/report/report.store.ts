@@ -69,10 +69,10 @@ export function createReportStore(
 
 // Gom giá trị đã chọn thành payload theo backendField (dùng khi submit / call api).
 export function buildReportSubmitPayload(
-  state: Pick<ReportState, "reportType" | "filters">,
+  state: Pick<ReportState, "reportType" | "filters" | "branch">,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = { reportType: state.reportType };
-  for (const line of getReportFormLines(state.reportType)) {
+  for (const line of getReportFormLines(state.reportType, state.branch)) {
     const meta = REPORT_FILTERS_LINE_METADATA[line] as {
       backendField: string;
       backendField2?: string;

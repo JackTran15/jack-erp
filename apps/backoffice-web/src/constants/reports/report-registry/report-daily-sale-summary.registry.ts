@@ -1,3 +1,4 @@
+import { REPORT_FILTERS_LINE } from "../report-filters.constant";
 import { ReportTableColumn, ReportTableColumnGroup, ReportTableColumnLabel } from "../report-table.constant";
 import { ReportTableConfig } from "../report.interface";
 
@@ -400,3 +401,17 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     },
   ],
 };
+
+export const single_filterRegistryReportDailySaleSummary = [
+  REPORT_FILTERS_LINE.STORE,
+  REPORT_FILTERS_LINE.REPORT_PERIOD,
+  REPORT_FILTERS_LINE.RANGE_DATE,
+  REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+];
+
+export const chain_filterRegistryReportDailySaleSummary = [
+  REPORT_FILTERS_LINE.STORE,
+  REPORT_FILTERS_LINE.REPORT_PERIOD,
+  REPORT_FILTERS_LINE.RANGE_DATE,
+  REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+];

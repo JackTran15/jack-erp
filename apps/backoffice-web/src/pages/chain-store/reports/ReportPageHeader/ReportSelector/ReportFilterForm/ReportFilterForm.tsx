@@ -15,6 +15,7 @@ interface Props {
 
 export function ReportFilterForm({ onSubmit, onCancel }: Props) {
   const reportType = useReportStore((s) => s.reportType);
+  const branch = useReportStore((s) => s.branch);
   const listReport = useReportStore((s) => s.listReport);
   const setReportType = useReportStore((s) => s.actions.setReportType);
 
@@ -22,7 +23,7 @@ export function ReportFilterForm({ onSubmit, onCancel }: Props) {
     value: v,
     label: getReportTypeLabel(v),
   }));
-  const lines = getReportFormLines(reportType);
+  const lines = getReportFormLines(reportType, branch);
 
   return (
     <div className="flex w-[640px] max-w-[calc(100vw-2rem)] flex-col">

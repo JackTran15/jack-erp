@@ -58,6 +58,8 @@ export interface TablePaginationActions {
 }
 
 export interface TableState extends TableInitialState {
+  // Thay toàn bộ cấu hình bảng (đổi report type) → reset cột/sort/trang theo config mới.
+  setConfig: (config: ReportTableConfig) => void;
   columnsActions: TableColumnsActions;
   sortingActions: TableSortingActions;
   paginationActions: TablePaginationActions;

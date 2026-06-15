@@ -4,6 +4,7 @@ import {
   REPORT_CATEGORY_METADATA,
 } from "../../../constants/reports/report-category.constant";
 import { REPORT_BRANCH } from "../../../constants/reports/report.constant";
+import { getReportTableConfig } from "../../../constants/reports/report-type.constant";
 import { useIsChainSelected } from "../../../store/common/branch/branch.store";
 import { TableStoreProvider } from "../../../store/common/table-store/table.context";
 import { buildInitialTableState } from "../../../store/common/table-store/table.factory";
@@ -11,6 +12,7 @@ import { ReportStoreProvider } from "../../../store/page-stores/report/report.co
 import { buildInitialReportState } from "../../../store/page-stores/report/report.factory";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
+import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
 
 interface Props {
   category: REPORT_CATEGORY;
@@ -21,13 +23,14 @@ export function ReportPage({ category }: Props) {
   const branch = isChain ? REPORT_BRANCH.CHAIN : REPORT_BRANCH.SINGLE;
   const configs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
 
-  const tableInitialState = useMemo(
-    () =>
-      configs
-        ? buildInitialTableState(`${category}-${branch}`, configs.tableConfig)
-        : null,
-    [category, branch, configs],
-  );
+  const tableInitialState = useMemo(() => {
+    if (!configs) return null;
+    const initialReportType = configs.listReport[0] ?? "";
+    return buildInitialTableState(
+      `${category}-${branch}`,
+      getReportTableConfig(initialReportType, branch),
+    );
+  }, [category, branch, configs]);
   const reportInitialState = useMemo(
     () =>
       configs ? buildInitialReportState({ category, branch, configs }) : null,
@@ -51,6 +54,7 @@ export function ReportPage({ category }: Props) {
         key={`${category}-${branch}`}
         initialState={tableInitialState}
       >
+        <ReportTableConfigSync />
         <div className="flex h-full flex-col bg-white px-2">
           <ReportPageHeader />
           <ReportPageTable />

@@ -7,10 +7,11 @@ import { ReportFilterForm } from "./ReportFilterForm/ReportFilterForm";
 export function ReportSelector() {
   const [open, setOpen] = useState(false);
   const reportType = useReportStore((s) => s.reportType);
+  const branch = useReportStore((s) => s.branch);
   const filters = useReportStore((s) => s.filters);
 
   const handleSubmit = () => {
-    const payload = buildReportSubmitPayload({ reportType, filters });
+    const payload = buildReportSubmitPayload({ reportType, filters, branch });
     // eslint-disable-next-line no-console
     console.log("[report-filter] submit", payload);
     setOpen(false);

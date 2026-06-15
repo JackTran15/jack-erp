@@ -1,4 +1,3 @@
-import { chain_tableRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import { REPORT_TYPE_SALES } from "./report-type.constant";
 import { REPORT_BRANCH } from "./report-branch.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
@@ -20,11 +19,9 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
     configs: {
       [REPORT_BRANCH.SINGLE]: {
         listReport: Object.values(REPORT_TYPE_SALES),
-        tableConfig: single_tableRegistryReportDailySaleSummary,
       },
       [REPORT_BRANCH.CHAIN]: {
         listReport: Object.values(REPORT_TYPE_SALES),
-        tableConfig: chain_tableRegistryReportDailySaleSummary,
       }
     }
   },

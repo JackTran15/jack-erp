@@ -1,12 +1,9 @@
 import type { ReportTableConfig } from "../../../constants/reports/report.interface";
 import { DEFAULT_PAGE_SIZE } from "./table.constant";
-import type { TableInitialState } from "./table.interface";
+import type { TableColumnsState, TableInitialState } from "./table.interface";
 
-// Dựng state khởi tạo cho store từ registry: thứ tự, ẩn/hiện, ghim, bề rộng đọc từ cấu hình cột.
-export function buildInitialTableState(
-  tableId: string,
-  config: ReportTableConfig,
-): TableInitialState {
+// Dựng state cột (thứ tự, ẩn/hiện, ghim, bề rộng) từ cấu hình cột của report.
+export function buildTableColumnsState(config: ReportTableConfig): TableColumnsState {
   const visibility: Record<string, boolean> = {};
   const order: string[] = [];
   const left: string[] = [];
@@ -23,10 +20,18 @@ export function buildInitialTableState(
     if (col.tableConfig?.width != null) sizing[id] = col.tableConfig.width;
   }
 
+  return { visibility, order, pinning: { left, right }, sizing };
+}
+
+// Dựng state khởi tạo cho store từ registry.
+export function buildInitialTableState(
+  tableId: string,
+  config: ReportTableConfig,
+): TableInitialState {
   return {
     tableId,
     config,
-    columns: { visibility, order, pinning: { left, right }, sizing },
+    columns: buildTableColumnsState(config),
     sorting: { items: [] },
     pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE },
   };
