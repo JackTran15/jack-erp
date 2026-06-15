@@ -11,6 +11,6 @@ test_logs/
 **/*/scripts/pos-e2e-py/*
 
 # Local-only personal files (not shared)
-CLAUDE.local.md
-personal_note_run.txt
-**.md
+# CLAUDE.local.md
+# personal_note_run.txt
+# **.md
