@@ -2158,6 +2158,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockSummaryV2Controller_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/storage-location": {
         parameters: {
             query?: never;
@@ -6576,6 +6592,40 @@ export interface components {
             outQty?: components["schemas"]["CompareFilterDto"];
             transferOutQty?: components["schemas"]["CompareFilterDto"];
             incomingQty?: components["schemas"]["CompareFilterDto"];
+        };
+        StockSummaryExportDto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** Format: uuid */
+            storageId?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+            movementFrom?: string;
+            movementTo?: string;
+            excludeReservations?: boolean;
+            isActive?: boolean;
+            isPosVisible?: boolean;
+            /** @enum {string} */
+            stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
+            itemCode?: components["schemas"]["StringFilterDto"];
+            itemName?: components["schemas"]["StringFilterDto"];
+            unit?: components["schemas"]["StringFilterDto"];
+            category?: components["schemas"]["StringFilterDto"];
+            brand?: components["schemas"]["StringFilterDto"];
+            storage?: components["schemas"]["StringFilterDto"];
+            quantity?: components["schemas"]["CompareFilterDto"];
+            openingQty?: components["schemas"]["CompareFilterDto"];
+            inQty?: components["schemas"]["CompareFilterDto"];
+            outQty?: components["schemas"]["CompareFilterDto"];
+            transferOutQty?: components["schemas"]["CompareFilterDto"];
+            incomingQty?: components["schemas"]["CompareFilterDto"];
+            /** @enum {string} */
+            variant: "MODEL_AND_VARIANTS" | "VARIANTS" | "SPLIT_ATTRIBUTES" | "MODELS";
         };
         CreateProductDto: {
             name: string;
@@ -12773,6 +12823,27 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    StockSummaryV2Controller_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockSummaryExportDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
