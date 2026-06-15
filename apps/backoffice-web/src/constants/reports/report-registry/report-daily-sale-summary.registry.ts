@@ -7,6 +7,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
   columns: [
     {
       column: ReportTableColumn.DATE,
+      backendField: "date",
       label: ReportTableColumnLabel[ReportTableColumn.DATE],
       order: 1,
       visible: true,
@@ -16,6 +17,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_TOTAL,
+      backendField: "revenueTotal",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_TOTAL],
       order: 2,
       visible: true,
@@ -26,6 +28,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_GOODS,
+      backendField: "revenueGoods",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_GOODS],
       order: 3,
       visible: true,
@@ -35,6 +38,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_FEE,
+      backendField: "revenueFee",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_FEE],
       order: 4,
       visible: true,
@@ -44,6 +48,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_PROMOTION,
+      backendField: "revenuePromotion",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_PROMOTION],
       order: 5,
       visible: true,
@@ -53,6 +58,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_DISCOUNT_POINT,
+      backendField: "revenueDiscountPoint",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_POINT],
       order: 6,
       visible: true,
@@ -62,6 +68,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_DISCOUNT_RATE,
+      backendField: "revenueDiscountRate",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_RATE],
       order: 7,
       visible: true,
@@ -71,6 +78,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_CASH,
+      backendField: "paymentCash",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_CASH],
       order: 8,
       visible: true,
@@ -80,6 +88,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_AMEX_DEBIT,
+      backendField: "paymentAmexDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_AMEX_DEBIT],
       order: 9,
       visible: true,
@@ -87,6 +96,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_AMEX,
+      backendField: "paymentAmex",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_AMEX],
       order: 10,
       visible: true,
@@ -94,6 +104,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_ATM,
+      backendField: "paymentAtm",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_ATM],
       order: 11,
       visible: true,
@@ -101,6 +112,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_TRANSFER,
+      backendField: "paymentTransfer",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_TRANSFER],
       order: 12,
       visible: true,
@@ -108,6 +120,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_DINERS,
+      backendField: "paymentDiners",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_DINERS],
       order: 13,
       visible: true,
@@ -115,6 +128,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_DISCOVER,
+      backendField: "paymentDiscover",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_DISCOVER],
       order: 14,
       visible: true,
@@ -122,6 +136,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_JCB,
+      backendField: "paymentJcb",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_JCB],
       order: 15,
       visible: true,
@@ -129,6 +144,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_MASTERCARD_DEBIT,
+      backendField: "paymentMastercardDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_MASTERCARD_DEBIT],
       order: 16,
       visible: true,
@@ -136,6 +152,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_MASTERCARD,
+      backendField: "paymentMastercard",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_MASTERCARD],
       order: 17,
       visible: true,
@@ -143,6 +160,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_QR_TECHCOMBANK,
+      backendField: "paymentQrTechcombank",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_QR_TECHCOMBANK],
       order: 18,
       visible: true,
@@ -150,6 +168,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_UNIONPAY,
+      backendField: "paymentUnionpay",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_UNIONPAY],
       order: 19,
       visible: true,
@@ -157,6 +176,7 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_VISA_DEBIT,
+      backendField: "paymentVisaDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_VISA_DEBIT],
       order: 20,
       visible: true,
@@ -164,12 +184,14 @@ export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_VISA,
+      backendField: "paymentVisa",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_VISA],
       order: 21,
       visible: true,
     },
     {
       column: ReportTableColumn.NET_REVENUE,
+      backendField: "netRevenue",
       label: ReportTableColumnLabel[ReportTableColumn.NET_REVENUE],
       order: 22,
       visible: true,
@@ -185,6 +207,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
   columns: [
     {
       column: ReportTableColumn.DATE,
+      backendField: "date",
       label: ReportTableColumnLabel[ReportTableColumn.DATE],
       order: 1,
       visible: true,
@@ -194,6 +217,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_TOTAL,
+      backendField: "revenueTotal",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_TOTAL],
       order: 2,
       visible: true,
@@ -204,6 +228,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_GOODS,
+      backendField: "revenueGoods",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_GOODS],
       order: 3,
       visible: true,
@@ -213,6 +238,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_FEE,
+      backendField: "revenueFee",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_FEE],
       order: 4,
       visible: true,
@@ -222,6 +248,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_PROMOTION,
+      backendField: "revenuePromotion",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_PROMOTION],
       order: 5,
       visible: true,
@@ -231,6 +258,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_DISCOUNT_POINT,
+      backendField: "revenueDiscountPoint",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_POINT],
       order: 6,
       visible: true,
@@ -240,6 +268,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.REVENUE,
       column: ReportTableColumn.REVENUE_DISCOUNT_RATE,
+      backendField: "revenueDiscountRate",
       label: ReportTableColumnLabel[ReportTableColumn.REVENUE_DISCOUNT_RATE],
       order: 7,
       visible: true,
@@ -249,6 +278,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_CASH,
+      backendField: "paymentCash",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_CASH],
       order: 8,
       visible: true,
@@ -258,6 +288,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_AMEX_DEBIT,
+      backendField: "paymentAmexDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_AMEX_DEBIT],
       order: 9,
       visible: true,
@@ -265,6 +296,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_AMEX,
+      backendField: "paymentAmex",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_AMEX],
       order: 10,
       visible: true,
@@ -272,6 +304,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_ATM,
+      backendField: "paymentAtm",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_ATM],
       order: 11,
       visible: true,
@@ -279,6 +312,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_TRANSFER,
+      backendField: "paymentTransfer",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_TRANSFER],
       order: 12,
       visible: true,
@@ -286,6 +320,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_DINERS,
+      backendField: "paymentDiners",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_DINERS],
       order: 13,
       visible: true,
@@ -293,6 +328,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_DISCOVER,
+      backendField: "paymentDiscover",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_DISCOVER],
       order: 14,
       visible: true,
@@ -300,6 +336,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_JCB,
+      backendField: "paymentJcb",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_JCB],
       order: 15,
       visible: true,
@@ -307,6 +344,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_MASTERCARD_DEBIT,
+      backendField: "paymentMastercardDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_MASTERCARD_DEBIT],
       order: 16,
       visible: true,
@@ -314,6 +352,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_MASTERCARD,
+      backendField: "paymentMastercard",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_MASTERCARD],
       order: 17,
       visible: true,
@@ -321,6 +360,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_QR_TECHCOMBANK,
+      backendField: "paymentQrTechcombank",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_QR_TECHCOMBANK],
       order: 18,
       visible: true,
@@ -328,6 +368,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_UNIONPAY,
+      backendField: "paymentUnionpay",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_UNIONPAY],
       order: 19,
       visible: true,
@@ -335,6 +376,7 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_VISA_DEBIT,
+      backendField: "paymentVisaDebit",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_VISA_DEBIT],
       order: 20,
       visible: true,
@@ -342,12 +384,14 @@ export const chain_tableRegistryReportDailySaleSummary: ReportTableConfig = {
     {
       group: ReportTableColumnGroup.CUSTOMER_PAYMENT,
       column: ReportTableColumn.PAYMENT_VISA,
+      backendField: "paymentVisa",
       label: ReportTableColumnLabel[ReportTableColumn.PAYMENT_VISA],
       order: 21,
       visible: true,
     },
     {
       column: ReportTableColumn.NET_REVENUE,
+      backendField: "netRevenue",
       label: ReportTableColumnLabel[ReportTableColumn.NET_REVENUE],
       order: 22,
       visible: true,

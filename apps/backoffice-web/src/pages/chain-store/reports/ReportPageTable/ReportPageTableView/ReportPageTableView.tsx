@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Calendar } from "lucide-react";
 import {
   getCoreRowModel,
   useReactTable,
@@ -31,9 +30,15 @@ import {
   isReportNumberColumn,
   pinPosition,
 } from "../../../../../lib/table";
+import {
+  DEFAULT_COLUMN_FILTER_MODE,
+  type ColumnFilterMode,
+} from "../../../../../components/table/pagination.dto";
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
+import { useReportStore } from "../../../../../store/page-stores/report/report.context";
 import { ReportRow } from "../../_mock/report-daily-sales.mock";
 import { SortableHeaderCell, type DragData } from "./SortableHeaderCell/SortableHeaderCell";
+import { FilterHeaderCell } from "./FilterHeaderCell/FilterHeaderCell";
 
 interface Props {
   rows: ReportRow[];
@@ -67,10 +72,11 @@ export function ReportPageTableView({ rows, totals }: Props) {
   const pinning = useTableStore((s) => s.columns.pinning);
   const sizing = useTableStore((s) => s.columns.sizing);
   const sorting = useTableStore((s) => s.sorting.items);
-  const columnFilters = useTableStore((s) => s.filters.columns);
   const columnsActions = useTableStore((s) => s.columnsActions);
   const sortingActions = useTableStore((s) => s.sortingActions);
-  const filtersActions = useTableStore((s) => s.filtersActions);
+  // Column filter gom chung ở report store (đồng bộ với filter header/popover).
+  const columnFilters = useReportStore((s) => s.columnFilters);
+  const setColumnFilter = useReportStore((s) => s.actions.setColumnFilter);
 
   // Tra cứu cấu hình cột theo id để render metadata (label, group, mã, align, link).
   const configById = useMemo(() => {
@@ -360,31 +366,22 @@ export function ReportPageTableView({ rows, totals }: Props) {
               {orderedLeaf.map((column) => {
                 const col = configById.get(column.id);
                 if (!col) return null;
-                const pinned = column.getIsPinned();
-                const isDate = col.tableConfig?.dataType === "date";
-                const value = columnFilters[col.column]?.value ?? "";
+                const filter = columnFilters[col.column];
                 return (
-                  <td
+                  <FilterHeaderCell
                     key={column.id}
+                    col={col}
                     style={pinPosition(column)}
-                    className={[`${cellBorder} px-1.5 py-1 bg-[#F5F5F6]`, pinned ? "z-20" : ""].join(
-                      " ",
-                    )}
-                  >
-                    <div className="flex items-center gap-1 rounded-[2px] border border-[#D9D9DE] bg-white px-1.5 h-6">
-                      <span className="text-[#6B6B75] text-[12px] select-none">
-                        {isDate ? "=" : "≤"}
-                      </span>
-                      <input
-                        className="w-full min-w-0 bg-transparent text-[12px] outline-none"
-                        value={value}
-                        onChange={(e) =>
-                          filtersActions.setColumnFilter(col.column, { value: e.target.value })
-                        }
-                      />
-                      {isDate && <Calendar className="h-3.5 w-3.5 shrink-0 text-[#6B6B75]" />}
-                    </div>
-                  </td>
+                    pinned={Boolean(column.getIsPinned())}
+                    value={filter?.value ?? ""}
+                    operator={
+                      (filter?.operator as ColumnFilterMode) || DEFAULT_COLUMN_FILTER_MODE
+                    }
+                    onOperatorChange={(mode) =>
+                      setColumnFilter(col.column, { operator: mode })
+                    }
+                    onValueChange={(v) => setColumnFilter(col.column, { value: v })}
+                  />
                 );
               })}
             </tr>

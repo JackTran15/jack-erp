@@ -35,13 +35,31 @@ export function createReportStore(
               toDate: range.to,
             };
           }
+          // eslint-disable-next-line no-console
+          console.log("[report-filter] change", {
+            filters,
+            columnFilters: s.columnFilters,
+          });
           return { filters };
+        }),
+
+      setColumnFilter: (columnId, patch) =>
+        set((s) => {
+          const existing = s.columnFilters[columnId] ?? { operator: "", value: "" };
+          const columnFilters = {
+            ...s.columnFilters,
+            [columnId]: { ...existing, ...patch },
+          };
+          // eslint-disable-next-line no-console
+          console.log("[report-filter] change", { filters: s.filters, columnFilters });
+          return { columnFilters };
         }),
 
       resetFilters: () =>
         set({
           reportType: initialState.reportType,
-          filters: initialState.filters,
+          filters: {},
+          columnFilters: {},
         }),
 
       reset: () => set({ ...initialState }),
@@ -63,22 +81,22 @@ export function buildReportSubmitPayload(
       case REPORT_FILTERS_LINE.STORE: {
         const store = state.filters[REPORT_FILTERS_LINE.STORE];
         payload[meta.backendField] =
-          store.scope === "all" ? "all" : store.storeIds;
+          !store || store.scope === "all" ? "all" : store.storeIds;
         break;
       }
       case REPORT_FILTERS_LINE.REPORT_PERIOD:
         payload[meta.backendField] =
-          state.filters[REPORT_FILTERS_LINE.REPORT_PERIOD];
+          state.filters[REPORT_FILTERS_LINE.REPORT_PERIOD] ?? "";
         break;
       case REPORT_FILTERS_LINE.RANGE_DATE: {
         const range = state.filters[REPORT_FILTERS_LINE.RANGE_DATE];
-        payload[meta.backendField] = range.fromDate;
-        if (meta.backendField2) payload[meta.backendField2] = range.toDate;
+        payload[meta.backendField] = range?.fromDate ?? "";
+        if (meta.backendField2) payload[meta.backendField2] = range?.toDate ?? "";
         break;
       }
       case REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND:
         payload[meta.backendField] =
-          state.filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND];
+          state.filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND] ?? false;
         break;
     }
   }

@@ -27,7 +27,6 @@ export function buildInitialTableState(
     tableId,
     config,
     columns: { visibility, order, pinning: { left, right }, sizing },
-    filters: { global: "", columns: {} },
     sorting: { items: [] },
     pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE },
   };

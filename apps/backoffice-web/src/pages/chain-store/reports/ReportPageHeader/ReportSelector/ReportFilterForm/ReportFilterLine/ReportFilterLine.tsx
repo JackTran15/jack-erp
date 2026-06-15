@@ -31,14 +31,16 @@ export function ReportFilterLine({ line }: Props) {
       case REPORT_FILTERS_LINE.STORE:
         return (
           <StoreScopeField
-            value={filters[REPORT_FILTERS_LINE.STORE]}
+            value={
+              filters[REPORT_FILTERS_LINE.STORE] ?? { scope: "all", storeIds: [] }
+            }
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.STORE, v)}
           />
         );
       case REPORT_FILTERS_LINE.REPORT_PERIOD:
         return (
           <PeriodSelect
-            value={filters[REPORT_FILTERS_LINE.REPORT_PERIOD]}
+            value={filters[REPORT_FILTERS_LINE.REPORT_PERIOD] ?? ""}
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.REPORT_PERIOD, v)
             }
@@ -47,7 +49,12 @@ export function ReportFilterLine({ line }: Props) {
       case REPORT_FILTERS_LINE.RANGE_DATE:
         return (
           <DateRangeField
-            value={filters[REPORT_FILTERS_LINE.RANGE_DATE]}
+            value={
+              filters[REPORT_FILTERS_LINE.RANGE_DATE] ?? {
+                fromDate: "",
+                toDate: "",
+              }
+            }
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.RANGE_DATE, v)
             }
@@ -56,7 +63,9 @@ export function ReportFilterLine({ line }: Props) {
       case REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND:
         return (
           <StatisticByBranchCheckbox
-            value={filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND]}
+            value={
+              filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND] ?? false
+            }
             onChange={(v) =>
               actions.setFilterValue(
                 REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND,

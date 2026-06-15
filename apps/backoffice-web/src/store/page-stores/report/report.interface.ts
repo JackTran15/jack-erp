@@ -13,6 +13,12 @@ export interface ReportDateRangeValue {
   toDate: string; // ISO YYYY-MM-DD
 }
 
+// Filter của một cột trong bảng (toán tử + giá trị) — gom chung vào report store.
+export interface ReportColumnFilter {
+  operator: string;
+  value: string;
+}
+
 // Giá trị các dòng filter (TYPE tách riêng thành reportType ở state).
 export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.STORE]: StoreScopeValue;
@@ -28,7 +34,9 @@ export interface ReportInitialState {
   listReport: string[];
   tableConfig: ReportTableConfig;
   reportType: string;
-  filters: ReportFilterValues;
+  // Sparse như columnFilters: chỉ chứa line đã được set (không default dư thừa theo report type).
+  filters: Partial<ReportFilterValues>;
+  columnFilters: Record<string, ReportColumnFilter>;
 }
 
 export interface ReportActions {
@@ -37,6 +45,7 @@ export interface ReportActions {
     line: K,
     value: ReportFilterValues[K],
   ) => void;
+  setColumnFilter: (columnId: string, patch: Partial<ReportColumnFilter>) => void;
   resetFilters: () => void;
   reset: () => void;
 }

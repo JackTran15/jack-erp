@@ -17,17 +17,6 @@ export interface TableColumnsState {
   sizing: ColumnSizingState;
 }
 
-export interface TableColumnFilter {
-  operator: string;
-  value: string;
-}
-
-// State liên quan đến filter — filter toàn bảng + filter từng cột.
-export interface TableFiltersState {
-  global: string;
-  columns: Record<string, TableColumnFilter>;
-}
-
 // State liên quan đến sort.
 export interface TableSortingState {
   items: SortingState;
@@ -44,7 +33,6 @@ export interface TableInitialState {
   tableId: string;
   config: ReportTableConfig;
   columns: TableColumnsState;
-  filters: TableFiltersState;
   sorting: TableSortingState;
   pagination: TablePaginationState;
 }
@@ -59,12 +47,6 @@ export interface TableColumnsActions {
   togglePinned: (columnId: string, side: "left" | "right") => void;
 }
 
-export interface TableFiltersActions {
-  setGlobal: (value: string) => void;
-  setColumnFilter: (columnId: string, patch: Partial<TableColumnFilter>) => void;
-  reset: () => void;
-}
-
 export interface TableSortingActions {
   setSorting: (updater: Updater<SortingState>) => void;
 }
@@ -77,7 +59,6 @@ export interface TablePaginationActions {
 
 export interface TableState extends TableInitialState {
   columnsActions: TableColumnsActions;
-  filtersActions: TableFiltersActions;
   sortingActions: TableSortingActions;
   paginationActions: TablePaginationActions;
 }

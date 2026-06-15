@@ -16,6 +16,7 @@ export function PeriodSelect({ value, onChange }: Props) {
       onChange={(e) => onChange(e.target.value)}
       aria-label="Kỳ báo cáo"
     >
+      <option value="">— Kỳ báo cáo —</option>
       {PERIOD_PRESET_OPTIONS.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}

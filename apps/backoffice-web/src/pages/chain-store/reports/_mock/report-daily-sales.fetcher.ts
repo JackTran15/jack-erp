@@ -1,8 +1,19 @@
+import {
+  applyColumnFilter,
+  toComparableText,
+  DEFAULT_COLUMN_FILTER_MODE,
+  type ColumnFilterMode,
+} from "../../../../components/table/pagination.dto";
+import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
+import { ReportTableColumn } from "../../../../constants/reports/report-table.constant";
 import type {
-  TableFiltersState,
   TablePaginationState,
   TableSortingState,
 } from "../../../../store/common/table-store/table.interface";
+import type {
+  ReportColumnFilter,
+  ReportFilterValues,
+} from "../../../../store/page-stores/report/report.interface";
 import {
   dailySalesSummaryRows,
   dailySalesSummaryTotals,
@@ -10,9 +21,16 @@ import {
 } from "./report-daily-sales.mock";
 
 export interface ReportQueryParams {
-  filters: TableFiltersState;
+  columnFilters: Record<string, ReportColumnFilter>;
+  reportFilters: Partial<ReportFilterValues>;
   sorting: TableSortingState;
   pagination: TablePaginationState;
+}
+
+// "dd/MM/yyyy" -> "yyyy-MM-dd" để so sánh với khoảng ngày dạng ISO của filter.
+function vnDateToIso(value: unknown): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value ?? ""));
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 }
 
 export interface ReportQueryResult {
@@ -28,17 +46,32 @@ export async function fetchDailySalesSummary(
 ): Promise<ReportQueryResult> {
   let data = [...dailySalesSummaryRows];
 
-  const activeFilters = Object.entries(params.filters.columns).filter(
+  // 1) Column filter (toán tử + giá trị) theo từng cột.
+  const activeFilters = Object.entries(params.columnFilters).filter(
     ([, f]) => f.value.trim() !== "",
   );
   if (activeFilters.length > 0) {
     data = data.filter((row) => {
       const cells = row as Record<string, string | number | undefined>;
       return activeFilters.every(([id, f]) =>
-        String(cells[id] ?? "")
-          .toLowerCase()
-          .includes(f.value.trim().toLowerCase()),
+        applyColumnFilter(toComparableText(cells[id]), {
+          mode: (f.operator || DEFAULT_COLUMN_FILTER_MODE) as ColumnFilterMode,
+          value: f.value,
+        }),
       );
+    });
+  }
+
+  // 2) Report-level filter: chỉ khoảng ngày map được sang cột DATE của mock.
+  //    STORE / CHECKBOX / REPORT_PERIOD không có cột tương ứng → chỉ ảnh hưởng refetch.
+  const range = params.reportFilters[REPORT_FILTERS_LINE.RANGE_DATE];
+  if (range?.fromDate || range?.toDate) {
+    data = data.filter((row) => {
+      const iso = vnDateToIso((row as ReportRow)[ReportTableColumn.DATE]);
+      if (!iso) return true;
+      if (range.fromDate && iso < range.fromDate) return false;
+      if (range.toDate && iso > range.toDate) return false;
+      return true;
     });
   }
 

@@ -48,21 +48,6 @@ export function createTableStore(initialState: TableInitialState): TableStoreApi
         }),
     },
 
-    filtersActions: {
-      setGlobal: (value) => set((s) => ({ filters: { ...s.filters, global: value } })),
-      setColumnFilter: (columnId, patch) =>
-        set((s) => {
-          const existing = s.filters.columns[columnId] ?? { operator: "", value: "" };
-          return {
-            filters: {
-              ...s.filters,
-              columns: { ...s.filters.columns, [columnId]: { ...existing, ...patch } },
-            },
-          };
-        }),
-      reset: () => set((s) => ({ filters: { ...s.filters, global: "", columns: {} } })),
-    },
-
     sortingActions: {
       setSorting: (updater) =>
         set((s) => ({ sorting: { items: applyUpdater(updater, s.sorting.items) } })),
