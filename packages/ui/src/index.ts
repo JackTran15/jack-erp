@@ -55,6 +55,7 @@ export { LargeTextInput, type LargeTextInputProps } from "./components/large-tex
 export { DateTimeField, type DateTimeFieldProps } from "./components/date-time-field";
 export { TagsInput, type TagsInputProps } from "./components/tags-input";
 export { MultiSelect, type MultiSelectOption, type MultiSelectProps } from "./components/multi-select";
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from "./components/popover";
 export { AppModal, type AppModalProps } from "./components/app-modal";
 
 export {

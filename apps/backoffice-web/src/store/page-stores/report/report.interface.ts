@@ -1,0 +1,46 @@
+import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
+import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
+import { REPORT_BRANCH } from "../../../constants/reports/report.constant";
+import type { ReportTableConfig } from "../../../constants/reports/report.interface";
+
+export interface StoreScopeValue {
+  scope: "all" | "group";
+  storeIds: string[];
+}
+
+export interface ReportDateRangeValue {
+  fromDate: string; // ISO YYYY-MM-DD
+  toDate: string; // ISO YYYY-MM-DD
+}
+
+// Giá trị các dòng filter (TYPE tách riêng thành reportType ở state).
+export interface ReportFilterValues {
+  [REPORT_FILTERS_LINE.STORE]: StoreScopeValue;
+  [REPORT_FILTERS_LINE.REPORT_PERIOD]: string;
+  [REPORT_FILTERS_LINE.RANGE_DATE]: ReportDateRangeValue;
+  [REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND]: boolean;
+}
+
+// State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
+export interface ReportInitialState {
+  category: REPORT_CATEGORY;
+  branch: REPORT_BRANCH;
+  listReport: string[];
+  tableConfig: ReportTableConfig;
+  reportType: string;
+  filters: ReportFilterValues;
+}
+
+export interface ReportActions {
+  setReportType: (type: string) => void;
+  setFilterValue: <K extends keyof ReportFilterValues>(
+    line: K,
+    value: ReportFilterValues[K],
+  ) => void;
+  resetFilters: () => void;
+  reset: () => void;
+}
+
+export interface ReportState extends ReportInitialState {
+  actions: ReportActions;
+}
