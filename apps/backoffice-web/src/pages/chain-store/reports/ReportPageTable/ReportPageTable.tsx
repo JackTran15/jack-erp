@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useTableStore } from "../../../store/common/table-store/table.context";
+import { useTableStore } from "../../../../store/common/table-store/table.context";
 import { fetchDailySalesSummary } from "../_mock/report-daily-sales.fetcher";
 import { ReportPageTableView } from "./ReportPageTableView/ReportPageTableView";
 import { ReportPageTablePagination } from "./ReportPageTablePagination/ReportPageTablePagination";

@@ -5,8 +5,8 @@ import {
   ChevronsRight,
   RefreshCw,
 } from "lucide-react";
-import { useTableStore } from "../../../../store/common/table-store/table.context";
-import { PAGE_SIZE_OPTIONS } from "../../../../store/common/table-store/table.constant";
+import { useTableStore } from "../../../../../store/common/table-store/table.context";
+import { PAGE_SIZE_OPTIONS } from "../../../../../store/common/table-store/table.constant";
 
 interface Props {
   total: number;

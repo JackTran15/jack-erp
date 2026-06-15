@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { ReportDailySaleSummaryTableRegistry } from "../../constants/reports/report-table-registry/table-daily-sale-summary.registry";
-import { TableStoreProvider } from "../../store/common/table-store/table.context";
-import { buildInitialTableState } from "../../store/common/table-store/table.factory";
+import { ReportDailySaleSummaryTableRegistry } from "../../../constants/reports/report-table-registry/table-daily-sale-summary.registry";
+import { TableStoreProvider } from "../../../store/common/table-store/table.context";
+import { buildInitialTableState } from "../../../store/common/table-store/table.factory";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 

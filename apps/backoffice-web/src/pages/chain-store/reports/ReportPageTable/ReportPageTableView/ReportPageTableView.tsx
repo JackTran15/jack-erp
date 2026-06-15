@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
-import { ReportColumnConfig } from "../../../../constants/reports/report.interface";
+import { ReportColumnConfig } from "../../../../../constants/reports/report.interface";
 import {
   DEFAULT_REPORT_COLUMN_WIDTH,
   buildReportColumnSegments,
@@ -30,8 +30,8 @@ import {
   groupPinPosition,
   isReportNumberColumn,
   pinPosition,
-} from "../../../../lib/table";
-import { useTableStore } from "../../../../store/common/table-store/table.context";
+} from "../../../../../lib/table";
+import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { ReportRow } from "../../_mock/report-daily-sales.mock";
 import { SortableHeaderCell, type DragData } from "./SortableHeaderCell/SortableHeaderCell";
 

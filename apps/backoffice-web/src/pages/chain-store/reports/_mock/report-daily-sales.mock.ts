@@ -1,4 +1,4 @@
-import { ReportTableColumn } from "../../../constants/reports/report-table.constant";
+import { ReportTableColumn } from "../../../../constants/reports/report-table.constant";
 
 export type ReportRow = Partial<Record<ReportTableColumn, number | string>>;
 

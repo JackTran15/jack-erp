@@ -2,7 +2,7 @@ import type {
   TableFiltersState,
   TablePaginationState,
   TableSortingState,
-} from "../../../store/common/table-store/table.interface";
+} from "../../../../store/common/table-store/table.interface";
 import {
   dailySalesSummaryRows,
   dailySalesSummaryTotals,

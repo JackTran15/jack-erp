@@ -8,8 +8,8 @@ import {
   DialogTitle,
 } from "@erp/ui";
 import { HelpCircle, Save, X } from "lucide-react";
-import type { ReportColumnConfig } from "../../../../../constants/reports/report.interface";
-import { useTableStore } from "../../../../../store/common/table-store/table.context";
+import type { ReportColumnConfig } from "../../../../../../constants/reports/report.interface";
+import { useTableStore } from "../../../../../../store/common/table-store/table.context";
 import {
   ColumnConfigTable,
   type ColumnConfigRow,
