@@ -2110,6 +2110,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock/summary/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockSummaryController_getDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/stock/summary/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockSummaryV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/storage-location": {
         parameters: {
             query?: never;
@@ -2333,6 +2365,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["StockTransferController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/stock/transfers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTransferV2Controller_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3756,6 +3804,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/invoices/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_listTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_getColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceReportController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_listTemplates"];
+        put?: never;
+        post: operations["InvoiceReportController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["InvoiceReportController_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["InvoiceReportController_updateTemplate"];
+        trace?: never;
+    };
     "/inventory/purchase-orders": {
         parameters: {
             query?: never;
@@ -4028,6 +4156,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/stock-takes/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StockTakeController_previewMerge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StockTakeController_exportExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/stock-takes/{id}": {
         parameters: {
             query?: never;
@@ -4074,6 +4234,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["StockTakeController_updateLine"];
+        trace?: never;
+    };
+    "/inventory/stock-takes/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["StockTakeController_replaceMembers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/inventory/stock-takes/{id}/process": {
@@ -6198,6 +6374,36 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        StockSummarySearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+            /** Format: uuid */
+            storageId?: string;
+            /** Format: uuid */
+            categoryId?: string;
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+            excludeReservations?: boolean;
+            isActive?: boolean;
+            isPosVisible?: boolean;
+            /** @enum {string} */
+            stockState?: "ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "NEGATIVE";
+            itemCode?: components["schemas"]["StringFilterDto"];
+            itemName?: components["schemas"]["StringFilterDto"];
+            unit?: components["schemas"]["StringFilterDto"];
+            category?: components["schemas"]["StringFilterDto"];
+            brand?: components["schemas"]["StringFilterDto"];
+            storage?: components["schemas"]["StringFilterDto"];
+            quantity?: components["schemas"]["CompareFilterDto"];
+            openingQty?: components["schemas"]["CompareFilterDto"];
+            inQty?: components["schemas"]["CompareFilterDto"];
+            outQty?: components["schemas"]["CompareFilterDto"];
+            transferOutQty?: components["schemas"]["CompareFilterDto"];
+            incomingQty?: components["schemas"]["CompareFilterDto"];
+        };
         CreateProductDto: {
             name: string;
             description?: string;
@@ -6266,8 +6472,8 @@ export interface components {
         CreateTransferDto: Record<string, never>;
         StockTransferEntity: {
             documentNumber?: string;
-            sourceLocationId: string;
-            destinationLocationId: string;
+            sourceLocationId?: string;
+            destinationLocationId?: string;
             sourceBranchId: string;
             destinationBranchId: string;
             /** @enum {string} */
@@ -6278,8 +6484,21 @@ export interface components {
             postedBy?: string;
             /** Format: date-time */
             postedAt?: string;
+            transporterUserId?: string;
+            /** Format: date-time */
+            transferredAt?: string;
+            attachmentIds: string[];
             notes?: string;
             lines: components["schemas"]["StockTransferLineEntity"][];
+            transporter?: {
+                id: string;
+                fullName: string;
+            };
+            /**
+             * @description Transient (not a column): sum of line_value across the transfer's lines,
+             *     inlined by the v2 search handler so the FE can render Tổng tiền + footer.
+             */
+            totalAmount?: number;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -6296,14 +6515,20 @@ export interface components {
             id: string;
             transferId: string;
             itemId: string;
+            sourceStorageId?: string;
+            destinationStorageId?: string;
             sourceLocationId?: string;
             destinationLocationId?: string;
             quantity: number;
+            unitPrice?: string | null;
+            lineValue?: string | null;
             notes?: string;
             transfer?: components["schemas"]["StockTransferEntity"];
             item?: components["schemas"]["ItemEntity"];
             sourceLocation?: components["schemas"]["LocationEntity"];
             destinationLocation?: components["schemas"]["LocationEntity"];
+            sourceStorage?: components["schemas"]["StorageEntity"];
+            destinationStorage?: components["schemas"]["StorageEntity"];
         };
         IntraWarehouseTransferLineDto: {
             /**
@@ -6339,6 +6564,28 @@ export interface components {
             destinationLocationId?: string;
             /** @description Lines to transfer */
             lines: components["schemas"]["IntraWarehouseTransferLineDto"][];
+        };
+        DateRangeFilterDto: {
+            from?: string;
+            to?: string;
+        };
+        StockTransferSearchV2Dto: {
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+            /** @description Số phiếu chuyển (document number) */
+            documentNumber?: components["schemas"]["StringFilterDto"];
+            /** @description Đối tượng (counterparty — matches the transporter user's full name) */
+            party?: components["schemas"]["StringFilterDto"];
+            /** @description Diễn giải (notes) */
+            notes?: components["schemas"]["StringFilterDto"];
+            /** @description Ngày (transfer date — single date + compare operator =/<\/<=/>/>=) */
+            date?: components["schemas"]["CompareFilterDto"];
+            /** @description Khoảng thời gian (Từ ngày / Đến ngày từ thanh PeriodFilter) — inclusive. */
+            dateRange?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Tổng tiền (computed line total: SUM(line_value)) */
+            totalAmount?: components["schemas"]["CompareFilterDto"];
         };
         CreatePayableDto: {
             vendorName: string;
@@ -7190,10 +7437,6 @@ export interface components {
         EnumFilterDto: {
             value: string | null;
         };
-        DateRangeFilterDto: {
-            from?: string;
-            to?: string;
-        };
         InvoiceSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -7390,6 +7633,93 @@ export interface components {
             branchId?: string;
             startDate?: string;
             endDate?: string;
+        };
+        InvoiceReportFilterDto: {
+            /** @description Report period — enforced present by the search handler. */
+            issuedAt?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+            type?: components["schemas"]["EnumFilterDto"];
+            /** Format: uuid */
+            branchId?: string;
+            /**
+             * Format: uuid
+             * @description Optional person filters (used by per-line reports; absent = all).
+             */
+            customerId?: string;
+            /**
+             * Format: uuid
+             * @description Cashier — matches invoice.staffId.
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Salesperson — matches invoice.salespersonId.
+             */
+            salespersonId?: string;
+            /**
+             * @description revenue-by-item only — row grain (default item).
+             * @enum {string}
+             */
+            groupBy?: "item" | "group" | "brand";
+            /**
+             * Format: uuid
+             * @description revenue-by-item only — filter by item category (Nhóm hàng hóa).
+             */
+            categoryId?: string;
+            /** @description revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
+            brand?: string;
+        };
+        ColumnFilterDto: {
+            col: string;
+            eq?: Record<string, never>;
+            lt?: number;
+            lte?: number;
+            gt?: number;
+            gte?: number;
+            from?: string;
+            to?: string;
+        };
+        InvoiceReportSearchDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys + dynamic `payment.method.<coaAccountId>`). */
+            columns: string[];
+            filters: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** Format: uuid */
+            branchId?: string;
+            /** @default 1 */
+            page: number;
+            /** @default 31 */
+            limit: number;
+        };
+        ReportTemplateColumnDto: {
+            col: string;
+            /** @description User-renamed label; empty/blank ⇒ persisted as null (falls back to catalog name). */
+            displayName?: string | null;
+            /** @description Defaults to true when omitted. */
+            visible?: boolean;
+            /** @description Defaults to false when omitted. */
+            frozen?: boolean;
+            /** @description Ignored on persist — the server stamps order from array position. */
+            order?: number;
+        };
+        CreateInvoiceReportTemplateDto: {
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateInvoiceReportTemplateDto: {
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
         };
         CreatePurchaseOrderDto: Record<string, never>;
         PurchaseOrderEntity: {
@@ -7725,7 +8055,13 @@ export interface components {
             itemId: string;
             locationId?: string;
             countedQty?: Record<string, never> | null;
+            countedValue?: Record<string, never> | null;
             reason?: string;
+        };
+        StockTakeMemberDto: {
+            fullName: string;
+            title?: string;
+            representative?: string;
         };
         CreateStockTakeDto: {
             storageId?: string;
@@ -7737,9 +8073,28 @@ export interface components {
             notes?: string;
             /** @description Kết luận sau kiểm kê */
             conclusion?: string;
+            countByValue?: boolean;
             /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
             countedAt?: string;
             lines?: components["schemas"]["CreateStockTakeLineDto"][];
+            members?: components["schemas"]["StockTakeMemberDto"][];
+            mergeSourceIds?: string[];
+        };
+        StockTakeMemberEntity: {
+            id: string;
+            organizationId: string;
+            branchId?: string;
+            stockTakeId: string;
+            fullName: string;
+            title?: string | null;
+            representative?: string | null;
+            sortOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            createdBy: string;
+            stockTake: components["schemas"]["StockTakeEntity"];
         };
         StockTakeEntity: {
             documentNumber?: string;
@@ -7749,6 +8104,7 @@ export interface components {
             locationId?: string;
             /** @description Mục đích — free-text purpose written by user on the form. */
             purpose?: string;
+            countByValue: boolean;
             /** @description Kiểm kê đến ngày — planned cutoff date chosen in the create dialog (date only, no time). */
             plannedDate?: string;
             /**
@@ -7767,9 +8123,16 @@ export interface components {
             /** @description IDs of the goods-receipt/goods-issue documents auto-generated by process(). */
             generatedReceiptId?: string;
             generatedIssueId?: string;
+            /** @description Set on source vouchers after they are saved into a merged stock-take. */
+            mergedIntoId?: string | null;
+            /** @description Audit trail retained on the merged voucher. */
+            mergeSourceIds?: string[] | null;
+            /** Format: date-time */
+            mergedAt?: string | null;
             /** Format: date-time */
             deletedAt?: string;
             lines: components["schemas"]["StockTakeLineEntity"][];
+            members: components["schemas"]["StockTakeMemberEntity"][];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -7791,6 +8154,8 @@ export interface components {
             locationId: string;
             expectedQty: string;
             countedQty?: string | null;
+            expectedValue: string;
+            countedValue?: string | null;
             note?: string;
             /** @description Nguyên nhân — reason text for the variance on this line. */
             reason?: string;
@@ -7803,11 +8168,15 @@ export interface components {
             item?: components["schemas"]["ItemEntity"];
             location?: components["schemas"]["LocationEntity"];
         };
+        MergeStockTakesDto: {
+            sourceIds: string[];
+        };
         UpdateStockTakeHeaderDto: {
             purpose?: string;
             notes?: string;
             /** @description Kết luận sau kiểm kê */
             conclusion?: string;
+            countByValue?: boolean;
             /** @description Ngày + giờ kiểm kê thực tế (ISO 8601) */
             countedAt?: string;
         };
@@ -7817,9 +8186,13 @@ export interface components {
         };
         UpdateLineCountDto: {
             countedQty?: Record<string, never> | null;
+            countedValue?: Record<string, never> | null;
             note?: string;
             /** @description Nguyên nhân chênh lệch */
             reason?: string;
+        };
+        ReplaceMembersDto: {
+            members: components["schemas"]["StockTakeMemberDto"][];
         };
         CreateTransferOrderDto: Record<string, never>;
         TransferOrderEntity: {
@@ -12169,6 +12542,10 @@ export interface operations {
                 movementFrom?: string;
                 /** @description Filter rows with last_movement_at <= movementTo end-of-day (YYYY-MM-DD). */
                 movementTo?: string;
+                /** @description Period start date used to calculate opening/in/out/closing. */
+                startDate?: string;
+                /** @description Inclusive period end date used to calculate in/out/closing. */
+                endDate?: string;
             };
             header?: never;
             path?: never;
@@ -12196,6 +12573,55 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockSummaryController_getDetails: {
+        parameters: {
+            query: {
+                itemId: string;
+                storageId: string;
+                startDate?: string;
+                endDate?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockSummaryV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockSummarySearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12707,6 +13133,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockTransferEntity"];
+                };
+            };
+        };
+    };
+    StockTransferV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockTransferSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
                 };
             };
         };
@@ -15154,6 +15603,180 @@ export interface operations {
             };
         };
     };
+    InvoiceReportController_listTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_getColumns: {
+        parameters: {
+            query: {
+                reportType: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceReportSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvoiceReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     PurchaseOrderController_list: {
         parameters: {
             query?: {
@@ -15704,6 +16327,10 @@ export interface operations {
                 fromDate?: string;
                 /** @description Lọc createdAt <= (YYYY-MM-DD) */
                 toDate?: string;
+                documentNumber?: string;
+                storage?: string;
+                purpose?: string;
+                mergeStatus?: "MERGED" | "UNMERGED";
             };
             header?: never;
             path?: never;
@@ -15739,6 +16366,48 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StockTakeEntity"];
                 };
+            };
+        };
+    };
+    StockTakeController_previewMerge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeStockTakesDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockTakeController_exportExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -15874,6 +16543,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockTakeLineEntity"];
+                };
+            };
+        };
+    };
+    StockTakeController_replaceMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceMembersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockTakeEntity"];
                 };
             };
         };

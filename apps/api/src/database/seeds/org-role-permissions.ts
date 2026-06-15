@@ -31,6 +31,8 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
     key.startsWith('goods_receipt.') ||
     key.startsWith('accounting.') ||
     key.startsWith('reporting.dashboard.branch.') ||
+    key.startsWith('reporting.invoice.branch.') ||
+    key === 'reporting.invoice-template.manage' ||
     key === 'iam.user.read' ||
     key === 'iam.user.roles.write' ||
     key === 'iam.user.branches.write' ||

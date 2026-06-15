@@ -13,3 +13,4 @@ export * from './events';
 export * from './websocket';
 export * from './crud';
 export * from './reporting';
+export * from './invoice-report';
