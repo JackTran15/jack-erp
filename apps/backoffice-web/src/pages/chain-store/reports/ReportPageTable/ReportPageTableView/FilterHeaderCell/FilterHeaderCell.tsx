@@ -13,7 +13,7 @@ interface Props {
   onValueChange: (value: string) => void;
 }
 
-const cellBorder = "border-b border-r border-[#E8E8EC]";
+const cellBorder = "border-b border-r border-border";
 
 // Ô filter trong header (tầng 3): chip chọn toán tử (giống table v1) + ô nhập giá trị.
 export function FilterHeaderCell({
@@ -29,17 +29,17 @@ export function FilterHeaderCell({
   return (
     <td
       style={style}
-      className={[`${cellBorder} px-1.5 py-1 bg-[#F5F5F6]`, pinned ? "z-20" : ""].join(" ")}
+      className={[`${cellBorder} px-1.5 py-1 bg-background`, pinned ? "z-20" : ""].join(" ")}
     >
-      <div className="flex h-6 items-stretch overflow-hidden rounded-[2px] border border-[#D9D9DE] bg-white">
+      <div className="flex h-6 items-stretch overflow-hidden rounded-[2px] border border-border bg-background">
         <ColumnFilterModeDropdown
           fieldLabel={label}
           value={operator}
           onChange={onOperatorChange}
-          triggerClassName="h-6 w-6 rounded-none border-0 border-r border-[#D9D9DE] text-[12px] shadow-none"
+          triggerClassName="h-6 w-6 rounded-none border-0 border-r border-border text-xs shadow-none"
         />
         <input
-          className="w-full min-w-0 bg-transparent px-1.5 text-[12px] outline-none"
+          className="w-full min-w-0 bg-transparent px-1.5 text-xs outline-none"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
           aria-label={`Lọc ${label}`}

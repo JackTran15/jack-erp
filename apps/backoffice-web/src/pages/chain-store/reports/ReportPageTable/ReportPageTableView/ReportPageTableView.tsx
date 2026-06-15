@@ -45,7 +45,7 @@ interface Props {
   totals: ReportRow;
 }
 
-const cellBorder = "border-b border-r border-[#E8E8EC]";
+const cellBorder = "border-b border-r border-border";
 
 // Một "unit" kéo-thả cấp top: cột đơn (key = columnId) hoặc group (key = `group:<label>`, gộp leaf liên tiếp).
 interface ColumnUnit {
@@ -224,7 +224,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-[#3B5BDB]"
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-500"
       />
     );
   };
@@ -254,12 +254,12 @@ export function ReportPageTableView({ rows, totals }: Props) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="min-h-0 flex-1 overflow-auto border border-[#D9D9DE]">
+      <div className="min-h-0 flex-1 overflow-auto border border-border bg-background">
         <table
-          className="border-separate border-spacing-0 text-[13px] text-[#212121]"
+          className="border-separate border-spacing-0 text-sm"
           style={{ width: "max-content", minWidth: "100%" }}
         >
-          <thead className="bg-[#F5F5F6] text-[12px] font-bold">
+          <thead className="bg-muted text-xs font-semibold">
             {/* Tầng 1: group header */}
             <SortableContext items={topItems} strategy={horizontalListSortingStrategy}>
               <tr>
@@ -279,7 +279,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                         rowSpan={2}
                         style={{ width, minWidth: width, ...pinPosition(column) }}
                         className={[
-                          `relative cursor-grab ${cellBorder} px-2 py-2 align-middle bg-[#F5F5F6]`,
+                          `relative cursor-grab ${cellBorder} px-2 py-2 align-middle bg-muted`,
                           pinned ? "z-30" : "",
                           pinned === "right"
                             ? "text-center"
@@ -291,7 +291,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       >
                         {seg.col.label}
                         {getReportColumnCode(seg.col) && (
-                          <div className="font-normal text-[#5C5C66]">
+                          <div className="font-normal text-muted-foreground">
                             {getReportColumnCode(seg.col)}
                           </div>
                         )}
@@ -310,7 +310,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       colSpan={seg.cols.length}
                       style={groupStyle}
                       className={[
-                        `cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
+                        `cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`,
                         groupPinned ? "z-30" : "",
                       ].join(" ")}
                     >
@@ -343,14 +343,14 @@ export function ReportPageTableView({ rows, totals }: Props) {
                           validOver={validOverId === id}
                           style={{ width, minWidth: width, ...pinPosition(column) }}
                           className={[
-                            `relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
+                            `relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-muted`,
                             pinned ? "z-30" : "",
                           ].join(" ")}
                           resizeHandle={renderResizeHandle(column)}
                         >
                           {col.label}
                           {getReportColumnCode(col) && (
-                            <div className="font-normal text-[#5C5C66]">
+                            <div className="font-normal text-muted-foreground">
                               {getReportColumnCode(col)}
                             </div>
                           )}
@@ -388,14 +388,15 @@ export function ReportPageTableView({ rows, totals }: Props) {
           </thead>
 
           <tbody>
-            {table.getRowModel().rows.map((row) => {
+            {table.getRowModel().rows.map((row, rowIndex) => {
               const cells = [
                 ...row.getLeftVisibleCells(),
                 ...row.getCenterVisibleCells(),
                 ...row.getRightVisibleCells(),
               ];
+              const rowBg = rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20";
               return (
-                <tr key={row.id} className="hover:bg-[#F8F8FA]">
+                <tr key={row.id} className={`${rowBg} hover:bg-blue-50/70`}>
                   {cells.map((cell) => {
                     const col = configById.get(cell.column.id);
                     if (!col) return null;
@@ -407,13 +408,13 @@ export function ReportPageTableView({ rows, totals }: Props) {
                         key={cell.id}
                         style={{ width, minWidth: width, ...pinPosition(cell.column) }}
                         className={[
-                          `${cellBorder} px-2 py-1.5 align-middle bg-white`,
+                          `${cellBorder} h-8 px-2 py-0 align-middle`,
                           getReportCellAlignClass(col),
-                          pinned ? "z-10" : "",
+                          pinned ? `z-10 ${rowBg}` : "",
                         ].join(" ")}
                       >
                         {col.tableConfig?.link ? (
-                          <a className="text-[#3B5BDB] hover:underline cursor-pointer">{raw ?? ""}</a>
+                          <a className="text-blue-600 hover:underline cursor-pointer">{raw ?? ""}</a>
                         ) : isReportNumberColumn(col) ? (
                           formatReportNumber(raw)
                         ) : (
@@ -427,7 +428,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
             })}
           </tbody>
 
-          <tfoot className="bg-[#F5F5F6] font-bold">
+          <tfoot className="bg-muted text-xs font-semibold">
             <tr>
               {orderedLeaf.map((column, idx) => {
                 const col = configById.get(column.id);
@@ -439,7 +440,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     key={column.id}
                     style={pinPosition(column)}
                     className={[
-                      `${cellBorder} px-2 py-1.5 align-middle bg-[#F5F5F6]`,
+                      `${cellBorder} h-8 px-2 py-0 align-middle bg-muted`,
                       getReportCellAlignClass(col),
                       pinned ? "z-10" : "",
                     ].join(" ")}
@@ -459,7 +460,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
 
       <DragOverlay modifiers={[restrictToHorizontalAxis]}>
         {activeData ? (
-          <div className="cursor-grabbing rounded-[2px] border border-[#3B5BDB] bg-[#F5F5F6] px-2 py-2 text-[12px] font-bold text-[#212121] shadow-md">
+          <div className="cursor-grabbing rounded-[2px] border border-blue-500 bg-muted px-2 py-2 text-xs font-semibold text-foreground shadow-md">
             {overlayLabel(activeData)}
           </div>
         ) : null}

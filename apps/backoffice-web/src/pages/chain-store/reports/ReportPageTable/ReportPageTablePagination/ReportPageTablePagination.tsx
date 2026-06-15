@@ -13,7 +13,7 @@ interface Props {
 }
 
 const iconButtonClass =
-  "flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-[#D9D9DE] bg-white text-[#6B6B75] disabled:opacity-45";
+  "flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-border bg-background text-muted-foreground disabled:opacity-45";
 
 export function ReportPageTablePagination({ total }: Props) {
   const pageIndex = useTableStore((s) => s.pagination.pageIndex);
@@ -28,7 +28,7 @@ export function ReportPageTablePagination({ total }: Props) {
   const to = Math.min(total, (pageIndex + 1) * pageSize);
 
   return (
-    <div className="flex h-8 items-center justify-between border-t border-[#E8E8EC] bg-white px-2 text-[12px] text-[#5C5C66]">
+    <div className="flex h-8 items-center justify-between border-t border-border bg-background px-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -50,7 +50,7 @@ export function ReportPageTablePagination({ total }: Props) {
         </button>
         <span>Trang</span>
         <input
-          className="h-[22px] w-9 rounded-[2px] border border-[#D9D9DE] bg-white text-center text-[#212121] outline-none"
+          className="h-[22px] w-9 rounded-[2px] border border-border bg-background text-center text-foreground outline-none"
           value={currentPage}
           readOnly
         />
@@ -75,14 +75,14 @@ export function ReportPageTablePagination({ total }: Props) {
         </button>
         <button
           type="button"
-          className="flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-[#D9D9DE] bg-white text-[#2B3164]"
+          className="flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-border bg-background text-foreground"
           aria-label="Tải lại"
           onClick={() => setPageIndex(pageIndex)}
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
         <select
-          className="h-[22px] rounded-[2px] border border-[#D9D9DE] bg-white px-1 text-[#212121] outline-none"
+          className="h-[22px] rounded-[2px] border border-border bg-background px-1 text-foreground outline-none"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
         >

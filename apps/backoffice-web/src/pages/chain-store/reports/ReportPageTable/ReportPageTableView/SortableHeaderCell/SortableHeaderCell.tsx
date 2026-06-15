@@ -42,7 +42,7 @@ export function SortableHeaderCell({
       {...listeners}
       style={{
         ...style,
-        ...(validOver ? { boxShadow: "inset 2px 0 0 0 #3B5BDB" } : {}),
+        ...(validOver ? { boxShadow: "inset 2px 0 0 0 #3b82f6" } : {}),
       }}
       className={[className ?? "", isDragging ? "opacity-40" : ""].join(" ")}
     >
