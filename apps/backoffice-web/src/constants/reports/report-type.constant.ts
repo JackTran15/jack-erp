@@ -1,4 +1,6 @@
+import { REPORT_BRANCH } from "./report-branch.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
+import { chain_tableRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import type { ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -26,19 +28,49 @@ export enum REPORT_TYPE_SALES {
 export const REPORT_TYPE_SALES_METADATA = {
   [REPORT_TYPE_SALES.DAILY_SALES_SUMMARY]: {
     label: 'Tổng hợp bán hàng theo ngày',
+    filterConfig: {
+      [REPORT_BRANCH.SINGLE]: [
+        REPORT_FILTERS_LINE.STORE,
+        REPORT_FILTERS_LINE.REPORT_PERIOD,
+        REPORT_FILTERS_LINE.RANGE_DATE,
+        REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+      ],
+      [REPORT_BRANCH.CHAIN]: [
+        REPORT_FILTERS_LINE.STORE,
+        REPORT_FILTERS_LINE.REPORT_PERIOD,
+        REPORT_FILTERS_LINE.RANGE_DATE,
+        REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+      ]
+    },
+    tableConfig: {
+      [REPORT_BRANCH.SINGLE]: single_tableRegistryReportDailySaleSummary,
+      [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportDailySaleSummary
+    },
     filterLines: [
       REPORT_FILTERS_LINE.STORE,
       REPORT_FILTERS_LINE.REPORT_PERIOD,
       REPORT_FILTERS_LINE.RANGE_DATE,
       REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+    ],
+  },
+  [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: {
+    label: 'Bảng kê hóa đơn và đơn hàng',
+    filterLines: [
+      REPORT_FILTERS_LINE.STORE,
+      REPORT_FILTERS_LINE.INVOICE_STATUS,
+      REPORT_FILTERS_LINE.STAT_DATE_TYPE,
+      REPORT_FILTERS_LINE.REPORT_PERIOD,
+      REPORT_FILTERS_LINE.RANGE_DATE,
+      REPORT_FILTERS_LINE.CASHIER,
+      REPORT_FILTERS_LINE.SALESPERSON,
+      REPORT_FILTERS_LINE.CUSTOMER,
     ]
   },
-  [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: { label: 'Bảng kê hóa đơn và đơn hàng' },
+  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng' },
+  [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng' },
   [REPORT_TYPE_SALES.PROMOTIONAL_INVOICE_LIST]: { label: 'Danh sách hóa đơn khuyến mại' },
   [REPORT_TYPE_SALES.PROMOTION_BY_INVOICE_AND_PRODUCT]: { label: 'Khuyến mãi theo hóa đơn và hàng hóa' },
-  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng' },
   [REPORT_TYPE_SALES.REVENUE_BY_TIME]: { label: 'Doanh thu theo thời gian' },
-  [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng' },
   [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT_AND_PROMOTION]: { label: 'Doanh thu theo mặt hàng và khuyến mãi' },
   [REPORT_TYPE_SALES.PRODUCT_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu mặt hàng theo thời gian' },
   [REPORT_TYPE_SALES.REVENUE_BY_EMPLOYEE]: { label: 'Doanh thu theo nhân viên' },

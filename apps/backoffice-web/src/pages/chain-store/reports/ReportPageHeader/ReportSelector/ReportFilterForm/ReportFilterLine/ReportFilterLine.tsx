@@ -3,10 +3,18 @@ import {
   REPORT_FILTERS_LINE_METADATA,
 } from "../../../../../../../constants/reports/report-filters.constant";
 import { useReportStore } from "../../../../../../../store/page-stores/report/report.context";
+import {
+  statDateTypeOptions,
+  cashierOptions,
+  salespersonOptions,
+  customerOptions,
+} from "../../_mock/report-invoice-filter.mock";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
 import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
 import { StatisticByBranchCheckbox } from "./StatisticByBranchCheckbox/StatisticByBranchCheckbox";
+import { InvoiceStatusMultiSelect } from "./InvoiceStatusMultiSelect/InvoiceStatusMultiSelect";
+import { ReportSelectField } from "./ReportSelectField/ReportSelectField";
 
 interface Props {
   line: REPORT_FILTERS_LINE;
@@ -35,6 +43,26 @@ export function ReportFilterLine({ line }: Props) {
               filters[REPORT_FILTERS_LINE.STORE] ?? { scope: "all", storeIds: [] }
             }
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.STORE, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.INVOICE_STATUS:
+        return (
+          <InvoiceStatusMultiSelect
+            value={filters[REPORT_FILTERS_LINE.INVOICE_STATUS] ?? []}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.INVOICE_STATUS, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.STAT_DATE_TYPE:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.STAT_DATE_TYPE] ?? ""}
+            options={statDateTypeOptions}
+            placeholder="— Chọn —"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.STAT_DATE_TYPE, v)
+            }
           />
         );
       case REPORT_FILTERS_LINE.REPORT_PERIOD:
@@ -71,6 +99,37 @@ export function ReportFilterLine({ line }: Props) {
                 REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND,
                 v,
               )
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.CASHIER:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.CASHIER] ?? ""}
+            options={cashierOptions}
+            placeholder="Tất cả"
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.CASHIER, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.SALESPERSON:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.SALESPERSON] ?? ""}
+            options={salespersonOptions}
+            placeholder="Tất cả"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.SALESPERSON, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.CUSTOMER:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.CUSTOMER] ?? ""}
+            options={customerOptions}
+            placeholder="Tất cả"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.CUSTOMER, v)
             }
           />
         );

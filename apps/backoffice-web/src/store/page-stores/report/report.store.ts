@@ -84,6 +84,26 @@ export function buildReportSubmitPayload(
           !store || store.scope === "all" ? "all" : store.storeIds;
         break;
       }
+      case REPORT_FILTERS_LINE.INVOICE_STATUS:
+        payload[meta.backendField] =
+          state.filters[REPORT_FILTERS_LINE.INVOICE_STATUS] ?? [];
+        break;
+      case REPORT_FILTERS_LINE.STAT_DATE_TYPE:
+        payload[meta.backendField] =
+          state.filters[REPORT_FILTERS_LINE.STAT_DATE_TYPE] ?? "";
+        break;
+      case REPORT_FILTERS_LINE.CASHIER:
+        payload[meta.backendField] =
+          state.filters[REPORT_FILTERS_LINE.CASHIER] ?? "";
+        break;
+      case REPORT_FILTERS_LINE.SALESPERSON:
+        payload[meta.backendField] =
+          state.filters[REPORT_FILTERS_LINE.SALESPERSON] ?? "";
+        break;
+      case REPORT_FILTERS_LINE.CUSTOMER:
+        payload[meta.backendField] =
+          state.filters[REPORT_FILTERS_LINE.CUSTOMER] ?? "";
+        break;
       case REPORT_FILTERS_LINE.REPORT_PERIOD:
         payload[meta.backendField] =
           state.filters[REPORT_FILTERS_LINE.REPORT_PERIOD] ?? "";

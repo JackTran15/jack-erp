@@ -1,5 +1,4 @@
 import { ReportTableColumn, ReportTableColumnGroup, ReportTableColumnLabel } from "../report-table.constant";
-import { REPORT_TYPE_SALES } from "../report-type.constant";
 import { ReportTableConfig } from "../report.interface";
 
 export const single_tableRegistryReportDailySaleSummary: ReportTableConfig = {

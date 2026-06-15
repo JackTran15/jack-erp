@@ -22,9 +22,14 @@ export interface ReportColumnFilter {
 // Giá trị các dòng filter (TYPE tách riêng thành reportType ở state).
 export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.STORE]: StoreScopeValue;
+  [REPORT_FILTERS_LINE.INVOICE_STATUS]: string[];
+  [REPORT_FILTERS_LINE.STAT_DATE_TYPE]: string;
   [REPORT_FILTERS_LINE.REPORT_PERIOD]: string;
   [REPORT_FILTERS_LINE.RANGE_DATE]: ReportDateRangeValue;
   [REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND]: boolean;
+  [REPORT_FILTERS_LINE.CASHIER]: string;
+  [REPORT_FILTERS_LINE.SALESPERSON]: string;
+  [REPORT_FILTERS_LINE.CUSTOMER]: string;
 }
 
 // State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
