@@ -32,6 +32,13 @@ export class LocationEntity extends BaseEntity {
   })
   isUnassigned: boolean;
 
+  @Column({
+    name: 'is_default',
+    default: false,
+    comment: 'Dedicated "Mặc định" location — POS sells from here when a product has no assigned shelf (one per showroom storage)',
+  })
+  isDefault: boolean;
+
   @ManyToOne(() => StorageEntity)
   @JoinColumn({ name: 'storage_id' })
   storage?: StorageEntity;

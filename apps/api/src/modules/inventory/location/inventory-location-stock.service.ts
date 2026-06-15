@@ -26,7 +26,7 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
-import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import {
   IntraWarehouseMoveLine,
   StockTransferService,
@@ -56,7 +56,7 @@ export class InventoryLocationStockService {
     private readonly barcodeRepo: Repository<ItemBarcodeEntity>,
     @InjectRepository(ItemProviderEntity)
     private readonly itemProviderRepo: Repository<ItemProviderEntity>,
-    private readonly pslService: ProductStorageLocationService,
+    private readonly pslService: ItemStorageLocationService,
     private readonly locationService: InventoryLocationService,
     private readonly stockTransferService: StockTransferService,
     private readonly dataSource: DataSource,
@@ -197,9 +197,9 @@ export class InventoryLocationStockService {
       throw new NotFoundException('Hàng hoá không tồn tại');
     }
 
-    // Validate / auto-create product-storage-location binding (product-level).
+    // Validate / auto-create item-storage-location binding (item-level).
     // pslService uses its own repos — runs outside the transaction boundary
-    // which is acceptable here (PSL is a config mapping, not a balance row).
+    // which is acceptable here (the mapping is config, not a balance row).
     await this.pslService.validateAndAssignByLocation(itemId, locationId, actor);
 
     // Upsert stock_balance row so the item appears in the location's stock list.
@@ -591,21 +591,19 @@ export class InventoryLocationStockService {
     });
     if (!item) return null;
 
-    if (item.productId) {
-      const psls = await this.pslService.listByProduct(item.productId, actor);
-      const psl = psls.find((p) => p.storageId === storageId);
-      if (psl) {
-        const preferred = await this.findAccessibleShelf(
-          psl.locationId,
-          storageId,
-          actor,
-        );
-        if (preferred) return preferred;
-      }
+    const psls = await this.pslService.listByItem(itemId, actor);
+    const psl = psls.find((p) => p.storageId === storageId);
+    if (psl) {
+      const preferred = await this.findAccessibleShelf(
+        psl.locationId,
+        storageId,
+        actor,
+      );
+      if (preferred) return preferred;
     }
 
     // Legacy items and imported data may have real stock locations without a
-    // product-level preferred-shelf mapping. Fall back to the item's most-used
+    // preferred-shelf mapping. Fall back to the item's most-used
     // accessible shelf in the selected storage so document forms can still
     // auto-fill a valid location.
     const balances = await this.stockBalanceRepo.find({

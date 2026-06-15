@@ -15,6 +15,7 @@ import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-pr
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { StorageEntity } from '../inventory/location/storage.entity';
 import { ShowroomEntity } from '../inventory/location/showroom.entity';
+import { LocationEntity } from '../inventory/location/location.entity';
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -56,7 +57,9 @@ describe('BranchService', () => {
     getRepository: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    createQueryBuilder: jest.Mock;
   };
+  let locationInserts: Array<{ entity: unknown; values: Record<string, unknown> }>;
   let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
@@ -78,6 +81,9 @@ describe('BranchService', () => {
 
     // Fake EntityManager: create() tags rows with their entity class so tests can
     // find the StorageEntity/ShowroomEntity payloads; save() stamps a per-class id.
+    // createQueryBuilder() captures the insert().into().values() payload so tests
+    // can assert the default-location insert.
+    locationInserts = [];
     manager = {
       getRepository: jest.fn(() => ({
         create: (dto: Record<string, unknown>) => ({ ...dto }),
@@ -91,6 +97,27 @@ describe('BranchService', () => {
       save: jest.fn((entity: { __type?: { name: string } }) =>
         Promise.resolve({ id: `${entity.__type?.name ?? 'row'}-id`, ...entity }),
       ),
+      createQueryBuilder: jest.fn(() => {
+        const qb: Record<string, unknown> = {};
+        const insert: { entity?: unknown; values?: Record<string, unknown> } = {};
+        Object.assign(qb, {
+          insert: () => qb,
+          into: (entity: unknown) => {
+            insert.entity = entity;
+            return qb;
+          },
+          values: (values: Record<string, unknown>) => {
+            insert.values = values;
+            return qb;
+          },
+          orIgnore: () => qb,
+          execute: () => {
+            locationInserts.push({ entity: insert.entity, values: insert.values ?? {} });
+            return Promise.resolve({});
+          },
+        });
+        return qb;
+      }),
     };
     dataSource = {
       transaction: jest.fn((cb: (m: typeof manager) => unknown) => cb(manager)),
@@ -175,6 +202,21 @@ describe('BranchService', () => {
         isMainShowroom: true,
         branchId: 'branch-new',
         storageId: 'StorageEntity-id',
+      });
+    });
+
+    it('creates a default "Mặc định" location in the showroom storage', async () => {
+      branchRepo.findOne.mockResolvedValue(null);
+      branchRepo.count.mockResolvedValue(1);
+
+      await service.create({ name: 'HQ' }, actor);
+
+      const insert = locationInserts.find((i) => i.entity === LocationEntity);
+      expect(insert?.values).toMatchObject({
+        code: 'DEFAULT',
+        isDefault: true,
+        storageId: 'StorageEntity-id',
+        branchId: 'branch-new',
       });
     });
   });

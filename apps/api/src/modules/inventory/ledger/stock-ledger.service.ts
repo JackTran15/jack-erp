@@ -17,7 +17,7 @@ import { EventPublisher } from '../../events/event-publisher.service';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
-import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import {
   type StringFilterMode,
   type NumericFilterOp,
@@ -139,7 +139,7 @@ export class StockLedgerService {
     private readonly balanceRepo: Repository<StockBalanceEntity>,
     private readonly dataSource: DataSource,
     private readonly eventPublisher: EventPublisher,
-    private readonly pslService: ProductStorageLocationService,
+    private readonly pslService: ItemStorageLocationService,
   ) {}
 
   async recordMovement(

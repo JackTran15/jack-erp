@@ -957,14 +957,25 @@ async function seedInventoryData() {
       ],
     );
 
-    // Product storage location: Giày Gelli → Main Warehouse → Main Rack A1
+    // Item storage locations: Giày Gelli variants → Main Warehouse → Main Rack A1
     await AppDataSource.query(
       `
-      INSERT INTO product_storage_locations (id, organization_id, branch_id, product_id, storage_id, location_id, created_by, created_at, updated_at)
-      VALUES (gen_random_uuid(), $1, NULL, $2, $3, $4, $5, NOW(), NOW())
-      ON CONFLICT (product_id, storage_id) DO NOTHING
+      INSERT INTO item_storage_locations (id, organization_id, branch_id, item_id, storage_id, location_id, created_by, created_at, updated_at)
+      VALUES
+        (gen_random_uuid(), $1, NULL, $2, $5, $6, $7, NOW(), NOW()),
+        (gen_random_uuid(), $1, NULL, $3, $5, $6, $7, NOW(), NOW()),
+        (gen_random_uuid(), $1, NULL, $4, $5, $6, $7, NOW(), NOW())
+      ON CONFLICT (item_id, storage_id) DO NOTHING
       `,
-      [IDS.organization, IDS.productShoe, IDS.storageMain, IDS.locationMain, IDS.user],
+      [
+        IDS.organization,
+        IDS.itemShoe39Nau,
+        IDS.itemShoe40Den,
+        IDS.itemShoe43Nau,
+        IDS.storageMain,
+        IDS.locationMain,
+        IDS.user,
+      ],
     );
 
     // Stock balances for a few shoe variants (so the matrix view shows data)

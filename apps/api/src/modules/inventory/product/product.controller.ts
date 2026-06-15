@@ -19,7 +19,7 @@ import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
 import { ProductCrudService } from './product-crud.service';
 import { VariantGenerationService } from './variant-generation.service';
-import { ProductStorageLocationService } from './product-storage-location.service';
+import { ItemStorageLocationService } from './item-storage-location.service';
 import { CreateProductDto, UpdateProductDto, GenerateVariantsDto, ResolveVariantDto } from './dto';
 
 @Controller('products')
@@ -29,7 +29,7 @@ export class ProductController {
   constructor(
     private readonly productService: ProductCrudService,
     private readonly variantService: VariantGenerationService,
-    private readonly pslService: ProductStorageLocationService,
+    private readonly pslService: ItemStorageLocationService,
   ) {}
 
   /**
