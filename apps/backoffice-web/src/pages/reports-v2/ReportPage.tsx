@@ -1,20 +1,24 @@
+import { useMemo } from "react";
 import { ReportDailySaleSummaryTableRegistry } from "../../constants/reports/report-table-registry/table-daily-sale-summary.registry";
+import { TableStoreProvider } from "../../store/common/table-store/table.context";
+import { buildInitialTableState } from "../../store/common/table-store/table.factory";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
-import {
-  dailySalesSummaryRows,
-  dailySalesSummaryTotals,
-} from "./_mock/report-daily-sales.mock";
+
+const TABLE_ID = "daily-sale-summary";
 
 export function ReportPage() {
+  const initialState = useMemo(
+    () => buildInitialTableState(TABLE_ID, ReportDailySaleSummaryTableRegistry),
+    [],
+  );
+
   return (
-    <div className="flex h-full flex-col bg-white px-2">
-      <ReportPageHeader />
-      <ReportPageTable
-        config={ReportDailySaleSummaryTableRegistry}
-        rows={dailySalesSummaryRows}
-        totals={dailySalesSummaryTotals}
-      />
-    </div>
+    <TableStoreProvider initialState={initialState}>
+      <div className="flex h-full flex-col bg-white px-2">
+        <ReportPageHeader />
+        <ReportPageTable />
+      </div>
+    </TableStoreProvider>
   );
 }

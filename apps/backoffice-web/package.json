@@ -15,6 +15,7 @@
     "@erp/shared-interfaces": "workspace:*",
     "@erp/ui": "workspace:*",
     "@tanstack/react-query": "^5.100.1",
+    "@tanstack/react-table": "^8.21.3",
     "axios": "^1.15.2",
     "lucide-react": "^0.400.0",
     "react": "^19.0.0",

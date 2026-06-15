@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { ChevronDown, Printer, Settings, UploadCloud } from "lucide-react";
+import { ColumnConfigDialog } from "./ColumnConfigDialog/ColumnConfigDialog";
 
 const buttonClass =
   "flex h-[30px] items-center gap-1.5 rounded-[3px] border border-[#D9D9DE] bg-white px-2.5 text-[13px] font-medium text-[#2B3164] hover:bg-[#F5F5F6]";
 
 export function ReportPageToolbar() {
+  const [configOpen, setConfigOpen] = useState(false);
+
   return (
     <div className="flex items-center gap-2">
       <button type="button" className={buttonClass}>
@@ -21,9 +25,12 @@ export function ReportPageToolbar() {
         type="button"
         className="flex h-[30px] w-[30px] items-center justify-center rounded-[3px] border border-[#D9D9DE] bg-white text-[#6B6B75] hover:bg-[#F5F5F6]"
         aria-label="Thiết lập cột hiển thị"
+        onClick={() => setConfigOpen(true)}
       >
         <Settings className="h-[18px] w-[18px]" />
       </button>
+
+      <ColumnConfigDialog open={configOpen} onClose={() => setConfigOpen(false)} />
     </div>
   );
 }
