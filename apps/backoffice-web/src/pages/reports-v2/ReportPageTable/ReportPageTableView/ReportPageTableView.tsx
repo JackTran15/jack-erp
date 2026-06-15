@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useMemo, useState } from "react";
 import { Calendar } from "lucide-react";
 import {
   getCoreRowModel,
@@ -7,24 +7,33 @@ import {
   type ColumnDef,
   type Header,
 } from "@tanstack/react-table";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { ReportColumnConfig } from "../../../../constants/reports/report.interface";
 import {
   DEFAULT_REPORT_COLUMN_WIDTH,
   buildReportColumnSegments,
-  canDrop,
-  cellKey,
-  draggedColumnIds,
   formatReportNumber,
   getReportCellAlignClass,
   getReportColumnCode,
   groupPinPosition,
   isReportNumberColumn,
   pinPosition,
-  reorderByDrag,
-  type DragToken,
 } from "../../../../lib/table";
 import { useTableStore } from "../../../../store/common/table-store/table.context";
 import { ReportRow } from "../../_mock/report-daily-sales.mock";
+import { SortableHeaderCell, type DragData } from "./SortableHeaderCell/SortableHeaderCell";
 
 interface Props {
   rows: ReportRow[];
@@ -32,6 +41,24 @@ interface Props {
 }
 
 const cellBorder = "border-b border-r border-[#E8E8EC]";
+
+// Một "unit" kéo-thả cấp top: cột đơn (key = columnId) hoặc group (key = `group:<label>`, gộp leaf liên tiếp).
+interface ColumnUnit {
+  key: string;
+  ids: string[];
+}
+
+function buildUnits(order: string[], configById: Map<string, ReportColumnConfig>): ColumnUnit[] {
+  const units: ColumnUnit[] = [];
+  for (const id of order) {
+    const group = configById.get(id)?.group ?? null;
+    const key = group ? `group:${group}` : id;
+    const last = units[units.length - 1];
+    if (group && last && last.key === key) last.ids.push(id);
+    else units.push({ key, ids: [id] });
+  }
+  return units;
+}
 
 export function ReportPageTableView({ rows, totals }: Props) {
   const config = useTableStore((s) => s.config);
@@ -103,75 +130,92 @@ export function ReportPageTableView({ rows, totals }: Props) {
     return map;
   }, [table, sizing, order, visibility, pinning]);
 
-  // Kéo-thả đổi vị trí cột/group (HTML5 DnD gốc, tránh xung đột transform với cột sticky).
-  const dragTokenRef = useRef<DragToken | null>(null);
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  // Tắt draggable khi con trỏ ở trên tay cầm resize → mousedown ở mép = resize, không bị native drag chiếm.
-  const [canDrag, setCanDrag] = useState(true);
+  // Kéo-thả đổi vị trí cột/group bằng @dnd-kit. Group dời nguyên khối; con chỉ đổi trong cùng group.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const [activeData, setActiveData] = useState<DragData | null>(null);
+  const [validOverId, setValidOverId] = useState<string | null>(null);
+  const units = useMemo(() => buildUnits(order, configById), [order, configById]);
 
-  const clearDrag = () => {
-    dragTokenRef.current = null;
-    setDraggingKey(null);
-    setDragOverKey(null);
-  };
-  const handleDrop = (target: DragToken) => {
-    const source = dragTokenRef.current;
-    if (source) {
-      const next = reorderByDrag(order, configById, source, target);
-      if (next) {
-        columnsActions.setOrder(next);
-        // Kéo cột đang fixed → bỏ ghim cột đó (group thì bỏ cả cụm).
-        const dragged = draggedColumnIds(source, order, configById);
-        const draggedSet = new Set(dragged);
-        const wasPinned = dragged.some(
-          (id) => (pinning.left ?? []).includes(id) || (pinning.right ?? []).includes(id),
-        );
-        if (wasPinned) {
-          columnsActions.setPinning((prev) => ({
-            left: (prev.left ?? []).filter((id) => !draggedSet.has(id)),
-            right: (prev.right ?? []).filter((id) => !draggedSet.has(id)),
-          }));
-        }
-      }
+  // Quy điểm thả về id ô được chỉ-báo (null nếu không hợp lệ). Kéo group thì chỉ-báo trên ô group đích.
+  const resolveValidOverId = (source: DragData, over: DragData): string | null => {
+    if (source.level === "top") {
+      const targetKey = over.level === "top" ? over.key : `group:${over.group}`;
+      return source.key !== targetKey ? targetKey : null;
     }
-    clearDrag();
-  };
-  const onCellDragOver = (token: DragToken, e: DragEvent<HTMLTableCellElement>) => {
-    const source = dragTokenRef.current;
-    if (!source || !canDrop(source, token)) return;
-    e.preventDefault();
-    const key = cellKey(token);
-    setDragOverKey((prev) => (prev === key ? prev : key));
+    if (over.level === "child" && over.group === source.group && over.id !== source.id) return over.id;
+    return null;
   };
 
-  // Toàn bộ header cell kéo được; bỏ qua khi thao tác bắt đầu từ vùng resize handle.
-  const dragProps = (token: DragToken) => ({
-    draggable: canDrag,
-    onDragStart: (e: DragEvent<HTMLTableCellElement>) => {
-      if (!canDrag || (e.target as HTMLElement).closest("[data-resize-handle]")) {
-        e.preventDefault();
-        return;
-      }
-      dragTokenRef.current = token;
-      setDraggingKey(cellKey(token));
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", "");
-    },
-    onDragEnd: clearDrag,
-    onDragOver: (e: DragEvent<HTMLTableCellElement>) => onCellDragOver(token, e),
-    onDrop: () => handleDrop(token),
-  });
+  // Tính order mới khi thả source lên over (null nếu không đổi). Top→arrayMove unit; child→arrayMove trong group.
+  const reorder = (source: DragData, over: DragData): string[] | null => {
+    if (source.level === "top") {
+      const targetKey = over.level === "top" ? over.key : `group:${over.group}`;
+      if (source.key === targetKey) return null;
+      const from = units.findIndex((u) => u.key === source.key);
+      const to = units.findIndex((u) => u.key === targetKey);
+      if (from < 0 || to < 0) return null;
+      return arrayMove(units, from, to).flatMap((u) => u.ids);
+    }
+    if (over.level === "child" && over.group === source.group && over.id !== source.id) {
+      const gi = units.findIndex((u) => u.key === `group:${source.group}`);
+      if (gi < 0) return null;
+      const from = units[gi].ids.indexOf(source.id);
+      const to = units[gi].ids.indexOf(over.id);
+      if (from < 0 || to < 0) return null;
+      const next = [...units];
+      next[gi] = { ...units[gi], ids: arrayMove(units[gi].ids, from, to) };
+      return next.flatMap((u) => u.ids);
+    }
+    return null;
+  };
 
-  // Tay cầm kéo resize, đặt ở mép phải header cell (cell phải có position: relative).
+  // Các column id bị ảnh hưởng khi kéo (group → cả cụm) — dùng để bỏ ghim.
+  const draggedIds = (source: DragData): string[] => {
+    if (source.level === "child") return [source.id];
+    return units.find((u) => u.key === source.key)?.ids ?? [];
+  };
+
+  const handleDragStart = (e: DragStartEvent) => {
+    setActiveData((e.active.data.current as DragData | undefined) ?? null);
+  };
+  const handleDragOver = (e: DragOverEvent) => {
+    const source = e.active.data.current as DragData | undefined;
+    const over = e.over?.data.current as DragData | undefined;
+    setValidOverId(source && over ? resolveValidOverId(source, over) : null);
+  };
+  const handleDragEnd = (e: DragEndEvent) => {
+    const source = e.active.data.current as DragData | undefined;
+    const over = e.over?.data.current as DragData | undefined;
+    setActiveData(null);
+    setValidOverId(null);
+    if (!source || !over) return;
+    const next = reorder(source, over);
+    if (!next) return;
+    columnsActions.setOrder(next);
+    // Kéo cột đang ghim → bỏ ghim cột đó (group thì bỏ cả cụm).
+    const draggedSet = new Set(draggedIds(source));
+    const wasPinned = [...draggedSet].some(
+      (id) => (pinning.left ?? []).includes(id) || (pinning.right ?? []).includes(id),
+    );
+    if (wasPinned) {
+      columnsActions.setPinning((prev) => ({
+        left: (prev.left ?? []).filter((id) => !draggedSet.has(id)),
+        right: (prev.right ?? []).filter((id) => !draggedSet.has(id)),
+      }));
+    }
+  };
+  const handleDragCancel = () => {
+    setActiveData(null);
+    setValidOverId(null);
+  };
+
+  // Tay cầm kéo resize ở mép phải header cell; chặn sensor drag khi nắm mép (stopPropagation pointerdown).
   const renderResizeHandle = (column: Column<ReportRow>) => {
     const header = headerById.get(column.id);
     if (!header || !column.getCanResize()) return null;
     return (
       <div
-        data-resize-handle
-        onMouseEnter={() => setCanDrag(false)}
-        onMouseLeave={() => setCanDrag(true)}
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
         className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-[#3B5BDB]"
@@ -184,216 +228,245 @@ export function ReportPageTableView({ rows, totals }: Props) {
     .map((c) => configById.get(c.id))
     .filter((c): c is ReportColumnConfig => Boolean(c));
   const segments = buildReportColumnSegments(orderedConfigs);
+  const topItems = segments.map((seg) =>
+    seg.kind === "single" ? seg.col.column : `group:${seg.label}`,
+  );
+
+  // Nhãn hiển thị trong DragOverlay (bản xem trước nổi của unit đang kéo).
+  const overlayLabel = (data: DragData): string => {
+    if (data.level === "child") return configById.get(data.id)?.label ?? data.id;
+    if (data.key.startsWith("group:")) return data.key.slice("group:".length);
+    return configById.get(data.key)?.label ?? data.key;
+  };
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto border border-[#D9D9DE]">
-      <table
-        className="border-separate border-spacing-0 text-[13px] text-[#212121]"
-        style={{ width: "max-content", minWidth: "100%" }}
-      >
-        <thead className="bg-[#F5F5F6] text-[12px] font-bold">
-          {/* Tầng 1: group header */}
-          <tr>
-            {segments.map((seg) => {
-              if (seg.kind === "single") {
-                const column = columnById.get(seg.col.column);
-                if (!column) return null;
-                const pinned = column.getIsPinned();
-                const width = column.getSize();
-                const token: DragToken = { level: "top", key: seg.col.column };
-                const key = cellKey(token);
-                return (
-                  <th
-                    key={seg.col.column}
-                    rowSpan={2}
-                    {...dragProps(token)}
-                    style={{
-                      width,
-                      minWidth: width,
-                      ...pinPosition(column),
-                      ...(dragOverKey === key ? { boxShadow: "inset 2px 0 0 0 #3B5BDB" } : {}),
-                    }}
-                    className={[
-                      `relative cursor-grab ${cellBorder} px-2 py-2 align-middle bg-[#F5F5F6]`,
-                      pinned ? "z-30" : "",
-                      draggingKey === key ? "opacity-40" : "",
-                      pinned === "right" ? "text-center" : pinned === "left" ? "text-left" : "text-center",
-                    ].join(" ")}
-                  >
-                    {seg.col.label}
-                    {renderResizeHandle(column)}
-                    {getReportColumnCode(seg.col) && (
-                      <div className="font-normal text-[#5C5C66]">{getReportColumnCode(seg.col)}</div>
-                    )}
-                  </th>
-                );
-              }
-              const groupStyle = groupPinPosition(seg, columnById);
-              const groupPinned = "position" in groupStyle;
-              const token: DragToken = { level: "top", key: `group:${seg.label}` };
-              const key = cellKey(token);
-              return (
-                <th
-                  key={seg.label}
-                  colSpan={seg.cols.length}
-                  {...dragProps(token)}
-                  style={{
-                    ...groupStyle,
-                    ...(dragOverKey === key ? { boxShadow: "inset 2px 0 0 0 #3B5BDB" } : {}),
-                  }}
-                  className={[
-                    `cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
-                    groupPinned ? "z-30" : "",
-                    draggingKey === key ? "opacity-40" : "",
-                  ].join(" ")}
-                >
-                  {seg.label}
-                </th>
-              );
-            })}
-          </tr>
-          {/* Tầng 2: column header */}
-          <tr>
-            {segments.flatMap((seg) =>
-              seg.kind === "group"
-                ? seg.cols.map((col) => {
-                    const column = columnById.get(col.column);
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="min-h-0 flex-1 overflow-auto border border-[#D9D9DE]">
+        <table
+          className="border-separate border-spacing-0 text-[13px] text-[#212121]"
+          style={{ width: "max-content", minWidth: "100%" }}
+        >
+          <thead className="bg-[#F5F5F6] text-[12px] font-bold">
+            {/* Tầng 1: group header */}
+            <SortableContext items={topItems} strategy={horizontalListSortingStrategy}>
+              <tr>
+                {segments.map((seg) => {
+                  if (seg.kind === "single") {
+                    const column = columnById.get(seg.col.column);
                     if (!column) return null;
                     const pinned = column.getIsPinned();
                     const width = column.getSize();
-                    const token: DragToken = { level: "child", id: col.column, group: seg.label };
-                    const key = cellKey(token);
+                    const id = seg.col.column;
                     return (
-                      <th
-                        key={col.column}
-                        {...dragProps(token)}
-                        style={{
-                          width,
-                          minWidth: width,
-                          ...pinPosition(column),
-                          ...(dragOverKey === key ? { boxShadow: "inset 2px 0 0 0 #3B5BDB" } : {}),
-                        }}
+                      <SortableHeaderCell
+                        key={id}
+                        id={id}
+                        data={{ level: "top", key: id }}
+                        validOver={validOverId === id}
+                        rowSpan={2}
+                        style={{ width, minWidth: width, ...pinPosition(column) }}
                         className={[
-                          `relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
+                          `relative cursor-grab ${cellBorder} px-2 py-2 align-middle bg-[#F5F5F6]`,
                           pinned ? "z-30" : "",
-                          draggingKey === key ? "opacity-40" : "",
+                          pinned === "right"
+                            ? "text-center"
+                            : pinned === "left"
+                              ? "text-left"
+                              : "text-center",
                         ].join(" ")}
+                        resizeHandle={renderResizeHandle(column)}
                       >
-                        {col.label}
-                        {renderResizeHandle(column)}
-                        {getReportColumnCode(col) && (
-                          <div className="font-normal text-[#5C5C66]">{getReportColumnCode(col)}</div>
+                        {seg.col.label}
+                        {getReportColumnCode(seg.col) && (
+                          <div className="font-normal text-[#5C5C66]">
+                            {getReportColumnCode(seg.col)}
+                          </div>
                         )}
-                      </th>
+                      </SortableHeaderCell>
                     );
-                  })
-                : [],
-            )}
-          </tr>
-          {/* Tầng 3: filter row */}
-          <tr>
-            {orderedLeaf.map((column) => {
-              const col = configById.get(column.id);
-              if (!col) return null;
-              const pinned = column.getIsPinned();
-              const isDate = col.tableConfig?.dataType === "date";
-              const value = columnFilters[col.column]?.value ?? "";
-              return (
-                <td
-                  key={column.id}
-                  style={pinPosition(column)}
-                  className={[
-                    `${cellBorder} px-1.5 py-1 bg-[#F5F5F6]`,
-                    pinned ? "z-20" : "",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center gap-1 rounded-[2px] border border-[#D9D9DE] bg-white px-1.5 h-6">
-                    <span className="text-[#6B6B75] text-[12px] select-none">
-                      {isDate ? "=" : "≤"}
-                    </span>
-                    <input
-                      className="w-full min-w-0 bg-transparent text-[12px] outline-none"
-                      value={value}
-                      onChange={(e) =>
-                        filtersActions.setColumnFilter(col.column, { value: e.target.value })
-                      }
-                    />
-                    {isDate && <Calendar className="h-3.5 w-3.5 shrink-0 text-[#6B6B75]" />}
-                  </div>
-                </td>
-              );
-            })}
-          </tr>
-        </thead>
-
-        <tbody>
-          {table.getRowModel().rows.map((row) => {
-            const cells = [
-              ...row.getLeftVisibleCells(),
-              ...row.getCenterVisibleCells(),
-              ...row.getRightVisibleCells(),
-            ];
-            return (
-              <tr key={row.id} className="hover:bg-[#F8F8FA]">
-                {cells.map((cell) => {
-                  const col = configById.get(cell.column.id);
-                  if (!col) return null;
-                  const pinned = cell.column.getIsPinned();
-                  const width = cell.column.getSize();
-                  const raw = cell.getValue() as number | string | undefined;
+                  }
+                  const groupStyle = groupPinPosition(seg, columnById);
+                  const groupPinned = "position" in groupStyle;
+                  const id = `group:${seg.label}`;
                   return (
-                    <td
-                      key={cell.id}
-                      style={{ width, minWidth: width, ...pinPosition(cell.column) }}
+                    <SortableHeaderCell
+                      key={seg.label}
+                      id={id}
+                      data={{ level: "top", key: id }}
+                      validOver={validOverId === id}
+                      colSpan={seg.cols.length}
+                      style={groupStyle}
                       className={[
-                        `${cellBorder} px-2 py-1.5 align-middle bg-white`,
-                        getReportCellAlignClass(col),
-                        pinned ? "z-10" : "",
+                        `cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
+                        groupPinned ? "z-30" : "",
                       ].join(" ")}
                     >
-                      {col.tableConfig?.link ? (
-                        <a className="text-[#3B5BDB] hover:underline cursor-pointer">{raw ?? ""}</a>
-                      ) : isReportNumberColumn(col) ? (
-                        formatReportNumber(raw)
-                      ) : (
-                        raw ?? ""
-                      )}
-                    </td>
+                      {seg.label}
+                    </SortableHeaderCell>
                   );
                 })}
               </tr>
-            );
-          })}
-        </tbody>
+            </SortableContext>
+            {/* Tầng 2: column header */}
+            <tr>
+              {segments.map((seg) =>
+                seg.kind === "group" ? (
+                  <SortableContext
+                    key={seg.label}
+                    items={seg.cols.map((c) => c.column)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {seg.cols.map((col) => {
+                      const column = columnById.get(col.column);
+                      if (!column) return null;
+                      const pinned = column.getIsPinned();
+                      const width = column.getSize();
+                      const id = col.column;
+                      return (
+                        <SortableHeaderCell
+                          key={id}
+                          id={id}
+                          data={{ level: "child", id, group: seg.label }}
+                          validOver={validOverId === id}
+                          style={{ width, minWidth: width, ...pinPosition(column) }}
+                          className={[
+                            `relative cursor-grab ${cellBorder} px-2 py-2 text-center align-middle bg-[#F5F5F6]`,
+                            pinned ? "z-30" : "",
+                          ].join(" ")}
+                          resizeHandle={renderResizeHandle(column)}
+                        >
+                          {col.label}
+                          {getReportColumnCode(col) && (
+                            <div className="font-normal text-[#5C5C66]">
+                              {getReportColumnCode(col)}
+                            </div>
+                          )}
+                        </SortableHeaderCell>
+                      );
+                    })}
+                  </SortableContext>
+                ) : null,
+              )}
+            </tr>
+            {/* Tầng 3: filter row */}
+            <tr>
+              {orderedLeaf.map((column) => {
+                const col = configById.get(column.id);
+                if (!col) return null;
+                const pinned = column.getIsPinned();
+                const isDate = col.tableConfig?.dataType === "date";
+                const value = columnFilters[col.column]?.value ?? "";
+                return (
+                  <td
+                    key={column.id}
+                    style={pinPosition(column)}
+                    className={[`${cellBorder} px-1.5 py-1 bg-[#F5F5F6]`, pinned ? "z-20" : ""].join(
+                      " ",
+                    )}
+                  >
+                    <div className="flex items-center gap-1 rounded-[2px] border border-[#D9D9DE] bg-white px-1.5 h-6">
+                      <span className="text-[#6B6B75] text-[12px] select-none">
+                        {isDate ? "=" : "≤"}
+                      </span>
+                      <input
+                        className="w-full min-w-0 bg-transparent text-[12px] outline-none"
+                        value={value}
+                        onChange={(e) =>
+                          filtersActions.setColumnFilter(col.column, { value: e.target.value })
+                        }
+                      />
+                      {isDate && <Calendar className="h-3.5 w-3.5 shrink-0 text-[#6B6B75]" />}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          </thead>
 
-        <tfoot className="bg-[#F5F5F6] font-bold">
-          <tr>
-            {orderedLeaf.map((column, idx) => {
-              const col = configById.get(column.id);
-              if (!col) return null;
-              const pinned = column.getIsPinned();
-              const raw = totals[col.column];
+          <tbody>
+            {table.getRowModel().rows.map((row) => {
+              const cells = [
+                ...row.getLeftVisibleCells(),
+                ...row.getCenterVisibleCells(),
+                ...row.getRightVisibleCells(),
+              ];
               return (
-                <td
-                  key={column.id}
-                  style={pinPosition(column)}
-                  className={[
-                    `${cellBorder} px-2 py-1.5 align-middle bg-[#F5F5F6]`,
-                    getReportCellAlignClass(col),
-                    pinned ? "z-10" : "",
-                  ].join(" ")}
-                >
-                  {idx === 0
-                    ? config.summaryLabel ?? ""
-                    : isReportNumberColumn(col)
-                      ? formatReportNumber(raw)
-                      : raw ?? ""}
-                </td>
+                <tr key={row.id} className="hover:bg-[#F8F8FA]">
+                  {cells.map((cell) => {
+                    const col = configById.get(cell.column.id);
+                    if (!col) return null;
+                    const pinned = cell.column.getIsPinned();
+                    const width = cell.column.getSize();
+                    const raw = cell.getValue() as number | string | undefined;
+                    return (
+                      <td
+                        key={cell.id}
+                        style={{ width, minWidth: width, ...pinPosition(cell.column) }}
+                        className={[
+                          `${cellBorder} px-2 py-1.5 align-middle bg-white`,
+                          getReportCellAlignClass(col),
+                          pinned ? "z-10" : "",
+                        ].join(" ")}
+                      >
+                        {col.tableConfig?.link ? (
+                          <a className="text-[#3B5BDB] hover:underline cursor-pointer">{raw ?? ""}</a>
+                        ) : isReportNumberColumn(col) ? (
+                          formatReportNumber(raw)
+                        ) : (
+                          raw ?? ""
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
               );
             })}
-          </tr>
-        </tfoot>
-      </table>
-    </div>
+          </tbody>
+
+          <tfoot className="bg-[#F5F5F6] font-bold">
+            <tr>
+              {orderedLeaf.map((column, idx) => {
+                const col = configById.get(column.id);
+                if (!col) return null;
+                const pinned = column.getIsPinned();
+                const raw = totals[col.column];
+                return (
+                  <td
+                    key={column.id}
+                    style={pinPosition(column)}
+                    className={[
+                      `${cellBorder} px-2 py-1.5 align-middle bg-[#F5F5F6]`,
+                      getReportCellAlignClass(col),
+                      pinned ? "z-10" : "",
+                    ].join(" ")}
+                  >
+                    {idx === 0
+                      ? config.summaryLabel ?? ""
+                      : isReportNumberColumn(col)
+                        ? formatReportNumber(raw)
+                        : raw ?? ""}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <DragOverlay modifiers={[restrictToHorizontalAxis]}>
+        {activeData ? (
+          <div className="cursor-grabbing rounded-[2px] border border-[#3B5BDB] bg-[#F5F5F6] px-2 py-2 text-[12px] font-bold text-[#212121] shadow-md">
+            {overlayLabel(activeData)}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
