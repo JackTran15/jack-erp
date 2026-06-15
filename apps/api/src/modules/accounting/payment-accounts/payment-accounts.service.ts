@@ -28,9 +28,11 @@ export class PaymentAccountsService {
   ) {}
 
   /**
-   * List the active payment accounts configured for the actor's branch, so the POS
-   * can let the cashier pick which bank/card account a payment goes into. Optionally
-   * filtered to a single method; ordered by `sortOrder` for a stable UI.
+   * List the active payment accounts the actor's branch can pick at checkout, so the
+   * POS can let the cashier choose which bank/card account a payment goes into.
+   * Mappings are org-wide (branch_id NULL) unless the branch has its own override,
+   * which then hides the org-wide default for that method. Optionally filtered to a
+   * single method; ordered by `sortOrder` for a stable UI.
    */
   async list(
     actor: ActorContext,
@@ -44,7 +46,6 @@ export class PaymentAccountsService {
 
     const where: FindOptionsWhere<PaymentAccountEntity> = {
       organizationId: actor.organizationId,
-      branchId: actor.branchId,
       isActive: true,
     };
     if (method) {
@@ -53,7 +54,19 @@ export class PaymentAccountsService {
 
     const rows = await this.repo.find({ where, order: { sortOrder: 'ASC' } });
 
-    return rows.map((r) => ({
+    // Keep the org-wide defaults and this branch's overrides; drop other branches'
+    // overrides, and hide an org-wide default for any method this branch overrides.
+    const scoped = rows.filter(
+      (r) => !r.branchId || r.branchId === actor.branchId,
+    );
+    const overriddenMethods = new Set(
+      scoped.filter((r) => r.branchId).map((r) => r.paymentMethod),
+    );
+    const visible = scoped.filter(
+      (r) => r.branchId || !overriddenMethods.has(r.paymentMethod),
+    );
+
+    return visible.map((r) => ({
       id: r.id,
       paymentMethod: r.paymentMethod,
       bankName: r.bankName ?? null,

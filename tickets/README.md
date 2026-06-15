@@ -703,3 +703,19 @@ flowchart LR
   T2 --> T3
 ```
 
+## EPIC-14062026 POS branch-scoped product-location resolver (fix cross-branch stock deduction)
+
+- [EPIC-14062026 POS branch-scoped product-location resolver](./epics/EPIC-14062026-pos-branch-scoped-location-resolver.md)
+- **Bug fix:** checkout/exchange trừ kho nhầm **chi nhánh** khi một sản phẩm (org-wide) có dòng vị trí ưu tiên `product_storage_locations` (PSL) ở storage của **nhiều chi nhánh**. Hai chỗ resolve trong POS (`invoice.service.ts` `resolveProductLocations`, `create-exchange-invoice.service.ts` `buildNewLineEntities`) lookup PSL **chỉ theo `productId`**, không scope branch/storage, rồi `new Map()` lấy **dòng cuối** → checkout chi nhánh B có thể resolve `locationId` nằm trong storage chi nhánh A → `SALE_ISSUE` ghi lệch branch/location. Fix: gom về **một helper chung** scope PSL theo **storage của `actor.branchId`** (`storageId IN`), **ưu tiên `isMainStorage`** (showroom); product không có mapping trong chi nhánh → bỏ khỏi map → guard checkout cũ ném 400 (fail-closed). **Không** entity/migration/event/FE/permission/OpenAPI; chỉ sửa tầng service + unit test.
+
+| Ticket                                                                   | Mô tả                                                                                       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [TKT-PBL-01](./tickets/TKT-PBL-01-branch-scoped-psl-resolver.md)         | BE: helper `resolveBranchProductLocations` (scope storage theo branch, ưu tiên main) + rewire 2 chỗ POS + regression test cross-branch / main-storage / fail-closed |
+
+### Ticket dependency graph (EPIC-14062026 pos-branch-scoped-location-resolver)
+
+```mermaid
+flowchart LR
+  T1["TKT-PBL-01 Branch-scoped resolver + rewire + tests"]
+```
+

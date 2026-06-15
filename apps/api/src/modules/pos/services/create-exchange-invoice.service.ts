@@ -17,7 +17,7 @@ import {
   ItemDirection,
 } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
-import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
+import { resolveBranchProductLocations } from './resolve-branch-product-locations';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CreateInvoiceItemDto } from '../dto/create-invoice.dto';
 import { ReturnInvoiceLineDto } from '../dto/create-return-invoice.dto';
@@ -164,14 +164,10 @@ export class CreateExchangeInvoiceService {
         catalogItems.map((c) => c.productId).filter((p): p is string => !!p),
       ),
     ];
-    const locRows =
-      productIds.length > 0
-        ? await manager.findBy(ProductStorageLocationEntity, {
-            productId: In(productIds),
-          })
-        : [];
-    const productLocationMap = new Map(
-      locRows.map((r) => [r.productId, r.locationId]),
+    const productLocationMap = await resolveBranchProductLocations(
+      manager,
+      productIds,
+      actor,
     );
 
     return newLines.map((line, index) => {

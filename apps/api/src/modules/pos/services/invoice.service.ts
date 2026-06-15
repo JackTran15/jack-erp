@@ -16,7 +16,7 @@ import { ItemEntity } from '../../inventory/location/item.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
-import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
+import { resolveBranchProductLocations } from './resolve-branch-product-locations';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
@@ -170,7 +170,7 @@ export class InvoiceService {
           throw new BadRequestException(`Items not found in this organisation: ${missingIds.join(', ')}`);
         }
 
-        const productLocationMap = await this.resolveProductLocations(manager, catalogItems);
+        const productLocationMap = await this.resolveProductLocations(manager, catalogItems, actor);
 
         const itemEntities = items.map((item, index) => {
           const catalog = priceMap.get(item.itemId);
@@ -328,7 +328,7 @@ export class InvoiceService {
           const itemIds = [...new Set(dto.items.map((i) => i.itemId))];
           const catalogItems = await manager.findBy(ItemEntity, { id: In(itemIds) });
           const priceMap = new Map(catalogItems.map((c) => [c.id, c]));
-          const productLocationMap = await this.resolveProductLocations(manager, catalogItems);
+          const productLocationMap = await this.resolveProductLocations(manager, catalogItems, actor);
 
           const itemEntities = dto.items.map((item, index) => {
             const catalog = priceMap.get(item.itemId);
@@ -406,16 +406,12 @@ export class InvoiceService {
   private async resolveProductLocations(
     manager: EntityManager,
     catalogItems: ItemEntity[],
+    actor: ActorContext,
   ): Promise<Map<string, string>> {
     const productIds = [
       ...new Set(catalogItems.map((c) => c.productId).filter((p): p is string => !!p)),
     ];
-    if (productIds.length === 0) return new Map();
-
-    const rows = await manager.findBy(ProductStorageLocationEntity, {
-      productId: In(productIds),
-    });
-    return new Map(rows.map((r) => [r.productId, r.locationId]));
+    return resolveBranchProductLocations(manager, productIds, actor);
   }
 
   async findDrafts(
