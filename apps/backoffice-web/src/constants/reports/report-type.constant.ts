@@ -1,6 +1,7 @@
 import { REPORT_BRANCH } from "./report-branch.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
+import { chain_filterRegistryReportInvoiceAndOrderList, chain_tableRegistryReportInvoiceAndOrderList, single_filterRegistryReportInvoiceAndOrderList, single_tableRegistryReportInvoiceAndOrderList } from "./report-registry/report-invoice-and-order-list.registry";
 import type { ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -39,27 +40,13 @@ export const REPORT_TYPE_SALES_METADATA = {
   },
   [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: {
     label: 'Bảng kê hóa đơn và đơn hàng',
-    filterConfig: {
-      [REPORT_BRANCH.SINGLE]: [
-        REPORT_FILTERS_LINE.STORE,
-        REPORT_FILTERS_LINE.INVOICE_STATUS,
-        REPORT_FILTERS_LINE.STAT_DATE_TYPE,
-        REPORT_FILTERS_LINE.REPORT_PERIOD,
-        REPORT_FILTERS_LINE.RANGE_DATE,
-        REPORT_FILTERS_LINE.CASHIER,
-        REPORT_FILTERS_LINE.SALESPERSON,
-        REPORT_FILTERS_LINE.CUSTOMER,
-      ],
-      [REPORT_BRANCH.CHAIN]: [
-        REPORT_FILTERS_LINE.STORE,
-        REPORT_FILTERS_LINE.INVOICE_STATUS,
-        REPORT_FILTERS_LINE.STAT_DATE_TYPE,
-        REPORT_FILTERS_LINE.REPORT_PERIOD,
-        REPORT_FILTERS_LINE.RANGE_DATE,
-        REPORT_FILTERS_LINE.CASHIER,
-        REPORT_FILTERS_LINE.SALESPERSON,
-        REPORT_FILTERS_LINE.CUSTOMER,
-      ],
+    tableConfig: {
+      [REPORT_BRANCH.SINGLE]: single_tableRegistryReportInvoiceAndOrderList,
+      [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportInvoiceAndOrderList
+    },
+   filterConfig: {
+      [REPORT_BRANCH.SINGLE]: single_filterRegistryReportInvoiceAndOrderList,
+      [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportInvoiceAndOrderList
     },
   },
   [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng' },

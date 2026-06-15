@@ -19,7 +19,8 @@ import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPag
 import { ApprovalQueuePage } from "./pages/onboarding/ApprovalQueuePage";
 import { RegistrationDetailPage } from "./pages/onboarding/RegistrationDetailPage";
 import { DashboardReportPage } from "./pages/reports/DashboardReportPage";
-import { SalesReportPage } from "./pages/reports/SalesReportPage";
+import { ReportPage } from "./pages/chain-store/reports/ReportPage";
+import { REPORT_CATEGORY } from "./constants/reports/report-category.constant";
 import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
@@ -176,7 +177,10 @@ export function App() {
                   path="/reports/dashboard"
                   element={<DashboardReportPage />}
                 />
-                <Route path="/reports/sales" element={<SalesReportPage />} />
+                <Route
+                  path="/reports/sales"
+                  element={<ReportPage category={REPORT_CATEGORY.SALES} />}
+                />
                 <Route
                   path="/reports/inventory"
                   element={<InventoryReportPage />}

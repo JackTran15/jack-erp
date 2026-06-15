@@ -28,6 +28,11 @@ export enum ReportTableColumn {
   REVENUE_DISCOUNT_RATE = 'revenue_discount_rate',
   NET_REVENUE = 'net_revenue',
 
+  // === Doanh thu sàn TMĐT ===
+  PLATFORM_FEE = 'platform_fee',
+  PLATFORM_OTHER_INCOME = 'platform_other_income',
+  PLATFORM_REVENUE = 'platform_revenue',
+
   // === Khuyến mại ===
   PROMO_CODE = 'promo_code',
   PROMO_TYPE = 'promo_type',
@@ -56,6 +61,8 @@ export enum ReportTableColumn {
   PAYMENT_DEBT = 'payment_debt',
   PAYMENT_HELPER = 'payment_helper',
   PAYMENT_BANK_ACCOUNT = 'payment_bank_account',
+  PAYMENT_BANK_DEPOSIT = 'payment_bank_deposit',
+  PAYMENT_COLLECT = 'payment_collect',
 
   // === Thực thu & Công nợ ===
   NET_RECEIVED = 'net_received',
@@ -102,7 +109,7 @@ export enum ReportTableColumnGroup {
   // === Doanh thu & Lợi nhuận ===
   REVENUE = 'Doanh thu',
   REVENUE_DETAIL = 'Chi tiết doanh thu',
-  REVENUE_TMDT = 'Doanh thu sản TMDT',
+  REVENUE_TMDT = 'Doanh thu sàn TMĐT',
   NET_REVENUE = 'Thực thu',
   PROFIT = 'Lợi nhuận',
 
@@ -164,6 +171,10 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.REVENUE_DISCOUNT_RATE]: 'Tỷ lệ KM (%)',
   [ReportTableColumn.NET_REVENUE]: 'Thực thu',
 
+  [ReportTableColumn.PLATFORM_FEE]: 'Phí trả sàn',
+  [ReportTableColumn.PLATFORM_OTHER_INCOME]: 'Thu khác từ sàn',
+  [ReportTableColumn.PLATFORM_REVENUE]: 'Doanh thu từ sàn',
+
   [ReportTableColumn.PROMO_CODE]: 'Mã khuyến mại',
   [ReportTableColumn.PROMO_TYPE]: 'Loại khuyến mại',
   [ReportTableColumn.PROMO_VALUE]: 'Giá trị khuyến mại',
@@ -190,6 +201,8 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.PAYMENT_DEBT]: 'Công nợ',
   [ReportTableColumn.PAYMENT_HELPER]: 'Trợ giúp',
   [ReportTableColumn.PAYMENT_BANK_ACCOUNT]: 'Tài khoản ngân hàng',
+  [ReportTableColumn.PAYMENT_BANK_DEPOSIT]: 'Tiền gửi NH',
+  [ReportTableColumn.PAYMENT_COLLECT]: 'Thu hộ',
 
   [ReportTableColumn.NET_RECEIVED]: 'Thực thu',
   [ReportTableColumn.DEBT]: 'Công nợ',
