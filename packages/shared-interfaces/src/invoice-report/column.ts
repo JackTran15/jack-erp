@@ -74,6 +74,7 @@ export const INVOICE_REPORT_COLUMN_LABELS_VI: Record<string, string> = {
   sku: 'Mã SKU',
   itemName: 'Tên hàng hóa',
   itemCategory: 'Nhóm hàng hóa',
+  brand: 'Thương hiệu',
   unit: 'Đơn vị tính',
   quantity: 'Số lượng',
   unitPrice: 'Đơn giá',

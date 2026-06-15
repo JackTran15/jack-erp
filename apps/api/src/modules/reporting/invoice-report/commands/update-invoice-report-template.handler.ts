@@ -1,15 +1,16 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { InvoiceReportTemplateView } from '@erp/shared-interfaces';
 import { InvoiceReportTemplateEntity } from '../invoice-report-template.entity';
 import { toTemplateView } from '../invoice-report-template.view';
-import { isAcceptedColumnKey } from '../invoice-report.columns';
+import {
+  assertColumnsInCatalog,
+  buildColumnCatalog,
+  normalizeTemplateColumns,
+} from '../invoice-report-template.columns.util';
+import { ReportRegistry } from '../report-definition';
 import { UpdateInvoiceReportTemplateCommand } from './update-invoice-report-template.command';
 
 @CommandHandler(UpdateInvoiceReportTemplateCommand)
@@ -19,6 +20,7 @@ export class UpdateInvoiceReportTemplateHandler
   constructor(
     @InjectRepository(InvoiceReportTemplateEntity)
     private readonly repo: Repository<InvoiceReportTemplateEntity>,
+    private readonly registry: ReportRegistry,
   ) {}
 
   async execute({
@@ -34,15 +36,19 @@ export class UpdateInvoiceReportTemplateHandler
     }
 
     if (dto.columns !== undefined || dto.columnFilters !== undefined) {
-      const referenced = [
-        ...(dto.columns ?? entity.columns),
-        ...(dto.columnFilters ?? []).map((f) => f.col),
-      ];
-      const unknown = referenced.filter((k) => !isAcceptedColumnKey(k));
-      if (unknown.length) {
-        throw new BadRequestException(
-          `Unknown report columns: ${[...new Set(unknown)].join(', ')}`,
+      const catalog = await buildColumnCatalog(
+        this.registry,
+        entity.reportType,
+        actor,
+      );
+      if (dto.columnFilters !== undefined) {
+        assertColumnsInCatalog(
+          dto.columnFilters.map((f) => f.col),
+          catalog,
         );
+      }
+      if (dto.columns !== undefined) {
+        entity.columns = normalizeTemplateColumns(dto.columns, catalog);
       }
     }
 
@@ -62,7 +68,6 @@ export class UpdateInvoiceReportTemplateHandler
     }
 
     if (dto.description !== undefined) entity.description = dto.description;
-    if (dto.columns !== undefined) entity.columns = dto.columns;
     if (dto.sortOrder !== undefined) entity.sortOrder = dto.sortOrder;
     if (dto.filters !== undefined || dto.columnFilters !== undefined) {
       const existing = (entity.filters ?? {}) as Record<string, unknown>;

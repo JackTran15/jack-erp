@@ -7656,6 +7656,18 @@ export interface components {
              * @description Salesperson — matches invoice.salespersonId.
              */
             salespersonId?: string;
+            /**
+             * @description revenue-by-item only — row grain (default item).
+             * @enum {string}
+             */
+            groupBy?: "item" | "group" | "brand";
+            /**
+             * Format: uuid
+             * @description revenue-by-item only — filter by item category (Nhóm hàng hóa).
+             */
+            categoryId?: string;
+            /** @description revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
+            brand?: string;
         };
         ColumnFilterDto: {
             col: string;
@@ -7681,11 +7693,22 @@ export interface components {
             /** @default 31 */
             limit: number;
         };
+        ReportTemplateColumnDto: {
+            col: string;
+            /** @description User-renamed label; empty/blank ⇒ persisted as null (falls back to catalog name). */
+            displayName?: string | null;
+            /** @description Defaults to true when omitted. */
+            visible?: boolean;
+            /** @description Defaults to false when omitted. */
+            frozen?: boolean;
+            /** @description Ignored on persist — the server stamps order from array position. */
+            order?: number;
+        };
         CreateInvoiceReportTemplateDto: {
             reportType: string;
             name: string;
             description?: string;
-            columns: string[];
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
             filters?: components["schemas"]["InvoiceReportFilterDto"];
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;
@@ -7693,7 +7716,7 @@ export interface components {
         UpdateInvoiceReportTemplateDto: {
             name?: string;
             description?: string;
-            columns?: string[];
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
             filters?: components["schemas"]["InvoiceReportFilterDto"];
             columnFilters?: components["schemas"]["ColumnFilterDto"][];
             sortOrder?: number;

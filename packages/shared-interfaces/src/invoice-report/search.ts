@@ -10,6 +10,13 @@ export interface ReportEnumFilter {
   value: string | null;
 }
 
+/** Row grain for the revenue-by-item report ("Thống kê theo"). */
+export enum ReportGroupBy {
+  ITEM = 'item',
+  GROUP = 'group',
+  BRAND = 'brand',
+}
+
 /** Scope filters applied PRE-aggregate (at SQL level), like the existing search APIs. */
 export interface InvoiceReportFilterPayload {
   /** Report period — required (daily aggregate over an unbounded range is meaningless). */
@@ -23,6 +30,12 @@ export interface InvoiceReportFilterPayload {
   cashierId?: string;
   /** Salesperson — matches invoice.salespersonId. */
   salespersonId?: string;
+  /** revenue-by-item only — row grain (default item); ignored by other reports. */
+  groupBy?: ReportGroupBy;
+  /** revenue-by-item only — filter by item category (Nhóm hàng hóa). */
+  categoryId?: string;
+  /** revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
+  brand?: string;
 }
 
 /** Per-column filter applied POST-aggregate on a day's value (the "=" / "≤" widget row). */

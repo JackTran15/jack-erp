@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { ColumnFilterDto } from './column-filter.dto';
 import { InvoiceReportFilterDto } from './invoice-report-filter.dto';
+import { ReportTemplateColumnDto } from './report-template-column.dto';
 
 export class CreateInvoiceReportTemplateDto {
   @IsString()
@@ -27,8 +28,9 @@ export class CreateInvoiceReportTemplateDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  columns: string[];
+  @ValidateNested({ each: true })
+  @Type(() => ReportTemplateColumnDto)
+  columns: ReportTemplateColumnDto[];
 
   @IsOptional()
   @ValidateNested()

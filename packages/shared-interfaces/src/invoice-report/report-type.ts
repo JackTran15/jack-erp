@@ -18,4 +18,5 @@ export const REPORT_TYPE_LABELS_VI: Record<string, string> = {
   'daily-sales-summary': 'Tổng hợp bán hàng theo ngày',
   'invoice-order-listing': 'Bảng kê hóa đơn và đơn hàng',
   'invoice-item-revenue-detail': 'Chi tiết doanh thu theo hóa đơn và mặt hàng',
+  'revenue-by-item': 'Doanh thu theo mặt hàng',
 };

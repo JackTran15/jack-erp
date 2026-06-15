@@ -33,6 +33,7 @@ import { ReportRegistry } from './report-definition';
 import { DailySalesSummaryReport } from './reports/daily-sales-summary.report';
 import { InvoiceOrderListingReport } from './reports/invoice-order-listing.report';
 import { InvoiceItemRevenueDetailReport } from './reports/invoice-item-revenue-detail.report';
+import { RevenueByItemReport } from './reports/revenue-by-item.report';
 
 @Module({
   imports: [
@@ -64,17 +65,20 @@ import { InvoiceItemRevenueDetailReport } from './reports/invoice-item-revenue-d
     DailySalesSummaryReport,
     InvoiceOrderListingReport,
     InvoiceItemRevenueDetailReport,
+    RevenueByItemReport,
     {
       provide: ReportRegistry,
       useFactory: (
         daily: DailySalesSummaryReport,
         listing: InvoiceOrderListingReport,
         itemRevenue: InvoiceItemRevenueDetailReport,
-      ) => new ReportRegistry([daily, listing, itemRevenue]),
+        revenueByItem: RevenueByItemReport,
+      ) => new ReportRegistry([daily, listing, itemRevenue, revenueByItem]),
       inject: [
         DailySalesSummaryReport,
         InvoiceOrderListingReport,
         InvoiceItemRevenueDetailReport,
+        RevenueByItemReport,
       ],
     },
     // Report-type catalogue sync (seeds report_types on boot)

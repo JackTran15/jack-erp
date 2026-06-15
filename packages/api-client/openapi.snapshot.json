@@ -24946,6 +24946,24 @@
             "type": "string",
             "description": "Salesperson — matches invoice.salespersonId.",
             "format": "uuid"
+          },
+          "groupBy": {
+            "type": "string",
+            "description": "revenue-by-item only — row grain (default item).",
+            "enum": [
+              "item",
+              "group",
+              "brand"
+            ]
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "revenue-by-item only — filter by item category (Nhóm hàng hóa).",
+            "format": "uuid"
+          },
+          "brand": {
+            "type": "string",
+            "description": "revenue-by-item only — filter by denormalized item brand (Thương hiệu)."
           }
         }
       },
@@ -25027,6 +25045,39 @@
           "filters"
         ]
       },
+      "ReportTemplateColumnDto": {
+        "type": "object",
+        "properties": {
+          "col": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User-renamed label; empty/blank ⇒ persisted as null (falls back to catalog name).",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "visible": {
+            "type": "boolean",
+            "description": "Defaults to true when omitted."
+          },
+          "frozen": {
+            "type": "boolean",
+            "description": "Defaults to false when omitted."
+          },
+          "order": {
+            "type": "number",
+            "description": "Ignored on persist — the server stamps order from array position.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "col"
+        ]
+      },
       "CreateInvoiceReportTemplateDto": {
         "type": "object",
         "properties": {
@@ -25047,7 +25098,7 @@
             "minItems": 1,
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
             }
           },
           "filters": {
@@ -25084,7 +25135,7 @@
           "columns": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
             }
           },
           "filters": {

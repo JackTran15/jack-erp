@@ -56,7 +56,3 @@ export const parseDynamicColumnKey = (key: string): { accountId: string } | null
   return m ? { accountId: m[1] } : null;
 };
 export const dynamicColumnKey = (coaAccountId: string): string => `payment.method.${coaAccountId}`;
-
-/** True when the key is either a known fixed column or a well-formed dynamic payment column. */
-export const isAcceptedColumnKey = (key: string): boolean =>
-  isKnownSummaryColumn(key) || isDynamicColumnKey(key);

@@ -1,11 +1,16 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InvoiceReportTemplateView } from '@erp/shared-interfaces';
 import { InvoiceReportTemplateEntity } from '../invoice-report-template.entity';
 import { toTemplateView } from '../invoice-report-template.view';
-import { isAcceptedColumnKey } from '../invoice-report.columns';
+import {
+  assertColumnsInCatalog,
+  buildColumnCatalog,
+  normalizeTemplateColumns,
+} from '../invoice-report-template.columns.util';
+import { ReportRegistry } from '../report-definition';
 import { CreateInvoiceReportTemplateCommand } from './create-invoice-report-template.command';
 
 @CommandHandler(CreateInvoiceReportTemplateCommand)
@@ -15,22 +20,23 @@ export class CreateInvoiceReportTemplateHandler
   constructor(
     @InjectRepository(InvoiceReportTemplateEntity)
     private readonly repo: Repository<InvoiceReportTemplateEntity>,
+    private readonly registry: ReportRegistry,
   ) {}
 
   async execute({
     dto,
     actor,
   }: CreateInvoiceReportTemplateCommand): Promise<InvoiceReportTemplateView> {
-    const referenced = [
-      ...dto.columns,
-      ...(dto.columnFilters ?? []).map((f) => f.col),
-    ];
-    const unknown = referenced.filter((k) => !isAcceptedColumnKey(k));
-    if (unknown.length) {
-      throw new BadRequestException(
-        `Unknown report columns: ${[...new Set(unknown)].join(', ')}`,
-      );
-    }
+    const catalog = await buildColumnCatalog(
+      this.registry,
+      dto.reportType,
+      actor,
+    );
+    assertColumnsInCatalog(
+      (dto.columnFilters ?? []).map((f) => f.col),
+      catalog,
+    );
+    const columns = normalizeTemplateColumns(dto.columns, catalog);
 
     const dup = await this.repo.findOne({
       where: {
@@ -50,7 +56,7 @@ export class CreateInvoiceReportTemplateHandler
         reportType: dto.reportType,
         name: dto.name,
         description: dto.description ?? null,
-        columns: dto.columns,
+        columns,
         filters: {
           ...(dto.filters ?? {}),
           columnFilters: dto.columnFilters ?? [],

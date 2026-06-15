@@ -1,7 +1,6 @@
 import { INVOICE_REPORT_COLUMN_LABELS_VI } from '@erp/shared-interfaces';
 import {
   INVOICE_REPORT_SUMMARY_COLUMNS,
-  isAcceptedColumnKey,
   isDynamicColumnKey,
   isKnownSummaryColumn,
   parseDynamicColumnKey,
@@ -29,11 +28,5 @@ describe('invoice-report.columns', () => {
       accountId: UUID,
     });
     expect(parseDynamicColumnKey('revenue.goods')).toBeNull();
-  });
-
-  it('isAcceptedColumnKey covers fixed + dynamic, rejects garbage', () => {
-    expect(isAcceptedColumnKey('revenue.total')).toBe(true);
-    expect(isAcceptedColumnKey(`payment.method.${UUID}`)).toBe(true);
-    expect(isAcceptedColumnKey('bogus')).toBe(false);
   });
 });

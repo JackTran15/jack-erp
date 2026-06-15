@@ -1,5 +1,12 @@
+import { ReportGroupBy } from '@erp/shared-interfaces';
 import { Type } from 'class-transformer';
-import { IsOptional, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import {
   DateRangeFilterDto,
   EnumFilterDto,
@@ -45,4 +52,19 @@ export class InvoiceReportFilterDto {
   @IsOptional()
   @IsUUID()
   salespersonId?: string;
+
+  /** revenue-by-item only — row grain (default item). */
+  @IsOptional()
+  @IsEnum(ReportGroupBy)
+  groupBy?: ReportGroupBy;
+
+  /** revenue-by-item only — filter by item category (Nhóm hàng hóa). */
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  /** revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
+  @IsOptional()
+  @IsString()
+  brand?: string;
 }

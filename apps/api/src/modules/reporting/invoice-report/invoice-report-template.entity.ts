@@ -1,3 +1,4 @@
+import { ReportTemplateColumn } from '@erp/shared-interfaces';
 import { Column, DeleteDateColumn, Entity, Index } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 
@@ -24,9 +25,12 @@ export class InvoiceReportTemplateEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description?: string | null;
 
-  /** Selected report column keys: fixed registry keys + dynamic `payment.method.<coaAccountId>`. */
+  /**
+   * Configured columns: per-column `{ col, displayName, visible, frozen, order }`
+   * records (`col` = fixed registry key or dynamic `payment.method.<coaAccountId>`).
+   */
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  columns: string[];
+  columns: ReportTemplateColumn[];
 
   /** Saved filter set — scope filters plus `{ columnFilters }`. Shape = InvoiceReportFilterPayload + columnFilters. */
   @Column({ type: 'jsonb', default: () => "'{}'" })
