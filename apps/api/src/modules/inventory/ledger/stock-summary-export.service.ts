@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import * as ExcelJS from "exceljs";
 import { In, Repository } from "typeorm";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 import { BranchEntity } from "../../branch/branch.entity";
 import { ItemEntity } from "../location/item.entity";
 import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
@@ -244,6 +245,7 @@ export class StockSummaryExportService {
     });
     sheet.views = [{ state: "frozen", ySplit: 7 }];
     sheet.autoFilter = { from: { row: 7, column: 1 }, to: { row: 7, column: lastColumn } };
+    applyWorkbookFont(workbook);
     return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 

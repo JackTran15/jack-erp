@@ -26,6 +26,7 @@ import {
   type InventoryImportExcelRow,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 import { WebSocketEmitterService } from "../../websocket/websocket-emitter.service";
 import { InventoryLocationService } from "../location/inventory-location.service";
 import { ItemEntity } from "../location/item.entity";
@@ -1004,6 +1005,7 @@ export class CsvImportService {
     sheet.columns.forEach((column) => {
       column.width = 24;
     });
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }

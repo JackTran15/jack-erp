@@ -22,6 +22,7 @@ import {
   StockTakeStatus,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
 import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
 import { GoodsIssueLineEntity } from "../goods-issue/goods-issue-line.entity";
@@ -1088,6 +1089,7 @@ export class StockTakeService {
       }
     }
 
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
@@ -1380,6 +1382,7 @@ export class StockTakeService {
       fgColor: { argb: "FFE6E6E6" },
     };
 
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
