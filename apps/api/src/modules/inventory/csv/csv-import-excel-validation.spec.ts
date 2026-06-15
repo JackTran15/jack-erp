@@ -13,6 +13,7 @@ import { ExcelParserService } from './excel-parser.service';
 import { ExcelImportItemService } from './excel-import-item.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
+import { ExcelImportGoodsReceiptService } from './excel-import-goods-receipt.service';
 import {
   ImportDuplicateMode,
   InventoryImportExcelField,
@@ -70,6 +71,7 @@ describe('CsvImportService.validateExcelItemRow', () => {
           useValue: { buildItemsWorkbookBuffer: jest.fn() },
         },
         { provide: ExcelImportStockTakeService, useValue: noopService },
+        { provide: ExcelImportGoodsReceiptService, useValue: noopService },
       ],
     }).compile();
 

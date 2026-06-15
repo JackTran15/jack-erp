@@ -2988,6 +2988,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/goods-receipts/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateGoodsReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-receipts/import-template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadGoodsReceiptTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-receipts/jobs/{id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_listGoodsReceiptJobRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-receipts/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CsvImportController_cancelGoodsReceiptJob"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-receipts/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportGoodsReceiptJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/locations/validate": {
         parameters: {
             query?: never;
@@ -6989,7 +7069,7 @@ export interface components {
         };
         InventoryImportJobEntity: {
             /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS";
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT";
             referenceId?: string | null;
             fileName: string;
             fileChecksum: string;
@@ -7019,9 +7099,11 @@ export interface components {
             jobId: string;
             rowNumber: number;
             rawData: Record<string, never>;
+            normalizedData?: Record<string, never> | null;
             /** @enum {string} */
             status: "VALID" | "ERROR" | "COMMITTED";
             errorMessages?: string[];
+            warningMessages?: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -14184,6 +14266,106 @@ export interface operations {
                 content: {
                     "application/json": Record<string, never>;
                 };
+            };
+        };
+    };
+    CsvImportController_validateGoodsReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_downloadGoodsReceiptTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_listGoodsReceiptJobRows: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_cancelGoodsReceiptJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportGoodsReceiptJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

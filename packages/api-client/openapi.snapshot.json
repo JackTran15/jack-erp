@@ -9493,6 +9493,168 @@
         ]
       }
     },
+    "/inventory/imports/goods-receipts/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateGoodsReceipt",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-receipts/import-template.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_downloadGoodsReceiptTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-receipts/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CsvImportController_listGoodsReceiptJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-receipts/jobs/{id}": {
+      "delete": {
+        "operationId": "CsvImportController_cancelGoodsReceiptJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-receipts/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportGoodsReceiptJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/locations/validate": {
       "post": {
         "operationId": "CsvImportController_validateLocations",
@@ -22622,7 +22784,8 @@
               "OPENING_BALANCES",
               "ADJUSTMENTS",
               "STOCK_TAKE",
-              "LOCATIONS"
+              "LOCATIONS",
+              "GOODS_RECEIPT"
             ]
           },
           "referenceId": {
@@ -22729,6 +22892,10 @@
           "rawData": {
             "type": "object"
           },
+          "normalizedData": {
+            "type": "object",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -22742,6 +22909,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "warningMessages": {
+            "type": "object",
+            "nullable": true
           },
           "createdAt": {
             "format": "date-time",
