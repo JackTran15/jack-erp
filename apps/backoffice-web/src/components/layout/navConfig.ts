@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { hasPermission } from "../../lib/permissions";
+import { REPORT_CATEGORY_METADATA } from "../../constants/reports/report-category.constant";
 
 export interface NavChild {
   to: string;
@@ -194,6 +195,13 @@ export const navConfig: NavModule[] = [
     flyout: { enabled: true },
     sections: [
       {
+        id: "reports-main",
+        children: Object.values(REPORT_CATEGORY_METADATA).map((category) => ({
+          to: category.url,
+          label: category.label,
+        }))
+      },
+      {
         id: "reports-overview",
         label: "Tổng hợp",
         children: [{ to: "/reports", label: "Bảng tổng hợp", end: true }],
@@ -202,7 +210,7 @@ export const navConfig: NavModule[] = [
         id: "reports-detail",
         label: "Chi tiết",
         children: [
-          { to: "/reports/sales", label: "Doanh số" },
+          // { to: "/reports/sales", label: "Doanh số" },
           { to: "/reports/inventory", label: "Tồn kho" },
           { to: "/reports/aging", label: "Công nợ" },
           { to: "/reports/cash", label: "Tiền mặt" },

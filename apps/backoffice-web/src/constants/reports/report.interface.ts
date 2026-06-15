@@ -1,4 +1,6 @@
+import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { ReportTableColumn, ReportTableColumnGroup } from "./report-table.constant";
+import { REPORT_BRANCH } from "./report.constant";
 
 export type ReportColumnAlign = "left" | "right" | "center";
 export type ReportColumnDataType = "date" | "number" | "text";
@@ -29,4 +31,10 @@ export interface ReportColumnConfig {
 export interface ReportTableConfig {
   columns: ReportColumnConfig[];
   summaryLabel?: string;            // nhãn ô đầu dòng footer, vd "Tổng"
+}
+
+export type ReportFiltersConfig = {
+  [key in REPORT_BRANCH]?: {
+    lines: REPORT_FILTERS_LINE[]; 
+  }
 }

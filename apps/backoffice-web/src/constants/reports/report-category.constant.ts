@@ -8,12 +8,33 @@ export enum REPORT_CATEGORY {
   PROFIT = 'profit',
 }
 
-export const REPORT_CATEGORY_LABEL = {
-  [REPORT_CATEGORY.SALES]: 'Bán hàng',
-  [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: 'Bán hàng đa kênh',
-  [REPORT_CATEGORY.PURCHASES]: 'Mua hàng',
-  [REPORT_CATEGORY.INVENTORY]: 'Tồn kho',
-  [REPORT_CATEGORY.DEBTS]: 'Công nợ',
-  [REPORT_CATEGORY.CASH_FUND]: 'Quỹ tiền mặt',
-  [REPORT_CATEGORY.PROFIT]: 'Lợi nhuận',
-};
+export const REPORT_CATEGORY_METADATA = {
+  [REPORT_CATEGORY.SALES]: {
+    label: "Bán hàng",
+    url: "/reports/sales",
+  },
+  // [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: {
+  //   label: "Bán hàng đa kênh",
+  //   url: "/reports/multi-channel-sales",
+  // },
+  // [REPORT_CATEGORY.PURCHASES]: {
+  //   label: "Mua hàng",
+  //   url: "/reports/purchases",
+  // },
+  // [REPORT_CATEGORY.INVENTORY]: {
+  //   label: "Tồn kho",
+  //   url: "/reports/inventory",
+  // },
+  // [REPORT_CATEGORY.DEBTS]: {
+  //   label: "Công nợ",
+  //   url: "/reports/debts",
+  // },
+  // [REPORT_CATEGORY.CASH_FUND]: {
+  //   label: "Quỹ tiền mặt",
+  //   url: "/reports/cash-fund",
+  // },
+  // [REPORT_CATEGORY.PROFIT]: {
+  //   label: "Lợi nhuận",
+  //   url: "/reports/profit",
+  // },
+}

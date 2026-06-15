@@ -1,7 +1,9 @@
+import { REPORT_FILTERS_LINE } from "../report-filters.constant";
 import { ReportTableColumn, ReportTableColumnGroup, ReportTableColumnLabel } from "../report-table.constant";
-import { ReportTableConfig } from "../report.interface";
+import { REPORT_BRANCH } from "../report.constant";
+import { ReportFiltersConfig, ReportTableConfig } from "../report.interface";
 
-export const ReportDailySaleSummaryTableRegistry: ReportTableConfig = {
+export const reportDailySaleSummaryTableRegistry: ReportTableConfig = {
   summaryLabel: "Tổng",
   columns: [
     {
@@ -178,3 +180,15 @@ export const ReportDailySaleSummaryTableRegistry: ReportTableConfig = {
     },
   ],
 };
+
+export const reportDailySaleSummaryFiltersRegistry: ReportFiltersConfig = {
+  [REPORT_BRANCH.SINGLE]: {
+    lines: [
+      REPORT_FILTERS_LINE.TYPE,
+      REPORT_FILTERS_LINE.STORE,
+      REPORT_FILTERS_LINE.REPORT_PERIOD,
+      REPORT_FILTERS_LINE.FROM_DATE,
+      REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND
+    ] 
+  },
+}
