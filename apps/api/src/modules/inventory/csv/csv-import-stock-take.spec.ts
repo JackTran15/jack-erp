@@ -59,6 +59,7 @@ describe("CsvImportService STOCK_TAKE validation", () => {
       {} as never,
       {} as never,
       stockTakeImporter as never,
+      {} as never,
     );
 
     const result = await service.validate(

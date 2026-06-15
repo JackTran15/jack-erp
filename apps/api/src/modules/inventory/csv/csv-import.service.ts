@@ -49,6 +49,10 @@ import {
   ExcelImportStockTakeService,
   StockTakeImportRow,
 } from "./excel-import-stock-take.service";
+import {
+  ExcelImportGoodsReceiptService,
+  GoodsReceiptImportRow,
+} from "./excel-import-goods-receipt.service";
 import { StockTakeEntity } from "../stock-take/stock-take.entity";
 import { parseInventoryItemsFromDelimitedText } from "./inventory-import-delimited.parser";
 import {
@@ -99,6 +103,7 @@ export class CsvImportService {
     private readonly excelImportItemService: ExcelImportItemService,
     private readonly workbookService: InventoryImportWorkbookService,
     private readonly excelImportStockTakeService: ExcelImportStockTakeService,
+    private readonly excelImportGoodsReceiptService: ExcelImportGoodsReceiptService,
   ) {}
 
   async validate(
@@ -199,15 +204,24 @@ export class CsvImportService {
       for (let i = 0; i < chunk.length; i++) {
         const rawData = chunk[i];
         const rowNumber = offset + i + 1;
-        const errors = await this.validateRow(
-          type,
-          rawData,
-          actor,
-          duplicateMode,
-          false,
-          existingSkuCodes,
-          stockTake,
-        );
+        const goodsReceiptResult =
+          type === ImportJobType.GOODS_RECEIPT
+            ? await this.goodsReceiptImporter().validateAndNormalizeRow(
+                rawData as GoodsReceiptImportRow,
+                actor,
+              )
+            : undefined;
+        const errors =
+          goodsReceiptResult?.errors ??
+          (await this.validateRow(
+            type,
+            rawData,
+            actor,
+            duplicateMode,
+            false,
+            existingSkuCodes,
+            stockTake,
+          ));
         if (
           stockTake &&
           errors.length === 0 &&
@@ -229,8 +243,15 @@ export class CsvImportService {
             jobId: savedJob.id,
             rowNumber,
             rawData,
+            normalizedData: goodsReceiptResult?.normalizedData
+              ? { ...goodsReceiptResult.normalizedData }
+              : undefined,
             status,
             errorMessages: errors.length > 0 ? errors : undefined,
+            warningMessages:
+              goodsReceiptResult?.warnings.length
+                ? goodsReceiptResult.warnings
+                : undefined,
           }),
         );
       }
@@ -426,7 +447,10 @@ export class CsvImportService {
       order: { rowNumber: "ASC" },
     });
 
-    if (job.type === ImportJobType.STOCK_TAKE) {
+    if (
+      job.type === ImportJobType.STOCK_TAKE ||
+      job.type === ImportJobType.GOODS_RECEIPT
+    ) {
       return this.buildGenericErrorRowsWorkbook(errorRows);
     }
 
@@ -478,6 +502,9 @@ export class CsvImportService {
       if (type === ImportJobType.STOCK_TAKE) {
         return this.stockTakeImporter().parseWorkbook(file.buffer);
       }
+      if (type === ImportJobType.GOODS_RECEIPT) {
+        return this.goodsReceiptImporter().parseWorkbook(file.buffer);
+      }
       // Canonical Excel grid is shared for all ITEMS import.
       return this.excelParser.parseInventoryItemsWorkbook(file.buffer);
     }
@@ -489,6 +516,9 @@ export class CsvImportService {
       }
       if (type === ImportJobType.STOCK_TAKE) {
         return this.stockTakeImporter().parseCsv(csvText);
+      }
+      if (type === ImportJobType.GOODS_RECEIPT) {
+        return this.goodsReceiptImporter().parseCsv(csvText);
       }
       // Opening balances / adjustments keep legacy CSV parsers.
       return this.parseCsv(csvText);
@@ -948,6 +978,10 @@ export class CsvImportService {
 
   private stockTakeImporter(): ExcelImportStockTakeService {
     return this.excelImportStockTakeService;
+  }
+
+  private goodsReceiptImporter(): ExcelImportGoodsReceiptService {
+    return this.excelImportGoodsReceiptService;
   }
 
   private async buildGenericErrorRowsWorkbook(

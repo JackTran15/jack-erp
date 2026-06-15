@@ -9,6 +9,7 @@ export enum ImportJobType {
   ADJUSTMENTS = "ADJUSTMENTS",
   STOCK_TAKE = "STOCK_TAKE",
   LOCATIONS = "LOCATIONS",
+  GOODS_RECEIPT = "GOODS_RECEIPT",
 }
 
 /** Tracks a bulk CSV import operation for items, opening balances, or adjustments. Enforces idempotency. */
@@ -20,7 +21,7 @@ export class InventoryImportJobEntity extends BaseEntity {
     type: "enum",
     enum: ImportJobType,
     comment:
-      "What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS, STOCK_TAKE, LOCATIONS)",
+      "What type of data is being imported (ITEMS, OPENING_BALANCES, ADJUSTMENTS, STOCK_TAKE, LOCATIONS, GOODS_RECEIPT)",
   })
   type: ImportJobType;
 

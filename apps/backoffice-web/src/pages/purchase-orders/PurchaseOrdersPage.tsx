@@ -79,6 +79,8 @@ import {
   buildV2Body,
   type V2SearchConfig,
 } from "../../components/crud/crudV2Search";
+import { GoodsReceiptImportDialog } from "./import/GoodsReceiptImportDialog";
+import type { GoodsReceiptImportJobRow } from "./import/import-goods-receipt.types";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
@@ -1125,6 +1127,7 @@ function PurchaseOrderFormDialog({
   >(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
     Array<{ id: string; name: string; branchId: string }>
   >([]);
@@ -1161,6 +1164,37 @@ function PurchaseOrderFormDialog({
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
+
+  const handleApplyDraftImport = useCallback(
+    (importedRows: GoodsReceiptImportJobRow[]) => {
+      const mapped = importedRows.flatMap((row) => {
+        const normalized = row.normalizedData;
+        if (!normalized) return [];
+        return [
+          {
+            itemId: normalized.itemId,
+            itemLabel: normalized.itemCode,
+            itemName: normalized.itemName,
+            unit: normalized.unit,
+            storageId: normalized.storageId,
+            storageLabel: normalized.storageName,
+            locationId: normalized.locationId,
+            locationLabel: normalized.locationCode,
+            orderedQuantity: normalized.quantity,
+            unitPrice: normalized.unitPrice,
+            notes: normalized.note,
+          },
+        ];
+      });
+      setLines(normalizeFormLines(mapped));
+      if (mapped[0]) {
+        setStorageId(mapped[0].storageId);
+        setStorageQuery(mapped[0].storageLabel);
+      }
+      setDirty(true);
+    },
+    [],
+  );
 
   /** Load a picked transfer order into the form as the import leg (locked detail). */
   const prefillFromTransferOrder = useCallback(
@@ -2141,7 +2175,9 @@ function PurchaseOrderFormDialog({
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+              disabled={linesLocked || saving}
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               Nhập khẩu
             </button>
@@ -2287,6 +2323,12 @@ function PurchaseOrderFormDialog({
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={prefillFromTransferOrder}
+      />
+
+      <GoodsReceiptImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onApplyDraft={handleApplyDraftImport}
       />
     </>
   );

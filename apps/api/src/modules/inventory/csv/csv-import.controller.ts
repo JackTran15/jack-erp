@@ -39,6 +39,7 @@ import { ApiQuery } from "@nestjs/swagger";
 import { CsvImportService } from "./csv-import.service";
 import { LocationImportService } from "./location-import.service";
 import { ImportJobType } from "./inventory-import-job.entity";
+import { ExcelImportGoodsReceiptService } from "./excel-import-goods-receipt.service";
 
 class ImportJobQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -69,6 +70,7 @@ export class CsvImportController {
   constructor(
     private readonly csvImportService: CsvImportService,
     private readonly locationImportService: LocationImportService,
+    private readonly goodsReceiptImporter: ExcelImportGoodsReceiptService,
   ) {}
 
   // ─── Items ─────────────────────────────────────────────────────────
@@ -189,6 +191,82 @@ export class CsvImportController {
   }
 
   // ─── Locations ────────────────────────────────────────────────────
+
+  @Post("goods-receipts/validate")
+  @RequirePermission("goods_receipt.write")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  validateGoodsReceipt(
+    @UploadedFile() file: Express.Multer.File,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.GOODS_RECEIPT,
+      file,
+      actor,
+    );
+  }
+
+  @Get("goods-receipts/import-template.xlsx")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  async downloadGoodsReceiptTemplate(@Res() res: Response) {
+    const buffer = await this.goodsReceiptImporter.buildTemplateBuffer();
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="DanhSachHangHoaNhapKho.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  @Get("goods-receipts/jobs/:id/rows")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  listGoodsReceiptJobRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ImportJobRowsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.listJobRows(id, query, actor);
+  }
+
+  @Delete("goods-receipts/jobs/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission("goods_receipt.write")
+  @RequireBranchScope()
+  cancelGoodsReceiptJob(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.cancelJob(id, actor);
+  }
+
+  @Get("goods-receipts/jobs/:id/error-rows.xlsx")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  async exportGoodsReceiptJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvImportService.exportJobErrorRowsExcelBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="dong-nhap-kho-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
 
   @Post("locations/validate")
   @RequirePermission("inventory.write")
