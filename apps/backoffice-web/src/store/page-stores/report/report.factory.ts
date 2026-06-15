@@ -21,5 +21,6 @@ export function buildInitialReportState({
     reportType: configs.listReport[0] ?? "",
     filters: {},
     columnFilters: {},
+    appliedRequest: null,
   };
 }

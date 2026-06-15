@@ -31,6 +31,13 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.CUSTOMER]: string;
 }
 
+// Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.
+export interface AppliedReportRequest {
+  reportType: string;
+  filters: Partial<ReportFilterValues>;
+  columnFilters: Record<string, ReportColumnFilter>;
+}
+
 // State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
 export interface ReportInitialState {
   category: REPORT_CATEGORY;
@@ -40,6 +47,8 @@ export interface ReportInitialState {
   // Sparse như columnFilters: chỉ chứa line đã được set (không default dư thừa theo report type).
   filters: Partial<ReportFilterValues>;
   columnFilters: Record<string, ReportColumnFilter>;
+  // null = chưa áp dụng → table chưa gọi API data.
+  appliedRequest: AppliedReportRequest | null;
 }
 
 export interface ReportActions {
@@ -49,6 +58,8 @@ export interface ReportActions {
     value: ReportFilterValues[K],
   ) => void;
   setColumnFilter: (columnId: string, patch: Partial<ReportColumnFilter>) => void;
+  // Chốt filter hiện tại → appliedRequest (kích hoạt fetch data).
+  applyFilters: () => void;
   resetFilters: () => void;
   reset: () => void;
 }

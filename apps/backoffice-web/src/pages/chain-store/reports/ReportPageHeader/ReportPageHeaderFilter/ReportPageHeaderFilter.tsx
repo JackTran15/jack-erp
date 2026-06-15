@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { PERIOD_PRESET_OPTIONS } from "@erp/ui";
 import { Filter } from "lucide-react";
 import { REPORT_FILTERS_LINE } from "../../../../../constants/reports/report-filters.constant";
@@ -8,7 +7,7 @@ const controlClass =
   "h-[30px] rounded-[3px] border border-[#D9D9DE] bg-white px-2 text-[13px] text-[#212121] outline-none";
 
 export function ReportPageHeaderFilter() {
-  const queryClient = useQueryClient();
+  const applyFilters = useReportStore((s) => s.actions.applyFilters);
   const period =
     useReportStore((s) => s.filters[REPORT_FILTERS_LINE.REPORT_PERIOD]) ?? "";
   const range = useReportStore(
@@ -63,9 +62,7 @@ export function ReportPageHeaderFilter() {
 
       <button
         type="button"
-        onClick={() =>
-          queryClient.invalidateQueries({ queryKey: ["report-table"] })
-        }
+        onClick={() => applyFilters()}
         className="flex h-[30px] items-center gap-1.5 rounded-[3px] border border-[#D9D9DE] bg-white px-3 text-[13px] font-medium text-[#2B3164] hover:bg-[#F5F5F6]"
       >
         <Filter className="h-3.5 w-3.5" />

@@ -1,5 +1,4 @@
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
-import { ReportTableColumn, ReportTableColumnGroup } from "./report-table.constant";
 import { REPORT_BRANCH } from "./report.constant";
 
 export type ReportColumnAlign = "left" | "right" | "center";
@@ -16,10 +15,12 @@ export interface ReportColumnTableConfig {
 }
 
 export interface ReportColumnConfig {
-  column: ReportTableColumn;
+  // Khóa cột (string) — registry FE dùng enum ReportTableColumn (giá trị string),
+  // columns từ API là khóa tự do ("revenue.total", "payment.method.<id>"…).
+  column: string;
   order: number;
   label?: string;
-  group?: ReportTableColumnGroup | null;
+  group?: string | null;        // nhãn band (registry: enum; API: group.name)
   visible?: boolean;
   backendField?: string;
   number?: number;
@@ -36,6 +37,8 @@ export interface ReportTableConfig {
 // Metadata của một loại report: nhãn + filter + table config (theo từng loại view).
 export interface ReportTypeMetadata {
   label?: string;
+  // Khóa report type phía backend (kebab) — chỉ type được BE hỗ trợ mới có.
+  backendKey?: string;
   filterConfig?: Partial<Record<REPORT_BRANCH, REPORT_FILTERS_LINE[]>>;
   tableConfig?: Partial<Record<REPORT_BRANCH, ReportTableConfig>>;
 }

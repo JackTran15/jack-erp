@@ -31,7 +31,8 @@ export function buildReportColumnSegments(cols: ReportColumnConfig[]): ReportTab
 
 // Mã công thức cột, vd "(1)=(3)+(4)-(5)-(14)" hoặc "(3)"; null khi cột không có số thứ tự.
 export function getReportColumnCode(col: ReportColumnConfig): string | null {
-  if (!col.number) return null;
+  // Cột từ API: không có `number`, `formulaDisplay` là chuỗi code đầy đủ (vd "(1)=(3)-(5)-(14)").
+  if (!col.number) return col.formulaDisplay ?? null;
   return col.formulaDisplay ? `(${col.number})=${col.formulaDisplay}` : `(${col.number})`;
 }
 

@@ -1,19 +1,14 @@
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@erp/ui";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
-import { buildReportSubmitPayload } from "../../../../../store/page-stores/report/report.store";
 import { ReportFilterForm } from "./ReportFilterForm/ReportFilterForm";
 
 export function ReportSelector() {
   const [open, setOpen] = useState(false);
-  const reportType = useReportStore((s) => s.reportType);
-  const branch = useReportStore((s) => s.branch);
-  const filters = useReportStore((s) => s.filters);
+  const applyFilters = useReportStore((s) => s.actions.applyFilters);
 
   const handleSubmit = () => {
-    const payload = buildReportSubmitPayload({ reportType, filters, branch });
-    // eslint-disable-next-line no-console
-    console.log("[report-filter] submit", payload);
+    applyFilters();
     setOpen(false);
   };
 

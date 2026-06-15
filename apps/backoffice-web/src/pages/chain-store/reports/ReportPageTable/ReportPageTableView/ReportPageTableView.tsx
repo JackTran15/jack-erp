@@ -36,7 +36,7 @@ import {
 } from "../../../../../components/table/pagination.dto";
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
-import { ReportRow } from "../../_mock/report-daily-sales.mock";
+import type { ReportRow } from "../../_api/invoice-report.api";
 import { SortableHeaderCell, type DragData } from "./SortableHeaderCell/SortableHeaderCell";
 import { FilterHeaderCell } from "./FilterHeaderCell/FilterHeaderCell";
 

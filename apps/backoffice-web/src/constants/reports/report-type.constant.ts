@@ -29,6 +29,7 @@ export enum REPORT_TYPE_SALES {
 export const REPORT_TYPE_SALES_METADATA = {
   [REPORT_TYPE_SALES.DAILY_SALES_SUMMARY]: {
     label: 'Tổng hợp bán hàng theo ngày',
+    backendKey: 'daily-sales-summary',
     filterConfig: {
       [REPORT_BRANCH.SINGLE]: single_filterRegistryReportDailySaleSummary,
       [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportDailySaleSummary
@@ -40,6 +41,7 @@ export const REPORT_TYPE_SALES_METADATA = {
   },
   [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: {
     label: 'Bảng kê hóa đơn và đơn hàng',
+    backendKey: 'invoice-order-listing',
     tableConfig: {
       [REPORT_BRANCH.SINGLE]: single_tableRegistryReportInvoiceAndOrderList,
       [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportInvoiceAndOrderList
@@ -49,8 +51,8 @@ export const REPORT_TYPE_SALES_METADATA = {
       [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportInvoiceAndOrderList
     },
   },
-  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng' },
-  [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng' },
+  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng', backendKey: 'invoice-item-revenue-detail' },
+  [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng', backendKey: 'revenue-by-item' },
   [REPORT_TYPE_SALES.PROMOTIONAL_INVOICE_LIST]: { label: 'Danh sách hóa đơn khuyến mại' },
   [REPORT_TYPE_SALES.PROMOTION_BY_INVOICE_AND_PRODUCT]: { label: 'Khuyến mãi theo hóa đơn và hàng hóa' },
   [REPORT_TYPE_SALES.REVENUE_BY_TIME]: { label: 'Doanh thu theo thời gian' },
@@ -191,6 +193,11 @@ export const REPORT_TYPE_METADATA: Record<string, ReportTypeMetadata> = {
 // Nhãn hiển thị của một report type (đọc trực tiếp từ metadata).
 export function getReportTypeLabel(reportType: string): string {
   return REPORT_TYPE_METADATA[reportType]?.label ?? reportType;
+}
+
+// Khóa report type phía backend (kebab) — undefined nếu type chưa được BE hỗ trợ.
+export function getReportBackendKey(reportType: string): string | undefined {
+  return REPORT_TYPE_METADATA[reportType]?.backendKey;
 }
 
 // Các dòng filter của report type đang chọn theo loại view (dòng chọn báo cáo "TYPE"
