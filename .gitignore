@@ -9,3 +9,8 @@ coverage
 test_logs/
 **copy**
 **/*/scripts/pos-e2e-py/*
+
+# Local-only personal files (not shared)
+CLAUDE.local.md
+personal_note_run.txt
+**.md
