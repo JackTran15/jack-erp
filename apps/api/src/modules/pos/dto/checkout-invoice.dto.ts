@@ -5,6 +5,8 @@ import {
   IsString,
   IsUUID,
   IsArray,
+  IsDateString,
+  IsInt,
   ValidateNested,
   Min,
 } from 'class-validator';
@@ -45,4 +47,20 @@ export class CheckoutInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => InvoicePaymentLineDto)
   payments: InvoicePaymentLineDto[];
+
+  /**
+   * Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale
+   * leaves a remaining balance (DEBT / PARTIAL_DEBT). Ignored when fully paid.
+   */
+  @ApiPropertyOptional({ example: '2026-06-25' })
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+
+  /** Credit term in days entered at checkout (per invoice). */
+  @ApiPropertyOptional({ example: 9 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  creditDays?: number;
 }

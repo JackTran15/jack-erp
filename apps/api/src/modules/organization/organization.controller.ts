@@ -13,7 +13,11 @@ import {
 import { PaginationQuery, RegistrationStatus } from '@erp/shared-interfaces';
 import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
 import { OrganizationService } from './organization.service';
-import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  UpdatePosSettingsDto,
+} from './dto';
 import { RegistrationService } from '../registration/registration.service';
 import { RegistrationType } from '../registration/registration-request.entity';
 
@@ -61,6 +65,20 @@ export class OrganizationController {
       },
       actor,
     );
+  }
+
+  /** Org-wide POS settings for the actor's organization (e.g. checkout prefill). */
+  @Get('current/pos-settings')
+  getPosSettings(@Actor() actor: ActorContext) {
+    return this.orgService.getPosSettings(actor);
+  }
+
+  @Patch('current/pos-settings')
+  updatePosSettings(
+    @Body() dto: UpdatePosSettingsDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.orgService.updatePosSettings(actor, dto);
   }
 
   @Get(':id')

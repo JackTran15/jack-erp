@@ -347,6 +347,21 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         expect.objectContaining({ status: InvoiceStatus.PARTIAL_DEBT }),
         80,
         mockManager,
+        { dueDate: undefined, creditDays: undefined },
+      );
+    });
+
+    it('passes dueDate + creditDays through to createFromInvoice', async () => {
+      await service.checkout(
+        'inv-1',
+        { ...partialDto(), dueDate: '2999-12-31', creditDays: 9 },
+        actor,
+      );
+      expect(invoiceDebtService.createFromInvoice).toHaveBeenCalledWith(
+        expect.anything(),
+        80,
+        mockManager,
+        { dueDate: '2999-12-31', creditDays: 9 },
       );
     });
 
@@ -384,6 +399,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         expect.objectContaining({ status: InvoiceStatus.DEBT }),
         200,
         mockManager,
+        { dueDate: undefined, creditDays: undefined },
       );
     });
   });

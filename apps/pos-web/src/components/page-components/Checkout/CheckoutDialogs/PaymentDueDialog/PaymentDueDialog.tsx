@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { PosDialog } from "@erp/pos/components/common/PosDialog/PosDialog";
 import { PosTextInput } from "@erp/pos/components/common/PosTextInput/PosTextInput";
 import { CalendarIcon } from "@erp/pos/components/common/PosIcons/PosIcons";
@@ -56,6 +56,25 @@ export function PaymentDueDialog({
   const [days, setDays] = useState(
     initialDays != null ? String(initialDays) : "",
   );
+
+  // Sync internal state from props each time the dialog opens. The component
+  // stays mounted, so without this the once-only useState initializer would
+  // ignore a later-resolved prefill (e.g. org default fetched async) and keep
+  // stale values across reopens. Prefer an explicit date; otherwise derive it
+  // from the day count so date + days stay consistent.
+  useEffect(() => {
+    if (!open) return;
+    if (initialDate) {
+      setDate(initialDate);
+      setDays(String(daysFromToday(initialDate)));
+    } else if (initialDays != null) {
+      setDays(String(initialDays));
+      setDate(addDaysIso(initialDays));
+    } else {
+      setDate("");
+      setDays("");
+    }
+  }, [open, initialDate, initialDays]);
 
   const handleDateChange = (next: string) => {
     setDate(next);

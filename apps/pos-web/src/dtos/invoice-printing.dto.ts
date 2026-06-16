@@ -16,8 +16,6 @@ export interface InvoicePayload {
   totals: InvoiceTotals;
   /** Per-method payment breakdown — one row per entry on the receipt. */
   payments: InvoicePaymentEntry[];
-  /** Discount note text after totals (empty = "HĐ đã được KM:" with no value). */
-  discountNote?: string;
   /** Bản tạm tính (chưa checkout) → tiêu đề "HÓA ĐƠN TẠM TÍNH". */
   provisional?: boolean;
   policy: InvoicePolicy;

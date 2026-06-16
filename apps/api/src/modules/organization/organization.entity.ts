@@ -22,6 +22,9 @@ export class OrganizationEntity extends BaseEntity {
   @Column({ name: 'main_branch_id', type: 'uuid', nullable: true, comment: 'FK to branches — the default/headquarters branch' })
   mainBranchId?: string;
 
+  @Column({ name: 'default_credit_days', type: 'int', nullable: true, comment: 'Org-wide default credit days used to prefill the POS due-date modal' })
+  defaultCreditDays?: number;
+
   @Column({
     type: 'enum',
     enum: OrganizationStatus,

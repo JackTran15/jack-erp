@@ -379,6 +379,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/organizations/current/pos-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Org-wide POS settings for the actor's organization (e.g. checkout prefill). */
+        get: operations["OrganizationController_getPosSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["OrganizationController_updatePosSettings"];
+        trace?: never;
+    };
     "/organizations/{id}": {
         parameters: {
             query?: never;
@@ -4997,6 +5014,7 @@ export interface components {
             contactEmail: string;
             contactPhone?: string;
             mainBranchId?: string;
+            defaultCreditDays?: number;
             /** @enum {string} */
             status: "ACTIVE" | "SUSPENDED";
             id: string;
@@ -5010,6 +5028,20 @@ export interface components {
             updatedAt: string;
             /** @description UUID of the user who created this record. */
             createdBy: string;
+        };
+        PosSettingsDto: {
+            /**
+             * @description Default credit days used to prefill the POS due-date modal; null when unset.
+             * @example 30
+             */
+            defaultCreditDays: number | null;
+        };
+        UpdatePosSettingsDto: {
+            /**
+             * @description Default credit days; send null to clear.
+             * @example 30
+             */
+            defaultCreditDays?: number | null;
         };
         UpdateOrganizationDto: {
             name?: string;
@@ -6209,6 +6241,7 @@ export interface components {
             description?: string | null;
             isActive: boolean;
             isUnassigned: boolean;
+            isDefault: boolean;
             storage?: components["schemas"]["StorageEntity"];
             /**
              * @description Transient (not a column): whether any item has been placed at this location
@@ -7737,6 +7770,7 @@ export interface components {
             remainingAmount: number;
             issuedAt: string;
             dueDate?: string;
+            creditDays?: number;
             /** Format: date-time */
             settledAt?: string;
             /** @enum {string} */
@@ -7826,6 +7860,17 @@ export interface components {
             reference?: string;
         };
         CheckoutInvoiceDto: {
+            /**
+             * @description Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale
+             *     leaves a remaining balance (DEBT / PARTIAL_DEBT). Ignored when fully paid.
+             * @example 2026-06-25
+             */
+            dueDate?: string;
+            /**
+             * @description Credit term in days entered at checkout (per invoice).
+             * @example 9
+             */
+            creditDays?: number;
             /** @description Payment lines. Empty array = full debt (requires a customer on the invoice). */
             payments: components["schemas"]["InvoicePaymentLineDto"][];
         };
@@ -9542,6 +9587,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegistrationRequestEntity"];
+                };
+            };
+        };
+    };
+    OrganizationController_getPosSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSettingsDto"];
+                };
+            };
+        };
+    };
+    OrganizationController_updatePosSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePosSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSettingsDto"];
                 };
             };
         };

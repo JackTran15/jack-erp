@@ -22,6 +22,16 @@ export enum DomainEventType {
   LOYALTY_POINTS_REVERSE_REQUESTED = 'LOYALTY_POINTS_REVERSE_REQUESTED',
   CASH_REFUND_REQUESTED = 'CASH_REFUND_REQUESTED',
   JOURNAL_POST_RETURN_REQUESTED = 'JOURNAL_POST_RETURN_REQUESTED',
+  DEBT_OVERDUE = 'DEBT_OVERDUE',
+}
+
+/** Emitted when a credit invoice debt passes its due date and is marked overdue. */
+export interface DebtOverduePayload {
+  debtId: string;
+  invoiceId: string;
+  customerId: string;
+  dueDate: string;
+  remainingAmount: number;
 }
 
 export enum DeadLetterStatus {

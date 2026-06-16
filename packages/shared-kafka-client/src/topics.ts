@@ -27,6 +27,7 @@ export const ERP_TOPICS = {
   CASH_REFUND: 'erp.cash.refund',
   JOURNAL_POST_RETURN: 'erp.journal.post.return',
   GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
+  DEBT_OVERDUE: 'erp.debt.overdue',
 } as const;
 
 export type ErpTopic = (typeof ERP_TOPICS)[keyof typeof ERP_TOPICS];

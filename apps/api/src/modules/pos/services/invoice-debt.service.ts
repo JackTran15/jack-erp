@@ -32,6 +32,25 @@ export interface CollectPaymentDto {
   cashAccountId?: string;
 }
 
+/** Credit terms entered at checkout, stored per invoice on the debt record. */
+export interface DebtTerms {
+  dueDate?: string | null;
+  creditDays?: number | null;
+}
+
+/** Add `days` to an ISO `YYYY-MM-DD` date, returning a new ISO date string. */
+function addDaysIso(iso: string, days: number): string {
+  const ms = new Date(`${iso}T00:00:00Z`).getTime() + days * 86_400_000;
+  return new Date(ms).toISOString().split('T')[0];
+}
+
+/** Whole days from `fromIso` to `toIso` (ISO `YYYY-MM-DD`), may be negative. */
+function daysBetween(fromIso: string, toIso: string): number {
+  const from = new Date(`${fromIso}T00:00:00Z`).getTime();
+  const to = new Date(`${toIso}T00:00:00Z`).getTime();
+  return Math.round((to - from) / 86_400_000);
+}
+
 @Injectable()
 export class InvoiceDebtService {
   private readonly logger = new Logger(InvoiceDebtService.name);
@@ -52,6 +71,7 @@ export class InvoiceDebtService {
     invoice: InvoiceEntity,
     debtAmount?: number,
     manager?: EntityManager,
+    debtTerms?: DebtTerms,
   ): Promise<InvoiceDebtEntity> {
     if (!invoice.customerId) {
       throw new BadRequestException(
@@ -61,6 +81,16 @@ export class InvoiceDebtService {
 
     const today = new Date().toISOString().split('T')[0];
     const amount = debtAmount ?? invoice.amountDue;
+
+    // Resolve due date / credit term. Clients usually send both, but derive the
+    // missing one when only a date or only a day count is provided.
+    let dueDate = debtTerms?.dueDate ?? null;
+    let creditDays = debtTerms?.creditDays ?? null;
+    if (!dueDate && creditDays != null) dueDate = addDaysIso(today, creditDays);
+    if (dueDate && creditDays == null) creditDays = daysBetween(today, dueDate);
+    if (dueDate && dueDate < today) {
+      throw new BadRequestException('dueDate must be on or after the issue date');
+    }
 
     const debtData: Partial<InvoiceDebtEntity> = {
       organizationId: invoice.organizationId,
@@ -74,6 +104,8 @@ export class InvoiceDebtService {
       remainingAmount: amount,
       paidAmount: 0,
       issuedAt: today,
+      dueDate: dueDate ?? undefined,
+      creditDays: creditDays ?? undefined,
       status: DebtStatus.OPEN,
     };
 

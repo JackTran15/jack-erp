@@ -7,6 +7,7 @@ import type {
 import { deriveInvoiceTotals } from "./checkoutSettlement";
 import {
   formatLineDiscountLabel,
+  lineDiscountAmount,
   lineTotal,
   resolvePaymentMethodLabel,
 } from "./checkoutUtils";
@@ -36,7 +37,15 @@ const CLOSING_MESSAGE = "Giày MT hân hạnh phục vụ quý khách!";
 interface BuildCheckoutInvoicePayloadInput {
   printInvoice: boolean;
   cart: CartLine[];
+  /** Net "Tổng thanh toán" hiển thị (đã trừ KM dòng, chưa trừ đặt cọc). */
   grandTotal: number;
+  /**
+   * Net cần tất toán đã trừ đặt cọc (+ phí đổi trả − đổi điểm) = `settlementGrandTotal`.
+   * Dùng để derive "Trả lại khách" / "Khách nợ".
+   */
+  settlementTotal: number;
+  /** Tiền đặt cọc — in thành dòng riêng "Đặt cọc" dưới "Tổng thanh toán" khi > 0. */
+  deposit: number;
   totalPaid: number;
   paymentLines: PaymentLine[];
   primaryMethodLabel: string;
@@ -52,6 +61,8 @@ export function buildCheckoutInvoicePayload({
   printInvoice,
   cart,
   grandTotal,
+  settlementTotal,
+  deposit,
   totalPaid,
   paymentLines,
   primaryMethodLabel,
@@ -66,13 +77,21 @@ export function buildCheckoutInvoicePayload({
     (sum, l) => sum + (l.isReturnCredit ? Math.abs(l.qty) : l.qty),
     0,
   );
-  // Công nợ = nợ toàn phần: BE ghi payments=[], nên bản in cũng phản ánh đã trả
-  // = 0 và dồn toàn bộ vào "Khách nợ" (tránh vừa hiện đã trả đủ vừa hiện nợ đủ
-  // do dòng thanh toán auto-fill).
-  const effectiveTotalPaid = debt ? 0 : totalPaid;
-  const paid = effectiveTotalPaid > 0 ? effectiveTotalPaid : 0;
+  // "Tiền hàng" = gross trước KM; "Khuyến mãi" = tổng KM theo mặt hàng. Cùng dấu
+  // với lineTotal nên grossSubtotal − itemDiscountTotal === grandTotal (net).
+  const grossSubtotal = cart.reduce(
+    (sum, l) => sum + (l.isReturnCredit ? -1 : 1) * l.unitPrice * l.qty,
+    0,
+  );
+  const itemDiscountTotal = cart.reduce(
+    (sum, l) => sum + (l.isReturnCredit ? -1 : 1) * lineDiscountAmount(l),
+    0,
+  );
+  // Bản in phản ánh đúng số khách trả: khi "Tính vào công nợ", phần đã trả (nếu
+  // có) hiện ở "Đã trả", phần còn lại dồn vào "Khách nợ" (BE ghi nợ một phần).
+  const paid = totalPaid > 0 ? totalPaid : 0;
   const payments =
-    effectiveTotalPaid > 0
+    totalPaid > 0
       ? paymentLines
           .filter((l) => l.amount > 0)
           .map((l) => ({
@@ -81,9 +100,10 @@ export function buildCheckoutInvoicePayload({
           }))
       : [{ label: primaryMethodLabel, amount: 0 }];
 
+  // Đặt cọc đã được trừ trong settlementTotal → "Trả lại" / "Khách nợ" đúng.
   const t = deriveInvoiceTotals({
-    grandTotal,
-    totalPaid: effectiveTotalPaid,
+    grandTotal: settlementTotal,
+    totalPaid,
     keepChange,
     debt,
   });
@@ -103,8 +123,10 @@ export function buildCheckoutInvoicePayload({
     })),
     totals: {
       totalQty,
-      subtotal: grandTotal,
+      subtotal: grossSubtotal,
+      itemDiscountTotal: itemDiscountTotal > 0 ? itemDiscountTotal : undefined,
       grandTotal,
+      depositAmount: deposit > 0 ? deposit : undefined,
       paid,
       change: t.change,
       keptChange: t.keptChange,

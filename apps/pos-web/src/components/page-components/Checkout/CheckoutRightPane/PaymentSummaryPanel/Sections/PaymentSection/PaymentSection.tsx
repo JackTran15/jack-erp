@@ -43,11 +43,13 @@ export function PaymentSection({
   const paymentAccountsQuery = usePaymentAccountsQuery();
   const accounts = paymentAccountsQuery.accounts;
 
-  // Dòng thanh toán đầu (khi chỉ có 1 dòng) luôn bám theo "số tiền cần thanh toán":
-  // mỗi khi tổng đổi, ghi đè lại số tiền. Số gõ tay chỉ giữ tới lần tổng đổi kế.
+  // Dòng thanh toán đầu (khi chỉ có 1 dòng) bám theo "số tiền cần thanh toán" KHI
+  // không ghi nợ: mỗi khi tổng đổi, ghi đè lại số tiền. Khi "Tính vào công nợ",
+  // nhân viên tự quyết số thu ngay (phần còn lại vào công nợ) nên không ghi đè.
   useEffect(() => {
+    if (debt) return;
     setFirstLineAmountAuto(settlementAbs);
-  }, [settlementAbs, setFirstLineAmountAuto]);
+  }, [debt, settlementAbs, setFirstLineAmountAuto]);
 
   // Gán tài khoản mặc định cho dòng thanh toán chưa chọn. Dùng `setPaymentLines`
   // (functional updater → đọc state TƯƠI, KHÔNG chạy manual-edit detection) thay vì
