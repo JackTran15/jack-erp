@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
   REPORT_CATEGORY,
   REPORT_CATEGORY_METADATA,
@@ -11,6 +12,7 @@ import { buildInitialReportState } from "../../../store/page-stores/report/repor
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
+import { ReportUrlSync } from "./ReportUrlSync/ReportUrlSync";
 import { STORE_TYPE } from "../../../constants/store.constant";
 
 interface Props {
@@ -22,6 +24,11 @@ export function ReportPage({ category }: Props) {
   const branch = isChain ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE;
   const configs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
 
+  // Report type khởi tạo lấy từ URL hash (vd #daily_sales_summary) để giữ trạng
+  // thái khi reload / chia sẻ link; factory tự fallback nếu hash không hợp lệ.
+  const { hash } = useLocation();
+  const hashReportType = decodeURIComponent(hash.replace(/^#/, ""));
+
   // Columns nạp từ API (ReportTableConfigSync) → khởi tạo rỗng.
   const tableInitialState = useMemo(() => {
     if (!configs) return null;
@@ -29,8 +36,15 @@ export function ReportPage({ category }: Props) {
   }, [category, branch, configs]);
   const reportInitialState = useMemo(
     () =>
-      configs ? buildInitialReportState({ category, branch, configs }) : null,
-    [category, branch, configs],
+      configs
+        ? buildInitialReportState({
+            category,
+            branch,
+            configs,
+            reportType: hashReportType,
+          })
+        : null,
+    [category, branch, configs, hashReportType],
   );
 
   if (!configs || !tableInitialState || !reportInitialState) {
@@ -51,6 +65,7 @@ export function ReportPage({ category }: Props) {
         initialState={tableInitialState}
       >
         <ReportTableConfigSync />
+        <ReportUrlSync />
         <div className="flex h-full flex-col bg-white px-2">
           <ReportPageHeader />
           <ReportPageTable />

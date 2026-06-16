@@ -7,18 +7,24 @@ interface BuildArgs {
   category: REPORT_CATEGORY;
   branch: STORE_TYPE;
   configs: ReportBranchConfig;
+  /** Report type khởi tạo (vd lấy từ URL hash); chỉ dùng nếu thuộc listReport. */
+  reportType?: string;
 }
 
 export function buildInitialReportState({
   category,
   branch,
   configs,
+  reportType,
 }: BuildArgs): ReportInitialState {
+  const list = configs.listReport;
+  const initialReportType =
+    reportType && list.includes(reportType) ? reportType : (list[0] ?? "");
   return {
     category,
     branch,
-    listReport: configs.listReport,
-    reportType: configs.listReport[0] ?? "",
+    listReport: list,
+    reportType: initialReportType,
     filters: {},
     columnFilters: {},
     appliedRequest: null,
