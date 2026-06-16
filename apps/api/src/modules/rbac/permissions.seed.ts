@@ -122,6 +122,9 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "reporting.dashboard.branch.read", module: "reporting" },
   { key: "reporting.dashboard.consolidated.read", module: "reporting" },
   { key: "inventory.reports.read", module: "reporting" },
+  { key: "reporting.invoice.branch.read", module: "reporting" },
+  { key: "reporting.invoice.consolidated.read", module: "reporting" },
+  { key: "reporting.invoice-template.manage", module: "reporting" },
 
   // Registration
   { key: "org.registration.submit", module: "registration" },

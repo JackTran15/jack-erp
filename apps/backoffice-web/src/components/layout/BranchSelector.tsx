@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@erp/ui";
 import { ChevronDown } from "lucide-react";
@@ -11,31 +12,55 @@ import { toast } from "sonner";
 import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
 import { erpApi, requireErpData } from "../../lib/erp-api";
+import { persistSwitchBranchResponse } from "../../lib/auth-storage";
+import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
 import {
-  getActiveBranch,
-  persistSwitchBranchResponse,
-} from "../../lib/auth-storage";
+  useBranchStore,
+  useIsChainSelected,
+} from "../../store/common/branch/branch.store";
 
 export function BranchSelector() {
   const { data: branches } = useMyBranches();
+  const isChain = useIsChainSelected();
+  const branchId = useBranchStore((s) => s.branchId);
+  const branchName = useBranchStore((s) => s.branchName);
+  const selectBranch = useBranchStore((s) => s.selectBranch);
+  const selectChain = useBranchStore((s) => s.selectChain);
   const [switching, setSwitching] = useState(false);
+
+  useEffect(() => {
+    if (isChain || !branchId || branchName) return;
+    const branch = branches?.find((b) => b.id === branchId);
+    if (branch) selectBranch(branch.id, branch.name);
+  }, [isChain, branchId, branchName, branches, selectBranch]);
 
   if (!branches?.length) return null;
 
-  const activeBranchId = getActiveBranch();
-  const activeBranch = branches.find((b) => b.id === activeBranchId);
-  const displayName = activeBranch?.name ?? "Chọn cửa hàng";
+  const displayName = isChain
+    ? "Chuỗi cửa hàng"
+    : (branchName ??
+      branches.find((b) => b.id === branchId)?.name ??
+      "Chọn cửa hàng");
+  const selectedValue = isChain ? CHAIN_OPTION_VALUE : (branchId ?? "");
 
-  const handleSelect = async (id: string) => {
-    if (switching || id === activeBranchId) return;
+  const handleSelect = async (value: string) => {
+    // Chuỗi cửa hàng: chỉ là chế độ FE (mock), không gọi backend.
+    if (value === CHAIN_OPTION_VALUE) {
+      selectChain();
+      return;
+    }
+    // Bỏ qua nếu đang đổi, hoặc đã chọn đúng chi nhánh đó (trừ khi đang ở chuỗi).
+    if (switching || (!isChain && value === branchId)) return;
+    const branch = branches.find((b) => b.id === value);
     setSwitching(true);
     try {
       const res = requireErpData(
         await erpApi.POST<SwitchBranchResponse>("/auth/switch-branch", {
-          body: { branchId: id },
+          body: { branchId: value },
         }),
       );
-      persistSwitchBranchResponse(res, id);
+      persistSwitchBranchResponse(res, value);
+      if (branch) selectBranch(branch.id, branch.name);
       window.location.reload();
     } catch {
       toast.error("Không thể đổi chi nhánh. Vui lòng thử lại.");
@@ -55,10 +80,11 @@ export function BranchSelector() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" className="min-w-[180px]">
-        <DropdownMenuRadioGroup
-          value={activeBranchId ?? ""}
-          onValueChange={handleSelect}
-        >
+        <DropdownMenuRadioGroup value={selectedValue} onValueChange={handleSelect}>
+          <DropdownMenuRadioItem value={CHAIN_OPTION_VALUE}>
+            Chuỗi cửa hàng
+          </DropdownMenuRadioItem>
+          <DropdownMenuSeparator />
           {branches.map((branch) => (
             <DropdownMenuRadioItem key={branch.id} value={branch.id}>
               {branch.name}

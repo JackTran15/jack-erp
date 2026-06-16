@@ -19,22 +19,15 @@ import { BranchRegistrationPage } from "./pages/onboarding/BranchRegistrationPag
 import { ApprovalQueuePage } from "./pages/onboarding/ApprovalQueuePage";
 import { RegistrationDetailPage } from "./pages/onboarding/RegistrationDetailPage";
 import { DashboardReportPage } from "./pages/reports/DashboardReportPage";
-import { SalesReportPage } from "./pages/reports/SalesReportPage";
-import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
+import { ReportPage } from "./pages/chain-store/reports/ReportPage";
+import { REPORT_CATEGORY } from "./constants/reports/report-category.constant";
+import { PageKey } from "./constants/page-registry.constant";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
 import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
 import { TreasuryCashReceiptsPage } from "./pages/treasury/cash/receipts-expenses/TreasuryCashReceiptsPage";
 import { TreasuryCashCountPage } from "./pages/treasury/cash/TreasuryCashCountPage";
 import { TreasuryWipPage } from "./pages/treasury/TreasuryWipPage";
-import { StockSummaryReportPage } from "./pages/reports/storage/StockSummaryReportPage";
-import { StockDocumentDetailsReportPage } from "./pages/reports/storage/StockDocumentDetailsReportPage";
-import { StockQuantityDetailsReportPage } from "./pages/reports/storage/StockQuantityDetailsReportPage";
-import { StockByBranchReportPage } from "./pages/reports/storage/StockByBranchReportPage";
-import { StockSummaryByBranchReportPage } from "./pages/reports/storage/StockSummaryByBranchReportPage";
-import { TransferSummaryReportPage } from "./pages/reports/storage/TransferSummaryReportPage";
-import { TransferByBranchReportPage } from "./pages/reports/storage/TransferByBranchReportPage";
-import { TemporaryIssuesReportPage } from "./pages/reports/storage/TemporaryIssuesReportPage";
 import { InventoryManagementPage } from "./pages/inventory/InventoryManagementPage";
 import { InventoryItemsPage } from "./pages/inventory/InventoryItemsPage";
 import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
@@ -53,6 +46,9 @@ import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
 import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
+import { DynamicStoreView } from "./pages/dynamic-store-view";
+import { REPORT_TYPE_INVENTORY } from "./constants/reports/report-type.constant";
+import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -176,11 +172,20 @@ export function App() {
                   path="/reports/dashboard"
                   element={<DashboardReportPage />}
                 />
-                <Route path="/reports/sales" element={<SalesReportPage />} />
+                <Route
+                  path="/reports/sales"
+                  element={<ReportPage category={REPORT_CATEGORY.SALES} />}
+                />
+                
                 <Route
                   path="/reports/inventory"
                   element={<InventoryReportPage />}
                 />
+                <Route
+                  path="/reports/chain-inventory"
+                  element={<ReportPage category={REPORT_CATEGORY.INVENTORY} />}
+                />
+                
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
                 <Route
@@ -205,35 +210,35 @@ export function App() {
                 />
                 <Route
                   path="/reports/storage/stock-summary"
-                  element={<StockSummaryReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY} />} 
                 />
                 <Route
                   path="/reports/storage/stock-document-details"
-                  element={<StockDocumentDetailsReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST} />}
                 />
                 <Route
                   path="/reports/storage/stock-quantity-details"
-                  element={<StockQuantityDetailsReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL} />}
                 />
                 <Route
                   path="/reports/storage/stock-by-branch"
-                  element={<StockByBranchReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE} />}
                 />
                 <Route
                   path="/reports/storage/stock-summary-by-branch"
-                  element={<StockSummaryByBranchReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY} />}
                 />
                 <Route
                   path="/reports/storage/transfer-summary"
-                  element={<TransferSummaryReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY} />}
                 />
                 <Route
                   path="/reports/storage/transfer-by-branch"
-                  element={<TransferByBranchReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE} />}
                 />
                 <Route
                   path="/reports/storage/temporary-issues"
-                  element={<TemporaryIssuesReportPage />}
+                  element={<DynamicStoreView type={REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS} />}
                 />
                 <Route
                   path="/settings/document-numbering"

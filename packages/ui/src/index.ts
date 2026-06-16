@@ -72,6 +72,7 @@ export { AppModal, type AppModalProps } from "./components/app-modal";
 export {
   Popover,
   PopoverTrigger,
+  PopoverAnchor,
   PopoverClose,
   PopoverPortal,
   PopoverContent,

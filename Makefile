@@ -108,3 +108,6 @@ seed-inventory:
 
 seed-dev-admin:
 	$(PNPM) --filter $(API_FILTER) seed:dev-admin
+
+seed-report-admin:
+	$(PNPM) --filter $(API_FILTER) seed:report-types

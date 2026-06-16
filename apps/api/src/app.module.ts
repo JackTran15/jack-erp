@@ -25,6 +25,7 @@ import { TempWarehouseModule } from './modules/inventory/temp-warehouse/temp-war
 import { InventoryCsvModule } from './modules/inventory/csv/inventory-csv.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
+import { InvoiceReportModule } from './modules/reporting/invoice-report/invoice-report.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
 import { IssueReasonModule } from './modules/inventory/issue-reason/issue-reason.module';
@@ -90,6 +91,7 @@ import { AdminSearchModule } from './modules/admin-search/admin-search.module';
     InventoryCsvModule,
     PosModule,
     ReportingModule,
+    InvoiceReportModule,
     PurchaseOrderModule,
     GoodsIssueModule,
     IssueReasonModule,

@@ -14,7 +14,6 @@ import {
   TooltipTrigger,
 } from "@erp/ui";
 import {
-  navConfig,
   visibleNavConfig,
   activeModuleFor,
   isFlyoutEnabled,
@@ -24,13 +23,15 @@ import {
 } from "./navConfig";
 import { useLayout } from "./LayoutContext";
 import { MegaMenuPanel } from "./MegaMenuPanel";
+import { useCurrentView } from "../../store/common/branch/branch.store";
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export function AppSidebar() {
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebar } = useLayout();
-  const filteredNav = visibleNavConfig();
+  const view = useCurrentView();
+  const filteredNav = visibleNavConfig(view);
   const activeModule =
     activeModuleFor(location.pathname, filteredNav) ?? filteredNav[0];
 

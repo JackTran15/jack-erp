@@ -12943,6 +12943,243 @@
         ]
       }
     },
+    "/reports/invoices/types": {
+      "get": {
+        "operationId": "InvoiceReportController_listTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
+    "/reports/invoices/columns": {
+      "get": {
+        "operationId": "InvoiceReportController_getColumns",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
+    "/reports/invoices/search": {
+      "post": {
+        "operationId": "InvoiceReportController_search",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceReportSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
+    "/reports/invoices/templates": {
+      "get": {
+        "operationId": "InvoiceReportController_listTemplates",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      },
+      "post": {
+        "operationId": "InvoiceReportController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
+    "/reports/invoices/templates/{id}": {
+      "get": {
+        "operationId": "InvoiceReportController_getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      },
+      "patch": {
+        "operationId": "InvoiceReportController_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvoiceReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      },
+      "delete": {
+        "operationId": "InvoiceReportController_deleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
     "/inventory/purchase-orders": {
       "post": {
         "operationId": "PurchaseOrderController_create",
@@ -23525,9 +23762,6 @@
       "UpdateLineCountDto": {
         "type": "object",
         "properties": {
-          "locationId": {
-            "type": "string"
-          },
           "countedQty": {
             "type": "object",
             "nullable": true
@@ -25765,6 +25999,248 @@
         "required": [
           "type"
         ]
+      },
+      "InvoiceReportFilterDto": {
+        "type": "object",
+        "properties": {
+          "issuedAt": {
+            "description": "Report period — enforced present by the search handler.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumFilterDto"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Optional person filters (used by per-line reports; absent = all).",
+            "format": "uuid"
+          },
+          "cashierId": {
+            "type": "string",
+            "description": "Cashier — matches invoice.staffId.",
+            "format": "uuid"
+          },
+          "salespersonId": {
+            "type": "string",
+            "description": "Salesperson — matches invoice.salespersonId.",
+            "format": "uuid"
+          },
+          "groupBy": {
+            "type": "string",
+            "description": "revenue-by-item only — row grain (default item).",
+            "enum": [
+              "item",
+              "group",
+              "brand"
+            ]
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "revenue-by-item only — filter by item category (Nhóm hàng hóa).",
+            "format": "uuid"
+          },
+          "brand": {
+            "type": "string",
+            "description": "revenue-by-item only — filter by denormalized item brand (Thương hiệu)."
+          }
+        }
+      },
+      "ColumnFilterDto": {
+        "type": "object",
+        "properties": {
+          "col": {
+            "type": "string"
+          },
+          "eq": {
+            "type": "object"
+          },
+          "lt": {
+            "type": "number"
+          },
+          "lte": {
+            "type": "number"
+          },
+          "gt": {
+            "type": "number"
+          },
+          "gte": {
+            "type": "number"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "col"
+        ]
+      },
+      "InvoiceReportSearchDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys + dynamic `payment.method.<coaAccountId>`).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InvoiceReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 31,
+            "minimum": 1,
+            "maximum": 366
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "ReportTemplateColumnDto": {
+        "type": "object",
+        "properties": {
+          "col": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User-renamed label; empty/blank ⇒ persisted as null (falls back to catalog name).",
+            "minLength": 0,
+            "maxLength": 120
+          },
+          "visible": {
+            "type": "boolean",
+            "description": "Defaults to true when omitted."
+          },
+          "frozen": {
+            "type": "boolean",
+            "description": "Defaults to false when omitted."
+          },
+          "order": {
+            "type": "number",
+            "description": "Ignored on persist — the server stamps order from array position.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "col"
+        ]
+      },
+      "CreateInvoiceReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InvoiceReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "reportType",
+          "name",
+          "columns"
+        ]
+      },
+      "UpdateInvoiceReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InvoiceReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
       },
       "CreatePurchaseOrderDto": {
         "type": "object",

@@ -703,6 +703,140 @@ flowchart LR
   T2 --> T3
 ```
 
+## EPIC-11062026 Báo cáo tổng hợp bán hàng theo ngày (cột động theo phương thức thanh toán + template, full CQRS)
+
+- [EPIC-11062026 Báo cáo tổng hợp bán hàng theo ngày](./epics/EPIC-11062026-invoice-report-builder.md)
+- Trang **Tổng hợp bán hàng theo ngày** (`backoffice-web`) tự dựng (KiotViet-style), **2 API tách biệt**: **(1)** `GET /reports/invoices/columns` → **chỉ** `{ headers }` = toàn bộ catalog cột — cột **cố định** whitelist trong registry server (`INVOICE_REPORT_SUMMARY_COLUMNS`: Tiền hàng/Tiền phí/Khuyến mại/Tổng/Tỷ lệ KM %/Thực thu… có cột **computed**) **+ cột động** sinh runtime từ `PaymentAccountEntity` (một cột / một phương thức thanh toán của org/branch), dưới 2 band "Doanh thu" / "Khách hàng thanh toán"; header `{ col, name, desc, type, group }`. **(2)** `POST /reports/invoices/search` → **chỉ** `{ dataRaw: ReportCell[][], totals, total, page, limit }` (cell tự mô tả `{col,type,value}`, **không** kèm headers) = **aggregate một dòng/một ngày** + **dòng tổng**, lọc theo cửa hàng (branch) hoặc toàn chuỗi (consolidated). Filter 2 tầng (giống search hiện tại): **scope** `issuedAt`(bắt buộc)/`status`/`type`/`branch` (pre-aggregate, SQL `FilterBuilder`) + **per-column** `columnFilters[]` widget `=`/`≤` dưới mỗi header (post-aggregate, JS — áp cả cột computed/động). Aggregate **tính trên RAM (JS), không `GROUP BY` SQL** (feedback `prefer_in_memory_aggregation`). **Template** = entity org-shared mang **bộ cột riêng + bộ filter riêng** (`columns` jsonb gồm key động + `filters` jsonb gồm `columnFilters`). **TOÀN BỘ theo chuẩn CQRS** trên **1 controller riêng** `InvoiceReportController`. Export Excel = ngoài scope v1.
+
+| Ticket                                                            | Mô tả                                                                              |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-IRB-01](./tickets/TKT-IRB-01-be-schema-entity-module.md)     | BE: migration `invoice_report_templates` (columns+filters jsonb) + entity + module CQRS skeleton + controller shell |
+| [TKT-IRB-02](./tickets/TKT-IRB-02-shared-interfaces.md)           | Shared: contract descriptor+cell (`ReportColumnHeader`/`ReportCell`/`dataRaw[][]`/`totals`) + rich `ReportColumnDataType` + `INVOICE_REPORT_COLUMN_LABELS_VI` + shape search/template |
+| [TKT-IRB-03](./tickets/TKT-IRB-03-be-column-registry-catalog.md)  | BE: registry cố định `INVOICE_REPORT_SUMMARY_COLUMNS` + cột động (pivot `PaymentAccountEntity`) + `GetInvoiceReportColumnsQuery` + `GET columns` |
+| [TKT-IRB-04](./tickets/TKT-IRB-04-be-cqrs-report-search.md)       | BE: `SearchInvoiceReportQuery` + handler (validate cột, aggregate theo ngày trong JS, pivot payment-account, computed, scope, totals) |
+| [TKT-IRB-05](./tickets/TKT-IRB-05-be-template-cqrs-crud.md)       | BE: template queries (List/Get) + commands (Create/Update/Delete) + handlers, org-scope, soft-delete |
+| [TKT-IRB-06](./tickets/TKT-IRB-06-be-permissions-openapi.md)      | BE: seed 3 permission (`reporting.invoice.branch.read`/`.consolidated.read`/`invoice-template.manage`) + VI labels + openapi:generate |
+| [TKT-IRB-07](./tickets/TKT-IRB-07-fe-data-layer.md)               | FE: api wrapper + hooks (columns/search/template) + `formatCell`(theo type)/`groupHeaders` |
+| [TKT-IRB-08](./tickets/TKT-IRB-08-fe-report-page.md)              | FE: trang báo cáo (bảng 2 tầng header band + cột động + dòng tổng + khoảng ngày + save/load template) + Route + Nav |
+| [TKT-IRB-09](./tickets/TKT-IRB-09-tests-e2e.md)                   | Tests handler/command + spec đối chiếu registry cố định⟷label + E2E round-trip aggregate + DoD gate  |
+
+### Ticket dependency graph (EPIC-11062026 invoice-report-builder)
+
+```mermaid
+flowchart LR
+  T1["TKT-IRB-01 Schema + entity + module"] --> T3["TKT-IRB-03 Registry cố định + động + columns query"]
+  T1 --> T4["TKT-IRB-04 Aggregate search query"]
+  T1 --> T5["TKT-IRB-05 Template CQRS CRUD"]
+  T2["TKT-IRB-02 shared-interfaces (contract)"] --> T3
+  T2 --> T4
+  T2 --> T5
+  T2 --> T7["TKT-IRB-07 FE data layer"]
+  T3 --> T4
+  T4 --> T6["TKT-IRB-06 Permissions + openapi"]
+  T5 --> T6
+  T6 --> T7
+  T7 --> T8["TKT-IRB-08 FE page + nav"]
+  T4 --> T9["TKT-IRB-09 Tests + E2E + DoD"]
+  T5 --> T9
+  T8 --> T9
+```
+
+## EPIC-14062026 Bảng kê hóa đơn và đơn hàng (report type thứ 2 — một dòng/hóa đơn, backend-only)
+
+- [EPIC-14062026 Bảng kê hóa đơn và đơn hàng](./epics/EPIC-14062026-invoice-order-listing-report.md)
+- **Follow-up** của EPIC-11062026: thêm **report type thứ 2** `invoice-order-listing` (clone màn hình MISA eShop "BẢNG KÊ HÓA ĐƠN VÀ ĐƠN HÀNG") vào registry báo cáo generic có sẵn. Khác `daily-sales-summary` (một dòng/**ngày**), báo cáo này là **một dòng / một hóa đơn** (detail), trải bộ cột MISA: nền (Ngày/Giờ/Số hóa đơn/Trạng thái) + band **Doanh thu** + band **Khách hàng thanh toán** (gồm cột động `payment.method.<id>` từ `PaymentAccountEntity`) + band **Doanh thu sàn TMĐT**. **Sandbox = chỉ backend** (FE là renderer generic, không đổi). Cột thiếu backing (sàn TMĐT, Thu hộ, Tài khoản ngân hàng, Kênh bán hàng, Tiền phí) → **placeholder 0/null** (chốt với user). **Thuần additive**: KHÔNG entity/migration/endpoint mới — chỉ thêm 1 `ReportDefinition` + registry cột riêng + nhãn VI (shared-interfaces) + wiring. Tái dùng nguyên `InvoiceReportController` + handler search/columns/types + template CQRS. Ước lượng **~6 dev-days**.
+
+| Ticket                                                              | Mô tả                                                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-IOL-01](./tickets/TKT-IOL-01-shared-interfaces-labels.md)      | Shared: nhãn VI report type `invoice-order-listing` + key cột mới + band `platform`="Doanh thu sàn TMĐT" (additive) |
+| [TKT-IOL-02](./tickets/TKT-IOL-02-column-registry-aggregator.md)    | BE: registry cột per-invoice `INVOICE_LISTING_COLUMNS` + aggregator/row-builder (JS) + classification BACKED/DERIVED/PLACEHOLDER |
+| [TKT-IOL-03](./tickets/TKT-IOL-03-report-definition.md)             | BE: `InvoiceOrderListingReport` (buildColumns cố định+động+placeholder; buildData một dòng/hóa đơn, inline FK, scope, per-column filter, totals) |
+| [TKT-IOL-04](./tickets/TKT-IOL-04-module-wiring-openapi.md)         | BE: wiring providers+`ReportRegistry` factory + seed report-type + `forFeature` repo (Customer/Branch/Employee) + openapi:generate |
+| [TKT-IOL-05](./tickets/TKT-IOL-05-tests-e2e-dod.md)                 | Tests + E2E round-trip (types/columns/search/template) + no-regress daily-sales + DoD gate |
+
+### Ticket dependency graph (EPIC-14062026 invoice-order-listing-report)
+
+```mermaid
+flowchart LR
+  T1["TKT-IOL-01 Shared labels"] --> T2["TKT-IOL-02 Registry + aggregator"]
+  T1 --> T3["TKT-IOL-03 ReportDefinition"]
+  T2 --> T3
+  T3 --> T4["TKT-IOL-04 Wiring + openapi"]
+  T4 --> T5["TKT-IOL-05 Tests + E2E + DoD"]
+  T2 --> T5
+```
+
+## EPIC-14062026 Chi tiết doanh thu theo hóa đơn và mặt hàng (report type thứ 3 — một dòng/dòng hàng, backend-only)
+
+- [EPIC-14062026 Chi tiết doanh thu theo hóa đơn và mặt hàng](./epics/EPIC-14062026-invoice-item-revenue-detail-report.md)
+- **Follow-up** của EPIC-14062026 (invoice-order-listing) + EPIC-11062026: thêm **report type thứ 3** `invoice-item-revenue-detail` (clone màn hình MISA eShop "CHI TIẾT DOANH THU THEO HÓA ĐƠN VÀ MẶT HÀNG") vào registry báo cáo generic. Khác 2 type trước (một dòng/**ngày**, một dòng/**hóa đơn**), báo cáo này là **một dòng / một dòng hàng (invoice line item)**, trải ~33 cột MISA (Ngày/Giờ/Số HĐ/Mã SKU/Tên hàng/Nhóm hàng/ĐVT/SL/Đơn giá/Tiền hàng/Tiền KM/Điểm KM/Doanh thu/Tham chiếu/Vị trí/TK ngân hàng/Khách hàng/Kênh bán/Thu ngân/NV bán hàng/Người nhận/Cửa hàng/Ghi chú/Nhà cung cấp). Catalog **phẳng** (không band, không cột động). **Sandbox = chỉ backend** (FE renderer generic, không đổi). Cột thiếu backing (Điểm KM theo dòng, Tham chiếu, TK ngân hàng, Kênh bán hàng, Người nhận/SĐT) → **placeholder 0/null**. **Thuần additive**: KHÔNG entity/migration/endpoint mới — thêm 1 `ReportDefinition` + registry/aggregator riêng + nhãn VI + **3 filter optional** (customer/cashier/salesperson) + wiring. Branch scope = single + consolidated; checkbox combo = out of scope. Ước lượng **~5.5 dev-days**.
+
+| Ticket                                                              | Mô tả                                                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-IRD-01](./tickets/TKT-IRD-01-shared-interfaces-labels.md)      | Shared: nhãn VI report type `invoice-item-revenue-detail` + key cột line-item mới + 3 filter optional (customer/cashier/salesperson) (additive) |
+| [TKT-IRD-02](./tickets/TKT-IRD-02-column-registry-aggregator.md)    | BE: registry cột per-line-item `INVOICE_ITEM_REVENUE_COLUMNS` + aggregator/row-builder (JS) + classification BACKED/DERIVED/PLACEHOLDER |
+| [TKT-IRD-03](./tickets/TKT-IRD-03-report-definition.md)             | BE: `InvoiceItemRevenueDetailReport` (buildColumns phẳng; buildData một dòng/dòng hàng, inline FK, scope, 3 filter, per-column filter, totals) |
+| [TKT-IRD-04](./tickets/TKT-IRD-04-module-wiring-openapi.md)         | BE: wiring providers+`ReportRegistry` factory + seed report-type (sortOrder 30) + `forFeature` 8 repo mới + openapi:generate (có diff) |
+| [TKT-IRD-05](./tickets/TKT-IRD-05-tests-e2e-dod.md)                 | Tests + E2E round-trip (types/columns/search/columnFilters) + no-regress 2 type cũ + DoD gate |
+
+### Ticket dependency graph (EPIC-14062026 invoice-item-revenue-detail-report)
+
+```mermaid
+flowchart LR
+  T1["TKT-IRD-01 Shared labels + filters"] --> T2["TKT-IRD-02 Registry + aggregator"]
+  T1 --> T3["TKT-IRD-03 ReportDefinition"]
+  T2 --> T3
+  T3 --> T4["TKT-IRD-04 Wiring + openapi"]
+  T4 --> T5["TKT-IRD-05 Tests + E2E + DoD"]
+  T2 --> T5
+```
+
+## EPIC-15062026 Cấu hình cột báo cáo theo template (mỗi cột = 1 record, backend-only)
+
+- [EPIC-15062026 Cấu hình cột báo cáo theo template](./epics/EPIC-15062026-report-template-column-config.md)
+- **Follow-up** của EPIC-11062026 (invoice-report-builder): nâng `invoice_report_templates.columns` từ `string[]` → **mảng record** `{col, displayName, visible, frozen, order}` để khớp màn cấu hình cột MISA (Tên cột hiển thị / Hiển thị / Cố định cột / sắp xếp), **generic cho cả 3 report type**. **Tại chỗ** — KHÔNG bảng mới, KHÔNG đổi DDL (cột vẫn `jsonb`); chỉ **data-transform migration** + đổi type entity. Đồng thời **vá** validate cột ở 2 handler template từ `isAcceptedColumnKey` (daily-sales-only) sang validate theo **catalog của `reportType`** (`ReportRegistry.buildColumns`). **Chỉ backend** — FE renderer/màn cấu hình defer; `search` vẫn nhận `columns: string[]`. Không event/permission mới, org-scope.
+
+| Ticket                                                                       | Mô tả                                                                                          |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [TKT-RTC-01](./tickets/TKT-RTC-01-shared-interfaces-column-record.md)        | Shared: `ReportTemplateColumn` + đổi `columns` ở `InvoiceReportTemplateView`/`Payload`         |
+| [TKT-RTC-02](./tickets/TKT-RTC-02-be-migration-entity.md)                    | BE: data-transform migration `string[]`→record[] (idempotent, có `down`) + đổi type entity     |
+| [TKT-RTC-03](./tickets/TKT-RTC-03-be-dto-validation-handlers.md)             | BE: `ReportTemplateColumnDto` + validate cột theo `reportType` (catalog) + 2 handler + view     |
+| [TKT-RTC-04](./tickets/TKT-RTC-04-be-openapi-tests-dod.md)                   | BE: openapi regen + unit + E2E round-trip (3 report type + migration assert) + DoD gate          |
+
+### Ticket dependency graph (EPIC-15062026 report-template-column-config)
+
+```mermaid
+flowchart LR
+  T1["TKT-RTC-01 shared-interfaces"] --> T3["TKT-RTC-03 DTO + validate + handlers"]
+  T2["TKT-RTC-02 migration + entity"] --> T3
+  T3 --> T4["TKT-RTC-04 openapi + tests + DoD"]
+```
+
+## EPIC-15062026 Doanh thu theo mặt hàng (report type #4 — pivot item·nhóm·thương hiệu, backend-only)
+
+- [EPIC-15062026 Doanh thu theo mặt hàng](./epics/EPIC-15062026-revenue-by-item-report.md)
+- **Follow-up** của EPIC-11062026 + EPIC-14062026: thêm **report type thứ 4** `revenue-by-item` ("Doanh thu theo mặt hàng" — ảnh #1) vào registry generic. Khác type #3 (một dòng/**dòng hàng**), báo cáo này **gộp một dòng / một mặt hàng** với chiều thống kê chuyển đổi được ("Thống kê theo": **mặt hàng / nhóm hàng / thương hiệu**) qua param `groupBy` (để trong `filters` để template lưu được). Lọc thêm `categoryId` (Nhóm hàng hóa) + `brand` (Thương hiệu), gộp/cộng **trong JS**. **Thuần additive, chỉ backend** — KHÔNG entity/migration/endpoint/permission mới; tái dùng `InvoiceReportController` + template CQRS + `resolveBranchScope`; `forFeature` đã có `ItemEntity`/`ItemCategoryEntity`. Band "Khách hàng thanh toán", checkbox chi nhánh/combo, filter "Loại hàng hóa" → out of scope v1.
+
+| Ticket                                                              | Mô tả                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [TKT-RBI-01](./tickets/TKT-RBI-01-shared-interfaces-labels.md)     | Shared: nhãn VI `revenue-by-item` + nhãn cột (`brand`…) + enum `ReportGroupBy` + 3 filter additive |
+| [TKT-RBI-02](./tickets/TKT-RBI-02-column-registry-aggregator.md)   | BE: registry cột `REVENUE_BY_ITEM_COLUMNS` + aggregator group-and-sum theo `groupBy` (JS, pure) |
+| [TKT-RBI-03](./tickets/TKT-RBI-03-report-definition.md)            | BE: `RevenueByItemReport` (buildColumns; buildData scope+load+lọc category/brand+gộp+filter+totals) + filter DTO |
+| [TKT-RBI-04](./tickets/TKT-RBI-04-module-wiring-openapi.md)        | BE: wiring provider+`ReportRegistry` factory + seed report-type (sortOrder 40) + openapi:generate |
+| [TKT-RBI-05](./tickets/TKT-RBI-05-tests-e2e-dod.md)               | Tests + E2E round-trip (3 groupBy + filter + columnFilters) + no-regress 3 type cũ + DoD gate |
+
+### Ticket dependency graph (EPIC-15062026 revenue-by-item-report)
+
+```mermaid
+flowchart LR
+  T1["TKT-RBI-01 shared labels + groupBy + filters"] --> T2["TKT-RBI-02 Registry + aggregator"]
+  T1 --> T3["TKT-RBI-03 ReportDefinition + filter DTO"]
+  T2 --> T3
+  T3 --> T4["TKT-RBI-04 Wiring + seed + openapi"]
+  T4 --> T5["TKT-RBI-05 Tests + E2E + DoD"]
+  T2 --> T5
+```
+
 ## EPIC-14062026 POS branch-scoped product-location resolver (fix cross-branch stock deduction)
 
 - [EPIC-14062026 POS branch-scoped product-location resolver](./epics/EPIC-14062026-pos-branch-scoped-location-resolver.md)
@@ -717,6 +851,8 @@ flowchart LR
 ```mermaid
 flowchart LR
   T1["TKT-PBL-01 Branch-scoped resolver + rewire + tests"]
+```
+
 ## EPIC-16062026 Active branch trong token (switch-branch mint token mới + actor đọc branch từ JWT)
 
 - [EPIC-16062026 Active branch trong token](./epics/EPIC-16062026-active-branch-token.md)

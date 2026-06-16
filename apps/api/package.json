@@ -20,6 +20,7 @@
     "seed:inventory": "ts-node src/database/seeds/inventory.seed.ts",
     "seed:dev-admin": "ts-node src/database/seeds/inventory.seed.ts",
     "seed:sync-admin-permissions": "ts-node src/database/seeds/sync-admin-permissions.seed.ts",
+    "seed:report-types": "ts-node src/database/seeds/report-types.seed.ts",
     "seed:demo": "ts-node src/database/seeds/inventory-demo.seed.ts",
     "seed:all": "pnpm seed:inventory && pnpm seed:demo",
     "migrate:legacy-items": "ts-node src/scripts/migrate-legacy-items.ts",

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T10:06:16.028Z",
+  "generatedAt": "2026-05-22T08:29:25.851Z",
   "totalEntities": 87,
   "entities": [
     {
@@ -5796,6 +5796,34 @@
           "isPrimaryKey": false
         },
         {
+          "property": "purpose",
+          "dbColumn": "purpose",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "plannedDate",
+          "dbColumn": "planned_date",
+          "type": "date",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "countedAt",
+          "dbColumn": "counted_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "conclusion",
+          "dbColumn": "conclusion",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
           "property": "snapshotAt",
           "dbColumn": "snapshot_at",
           "type": "timestamptz",
@@ -5819,6 +5847,20 @@
         {
           "property": "postedBy",
           "dbColumn": "posted_by",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "generatedReceiptId",
+          "dbColumn": "generated_receipt_id",
+          "type": "uuid",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "generatedIssueId",
+          "dbColumn": "generated_issue_id",
           "type": "uuid",
           "nullable": true,
           "isPrimaryKey": false
@@ -5902,6 +5944,13 @@
         {
           "property": "note",
           "dbColumn": "note",
+          "type": "text",
+          "nullable": true,
+          "isPrimaryKey": false
+        },
+        {
+          "property": "reason",
+          "dbColumn": "reason",
           "type": "text",
           "nullable": true,
           "isPrimaryKey": false

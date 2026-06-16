@@ -4188,6 +4188,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/invoices/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_listTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_getColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["InvoiceReportController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_listTemplates"];
+        put?: never;
+        post: operations["InvoiceReportController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/invoices/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InvoiceReportController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["InvoiceReportController_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["InvoiceReportController_updateTemplate"];
+        trace?: never;
+    };
     "/inventory/purchase-orders": {
         parameters: {
             query?: never;
@@ -7318,7 +7398,6 @@ export interface components {
             locationId?: string;
         };
         UpdateLineCountDto: {
-            locationId?: string;
             countedQty?: Record<string, never> | null;
             countedValue?: Record<string, never> | null;
             note?: string;
@@ -8026,6 +8105,93 @@ export interface components {
             branchId?: string;
             startDate?: string;
             endDate?: string;
+        };
+        InvoiceReportFilterDto: {
+            /** @description Report period — enforced present by the search handler. */
+            issuedAt?: components["schemas"]["DateRangeFilterDto"];
+            status?: components["schemas"]["EnumFilterDto"];
+            type?: components["schemas"]["EnumFilterDto"];
+            /** Format: uuid */
+            branchId?: string;
+            /**
+             * Format: uuid
+             * @description Optional person filters (used by per-line reports; absent = all).
+             */
+            customerId?: string;
+            /**
+             * Format: uuid
+             * @description Cashier — matches invoice.staffId.
+             */
+            cashierId?: string;
+            /**
+             * Format: uuid
+             * @description Salesperson — matches invoice.salespersonId.
+             */
+            salespersonId?: string;
+            /**
+             * @description revenue-by-item only — row grain (default item).
+             * @enum {string}
+             */
+            groupBy?: "item" | "group" | "brand";
+            /**
+             * Format: uuid
+             * @description revenue-by-item only — filter by item category (Nhóm hàng hóa).
+             */
+            categoryId?: string;
+            /** @description revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
+            brand?: string;
+        };
+        ColumnFilterDto: {
+            col: string;
+            eq?: Record<string, never>;
+            lt?: number;
+            lte?: number;
+            gt?: number;
+            gte?: number;
+            from?: string;
+            to?: string;
+        };
+        InvoiceReportSearchDto: {
+            /** @description Which backend report definition to run. */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys + dynamic `payment.method.<coaAccountId>`). */
+            columns: string[];
+            filters: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** Format: uuid */
+            branchId?: string;
+            /** @default 1 */
+            page: number;
+            /** @default 31 */
+            limit: number;
+        };
+        ReportTemplateColumnDto: {
+            col: string;
+            /** @description User-renamed label; empty/blank ⇒ persisted as null (falls back to catalog name). */
+            displayName?: string | null;
+            /** @description Defaults to true when omitted. */
+            visible?: boolean;
+            /** @description Defaults to false when omitted. */
+            frozen?: boolean;
+            /** @description Ignored on persist — the server stamps order from array position. */
+            order?: number;
+        };
+        CreateInvoiceReportTemplateDto: {
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateInvoiceReportTemplateDto: {
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["InvoiceReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
         };
         CreatePurchaseOrderDto: Record<string, never>;
         PurchaseOrderEntity: {
@@ -16396,6 +16562,180 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InvoiceReportController_listTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_getColumns: {
+        parameters: {
+            query: {
+                reportType: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceReportSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInvoiceReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };

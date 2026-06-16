@@ -107,6 +107,9 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   // Báo cáo
   'reporting.dashboard.branch.read': 'Xem báo cáo theo chi nhánh',
   'reporting.dashboard.consolidated.read': 'Xem báo cáo tổng hợp',
+  'reporting.invoice.branch.read': 'Xem báo cáo hóa đơn (chi nhánh)',
+  'reporting.invoice.consolidated.read': 'Xem báo cáo hóa đơn (toàn chuỗi)',
+  'reporting.invoice-template.manage': 'Quản lý mẫu báo cáo hóa đơn',
   'inventory.reports.read': 'Xem báo cáo nhập xuất tồn kho',
 
   // Đăng ký

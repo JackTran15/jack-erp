@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
 import { cn } from "@erp/ui";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { LayoutContext } from "./LayoutContext";
+import { RouteAccessGuard } from "./RouteAccessGuard";
 
 export function BackofficeLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -22,7 +22,7 @@ export function BackofficeLayout() {
             )}
           >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col p-2.5">
-              <Outlet />
+              <RouteAccessGuard />
             </div>
           </main>
         </div>
