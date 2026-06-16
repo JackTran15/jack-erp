@@ -24,6 +24,7 @@ import {
   OpenSessionDto,
   SubmitReconciliationDto,
   PosCatalogQueryDto,
+  PosCatalogLookupQueryDto,
   PosCatalogProductsQueryDto,
   PosCatalogProductDetailQueryDto,
   PosProductListResponseDto,
@@ -54,6 +55,16 @@ export class PosController {
       query.search,
       query.direction,
     );
+  }
+
+  @Get('branches/:branchId/catalog/lookup')
+  @RequirePermission('pos.sale.create')
+  getCatalogLookup(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @Query() query: PosCatalogLookupQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.catalogService.lookupByCode(branchId, actor, query.code);
   }
 
   @Get('branches/:branchId/catalog/products')

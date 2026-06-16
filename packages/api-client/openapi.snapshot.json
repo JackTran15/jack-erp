@@ -10986,6 +10986,49 @@
         ]
       }
     },
+    "/pos/branches/{branchId}/catalog/lookup": {
+      "get": {
+        "operationId": "PosController_getCatalogLookup",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "description": "Exact barcode or SKU code to look up.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Pos"
+        ]
+      }
+    },
     "/pos/branches/{branchId}/catalog/products": {
       "get": {
         "operationId": "PosController_listCatalogProducts",
@@ -21263,7 +21306,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0.000001,
+            "minimum": 1e-06,
             "description": "Số lượng cần xếp"
           }
         },
@@ -22192,7 +22235,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 0.000001,
+            "minimum": 1e-06,
             "description": "Quantity to transfer (must be > 0)"
           },
           "sourceLocationId": {
@@ -23846,6 +23889,9 @@
       "UpdateLineCountDto": {
         "type": "object",
         "properties": {
+          "locationId": {
+            "type": "string"
+          },
           "countedQty": {
             "type": "object",
             "nullable": true

@@ -1,10 +1,14 @@
-import { useEffect, type RefObject } from "react";
+import { useCallback, useEffect, type RefObject } from "react";
 import {
   BarcodeIcon,
   ChevronDownIcon,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosIconButton } from "@erp/pos/components/common/PosIconButton/PosIconButton";
-import { PosSearchPopover } from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
+import {
+  PosSearchPopover,
+  type SearchSuggestion,
+} from "@erp/pos/components/common/PosSearchPopover/PosSearchPopover";
+import { useCheckoutBarcodeAutoAdd } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-barcode-auto-add";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
@@ -39,6 +43,7 @@ export function ProductSearchInput({
 }: ProductSearchInputProps) {
   const { toolbar, setToolbar, productSearchAdapter } = useCheckoutCatalog();
   const { addProductByItem, addProductByQuery } = useCheckoutCartActions();
+  const { tryAutoAdd, resetGuard } = useCheckoutBarcodeAutoAdd();
   const focusSeq = usePosCheckoutUiStore((s) => s.productSearchFocusSeq);
 
   useEffect(() => {
@@ -47,20 +52,49 @@ export function ProductSearchInput({
     inputRef.current?.select();
   }, [focusSeq, inputRef]);
 
+  // Mỗi lần gõ/quét thật mở một phiên nhập mới (nhả guard khử trùng).
+  const handleValueChange = useCallback(
+    (q: string) => {
+      resetGuard();
+      setToolbar((s) => ({ ...s, query: q }));
+    },
+    [resetGuard, setToolbar],
+  );
+
+  // "Đổi input": ưu tiên khớp mã vạch/SKU 100% → auto-add (dropdown đóng vì trả
+  // []); chỉ khi không khớp mới rơi về gợi ý tên/SKU client-side như cũ.
+  const search = useCallback(
+    async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
+      const result = await tryAutoAdd(q);
+      if (result === "miss") return productSearchAdapter(q);
+      return [];
+    },
+    [tryAutoAdd, productSearchAdapter],
+  );
+
+  // Enter: tra trước; khớp 1 → đã add; chỉ khi không khớp mới giữ addProductByQuery cũ.
+  const handleSubmitQuery = useCallback(
+    (q: string): boolean => {
+      if (!q.trim()) return true;
+      void tryAutoAdd(q).then((result) => {
+        if (result === "miss") addProductByQuery();
+      });
+      return true;
+    },
+    [tryAutoAdd, addProductByQuery],
+  );
+
   return (
     <PosSearchPopover<PosCatalogLine>
       inputRef={inputRef}
       value={toolbar.query}
-      onValueChange={(q) => setToolbar((s) => ({ ...s, query: q }))}
-      search={productSearchAdapter}
+      onValueChange={handleValueChange}
+      search={search}
       onSelect={(item) => addProductByItem(item)}
       itemKey={(item) => item.itemId}
       renderItem={(item) => item.name}
       renderMeta={(item) => `${item.code} · ${item.unit}`}
-      onSubmitQuery={() => {
-        addProductByQuery();
-        return true;
-      }}
+      onSubmitQuery={handleSubmitQuery}
       placeholder={placeholder}
       disabled={disabled}
       minChars={minChars}

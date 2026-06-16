@@ -3501,6 +3501,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pos/branches/{branchId}/catalog/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosController_getCatalogLookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/pos/branches/{branchId}/catalog/products": {
         parameters: {
             query?: never;
@@ -7431,6 +7447,7 @@ export interface components {
             locationId?: string;
         };
         UpdateLineCountDto: {
+            locationId?: string;
             countedQty?: Record<string, never> | null;
             countedValue?: Record<string, never> | null;
             note?: string;
@@ -15377,6 +15394,30 @@ export interface operations {
             query?: {
                 search?: string;
                 direction?: "warehouse" | "showroom";
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    PosController_getCatalogLookup: {
+        parameters: {
+            query: {
+                /** @description Exact barcode or SKU code to look up. */
+                code: string;
             };
             header?: never;
             path: {
