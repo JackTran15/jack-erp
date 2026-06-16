@@ -3,6 +3,13 @@ import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import { chain_filterRegistryReportInvoiceAndOrderList, chain_tableRegistryReportInvoiceAndOrderList, single_filterRegistryReportInvoiceAndOrderList, single_tableRegistryReportInvoiceAndOrderList } from "./report-registry/report-invoice-and-order-list.registry";
 import { chain_filterRegistryReportInventoryInOutStockSummary, chain_tableRegistryReportInventoryInOutStockSummary, single_filterRegistryReportInventoryInOutStockSummary, single_tableRegistryReportInventoryInOutStockSummary } from "./report-registry/report-inventory-in-out-stock-summary.registry";
+import { chain_filterRegistryReportWarehouseVoucherDetailList, chain_tableRegistryReportWarehouseVoucherDetailList, single_filterRegistryReportWarehouseVoucherDetailList, single_tableRegistryReportWarehouseVoucherDetailList } from "./report-registry/report-warehouse-voucher-detail-list.registry";
+import { chain_filterRegistryReportInventoryInOutStockQuantityDetail, chain_tableRegistryReportInventoryInOutStockQuantityDetail, single_filterRegistryReportInventoryInOutStockQuantityDetail, single_tableRegistryReportInventoryInOutStockQuantityDetail } from "./report-registry/report-inventory-in-out-stock-quantity-detail.registry";
+import { chain_filterRegistryReportStoreInventoryInOutStockSummary, chain_tableRegistryReportStoreInventoryInOutStockSummary, single_filterRegistryReportStoreInventoryInOutStockSummary, single_tableRegistryReportStoreInventoryInOutStockSummary } from "./report-registry/report-store-inventory-in-out-stock-summary.registry";
+import { chain_filterRegistryReportStockQuantityByStore, chain_tableRegistryReportStockQuantityByStore, single_filterRegistryReportStockQuantityByStore, single_tableRegistryReportStockQuantityByStore } from "./report-registry/report-stock-quantity-by-store.registry";
+import { chain_filterRegistryReportTransferInOutSummary, chain_tableRegistryReportTransferInOutSummary, single_filterRegistryReportTransferInOutSummary, single_tableRegistryReportTransferInOutSummary } from "./report-registry/report-transfer-in-out-summary.registry";
+import { chain_filterRegistryReportTransferredGoodsSummaryByStore, chain_tableRegistryReportTransferredGoodsSummaryByStore, single_filterRegistryReportTransferredGoodsSummaryByStore, single_tableRegistryReportTransferredGoodsSummaryByStore } from "./report-registry/report-transferred-goods-summary-by-store.registry";
+import { chain_filterRegistryReportTemporaryWarehouseOutGoods, chain_tableRegistryReportTemporaryWarehouseOutGoods, single_filterRegistryReportTemporaryWarehouseOutGoods, single_tableRegistryReportTemporaryWarehouseOutGoods } from "./report-registry/report-temporary-warehouse-out-goods.registry";
 import type { ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -158,16 +165,86 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportInventoryInOutStockSummary,
     },
   },
-  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: { label: 'Bảng kê chi tiết phiếu nhập xuất kho' },
-  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: { label: 'Chi tiết số lượng nhập xuất tồn kho' },
-  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng' },
-  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: { label: 'Số lượng tồn kho theo cửa hàng' },
+  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: {
+    label: 'Bảng kê chi tiết phiếu nhập xuất kho',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportWarehouseVoucherDetailList,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportWarehouseVoucherDetailList,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportWarehouseVoucherDetailList,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportWarehouseVoucherDetailList,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: {
+    label: 'Chi tiết số lượng nhập xuất tồn kho',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportInventoryInOutStockQuantityDetail,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportInventoryInOutStockQuantityDetail,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportInventoryInOutStockQuantityDetail,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportInventoryInOutStockQuantityDetail,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: {
+    label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportStoreInventoryInOutStockSummary,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportStoreInventoryInOutStockSummary,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportStoreInventoryInOutStockSummary,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportStoreInventoryInOutStockSummary,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: {
+    label: 'Số lượng tồn kho theo cửa hàng',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportStockQuantityByStore,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportStockQuantityByStore,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportStockQuantityByStore,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportStockQuantityByStore,
+    },
+  },
   [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_WAREHOUSE]: { label: 'Số lượng tồn kho theo kho' },
   [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu' },
-  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: { label: 'Tổng hợp nhập xuất điều chuyển' },
-  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: { label: 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng' },
+  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: {
+    label: 'Tổng hợp nhập xuất điều chuyển',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferInOutSummary,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferInOutSummary,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferInOutSummary,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferInOutSummary,
+    },
+  },
+  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: {
+    label: 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferredGoodsSummaryByStore,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferredGoodsSummaryByStore,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTransferredGoodsSummaryByStore,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferredGoodsSummaryByStore,
+    },
+  },
   [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm' },
-  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: { label: 'Hàng hóa xuất kho tạm' },
+  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: {
+    label: 'Hàng hóa xuất kho tạm',
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportTemporaryWarehouseOutGoods,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportTemporaryWarehouseOutGoods,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportTemporaryWarehouseOutGoods,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportTemporaryWarehouseOutGoods,
+    },
+  },
   [REPORT_TYPE_INVENTORY.GOODS_STORAGE_TIME]: { label: 'Thời gian lưu kho hàng hóa' },
   [REPORT_TYPE_INVENTORY.GOODS_OUT_BY_REASON]: { label: 'Hàng hóa xuất kho theo lý do' },
 };

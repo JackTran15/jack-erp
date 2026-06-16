@@ -13,7 +13,16 @@ import {
   mapTotals,
   type ReportRow,
 } from "./invoice-report.api";
-import { fetchStockSummary } from "./inventory-report.api";
+import {
+  fetchStockByBranch,
+  fetchStockDocumentDetails,
+  fetchStockQuantityDetails,
+  fetchStockSummary,
+  fetchStockSummaryByBranch,
+  fetchTemporaryWarehouseOutGoods,
+  fetchTransferByBranch,
+  fetchTransferSummary,
+} from "./inventory-report.api";
 
 // Tham số chuẩn hóa truyền cho mọi fetcher data của report.
 export interface ReportDataArgs {
@@ -56,6 +65,17 @@ const invoiceDataFetcher: ReportDataFetcher = async (args) => {
 // Report kho dùng endpoint riêng (mỗi report 1 fetcher).
 const CUSTOM_FETCHERS: Record<string, ReportDataFetcher> = {
   [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: fetchStockSummary,
+  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: fetchStockDocumentDetails,
+  [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]:
+    fetchStockQuantityDetails,
+  [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]:
+    fetchStockSummaryByBranch,
+  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: fetchStockByBranch,
+  [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: fetchTransferSummary,
+  [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]:
+    fetchTransferByBranch,
+  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]:
+    fetchTemporaryWarehouseOutGoods,
 };
 
 // Chọn nguồn data theo report type:

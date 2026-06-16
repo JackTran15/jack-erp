@@ -12,6 +12,18 @@ export enum REPORT_CATEGORY {
   PROFIT = 'profit',
 }
 
+// 8 báo cáo kho theo thứ tự hiển thị trong dropdown.
+const STORAGE_REPORTS = [
+  REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY,
+  REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST,
+  REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL,
+  REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY,
+  REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE,
+  REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY,
+  REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE,
+  REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS,
+];
+
 export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCategoryMetadata>> = {
   [REPORT_CATEGORY.SALES]: {
     label: "Bán hàng",
@@ -29,13 +41,9 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
     label: "Kho",
     url: "/reports/chain-inventory",
     configs: {
-      // Chỉ liệt kê report đã cấu hình; thêm dần khi triển khai các report kho còn lại.
-      [STORE_TYPE.SINGLE]: {
-        listReport: [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY],
-      },
-      [STORE_TYPE.CHAIN]: {
-        listReport: [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY],
-      },
+      // 8 báo cáo kho đã cấu hình (registry + fetcher).
+      [STORE_TYPE.SINGLE]: { listReport: STORAGE_REPORTS },
+      [STORE_TYPE.CHAIN]: { listReport: STORAGE_REPORTS },
     },
   },
   // [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: {
