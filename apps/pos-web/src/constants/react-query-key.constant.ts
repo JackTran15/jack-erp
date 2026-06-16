@@ -86,6 +86,9 @@ export const CATALOG_KEYS = {
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
   LOOKUP: (branchId: string, code: string) =>
     ["catalog", "lookup", branchId, code] as const,
+  /** Tìm kiếm catalog server-side (name/SKU/mã vạch ILIKE) cho dropdown gợi ý. */
+  SEARCH: (branchId: string, term: string) =>
+    ["catalog", "search", branchId, term] as const,
 } as const;
 
 export const ITEM_CATEGORY_KEYS = {

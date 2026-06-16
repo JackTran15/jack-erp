@@ -179,3 +179,45 @@ describe('PosCatalogService.lookupByCode', () => {
     expect(res).toEqual([]);
   });
 });
+
+describe('PosCatalogService.getCatalog', () => {
+  let service: PosCatalogService;
+  let query: jest.Mock;
+
+  beforeEach(async () => {
+    query = jest.fn();
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PosCatalogService,
+        { provide: DataSource, useValue: { query } },
+      ],
+    }).compile();
+
+    service = module.get(PosCatalogService);
+  });
+
+  it('matches name, SKU code and barcode (ILIKE) when a search term is given', async () => {
+    query.mockResolvedValue([]);
+
+    await service.getCatalog('branch-1', actor, '893');
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0];
+    expect(params).toEqual(['org-1', 'branch-1', '%893%']);
+    expect(sql).toContain('i.name ILIKE $3');
+    expect(sql).toContain('i.code ILIKE $3');
+    // Barcode partial match via item_barcodes EXISTS subquery.
+    expect(sql).toContain('item_barcodes');
+    expect(sql).toContain('b.code ILIKE $3');
+  });
+
+  it('omits the search clause (and the pattern param) when no term is given', async () => {
+    query.mockResolvedValue([]);
+
+    await service.getCatalog('branch-1', actor);
+
+    const [sql, params] = query.mock.calls[0];
+    expect(params).toEqual(['org-1', 'branch-1']);
+    expect(sql).not.toContain('ILIKE');
+  });
+});

@@ -139,3 +139,22 @@ export function useLookupCatalogByCode() {
     [queryClient],
   );
 }
+
+/**
+ * Imperative server-side catalog search (name / SKU / mã vạch ILIKE) —
+ * `GET /pos/branches/:id/catalog?search=`. Trả callback `(branchId, term) =>
+ * Promise<PosCatalogLine[]>` để ô tìm hàng gọi mỗi lần đổi input; cache theo
+ * `CATALOG_KEYS.SEARCH` nên gõ lại cùng từ khóa không phát request thừa.
+ */
+export function useSearchCatalog() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string, term: string): Promise<PosCatalogLine[]> =>
+      queryClient.fetchQuery({
+        queryKey: CATALOG_KEYS.SEARCH(branchId, term),
+        queryFn: () => catalogService.fetch(branchId, term),
+        staleTime: 30_000,
+      }),
+    [queryClient],
+  );
+}

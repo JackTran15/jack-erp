@@ -4,7 +4,6 @@ import { CHECKOUT_ERRORS } from "@erp/pos/constants/checkout-messages.constant";
 import { useCheckoutCatalog } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-catalog";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 import type { CatalogProduct } from "@erp/pos/interfaces/checkout.interface";
-import { locationQtyFor } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
 import { clampPosCheckoutQtyNumber } from "@erp/pos/lib/page-libs/checkout/posCheckoutQty";
 import {
@@ -47,12 +46,9 @@ export function useCheckoutCartActions(): UseCheckoutCartActionsResult {
 
   const addProductByItem = useCallback(
     (product: PosCatalogLine, qty = 1) => {
-      const atDef = locationQtyFor(product);
+      // Cho phép bán khống: KHÔNG chặn khi hết tồn (addProduct dùng tồn làm
+      // snapshot maxQty để cảnh báo vượt tồn, không chặn thêm vào giỏ).
       const ui = usePosCheckoutUiStore.getState();
-      if (atDef < 1) {
-        ui.setCartError(CHECKOUT_ERRORS.OUT_OF_STOCK);
-        return;
-      }
       const requested = clampPosCheckoutQtyNumber(qty);
       const lineId = addProduct(product, requested);
       clearToolbarQuery();
