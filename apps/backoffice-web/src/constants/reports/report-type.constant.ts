@@ -209,8 +209,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportStockQuantityByStore,
     },
   },
-  [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_WAREHOUSE]: { label: 'Số lượng tồn kho theo kho' },
-  [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu' },
+  // [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_WAREHOUSE]: { label: 'Số lượng tồn kho theo kho' },
+  // [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu' },
   [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: {
     label: 'Tổng hợp nhập xuất điều chuyển',
     filterConfig: {
@@ -233,7 +233,7 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportTransferredGoodsSummaryByStore,
     },
   },
-  [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm' },
+  // [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm' },
   [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: {
     label: 'Hàng hóa xuất kho tạm',
     filterConfig: {
@@ -245,8 +245,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportTemporaryWarehouseOutGoods,
     },
   },
-  [REPORT_TYPE_INVENTORY.GOODS_STORAGE_TIME]: { label: 'Thời gian lưu kho hàng hóa' },
-  [REPORT_TYPE_INVENTORY.GOODS_OUT_BY_REASON]: { label: 'Hàng hóa xuất kho theo lý do' },
+  // [REPORT_TYPE_INVENTORY.GOODS_STORAGE_TIME]: { label: 'Thời gian lưu kho hàng hóa' },
+  // [REPORT_TYPE_INVENTORY.GOODS_OUT_BY_REASON]: { label: 'Hàng hóa xuất kho theo lý do' },
 };
 
 export const REPORT_TYPE_DEBTS_METADATA = {

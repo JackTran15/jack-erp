@@ -39,7 +39,7 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
   },
   [REPORT_CATEGORY.INVENTORY]: {
     label: "Kho",
-    url: "/reports/chain-inventory",
+    url: "reports/storage/stock-summary",
     configs: {
       // 8 báo cáo kho đã cấu hình (registry + fetcher).
       [STORE_TYPE.SINGLE]: { listReport: STORAGE_REPORTS },
