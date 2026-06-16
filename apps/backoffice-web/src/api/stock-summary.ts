@@ -1,4 +1,11 @@
 import { erpApi, requireErpData } from "../lib/erp-api";
+import { apiClient } from "../lib/api-axios";
+
+export type StockSummaryExportVariant =
+  | "MODEL_AND_VARIANTS"
+  | "VARIANTS"
+  | "SPLIT_ATTRIBUTES"
+  | "MODELS";
 
 export interface StockSummaryRow {
   itemId: string;
@@ -89,6 +96,23 @@ export async function searchStockSummary(
       { body },
     ),
   );
+}
+
+export async function downloadStockSummaryExport(
+  variant: StockSummaryExportVariant,
+  filters: Record<string, unknown>,
+): Promise<void> {
+  const { data } = await apiClient.post<Blob>(
+    "/inventory/stock/summary/export",
+    { ...filters, page: undefined, limit: undefined, variant },
+    { responseType: "blob" },
+  );
+  const url = URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "tong-hop-ton-kho.xlsx";
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export interface StockSummaryFilterOptions {

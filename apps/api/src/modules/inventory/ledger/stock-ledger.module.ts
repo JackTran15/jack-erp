@@ -21,11 +21,21 @@ import { StockDeductionPublisher } from "../publishers/stock-deduction.publisher
 import { StockDeductionConsumer } from "../consumers/stock-deduction.consumer";
 import { StockReturnConsumer } from "../consumers/stock-return.consumer";
 import { StockReturnInConsumer } from "../consumers/stock-return-in.consumer";
+import { ItemEntity } from "../location/item.entity";
+import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
+import { BranchEntity } from "../../branch/branch.entity";
+import { StockSummaryExportService } from "./stock-summary-export.service";
 
 @Module({
   imports: [
     CqrsModule,
-    TypeOrmModule.forFeature([StockLedgerEntryEntity, StockBalanceEntity]),
+    TypeOrmModule.forFeature([
+      StockLedgerEntryEntity,
+      StockBalanceEntity,
+      ItemEntity,
+      ItemAttributeValueEntity,
+      BranchEntity,
+    ]),
     ProductModule,
     ItemCostSnapshotModule,
   ],
@@ -37,6 +47,7 @@ import { StockReturnInConsumer } from "../consumers/stock-return-in.consumer";
   providers: [
     StockLedgerService,
     StockSummaryService,
+    StockSummaryExportService,
     SearchStockSummaryV2Handler,
     InventoryStockBalanceCrudService,
     {

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   DocumentListShell,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Input,
   PeriodFilter,
   formatMoneyInteger,
@@ -9,7 +13,7 @@ import {
   type PeriodValue,
 } from "@erp/ui";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, CloudDownload, Filter, Search } from "lucide-react";
+import { ChevronDown, CloudDownload, Filter, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import {
@@ -30,6 +34,8 @@ import {
 } from "../../components/table/pagination.dto";
 import {
   searchStockSummary,
+  downloadStockSummaryExport,
+  type StockSummaryExportVariant,
   type StockStateFilter,
   type StockSummaryQuery,
   type StockSummaryRow,
@@ -151,6 +157,8 @@ export function InventoryManagementPage() {
   const [selectedItem, setSelectedItem] = useState<SelectedStockItem | null>(
     null,
   );
+  const [exportingVariant, setExportingVariant] =
+    useState<StockSummaryExportVariant | null>(null);
 
   const { options: storageOptions } = useStorageOptions({ withAll: false });
   const { options: categoryOptions } = useItemCategoryOptions({
@@ -379,48 +387,16 @@ export function InventoryManagementPage() {
     [columnFilters],
   );
 
-  const exportVisibleRows = () => {
-    const header = [
-      "Mã SKU",
-      "Tên hàng hóa",
-      "Đơn vị tính",
-      "Nhóm hàng hóa",
-      "Thương hiệu",
-      "Kho",
-      "SL tồn",
-      "Tồn đầu kỳ",
-      "SL nhập",
-      "SL xuất",
-      "Đang chuyển đi",
-      "Sắp nhận về",
-    ];
-    const csv = [
-      header,
-      ...rows.map((row) => [
-        row.item.code,
-        row.item.name,
-        row.item.unit,
-        row.item.categoryName ?? "",
-        row.item.brand ?? "",
-        row.storage.name,
-        displayStockQuantity(row, applied.advanced.excludeReservations),
-        row.openingQty,
-        row.inQty,
-        row.outQty,
-        row.transferOutQty,
-        row.incomingQty,
-      ]),
-    ]
-      .map((line) => line.map(csvCell).join(","))
-      .join("\n");
-    const url = URL.createObjectURL(
-      new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "tong-hop-ton-kho.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+  const handleExport = async (variant: StockSummaryExportVariant) => {
+    try {
+      setExportingVariant(variant);
+      await downloadStockSummaryExport(variant, searchBody);
+      toast.success("Đã tải tệp tổng hợp tồn kho");
+    } catch (error) {
+      toast.error(await getStockSummaryExportErrorMessage(error));
+    } finally {
+      setExportingVariant(null);
+    }
   };
 
   return (
@@ -495,17 +471,35 @@ export function InventoryManagementPage() {
               <Search className="mr-1.5 h-3.5 w-3.5" />
               Lấy dữ liệu
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={exportVisibleRows}
-              disabled={rows.length === 0}
-            >
-              <CloudDownload className="mr-1.5 h-3.5 w-3.5" />
-              Xuất khẩu
-              <ChevronDown className="ml-2 h-3.5 w-3.5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={rows.length === 0 || exportingVariant !== null}
+                >
+                  {exportingVariant ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CloudDownload className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Xuất khẩu
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[310px]">
+                {STOCK_SUMMARY_EXPORT_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.variant}
+                    disabled={exportingVariant !== null}
+                    onSelect={() => void handleExport(option.variant)}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </form>
 
           <div className="flex items-center gap-2 pb-1">
@@ -602,7 +596,31 @@ function displayStockQuantity(
   return row.quantity - (excludeReservations ? row.reservedQty : 0);
 }
 
-function csvCell(value: string | number): string {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
+const STOCK_SUMMARY_EXPORT_OPTIONS: Array<{
+  variant: StockSummaryExportVariant;
+  label: string;
+}> = [
+  { variant: "MODEL_AND_VARIANTS", label: "Xuất khẩu mẫu mã và thuộc tính chi tiết" },
+  { variant: "VARIANTS", label: "Xuất khẩu thuộc tính chi tiết" },
+  { variant: "SPLIT_ATTRIBUTES", label: "Xuất khẩu thuộc tính, tách riêng cột thuộc tính" },
+  { variant: "MODELS", label: "Xuất khẩu mẫu mã" },
+];
+
+async function getStockSummaryExportErrorMessage(error: unknown): Promise<string> {
+  if (
+    error &&
+    typeof error === "object" &&
+    "response" in error &&
+    (error as { response?: { data?: unknown } }).response?.data instanceof Blob
+  ) {
+    try {
+      const body = JSON.parse(
+        await (error as { response: { data: Blob } }).response.data.text(),
+      ) as { message?: unknown };
+      if (typeof body.message === "string") return body.message;
+    } catch {
+      // Fall through to the shared API error mapper.
+    }
+  }
+  return getUserFacingApiErrorMessage(error);
 }

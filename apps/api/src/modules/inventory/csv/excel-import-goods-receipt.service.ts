@@ -4,6 +4,7 @@ import * as ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { ILike, Repository } from "typeorm";
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 import { ItemBarcodeEntity } from "../location/item-barcode.entity";
 import { ItemEntity } from "../location/item.entity";
 import { LocationEntity } from "../location/location.entity";
@@ -275,6 +276,7 @@ export class ExcelImportGoodsReceiptService {
         formula: `IF(OR(G${row}="",H${row}=""),"",G${row}*H${row})`,
       };
     }
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }

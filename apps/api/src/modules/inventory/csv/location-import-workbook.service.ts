@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import * as ExcelJS from "exceljs";
+import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 
 export interface LocationImportRow {
   code: string;
@@ -100,6 +101,7 @@ export class LocationImportWorkbookService {
     sheet.getColumn(4).width = 15;
     if (withStatusCol) sheet.getColumn(5).width = 50;
 
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }

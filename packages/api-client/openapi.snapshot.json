@@ -6980,6 +6980,30 @@
         ]
       }
     },
+    "/inventory/stock/summary/export": {
+      "post": {
+        "operationId": "StockSummaryV2Controller_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockSummaryExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "StockSummaryV2"
+        ]
+      }
+    },
     "/products/storage-location": {
       "get": {
         "operationId": "ProductController_resolveStorageLocation",
@@ -21340,6 +21364,111 @@
             "$ref": "#/components/schemas/CompareFilterDto"
           }
         }
+      },
+      "StockSummaryExportDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "search": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "movementFrom": {
+            "type": "string"
+          },
+          "movementTo": {
+            "type": "string"
+          },
+          "excludeReservations": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isPosVisible": {
+            "type": "boolean"
+          },
+          "stockState": {
+            "enum": [
+              "ALL",
+              "IN_STOCK",
+              "OUT_OF_STOCK",
+              "NEGATIVE"
+            ],
+            "type": "string"
+          },
+          "itemCode": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "itemName": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "category": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "brand": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StringFilterDto"
+          },
+          "quantity": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "openingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "inQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "outQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "transferOutQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "incomingQty": {
+            "$ref": "#/components/schemas/CompareFilterDto"
+          },
+          "variant": {
+            "type": "string",
+            "enum": [
+              "MODEL_AND_VARIANTS",
+              "VARIANTS",
+              "SPLIT_ATTRIBUTES",
+              "MODELS"
+            ]
+          }
+        },
+        "required": [
+          "variant"
+        ]
       },
       "CreateProductDto": {
         "type": "object",

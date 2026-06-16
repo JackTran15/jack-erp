@@ -16,6 +16,7 @@ import {
   StringFilterDto,
 } from "../../../../common/filters/filter.dto";
 import { StockStateFilter } from "./stock-summary-query.dto";
+import { StockSummaryExportVariant } from "../stock-summary-export.service";
 
 export class StockSummarySearchV2Dto {
   @IsOptional()
@@ -134,4 +135,9 @@ export class StockSummarySearchV2Dto {
   @ValidateNested()
   @Type(() => CompareFilterDto)
   incomingQty?: CompareFilterDto;
+}
+
+export class StockSummaryExportDto extends StockSummarySearchV2Dto {
+  @IsEnum(StockSummaryExportVariant)
+  variant: StockSummaryExportVariant;
 }
