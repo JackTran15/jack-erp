@@ -1,6 +1,7 @@
 import { createStore, type StoreApi } from "zustand";
 import { resolvePeriodRange, type PeriodPreset } from "@erp/ui";
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
+import { STORE_TYPE } from "../../../constants/store.constant";
 import type {
   ReportInitialState,
   ReportState,
@@ -15,8 +16,16 @@ export function createReportStore(
     ...initialState,
 
     actions: {
-      // Đổi report type → xóa appliedRequest (data cũ) để chờ áp dụng lại; columns tự fetch theo type.
-      setReportType: (reportType) => set({ reportType, appliedRequest: null }),
+      // Đổi report type → columns tự fetch theo type. Chain: tự áp dụng ngay
+      // (snapshot mới) để fill data không cần bấm nút; single: xóa để chờ áp dụng.
+      setReportType: (reportType) =>
+        set((s) => ({
+          reportType,
+          appliedRequest:
+            s.branch === STORE_TYPE.CHAIN
+              ? { reportType, filters: s.filters, columnFilters: s.columnFilters }
+              : null,
+        })),
 
       setFilterValue: (line, value) =>
         set((s) => {
