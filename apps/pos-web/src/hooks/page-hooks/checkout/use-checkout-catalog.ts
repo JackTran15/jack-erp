@@ -6,6 +6,7 @@ import { matchesCatalogQuery } from "@erp/pos/lib/page-libs/checkout/checkoutUti
 import {
   useCatalogProductsQuery,
   useCatalogQuery,
+  useSearchCatalog,
 } from "@erp/pos/hooks/react-query/use-query-catalog";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import {
@@ -134,14 +135,17 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
       }));
   }, [productCards, catalogQuery]);
 
+  // Gợi ý dropdown lấy server-side: name / SKU / mã vạch khớp ILIKE (client-side
+  // chỉ lọc được name+code trên catalog đã tải, không có mã vạch). Trả tối đa 8.
+  const searchCatalog = useSearchCatalog();
   const productSearchAdapter = useCallback(
     async (q: string): Promise<SearchSuggestion<PosCatalogLine>[]> => {
-      const matched = catalog.filter((p) => matchesCatalogQuery(p, q));
-      return matched.slice(0, 8).map((p) => ({
-        item: p,
-      }));
+      const term = q.trim();
+      if (!term || !branchId) return [];
+      const rows = await searchCatalog(branchId, term);
+      return rows.slice(0, 8).map((p) => ({ item: p }));
     },
-    [catalog],
+    [searchCatalog, branchId],
   );
 
   return {

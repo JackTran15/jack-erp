@@ -37,7 +37,16 @@ export class PosCatalogService {
     if (safeSearch.length > 0) {
       const pattern = `%${safeSearch}%`;
       params.push(pattern);
-      searchClause = `AND (i.name ILIKE $3 OR i.code ILIKE $3)`;
+      searchClause = `AND (
+                i.name ILIKE $3
+                OR i.code ILIKE $3
+                OR EXISTS (
+                  SELECT 1 FROM item_barcodes b
+                  WHERE b.item_id = i.id
+                    AND b.organization_id = i.organization_id
+                    AND b.code ILIKE $3
+                )
+              )`;
     }
 
     const rows: Array<{
