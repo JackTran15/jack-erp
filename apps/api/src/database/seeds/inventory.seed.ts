@@ -1026,6 +1026,22 @@ async function seedInventoryData() {
       cashAccountId: IDS.cashAccountCanTho,
     });
 
+    // Dedicated "Mặc định" (is_default) location per main storage so the POS
+    // location resolver can sell any item without a manual shelf mapping
+    // (imported items have none). Mirrors AddDefaultLocation migration +
+    // branch.service.ts; idempotent via UQ_locations_default_per_storage.
+    await AppDataSource.query(
+      `
+      INSERT INTO locations (id, organization_id, branch_id, created_by, code, name, storage_id, type, is_active, is_default, created_at, updated_at)
+      SELECT gen_random_uuid(), s.organization_id, s.branch_id, s.created_by, 'DEFAULT', 'Mặc định', s.id, 'SHELF', true, true, NOW(), NOW()
+      FROM storages s
+      WHERE s.is_main_storage = true
+        AND NOT EXISTS (
+          SELECT 1 FROM locations l WHERE l.storage_id = s.id AND l.is_default = true
+        )
+      `,
+    );
+
     // Membership card types (default tiers per org)
     await AppDataSource.query(
       `

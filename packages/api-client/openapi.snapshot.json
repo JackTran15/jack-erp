@@ -1064,6 +1064,57 @@
         ]
       }
     },
+    "/organizations/current/pos-settings": {
+      "get": {
+        "operationId": "OrganizationController_getPosSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Org-wide POS settings for the actor's organization (e.g. checkout prefill).",
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "operationId": "OrganizationController_updatePosSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePosSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/organizations/{id}": {
       "get": {
         "operationId": "OrganizationController_findById",
@@ -16079,6 +16130,9 @@
           "mainBranchId": {
             "type": "string"
           },
+          "defaultCreditDays": {
+            "type": "number"
+          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -16120,6 +16174,32 @@
           "updatedAt",
           "createdBy"
         ]
+      },
+      "PosSettingsDto": {
+        "type": "object",
+        "properties": {
+          "defaultCreditDays": {
+            "type": "number",
+            "nullable": true,
+            "description": "Default credit days used to prefill the POS due-date modal; null when unset.",
+            "example": 30
+          }
+        },
+        "required": [
+          "defaultCreditDays"
+        ]
+      },
+      "UpdatePosSettingsDto": {
+        "type": "object",
+        "properties": {
+          "defaultCreditDays": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Default credit days; send null to clear.",
+            "example": 30
+          }
+        }
       },
       "UpdateOrganizationDto": {
         "type": "object",
@@ -19997,6 +20077,9 @@
           "isUnassigned": {
             "type": "boolean"
           },
+          "isDefault": {
+            "type": "boolean"
+          },
           "storage": {
             "$ref": "#/components/schemas/StorageEntity"
           },
@@ -20035,6 +20118,7 @@
           "type",
           "isActive",
           "isUnassigned",
+          "isDefault",
           "id",
           "organizationId",
           "createdAt",
@@ -24871,6 +24955,9 @@
           "dueDate": {
             "type": "string"
           },
+          "creditDays": {
+            "type": "number"
+          },
           "settledAt": {
             "format": "date-time",
             "type": "string"
@@ -25121,6 +25208,17 @@
       "CheckoutInvoiceDto": {
         "type": "object",
         "properties": {
+          "dueDate": {
+            "type": "string",
+            "description": "Credit due date (ISO `YYYY-MM-DD`). Stored on the debt record when the sale\nleaves a remaining balance (DEBT / PARTIAL_DEBT). Ignored when fully paid.",
+            "example": "2026-06-25"
+          },
+          "creditDays": {
+            "type": "number",
+            "description": "Credit term in days entered at checkout (per invoice).",
+            "minimum": 0,
+            "example": 9
+          },
           "payments": {
             "description": "Payment lines. Empty array = full debt (requires a customer on the invoice).",
             "type": "array",

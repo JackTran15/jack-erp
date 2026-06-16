@@ -38,7 +38,9 @@ export function derivePaymentDisplay(input: {
     return {
       changeAmount: 0,
       shortageAmount: 0,
-      debtAmount: settlementAbs,
+      // Sale: only the unpaid remainder becomes customer debt (tendered cash/transfer
+      // reduces it). Refund-debt keeps the full magnitude (out of scope here).
+      debtAmount: isRefund ? settlementAbs : rawUnder,
     };
   }
 

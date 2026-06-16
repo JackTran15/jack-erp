@@ -86,6 +86,7 @@ export function PosLayout() {
   );
 
   const clearBranch = usePosBranchStore((s) => s.clearBranch);
+  const resetSession = usePosCheckoutSessionStore((s) => s.resetSession);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const posSessionId = usePosCheckoutSessionStore((s) => s.posSessionId);
@@ -223,6 +224,7 @@ export function PosLayout() {
   const handleLogout = () => {
     authService.clearSession();
     clearBranch();
+    resetSession();
     navigate("/dang-nhap", { replace: true });
   };
 

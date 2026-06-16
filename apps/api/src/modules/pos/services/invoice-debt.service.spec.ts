@@ -200,6 +200,80 @@ describe('InvoiceDebtService', () => {
       expect(debtRepo.create).not.toHaveBeenCalled();
       expect(result).toEqual(createdEntity);
     });
+
+    it('stores dueDate and creditDays when both are provided', async () => {
+      const invoice = invoiceStub();
+      const createdEntity = { ...debtStub() };
+      debtRepo.create.mockReturnValue(createdEntity);
+      debtRepo.save.mockResolvedValue(createdEntity);
+
+      await service.createFromInvoice(invoice, undefined, undefined, {
+        dueDate: '2999-12-31',
+        creditDays: 9,
+      });
+
+      expect(debtRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ dueDate: '2999-12-31', creditDays: 9 }),
+      );
+    });
+
+    it('derives dueDate from creditDays when only creditDays is provided', async () => {
+      const invoice = invoiceStub();
+      const createdEntity = { ...debtStub() };
+      debtRepo.create.mockReturnValue(createdEntity);
+      debtRepo.save.mockResolvedValue(createdEntity);
+
+      const today = new Date().toISOString().split('T')[0];
+      const expectedDue = new Date(
+        new Date(`${today}T00:00:00Z`).getTime() + 10 * 86_400_000,
+      )
+        .toISOString()
+        .split('T')[0];
+
+      await service.createFromInvoice(invoice, undefined, undefined, {
+        creditDays: 10,
+      });
+
+      expect(debtRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ dueDate: expectedDue, creditDays: 10 }),
+      );
+    });
+
+    it('derives creditDays from dueDate when only dueDate is provided', async () => {
+      const invoice = invoiceStub();
+      const createdEntity = { ...debtStub() };
+      debtRepo.create.mockReturnValue(createdEntity);
+      debtRepo.save.mockResolvedValue(createdEntity);
+
+      const today = new Date().toISOString().split('T')[0];
+      const dueDate = new Date(
+        new Date(`${today}T00:00:00Z`).getTime() + 15 * 86_400_000,
+      )
+        .toISOString()
+        .split('T')[0];
+
+      await service.createFromInvoice(invoice, undefined, undefined, { dueDate });
+
+      expect(debtRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ dueDate, creditDays: 15 }),
+      );
+    });
+
+    it('throws BadRequestException when dueDate is before the issue date', async () => {
+      const invoice = invoiceStub();
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(
+        new Date(`${today}T00:00:00Z`).getTime() - 86_400_000,
+      )
+        .toISOString()
+        .split('T')[0];
+
+      await expect(
+        service.createFromInvoice(invoice, undefined, undefined, {
+          dueDate: yesterday,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   // =========================================================================

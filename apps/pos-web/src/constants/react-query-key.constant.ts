@@ -15,6 +15,11 @@ export const BRANCH_KEYS = {
   MY_BRANCHES: ["branches", "me"] as const,
 } as const;
 
+export const ORGANIZATION_KEYS = {
+  ALL: ["organization"] as const,
+  POS_SETTINGS: ["organization", "pos-settings"] as const,
+} as const;
+
 export const ACCOUNT_KEYS = {
   ALL: ["accounts"] as const,
   PAYMENT: ["accounts", "payment"] as const,

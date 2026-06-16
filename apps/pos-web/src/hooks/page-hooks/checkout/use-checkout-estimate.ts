@@ -1,11 +1,8 @@
-import { useCallback } from "react";
-import { toast } from "sonner";
+import { useCallback, useState } from "react";
 
 import { useInvoicePrinter } from "@erp/pos/hooks/page-hooks/checkout/use-invoice-printer";
-import { useCreateInvoiceMutation } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { buildCheckoutInvoicePayload } from "@erp/pos/lib/page-libs/checkout/checkoutReceiptFactory";
 import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettlement";
-import { buildCreateInvoicePayload } from "@erp/pos/lib/page-libs/checkout/invoicePayloadMapper";
 import {
   PAYMENT_METHODS,
   PaymentMethodEnum,
@@ -13,36 +10,32 @@ import {
 import {
   CHECKOUT_ANNOUNCEMENTS,
   CHECKOUT_ERRORS,
-  CHECKOUT_TOASTS,
 } from "@erp/pos/constants/checkout-messages.constant";
 import {
   computeReceiptLines,
-  selectCustomerDraft,
   selectGrandTotal,
   selectHasAnyCartLines,
-  selectMetaDraft,
   selectPaymentDraft,
   selectPointsDiscountAmount,
-  selectPurchaseCart,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface UseCheckoutEstimateResult {
-  /** Tạo invoice draft (KHÔNG checkout) rồi in bản "HÓA ĐƠN TẠM TÍNH". Giữ nguyên giỏ/tab. */
+  /** In bản "HÓA ĐƠN TẠM TÍNH" thuần từ state hiện tại. KHÔNG tạo draft, KHÔNG reset giỏ/tab. */
   printEstimate: () => Promise<void>;
   isPrinting: boolean;
 }
 
 /**
- * "In tạm tính": gọi `POST /invoices` tạo draft nhưng KHÔNG checkout, in hóa đơn
- * với tiêu đề tạm tính, và KHÔNG reset session/UI (khác hẳn finalize) để thu ngân
- * còn sửa giỏ trước khi thu tiền chính thức. Đọc state qua `getState()` tại thời
- * điểm bấm (không subscribe payment store reactive).
+ * "In tạm tính": chỉ in xem trước từ state hiện tại — KHÔNG gọi API tạo draft,
+ * KHÔNG checkout, KHÔNG reset session/UI (thu ngân còn sửa giỏ trước khi thu
+ * tiền chính thức). Đọc state qua `getState()` tại thời điểm bấm (không subscribe
+ * payment store reactive).
  */
 export function useCheckoutEstimate(): UseCheckoutEstimateResult {
   const invoicePrinter = useInvoicePrinter();
-  const createMutation = useCreateInvoiceMutation();
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const printEstimate = useCallback(async () => {
     const sessionState = usePosCheckoutSessionStore.getState();
@@ -53,14 +46,10 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       return;
     }
 
-    const selectedCustomer = selectCustomerDraft(sessionState).selectedCustomer;
-    const selectedSalesperson =
-      selectMetaDraft(sessionState).selectedSalesperson;
-    const purchaseCart = selectPurchaseCart(sessionState);
     const p = selectPaymentDraft(sessionState);
     const grandTotal = selectGrandTotal(sessionState);
     const pointsDiscountAmount = selectPointsDiscountAmount(sessionState);
-    const { totalPaid } = deriveSettlement({
+    const { totalPaid, settlementGrandTotal } = deriveSettlement({
       grandTotal,
       deposit: p.deposit,
       returnFee: p.returnFee,
@@ -79,6 +68,8 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       provisional: true,
       cart: computeReceiptLines(sessionState),
       grandTotal,
+      settlementTotal: settlementGrandTotal,
+      deposit: p.deposit,
       totalPaid,
       paymentLines: p.paymentLines,
       primaryMethodLabel,
@@ -86,37 +77,19 @@ export function useCheckoutEstimate(): UseCheckoutEstimateResult {
       keepChange: p.keepChange,
       debt: p.debt,
     });
+    if (!receiptPayload) return;
 
-    const note = p.note || undefined;
-
+    setIsPrinting(true);
     try {
-      // Chỉ TẠO draft — KHÔNG redeem điểm, KHÔNG checkout, KHÔNG reset session/UI.
-      await createMutation.mutateAsync(
-        buildCreateInvoicePayload({
-          sessionId: sessionState.posSessionId,
-          cart: purchaseCart,
-          customer: selectedCustomer,
-          note,
-          salesperson: selectedSalesperson,
-        }),
-      );
+      await invoicePrinter.print(receiptPayload);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : CHECKOUT_TOASTS.ESTIMATE_FAILED,
-      );
-      return;
-    }
-
-    if (receiptPayload) {
-      try {
-        await invoicePrinter.print(receiptPayload);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("Lỗi in hóa đơn tạm tính:", err);
-      }
+      // eslint-disable-next-line no-console
+      console.error("Lỗi in hóa đơn tạm tính:", err);
+    } finally {
+      setIsPrinting(false);
     }
     ui.setAnnouncement(CHECKOUT_ANNOUNCEMENTS.estimatePrinted);
-  }, [createMutation, invoicePrinter]);
+  }, [invoicePrinter]);
 
-  return { printEstimate, isPrinting: createMutation.isPending };
+  return { printEstimate, isPrinting };
 }

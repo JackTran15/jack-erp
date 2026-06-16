@@ -883,3 +883,80 @@ flowchart LR
   T6 --> T7
 ```
 
+## EPIC-16062026 POS partial debt checkout (net "Tính vào công nợ" against cash tendered)
+
+- [EPIC-16062026 POS partial debt checkout](./epics/EPIC-16062026-pos-partial-debt-checkout.md)
+- **Bug fix (FE-only):** dòng "Tính vào công nợ" tại POS checkout hiển thị **sai** và post **sai** — ví dụ tổng 1.500.000, đặt cọc 50.000, tiền mặt 145.000 → hiện **1.450.000** thay vì **1.305.000**. Checkbox đang code kiểu *nợ toàn phần*: khi tick, FE bỏ hết dòng tiền mặt/chuyển khoản (`buildCheckoutInvoiceApiPayload` trả `payments:[]`), `derivePaymentDisplay` trả `debtAmount = settlementAbs`, và `checkoutReceiptFactory` ép `effectiveTotalPaid = 0`. **Backend đã hỗ trợ sẵn nợ một phần** (`payments` không rỗng < `amountDue` → ghi payment + auto-book phần dư vào `invoice_debts`, status `PARTIAL_DEBT` tại `checkout-invoice.service.ts:180-228`); `validateCheckout` cũng đã cho debt + trả thiếu qua `debtCovered`. Fix theo hướng **"respect entered payments"**: `debtAmount = max(0, amountDue − ∑ payment lines)`, gửi đúng dòng thanh toán khi nợ, sửa receipt + chặn auto-fill ghi đè khi đang nợ. **Không** entity/migration/event/BE/permission/OpenAPI; chỉ 4 file `apps/pos-web`.
+
+| Ticket                                                                       | Mô tả                                                                                              |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [TKT-PDC-01](./tickets/TKT-PDC-01-settlement-residual-debt.md)               | FE: `derivePaymentDisplay` (sale) trả `debtAmount = rawUnder` (residual) + spec settlement         |
+| [TKT-PDC-02](./tickets/TKT-PDC-02-checkout-payload-send-payments.md)         | FE: bỏ short-circuit `payments:[]` khi debt → gửi dòng thanh toán thật + cập nhật caller + spec     |
+| [TKT-PDC-03](./tickets/TKT-PDC-03-receipt-and-autofill-parity.md)            | FE: receipt dùng `totalPaid` thật + chặn auto-fill ghi đè dòng đầu khi đang nợ                      |
+| [TKT-PDC-04](./tickets/TKT-PDC-04-verify-and-dod.md)                         | Verify: tsc build + chạy spec (vitest ad-hoc) + checkout thủ công (PARTIAL_DEBT, nợ 1.305.000) + DoD |
+
+### Ticket dependency graph (EPIC-16062026 pos-partial-debt-checkout)
+
+```mermaid
+flowchart LR
+  T1["TKT-PDC-01 Settlement residual"] --> T3["TKT-PDC-03 Receipt + auto-fill"]
+  T2["TKT-PDC-02 Payload sends payments"] --> T3
+  T1 --> T4["TKT-PDC-04 Verify + DoD"]
+  T2 --> T4
+  T3 --> T4
+```
+
+## EPIC-16062026 POS công nợ — Hạn thanh toán (per-invoice due date + org default + overdue)
+
+- [EPIC-16062026 POS công nợ — Hạn thanh toán](./epics/EPIC-16062026-pos-debt-due-date.md)
+- Tại POS checkout, chọn **"Hạn thanh toán"** cho công nợ rồi confirm modal nhưng (a) **không hiển thị lại** giá trị ra checkout section (KQHT) và (b) **không lưu xuống BE** (`paymentDueDate` chỉ là FE state). Số ngày được nợ **tính per-invoice** (thu ngân nhập từng hóa đơn), org `defaultCreditDays` chỉ để **prefill**. Epic: (1) FE hiển thị `Hạn thanh toán: dd/MM/yyyy (N ngày)`; (2) gửi + lưu `dueDate`/`creditDays` vào `invoice_debts` (cột `due_date` đã có, thêm `credit_days`); (3) org `defaultCreditDays` (cột mới) read/update + prefill modal; (4) cron hằng ngày đánh dấu `OVERDUE` + phát `debt.overdue`. **Phối hợp** EPIC-16062026 partial-debt-checkout (cùng `buildCheckoutInvoiceApiPayload`/`CheckoutInvoiceBody`). Thêm `@nestjs/schedule` (repo chưa có scheduler).
+
+| Ticket                                                                          | Mô tả                                                                              |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-DUE-01](./tickets/TKT-DUE-01-schema-credit-days-org-default.md)            | BE: migration + entity — `invoice_debts.credit_days` + `organizations.default_credit_days` |
+| [TKT-DUE-02](./tickets/TKT-DUE-02-checkout-dto-persist-debt-terms.md)           | BE: `CheckoutInvoiceDto` (`dueDate`/`creditDays`) + `createFromInvoice` lưu lên debt |
+| [TKT-DUE-03](./tickets/TKT-DUE-03-org-default-credit-days-api.md)               | BE: org `defaultCreditDays` — GET (POS prefill) + PATCH (admin)                     |
+| [TKT-DUE-04](./tickets/TKT-DUE-04-overdue-cron-and-event.md)                    | BE: cron `@nestjs/schedule` đánh dấu OVERDUE + event `debt.overdue` (idempotent)    |
+| [TKT-DUE-05](./tickets/TKT-DUE-05-openapi-regen.md)                             | OpenAPI regen + api-client snapshot                                                |
+| [TKT-DUE-06](./tickets/TKT-DUE-06-fe-checkout-send-and-display.md)              | FE: gửi `dueDate`/`creditDays` + hiển thị trong checkout section (bug KQMM)         |
+| [TKT-DUE-07](./tickets/TKT-DUE-07-fe-modal-prefill-org-default.md)              | FE: prefill modal "Hạn thanh toán" từ org default                                  |
+| [TKT-DUE-08](./tickets/TKT-DUE-08-tests-e2e-dod.md)                             | E2E checkout due-date + org default + cron + DoD gate                              |
+
+### Ticket dependency graph (EPIC-16062026 pos-debt-due-date)
+
+```mermaid
+flowchart LR
+  T1["TKT-DUE-01 Schema + entities"] --> T2["TKT-DUE-02 Checkout DTO + persist"]
+  T1 --> T3["TKT-DUE-03 Org default API"]
+  T1 --> T4["TKT-DUE-04 Overdue cron + event"]
+  T2 --> T5["TKT-DUE-05 openapi regen"]
+  T3 --> T5
+  T5 --> T6["TKT-DUE-06 FE send + display"]
+  T3 --> T7["TKT-DUE-07 FE prefill org default"]
+  T5 --> T7
+  T2 --> T8["TKT-DUE-08 Tests + E2E + DoD"]
+  T3 --> T8
+  T4 --> T8
+  T6 --> T8
+  T7 --> T8
+```
+
+## EPIC-16062026 POS "In tạm tính" — không lưu draft + receipt parity (đặt cọc / công nợ / phương thức / khuyến mãi)
+
+- [EPIC-16062026 POS "In tạm tính"](./epics/EPIC-16062026-pos-estimate-print.md)
+- **Bug fix (FE-only, `apps/pos-web`):** nút "In tạm tính" (1) gọi `POST /invoices` tạo **draft** mỗi lần bấm — sai, chỉ nên in xem trước; (2) bản in hiển thị **Đặt cọc / Tính vào công nợ / Phương thức thanh toán / Khuyến mãi sai/thiếu**. Renderer + factory **dùng chung** 2 luồng in nên fix áp dụng cho cả "In tạm tính" lẫn "In hóa đơn". Chốt: đặt cọc **net-out không dòng** (`settlementGrandTotal`), khuyến mãi = **gross Tiền hàng + "Khuyến mãi" + "KM theo mặt hàng"** (per-line) theo [Image #2], **fold** phần receipt của TKT-PDC-03 (bỏ `effectiveTotalPaid = 0`). Không entity/migration/event/BE/permission/OpenAPI.
+
+| Ticket                                                          | Mô tả                                                                                                  |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [TKT-EPT-01](./tickets/TKT-EPT-01-receipt-parity.md)           | FE: factory+DTO+renderer+call sites — đặt cọc net-out + `totalPaid` thật + gross Tiền hàng + Khuyến mãi/KM theo mặt hàng |
+| [TKT-EPT-02](./tickets/TKT-EPT-02-estimate-no-draft.md)        | FE: "In tạm tính" bỏ tạo draft, in thuần từ state hiện tại (không reset giỏ)                            |
+| [TKT-EPT-03](./tickets/TKT-EPT-03-verify-and-dod.md)           | Verify: tsc build + flow thủ công (no-draft + parity 2 bản in: Image #2 / đặt cọc / nợ một phần / không KM) + DoD |
+
+### Ticket dependency graph (EPIC-16062026 pos-estimate-print)
+
+```mermaid
+flowchart LR
+  T1["TKT-EPT-01 Receipt parity"] --> T3["TKT-EPT-03 Verify + DoD"]
+  T2["TKT-EPT-02 In tạm tính: no draft"] --> T3
+```
+

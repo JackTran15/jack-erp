@@ -184,6 +184,9 @@ interface PosCheckoutSessionState {
 
   /** Open a draft on a new invoice tab; leaves the previously active tab unchanged. */
   openDraftInNewSession: (draft: DraftInvoice) => void;
+
+  /** Clear all session data on logout — resets in-memory state and triggers persist to overwrite localStorage. */
+  resetSession: () => void;
 }
 
 // const initialId = `s-${crypto.randomUUID()}`;
@@ -527,6 +530,17 @@ export const usePosCheckoutSessionStore = create<PosCheckoutSessionState>()(
         set({
           sessions: [...sessions, newSession],
           activeSessionId: newId,
+        });
+      },
+
+      resetSession: () => {
+        const freshId = `s-${crypto.randomUUID()}`;
+        set({
+          posSessionId: crypto.randomUUID(),
+          sessions: [createSaleSession(freshId, "Hóa đơn 1")],
+          activeSessionId: freshId,
+          cashierDisplayName: null,
+          draftsDialogOpen: false,
         });
       },
     }),

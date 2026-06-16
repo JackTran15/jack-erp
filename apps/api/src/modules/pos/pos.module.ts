@@ -36,6 +36,7 @@ import { InvoiceService } from './services/invoice.service';
 import { CheckoutInvoiceService } from './services/checkout-invoice.service';
 import { CancelInvoiceService } from './services/cancel-invoice.service';
 import { InvoiceDebtService } from './services/invoice-debt.service';
+import { OverdueDebtsService } from './services/overdue-debts.service';
 import { ReturnEligibilityService } from './services/return-eligibility.service';
 import { CreateReturnInvoiceService } from './services/create-return-invoice.service';
 import { CreateExchangeInvoiceService } from './services/create-exchange-invoice.service';
@@ -102,6 +103,7 @@ import { StockReturnInPublisher } from './publishers/stock-return-in.publisher';
     CheckoutInvoiceService,
     CancelInvoiceService,
     InvoiceDebtService,
+    OverdueDebtsService,
     InvoiceCancelledPublisher,
     DebtPaymentVoucherLinkConsumer,
     ReturnPostedPublisher,

@@ -153,14 +153,7 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
       .summary-row.forgiven { font-weight: 700; font-style: italic; }
       .summary-row.forgiven .value { font-weight: 700; }
 
-      .km-line {
-        border-top: 1px solid #000;
-        padding: 4px 0;
-        margin: 0 0 16px 0;
-        font-size: 13px;
-        font-weight: 700;
-      }
-      .km-line .value { font-weight: 400; margin-left: 8px; }
+      .summary-row.km-sub { padding-left: 16px; }
 
       .policy { padding: 8px 0; text-align: center; }
       .policy-title {
@@ -226,10 +219,30 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
           <span>Tiền hàng</span>
           <span class="value">${formatVnd(totals.subtotal)}</span>
         </div>
+        ${
+          totals.itemDiscountTotal != null && totals.itemDiscountTotal > 0
+            ? `<div class="summary-row bold">
+          <span>Khuyến mãi</span>
+          <span class="value">${formatVnd(totals.itemDiscountTotal)}</span>
+        </div>
+        <div class="summary-row km-sub">
+          <span>KM theo mặt hàng</span>
+          <span class="value">${formatVnd(totals.itemDiscountTotal)}</span>
+        </div>`
+            : ""
+        }
         <div class="summary-row grand-total">
           <span>Tổng thanh toán:</span>
           <span class="value">${formatVnd(totals.grandTotal)}</span>
         </div>
+        ${
+          totals.depositAmount != null && totals.depositAmount > 0
+            ? `<div class="summary-row">
+          <span>Đặt cọc</span>
+          <span class="value">${formatVnd(totals.depositAmount)}</span>
+        </div>`
+            : ""
+        }
         ${paymentRows}
         <div class="summary-row change">
           <span>Trả lại khách</span>
@@ -268,14 +281,6 @@ export function renderInvoiceHtml(invoice: InvoicePayload): string {
             : ""
         }
       </section>
-
-      <p class="km-line">
-        HĐ đã được KM:${
-          invoice.discountNote
-            ? `<span class="value">${escapeHtml(invoice.discountNote)}</span>`
-            : ""
-        }
-      </p>
 
       <section class="policy">
         <div class="policy-title">${escapeHtml(invoice.policy.title)}</div>

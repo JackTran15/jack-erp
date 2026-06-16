@@ -45,6 +45,9 @@ export class InvoiceDebtEntity extends BaseEntity {
   @Column({ name: 'due_date', type: 'date', nullable: true, comment: 'Optional payment deadline' })
   dueDate?: string;
 
+  @Column({ name: 'credit_days', type: 'int', nullable: true, comment: 'Credit term in days entered at checkout (per invoice); null = open-ended' })
+  creditDays?: number;
+
   @Column({ name: 'settled_at', type: 'timestamptz', nullable: true, comment: 'Timestamp when the debt was fully settled; null while open' })
   settledAt?: Date;
 

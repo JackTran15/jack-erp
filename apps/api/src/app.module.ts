@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthModule } from './modules/health/health.module';
 import { RedisModule } from './modules/redis/redis.module';
@@ -67,6 +68,8 @@ import { AdminSearchModule } from './modules/admin-search/admin-search.module';
         synchronize: false,
       }),
     }),
+
+    ScheduleModule.forRoot(),
 
     HealthModule,
     RedisModule,

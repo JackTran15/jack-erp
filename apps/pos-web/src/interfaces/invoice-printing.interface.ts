@@ -33,10 +33,20 @@ export interface InvoiceLineData {
 
 export interface InvoiceTotals {
   totalQty: number;
-  /** Sub-total before any rounding / promotion. */
+  /** "Tiền hàng" — gross line total before any promotion / discount. */
   subtotal: number;
-  /** Final amount the customer is asked to pay. */
+  /**
+   * Optional "Khuyến mãi" block: total per-line discount (KM theo mặt hàng).
+   * Omitted/undefined when there is no discount → renderer hides the block.
+   */
+  itemDiscountTotal?: number;
+  /** "Tổng thanh toán" — net amount the customer is asked to pay. */
   grandTotal: number;
+  /**
+   * Optional "Đặt cọc" line: deposit collected upfront, subtracted from the
+   * amount due. Omitted/undefined or ≤ 0 → renderer hides the line.
+   */
+  depositAmount?: number;
   /** Amount tendered (e.g. cash given). */
   paid: number;
   /**
