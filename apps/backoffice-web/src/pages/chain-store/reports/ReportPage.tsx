@@ -17,17 +17,22 @@ import { STORE_TYPE } from "../../../constants/store.constant";
 
 interface Props {
   category: REPORT_CATEGORY;
+  /** Report type mặc định theo route (vd báo cáo kho); dùng khi URL chưa có hash. */
+  reportType?: string;
 }
 
-export function ReportPage({ category }: Props) {
+export function ReportPage({ category, reportType }: Props) {
   const isChain = useIsChainSelected();
   const branch = isChain ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE;
   const configs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
 
-  // Report type khởi tạo lấy từ URL hash (vd #daily_sales_summary) để giữ trạng
-  // thái khi reload / chia sẻ link; factory tự fallback nếu hash không hợp lệ.
+  // Report type khởi tạo: ưu tiên URL hash (giữ trạng thái khi reload / chia sẻ
+  // link), kế đến report type theo route, cuối cùng factory fallback listReport[0].
   const { hash } = useLocation();
   const hashReportType = decodeURIComponent(hash.replace(/^#/, ""));
+  const initialReportType = (configs?.listReport ?? []).includes(hashReportType)
+    ? hashReportType
+    : reportType;
 
   // Columns nạp từ API (ReportTableConfigSync) → khởi tạo rỗng.
   const tableInitialState = useMemo(() => {
@@ -41,10 +46,10 @@ export function ReportPage({ category }: Props) {
             category,
             branch,
             configs,
-            reportType: hashReportType,
+            reportType: initialReportType,
           })
         : null,
-    [category, branch, configs, hashReportType],
+    [category, branch, configs, initialReportType],
   );
 
   if (!configs || !tableInitialState || !reportInitialState) {

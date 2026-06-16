@@ -23,6 +23,7 @@ import {
 } from "../../../../components/table/pagination.dto";
 import { ReportFilterPopover, withDefaults } from "./ReportFilterDialog";
 import { ColumnConfigDialog, type ColumnConfigEntry } from "./ColumnConfigDialog";
+import { StorageReportSelect } from "./StorageReportSelect";
 import {
   type FilterField,
   type FilterValues,
@@ -265,32 +266,38 @@ export function StorageReportShell<T>({
     <div className="flex h-full min-h-0 flex-col bg-background">
       {/* Top bar: filter button (left) — title + subtitle (center) */}
       <div className="grid shrink-0 grid-cols-[auto_1fr_auto] items-start gap-4 border-b px-4 py-3">
-        <div className="relative">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-9"
-            data-report-filter-trigger
-            onClick={() => setFilterOpen((o) => !o)}
-          >
-            <Filter className="mr-1.5 h-4 w-4" />
-            Chọn bộ lọc
-          </Button>
-          <ReportFilterPopover
-            open={filterOpen}
-            onOpenChange={setFilterOpen}
-            fields={filterFields}
-            value={filterValues}
-            onSubmit={(next) => {
-              setFilterValues(next);
-              setPagination((p) => ({ ...p, page: 1 }));
-              const periodField = filterFields.find((f) => f.type === "period");
-              const nextPeriod =
-                periodField && (next[periodField.key] as PeriodValue | undefined);
-              if (nextPeriod) setPeriod(nextPeriod);
-              onApply?.(next, nextPeriod ?? period);
-            }}
-          />
+        <div className="flex gap-2 flex-col">
+          {/* Dropdown chọn báo cáo kho (tạm thời cho store view). */}
+          <div className="w-[250px]">
+            <StorageReportSelect />
+          </div>
+          <div className="relative">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9"
+              data-report-filter-trigger
+              onClick={() => setFilterOpen((o) => !o)}
+            >
+              <Filter className="mr-1.5 h-4 w-4" />
+              Chọn bộ lọc
+            </Button>
+            <ReportFilterPopover
+              open={filterOpen}
+              onOpenChange={setFilterOpen}
+              fields={filterFields}
+              value={filterValues}
+              onSubmit={(next) => {
+                setFilterValues(next);
+                setPagination((p) => ({ ...p, page: 1 }));
+                const periodField = filterFields.find((f) => f.type === "period");
+                const nextPeriod =
+                  periodField && (next[periodField.key] as PeriodValue | undefined);
+                if (nextPeriod) setPeriod(nextPeriod);
+                onApply?.(next, nextPeriod ?? period);
+              }}
+            />
+          </div>
         </div>
 
         <div className="flex flex-col items-center text-center">
