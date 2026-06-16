@@ -9,6 +9,16 @@ import {
   salespersonOptions,
   customerOptions,
 } from "../../_mock/report-invoice-filter.mock";
+import {
+  warehouseOptions,
+  productGroupOptions,
+  statisticByOptions,
+  unitOptions,
+  brandOptions,
+  workShiftOptions,
+  receivingStoreOptions,
+} from "../../_mock/report-inventory-filter.mock";
+import { SourceStoreField } from "./SourceStoreField/SourceStoreField";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
 import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
@@ -130,6 +140,81 @@ export function ReportFilterLine({ line }: Props) {
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.CUSTOMER, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.WAREHOUSE:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.WAREHOUSE] ?? ""}
+            options={warehouseOptions}
+            placeholder="Tất cả kho"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.WAREHOUSE, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.PRODUCT_GROUP:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.PRODUCT_GROUP] ?? ""}
+            options={productGroupOptions}
+            placeholder="Tất cả nhóm"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_GROUP, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.STATISTIC_BY:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.STATISTIC_BY] ?? "item"}
+            options={statisticByOptions}
+            placeholder="Hàng hóa"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.STATISTIC_BY, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.UNIT:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.UNIT] ?? ""}
+            options={unitOptions}
+            placeholder="Tất cả ĐVT"
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.UNIT, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.BRAND:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.BRAND] ?? ""}
+            options={brandOptions}
+            placeholder="Tất cả"
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.BRAND, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.WORK_SHIFT:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.WORK_SHIFT] ?? ""}
+            options={workShiftOptions}
+            placeholder="Tất cả"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.WORK_SHIFT, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.SOURCE_STORE:
+        return <SourceStoreField />;
+      case REPORT_FILTERS_LINE.RECEIVING_STORE:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.RECEIVING_STORE] ?? ""}
+            options={receivingStoreOptions}
+            placeholder="Tất cả"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.RECEIVING_STORE, v)
             }
           />
         );
