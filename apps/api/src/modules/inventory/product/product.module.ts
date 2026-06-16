@@ -5,13 +5,13 @@ import { ProductEntity } from './product.entity';
 import { ProductAttributeDefinitionEntity } from './product-attribute-definition.entity';
 import { ProductAttributeOptionEntity } from './product-attribute-option.entity';
 import { ItemAttributeValueEntity } from './item-attribute-value.entity';
-import { ProductStorageLocationEntity } from './product-storage-location.entity';
+import { ItemStorageLocationEntity } from './item-storage-location.entity';
 import { ItemEntity } from '../location/item.entity';
 import { ItemProviderEntity } from '../location/item-provider.entity';
 import { ProductCrudService, PRODUCT_ENTITY_CONFIG, PRODUCT_SERVICE_TOKEN } from './product-crud.service';
 import { ProductAttributeService } from './product-attribute.service';
 import { VariantGenerationService } from './variant-generation.service';
-import { ProductStorageLocationService } from './product-storage-location.service';
+import { ItemStorageLocationService } from './item-storage-location.service';
 import { LocationEntity } from '../location/location.entity';
 import { ProductController } from './product.controller';
 import { ProductAttributeController } from './product-attribute.controller';
@@ -23,7 +23,7 @@ import { ProductAttributeController } from './product-attribute.controller';
       ProductAttributeDefinitionEntity,
       ProductAttributeOptionEntity,
       ItemAttributeValueEntity,
-      ProductStorageLocationEntity,
+      ItemStorageLocationEntity,
       ItemEntity,
       ItemProviderEntity,
       LocationEntity,
@@ -34,13 +34,13 @@ import { ProductAttributeController } from './product-attribute.controller';
     ProductCrudService,
     ProductAttributeService,
     VariantGenerationService,
-    ProductStorageLocationService,
+    ItemStorageLocationService,
     {
       provide: PRODUCT_SERVICE_TOKEN,
       useExisting: ProductCrudService,
     },
   ],
-  exports: [ProductCrudService, ProductAttributeService, VariantGenerationService, ProductStorageLocationService],
+  exports: [ProductCrudService, ProductAttributeService, VariantGenerationService, ItemStorageLocationService],
 })
 export class ProductModule implements OnModuleInit {
   constructor(private readonly entityRegistry: EntityRegistryService) {}

@@ -19,6 +19,9 @@ import { BranchEntity } from "./branch.entity";
 import { UserBranchAssignmentEntity } from "./user-branch-assignment.entity";
 import { CreateBranchDto, UpdateBranchDto } from "./dto";
 import { StorageEntity } from "../inventory/location/storage.entity";
+import { ShowroomEntity } from "../inventory/location/showroom.entity";
+import { LocationEntity } from "../inventory/location/location.entity";
+import { LocationType } from "@erp/shared-interfaces";
 
 @Injectable()
 export class BranchService {
@@ -82,15 +85,52 @@ export class BranchService {
         }),
       );
 
-      await manager.save(
+      // Each branch's default warehouse is its sales showroom ("Kho bán hàng").
+      // The storage is the showroom's backing inventory (kept isMainStorage so
+      // stock flows can still target it); it is hidden from the warehouses list.
+      const showroomName = `${branch.name} - Showroom`;
+      const storage = await manager.save(
         manager.create(StorageEntity, {
-          name: branch.name,
+          name: showroomName,
           isMainStorage: true,
           branchId: branch.id,
           organizationId: branch.organizationId,
           createdBy: actor.userId,
         }),
       );
+
+      await manager.save(
+        manager.create(ShowroomEntity, {
+          name: showroomName,
+          storageId: storage.id,
+          branchId: branch.id,
+          isMainShowroom: true,
+          organizationId: branch.organizationId,
+          createdBy: actor.userId,
+        }),
+      );
+
+      // Dedicated "Mặc định" location so every POS-visible product is sellable
+      // from the showroom without manual shelf assignment; the resolver falls
+      // back to it and users relocate to a real shelf later. Idempotent via the
+      // partial unique index UQ_locations_default_per_storage.
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(LocationEntity)
+        .values({
+          code: "DEFAULT",
+          name: "Mặc định",
+          storageId: storage.id,
+          type: LocationType.SHELF,
+          isActive: true,
+          isDefault: true,
+          organizationId: branch.organizationId,
+          branchId: branch.id,
+          createdBy: actor.userId,
+        })
+        .orIgnore()
+        .execute();
 
       return branch;
     });

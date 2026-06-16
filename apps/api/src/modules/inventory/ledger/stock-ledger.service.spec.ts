@@ -5,7 +5,7 @@ import { StockLedgerService, RecordMovementParams } from './stock-ledger.service
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { EventPublisher } from '../../events/event-publisher.service';
-import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import { StockMovementType } from '@erp/shared-interfaces';
 
 describe('StockLedgerService', () => {
@@ -76,7 +76,7 @@ describe('StockLedgerService', () => {
         { provide: getRepositoryToken(StockBalanceEntity), useValue: balanceRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: EventPublisher, useValue: eventPublisher },
-        { provide: ProductStorageLocationService, useValue: pslService },
+        { provide: ItemStorageLocationService, useValue: pslService },
       ],
     }).compile();
 

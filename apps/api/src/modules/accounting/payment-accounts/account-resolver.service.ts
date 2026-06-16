@@ -51,18 +51,20 @@ export class AccountResolverService {
   }
 
   /**
-   * Resolve the receiving COA account for a POS payment, scoped to the actor's
-   * branch.
+   * Resolve the receiving COA account for a POS payment. Mappings are org-wide
+   * (branch_id NULL) by default; a branch override (branch_id = actor.branchId)
+   * wins over the org-wide default for the same method.
    *
    * When `paymentAccountId` is given, the client is selecting a specific configured
    * account (e.g. which bank a transfer went into): the mapping is validated to
-   * belong to the actor's org + branch, be active, and match `method`, then its COA
-   * account is returned. Clients never send a COA account id directly — only the
-   * whitelisted mapping id.
+   * belong to the actor's org, be the org-wide default or the actor's own branch
+   * override, be active, and match `method`, then its COA account is returned.
+   * Clients never send a COA account id directly — only the whitelisted mapping id.
    *
    * When omitted, it falls back to the single active mapping configured for the
-   * method. It throws when none is configured, and when more than one exists (the
-   * choice is ambiguous — the caller must pass `paymentAccountId`).
+   * method (branch override preferred, else org-wide default). It throws when none
+   * is configured, and when more than one exists (the choice is ambiguous — the
+   * caller must pass `paymentAccountId`).
    */
   async resolvePaymentAccount(
     method: PaymentAccountMethod,
@@ -80,11 +82,12 @@ export class AccountResolverService {
         where: {
           id: paymentAccountId,
           organizationId: actor.organizationId,
-          branchId: actor.branchId,
           isActive: true,
         },
       });
-      if (!row) {
+      // Accept the org-wide default (branch_id NULL) or the actor's own branch
+      // override; reject another branch's mapping.
+      if (!row || (row.branchId && row.branchId !== actor.branchId)) {
         throw new BadRequestException(
           `Payment account ${paymentAccountId} not found for branch ${actor.branchId}`,
         );
@@ -100,23 +103,28 @@ export class AccountResolverService {
     const rows = await this.paymentAccountRepo.find({
       where: {
         organizationId: actor.organizationId,
-        branchId: actor.branchId,
         paymentMethod: method,
         isActive: true,
       },
       order: { sortOrder: 'ASC' },
     });
 
-    if (rows.length === 0) {
+    // Branch override wins over org-wide default; both are fetched and the winner
+    // is picked in memory rather than relying on SQL NULL ordering.
+    const branchRows = rows.filter((r) => r.branchId === actor.branchId);
+    const orgRows = rows.filter((r) => !r.branchId);
+    const candidates = branchRows.length > 0 ? branchRows : orgRows;
+
+    if (candidates.length === 0) {
       throw new BadRequestException(
         `No payment account configured for method ${method} (branch ${actor.branchId})`,
       );
     }
-    if (rows.length > 1) {
+    if (candidates.length > 1) {
       throw new BadRequestException(
         `Multiple payment accounts configured for method ${method} (branch ${actor.branchId}); a paymentAccountId must be specified`,
       );
     }
-    return rows[0].accountId;
+    return candidates[0].accountId;
   }
 }

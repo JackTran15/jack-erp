@@ -64,7 +64,8 @@ const IDS = {
   accountPayable: 'B0000000-0000-4000-8000-000000000006',
   accountOtherIncome: 'B0000000-0000-4000-8000-000000000007',
   accountOtherExpense: 'B0000000-0000-4000-8000-000000000008',
-  // Payment-account & default-account config (resolved server-side at checkout)
+  // Payment-account & default-account config (resolved server-side at checkout).
+  // Payment accounts are org-wide (branch_id NULL) — one set shared by all branches.
   defaultAccountRevenue:    'E0000000-0000-4000-8000-000000000001',
   defaultAccountReceivable: 'E0000000-0000-4000-8000-000000000002',
   paymentAccountCash:       'E0000000-0000-4000-8000-000000000003',
@@ -95,7 +96,7 @@ const IDS = {
   itemShoe43Den: 'A3000000-0000-4000-8000-000000000006',
   // ─── Extra sell-ready branches (Cà Mau, Cần Thơ) ─────────────────────────
   // Each: 2 warehouses + 1 showroom storage + locations + showroom + a
-  // branch cash fund (REGISTER) + cash/bank/card payment accounts + shoe stock.
+  // branch cash fund (REGISTER) + shoe stock. Payment accounts are org-wide.
   branchCaMau: '20000000-0000-4000-8000-000000000002',
   branchCanTho: '20000000-0000-4000-8000-000000000003',
   storageCaMauMain: '50000000-0000-4000-8000-000000000011',
@@ -114,12 +115,6 @@ const IDS = {
   showroomCanTho: '55000000-0000-4000-8000-000000000003',
   cashAccountCaMau: 'C0000000-0000-4000-8000-000000000002',
   cashAccountCanTho: 'C0000000-0000-4000-8000-000000000003',
-  paymentAccountCashCaMau: 'E0000000-0000-4000-8000-000000000011',
-  paymentAccountBankCaMau: 'E0000000-0000-4000-8000-000000000012',
-  paymentAccountCardCaMau: 'E0000000-0000-4000-8000-000000000013',
-  paymentAccountCashCanTho: 'E0000000-0000-4000-8000-000000000021',
-  paymentAccountBankCanTho: 'E0000000-0000-4000-8000-000000000022',
-  paymentAccountCardCanTho: 'E0000000-0000-4000-8000-000000000023',
 };
 
 async function upsertPermissions(): Promise<void> {
@@ -204,9 +199,6 @@ interface SellReadyBranchSeed {
   locationShowroomId: string;
   showroomId: string;
   cashAccountId: string;
-  paymentCashId: string;
-  paymentBankId: string;
-  paymentCardId: string;
 }
 
 /** The 6 shoe variants (the only product these branches sell for now). */
@@ -313,29 +305,8 @@ async function seedSellReadyBranch(opts: SellReadyBranchSeed): Promise<void> {
     [opts.cashAccountId, IDS.organization, opts.branchId, IDS.accountCash, IDS.user],
   );
 
-  // Payment method → receiving COA account, branch-scoped (cash / bank / card).
-  await AppDataSource.query(
-    `
-    INSERT INTO payment_accounts
-      (id, organization_id, branch_id, payment_method, account_id, label, is_active, sort_order, created_by, created_at, updated_at)
-    VALUES
-      ($1, $7, $8, 'cash',          $4, 'Tiền mặt',     true, 0, $9, NOW(), NOW()),
-      ($2, $7, $8, 'bank_transfer', $5, 'Chuyển khoản', true, 0, $9, NOW(), NOW()),
-      ($3, $7, $8, 'card',          $6, 'Quẹt thẻ',     true, 0, $9, NOW(), NOW())
-    ON CONFLICT (id) DO NOTHING
-    `,
-    [
-      opts.paymentCashId,
-      opts.paymentBankId,
-      opts.paymentCardId,
-      IDS.accountCash,
-      IDS.accountBank,
-      IDS.accountBank,
-      IDS.organization,
-      opts.branchId,
-      IDS.user,
-    ],
-  );
+  // Payment accounts are org-wide (seeded once, branch_id NULL); this branch shares
+  // them, so no per-branch payment_accounts rows are needed.
 
   // Shoe stock: all 6 variants in the main warehouse (20) and showroom floor (10).
   const stockRows: string[] = [];
@@ -594,15 +565,16 @@ async function seedInventoryData() {
       ],
     );
 
-    // Payment method → receiving COA account, branch-scoped.
+    // Payment method → receiving COA account, org-wide (branch_id NULL) so every
+    // branch shares it; a branch may still add its own override row later.
     await AppDataSource.query(
       `
       INSERT INTO payment_accounts
         (id, organization_id, branch_id, payment_method, account_id, label, is_active, sort_order, created_by, created_at, updated_at)
       VALUES
-        ($1, $7, $8, 'cash',          $4, 'Tiền mặt',     true, 0, $9, NOW(), NOW()),
-        ($2, $7, $8, 'bank_transfer', $5, 'Chuyển khoản', true, 0, $9, NOW(), NOW()),
-        ($3, $7, $8, 'card',          $6, 'Quẹt thẻ',     true, 0, $9, NOW(), NOW())
+        ($1, $7, NULL, 'cash',          $4, 'Tiền mặt',     true, 0, $8, NOW(), NOW()),
+        ($2, $7, NULL, 'bank_transfer', $5, 'Chuyển khoản', true, 0, $8, NOW(), NOW()),
+        ($3, $7, NULL, 'card',          $6, 'Quẹt thẻ',     true, 0, $8, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -613,7 +585,6 @@ async function seedInventoryData() {
         IDS.accountBank,
         IDS.accountBank,
         IDS.organization,
-        IDS.branch,
         IDS.user,
       ],
     );
@@ -986,14 +957,25 @@ async function seedInventoryData() {
       ],
     );
 
-    // Product storage location: Giày Gelli → Main Warehouse → Main Rack A1
+    // Item storage locations: Giày Gelli variants → Main Warehouse → Main Rack A1
     await AppDataSource.query(
       `
-      INSERT INTO product_storage_locations (id, organization_id, branch_id, product_id, storage_id, location_id, created_by, created_at, updated_at)
-      VALUES (gen_random_uuid(), $1, NULL, $2, $3, $4, $5, NOW(), NOW())
-      ON CONFLICT (product_id, storage_id) DO NOTHING
+      INSERT INTO item_storage_locations (id, organization_id, branch_id, item_id, storage_id, location_id, created_by, created_at, updated_at)
+      VALUES
+        (gen_random_uuid(), $1, NULL, $2, $5, $6, $7, NOW(), NOW()),
+        (gen_random_uuid(), $1, NULL, $3, $5, $6, $7, NOW(), NOW()),
+        (gen_random_uuid(), $1, NULL, $4, $5, $6, $7, NOW(), NOW())
+      ON CONFLICT (item_id, storage_id) DO NOTHING
       `,
-      [IDS.organization, IDS.productShoe, IDS.storageMain, IDS.locationMain, IDS.user],
+      [
+        IDS.organization,
+        IDS.itemShoe39Nau,
+        IDS.itemShoe40Den,
+        IDS.itemShoe43Nau,
+        IDS.storageMain,
+        IDS.locationMain,
+        IDS.user,
+      ],
     );
 
     // Stock balances for a few shoe variants (so the matrix view shows data)
@@ -1030,9 +1012,6 @@ async function seedInventoryData() {
       locationShowroomId: IDS.locationCaMauShowroom,
       showroomId: IDS.showroomCaMau,
       cashAccountId: IDS.cashAccountCaMau,
-      paymentCashId: IDS.paymentAccountCashCaMau,
-      paymentBankId: IDS.paymentAccountBankCaMau,
-      paymentCardId: IDS.paymentAccountCardCaMau,
     });
     await seedSellReadyBranch({
       branchId: IDS.branchCanTho,
@@ -1045,9 +1024,6 @@ async function seedInventoryData() {
       locationShowroomId: IDS.locationCanThoShowroom,
       showroomId: IDS.showroomCanTho,
       cashAccountId: IDS.cashAccountCanTho,
-      paymentCashId: IDS.paymentAccountCashCanTho,
-      paymentBankId: IDS.paymentAccountBankCanTho,
-      paymentCardId: IDS.paymentAccountCardCanTho,
     });
 
     // Membership card types (default tiers per org)
