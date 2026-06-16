@@ -1,5 +1,5 @@
 import { STORE_TYPE } from "../store.constant";
-import { REPORT_TYPE_SALES } from "./report-type.constant";
+import { REPORT_TYPE_INVENTORY, REPORT_TYPE_SALES } from "./report-type.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
 
 export enum REPORT_CATEGORY {
@@ -25,6 +25,18 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
       }
     }
   },
+  // [REPORT_CATEGORY.INVENTORY]: {
+  //   label: "Kho",
+  //   url: "/reports/chain-inventory",
+  //   configs: {
+  //     [STORE_TYPE.SINGLE]: {
+  //       listReport: Object.values(REPORT_TYPE_INVENTORY),
+  //     },
+  //     [STORE_TYPE.CHAIN]: {
+  //       listReport: Object.values(REPORT_TYPE_INVENTORY),
+  //     }
+  //   }
+  // },
   // [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: {
   //   label: "Bán hàng đa kênh",
   //   url: "/reports/multi-channel-sales",

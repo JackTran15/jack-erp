@@ -147,7 +147,7 @@ export const REPORT_TYPE_PURCHASES_METADATA = {
 
 export const REPORT_TYPE_INVENTORY_METADATA = {
   [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho' },
-  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: { label: 'Bảng kê chi tiết phiếu kho' },
+  [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: { label: 'Bảng kê chi tiết phiếu nhập xuất kho' },
   [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: { label: 'Chi tiết số lượng nhập xuất tồn kho' },
   [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: { label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng' },
   [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: { label: 'Số lượng tồn kho theo cửa hàng' },
