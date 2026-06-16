@@ -29,6 +29,13 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.CASHIER]: string;
   [REPORT_FILTERS_LINE.SALESPERSON]: string;
   [REPORT_FILTERS_LINE.CUSTOMER]: string;
+  [REPORT_FILTERS_LINE.WAREHOUSE]: string;
+  [REPORT_FILTERS_LINE.PRODUCT_GROUP]: string;
+  [REPORT_FILTERS_LINE.STATISTIC_BY]: string;
+  [REPORT_FILTERS_LINE.UNIT]: string;
+  [REPORT_FILTERS_LINE.BRAND]: string;
+  [REPORT_FILTERS_LINE.WORK_SHIFT]: string;
+  [REPORT_FILTERS_LINE.RECEIVING_STORE]: string;
 }
 
 // Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.

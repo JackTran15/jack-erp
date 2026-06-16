@@ -50,7 +50,10 @@ export const single_tableRegistryReportStockQuantityByStore = tableConfig;
 export const chain_tableRegistryReportStockQuantityByStore = tableConfig;
 
 const filterLines = [
-  REPORT_FILTERS_LINE.STORE,
+  REPORT_FILTERS_LINE.PRODUCT_GROUP,
+  REPORT_FILTERS_LINE.BRAND,
+  REPORT_FILTERS_LINE.STATISTIC_BY,
+  REPORT_FILTERS_LINE.UNIT,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];

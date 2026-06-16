@@ -49,9 +49,10 @@ export const single_tableRegistryReportTemporaryWarehouseOutGoods = tableConfig;
 export const chain_tableRegistryReportTemporaryWarehouseOutGoods = tableConfig;
 
 const filterLines = [
-  REPORT_FILTERS_LINE.STORE,
+  REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
+  REPORT_FILTERS_LINE.WORK_SHIFT,
 ];
 export const single_filterRegistryReportTemporaryWarehouseOutGoods = filterLines;
 export const chain_filterRegistryReportTemporaryWarehouseOutGoods = filterLines;

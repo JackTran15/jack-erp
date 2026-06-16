@@ -8,6 +8,14 @@ export enum REPORT_FILTERS_LINE {
     CASHIER = 'cashier',
     SALESPERSON = 'salesperson',
     CUSTOMER = 'customer',
+    WAREHOUSE = 'warehouse',
+    PRODUCT_GROUP = 'product_group',
+    STATISTIC_BY = 'statistic_by',
+    UNIT = 'unit',
+    BRAND = 'brand',
+    WORK_SHIFT = 'work_shift',
+    SOURCE_STORE = 'source_store',
+    RECEIVING_STORE = 'receiving_store',
 }
 
 export const REPORT_FILTERS_LINE_METADATA = {
@@ -50,5 +58,37 @@ export const REPORT_FILTERS_LINE_METADATA = {
         label: 'khách hàng',
         isRequired: true,
         backendField: 'customerId',
+    },
+    [REPORT_FILTERS_LINE.WAREHOUSE]: {
+        label: 'kho',
+        backendField: 'warehouseId',
+    },
+    [REPORT_FILTERS_LINE.PRODUCT_GROUP]: {
+        label: 'nhóm hàng hóa',
+        backendField: 'categoryId',
+    },
+    [REPORT_FILTERS_LINE.STATISTIC_BY]: {
+        label: 'thống kê theo',
+        backendField: 'statBy',
+    },
+    [REPORT_FILTERS_LINE.UNIT]: {
+        label: 'đơn vị tính',
+        backendField: 'unit',
+    },
+    [REPORT_FILTERS_LINE.BRAND]: {
+        label: 'thương hiệu',
+        backendField: 'brand',
+    },
+    [REPORT_FILTERS_LINE.WORK_SHIFT]: {
+        label: 'ca làm việc',
+        backendField: 'workShift',
+    },
+    [REPORT_FILTERS_LINE.SOURCE_STORE]: {
+        label: 'cửa hàng xuất',
+        backendField: 'sourceStoreId',
+    },
+    [REPORT_FILTERS_LINE.RECEIVING_STORE]: {
+        label: 'cửa hàng nhận',
+        backendField: 'receivingStoreId',
     },
 }

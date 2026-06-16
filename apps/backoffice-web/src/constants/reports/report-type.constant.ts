@@ -97,12 +97,14 @@ export enum REPORT_TYPE_INVENTORY {
   INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL = 'inventory_in_out_stock_quantity_detail',
   STORE_INVENTORY_IN_OUT_STOCK_SUMMARY = 'store_inventory_in_out_stock_summary',
   STOCK_QUANTITY_BY_STORE = 'stock_quantity_by_store',
-  STOCK_QUANTITY_BY_WAREHOUSE = 'stock_quantity_by_warehouse',
-  STOCK_BELOW_MINIMUM_LEVEL = 'stock_below_minimum_level',
   TRANSFER_IN_OUT_SUMMARY = 'transfer_in_out_summary',
   TRANSFERRED_GOODS_SUMMARY_BY_STORE = 'transferred_goods_summary_by_store',
-  TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY = 'temporary_warehouse_transfer_summary',
   TEMPORARY_WAREHOUSE_OUT_GOODS = 'temporary_warehouse_out_goods',
+  
+  
+  TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY = 'temporary_warehouse_transfer_summary',
+  STOCK_BELOW_MINIMUM_LEVEL = 'stock_below_minimum_level',
+  STOCK_QUANTITY_BY_WAREHOUSE = 'stock_quantity_by_warehouse',
   GOODS_STORAGE_TIME = 'goods_storage_time',
   GOODS_OUT_BY_REASON = 'goods_out_by_reason',
 }

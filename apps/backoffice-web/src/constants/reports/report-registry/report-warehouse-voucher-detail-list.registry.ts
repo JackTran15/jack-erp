@@ -69,6 +69,7 @@ export const chain_tableRegistryReportWarehouseVoucherDetailList = tableConfig;
 
 const filterLines = [
   REPORT_FILTERS_LINE.STORE,
+  REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
