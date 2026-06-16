@@ -11,12 +11,15 @@ import {
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
+import { SwitchBranchDto } from './dto/switch-branch.dto';
 import type {
+  JwtPayload,
   LoginRequest,
   LoginResponse,
   RefreshRequest,
   RefreshResponse,
   SessionInfo,
+  SwitchBranchResponse,
 } from '@erp/shared-interfaces';
 
 @Controller('auth')
@@ -41,6 +44,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() body: RefreshRequest): Promise<RefreshResponse> {
     return this.authService.refresh(body.refreshToken);
+  }
+
+  @Post('switch-branch')
+  @HttpCode(HttpStatus.OK)
+  async switchBranch(
+    @Req() req: Request,
+    @Body() body: SwitchBranchDto,
+  ): Promise<SwitchBranchResponse> {
+    const user = (req as any).user as JwtPayload | undefined;
+    if (!user?.jti) {
+      throw new UnauthorizedException('No active session');
+    }
+    return this.authService.switchBranch(user, body.branchId);
   }
 
   @Post('logout')

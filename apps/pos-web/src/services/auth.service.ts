@@ -1,4 +1,7 @@
-import type { LoginResponse } from "@erp/shared-interfaces";
+import type {
+  LoginResponse,
+  SwitchBranchResponse,
+} from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "@erp/pos/lib/common/erp-api";
 import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
 import type { PosLoginInput } from "@erp/pos/dtos/auth.dto";
@@ -26,6 +29,21 @@ export const authService = {
     localStorage.setItem(ACCESS_TOKEN_KEY, login.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, login.refreshToken);
     localStorage.setItem(ORGANIZATION_ID_KEY, input.organizationId);
+  },
+
+  switchBranch: async (branchId: string): Promise<void> => {
+    const res = requireErpData(
+      await erpApi.POST<SwitchBranchResponse>("/auth/switch-branch", {
+        body: { branchId },
+      }),
+    );
+
+    if (!res.accessToken || !res.refreshToken) {
+      throw new Error("Phản hồi đổi chi nhánh không hợp lệ.");
+    }
+
+    localStorage.setItem(ACCESS_TOKEN_KEY, res.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, res.refreshToken);
   },
 
   getStoredOrganizationId: (): string | null =>

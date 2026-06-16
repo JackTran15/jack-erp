@@ -27,8 +27,8 @@ export const Actor = createParamDecorator(
     return {
       userId: user?.userId ?? 'system',
       organizationId: user?.organizationId ?? 'default',
-      // Prefer validated X-Branch-Id, then legacy JWT branchId, else first assigned branch
-      branchId: fromHeader ?? fromJwt ?? fromJwtList,
+      // Prefer active branch from JWT, then validated X-Branch-Id header, else first assigned branch
+      branchId: fromJwt ?? fromHeader ?? fromJwtList,
       roles: user?.roles ?? [],
     };
   },

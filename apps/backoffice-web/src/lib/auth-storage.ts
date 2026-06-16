@@ -1,4 +1,8 @@
-import type { LoginResponse, RefreshResponse } from "@erp/shared-interfaces";
+import type {
+  LoginResponse,
+  RefreshResponse,
+  SwitchBranchResponse,
+} from "@erp/shared-interfaces";
 import { setAccessToken, clearAccessToken } from "./access-token";
 
 const REFRESH = "refresh_token";
@@ -31,6 +35,17 @@ export function persistSessionInfo(session: LoginResponse["session"]): void {
 export function persistRefreshResponse(res: RefreshResponse): void {
   setAccessToken(res.accessToken);
   localStorage.setItem(REFRESH, res.refreshToken);
+  localStorage.removeItem("access_token");
+}
+
+export function persistSwitchBranchResponse(
+  res: SwitchBranchResponse,
+  branchId: string,
+): void {
+  setAccessToken(res.accessToken);
+  localStorage.setItem(REFRESH, res.refreshToken);
+  localStorage.setItem(BRANCH, branchId);
+  persistPermissions(res.session.permissions ?? []);
   localStorage.removeItem("access_token");
 }
 
