@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { branchService } from "@erp/pos/services/branch.service";
+import { authService } from "@erp/pos/services/auth.service";
 import type { BranchRow } from "@erp/pos/interfaces/branch.interface";
 import { parseAccessTokenPayload } from "@erp/pos/lib/common/parseJwt";
 import { usePosBranchStore } from "../stores/common/branch.store";
@@ -17,6 +18,7 @@ export function BranchSelectPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -69,7 +71,7 @@ export function BranchSelectPage() {
     void load();
   }, [load]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) {
       setLoadError("Hãy chọn một chi nhánh.");
@@ -80,8 +82,20 @@ export function BranchSelectPage() {
       setLoadError("Chi nhánh không hợp lệ.");
       return;
     }
-    setBranch(opt.id, opt.name);
-    navigate("/", { replace: true });
+    setSubmitting(true);
+    setLoadError(null);
+    try {
+      await authService.switchBranch(opt.id);
+      setBranch(opt.id, opt.name);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setLoadError(
+        err instanceof Error
+          ? `Không đổi được chi nhánh: ${err.message}`
+          : "Không đổi được chi nhánh.",
+      );
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -154,8 +168,12 @@ export function BranchSelectPage() {
                   marginTop: "1rem",
                 }}
               >
-                <button type="submit" className="pos-btn pos-btn--primary">
-                  Tiếp tục
+                <button
+                  type="submit"
+                  className="pos-btn pos-btn--primary"
+                  disabled={submitting}
+                >
+                  {submitting ? "Đang chuyển…" : "Tiếp tục"}
                 </button>
                 <button
                   type="button"

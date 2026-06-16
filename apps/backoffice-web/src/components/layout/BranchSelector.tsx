@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,11 +7,18 @@ import {
   DropdownMenuTrigger,
 } from "@erp/ui";
 import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
+import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
-import { getActiveBranch, setActiveBranch } from "../../lib/auth-storage";
+import { erpApi, requireErpData } from "../../lib/erp-api";
+import {
+  getActiveBranch,
+  persistSwitchBranchResponse,
+} from "../../lib/auth-storage";
 
 export function BranchSelector() {
   const { data: branches } = useMyBranches();
+  const [switching, setSwitching] = useState(false);
 
   if (!branches?.length) return null;
 
@@ -18,9 +26,21 @@ export function BranchSelector() {
   const activeBranch = branches.find((b) => b.id === activeBranchId);
   const displayName = activeBranch?.name ?? "Chọn cửa hàng";
 
-  const handleSelect = (id: string) => {
-    setActiveBranch(id);
-    window.location.reload();
+  const handleSelect = async (id: string) => {
+    if (switching || id === activeBranchId) return;
+    setSwitching(true);
+    try {
+      const res = requireErpData(
+        await erpApi.POST<SwitchBranchResponse>("/auth/switch-branch", {
+          body: { branchId: id },
+        }),
+      );
+      persistSwitchBranchResponse(res, id);
+      window.location.reload();
+    } catch {
+      toast.error("Không thể đổi chi nhánh. Vui lòng thử lại.");
+      setSwitching(false);
+    }
   };
 
   return (

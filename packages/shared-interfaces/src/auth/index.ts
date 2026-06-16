@@ -20,6 +20,13 @@ export interface RefreshResponse {
   expiresIn: number;
 }
 
+export interface SwitchBranchRequest {
+  branchId: string;
+}
+
+/** Same shape as login: new tokens carry the active branch, plus refreshed session info. */
+export type SwitchBranchResponse = LoginResponse;
+
 export interface SessionInfo {
   userId: string;
   organizationId: string;
@@ -33,7 +40,10 @@ export interface JwtPayload {
   userId: string;
   organizationId: string;
   roles: string[];
+  /** Branches the user may access. */
   branchIds: string[];
+  /** Currently active branch (subset of branchIds). */
+  branchId?: string;
   jti: string;
   iat: number;
   exp: number;

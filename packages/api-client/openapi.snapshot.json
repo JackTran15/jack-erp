@@ -382,6 +382,37 @@
         ]
       }
     },
+    "/auth/switch-branch": {
+      "post": {
+        "operationId": "AuthController_switchBranch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -15341,6 +15372,19 @@
       }
     },
     "schemas": {
+      "SwitchBranchDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Branch to activate; must be one of the user's assigned branches."
+          }
+        },
+        "required": [
+          "branchId"
+        ]
+      },
       "EmployeeAddressDto": {
         "type": "object",
         "properties": {

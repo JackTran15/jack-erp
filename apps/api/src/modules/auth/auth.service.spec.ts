@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import type { JwtPayload } from '@erp/shared-interfaces';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -142,6 +143,22 @@ describe('AuthService', () => {
       });
     });
 
+    it('bakes the first assigned branch as the active branch', async () => {
+      setupValidLogin();
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+
+      await service.login('admin@example.com', 'password', 'org-1');
+
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({ branchId: 'branch-1' }),
+        expect.any(Number),
+      );
+    });
+
     it('throws on invalid password', async () => {
       userRepo.findOne.mockResolvedValue(mockUser as UserEntity);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
@@ -213,6 +230,73 @@ describe('AuthService', () => {
       });
     });
 
+    it('preserves the active branch across rotation', async () => {
+      (jwt.verify as jest.Mock).mockReturnValue({
+        jti: 'old-jti',
+        userId: 'user-1',
+      });
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1', 'branch-2'],
+        branchId: 'branch-2',
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+        { branchId: 'branch-2' } as UserBranchAssignmentEntity,
+      ]);
+      (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
+
+      await service.refresh('valid-refresh-token');
+
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({ branchId: 'branch-2' }),
+        expect.any(Number),
+      );
+    });
+
+    it('falls back to the first branch when the active branch is no longer assigned', async () => {
+      (jwt.verify as jest.Mock).mockReturnValue({
+        jti: 'old-jti',
+        userId: 'user-1',
+      });
+      sessionStore.getSession.mockResolvedValue({
+        userId: 'user-1',
+        organizationId: 'org-1',
+        branchIds: ['branch-1', 'branch-9'],
+        branchId: 'branch-9',
+        roles: ['admin'],
+        issuedAt: 1000,
+        expiresAt: 999999,
+      });
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue([
+        { branchId: 'branch-1' } as UserBranchAssignmentEntity,
+      ]);
+      (jwt.sign as jest.Mock).mockReturnValue('new-signed-token');
+
+      await service.refresh('valid-refresh-token');
+
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({ branchId: 'branch-1' }),
+        expect.any(Number),
+      );
+    });
+
     it('throws when refresh token is invalid', async () => {
       (jwt.verify as jest.Mock).mockImplementation(() => {
         throw new Error('invalid');
@@ -246,6 +330,71 @@ describe('AuthService', () => {
       await service.logout('jti-123');
 
       expect(sessionStore.revokeSession).toHaveBeenCalledWith('jti-123');
+    });
+  });
+
+  // =========================================================================
+  // switchBranch
+  // =========================================================================
+  describe('switchBranch', () => {
+    const current: JwtPayload = {
+      userId: 'user-1',
+      organizationId: 'org-1',
+      roles: ['admin'],
+      branchIds: ['branch-1', 'branch-2'],
+      branchId: 'branch-1',
+      jti: 'old-jti',
+      iat: 1000,
+      exp: 999999,
+    };
+
+    function setupAssignedBranches(branchIds: string[]) {
+      userRoleRepo.find.mockResolvedValue([
+        { id: 'ur-1', userId: 'user-1', roleId: 'role-1', organizationId: 'org-1' } as UserRoleEntity,
+      ]);
+      userBranchRepo.find.mockResolvedValue(
+        branchIds.map((branchId) => ({ branchId }) as UserBranchAssignmentEntity),
+      );
+    }
+
+    it('rotates the session and mints tokens carrying the new active branch', async () => {
+      setupAssignedBranches(['branch-1', 'branch-2']);
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+      sessionStore.createSession.mockResolvedValue(undefined);
+      (jwt.sign as jest.Mock).mockReturnValue('switched-token');
+
+      const result = await service.switchBranch(current, 'branch-2');
+
+      expect(sessionStore.revokeSession).toHaveBeenCalledWith('old-jti');
+      expect(sessionStore.createSession).toHaveBeenCalledWith(
+        'mock-uuid',
+        expect.objectContaining({
+          userId: 'user-1',
+          organizationId: 'org-1',
+          branchId: 'branch-2',
+          branchIds: ['branch-1', 'branch-2'],
+        }),
+        expect.any(Number),
+      );
+      expect(result).toEqual({
+        accessToken: 'switched-token',
+        refreshToken: 'switched-token',
+        expiresIn: 900,
+        session: expect.objectContaining({
+          branchIds: ['branch-1', 'branch-2'],
+        }),
+      });
+    });
+
+    it('throws and keeps the current session when the branch is not assigned', async () => {
+      setupAssignedBranches(['branch-1']);
+      sessionStore.revokeSession.mockResolvedValue(undefined);
+
+      await expect(service.switchBranch(current, 'branch-2')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(sessionStore.revokeSession).not.toHaveBeenCalled();
+      expect(sessionStore.createSession).not.toHaveBeenCalled();
     });
   });
 
