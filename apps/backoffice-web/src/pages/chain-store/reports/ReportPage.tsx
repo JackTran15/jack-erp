@@ -3,7 +3,6 @@ import {
   REPORT_CATEGORY,
   REPORT_CATEGORY_METADATA,
 } from "../../../constants/reports/report-category.constant";
-import { REPORT_BRANCH } from "../../../constants/reports/report.constant";
 import { useIsChainSelected } from "../../../store/common/branch/branch.store";
 import { TableStoreProvider } from "../../../store/common/table-store/table.context";
 import { buildInitialTableState } from "../../../store/common/table-store/table.factory";
@@ -12,6 +11,7 @@ import { buildInitialReportState } from "../../../store/page-stores/report/repor
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
+import { STORE_TYPE } from "../../../constants/store.constant";
 
 interface Props {
   category: REPORT_CATEGORY;
@@ -19,7 +19,7 @@ interface Props {
 
 export function ReportPage({ category }: Props) {
   const isChain = useIsChainSelected();
-  const branch = isChain ? REPORT_BRANCH.CHAIN : REPORT_BRANCH.SINGLE;
+  const branch = isChain ? STORE_TYPE.CHAIN : STORE_TYPE.SINGLE;
   const configs = REPORT_CATEGORY_METADATA[category]?.configs?.[branch];
 
   // Columns nạp từ API (ReportTableConfigSync) → khởi tạo rỗng.

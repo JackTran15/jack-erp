@@ -1,11 +1,11 @@
 import type { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
-import type { REPORT_BRANCH } from "../../../constants/reports/report.constant";
 import type { ReportBranchConfig } from "../../../constants/reports/report.interface";
+import { STORE_TYPE } from "../../../constants/store.constant";
 import type { ReportInitialState } from "./report.interface";
 
 interface BuildArgs {
   category: REPORT_CATEGORY;
-  branch: REPORT_BRANCH;
+  branch: STORE_TYPE;
   configs: ReportBranchConfig;
 }
 

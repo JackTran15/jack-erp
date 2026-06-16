@@ -1,9 +1,6 @@
 import { REPORT_CATEGORY } from "./report-category.constant";
 import { REPORT_TYPE_CASH_FUND, REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_MULTI_CHANNEL_SALES, REPORT_TYPE_PROFIT, REPORT_TYPE_PURCHASES, REPORT_TYPE_SALES } from "./report-type.constant";
 
-export { REPORT_BRANCH } from "./report-branch.constant";
-
-
 export const branchReport = {
     [REPORT_CATEGORY.SALES]: Object.values(REPORT_TYPE_SALES),
     [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: Object.values(REPORT_TYPE_MULTI_CHANNEL_SALES),

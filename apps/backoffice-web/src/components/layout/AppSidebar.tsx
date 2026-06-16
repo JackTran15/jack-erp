@@ -14,7 +14,6 @@ import {
   TooltipTrigger,
 } from "@erp/ui";
 import {
-  navConfig,
   visibleNavConfig,
   activeModuleFor,
   isFlyoutEnabled,

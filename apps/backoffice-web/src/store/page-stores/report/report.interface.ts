@@ -1,6 +1,6 @@
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
-import { REPORT_BRANCH } from "../../../constants/reports/report.constant";
+import { STORE_TYPE } from "../../../constants/store.constant";
 
 export interface StoreScopeValue {
   scope: "all" | "group";
@@ -41,7 +41,7 @@ export interface AppliedReportRequest {
 // State khởi tạo store (provider nhận, factory dựng từ metadata category + branch).
 export interface ReportInitialState {
   category: REPORT_CATEGORY;
-  branch: REPORT_BRANCH;
+  branch: STORE_TYPE;
   listReport: string[];
   reportType: string;
   // Sparse như columnFilters: chỉ chứa line đã được set (không default dư thừa theo report type).

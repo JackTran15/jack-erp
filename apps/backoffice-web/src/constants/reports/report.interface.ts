@@ -1,5 +1,5 @@
+import { STORE_TYPE } from "../store.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
-import { REPORT_BRANCH } from "./report.constant";
 
 export type ReportColumnAlign = "left" | "right" | "center";
 export type ReportColumnDataType = "date" | "number" | "text";
@@ -39,8 +39,8 @@ export interface ReportTypeMetadata {
   label?: string;
   // Khóa report type phía backend (kebab) — chỉ type được BE hỗ trợ mới có.
   backendKey?: string;
-  filterConfig?: Partial<Record<REPORT_BRANCH, REPORT_FILTERS_LINE[]>>;
-  tableConfig?: Partial<Record<REPORT_BRANCH, ReportTableConfig>>;
+  filterConfig?: Partial<Record<STORE_TYPE, REPORT_FILTERS_LINE[]>>;
+  tableConfig?: Partial<Record<STORE_TYPE, ReportTableConfig>>;
 }
 
 // Config của một báo cáo theo loại cửa hàng (chi nhánh / chuỗi).
@@ -53,5 +53,5 @@ export interface ReportBranchConfig {
 export interface ReportCategoryMetadata {
   label: string;
   url: string;
-  configs: Partial<Record<REPORT_BRANCH, ReportBranchConfig>>;
+  configs: Partial<Record<STORE_TYPE, ReportBranchConfig>>;
 }

@@ -1,4 +1,4 @@
-import { REPORT_BRANCH } from "./report-branch.constant";
+import { STORE_TYPE } from "../store.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import { chain_filterRegistryReportInvoiceAndOrderList, chain_tableRegistryReportInvoiceAndOrderList, single_filterRegistryReportInvoiceAndOrderList, single_tableRegistryReportInvoiceAndOrderList } from "./report-registry/report-invoice-and-order-list.registry";
@@ -31,24 +31,24 @@ export const REPORT_TYPE_SALES_METADATA = {
     label: 'Tổng hợp bán hàng theo ngày',
     backendKey: 'daily-sales-summary',
     filterConfig: {
-      [REPORT_BRANCH.SINGLE]: single_filterRegistryReportDailySaleSummary,
-      [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportDailySaleSummary
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportDailySaleSummary,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportDailySaleSummary
     },
     tableConfig: {
-      [REPORT_BRANCH.SINGLE]: single_tableRegistryReportDailySaleSummary,
-      [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportDailySaleSummary
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportDailySaleSummary,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportDailySaleSummary
     },
   },
   [REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST]: {
     label: 'Bảng kê hóa đơn và đơn hàng',
     backendKey: 'invoice-order-listing',
     tableConfig: {
-      [REPORT_BRANCH.SINGLE]: single_tableRegistryReportInvoiceAndOrderList,
-      [REPORT_BRANCH.CHAIN]: chain_tableRegistryReportInvoiceAndOrderList
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportInvoiceAndOrderList,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportInvoiceAndOrderList
     },
    filterConfig: {
-      [REPORT_BRANCH.SINGLE]: single_filterRegistryReportInvoiceAndOrderList,
-      [REPORT_BRANCH.CHAIN]: chain_filterRegistryReportInvoiceAndOrderList
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportInvoiceAndOrderList,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportInvoiceAndOrderList
     },
   },
   [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng', backendKey: 'invoice-item-revenue-detail' },
@@ -204,7 +204,7 @@ export function getReportBackendKey(reportType: string): string | undefined {
 // được render riêng, luôn hiển thị, ở ReportFilterForm — không nằm trong danh sách này).
 export function getReportFormLines(
   reportType: string,
-  branch: REPORT_BRANCH,
+  branch: STORE_TYPE,
 ): REPORT_FILTERS_LINE[] {
   return REPORT_TYPE_METADATA[reportType]?.filterConfig?.[branch] ?? [];
 }
@@ -214,7 +214,7 @@ const EMPTY_TABLE_CONFIG: ReportTableConfig = { columns: [] };
 // Table config theo report type + loại view; rỗng nếu report chưa cấu hình bảng.
 export function getReportTableConfig(
   reportType: string,
-  branch: REPORT_BRANCH,
+  branch: STORE_TYPE,
 ): ReportTableConfig {
   return REPORT_TYPE_METADATA[reportType]?.tableConfig?.[branch] ?? EMPTY_TABLE_CONFIG;
 }

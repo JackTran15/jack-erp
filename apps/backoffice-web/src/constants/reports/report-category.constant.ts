@@ -1,5 +1,5 @@
+import { STORE_TYPE } from "../store.constant";
 import { REPORT_TYPE_SALES } from "./report-type.constant";
-import { REPORT_BRANCH } from "./report-branch.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
 
 export enum REPORT_CATEGORY {
@@ -17,10 +17,10 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
     label: "Bán hàng",
     url: "/reports/sales",
     configs: {
-      [REPORT_BRANCH.SINGLE]: {
+      [STORE_TYPE.SINGLE]: {
         listReport: Object.values(REPORT_TYPE_SALES),
       },
-      [REPORT_BRANCH.CHAIN]: {
+      [STORE_TYPE.CHAIN]: {
         listReport: Object.values(REPORT_TYPE_SALES),
       }
     }

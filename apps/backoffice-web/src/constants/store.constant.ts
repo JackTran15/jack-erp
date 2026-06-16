@@ -1,4 +1,4 @@
-export enum REPORT_BRANCH {
+export enum STORE_TYPE {
   SINGLE = "single", // Chi nhánh
   CHAIN = "chain", // Chuỗi
 }
