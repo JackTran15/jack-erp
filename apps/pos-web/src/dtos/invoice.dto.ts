@@ -78,9 +78,14 @@ export interface InvoicePaymentLineBody {
  * Body cho `POST /invoices/:id/checkout` — chuyển draft → paid/debt/partial_debt.
  * `payments: []` đồng nghĩa "nợ toàn phần" (cần khách hàng trên hóa đơn). BE tự
  * resolve tài khoản doanh thu / công nợ phải thu từ cấu hình, FE không gửi.
+ *
+ * `dueDate` (ISO `YYYY-MM-DD`) + `creditDays` chỉ gửi khi tính vào công nợ; BE
+ * lưu vào `invoice_debts` khi đơn còn dư nợ. Bỏ qua nếu đơn thanh toán đủ.
  */
 export interface CheckoutInvoiceBody {
   payments: InvoicePaymentLineBody[];
+  dueDate?: string;
+  creditDays?: number;
 }
 
 // ─── Return / Exchange (EPIC-011) ──────────────────────────────────────────

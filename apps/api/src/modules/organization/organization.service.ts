@@ -10,7 +10,12 @@ import { randomUUID } from 'crypto';
 import { PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { OrganizationEntity, OrganizationStatus } from './organization.entity';
-import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  PosSettingsDto,
+  UpdatePosSettingsDto,
+} from './dto';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
 import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
 import { MembershipCardTypeSeederService } from '../customer/services/membership-card-type.seeder';
@@ -127,5 +132,31 @@ export class OrganizationService {
     branchId: string,
   ): Promise<void> {
     await this.orgRepo.update(orgId, { mainBranchId: branchId });
+  }
+
+  /** Org-wide POS defaults for the actor's organization. */
+  async getPosSettings(actor: ActorContext): Promise<PosSettingsDto> {
+    const org = await this.orgRepo.findOne({
+      where: { id: actor.organizationId },
+    });
+    if (!org) {
+      throw new NotFoundException(`Organization ${actor.organizationId} not found`);
+    }
+    return { defaultCreditDays: org.defaultCreditDays ?? null };
+  }
+
+  async updatePosSettings(
+    actor: ActorContext,
+    dto: UpdatePosSettingsDto,
+  ): Promise<PosSettingsDto> {
+    // Only touch the column when the field is present. `null` clears it; an
+    // absent field is a no-op (TypeORM skips `undefined`).
+    if (dto.defaultCreditDays !== undefined) {
+      await this.orgRepo.update(
+        { id: actor.organizationId },
+        { defaultCreditDays: dto.defaultCreditDays as number | undefined },
+      );
+    }
+    return this.getPosSettings(actor);
   }
 }

@@ -179,6 +179,8 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
         printInvoice: p.printInvoice,
         cart: computeReceiptLines(sessionState),
         grandTotal,
+        settlementTotal: settlementGrandTotal,
+        deposit: p.deposit,
         totalPaid,
         paymentLines: p.paymentLines,
         primaryMethodLabel,
@@ -197,7 +199,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           // ── SALE ──────────────────────────────────────────────────────────
           const checkoutResolve = buildCheckoutInvoiceApiPayload({
             paymentLines: p.paymentLines,
-            debt: p.debt,
+            // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
+            dueDate: p.debt ? p.paymentDueDate : null,
+            creditDays: p.debt ? p.creditDays : null,
           });
           if (!checkoutResolve.ok) {
             toast.error(describeResolveError(checkoutResolve.error));

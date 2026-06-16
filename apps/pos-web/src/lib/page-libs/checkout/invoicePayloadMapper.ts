@@ -93,27 +93,27 @@ export function buildUpdateInvoicePayload(
 
 interface BuildCheckoutInvoiceApiPayloadInput {
   paymentLines: PaymentLine[];
-  debt: boolean;
+  /** Hạn thanh toán công nợ (ISO `YYYY-MM-DD`) — chỉ truyền khi tính vào công nợ. */
+  dueDate?: string | null;
+  /** Số ngày được nợ — chỉ truyền khi tính vào công nợ. */
+  creditDays?: number | null;
 }
 
 /**
  * Build payload cho `POST /invoices/:id/checkout`. Trả về `{ ok: true, body }`
  * khi mọi dòng thanh toán đã chọn tài khoản; nếu không, `{ ok: false, error }`
  * để caller toast và abort. Quy tắc nghiệp vụ:
- *   - `debt === true` ⇒ payments=[] (nợ toàn phần). BE tự dựng bút toán phải thu.
- *   - Ngược lại: map từng PaymentLine có amount > 0, gửi `paymentAccountId` của
- *     tài khoản nhận tiền. BE tự suy ra COA account + tài khoản doanh thu / công
- *     nợ phải thu, nên FE không gửi revenue/receivable account nữa.
+ *   - Map từng PaymentLine có amount > 0, gửi `paymentAccountId` của tài khoản
+ *     nhận tiền. BE tự suy ra COA account + tài khoản doanh thu / công nợ phải thu.
+ *   - Khi "Tính vào công nợ": gửi đúng phần khách trả; phần còn lại (payments
+ *     rỗng = nợ toàn phần, hoặc ∑ < amountDue = nợ một phần) được BE auto-book
+ *     vào `invoice_debts` (`PARTIAL_DEBT`/`DEBT`). FE không cần cờ debt ở đây.
  */
 export function buildCheckoutInvoiceApiPayload(
   input: BuildCheckoutInvoiceApiPayloadInput,
 ):
   | { ok: true; body: CheckoutInvoiceBody }
   | { ok: false; error: ResolveCheckoutPayloadError } {
-  if (input.debt) {
-    return { ok: true, body: { payments: [] } };
-  }
-
   const activeLines = input.paymentLines.filter((line) => line.amount > 0);
   const payments: InvoicePaymentLineBody[] = [];
   for (const line of activeLines) {
@@ -127,7 +127,11 @@ export function buildCheckoutInvoiceApiPayload(
     });
   }
 
-  return { ok: true, body: { payments } };
+  const body: CheckoutInvoiceBody = { payments };
+  if (input.dueDate) body.dueDate = input.dueDate;
+  if (input.creditDays != null) body.creditDays = input.creditDays;
+
+  return { ok: true, body };
 }
 
 /**

@@ -34,7 +34,7 @@ export function useCatalogQuery(
 }
 
 /** Số product tải tối đa cho grid (1 trang, không phân trang thêm). */
-export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 100;
+export const POS_CATALOG_PRODUCTS_PAGE_SIZE = 30;
 
 /**
  * Danh sách catalog mức PRODUCT cho grid — `GET /pos/branches/:id/catalog/products`.

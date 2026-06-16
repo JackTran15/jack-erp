@@ -17,7 +17,7 @@ export function ProductCatalogGrid({ columns = 6 }: ProductCatalogGridProps) {
     <div
       role="list"
       aria-label="Danh sách sản phẩm tư vấn"
-      className="grid gap-2 overflow-auto bg-white p-3"
+      className="grid max-h-[400px] gap-2 overflow-auto bg-white p-3"
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
     >
       {catalogProducts.map((product) => (

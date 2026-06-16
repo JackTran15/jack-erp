@@ -180,4 +180,66 @@ describe('OrganizationService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('getPosSettings', () => {
+    it('returns defaultCreditDays scoped to the actor org', async () => {
+      orgRepo.findOne.mockResolvedValue({ ...orgStub, defaultCreditDays: 30 });
+
+      const result = await service.getPosSettings(actor);
+
+      expect(orgRepo.findOne).toHaveBeenCalledWith({ where: { id: 'org-1' } });
+      expect(result).toEqual({ defaultCreditDays: 30 });
+    });
+
+    it('returns null when defaultCreditDays is unset', async () => {
+      orgRepo.findOne.mockResolvedValue({ ...orgStub });
+
+      const result = await service.getPosSettings(actor);
+
+      expect(result).toEqual({ defaultCreditDays: null });
+    });
+
+    it('throws NotFoundException when org is missing', async () => {
+      orgRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getPosSettings(actor)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('updatePosSettings', () => {
+    it('updates defaultCreditDays and returns the new settings', async () => {
+      orgRepo.findOne.mockResolvedValue({ ...orgStub, defaultCreditDays: 15 });
+
+      const result = await service.updatePosSettings(actor, {
+        defaultCreditDays: 15,
+      });
+
+      expect(orgRepo.update).toHaveBeenCalledWith(
+        { id: 'org-1' },
+        { defaultCreditDays: 15 },
+      );
+      expect(result).toEqual({ defaultCreditDays: 15 });
+    });
+
+    it('clears defaultCreditDays when null is sent', async () => {
+      orgRepo.findOne.mockResolvedValue({ ...orgStub, defaultCreditDays: null });
+
+      await service.updatePosSettings(actor, { defaultCreditDays: null });
+
+      expect(orgRepo.update).toHaveBeenCalledWith(
+        { id: 'org-1' },
+        { defaultCreditDays: null },
+      );
+    });
+
+    it('does not touch the column when the field is absent', async () => {
+      orgRepo.findOne.mockResolvedValue({ ...orgStub });
+
+      await service.updatePosSettings(actor, {});
+
+      expect(orgRepo.update).not.toHaveBeenCalled();
+    });
+  });
 });

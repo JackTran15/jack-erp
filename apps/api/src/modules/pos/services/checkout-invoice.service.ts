@@ -224,7 +224,10 @@ export class CheckoutInvoiceService {
         }
 
         if (remainder > 0) {
-          await this.invoiceDebtService.createFromInvoice(saved, remainder, manager);
+          await this.invoiceDebtService.createFromInvoice(saved, remainder, manager, {
+            dueDate: dto.dueDate,
+            creditDays: dto.creditDays,
+          });
         }
 
         // Redeem loyalty points synchronously: locks the card, re-checks the
