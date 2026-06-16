@@ -13,6 +13,7 @@ import { ExcelParserService } from "./excel-parser.service";
 import { ExcelImportItemService } from "./excel-import-item.service";
 import { ExcelImportStockTakeService } from "./excel-import-stock-take.service";
 import { ExcelImportGoodsReceiptService } from "./excel-import-goods-receipt.service";
+import { ExcelImportDocumentLinesService } from "./excel-import-document-lines.service";
 import { InventoryImportWorkbookService } from "./import-workbook/inventory-import-workbook.service";
 import { CsvImportController } from "./csv-import.controller";
 import { CsvExportController } from "./csv-export.controller";
@@ -64,6 +65,7 @@ import { StockLedgerEntryEntity } from "../ledger/stock-ledger-entry.entity";
     ExcelImportItemService,
     ExcelImportStockTakeService,
     ExcelImportGoodsReceiptService,
+    ExcelImportDocumentLinesService,
     InventoryImportWorkbookService,
     LocationImportWorkbookService,
     LocationImportService,

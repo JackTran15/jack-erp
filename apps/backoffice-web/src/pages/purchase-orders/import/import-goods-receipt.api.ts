@@ -83,10 +83,10 @@ export async function downloadGoodsReceiptImportErrors(
 
 export async function downloadGoodsReceiptTemplate(): Promise<void> {
   const { data } = await apiClient.get<Blob>(
-    "/inventory/imports/goods-receipts/import-template.xlsx",
+    "/inventory/imports/goods-receipts/import-template.xls",
     { responseType: "blob" },
   );
-  triggerBlobDownload(data, "DanhSachHangHoaNhapKho.xlsx");
+  triggerBlobDownload(data, "NhapkhauHangHoaNhapKho.xls");
 }
 
 export function useValidateGoodsReceiptImport() {

@@ -53,6 +53,10 @@ import {
   ExcelImportGoodsReceiptService,
   GoodsReceiptImportRow,
 } from "./excel-import-goods-receipt.service";
+import {
+  ExcelImportDocumentLinesService,
+  DocumentLineImportRow,
+} from "./excel-import-document-lines.service";
 import { StockTakeEntity } from "../stock-take/stock-take.entity";
 import { parseInventoryItemsFromDelimitedText } from "./inventory-import-delimited.parser";
 import {
@@ -104,6 +108,7 @@ export class CsvImportService {
     private readonly workbookService: InventoryImportWorkbookService,
     private readonly excelImportStockTakeService: ExcelImportStockTakeService,
     private readonly excelImportGoodsReceiptService: ExcelImportGoodsReceiptService,
+    private readonly excelImportDocumentLinesService?: ExcelImportDocumentLinesService,
   ) {}
 
   async validate(
@@ -211,7 +216,16 @@ export class CsvImportService {
                 actor,
               )
             : undefined;
+        const documentLineResult =
+          this.supportsDocumentLineImport(type)
+            ? await this.documentLineImporter().validateAndNormalizeRow(
+                type,
+                rawData as DocumentLineImportRow,
+                actor,
+              )
+            : undefined;
         const errors =
+          documentLineResult?.errors ??
           goodsReceiptResult?.errors ??
           (await this.validateRow(
             type,
@@ -243,13 +257,18 @@ export class CsvImportService {
             jobId: savedJob.id,
             rowNumber,
             rawData,
-            normalizedData: goodsReceiptResult?.normalizedData
-              ? { ...goodsReceiptResult.normalizedData }
-              : undefined,
+            normalizedData: (() => {
+              const normalizedData =
+                documentLineResult?.normalizedData ??
+                goodsReceiptResult?.normalizedData;
+              return normalizedData ? { ...normalizedData } : undefined;
+            })(),
             status,
             errorMessages: errors.length > 0 ? errors : undefined,
             warningMessages:
-              goodsReceiptResult?.warnings.length
+              documentLineResult?.warnings.length
+                ? documentLineResult.warnings
+                : goodsReceiptResult?.warnings.length
                 ? goodsReceiptResult.warnings
                 : undefined,
           }),
@@ -449,7 +468,8 @@ export class CsvImportService {
 
     if (
       job.type === ImportJobType.STOCK_TAKE ||
-      job.type === ImportJobType.GOODS_RECEIPT
+      job.type === ImportJobType.GOODS_RECEIPT ||
+      this.supportsDocumentLineImport(job.type)
     ) {
       return this.buildGenericErrorRowsWorkbook(errorRows);
     }
@@ -505,6 +525,9 @@ export class CsvImportService {
       if (type === ImportJobType.GOODS_RECEIPT) {
         return this.goodsReceiptImporter().parseWorkbook(file.buffer);
       }
+      if (this.supportsDocumentLineImport(type)) {
+        return this.documentLineImporter().parseWorkbook(type, file.buffer);
+      }
       // Canonical Excel grid is shared for all ITEMS import.
       return this.excelParser.parseInventoryItemsWorkbook(file.buffer);
     }
@@ -519,6 +542,9 @@ export class CsvImportService {
       }
       if (type === ImportJobType.GOODS_RECEIPT) {
         return this.goodsReceiptImporter().parseCsv(csvText);
+      }
+      if (this.supportsDocumentLineImport(type)) {
+        return this.documentLineImporter().parseCsv(type, csvText);
       }
       // Opening balances / adjustments keep legacy CSV parsers.
       return this.parseCsv(csvText);
@@ -982,6 +1008,22 @@ export class CsvImportService {
 
   private goodsReceiptImporter(): ExcelImportGoodsReceiptService {
     return this.excelImportGoodsReceiptService;
+  }
+
+  private supportsDocumentLineImport(
+    type: ImportJobType,
+  ): type is
+    | ImportJobType.GOODS_ISSUE
+    | ImportJobType.STOCK_TRANSFER
+    | ImportJobType.TRANSFER_ORDER {
+    return this.excelImportDocumentLinesService?.supports(type) === true;
+  }
+
+  private documentLineImporter(): ExcelImportDocumentLinesService {
+    if (!this.excelImportDocumentLinesService) {
+      throw new BadRequestException("Chưa cấu hình dịch vụ nhập khẩu chứng từ");
+    }
+    return this.excelImportDocumentLinesService;
   }
 
   private async buildGenericErrorRowsWorkbook(
