@@ -960,3 +960,22 @@ flowchart LR
   T2["TKT-EPT-02 In tạm tính: no draft"] --> T3
 ```
 
+## EPIC-16062026 POS barcode-priority search + auto-add line (khớp 100% mã vạch/SKU)
+
+- [EPIC-16062026 POS barcode-priority search + auto-add](./epics/EPIC-16062026-pos-barcode-auto-add.md)
+- Tại ô tìm hàng POS checkout (`(F3) Nhập tên hàng hóa, mã vạch, mã SKU`), khi **đổi input** (gõ/máy quét) **và** khi **Enter** → **ưu tiên tra mã vạch** rồi mã SKU qua **endpoint POS lookup riêng**. Khớp **đúng 1 kết quả 100%** (mã vạch HOẶC SKU) → **auto-add dòng** qty 1 (quét lại +1), không cần click; input không khớp tuyệt đối giữ dropdown gợi ý tên/SKU như cũ. **Không** migration (dùng lại `item_barcodes`), **không** event, **không** permission mới (dùng `pos.sale.create`). Endpoint GET, không side-effect; thêm dòng là state giỏ phía client. Hàng tồn 0 kế thừa guard `OUT_OF_STOCK` (không bán âm trong epic này). Phải dedupe race "đổi input" ↔ "Enter" trên cùng chuỗi.
+
+| Ticket                                                                       | Mô tả                                                                                          |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [TKT-BAR-01](./tickets/TKT-BAR-01-pos-catalog-lookup-endpoint.md)            | BE: `GET /pos/branches/:id/catalog/lookup?code=` — exact match mã vạch HOẶC SKU → `PosCatalogLineDto[]` + spec |
+| [TKT-BAR-02](./tickets/TKT-BAR-02-openapi-regen.md)                          | OpenAPI regen + api-client snapshot                                                            |
+| [TKT-BAR-03](./tickets/TKT-BAR-03-fe-barcode-auto-add.md)                    | FE: service + react-query lookup + page-hook `tryAutoAdd` (dedupe) + wiring `ProductSearchInput` (change + Enter) |
+
+### Ticket dependency graph (EPIC-16062026 pos-barcode-auto-add)
+
+```mermaid
+flowchart LR
+  T1["TKT-BAR-01 BE lookup endpoint"] --> T2["TKT-BAR-02 OpenAPI regen"]
+  T1 --> T3["TKT-BAR-03 FE auto-add wiring"]
+```
+

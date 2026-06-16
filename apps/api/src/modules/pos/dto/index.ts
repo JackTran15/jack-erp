@@ -1,6 +1,7 @@
 export { OpenSessionDto, StartSalesDto } from './session.dto';
 export { SubmitReconciliationDto } from './reconciliation.dto';
 export { PosCatalogQueryDto } from './pos-catalog.query.dto';
+export { PosCatalogLookupQueryDto } from './pos-catalog-lookup.query.dto';
 export {
   PosCatalogProductsQueryDto,
   PosCatalogProductDetailQueryDto,

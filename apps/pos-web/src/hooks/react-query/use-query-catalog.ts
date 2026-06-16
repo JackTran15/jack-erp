@@ -120,3 +120,22 @@ export function useInvalidatePosBranchCatalog() {
     [queryClient],
   );
 }
+
+/**
+ * Imperative exact-match lookup mã vạch/SKU — `GET /pos/branches/:id/catalog/lookup`.
+ * Trả callback `(branchId, code) => Promise<PosCatalogLine[]>` để ô tìm hàng
+ * gọi mỗi lần đổi input / Enter; cache theo `CATALOG_KEYS.LOOKUP` nên quét lại
+ * cùng mã không phát request thừa trong staleTime.
+ */
+export function useLookupCatalogByCode() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (branchId: string, code: string): Promise<PosCatalogLine[]> =>
+      queryClient.fetchQuery({
+        queryKey: CATALOG_KEYS.LOOKUP(branchId, code),
+        queryFn: () => catalogService.lookupByCode(branchId, code),
+        staleTime: 30_000,
+      }),
+    [queryClient],
+  );
+}

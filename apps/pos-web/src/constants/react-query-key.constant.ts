@@ -84,6 +84,8 @@ export const CATALOG_KEYS = {
     ["catalog", "products", branchId, categoryId ?? "all"] as const,
   PRODUCT_DETAIL: (branchId: string, id: string, kind?: PosProductKind) =>
     ["catalog", "product-detail", branchId, id, kind ?? "auto"] as const,
+  LOOKUP: (branchId: string, code: string) =>
+    ["catalog", "lookup", branchId, code] as const,
 } as const;
 
 export const ITEM_CATEGORY_KEYS = {

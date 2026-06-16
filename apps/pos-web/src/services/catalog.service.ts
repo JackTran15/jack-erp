@@ -30,6 +30,15 @@ export const catalogService = {
   },
 
   /**
+   * Tra khớp tuyệt đối mã vạch / mã SKU — `GET /pos/branches/:id/catalog/lookup`.
+   * Trả 0..n dòng (cùng shape catalog) để caller auto-add khi đúng 1 kết quả.
+   */
+  lookupByCode: (branchId: string, code: string): Promise<PosCatalogLine[]> =>
+    http.get<PosCatalogLine[]>(
+      `/pos/branches/${encodeURIComponent(branchId)}/catalog/lookup?code=${encodeURIComponent(code)}`,
+    ),
+
+  /**
    * Danh sách catalog mức PRODUCT (gom biến thể) — `GET /pos/branches/:id/
    * catalog/products`. Phân trang (pageSize ≤ 100), không có tham số search.
    */
