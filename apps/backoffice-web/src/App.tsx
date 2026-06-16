@@ -48,6 +48,7 @@ import { RoleManagementPage } from "./pages/role-management/RoleManagementPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
 import { DynamicStoreView } from "./pages/dynamic-store-view";
 import { REPORT_TYPE_INVENTORY } from "./constants/reports/report-type.constant";
+import { InventoryReportPage } from "./pages/reports/InventoryReportPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -175,10 +176,15 @@ export function App() {
                   path="/reports/sales"
                   element={<ReportPage category={REPORT_CATEGORY.SALES} />}
                 />
-                {/* <Route
+                
+                <Route
+                  path="/reports/inventory"
+                  element={<InventoryReportPage />}
+                />
+                <Route
                   path="/reports/chain-inventory"
                   element={<ReportPage category={REPORT_CATEGORY.INVENTORY} />}
-                /> */}
+                />
                 
                 <Route path="/reports/aging" element={<AgingReportPage />} />
                 <Route path="/reports/cash" element={<CashReportPage />} />
