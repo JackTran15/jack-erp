@@ -52,6 +52,7 @@ export const authService = {
   clearSession: (): void => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(ORGANIZATION_ID_KEY);
   },
 
   isAuthenticated: (): boolean => {

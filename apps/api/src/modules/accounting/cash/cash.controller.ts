@@ -54,6 +54,30 @@ export class CashController {
     return this.cashService.listAccounts(query, actor!);
   }
 
+  @Get('accounts/my')
+  @RequirePermission('accounting.cash.read')
+  getMyBranchAccount(@Actor() actor: ActorContext) {
+    return this.cashService.getMyBranchAccount(actor);
+  }
+
+  @Get('accounts/by-branch/:branchId')
+  @RequirePermission('accounting.cash.read')
+  listAccountsByBranch(
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('type') type?: CashAccountType,
+    @Actor() actor?: ActorContext,
+  ) {
+    const query: CashListQuery = {
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+      branchId,
+      type,
+    };
+    return this.cashService.listAccounts(query, actor!);
+  }
+
   @Get('accounts/:id')
   @RequirePermission('accounting.cash.read')
   getAccount(
