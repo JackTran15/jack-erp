@@ -11,14 +11,15 @@ import { PaymentAccountMethod } from './enums';
 
 /**
  * Maps a POS payment method (cash/bank_transfer/card) to a single COA account
- * (the receiving account), scoped to org + branch. Bank columns are structured
- * so the UI can compose a label like "<accountNumber> - <bankCode> - <bankName>";
- * they are null for cash.
+ * (the receiving account). A mapping is either org-wide (branch_id NULL, the
+ * shared default for every branch) or a branch override (branch_id set); the
+ * branch override wins over the org-wide default when both exist for a method.
+ * Bank columns are structured so the UI can compose a label like
+ * "<accountNumber> - <bankCode> - <bankName>"; they are null for cash.
  *
- * Columns are declared explicitly instead of extending {@link BaseEntity}: this
- * table's `branch_id` is NOT NULL (always branch-scoped), and TypeORM 0.3.28
- * cannot override an inherited column's `nullable` flag (a child @Column may only
- * override `default`), which would leave entity metadata diverging from the DB.
+ * Columns are declared explicitly instead of extending {@link BaseEntity} so this
+ * table's enum/column metadata stays self-contained (e.g. the payment_method
+ * enum), matching the migration that owns the schema.
  */
 @Entity('payment_accounts')
 @Index('IDX_payment_accounts_org_branch', ['organizationId', 'branchId'])
@@ -30,9 +31,9 @@ export class PaymentAccountEntity {
   @Column({ name: 'organization_id', type: 'varchar' })
   organizationId: string;
 
-  /** Always branch-scoped — NOT NULL, unlike BaseEntity's nullable branch_id. */
-  @Column({ name: 'branch_id', type: 'varchar' })
-  branchId: string;
+  /** NULL = org-wide default mapping; set = branch override. */
+  @Column({ name: 'branch_id', type: 'varchar', nullable: true })
+  branchId: string | null;
 
   @Column({
     name: 'payment_method',

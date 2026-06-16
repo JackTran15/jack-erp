@@ -5,6 +5,8 @@ export interface SessionPayload {
   userId: string;
   organizationId: string;
   branchIds: string[];
+  /** Currently active branch (subset of branchIds). */
+  branchId?: string;
   roles: string[];
   issuedAt: number;
   expiresAt: number;

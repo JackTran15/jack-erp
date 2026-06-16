@@ -6,7 +6,7 @@ import { StockStateFilter, LocationType } from '@erp/shared-interfaces';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
-import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import { StockTransferService } from '../transfer/stock-transfer.service';
 import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemEntity } from './item.entity';
@@ -144,7 +144,7 @@ describe('InventoryLocationStockService', () => {
     itemProviderRepo = { find: jest.fn().mockResolvedValue([]) };
     itemRepo = { findOne: jest.fn().mockResolvedValue(null) };
     pslService = {
-      listByProduct: jest.fn().mockResolvedValue([]),
+      listByItem: jest.fn().mockResolvedValue([]),
       setLocationByItem: jest.fn().mockResolvedValue(undefined),
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
     };
@@ -196,7 +196,7 @@ describe('InventoryLocationStockService', () => {
           useValue: itemRepo,
         },
         {
-          provide: ProductStorageLocationService,
+          provide: ItemStorageLocationService,
           useValue: pslService,
         },
         {
@@ -739,7 +739,7 @@ describe('InventoryLocationStockService', () => {
         productId: 'prod-1',
         organizationId: 'org-1',
       });
-      pslService.listByProduct.mockResolvedValue([
+      pslService.listByItem.mockResolvedValue([
         {
           productId: 'prod-1',
           storageId: 'storage-1',
@@ -768,7 +768,7 @@ describe('InventoryLocationStockService', () => {
         productId: 'prod-1',
         organizationId: 'org-1',
       });
-      pslService.listByProduct.mockResolvedValue([
+      pslService.listByItem.mockResolvedValue([
         {
           productId: 'prod-1',
           storageId: 'storage-1',

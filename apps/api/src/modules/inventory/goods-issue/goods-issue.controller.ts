@@ -124,30 +124,39 @@ export class GoodsIssueController {
 
   @Post()
   @RequirePermission('inventory.write')
+  @RequireBranchScope()
   create(@Body() dto: CreateGoodsIssueDto, @Actor() actor: ActorContext) {
     return this.service.createAndPost(dto, actor);
   }
 
   @Get()
   @RequirePermission('inventory.read')
+  @RequireBranchScope()
   list(@Query() query: GoodsIssueQueryDto, @Actor() actor: ActorContext) {
-    return this.service.list({ ...query, organizationId: actor.organizationId });
+    return this.service.list({
+      ...query,
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+    });
   }
 
   @Get(':id')
   @RequirePermission('inventory.read')
+  @RequireBranchScope()
   getById(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
-    return this.service.getById(id, actor.organizationId);
+    return this.service.getById(id, actor);
   }
 
   @Post(':id/post')
   @RequirePermission('inventory.write')
+  @RequireBranchScope()
   post(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.post(id, actor);
   }
 
   @Post(':id/cancel')
   @RequirePermission('inventory.write')
+  @RequireBranchScope()
   cancel(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
     return this.service.cancel(id, actor);
   }

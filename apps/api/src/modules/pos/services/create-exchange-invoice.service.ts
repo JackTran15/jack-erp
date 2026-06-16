@@ -17,7 +17,7 @@ import {
   ItemDirection,
 } from '../entities/invoice-item.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
-import { ProductStorageLocationEntity } from '../../inventory/product/product-storage-location.entity';
+import { resolveBranchItemLocations } from './resolve-branch-item-locations';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CreateInvoiceItemDto } from '../dto/create-invoice.dto';
 import { ReturnInvoiceLineDto } from '../dto/create-return-invoice.dto';
@@ -159,26 +159,15 @@ export class CreateExchangeInvoiceService {
       );
     }
 
-    const productIds = [
-      ...new Set(
-        catalogItems.map((c) => c.productId).filter((p): p is string => !!p),
-      ),
-    ];
-    const locRows =
-      productIds.length > 0
-        ? await manager.findBy(ProductStorageLocationEntity, {
-            productId: In(productIds),
-          })
-        : [];
-    const productLocationMap = new Map(
-      locRows.map((r) => [r.productId, r.locationId]),
+    const itemLocationMap = await resolveBranchItemLocations(
+      manager,
+      itemIds,
+      actor,
     );
 
     return newLines.map((line, index) => {
       const catalog = priceMap.get(line.itemId);
-      const resolvedLocationId =
-        line.locationId ??
-        (catalog?.productId ? productLocationMap.get(catalog.productId) : undefined);
+      const resolvedLocationId = line.locationId ?? itemLocationMap.get(line.itemId);
       return manager.create(InvoiceItemEntity, {
         organizationId: actor.organizationId,
         branchId: actor.branchId,

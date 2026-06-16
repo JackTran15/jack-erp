@@ -1,4 +1,5 @@
 import * as ExcelJS from 'exceljs';
+import { applyWorkbookFont } from '../../../../../../common/utils/excel-workbook-font.util';
 import { INVENTORY_IMPORT_GUIDE_SHEET_NAME } from '../../inventory-import-template-sheet.constants';
 import { writeGridToWorksheet } from '../../grid-worksheet.utils';
 import { applyGuideSheetStyles } from './guide-sheet.styles';
@@ -16,5 +17,6 @@ export function buildGuideSheet(
 export function buildGuideSheetOnlyBuffer(grid: string[][]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   buildGuideSheet(workbook, grid);
+  applyWorkbookFont(workbook);
   return workbook.xlsx.writeBuffer().then((buf) => Buffer.from(buf));
 }

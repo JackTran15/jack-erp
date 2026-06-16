@@ -32,11 +32,17 @@ export class InventoryImportJobRowEntity {
   @Column({ name: 'raw_data', type: 'jsonb', comment: 'Parsed CSV row as a key-value object' })
   rawData: Record<string, unknown>;
 
+  @Column({ name: 'normalized_data', type: 'jsonb', nullable: true, comment: 'Resolved technical values ready for the target form' })
+  normalizedData?: Record<string, unknown> | null;
+
   @Column({ type: 'enum', enum: ImportRowStatus, comment: 'Row processing status (VALID, ERROR, COMMITTED)' })
   status: ImportRowStatus;
 
   @Column({ name: 'error_messages', type: 'jsonb', nullable: true, comment: 'Array of { column?, code, message } objects describing validation failures' })
   errorMessages?: Array<{ column?: string; code: string; message: string }>;
+
+  @Column({ name: 'warning_messages', type: 'jsonb', nullable: true, comment: 'Non-blocking validation warnings' })
+  warningMessages?: Array<{ column?: string; code: string; message: string }> | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

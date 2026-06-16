@@ -32,12 +32,10 @@ import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
 import { BrandEntity } from './brand.entity';
 import { ItemProviderEntity } from './item-provider.entity';
-import { ItemBarcodeEntity } from './item-barcode.entity';
 import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { ItemUnitEntity } from './item-unit.entity';
 import { LocationEntity } from './location.entity';
 import {
-  CreateItemBarcodeInput,
   CreateItemProviderInput,
   CreateItemThresholdInput,
   CreateItemUnitInput,
@@ -52,7 +50,6 @@ import type {
 export const INVENTORY_ITEM_SERVICE_TOKEN = 'InventoryItemCrudService';
 
 interface NestedPayload {
-  barcodes?: CreateItemBarcodeInput[];
   providers?: CreateItemProviderInput[];
   units?: CreateItemUnitInput[];
   threshold?: CreateItemThresholdInput;
@@ -183,7 +180,7 @@ export class InventoryItemCrudService extends BaseCrudService<
 
   /**
    * Full create: split nested arrays from the item payload, save the item,
-   * then upsert providers / barcodes / units / threshold / initial stock —
+   * then upsert providers / units / threshold / initial stock —
    * all in a single transaction.
    */
   override async create(
@@ -225,13 +222,6 @@ export class InventoryItemCrudService extends BaseCrudService<
         nested.providers,
         nested.providerId,
       );
-      await this.saveBarcodes(
-        manager,
-        savedItem.id,
-        actor,
-        nested.barcodes,
-        savedItem.code,
-      );
       await this.saveUnits(manager, savedItem.id, actor, nested.units);
       await this.saveThreshold(manager, savedItem.id, actor, nested.threshold);
 
@@ -240,30 +230,13 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     // Initial stock — done OUTSIDE the txn since StockLedgerService manages
     // its own transaction (ledger + balance + event publish).
-    if (nested.initialStock && Number(nested.initialStock) > 0) {
-      const locationId =
-        nested.initialLocationId ?? (await this.resolveDefaultLocationId(actor));
-      if (!locationId) {
-        throw new BadRequestException(
-          'Không tìm thấy vị trí kho mặc định để ghi tồn kho đầu kỳ. Vui lòng cấu hình tối thiểu một vị trí.',
-        );
-      }
-      await this.stockLedger.recordMovement({
-        itemId: saved.id,
-        locationId,
-        branchId: actor.branchId ?? '',
-        organizationId: actor.organizationId,
-        movementType: StockMovementType.ADJUSTMENT_INCREASE,
-        quantity: Number(nested.initialStock),
-        referenceType: 'INITIAL_STOCK',
-        referenceId: saved.id,
-        notes: `Tồn kho đầu kỳ — đơn giá nhập ${nested.initialStockUnitPrice ?? 0}`,
-        actorContext: actor,
-        unitCost: Number(
-          nested.initialStockUnitPrice ?? saved.purchasePrice ?? 0,
-        ),
-      });
-    }
+    await this.recordInitialStock(
+      saved,
+      nested.initialStock,
+      nested.initialStockUnitPrice,
+      actor,
+      nested.initialLocationId,
+    );
 
     this.logger.log(`Created inventory-items id=${saved.id}`);
     return saved;
@@ -366,7 +339,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     } = payload;
     return {
       nested: {
-        barcodes,
         providers,
         units,
         threshold,
@@ -417,38 +389,6 @@ export class InventoryItemCrudService extends BaseCrudService<
       }),
     );
     await manager.save(ItemProviderEntity, entities);
-  }
-
-  private async saveBarcodes(
-    manager: EntityManager,
-    itemId: string,
-    actor: ActorContext,
-    barcodes?: CreateItemBarcodeInput[],
-    fallbackCode?: string,
-  ): Promise<void> {
-    const provided = (barcodes ?? [])
-      .filter((b) => b.code && b.code.trim().length > 0)
-      .map((b) => ({ code: b.code.trim(), notes: b.notes }));
-    // No barcode supplied → default it to the item's SKU (code).
-    const fallback = fallbackCode?.trim();
-    const rows =
-      provided.length > 0
-        ? provided
-        : fallback
-          ? [{ code: fallback, notes: undefined as string | undefined }]
-          : [];
-    if (rows.length === 0) return;
-    const entities = rows.map((b) =>
-      manager.create(ItemBarcodeEntity, {
-        itemId,
-        code: b.code,
-        notes: b.notes,
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-      }),
-    );
-    await manager.save(ItemBarcodeEntity, entities);
   }
 
   private async saveUnits(
@@ -537,6 +477,40 @@ export class InventoryItemCrudService extends BaseCrudService<
     return row?.id;
   }
 
+  private async recordInitialStock(
+    item: ItemEntity,
+    quantity: unknown,
+    unitPrice: unknown,
+    actor: ActorContext,
+    locationId?: string,
+  ): Promise<void> {
+    const qty = finiteNumber(quantity);
+    if (!qty || qty <= 0) return;
+
+    const resolvedLocationId =
+      locationId ?? (await this.resolveDefaultLocationId(actor));
+    if (!resolvedLocationId) {
+      throw new BadRequestException(
+        'Không tìm thấy vị trí kho mặc định để ghi tồn kho đầu kỳ. Vui lòng cấu hình tối thiểu một vị trí.',
+      );
+    }
+
+    const cost = finiteNumber(unitPrice) ?? Number(item.purchasePrice) ?? 0;
+    await this.stockLedger.recordMovement({
+      itemId: item.id,
+      locationId: resolvedLocationId,
+      branchId: actor.branchId ?? '',
+      organizationId: actor.organizationId,
+      movementType: StockMovementType.ADJUSTMENT_INCREASE,
+      quantity: qty,
+      referenceType: 'INITIAL_STOCK',
+      referenceId: item.id,
+      notes: `Tồn kho đầu kỳ — đơn giá nhập ${cost}`,
+      actorContext: actor,
+      unitCost: cost,
+    });
+  }
+
   private async ensureCategoryBelongsToOrg(
     categoryId: string,
     actor: ActorContext,
@@ -602,6 +576,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       colors = [],
       sizes = [],
       variants = [],
+      initialStock,
+      initialStockUnitPrice,
+      initialLocationId,
     } = payload;
 
     if (!productName) throw new BadRequestException('Tên hàng hóa là bắt buộc');
@@ -648,7 +625,7 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const combos = this.buildCombos(colorOptions, sizeOptions);
 
-    // Per-variant overrides (price / SKU / name / unit / barcode) sent by the
+    // Per-variant overrides (price / SKU / name / unit) sent by the
     // FE variant table, keyed by the same "color__size" combo the table uses.
     const variantByKey = new Map<string, Record<string, any>>();
     for (const v of (Array.isArray(variants) ? variants : []) as Record<
@@ -657,7 +634,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     >[]) {
       variantByKey.set(`${v?.color ?? ''}__${v?.size ?? ''}`, v);
     }
-    const barcodeRepo = this.dataSource.getRepository(ItemBarcodeEntity);
     const str = (val: unknown): string | undefined =>
       typeof val === 'string' && val.trim() ? val.trim() : undefined;
     const sharedItemFields = pickProductVariantSharedItemFields(payload);
@@ -700,26 +676,20 @@ export class InventoryItemCrudService extends BaseCrudService<
         )
         .catch((err) => this.toConflictIfDuplicate(err));
 
-      // Barcode: the variant's own barcode, otherwise clone its SKU (code).
-      const barcodeCode = str(v?.barcode) ?? code;
-      await barcodeRepo
-        .save(
-          barcodeRepo.create({
-            itemId: item.id,
-            code: barcodeCode,
-            organizationId: actor.organizationId,
-            branchId: actor.branchId,
-            createdBy: actor.userId,
-          }),
-        )
-        .catch((err) => this.toConflictIfDuplicate(err));
-
       if (combo.color && colorDef) {
         await this.upsertAttrValue(item.id, colorDef, combo.color.id, actor);
       }
       if (combo.size && sizeDef) {
         await this.upsertAttrValue(item.id, sizeDef, combo.size.id, actor);
       }
+      await this.recordInitialStock(
+        item,
+        finiteNumber(v?.initialStock) ??
+          (combos.length === 1 ? finiteNumber(initialStock) : undefined),
+        initialStockUnitPrice,
+        actor,
+        initialLocationId,
+      );
       itemsCreated++;
     }
 
@@ -834,8 +804,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<void> {
     if (!Array.isArray(variants) || variants.length === 0) return;
-    const barcodeRepo = this.dataSource.getRepository(ItemBarcodeEntity);
-
     for (const raw of variants as Record<string, any>[]) {
       const itemId = typeof raw?.itemId === 'string' ? raw.itemId : undefined;
       if (!itemId) continue;
@@ -860,13 +828,6 @@ export class InventoryItemCrudService extends BaseCrudService<
         );
       }
 
-      const barcode = cleanString(raw.barcode);
-      if (barcode) {
-        await barcodeRepo.update(
-          { itemId, organizationId: actor.organizationId } as any,
-          { code: barcode } as any,
-        );
-      }
     }
   }
 
@@ -1197,7 +1158,7 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const attrs = await this.loadProductAttributes(productId);
     const variants = await this.loadProductVariants(actor, productId);
-    const opening = await this.loadInitialStockSnapshot(actor, item.id);
+    const opening = await this.loadProductInitialStockSnapshot(actor, productId);
 
     return {
       ...rest,
@@ -1247,6 +1208,35 @@ export class InventoryItemCrudService extends BaseCrudService<
       productId,
       actor.organizationId,
     ]);
+  }
+
+  private async loadProductInitialStockSnapshot(
+    actor: ActorContext,
+    productId: string,
+  ): Promise<{ initialStock: number; initialStockUnitPrice: number }> {
+    const rows = await this.dataSource.query<
+      Array<{ initialStock: string | number | null; notes: string | null }>
+    >(
+      `
+        SELECT
+          COALESCE(SUM(sle.quantity)::float, 0) AS "initialStock",
+          (
+            ARRAY_AGG(sle.notes ORDER BY sle.posted_at DESC)
+            FILTER (WHERE sle.notes IS NOT NULL)
+          )[1] AS notes
+        FROM stock_ledger_entries sle
+        INNER JOIN items i ON i.id = sle.item_id
+        WHERE sle.organization_id = $1
+          AND i.product_id = $2
+          AND sle.reference_type = 'INITIAL_STOCK'
+      `,
+      [actor.organizationId, productId],
+    );
+    const row = rows[0];
+    return {
+      initialStock: finiteNumber(row?.initialStock) ?? 0,
+      initialStockUnitPrice: parseInitialStockUnitPrice(row?.notes) ?? 0,
+    };
   }
 
   async getProductGroup(
@@ -1410,18 +1400,18 @@ function normalizePayload<T extends Record<string, any>>(payload: T): T {
 
 export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   entityKey: 'inventory-items',
-  displayName: 'Mặt hàng kho',
+  displayName: 'Hàng hoá',
   apiResource: 'inventory/items',
   idField: 'id',
   fields: [
     // ── List-visible fields (shown in table, order matches the UI) ────────
-    { key: 'code', label: 'Mã SKU', type: 'string', required: true },
-    { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true },
+    { key: 'code', label: 'Mã SKU', type: 'string' },
+    { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true, hideInList: true },
     { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
     { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
-    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money', required: true },
-    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money', required: true },
+    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
+    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money' },
     { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
     { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
     // ── Display fields removed from the table (kept for form/back-compat) ──

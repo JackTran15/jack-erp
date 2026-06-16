@@ -99,6 +99,13 @@ describe("StockSummaryService", () => {
             transfer_out_qty: "3",
             incoming_qty: "4",
           },
+        ])
+        .mockResolvedValueOnce([
+          {
+            item_id: row.item_id,
+            storage_id: row.storage_id,
+            reserved_qty: "2",
+          },
         ]),
     };
     const service = new StockSummaryService({
@@ -144,6 +151,104 @@ describe("StockSummaryService", () => {
         closingValue: 90,
         transferOutQty: 3,
         incomingQty: 4,
+        reservedQty: 2,
+      }),
+    );
+  });
+
+  it("counts draft and pending sale OUT lines as branch-scoped customer reservations", async () => {
+    const row = {
+      item_id: "11111111-1111-4111-8111-111111111111",
+      item_code: "SKU-1",
+      item_name: "Hàng hóa 1",
+      item_unit: "Cái",
+      item_brand: null,
+      item_is_active: true,
+      category_name: null,
+      storage_id: "22222222-2222-4222-8222-222222222222",
+      storage_name: "Kho 1",
+      branch_id: "33333333-3333-4333-8333-333333333333",
+      quantity: "9",
+      last_movement_at: null,
+    };
+    const qb = createQueryBuilder([row]);
+    const manager = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([{ total: 1, total_quantity: "9" }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            item_id: row.item_id,
+            storage_id: row.storage_id,
+            reserved_qty: "3",
+          },
+        ]),
+    };
+    const service = new StockSummaryService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+      manager,
+    } as never);
+
+    const result = await service.getSummary({
+      organizationId: "44444444-4444-4444-8444-444444444444",
+      branchId: row.branch_id,
+      excludeReservations: true,
+    });
+
+    expect(manager.query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("invoice.status IN ('draft', 'pending')"),
+      expect.arrayContaining([
+        row.branch_id,
+        "44444444-4444-4444-8444-444444444444",
+      ]),
+    );
+    expect(result.data[0].reservedQty).toBe(3);
+  });
+
+  it("returns an incoming-only row when the destination branch has no balance for the SKU", async () => {
+    const qb = createQueryBuilder([]);
+    const manager = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([{ total: 0, total_quantity: "0" }])
+        .mockResolvedValueOnce([
+          {
+            item_id: "item-1",
+            item_code: "SKU-1",
+            item_name: "Hàng hóa 1",
+            item_unit: "Cái",
+            item_brand: null,
+            item_is_active: true,
+            category_name: null,
+            storage_id: null,
+            storage_name: null,
+            branch_id: "branch-B",
+            incoming_qty: "4",
+          },
+        ]),
+    };
+    const service = new StockSummaryService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+      manager,
+    } as never);
+
+    const result = await service.getSummary({
+      organizationId: "org-1",
+      branchId: "branch-B",
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        itemId: "item-1",
+        storageId: "pending:branch-B",
+        incomingQty: 4,
+        quantity: 0,
+        storage: expect.objectContaining({ name: "Chưa chọn kho nhận" }),
       }),
     );
   });

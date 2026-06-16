@@ -1,6 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+/**
+ * Loại bỏ bút toán của phiếu đã xoá khỏi báo cáo (parity MISA): phiếu nhập bị
+ * huỷ (deleted_at hoặc status CANCELLED) và phiếu xuất bị huỷ (status CANCELLED)
+ * không còn xuất hiện. Bút toán gốc và bút toán đảo dùng chung reference_type +
+ * reference_id nên cả hai cùng bị loại. Dùng alias `le` cho stock_ledger_entries.
+ */
+const EXCLUDE_VOIDED_DOCS_SQL = `
+          AND NOT EXISTS (
+            SELECT 1 FROM goods_receipts grx
+            WHERE grx.id = le.reference_id
+              AND le.reference_type = 'GOODS_RECEIPT'
+              AND (grx.deleted_at IS NOT NULL OR grx.status = 'CANCELLED')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM goods_issues gix
+            WHERE gix.id = le.reference_id
+              AND le.reference_type = 'GOODS_ISSUE'
+              AND gix.status = 'CANCELLED'
+          )`;
+
 export type StockPeriodGroupBy = 'item_location' | 'item_branch';
 
 /** How the result rows are aggregated along the item dimension. */
@@ -46,6 +66,9 @@ export interface StockPeriodRow {
   unit: string;
   categoryId: string | null;
   categoryName: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   // Either location-level OR branch-level identity, depending on groupBy.
   locationId?: string;
   locationCode?: string;
@@ -62,6 +85,10 @@ export interface StockPeriodRow {
   outValue: number;
   closingQty: number;
   closingValue: number;
+  transferOutQty: number;
+  transferOutValue: number;
+  incomingQty: number;
+  incomingValue: number;
   // Optional breakdown (only if includeBreakdown=true)
   inQtyPurchase?: number;
   inQtyTransferIn?: number;
@@ -135,17 +162,111 @@ export class StockPeriodService {
       hideZeroRows,         // $8
     ];
 
-    const [rows, countRows] = await Promise.all([
+    const [rows, countRows, pendingRows] = await Promise.all([
       this.dataSource.query(dataSql, [...baseParams, pageSize, offset]),
       this.dataSource.query(countSql, baseParams),
+      this.loadPendingTransfers(query),
     ]);
 
     const total = Number(countRows[0]?.total ?? 0);
     const data = (rows as RawStockPeriodRow[]).map((r) =>
       this.mapRow(r, query.includeBreakdown === true, isLocation),
     );
+    this.applyPendingTransfers(data, pendingRows, isLocation);
 
     return { data, total };
+  }
+
+  private async loadPendingTransfers(
+    query: StockPeriodQuery,
+  ): Promise<RawPendingTransferRow[]> {
+    return this.dataSource.query(
+      `
+        SELECT
+          transfer_line.item_id,
+          transfer_line.source_location_id,
+          transfer_order.source_branch_id,
+          transfer_order.destination_branch_id,
+          SUM(transfer_line.requested_qty)::numeric AS quantity,
+          SUM(
+            transfer_line.requested_qty *
+            COALESCE(export_price.unit_price, item.purchase_price, 0)
+          )::numeric AS value
+        FROM transfer_orders transfer_order
+        INNER JOIN transfer_order_lines transfer_line
+          ON transfer_line.transfer_order_id = transfer_order.id
+         AND transfer_line.organization_id = transfer_order.organization_id
+        INNER JOIN items item
+          ON item.id = transfer_line.item_id
+         AND item.organization_id = transfer_order.organization_id
+        LEFT JOIN (
+          SELECT goods_issue_line.item_id,
+                 goods_issue_line.goods_issue_id,
+                 MAX(goods_issue_line.unit_price)::numeric AS unit_price
+          FROM goods_issue_lines goods_issue_line
+          GROUP BY goods_issue_line.item_id, goods_issue_line.goods_issue_id
+        ) export_price
+          ON export_price.goods_issue_id = transfer_order.export_goods_issue_id
+         AND export_price.item_id = transfer_line.item_id
+        WHERE transfer_order.organization_id = $1
+          AND transfer_order.status = 'IN_PROGRESS'
+          AND transfer_order.deleted_at IS NULL
+          AND (
+            $2::text[] IS NULL
+            OR transfer_order.source_branch_id = ANY($2)
+            OR transfer_order.destination_branch_id = ANY($2)
+          )
+          AND ($3::uuid[] IS NULL OR item.category_id = ANY($3))
+          AND ($4::text IS NULL OR item.code ILIKE '%' || $4 || '%' OR item.name ILIKE '%' || $4 || '%')
+        GROUP BY transfer_line.item_id,
+                 transfer_line.source_location_id,
+                 transfer_order.source_branch_id,
+                 transfer_order.destination_branch_id
+      `,
+      [
+        query.organizationId,
+        query.branchIds?.length ? query.branchIds : null,
+        query.categoryIds?.length ? query.categoryIds : null,
+        query.search?.trim() || null,
+      ],
+    );
+  }
+
+  private applyPendingTransfers(
+    data: StockPeriodRow[],
+    pendingRows: RawPendingTransferRow[],
+    isLocation: boolean,
+  ): void {
+    const incomingAssigned = new Set<string>();
+    for (const row of data) {
+      row.transferOutQty = 0;
+      row.transferOutValue = 0;
+      row.incomingQty = 0;
+      row.incomingValue = 0;
+
+      for (const pending of pendingRows) {
+        if (pending.item_id !== row.itemId) continue;
+        const quantity = Number(pending.quantity ?? 0);
+        const value = Number(pending.value ?? 0);
+        const isSource = isLocation
+          ? Boolean(row.locationId && row.locationId === pending.source_location_id)
+          : row.branchId === pending.source_branch_id;
+        if (isSource) {
+          row.transferOutQty += quantity;
+          row.transferOutValue += value;
+        }
+
+        const incomingKey = `${pending.item_id}:${pending.destination_branch_id}`;
+        if (
+          row.branchId === pending.destination_branch_id &&
+          !incomingAssigned.has(incomingKey)
+        ) {
+          row.incomingQty += quantity;
+          row.incomingValue += value;
+          incomingAssigned.add(incomingKey);
+        }
+      }
+    }
   }
 
   // ─── SQL builders ────────────────────────────────────────────────────────────
@@ -162,10 +283,12 @@ export class StockPeriodService {
       ? `loc.id AS location_id, loc.code AS location_code, loc.name AS location_name,`
       : '';
     const branchCols = isLocation
-      ? `NULL::uuid AS branch_id, NULL::text AS branch_code, NULL::text AS branch_name,`
+      ? `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`
       : `b.id AS branch_id, NULL::text AS branch_code, b.name AS branch_name,`;
     const joinLoc = isLocation
-      ? 'LEFT JOIN locations loc ON loc.id = c.group_key'
+      ? `LEFT JOIN locations loc ON loc.id = c.group_key
+         LEFT JOIN storages storage ON storage.id = loc.storage_id
+         LEFT JOIN branches b ON b.id = storage.branch_id`
       : '';
     const joinBranch = isLocation
       ? ''
@@ -185,6 +308,7 @@ export class StockPeriodService {
         i.unit        AS unit,
         ic.id         AS category_id,
         ic.name       AS category_name,
+        i.brand       AS brand,
         ${locCols}
         ${branchCols}
         c.opening_qty, c.opening_value,
@@ -193,7 +317,17 @@ export class StockPeriodService {
         c.opening_qty + c.in_qty - c.out_qty     AS closing_qty,
         c.opening_value + c.in_value - c.out_value AS closing_value,
         c.in_qty_purchase, c.in_qty_transfer_in, c.in_qty_return, c.in_qty_adjust_in,
-        c.out_qty_sale,    c.out_qty_transfer_out, c.out_qty_adjust_out
+        c.out_qty_sale,    c.out_qty_transfer_out, c.out_qty_adjust_out,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) IN ('màu sắc', 'màu', 'color')
+         LIMIT 1) AS color,
+        (SELECT pao.value_label FROM item_attribute_values iav
+         JOIN product_attribute_definitions pad ON pad.id = iav.attribute_definition_id
+         JOIN product_attribute_options pao ON pao.id = iav.option_id
+         WHERE iav.item_id = i.id AND LOWER(pad.name) = 'size'
+         LIMIT 1) AS size
       FROM combined c
       JOIN  items i                     ON i.id  = c.item_id AND i.organization_id = $1
       LEFT JOIN inventory_item_categories ic ON ic.id = i.category_id
@@ -278,7 +412,10 @@ export class StockPeriodService {
       NULL::text AS location_name,
       NULL::uuid AS branch_id,
       NULL::text AS branch_code,
-      NULL::text AS branch_name,`;
+      NULL::text AS branch_name,
+      NULL::text AS brand,
+      NULL::text AS color,
+      NULL::text AS size,`;
 
     const displayCols =
       itemGroupBy === 'parent'
@@ -362,6 +499,7 @@ export class StockPeriodService {
           AND le.posted_at < $2
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       in_period AS (
@@ -380,6 +518,7 @@ export class StockPeriodService {
           AND le.posted_at <  $3
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       out_period AS (
@@ -397,6 +536,7 @@ export class StockPeriodService {
           AND le.posted_at <  $3
           AND ($4::text[] IS NULL OR le.branch_id   = ANY($4::text[]))
           AND ($5::text[] IS NULL OR le.location_id::text = ANY($5::text[]))
+          ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY le.item_id, ${groupKeyExpr}
       ),
       combined AS (
@@ -442,6 +582,9 @@ export class StockPeriodService {
       unit: raw.unit ?? '',
       categoryId: raw.category_id ?? null,
       categoryName: raw.category_name ?? null,
+      brand: raw.brand ?? null,
+      color: raw.color ?? null,
+      size: raw.size ?? null,
       branchId: raw.branch_id ?? null,
       branchCode: raw.branch_code ?? null,
       branchName: raw.branch_name ?? null,
@@ -453,6 +596,10 @@ export class StockPeriodService {
       outValue: Number(raw.out_value ?? 0),
       closingQty: Number(raw.closing_qty ?? 0),
       closingValue: Number(raw.closing_value ?? 0),
+      transferOutQty: 0,
+      transferOutValue: 0,
+      incomingQty: 0,
+      incomingValue: 0,
     };
 
     if (isLocation) {
@@ -475,6 +622,15 @@ export class StockPeriodService {
   }
 }
 
+interface RawPendingTransferRow {
+  item_id: string;
+  source_location_id: string | null;
+  source_branch_id: string;
+  destination_branch_id: string;
+  quantity: string | number | null;
+  value: string | number | null;
+}
+
 /** Raw row shape returned by pg — NUMERIC columns come back as strings. */
 interface RawStockPeriodRow {
   item_id: string;
@@ -485,6 +641,9 @@ interface RawStockPeriodRow {
   unit: string | null;
   category_id: string | null;
   category_name: string | null;
+  brand?: string | null;
+  color?: string | null;
+  size?: string | null;
   location_id?: string | null;
   location_code?: string | null;
   location_name?: string | null;

@@ -177,7 +177,7 @@ export class GoodsIssueService {
   }
 
   async post(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    const gi = await this.findOrFail(id, actor.organizationId);
+    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
     this.validateTransition(gi.status, GoodsIssueStatus.POSTED);
 
     const documentNumber =
@@ -193,7 +193,17 @@ export class GoodsIssueService {
       throw new BadRequestException('Không xác định được chi nhánh để xuất hàng');
     }
 
-    await this.dataSource.transaction(async (manager) => {
+    const costByItemId = new Map<string, number>();
+    for (const itemId of new Set(gi.lines.map((line) => line.itemId))) {
+      const average = await this.ledgerService.getInstantAverageCost(
+        itemId,
+        gi.organizationId,
+        branchId,
+      );
+      costByItemId.set(itemId, average.unitCost);
+    }
+
+    const entries = await this.dataSource.transaction(async (manager) => {
       const movements: RecordMovementParams[] = gi.lines.map((line) => ({
         itemId: line.itemId,
         locationId: line.locationId,
@@ -205,10 +215,25 @@ export class GoodsIssueService {
         referenceId: gi.id,
         notes: `Xuất hàng: ${documentNumber}`,
         actorContext: actor,
-        unitCost: Number(line.unitPrice ?? 0),
+        unitCost: costByItemId.get(line.itemId) ?? 0,
       }));
 
-      await this.ledgerService.recordBatchMovements(movements);
+      for (const line of gi.lines) {
+        const unitCost = costByItemId.get(line.itemId) ?? 0;
+        await manager.update(
+          GoodsIssueLineEntity,
+          { id: line.id },
+          {
+            unitPrice: unitCost.toFixed(2),
+            lineTotal: (Number(line.quantity) * unitCost).toFixed(2),
+          },
+        );
+      }
+
+      const savedEntries = await this.ledgerService.recordBatchMovements(
+        movements,
+        manager,
+      );
 
       await manager.update(GoodsIssueEntity, id, {
         status: GoodsIssueStatus.POSTED,
@@ -216,14 +241,16 @@ export class GoodsIssueService {
         postedBy: actor.userId,
         postedAt: new Date(),
       });
+      return savedEntries;
     });
+    await this.ledgerService.publishMovementEvents(entries);
 
     this.logger.log(`Goods issue ${id} posted as ${documentNumber}`);
-    return this.findOrFail(id, actor.organizationId);
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   async cancel(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    const gi = await this.findOrFail(id, actor.organizationId);
+    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
 
     if (gi.status === GoodsIssueStatus.CANCELLED) {
       throw new ConflictException('Phiếu đã huỷ, không thể xoá lại');
@@ -236,7 +263,7 @@ export class GoodsIssueService {
           'Không xác định được chi nhánh để đảo bút tồn kho',
         );
       }
-      await this.dataSource.transaction(async () => {
+      const entries = await this.dataSource.transaction(async (manager) => {
         const reversals: RecordMovementParams[] = gi.lines.map((line) => ({
           itemId: line.itemId,
           locationId: line.locationId,
@@ -250,8 +277,9 @@ export class GoodsIssueService {
           actorContext: actor,
           unitCost: Number(line.unitPrice ?? 0),
         }));
-        await this.ledgerService.recordBatchMovements(reversals);
+        return this.ledgerService.recordBatchMovements(reversals, manager);
       });
+      await this.ledgerService.publishMovementEvents(entries);
     }
 
     gi.status = GoodsIssueStatus.CANCELLED;
@@ -260,8 +288,8 @@ export class GoodsIssueService {
     return saved;
   }
 
-  async getById(id: string, organizationId: string): Promise<GoodsIssueEntity> {
-    return this.findOrFail(id, organizationId);
+  async getById(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
+    return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {
@@ -314,6 +342,11 @@ export class GoodsIssueService {
             'Vui lòng chọn cửa hàng đích để điều chuyển',
           );
         }
+        if (actor.branchId && dto.targetBranchId === actor.branchId) {
+          throw new BadRequestException(
+            'Cửa hàng đích phải khác cửa hàng hiện tại',
+          );
+        }
         const branch = await this.branchRepo.findOne({
           where: { id: dto.targetBranchId, organizationId: actor.organizationId },
         });
@@ -336,8 +369,14 @@ export class GoodsIssueService {
     }
   }
 
-  private async findOrFail(id: string, organizationId: string): Promise<GoodsIssueEntity> {
-    const gi = await this.giRepo.findOne({ where: { id, organizationId } });
+  private async findOrFail(
+    id: string,
+    organizationId: string,
+    branchId?: string,
+  ): Promise<GoodsIssueEntity> {
+    const gi = await this.giRepo.findOne({
+      where: { id, organizationId, ...(branchId ? { branchId } : {}) },
+    });
     if (!gi) throw new NotFoundException(`Phiếu xuất hàng ${id} không tìm thấy`);
     return gi;
   }

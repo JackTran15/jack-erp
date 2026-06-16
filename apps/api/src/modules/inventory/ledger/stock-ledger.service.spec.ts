@@ -5,7 +5,7 @@ import { StockLedgerService, RecordMovementParams } from './stock-ledger.service
 import { StockLedgerEntryEntity } from './stock-ledger-entry.entity';
 import { StockBalanceEntity } from './stock-balance.entity';
 import { EventPublisher } from '../../events/event-publisher.service';
-import { ProductStorageLocationService } from '../product/product-storage-location.service';
+import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import { StockMovementType } from '@erp/shared-interfaces';
 
 describe('StockLedgerService', () => {
@@ -14,6 +14,7 @@ describe('StockLedgerService', () => {
   let balanceRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let eventPublisher: Record<string, jest.Mock>;
+  let pslService: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -38,6 +39,7 @@ describe('StockLedgerService', () => {
   beforeEach(async () => {
     ledgerRepo = {
       createQueryBuilder: jest.fn(),
+      query: jest.fn(),
     };
 
     balanceRepo = {
@@ -63,7 +65,7 @@ describe('StockLedgerService', () => {
       publishBatch: jest.fn().mockResolvedValue(undefined),
     };
 
-    const pslService = {
+    pslService = {
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -74,7 +76,7 @@ describe('StockLedgerService', () => {
         { provide: getRepositoryToken(StockBalanceEntity), useValue: balanceRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: EventPublisher, useValue: eventPublisher },
-        { provide: ProductStorageLocationService, useValue: pslService },
+        { provide: ItemStorageLocationService, useValue: pslService },
       ],
     }).compile();
 
@@ -185,10 +187,94 @@ describe('StockLedgerService', () => {
       );
     });
 
+    it('should preserve separate balances when the same item is posted to multiple locations', async () => {
+      (dataSource._mockManager as any).findOne.mockResolvedValue(null);
+
+      await service.recordBatchMovements([
+        { ...baseParams, locationId: 'loc-A01', quantity: 4 },
+        { ...baseParams, locationId: 'loc-B01', quantity: 6 },
+      ]);
+
+      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
+        1,
+        'item-1',
+        'loc-A01',
+        actor,
+      );
+      expect(pslService.validateAndAssignByLocation).toHaveBeenNthCalledWith(
+        2,
+        'item-1',
+        'loc-B01',
+        actor,
+      );
+      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
+        StockBalanceEntity,
+        expect.objectContaining({
+          itemId: 'item-1',
+          locationId: 'loc-A01',
+          quantity: 4,
+        }),
+      );
+      expect((dataSource._mockManager as any).create).toHaveBeenCalledWith(
+        StockBalanceEntity,
+        expect.objectContaining({
+          itemId: 'item-1',
+          locationId: 'loc-B01',
+          quantity: 6,
+        }),
+      );
+    });
+
     it('should return empty array for empty movements', async () => {
       const result = await service.recordBatchMovements([]);
       expect(result).toEqual([]);
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getInstantAverageCost', () => {
+    it('calculates the branch-wide instantaneous weighted average from signed ledger values', async () => {
+      ledgerRepo.query.mockResolvedValue([
+        {
+          quantity: '10',
+          inventory_value: '2150000',
+          missing_value_count: '0',
+          purchase_price: '250000',
+        },
+      ]);
+
+      await expect(
+        service.getInstantAverageCost('item-1', 'org-1', 'branch-1'),
+      ).resolves.toEqual({
+        itemId: 'item-1',
+        branchId: 'branch-1',
+        quantity: 10,
+        inventoryValue: 2150000,
+        unitCost: 215000,
+        source: 'LEDGER',
+      });
+    });
+
+    it('falls back to the current purchase price when historical ledger values are incomplete', async () => {
+      ledgerRepo.query.mockResolvedValue([
+        {
+          quantity: '10',
+          inventory_value: '1400000',
+          missing_value_count: '1',
+          purchase_price: '250000',
+        },
+      ]);
+
+      await expect(
+        service.getInstantAverageCost('item-1', 'org-1', 'branch-1'),
+      ).resolves.toEqual({
+        itemId: 'item-1',
+        branchId: 'branch-1',
+        quantity: 10,
+        inventoryValue: 1400000,
+        unitCost: 250000,
+        source: 'PURCHASE_PRICE_FALLBACK',
+      });
     });
   });
 

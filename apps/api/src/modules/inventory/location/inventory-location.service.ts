@@ -602,7 +602,7 @@ export class InventoryLocationService {
     dto: CreateShowroomDto,
     actor: ActorContext,
   ): Promise<ShowroomEntity> {
-    const branch = await this.branchService.findById(dto.branchId, actor);
+    await this.branchService.findById(dto.branchId, actor);
 
     const storage = await this.getStorageById(dto.storageId, actor);
     if (storage.branchId !== dto.branchId) {
@@ -611,44 +611,22 @@ export class InventoryLocationService {
       );
     }
 
-    if (dto.isMainShowroom) {
-      if (!branch.isMainBranch) {
-        throw new BadRequestException(
-          'Main showroom can only be created under the main branch',
-        );
-      }
-
-      const existingMain = await this.showroomRepo.findOne({
-        where: {
-          organizationId: actor.organizationId,
-          branchId: dto.branchId,
-          isMainShowroom: true,
-        },
-      });
-      if (existingMain) {
-        throw new ConflictException(
-          'A main showroom already exists for this branch',
-        );
-      }
-    }
-
-    const duplicate = await this.showroomRepo.findOne({
+    // A branch has exactly one showroom, which is its main showroom.
+    const existing = await this.showroomRepo.findOne({
       where: {
+        organizationId: actor.organizationId,
         branchId: dto.branchId,
-        name: dto.name,
       },
     });
-    if (duplicate) {
-      throw new ConflictException(
-        `Showroom "${dto.name}" already exists in this branch`,
-      );
+    if (existing) {
+      throw new ConflictException('This branch already has a showroom');
     }
 
     const showroom = this.showroomRepo.create({
       name: dto.name,
       branchId: dto.branchId,
       storageId: dto.storageId,
-      isMainShowroom: dto.isMainShowroom ?? false,
+      isMainShowroom: true,
       organizationId: actor.organizationId,
       createdBy: actor.userId,
     });

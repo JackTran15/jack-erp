@@ -10,7 +10,7 @@ import { ActorContext } from '../../../../common/decorators/actor-context.decora
 const actor: ActorContext = {
   userId: 'admin-1',
   organizationId: 'org-1',
-  branchId: undefined,
+  branchId: 'branch-1',
   roles: [],
 };
 
@@ -44,7 +44,7 @@ describe('SearchGoodsIssuesV2Handler', () => {
     handler = module.get(SearchGoodsIssuesV2Handler);
   }
 
-  it('scopes by org, hides CANCELLED, joins provider + targetBranch + lines', async () => {
+  it('scopes by org and active branch, hides CANCELLED, and joins relations', async () => {
     await build([]);
     await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
 
@@ -53,6 +53,9 @@ describe('SearchGoodsIssuesV2Handler', () => {
     });
     expect(qb.andWhere).toHaveBeenCalledWith('gi.status != :cancelled', {
       cancelled: GoodsIssueStatus.CANCELLED,
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('gi.branchId = :branchId', {
+      branchId: 'branch-1',
     });
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gi.provider', 'provider');
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('gi.targetBranch', 'targetBranch');

@@ -19,7 +19,7 @@ import {
   Actor,
   ActorContext,
 } from "../../../common/decorators/actor-context.decorator";
-import { RequirePermission } from "../../auth/decorators";
+import { RequireBranchScope, RequirePermission } from "../../auth/decorators";
 import { PermissionGuard } from "../../rbac/permission.guard";
 import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
 import { AuditInterceptor } from "../../crud/audit.interceptor";
@@ -35,8 +35,11 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ImportJobStatus, ImportRowStatus } from "@erp/shared-interfaces";
+import { ApiQuery } from "@nestjs/swagger";
 import { CsvImportService } from "./csv-import.service";
+import { LocationImportService } from "./location-import.service";
 import { ImportJobType } from "./inventory-import-job.entity";
+import { ExcelImportGoodsReceiptService } from "./excel-import-goods-receipt.service";
 
 class ImportJobQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -64,7 +67,11 @@ class ImportJobRowsQueryDto extends PaginationQueryDto {
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class CsvImportController {
-  constructor(private readonly csvImportService: CsvImportService) {}
+  constructor(
+    private readonly csvImportService: CsvImportService,
+    private readonly locationImportService: LocationImportService,
+    private readonly goodsReceiptImporter: ExcelImportGoodsReceiptService,
+  ) {}
 
   // ─── Items ─────────────────────────────────────────────────────────
 
@@ -141,6 +148,166 @@ export class CsvImportController {
     @Actor() actor: ActorContext,
   ) {
     return this.csvImportService.commit(jobId, actor);
+  }
+
+  // ─── Stock Takes ──────────────────────────────────────────────────
+
+  @Post("stock-takes/validate")
+  @RequirePermission("inventory.adjustment.create")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiQuery({ name: "stockTakeId", required: false, type: String })
+  @ApiQuery({ name: "storageId", required: false, type: String })
+  @ApiQuery({ name: "countByValue", required: false, type: Boolean })
+  validateStockTake(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("stockTakeId", new ParseUUIDPipe({ optional: true }))
+    stockTakeId: string | undefined,
+    @Query("storageId", new ParseUUIDPipe({ optional: true }))
+    storageId: string | undefined,
+    @Query("countByValue") countByValue: string | undefined,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.STOCK_TAKE,
+      file,
+      actor,
+      undefined,
+      stockTakeId,
+      storageId
+        ? { storageId, countByValue: countByValue === "true" }
+        : undefined,
+    );
+  }
+
+  @Post("stock-takes/commit")
+  @RequirePermission("inventory.adjustment.create")
+  @RequireBranchScope()
+  commitStockTake(
+    @Query("jobId", ParseUUIDPipe) jobId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.commit(jobId, actor);
+  }
+
+  // ─── Locations ────────────────────────────────────────────────────
+
+  @Post("goods-receipts/validate")
+  @RequirePermission("goods_receipt.write")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  validateGoodsReceipt(
+    @UploadedFile() file: Express.Multer.File,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.GOODS_RECEIPT,
+      file,
+      actor,
+    );
+  }
+
+  @Get("goods-receipts/import-template.xlsx")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  async downloadGoodsReceiptTemplate(@Res() res: Response) {
+    const buffer = await this.goodsReceiptImporter.buildTemplateBuffer();
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="DanhSachHangHoaNhapKho.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  @Get("goods-receipts/jobs/:id/rows")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  listGoodsReceiptJobRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ImportJobRowsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.listJobRows(id, query, actor);
+  }
+
+  @Delete("goods-receipts/jobs/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission("goods_receipt.write")
+  @RequireBranchScope()
+  cancelGoodsReceiptJob(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.cancelJob(id, actor);
+  }
+
+  @Get("goods-receipts/jobs/:id/error-rows.xlsx")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  async exportGoodsReceiptJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvImportService.exportJobErrorRowsExcelBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="dong-nhap-kho-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  @Post("locations/validate")
+  @RequirePermission("inventory.write")
+  @UseInterceptors(FileInterceptor("file"))
+  validateLocations(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("duplicateMode") duplicateMode: string | undefined,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.locationImportService.validate(file, actor, duplicateMode);
+  }
+
+  @Post("locations/commit")
+  @RequirePermission("inventory.write")
+  commitLocations(
+    @Query("jobId", ParseUUIDPipe) jobId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.locationImportService.commit(jobId, actor);
+  }
+
+  @Get("locations/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.read")
+  async exportLocationErrorRowsExcel(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.locationImportService.exportErrorRowsBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="vi-tri-loi-nhap-khau.xlsx"',
+    );
+    res.send(buffer);
   }
 
   // ─── Job queries ──────────────────────────────────────────────────

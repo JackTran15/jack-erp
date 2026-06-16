@@ -637,14 +637,14 @@ flowchart LR
 - [EPIC-09062026 Chuyển kho giữa các kho trong cùng chi nhánh](./epics/EPIC-09062026-inter-warehouse-transfer.md)
 - Nâng form **Chuyển kho** (`/inventory/stock-transfers`, module `inventory/transfer`) từ _chuyển giữa **vị trí** trong **một kho**_ sang _chuyển **kho → kho** trong **cùng chi nhánh**_, bám form mShopKeeper. **Mỗi dòng** mang `source_storage_id`/`destination_storage_id` riêng (+ vị trí tùy chọn; bỏ trống → location `is_unassigned` "Mặc định"). Ràng buộc cứng: mọi kho phải thuộc `actor.branchId` (liên chi nhánh vẫn là `transfer-order`). Khi **Lưu** = tạo + post nguyên tử: ghi `TRANSFER_OUT` rồi `TRANSFER_IN` trong **1 transaction** (`recordBatchMovements`, thêm khóa bi quan chống bán âm). Bổ sung `transporter_user_id` (Người vận chuyển — picker NV qua `/v2/employees/search`), `unit_price`/`line_value` (Đơn giá/Thành tiền; bỏ trống Đơn giá → snapshot giá vốn), `attachment_ids` (theo convention `jsonb` sẵn có), `transferred_at`. **Extend** entity/service/page sẵn có — KHÔNG module/permission mới. **CÓ migration** + backfill `*_storage_id` từ storage của location cũ.
 
-| Ticket                                                                            | Mô tả                                                                            |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [TKT-IWT-01](./tickets/TKT-IWT-01-schema-storage-valuation-transporter.md)        | Migration + entity: per-line storage, đơn giá/thành tiền, transporter, attachments, transferred_at + backfill |
-| [TKT-IWT-02](./tickets/TKT-IWT-02-service-kho-to-kho-posting.md)                  | DTO + Service: resolve vị trí mặc định, ràng buộc cùng chi nhánh, định giá, post 2 chân ledger 1 tx |
-| [TKT-IWT-03](./tickets/TKT-IWT-03-controller-and-response-shaping.md)             | Controller + Swagger DTO + inline quan hệ (storages/locations/transporter) |
-| [TKT-IWT-04](./tickets/TKT-IWT-04-openapi-regen.md)                               | `pnpm openapi:generate` + commit snapshot api-client |
-| [TKT-IWT-05](./tickets/TKT-IWT-05-fe-unified-kho-to-kho-form.md)                  | FE: rebuild form Chuyển kho kho→kho (header + cột chi tiết + pickers + payload) |
-| [TKT-IWT-06](./tickets/TKT-IWT-06-tests-and-dod.md)                               | Service spec + E2E + DoD gate |
+| Ticket                                                                     | Mô tả                                                                                                         |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [TKT-IWT-01](./tickets/TKT-IWT-01-schema-storage-valuation-transporter.md) | Migration + entity: per-line storage, đơn giá/thành tiền, transporter, attachments, transferred_at + backfill |
+| [TKT-IWT-02](./tickets/TKT-IWT-02-service-kho-to-kho-posting.md)           | DTO + Service: resolve vị trí mặc định, ràng buộc cùng chi nhánh, định giá, post 2 chân ledger 1 tx           |
+| [TKT-IWT-03](./tickets/TKT-IWT-03-controller-and-response-shaping.md)      | Controller + Swagger DTO + inline quan hệ (storages/locations/transporter)                                    |
+| [TKT-IWT-04](./tickets/TKT-IWT-04-openapi-regen.md)                        | `pnpm openapi:generate` + commit snapshot api-client                                                          |
+| [TKT-IWT-05](./tickets/TKT-IWT-05-fe-unified-kho-to-kho-form.md)           | FE: rebuild form Chuyển kho kho→kho (header + cột chi tiết + pickers + payload)                               |
+| [TKT-IWT-06](./tickets/TKT-IWT-06-tests-and-dod.md)                        | Service spec + E2E + DoD gate                                                                                 |
 
 ### Ticket dependency graph (EPIC-09062026 inter-warehouse-transfer)
 
@@ -663,13 +663,13 @@ flowchart LR
 - [EPIC-09062026 Danh sách Chuyển kho theo mẫu mShopKeeper](./epics/EPIC-09062026-stock-transfer-list-v2.md)
 - Clone UI **trang danh sách** Chuyển kho (`/inventory/stock-transfers`) theo mShopKeeper, mirror trang `Phiếu nhập`/`Xuất kho`: **CQRS v2 search** (`POST /v2/inventory/stock/transfers/search`) lọc theo từng cột (`=`/`*`/`≤`) toàn dataset + phân trang; cột **Ngày / Số phiếu chuyển (link) / Đối tượng (= Người vận chuyển) / Tổng tiền (∑ line_value) / Diễn giải** (bỏ Trạng thái/Số dòng/Tổng số lượng); **footer cộng Tổng tiền**; **panel "Chi tiết" master-detail** (dòng hàng kho/vị trí/đơn giá/thành tiền); toolbar **Thêm mới / Nhân bản / Xem / Sửa / Xóa / Nạp**. **Nhân bản** = mở form Thêm mới prefill (FE). **Xóa** = đảo bút toán + set `CANCELLED` (ledger bất biến, không hard-delete, không migration). Tái dùng `cqrs-search-endpoint`, `BaseDataTable` column filters + `useCrudV2Search`, `GoodsIssuePage`. Phụ thuộc [EPIC-09062026 Chuyển kho giữa các kho](./epics/EPIC-09062026-inter-warehouse-transfer.md) (transporter + line_value).
 
-| Ticket                                                            | Mô tả                                                                       |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [TKT-STL-01](./tickets/TKT-STL-01-be-cqrs-v2-search.md)           | BE: `POST /v2/inventory/stock/transfers/search` (DTO + Query + Handler + controller) |
-| [TKT-STL-02](./tickets/TKT-STL-02-be-reverse-and-void.md)         | BE: Xóa = đảo bút toán + set CANCELLED (mở rộng `cancel` cho POSTED)         |
-| [TKT-STL-03](./tickets/TKT-STL-03-openapi-regen.md)               | `pnpm openapi:generate` + commit snapshot (DTO v2 introspect được)          |
-| [TKT-STL-04](./tickets/TKT-STL-04-fe-list-redesign.md)            | FE: redesign danh sách (cột + column filters + footer + master-detail + Nhân bản + Xóa) |
-| [TKT-STL-05](./tickets/TKT-STL-05-tests-and-dod.md)               | Handler spec + reverse spec + DoD gate                                      |
+| Ticket                                                    | Mô tả                                                                                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [TKT-STL-01](./tickets/TKT-STL-01-be-cqrs-v2-search.md)   | BE: `POST /v2/inventory/stock/transfers/search` (DTO + Query + Handler + controller)    |
+| [TKT-STL-02](./tickets/TKT-STL-02-be-reverse-and-void.md) | BE: Xóa = đảo bút toán + set CANCELLED (mở rộng `cancel` cho POSTED)                    |
+| [TKT-STL-03](./tickets/TKT-STL-03-openapi-regen.md)       | `pnpm openapi:generate` + commit snapshot (DTO v2 introspect được)                      |
+| [TKT-STL-04](./tickets/TKT-STL-04-fe-list-redesign.md)    | FE: redesign danh sách (cột + column filters + footer + master-detail + Nhân bản + Xóa) |
+| [TKT-STL-05](./tickets/TKT-STL-05-tests-and-dod.md)       | Handler spec + reverse spec + DoD gate                                                  |
 
 ### Ticket dependency graph (EPIC-09062026 stock-transfer-list-v2)
 
@@ -688,11 +688,11 @@ flowchart LR
 - [EPIC-09062026 Sửa phiếu chuyển kho (POSTED)](./epics/EPIC-09062026-stock-transfer-edit.md)
 - Cho phép **sửa phiếu chuyển kho đã POSTED** (sửa mọi thông tin trừ `Số phiếu chuyển`). Vì sổ kho bất biến: khi lưu, hệ thống **đảo bút toán phiếu cũ (rollback tồn) rồi ghi bút toán mới** theo dữ liệu sửa trong **1 transaction**, giữ nguyên `id` + `Số phiếu chuyển` + POSTED. **Chặn nếu thiếu tồn** (khóa bi quan + kiểm tra net-delta mỗi `(item, location)`; kho xuất mới không đủ hoặc hàng đã rời kho nhập cũ → 400, rollback, phiếu gốc nguyên vẹn). Sửa CANCELLED → 400; DRAFT vẫn thay dòng no-ledger. **Mở rộng `update()`** (đang chỉ cho DRAFT) — tái dùng `resolveBranchScopedTransfer` + pattern đảo từ `cancel()` + khóa từ `post()` + `PATCH /:id`/DTO/`TransferFormDialog` edit đã có. **Không migration, không đổi OpenAPI, không permission mới.** Phụ thuộc [EPIC inter-warehouse-transfer](./epics/EPIC-09062026-inter-warehouse-transfer.md) + [EPIC list-v2](./epics/EPIC-09062026-stock-transfer-list-v2.md).
 
-| Ticket                                                              | Mô tả                                                                           |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [TKT-STE-01](./tickets/TKT-STE-01-be-edit-reverse-repost.md)        | BE: mở rộng `update()` cho POSTED — đảo + ghi lại 1 tx, net-delta chặn thiếu tồn |
-| [TKT-STE-02](./tickets/TKT-STE-02-fe-enable-edit.md)                | FE: bật nút "Sửa" cho POSTED + reload danh sách/Chi tiết                         |
-| [TKT-STE-03](./tickets/TKT-STE-03-tests-and-dod.md)                 | Service spec (đảo+ghi / chặn tồn / giữ số phiếu) + DoD gate                      |
+| Ticket                                                       | Mô tả                                                                            |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [TKT-STE-01](./tickets/TKT-STE-01-be-edit-reverse-repost.md) | BE: mở rộng `update()` cho POSTED — đảo + ghi lại 1 tx, net-delta chặn thiếu tồn |
+| [TKT-STE-02](./tickets/TKT-STE-02-fe-enable-edit.md)         | FE: bật nút "Sửa" cho POSTED + reload danh sách/Chi tiết                         |
+| [TKT-STE-03](./tickets/TKT-STE-03-tests-and-dod.md)          | Service spec (đảo+ghi / chặn tồn / giữ số phiếu) + DoD gate                      |
 
 ### Ticket dependency graph (EPIC-09062026 stock-transfer-edit)
 
@@ -835,5 +835,51 @@ flowchart LR
   T3 --> T4["TKT-RBI-04 Wiring + seed + openapi"]
   T4 --> T5["TKT-RBI-05 Tests + E2E + DoD"]
   T2 --> T5
+```
+
+## EPIC-14062026 POS branch-scoped product-location resolver (fix cross-branch stock deduction)
+
+- [EPIC-14062026 POS branch-scoped product-location resolver](./epics/EPIC-14062026-pos-branch-scoped-location-resolver.md)
+- **Bug fix:** checkout/exchange trừ kho nhầm **chi nhánh** khi một sản phẩm (org-wide) có dòng vị trí ưu tiên `product_storage_locations` (PSL) ở storage của **nhiều chi nhánh**. Hai chỗ resolve trong POS (`invoice.service.ts` `resolveProductLocations`, `create-exchange-invoice.service.ts` `buildNewLineEntities`) lookup PSL **chỉ theo `productId`**, không scope branch/storage, rồi `new Map()` lấy **dòng cuối** → checkout chi nhánh B có thể resolve `locationId` nằm trong storage chi nhánh A → `SALE_ISSUE` ghi lệch branch/location. Fix: gom về **một helper chung** scope PSL theo **storage của `actor.branchId`** (`storageId IN`), **ưu tiên `isMainStorage`** (showroom); product không có mapping trong chi nhánh → bỏ khỏi map → guard checkout cũ ném 400 (fail-closed). **Không** entity/migration/event/FE/permission/OpenAPI; chỉ sửa tầng service + unit test.
+
+| Ticket                                                           | Mô tả                                                                                                                                                               |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [TKT-PBL-01](./tickets/TKT-PBL-01-branch-scoped-psl-resolver.md) | BE: helper `resolveBranchProductLocations` (scope storage theo branch, ưu tiên main) + rewire 2 chỗ POS + regression test cross-branch / main-storage / fail-closed |
+
+### Ticket dependency graph (EPIC-14062026 pos-branch-scoped-location-resolver)
+
+```mermaid
+flowchart LR
+  T1["TKT-PBL-01 Branch-scoped resolver + rewire + tests"]
+```
+
+## EPIC-16062026 Active branch trong token (switch-branch mint token mới + actor đọc branch từ JWT)
+
+- [EPIC-16062026 Active branch trong token](./epics/EPIC-16062026-active-branch-token.md)
+- Gắn **chi nhánh đang chọn vào token** thay vì chỉ gửi header `X-Branch-Id`. `JwtPayload` + Redis session mang `branchId` (active); **login bake `branchIds[0]`**, **refresh giữ active branch**. Endpoint mới **`POST /auth/switch-branch`** (auth bằng access token hiện tại) validate `branchId ∈ branchIds[]`, **rotate session (jti mới)** và trả **access + refresh token mới** mang chi nhánh đã chọn. `@Actor()` **ưu tiên đọc branch từ JWT**, giữ `X-Branch-Id` làm **fallback** (rồi `branchIds[0]`) — không phá request cũ. FE **cả `backoffice-web` + `pos-web`** đổi chi nhánh = gọi switch-branch → lưu token mới (backoffice reload, pos navigate). **Không migration / không permission mới** (active branch sống trong JWT + Redis session). Tái dùng `AuthService` rotate-session pattern, `SessionStore`, `@Actor()`, global `IdempotencyInterceptor`.
+
+| Ticket                                                                | Mô tả                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [TKT-ABT-01](./tickets/TKT-ABT-01-shared-interfaces-active-branch.md) | shared-interfaces: `JwtPayload.branchId?` + `SwitchBranchRequest/Response`      |
+| [TKT-ABT-02](./tickets/TKT-ABT-02-auth-service-active-branch.md)      | AuthService + SessionStore: login/refresh mang active branch + `switchBranch()` |
+| [TKT-ABT-03](./tickets/TKT-ABT-03-controller-and-actor.md)            | `POST /auth/switch-branch` (DTO + controller) + `@Actor()` ưu tiên JWT branch   |
+| [TKT-ABT-04](./tickets/TKT-ABT-04-openapi-regen.md)                   | `pnpm openapi:generate` + commit snapshot api-client                            |
+| [TKT-ABT-05](./tickets/TKT-ABT-05-fe-backoffice-switch-branch.md)     | FE backoffice-web: BranchSelector → switch-branch → lưu token → reload          |
+| [TKT-ABT-06](./tickets/TKT-ABT-06-fe-pos-switch-branch.md)            | FE pos-web: BranchSelectPage → switch-branch → lưu token → navigate             |
+| [TKT-ABT-07](./tickets/TKT-ABT-07-tests-and-dod.md)                   | Service/actor spec + E2E (login→switch→scoped call) + DoD gate                  |
+
+### Ticket dependency graph (EPIC-16062026 active-branch-token)
+
+```mermaid
+flowchart LR
+  T1["TKT-ABT-01 shared types"] --> T2["TKT-ABT-02 AuthService + session"]
+  T2 --> T3["TKT-ABT-03 Controller + @Actor()"]
+  T3 --> T4["TKT-ABT-04 openapi:generate"]
+  T4 --> T5["TKT-ABT-05 FE backoffice"]
+  T4 --> T6["TKT-ABT-06 FE pos"]
+  T2 --> T7["TKT-ABT-07 Tests + DoD"]
+  T3 --> T7
+  T5 --> T7
+  T6 --> T7
 ```
 

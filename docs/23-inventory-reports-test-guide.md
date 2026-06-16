@@ -111,19 +111,21 @@ Sau bước này, `stock_ledger_entries` có thêm 2 rows với `movement_type =
 
 ---
 
-### Phase 4 — Điều chuyển kho (Stock Transfer)
+### Phase 4 — Chuyển kho (Stock Transfer)
 
 **Báo cáo ảnh hưởng:** 1, 2, 3, 4, 6, 7
 
-**Switch sang HN-01**, vào **Điều chuyển → Phiếu điều chuyển**:
+> **Lưu ý:** Dùng menu **"Chuyển kho"** (`/inventory/stock-transfers`), KHÔNG phải "Lệnh điều chuyển" (`/inventory/transfer-orders`). Report 6 & 7 đọc từ bảng `stock_transfers` — lệnh điều chuyển (TransferOrder) không ảnh hưởng các báo cáo này.
+
+**Switch sang HN-01**, vào **Chuyển kho**:
 
 | Bước | Thao tác |
 |------|----------|
-| 4-1 | Tạo phiếu điều chuyển **TRF-001** → tự động tạo `TRANSFER_OUT` (HN-01) + `TRANSFER_IN` (HCM-01) |
-|     | - Nguồn: HN-01 → Đích: HCM-01 |
+| 4-1 | Tạo phiếu chuyển kho **TRF-001** → tự động POSTED, ghi `TRANSFER_OUT` (HN-01) + `TRANSFER_IN` (HCM-01) |
+|     | - Vị trí nguồn: kho HN-01 → Vị trí đích: kho HCM-01 |
 |     | - SKU-001: số lượng **4** |
 |     | - SKU-002: số lượng **3** |
-| 4-2 | Tạo phiếu điều chuyển **TRF-002** — **điều chuyển ngược** HCM-01 → HN-01 |
+| 4-2 | Tạo phiếu chuyển kho **TRF-002** — **chiều ngược** HCM-01 → HN-01 |
 |     | - SKU-001: số lượng **1** |
 
 ---
@@ -380,13 +382,16 @@ Kỳ vọng: 2 rows (TRF-001: HN→HCM, TRF-002: HCM→HN). Kiểm tra:
 
 ---
 
-**TC-16: Điều chuyển nhận một phần → "Chênh lệch" > 0**
+**TC-16: `qtyDifference` = 0 cho mọi phiếu chuyển kho hợp lệ**
 
-Nếu flow điều chuyển có trạng thái IN_TRANSIT (chờ xác nhận nhận hàng) và chỉ nhận được một phần, cột `receivedQty < outQty` → `difference > 0`.
+StockTransfer ghi TRANSFER_OUT (nguồn) và TRANSFER_IN (đích) trong cùng một DB transaction — không có cơ chế nhận một phần. Report tính `qtyDifference = qtyReceived − qtyOut`; kết quả luôn = 0 nếu dữ liệu nhất quán.
 
-Kiểm tra: tạo TRF-003 (HN→HCM, 10 unit SKU-001), chỉ xác nhận nhận **7 unit**.
+| Filter | Giá trị |
+|--------|---------|
+| Period | `this_month` |
+| Branch | HN-01, HCM-01 |
 
-Kỳ vọng: `outQty = 10`, `inQty = 7`, `difference = 3`.
+Kỳ vọng: mọi row trong Report 6 đều có `qtyDifference = 0`. Nếu khác 0 → có lỗi ledger (TRANSFER_OUT ghi nhưng TRANSFER_IN không ghi, hoặc ngược lại).
 
 ---
 
@@ -401,7 +406,7 @@ Route: `/reports/storage/transfer-by-branch`
 | Period | `this_month` |
 | sourceBranchId | HN-01 |
 
-Kỳ vọng: chỉ có TRF-001 (HN→HCM) và TRF-003 (nếu đã tạo). Không có TRF-002 (HCM→HN).
+Kỳ vọng: chỉ có TRF-001 (HN→HCM). Không có TRF-002 vì TRF-002 xuất từ HCM-01.
 
 ---
 
@@ -431,6 +436,14 @@ Kỳ vọng: mỗi (item, dest_branch) là 1 row riêng. TRF-001 tạo 2 rows (S
 
 ---
 
+### Báo cáo 8 — Xuất kho trưng bày tạm thời
+
+Route: `/reports/storage/temporary-issues`
+
+> ⚠️ **Chưa có dữ liệu thật.** Trang hiện dùng mock data hardcoded — backend chưa implement endpoint thật. Bỏ qua khi test cho đến khi có dữ liệu từ BE.
+
+---
+
 ## Phần 3 — Xử lý sự cố thường gặp
 
 | Triệu chứng | Nguyên nhân | Cách kiểm tra |
@@ -456,5 +469,5 @@ Sau khi thực hiện Phase 0–5, check từng ô:
 - [ ] Report 3: tổng tồn per location khớp Report 1
 - [ ] Report 4: điều chuyển TRF-001 đối xứng giữa HN-01 và HCM-01
 - [ ] Report 5: pivot hiện đúng qty per branch, SKU-004 không xuất hiện
-- [ ] Report 6: TRF-001 có `difference = 0`, TRF-003 (nếu tạo) có `difference > 0`
+- [ ] Report 6: TRF-001 và TRF-002 đều có `qtyDifference = 0`
 - [ ] Report 7: `avgPrice` của SKU-001 = `purchase_price` = 15,000,000

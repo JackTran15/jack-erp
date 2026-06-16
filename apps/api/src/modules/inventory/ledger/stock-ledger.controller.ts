@@ -26,7 +26,7 @@ import {
   IsIn,
   IsNumber,
 } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiOkResponse, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   STRING_FILTER_MODES,
   NUMERIC_FILTER_OPS,
@@ -39,6 +39,26 @@ function parseBool(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value;
   const v = String(value).toLowerCase();
   return v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : undefined;
+}
+
+class InstantAverageCostDto {
+  @ApiProperty({ format: 'uuid' })
+  itemId: string;
+
+  @ApiProperty({ format: 'uuid' })
+  branchId: string;
+
+  @ApiProperty()
+  quantity: number;
+
+  @ApiProperty()
+  inventoryValue: number;
+
+  @ApiProperty()
+  unitCost: number;
+
+  @ApiProperty({ enum: ['LEDGER', 'PURCHASE_PRICE_FALLBACK'] })
+  source: 'LEDGER' | 'PURCHASE_PRICE_FALLBACK';
 }
 
 export class BalanceQueryDto extends PaginationQueryDto {
@@ -194,6 +214,21 @@ export class StockLedgerController {
       ...query,
       organizationId: actor.organizationId,
     });
+  }
+
+  @Get('items/:itemId/average-cost')
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOkResponse({ type: InstantAverageCostDto })
+  getInstantAverageCost(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getInstantAverageCost(
+      itemId,
+      actor.organizationId,
+      actor.branchId!,
+    );
   }
 
   @Get('balances/:itemId/:locationId')

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,8 +8,11 @@ import {
   DropdownMenuTrigger,
 } from "@erp/ui";
 import { ChevronDown } from "lucide-react";
-import { useEffect } from "react";
+import { toast } from "sonner";
+import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
+import { erpApi, requireErpData } from "../../lib/erp-api";
+import { persistSwitchBranchResponse } from "../../lib/auth-storage";
 import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
 import {
   useBranchStore,
@@ -22,6 +26,7 @@ export function BranchSelector() {
   const branchName = useBranchStore((s) => s.branchName);
   const selectBranch = useBranchStore((s) => s.selectBranch);
   const selectChain = useBranchStore((s) => s.selectChain);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     if (isChain || !branchId || branchName) return;
@@ -38,14 +43,29 @@ export function BranchSelector() {
       "Chọn cửa hàng");
   const selectedValue = isChain ? CHAIN_OPTION_VALUE : (branchId ?? "");
 
-  const handleSelect = (value: string) => {
+  const handleSelect = async (value: string) => {
+    // Chuỗi cửa hàng: chỉ là chế độ FE (mock), không gọi backend.
     if (value === CHAIN_OPTION_VALUE) {
       selectChain();
       return;
     }
+    // Bỏ qua nếu đang đổi, hoặc đã chọn đúng chi nhánh đó (trừ khi đang ở chuỗi).
+    if (switching || (!isChain && value === branchId)) return;
     const branch = branches.find((b) => b.id === value);
-    if (branch) selectBranch(branch.id, branch.name);
-    window.location.reload();
+    setSwitching(true);
+    try {
+      const res = requireErpData(
+        await erpApi.POST<SwitchBranchResponse>("/auth/switch-branch", {
+          body: { branchId: value },
+        }),
+      );
+      persistSwitchBranchResponse(res, value);
+      if (branch) selectBranch(branch.id, branch.name);
+      window.location.reload();
+    } catch {
+      toast.error("Không thể đổi chi nhánh. Vui lòng thử lại.");
+      setSwitching(false);
+    }
   };
 
   return (

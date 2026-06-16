@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
+import { applyWorkbookFont } from '../../../../common/utils/excel-workbook-font.util';
 import type { InventoryImportExportRow } from './sheets/data/data-sheet.export.utils';
 import { InventoryImportTemplateSheetKey } from './inventory-import-template-sheet.constants';
 import {
@@ -40,6 +41,7 @@ export class InventoryImportWorkbookService {
     buildGuideSheet(workbook, guideGrid);
     buildFieldSheet(workbook, fieldGrid);
 
+    applyWorkbookFont(workbook);
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }

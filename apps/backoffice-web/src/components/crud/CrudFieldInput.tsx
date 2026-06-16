@@ -42,6 +42,7 @@ export function CrudFieldInput({
   currentRecordId,
   layout,
   labelWidth,
+  disabled = false,
 }: {
   field: FieldDefinition;
   value: unknown;
@@ -55,6 +56,7 @@ export function CrudFieldInput({
   currentRecordId?: string;
   layout?: FormFieldLayout;
   labelWidth?: string;
+  disabled?: boolean;
 }) {
   const inputId = `${inputIdPrefix}-${field.key}`;
   const fieldProps = { layout, labelWidth } as const;
@@ -67,6 +69,7 @@ export function CrudFieldInput({
             id={inputId}
             type="checkbox"
             checked={Boolean(value)}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.checked)}
             className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary"
             aria-invalid={error ? true : undefined}
@@ -106,6 +109,7 @@ export function CrudFieldInput({
             id={inputId}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={String(value ?? "")}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
           >
             <option value="">-- Chọn --</option>
@@ -132,6 +136,7 @@ export function CrudFieldInput({
             <MoneyInput
               id={inputId}
               value={moneyValue as number | ""}
+              disabled={disabled}
               onChange={(next) => onChange(next === "" ? "" : next)}
             />
           </ControlRow>
@@ -145,6 +150,7 @@ export function CrudFieldInput({
             id={inputId}
             type="number"
             value={value === undefined || value === null ? "" : String(value)}
+            disabled={disabled}
             onChange={(event) =>
               onChange(event.target.value === "" ? "" : Number(event.target.value))
             }
@@ -194,6 +200,7 @@ export function CrudFieldInput({
             id={inputId}
             type="text"
             value={String(value ?? "")}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
           />
         </ControlRow>
@@ -209,6 +216,7 @@ export function CrudFieldInput({
             id={inputId}
             type="date"
             value={value ? String(value).slice(0, 10) : ""}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
           />
         </ControlRow>
@@ -224,6 +232,7 @@ export function CrudFieldInput({
             id={inputId}
             className="min-h-[96px] resize-y leading-relaxed"
             value={String(value ?? "")}
+            disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
             rows={4}
           />
@@ -239,6 +248,7 @@ export function CrudFieldInput({
           id={inputId}
           type="text"
           value={String(value ?? "")}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         />
       </ControlRow>

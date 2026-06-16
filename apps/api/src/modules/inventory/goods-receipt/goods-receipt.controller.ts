@@ -56,6 +56,7 @@ export class GoodsReceiptController {
 
   @Get()
   @RequirePermission('goods_receipt.read')
+  @RequireBranchScope()
   list(@Query() query: GoodsReceiptQueryDto, @Actor() actor: ActorContext) {
     return this.service.list({
       page: query.page ?? 1,
@@ -64,18 +65,19 @@ export class GoodsReceiptController {
       sortOrder: query.sortOrder,
       status: query.status,
       purpose: query.purpose,
-      branchId: query.branchId,
+      branchId: actor.branchId,
       organizationId: actor.organizationId,
     });
   }
 
   @Get(':id')
   @RequirePermission('goods_receipt.read')
+  @RequireBranchScope()
   getById(
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor.organizationId);
+    return this.service.getById(id, actor);
   }
 
   @Patch(':id')
@@ -92,6 +94,7 @@ export class GoodsReceiptController {
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('goods_receipt.write')
+  @RequireBranchScope()
   async cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,

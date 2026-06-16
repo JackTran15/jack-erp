@@ -15,8 +15,6 @@ import {
   type UnsavedChangesChoice,
 } from "@erp/ui";
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
   ChevronLeft,
   ChevronRight,
   CloudUpload,
@@ -156,7 +154,6 @@ export function TransferOrdersPage() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingOrder, setEditingOrder] = useState<TransferOrder | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TransferOrder | null>(null);
-  const [importTarget, setImportTarget] = useState<TransferOrder | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -246,53 +243,11 @@ export function TransferOrdersPage() {
     }
   };
 
-  const handleExport = async (order: TransferOrder) => {
-    setActionLoading(order.id);
-    try {
-      await apiClient.post(`/inventory/transfer-orders/${order.id}/export`);
-      toast.success("Đã xác nhận xuất kho. Phiếu chuyển sang trạng thái Đang điều chuyển.");
-      await reloadAfterMutation();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleImport = async (
-    order: TransferOrder,
-    destinationStorageId: string,
-  ) => {
-    setActionLoading(order.id);
-    try {
-      await apiClient.post(`/inventory/transfer-orders/${order.id}/import`, {
-        destinationStorageId,
-      });
-      toast.success("Đã xác nhận nhập kho. Phiếu hoàn thành.");
-      setImportTarget(null);
-      await reloadAfterMutation();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const activeBranchId = getActiveBranchId();
   const editable = selectedOrder?.status === "DRAFT";
   const deletable =
     !!selectedOrder &&
     selectedOrder.status !== "COMPLETED" &&
     selectedOrder.status !== "CANCELLED";
-  // Export: only a DRAFT voucher, and only from its source branch.
-  const exportable =
-    selectedOrder?.status === "DRAFT" &&
-    activeBranchId === selectedOrder.sourceBranchId;
-  // Import: only an IN_PROGRESS voucher, and only from its destination branch.
-  const importable =
-    selectedOrder?.status === "IN_PROGRESS" &&
-    activeBranchId === selectedOrder.destinationBranchId;
-
   const toolbarItems: ToolbarItem[] = [
     {
       id: "create",
@@ -347,39 +302,6 @@ export function TransferOrdersPage() {
       variant: "danger",
       disabled: !deletable,
       onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
-    },
-    { id: "sep-flow", type: "separator" },
-    {
-      id: "export",
-      label: "Xuất kho",
-      icon: ArrowUpFromLine,
-      disabled: !exportable || !!actionLoading,
-      onClick: () => {
-        if (!selectedOrder) return;
-        if (!exportable) {
-          toast.info(
-            "Chỉ chi nhánh nguồn xác nhận xuất được, và phiếu phải ở trạng thái Nháp.",
-          );
-          return;
-        }
-        void handleExport(selectedOrder);
-      },
-    },
-    {
-      id: "import",
-      label: "Nhập kho",
-      icon: ArrowDownToLine,
-      disabled: !importable || !!actionLoading,
-      onClick: () => {
-        if (!selectedOrder) return;
-        if (!importable) {
-          toast.info(
-            "Chỉ chi nhánh đích xác nhận nhập được, và phiếu phải ở trạng thái Đang điều chuyển.",
-          );
-          return;
-        }
-        setImportTarget(selectedOrder);
-      },
     },
     { id: "sep1", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
@@ -547,21 +469,16 @@ export function TransferOrdersPage() {
             setEditingOrder(null);
             await loadRecords();
           }}
+          onRequestCreate={() => {
+            setEditingOrder(null);
+            setDialogMode("create");
+          }}
+          onRequestEdit={() => setDialogMode("edit")}
           onRequestDelete={
             editingOrder && editingOrder.status !== "COMPLETED" && editingOrder.status !== "CANCELLED"
               ? () => setConfirmDelete(editingOrder)
               : undefined
           }
-        />
-      )}
-
-      {importTarget && (
-        <ImportWarehouseDialog
-          order={importTarget}
-          storages={storages}
-          loading={actionLoading === importTarget.id}
-          onCancel={() => setImportTarget(null)}
-          onConfirm={(storageId) => void handleImport(importTarget, storageId)}
         />
       )}
 
@@ -693,6 +610,8 @@ function TransferOrderFormDialog({
   actionLoading,
   onClose,
   onSaved,
+  onRequestCreate,
+  onRequestEdit,
   onRequestDelete,
 }: {
   mode: "create" | "edit" | "view";
@@ -703,6 +622,8 @@ function TransferOrderFormDialog({
   actionLoading: boolean;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
+  onRequestCreate: () => void;
+  onRequestEdit: () => void;
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
@@ -721,15 +642,11 @@ function TransferOrderFormDialog({
     initial?.sourceStorageId ??
     storages.find((s) => s.branchId === initialSourceBranchId)?.id ??
     "";
-  const initialSourceStorageName =
-    storages.find((s) => s.id === initialSourceStorageId)?.name ?? "";
-
   const [sourceBranchId, setSourceBranchId] = useState(initialSourceBranchId);
   const [sourceBranchLabel, setSourceBranchLabel] = useState(initialSourceBranchName);
   const [destBranchId, setDestBranchId] = useState(initialDestBranchId);
   const [destBranchLabel, setDestBranchLabel] = useState(initialDestBranchName);
   const [sourceStorageId, setSourceStorageId] = useState(initialSourceStorageId);
-  const [sourceStorageLabel, setSourceStorageLabel] = useState(initialSourceStorageName);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
@@ -753,6 +670,9 @@ function TransferOrderFormDialog({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [pendingAfterUnsaved, setPendingAfterUnsaved] = useState<
+    "close" | "create"
+  >("close");
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
@@ -769,7 +689,6 @@ function TransferOrderFormDialog({
     const first = storages.find((s) => s.branchId === sourceBranchId);
     if (first) {
       setSourceStorageId(first.id);
-      setSourceStorageLabel(first.name);
     }
   }, [sourceBranchId, sourceStorageId, storages]);
 
@@ -801,6 +720,16 @@ function TransferOrderFormDialog({
       return { items: data.data, hasMore: fetched < data.total, total: data.total };
     },
     [],
+  );
+  const searchDestinationBranches = useCallback(
+    async (query: string, page: number, pageSize?: number) => {
+      const result = await searchBranches(query, page, pageSize);
+      return {
+        ...result,
+        items: result.items.filter((branch) => branch.id !== fallbackSourceBranchId),
+      };
+    },
+    [fallbackSourceBranchId, searchBranches],
   );
 
   const searchItems = useCallback(
@@ -894,18 +823,31 @@ function TransferOrderFormDialog({
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
+      setPendingAfterUnsaved("close");
       setUnsavedOpen(true);
       return;
     }
     onClose();
   };
+  const requestCreate = () => {
+    if (dirtyRef.current && !isView) {
+      setPendingAfterUnsaved("create");
+      setUnsavedOpen(true);
+      return;
+    }
+    onRequestCreate();
+  };
 
   const handleUnsavedChoice = async (choice: UnsavedChangesChoice) => {
     if (choice === "save") {
       const ok = await handleSave();
-      if (ok) onClose();
+      if (ok) {
+        if (pendingAfterUnsaved === "create") onRequestCreate();
+        else onClose();
+      }
     } else if (choice === "discard") {
-      onClose();
+      if (pendingAfterUnsaved === "create") onRequestCreate();
+      else onClose();
     }
   };
 
@@ -918,15 +860,14 @@ function TransferOrderFormDialog({
       label: "Thêm mới",
       icon: Plus,
       disabled: mode === "create",
-      onClick: () => toast.info("Đóng phiếu hiện tại trước khi tạo phiếu mới."),
+      onClick: requestCreate,
     },
     {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
       disabled: !isView || initial?.status !== "DRAFT",
-      onClick: () =>
-        toast.info("Tính năng sửa lệnh đang được cập nhật. Vui lòng nhân bản phiếu mới."),
+      onClick: onRequestEdit,
     },
     {
       id: "save",
@@ -1089,35 +1030,10 @@ function TransferOrderFormDialog({
           <>
             <div className="grid grid-cols-[120px_minmax(0,1fr)_70px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
               <label className="text-sm text-muted-foreground">Điều chuyển từ</label>
-              <LookupField
-                enableSearchModal
-                searchModalTitle="Chọn chi nhánh nguồn"
-                searchModalPlaceholder="Nhập tên chi nhánh"
-                placeholder="Chọn chi nhánh nguồn"
+              <Input
                 value={sourceBranchLabel}
-                onValueChange={(v) => {
-                  setSourceBranchLabel(v);
-                  setSourceBranchId("");
-                  setSourceStorageId("");
-                  setSourceStorageLabel("");
-                  markDirty();
-                }}
-                onSelect={(b) => {
-                  setSourceBranchId(b.id);
-                  setSourceBranchLabel(b.name);
-                  setSourceStorageId("");
-                  setSourceStorageLabel("");
-                  markDirty();
-                }}
-                search={searchBranches}
-                itemKey={(b) => b.id}
-                renderItem={(b) => b.name}
-                renderMeta={(b) => b.address ?? ""}
-                columns={[
-                  { key: "name", label: "Tên chi nhánh", render: (b) => b.name },
-                  { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
-                ]}
-                disabled={isView}
+                readOnly
+                disabled
               />
               <label className="text-sm text-muted-foreground">Đến</label>
               <LookupField
@@ -1136,7 +1052,7 @@ function TransferOrderFormDialog({
                   setDestBranchLabel(b.name);
                   markDirty();
                 }}
-                search={searchBranches}
+                search={searchDestinationBranches}
                 itemKey={(b) => b.id}
                 renderItem={(b) => b.name}
                 renderMeta={(b) => b.address ?? ""}
@@ -1267,64 +1183,6 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
     <div className="grid grid-cols-[120px_1fr] items-center gap-3">
       <label className="text-sm text-muted-foreground">{label}</label>
       <div>{children}</div>
-    </div>
-  );
-}
-
-// ─── Import dialog: choose the destination warehouse at receipt time ───────────
-
-interface ImportWarehouseDialogProps {
-  order: TransferOrder;
-  storages: InventoryStorage[];
-  loading: boolean;
-  onCancel: () => void;
-  onConfirm: (destinationStorageId: string) => void;
-}
-
-function ImportWarehouseDialog({
-  order,
-  storages,
-  loading,
-  onCancel,
-  onConfirm,
-}: ImportWarehouseDialogProps) {
-  const destStorages = useMemo(
-    () => storages.filter((s) => s.branchId === order.destinationBranchId),
-    [storages, order.destinationBranchId],
-  );
-  const [storageId, setStorageId] = useState(
-    order.destinationStorageId ?? destStorages[0]?.id ?? "",
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[420px] rounded-md bg-background p-5 shadow-lg">
-        <h3 className="mb-1 text-base font-semibold">Xác nhận nhập kho</h3>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Chọn kho nhập cho phiếu{" "}
-          <strong className="text-foreground">{order.documentNumber}</strong>:
-        </p>
-        <select
-          className="mb-4 w-full rounded border px-2 py-1.5 text-sm"
-          value={storageId}
-          onChange={(e) => setStorageId(e.target.value)}
-        >
-          <option value="">— Chọn kho —</option>
-          {destStorages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={loading}>
-            Quay lại
-          </Button>
-          <Button onClick={() => onConfirm(storageId)} disabled={loading || !storageId}>
-            Xác nhận nhập
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

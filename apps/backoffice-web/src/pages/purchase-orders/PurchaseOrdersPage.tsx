@@ -79,6 +79,8 @@ import {
   buildV2Body,
   type V2SearchConfig,
 } from "../../components/crud/crudV2Search";
+import { GoodsReceiptImportDialog } from "./import/GoodsReceiptImportDialog";
+import type { GoodsReceiptImportJobRow } from "./import/import-goods-receipt.types";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
@@ -742,6 +744,7 @@ export function PurchaseOrdersPage() {
             setEditingOrder(null);
             await loadRecords();
           }}
+          onEdit={() => setDialogMode("edit")}
           onVoid={editingOrder ? () => setConfirmVoid(editingOrder) : undefined}
           onRequestDelete={
             editingOrder ? () => setConfirmDelete(editingOrder) : undefined
@@ -883,6 +886,7 @@ function DetailPanel({
 interface FormLine {
   itemId: string;
   itemLabel: string;
+  itemName: string;
   unit: string;
   /** Warehouse ("Kho") this line is received into. */
   storageId: string;
@@ -898,6 +902,7 @@ interface FormLine {
 const emptyLine = (): FormLine => ({
   itemId: "",
   itemLabel: "",
+  itemName: "",
   unit: "",
   storageId: "",
   storageLabel: "",
@@ -923,6 +928,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber,
   onClose,
   onSaved,
+  onEdit,
   onVoid,
   onRequestDelete,
 }: {
@@ -934,6 +940,7 @@ function PurchaseOrderFormDialog({
   previewDocumentNumber?: string;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
+  onEdit: () => void;
   /** Void/reverse the receipt → "Hoãn" toolbar button. */
   onVoid?: () => void;
   onRequestDelete?: () => void;
@@ -1043,6 +1050,7 @@ function PurchaseOrderFormDialog({
     const initialLines = initial.lines.map((l) => ({
       itemId: l.itemId,
       itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+      itemName: l.item?.name ?? "",
       unit: l.uomCode ?? "",
       storageId: l.location?.storageId ?? "",
       storageLabel:
@@ -1119,6 +1127,7 @@ function PurchaseOrderFormDialog({
   >(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
     Array<{ id: string; name: string; branchId: string }>
   >([]);
@@ -1156,6 +1165,37 @@ function PurchaseOrderFormDialog({
     if (!dirty) setDirty(true);
   };
 
+  const handleApplyDraftImport = useCallback(
+    (importedRows: GoodsReceiptImportJobRow[]) => {
+      const mapped = importedRows.flatMap((row) => {
+        const normalized = row.normalizedData;
+        if (!normalized) return [];
+        return [
+          {
+            itemId: normalized.itemId,
+            itemLabel: normalized.itemCode,
+            itemName: normalized.itemName,
+            unit: normalized.unit,
+            storageId: normalized.storageId,
+            storageLabel: normalized.storageName,
+            locationId: normalized.locationId,
+            locationLabel: normalized.locationCode,
+            orderedQuantity: normalized.quantity,
+            unitPrice: normalized.unitPrice,
+            notes: normalized.note,
+          },
+        ];
+      });
+      setLines(normalizeFormLines(mapped));
+      if (mapped[0]) {
+        setStorageId(mapped[0].storageId);
+        setStorageQuery(mapped[0].storageLabel);
+      }
+      setDirty(true);
+    },
+    [],
+  );
+
   /** Load a picked transfer order into the form as the import leg (locked detail). */
   const prefillFromTransferOrder = useCallback(
     (detail: TransferReceiptDetail, row: ImportableTransferOrderListItem) => {
@@ -1174,6 +1214,7 @@ function PurchaseOrderFormDialog({
       const mapped: FormLine[] = detail.lines.map((l) => ({
         itemId: l.itemId,
         itemLabel: l.item?.code ?? "",
+        itemName: l.item?.name ?? "",
         unit: l.item?.unit ?? "",
         storageId: "",
         storageLabel: "",
@@ -1329,11 +1370,18 @@ function PurchaseOrderFormDialog({
       const { data } = await apiClient.get<
         PaginatedResponse<{ id: string; name: string; address?: string | null }>
       >(`/branches?${params}`);
+      const activeBranchId = getActiveBranchId();
+      const items = activeBranchId
+        ? data.data.filter((branch) => branch.id !== activeBranchId)
+        : data.data;
       const fetched = data.page * data.pageSize;
       return {
-        items: data.data,
+        items,
         hasMore: fetched < data.total,
-        total: data.total,
+        total: Math.max(
+          0,
+          data.total - (items.length < data.data.length ? 1 : 0),
+        ),
       };
     },
     [],
@@ -1518,9 +1566,8 @@ function PurchaseOrderFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView,
-      onClick: () =>
-        toast.info("Chuyển sang chế độ chỉnh sửa từ thanh công cụ chính."),
+      disabled: !isView || initial?.status !== "DRAFT",
+      onClick: onEdit,
     },
     {
       id: "save",
@@ -1541,9 +1588,7 @@ function PurchaseOrderFormDialog({
       id: "void",
       label: "Hoãn",
       icon: RotateCcw,
-      // "Hoãn" = void/reverse a POSTED receipt (reverses the stock ledger).
-      // Never posts/approves.
-      disabled: !onVoid || initial?.status !== "POSTED",
+      disabled: true,
       onClick: () => onVoid?.(),
     },
     { id: "sep2", type: "separator" },
@@ -1587,6 +1632,7 @@ function PurchaseOrderFormDialog({
                   ? {
                       ...l,
                       itemLabel: val,
+                      itemName: "",
                       itemId: "",
                       locationId: "",
                       locationLabel: "",
@@ -1622,13 +1668,13 @@ function PurchaseOrderFormDialog({
                   ...l,
                   itemId: item.id,
                   itemLabel: item.code,
+                  itemName: item.name,
                   unit: item.unit,
                   storageId: selectedStorageId,
                   storageLabel: selectedStorageLabel,
                   locationId: "",
                   locationLabel: "",
-                  // Only overwrite if current price is 0 — preserve user's manual edits.
-                  unitPrice: l.unitPrice > 0 ? l.unitPrice : defaultUnitPrice,
+                  unitPrice: defaultUnitPrice,
                 };
               });
 
@@ -1670,7 +1716,7 @@ function PurchaseOrderFormDialog({
       label: "Tên hàng hóa",
       width: 220,
       type: "readonly",
-      getValue: (row) => row.itemLabel,
+      getValue: (row) => row.itemName,
     },
     {
       key: "warehouse",
@@ -2129,7 +2175,9 @@ function PurchaseOrderFormDialog({
             </button>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+              disabled={linesLocked || saving}
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               Nhập khẩu
             </button>
@@ -2235,7 +2283,9 @@ function PurchaseOrderFormDialog({
                       ...l,
                       itemId: item.id,
                       itemLabel: item.code,
+                      itemName: item.name,
                       unit: item.unit,
+                      unitPrice: Number(item.purchasePrice ?? 0),
                     }
                   : l,
               ),
@@ -2273,6 +2323,12 @@ function PurchaseOrderFormDialog({
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={prefillFromTransferOrder}
+      />
+
+      <GoodsReceiptImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onApplyDraft={handleApplyDraftImport}
       />
     </>
   );

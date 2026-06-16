@@ -25,6 +25,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TransferOrderStatus } from '@erp/shared-interfaces';
 import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { RequireBranchScope, RequirePermission } from '../../auth/decorators';
@@ -107,60 +108,89 @@ class ImportTransferOrderDto {
 }
 
 class ExportTransferOrderLineDto {
+  @ApiProperty({ format: 'uuid' })
   @IsUUID()
   itemId: string;
 
+  @ApiProperty({ format: 'uuid' })
   @IsUUID()
   locationId: string;
 
+  @ApiProperty({ minimum: 0.001 })
   @IsNumber()
   @Min(0.001)
   quantity: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
   unitPrice?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   notes?: string;
 }
 
 class ExportTransferOrderDto {
+  @ApiPropertyOptional({ type: [ExportTransferOrderLineDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ExportTransferOrderLineDto)
   lines?: ExportTransferOrderLineDto[];
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   reason?: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   notes?: string;
 
   /** Đối tượng (counterparty provider) selected on the goods-issue form. */
+  @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()
   providerId?: string;
 
   /** Người giao (free-text deliverer name). */
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   deliverer?: string;
 
   /** Tham chiếu — FE-supplied reference codes. */
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   references?: string[];
 
   /** User-entered issue date+time (ISO). */
+  @ApiPropertyOptional({ format: 'date-time' })
   @IsOptional()
   @IsDateString()
   occurredAt?: string;
+}
+
+class CreateAndExportTransferOrderDto extends ExportTransferOrderDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  locationId: string;
+
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  targetBranchId: string;
+
+  @ApiProperty({ type: [ExportTransferOrderLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ExportTransferOrderLineDto)
+  declare lines: ExportTransferOrderLineDto[];
 }
 
 class IssuableTransferOrderQueryDto {
@@ -264,6 +294,16 @@ export class TransferOrderController {
     return this.service.create(dto, actor);
   }
 
+  @Post('direct-export')
+  @RequirePermission('inventory.transfer.create')
+  @RequireBranchScope()
+  createAndConfirmExport(
+    @Body() dto: CreateAndExportTransferOrderDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.createAndConfirmExport(dto, actor);
+  }
+
   @Get()
   @RequirePermission('inventory.transfer.read')
   list(@Query() query: TransferOrderQueryDto, @Actor() actor: ActorContext) {
@@ -274,6 +314,7 @@ export class TransferOrderController {
       sortOrder: query.sortOrder,
       status: query.status,
       organizationId: actor.organizationId,
+      branchId: actor.branchId,
     });
   }
 
@@ -304,7 +345,7 @@ export class TransferOrderController {
   @Get('by-code/:code')
   @RequirePermission('inventory.transfer.read')
   getByCode(@Param('code') code: string, @Actor() actor: ActorContext) {
-    return this.service.getByCode(code, actor.organizationId);
+    return this.service.getByCode(code, actor);
   }
 
   @Get(':id')
@@ -313,7 +354,7 @@ export class TransferOrderController {
     @Param('id', ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.getById(id, actor.organizationId);
+    return this.service.getById(id, actor);
   }
 
   @Patch(':id')

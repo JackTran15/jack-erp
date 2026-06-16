@@ -1,11 +1,15 @@
 import {
-  ImportDuplicateMode,
-  IMPORT_DUPLICATE_MODE_LABELS,
   INVENTORY_IMPORT_PREVIEW_ROWS_LIMIT,
+  ImportDuplicateMode,
 } from "@erp/shared-interfaces";
-import { downloadInventoryTemplate } from "./import-inventory.api";
-import { ImportFilePicker } from "./ImportFilePicker";
 import { RadioGroup } from "../../../../components/forms/RadioGroup";
+import { ImportFilePicker } from "./ImportFilePicker";
+import {
+  DUPLICATE_MODE_OPTIONS,
+  IMPORT_FILE_ACCEPT,
+  isSupportedImportFile,
+} from "./import-file-utils";
+import { downloadInventoryTemplate } from "./import-inventory.api";
 
 interface Props {
   duplicateMode: ImportDuplicateMode;
@@ -13,16 +17,6 @@ interface Props {
   file: File | null;
   onFileChange: (file: File | null) => void;
 }
-
-const IMPORT_FILE_ACCEPT =
-  ".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
-
-const DUPLICATE_MODE_OPTIONS = (
-  Object.values(ImportDuplicateMode) as ImportDuplicateMode[]
-).map((value) => ({
-  value,
-  label: IMPORT_DUPLICATE_MODE_LABELS[value],
-}));
 
 const INTRO_BULLETS = [
   "Nhập khẩu hàng hóa từ phần mềm khác (MISA, Excel, CSV…).",
@@ -32,12 +26,6 @@ const INTRO_BULLETS = [
   "Tải tệp mẫu, điền dữ liệu từ dòng 5 trên sheet «Danh sách hàng hóa».",
   `File lớn được xử lý theo lô trên máy chủ; bước kiểm tra hiển thị tối đa ${INVENTORY_IMPORT_PREVIEW_ROWS_LIMIT} dòng mẫu.`,
 ];
-
-function isSupportedImportFile(file: File): boolean {
-  const lower = file.name.toLowerCase();
-  const supportedExtensions = [".xlsx", ".xls", ".csv"];
-  return supportedExtensions.some((ext) => lower.endsWith(ext));
-}
 
 export function ImportStepFileSelect({
   duplicateMode,

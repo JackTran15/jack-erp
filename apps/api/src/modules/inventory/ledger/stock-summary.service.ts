@@ -10,6 +10,26 @@ import { FilterBuilder } from "../../../common/filters/filter.builder";
 import { StockBalanceEntity } from "./stock-balance.entity";
 import { StockStateFilter } from "./dto/stock-summary-query.dto";
 
+/**
+ * Loại bút toán của phiếu đã xoá khỏi báo cáo nhập-xuất-tồn (parity MISA):
+ * phiếu nhập bị huỷ (deleted_at / status CANCELLED) và phiếu xuất bị huỷ
+ * (status CANCELLED). Bút toán gốc + bút toán đảo dùng chung reference nên cả
+ * hai cùng bị loại. Dùng alias `sle` cho stock_ledger_entries.
+ */
+const EXCLUDE_VOIDED_DOCS_SQL = `
+        AND NOT EXISTS (
+          SELECT 1 FROM goods_receipts grx
+          WHERE grx.id = sle.reference_id
+            AND sle.reference_type = 'GOODS_RECEIPT'
+            AND (grx.deleted_at IS NOT NULL OR grx.status = 'CANCELLED')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM goods_issues gix
+          WHERE gix.id = sle.reference_id
+            AND sle.reference_type = 'GOODS_ISSUE'
+            AND gix.status = 'CANCELLED'
+        )`;
+
 export interface StockSummaryQuery {
   organizationId: string;
   page?: number;
@@ -150,6 +170,26 @@ interface RawPendingTransferRow {
   incoming_qty: string | number | null;
 }
 
+interface RawReservationRow {
+  item_id: string;
+  storage_id: string;
+  reserved_qty: string | number | null;
+}
+
+interface RawPendingOnlyRow {
+  item_id: string;
+  item_code: string;
+  item_name: string;
+  item_unit: string;
+  item_brand: string | null;
+  item_is_active: boolean;
+  category_name: string | null;
+  storage_id: string | null;
+  storage_name: string | null;
+  branch_id: string;
+  incoming_qty: string | number | null;
+}
+
 interface RawDetailRow {
   reference_type: string;
   reference_id: string;
@@ -204,7 +244,7 @@ export class StockSummaryService {
       >(aggregateSql, aggParams),
     ]);
 
-    const total = Number(aggResult?.[0]?.total ?? 0);
+    let total = Number(aggResult?.[0]?.total ?? 0);
     const totalQuantity = Number(aggResult?.[0]?.total_quantity ?? 0);
 
     const periodDataMap = new Map<string, RawPeriodRow>();
@@ -230,6 +270,7 @@ export class StockSummaryService {
           ON pair.item_id = sle.item_id
          AND pair.storage_id = loc.storage_id
         WHERE sle.organization_id = $3
+        ${EXCLUDE_VOIDED_DOCS_SQL}
         GROUP BY sle.item_id, loc.storage_id
       `;
       const periodResult = await this.balanceRepo.manager.query<RawPeriodRow[]>(
@@ -289,9 +330,50 @@ export class StockSummaryService {
       }
     }
 
+    const reservationMap = new Map<string, RawReservationRow>();
+    if (rows.length > 0 && query.branchId) {
+      const itemIds = rows.map((r) => r.item_id);
+      const storageIds = rows.map((r) => r.storage_id);
+      const reservationQuery = `
+        SELECT
+          pairs.item_id,
+          pairs.storage_id,
+          COALESCE(SUM(invoice_item.quantity), 0)::numeric AS reserved_qty
+        FROM unnest($3::uuid[], $4::uuid[]) AS pairs(item_id, storage_id)
+        LEFT JOIN invoice_items invoice_item
+          ON invoice_item.item_id = pairs.item_id
+         AND invoice_item.organization_id = $2
+         AND invoice_item.direction = 'OUT'
+        LEFT JOIN invoices invoice
+          ON invoice.id = invoice_item.invoice_id
+         AND invoice.organization_id = $2
+         AND invoice.branch_id = $1
+         AND invoice.type = 'SALE'
+         AND invoice.status IN ('draft', 'pending')
+        LEFT JOIN locations reservation_location
+          ON reservation_location.id = invoice_item.location_id
+         AND reservation_location.organization_id = $2
+        WHERE invoice.id IS NOT NULL
+          AND reservation_location.storage_id = pairs.storage_id
+        GROUP BY pairs.item_id, pairs.storage_id
+      `;
+      const reservationRows = await this.balanceRepo.manager.query<
+        RawReservationRow[]
+      >(reservationQuery, [
+        query.branchId,
+        query.organizationId,
+        itemIds,
+        storageIds,
+      ]);
+      for (const row of reservationRows) {
+        reservationMap.set(`${row.item_id}:${row.storage_id}`, row);
+      }
+    }
+
     let data: StockSummaryRow[] = rows.map((r) => {
       const pd = periodDataMap.get(`${r.item_id}:${r.storage_id}`);
       const pending = pendingTransferMap.get(`${r.item_id}:${r.storage_id}`);
+      const reservation = reservationMap.get(`${r.item_id}:${r.storage_id}`);
       const openingQty = Number(pd?.opening_qty ?? 0);
       const openingValue = Number(pd?.opening_value ?? 0);
       const inQty = Number(pd?.in_qty ?? 0);
@@ -335,9 +417,101 @@ export class StockSummaryService {
         closingValue,
         transferOutQty: Number(pending?.transfer_out_qty ?? 0),
         incomingQty: Number(pending?.incoming_qty ?? 0),
-        reservedQty: 0,
+        reservedQty: Number(reservation?.reserved_qty ?? 0),
       };
     });
+
+    if (query.branchId && !query.storageId && page === 1) {
+      const pendingOnlyRows =
+        (await this.balanceRepo.manager.query<RawPendingOnlyRow[]>(
+          `
+            SELECT
+              item.id AS item_id,
+              item.code AS item_code,
+              item.name AS item_name,
+              item.unit AS item_unit,
+              item.brand AS item_brand,
+              item.is_active AS item_is_active,
+              category.name AS category_name,
+              destination_storage.id AS storage_id,
+              destination_storage.name AS storage_name,
+              transfer_order.destination_branch_id AS branch_id,
+              SUM(transfer_line.requested_qty)::numeric AS incoming_qty
+            FROM transfer_orders transfer_order
+            INNER JOIN transfer_order_lines transfer_line
+              ON transfer_line.transfer_order_id = transfer_order.id
+             AND transfer_line.organization_id = transfer_order.organization_id
+            INNER JOIN items item
+              ON item.id = transfer_line.item_id
+             AND item.organization_id = transfer_order.organization_id
+            LEFT JOIN inventory_item_categories category
+              ON category.id = item.category_id
+            LEFT JOIN storages destination_storage
+              ON destination_storage.id = transfer_order.destination_storage_id
+             AND destination_storage.organization_id = transfer_order.organization_id
+            WHERE transfer_order.organization_id = $1
+              AND transfer_order.destination_branch_id = $2
+              AND transfer_order.status = 'IN_PROGRESS'
+              AND transfer_order.deleted_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM stock_balances pending_balance
+                INNER JOIN locations pending_location
+                  ON pending_location.id = pending_balance.location_id
+                WHERE pending_balance.organization_id = transfer_order.organization_id
+                  AND pending_balance.item_id = transfer_line.item_id
+                  AND pending_balance.branch_id = transfer_order.destination_branch_id
+                  AND (
+                    transfer_order.destination_storage_id IS NULL
+                    OR pending_location.storage_id = transfer_order.destination_storage_id
+                  )
+              )
+            GROUP BY item.id, item.code, item.name, item.unit, item.brand,
+                     item.is_active, category.name, destination_storage.id,
+                     destination_storage.name, transfer_order.destination_branch_id
+          `,
+          [query.organizationId, query.branchId],
+        )) ?? [];
+      const existingKeys = new Set(data.map((row) => `${row.itemId}:${row.storageId}`));
+      let appended = 0;
+      for (const row of pendingOnlyRows) {
+        const storageId = row.storage_id ?? `pending:${row.branch_id}`;
+        if (existingKeys.has(`${row.item_id}:${storageId}`)) continue;
+        data.push({
+          itemId: row.item_id,
+          storageId,
+          item: {
+            id: row.item_id,
+            code: row.item_code,
+            name: row.item_name,
+            unit: row.item_unit,
+            brand: row.item_brand,
+            isActive: row.item_is_active,
+            categoryName: row.category_name,
+          },
+          storage: {
+            id: storageId,
+            name: row.storage_name ?? "Chưa chọn kho nhận",
+            branchId: row.branch_id,
+          },
+          quantity: 0,
+          lastMovementAt: null,
+          openingQty: 0,
+          openingValue: 0,
+          inQty: 0,
+          inValue: 0,
+          outQty: 0,
+          outValue: 0,
+          closingQty: 0,
+          closingValue: 0,
+          transferOutQty: 0,
+          incomingQty: Number(row.incoming_qty ?? 0),
+          reservedQty: 0,
+        });
+        appended += 1;
+      }
+      total += appended;
+    }
 
     if (needsDerivedFilter) {
       data = data.filter(
@@ -392,6 +566,7 @@ export class StockSummaryService {
         AND sle.branch_id = $4
         AND sle.posted_at >= $5
         AND sle.posted_at < $6
+        ${EXCLUDE_VOIDED_DOCS_SQL}
     `;
     const dataSql = `
       SELECT

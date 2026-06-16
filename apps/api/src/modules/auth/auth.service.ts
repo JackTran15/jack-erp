@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -20,6 +21,7 @@ import type {
   LoginResponse,
   RefreshResponse,
   SessionInfo,
+  SwitchBranchResponse,
 } from '@erp/shared-interfaces';
 
 const ACCESS_TOKEN_TTL = 15 * 60;
@@ -71,6 +73,7 @@ export class AuthService {
 
     const session = await this.buildSessionInfo(user.id, orgId);
     const { roles, branchIds } = session;
+    const branchId = branchIds[0];
     const jti = uuidv4();
 
     await this.sessionStore.createSession(
@@ -79,6 +82,7 @@ export class AuthService {
         userId: user.id,
         organizationId: orgId,
         branchIds,
+        branchId,
         roles,
         issuedAt: Math.floor(Date.now() / 1000),
         expiresAt: Math.floor(Date.now() / 1000) + REFRESH_TOKEN_TTL,
@@ -91,6 +95,7 @@ export class AuthService {
       organizationId: orgId,
       roles,
       branchIds,
+      branchId,
       jti,
     });
 
@@ -130,6 +135,12 @@ export class AuthService {
       session.organizationId,
     );
 
+    // Preserve the active branch across rotation; fall back if it is no longer assigned.
+    const branchId =
+      session.branchId && branchIds.includes(session.branchId)
+        ? session.branchId
+        : branchIds[0];
+
     await this.sessionStore.revokeSession(decoded.jti);
 
     const newJti = uuidv4();
@@ -139,6 +150,7 @@ export class AuthService {
         userId: session.userId,
         organizationId: session.organizationId,
         branchIds,
+        branchId,
         roles,
         issuedAt: Math.floor(Date.now() / 1000),
         expiresAt: Math.floor(Date.now() / 1000) + REFRESH_TOKEN_TTL,
@@ -151,6 +163,7 @@ export class AuthService {
       organizationId: session.organizationId,
       roles,
       branchIds,
+      branchId,
       jti: newJti,
     });
 
@@ -165,6 +178,64 @@ export class AuthService {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
       expiresIn: ACCESS_TOKEN_TTL,
+    };
+  }
+
+  async switchBranch(
+    current: JwtPayload,
+    branchId: string,
+  ): Promise<SwitchBranchResponse> {
+    const session = await this.buildSessionInfo(
+      current.userId,
+      current.organizationId,
+    );
+    const { roles, branchIds } = session;
+
+    if (!branchIds.includes(branchId)) {
+      throw new ForbiddenException('Branch not assigned to user');
+    }
+
+    await this.sessionStore.revokeSession(current.jti);
+
+    const jti = uuidv4();
+    const now = Math.floor(Date.now() / 1000);
+    await this.sessionStore.createSession(
+      jti,
+      {
+        userId: current.userId,
+        organizationId: current.organizationId,
+        branchIds,
+        branchId,
+        roles,
+        issuedAt: now,
+        expiresAt: now + REFRESH_TOKEN_TTL,
+      },
+      REFRESH_TOKEN_TTL,
+    );
+
+    const accessToken = this.signAccessToken({
+      userId: current.userId,
+      organizationId: current.organizationId,
+      roles,
+      branchIds,
+      branchId,
+      jti,
+    });
+
+    const refreshToken = this.signRefreshToken({
+      jti,
+      userId: current.userId,
+    });
+
+    this.logger.log(
+      `User ${current.userId} switched to branch ${branchId} (org=${current.organizationId})`,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: ACCESS_TOKEN_TTL,
+      session,
     };
   }
 

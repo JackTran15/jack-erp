@@ -28,6 +28,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { CsvExportService } from "./csv-export.service";
+import { LocationExportService } from "./location-export.service";
 
 class ExportQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -75,7 +76,10 @@ class ExportItemsBodyDto {
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class CsvExportController {
-  constructor(private readonly csvExportService: CsvExportService) {}
+  constructor(
+    private readonly csvExportService: CsvExportService,
+    private readonly locationExportService: LocationExportService,
+  ) {}
 
   @Get("items")
   @RequirePermission("inventory.read")
@@ -146,6 +150,22 @@ export class CsvExportController {
   ) {
     const csv = await this.csvExportService.exportLedger(query, actor);
     this.sendCsv(res, csv, "ledger-export.csv");
+  }
+
+  // ─── Locations ────────────────────────────────────────────────────
+
+  @Get("locations/template")
+  @RequirePermission("inventory.read")
+  async exportLocationsTemplate(@Res() res: Response) {
+    const buffer = await this.locationExportService.exportTemplateBuffer();
+    this.sendExcel(res, buffer, "mau-vi-tri-hang-hoa.xlsx");
+  }
+
+  @Get("locations/excel")
+  @RequirePermission("inventory.read")
+  async exportLocationsExcel(@Res() res: Response, @Actor() actor: ActorContext) {
+    const buffer = await this.locationExportService.exportLocationsExcelBuffer(actor);
+    this.sendExcel(res, buffer, "danh-sach-vi-tri-hang-hoa.xlsx");
   }
 
   private sendCsv(res: Response, csv: string, filename: string): void {
