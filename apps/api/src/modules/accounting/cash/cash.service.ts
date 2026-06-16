@@ -366,6 +366,22 @@ export class CashService {
     return account;
   }
 
+  async getMyBranchAccount(actor: ActorContext): Promise<CashAccountEntity> {
+    const account = await this.accountRepo.findOne({
+      where: {
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        type: CashAccountType.REGISTER,
+      },
+    });
+
+    if (!account) {
+      throw new NotFoundException('No register cash account found for this branch');
+    }
+
+    return account;
+  }
+
   async listAccounts(
     query: CashListQuery,
     actor: ActorContext,

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import type {
   CashAccount,
@@ -23,6 +23,17 @@ export function useCashAccounts(branchId?: string) {
       );
       return res.data ?? [];
     },
+    staleTime: 60_000,
+  });
+}
+
+export function useMyBranchCashAccount(): UseQueryResult<CashAccount> {
+  return useQuery({
+    queryKey: treasuryQueryKeys.myBranchCashAccount(),
+    queryFn: async () =>
+      requireErpData(
+        await erpApi.GET<CashAccount>("/cash/accounts/my", {}),
+      ),
     staleTime: 60_000,
   });
 }

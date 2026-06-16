@@ -37,7 +37,7 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
-import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
+import { useMyBranchCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   useCashPayment,
   useCashPaymentMutations,
@@ -108,8 +108,8 @@ function dialogKindFromItem(
 }
 
 export function TreasuryCashReceiptsPage() {
-  const { data: cashAccounts } = useCashAccounts();
-  const cashAccountId = cashAccounts?.[0]?.id ?? "";
+  const { data: myAccount } = useMyBranchCashAccount();
+  const cashAccountId = myAccount?.id ?? "";
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),

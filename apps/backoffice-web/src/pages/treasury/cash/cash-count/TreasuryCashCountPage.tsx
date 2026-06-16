@@ -22,7 +22,7 @@ import {
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
-import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
+import { useMyBranchCashAccount } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   loadCashCountParticipants,
   saveCashCountParticipants,
@@ -64,8 +64,8 @@ function emptyColumnFilters(): Record<CashCountFilterKey, ColumnFilter> {
 }
 
 export function TreasuryCashCountPage() {
-  const { data: cashAccounts } = useCashAccounts();
-  const cashAccountId = cashAccounts?.[0]?.id ?? "";
+  const { data: myAccount } = useMyBranchCashAccount();
+  const cashAccountId = myAccount?.id ?? "";
   const [period, setPeriod] = useState<PeriodValue>(() => ({
     preset: "this_month",
     ...resolvePeriodRange("this_month"),
