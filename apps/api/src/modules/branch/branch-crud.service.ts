@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, QueryFailedError, Repository } from "typeorm";
 import {
   CrudEntityConfig,
   DeletionPolicy,
@@ -67,5 +67,53 @@ export class BranchCrudService extends BaseCrudService<
       `Created ${this.entityConfig.entityKey} id=${(saved as any).id}`,
     );
     return saved;
+  }
+
+  override async remove(id: string, actor: ActorContext): Promise<void> {
+    try {
+      const branch = await this.getById(id, actor);
+
+      if (branch.isMainBranch) {
+        throw new BadRequestException(
+          "Không thể xoá cửa hàng chính của tổ chức.",
+        );
+      }
+
+      await super.remove(id, actor);
+    } catch (err) {
+      if (this.isForeignKeyViolation(err)) {
+        this.logger.error(
+          `Failed to delete branch id=${id} organizationId=${actor.organizationId} userId=${actor.userId}: branch is referenced by related records`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        throw new BadRequestException(
+          "Không thể xoá cửa hàng vì đã phát sinh dữ liệu liên quan. Vui lòng ngưng hoạt động hoặc lưu trữ cửa hàng thay vì xoá.",
+        );
+      }
+
+      if (err instanceof BadRequestException) {
+        this.logger.warn(
+          `Rejected branch delete id=${id} organizationId=${actor.organizationId} userId=${actor.userId}: ${err.message}`,
+        );
+        throw err;
+      }
+
+      this.logger.error(
+        `Failed to delete branch id=${id} organizationId=${actor.organizationId} userId=${actor.userId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
+    }
+  }
+
+  private isForeignKeyViolation(err: unknown): boolean {
+    if (!(err instanceof QueryFailedError)) return false;
+    const code =
+      (err as QueryFailedError & { code?: string }).code ??
+      (err as QueryFailedError & { driverError?: { code?: string } })
+        .driverError?.code;
+    return code === "23503";
   }
 }
