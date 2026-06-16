@@ -25,18 +25,19 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
       }
     }
   },
-  // [REPORT_CATEGORY.INVENTORY]: {
-  //   label: "Kho",
-  //   url: "/reports/chain-inventory",
-  //   configs: {
-  //     [STORE_TYPE.SINGLE]: {
-  //       listReport: Object.values(REPORT_TYPE_INVENTORY),
-  //     },
-  //     [STORE_TYPE.CHAIN]: {
-  //       listReport: Object.values(REPORT_TYPE_INVENTORY),
-  //     }
-  //   }
-  // },
+  [REPORT_CATEGORY.INVENTORY]: {
+    label: "Kho",
+    url: "/reports/chain-inventory",
+    configs: {
+      // Chỉ liệt kê report đã cấu hình; thêm dần khi triển khai các report kho còn lại.
+      [STORE_TYPE.SINGLE]: {
+        listReport: [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY],
+      },
+      [STORE_TYPE.CHAIN]: {
+        listReport: [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY],
+      },
+    },
+  },
   // [REPORT_CATEGORY.MULTI_CHANNEL_SALES]: {
   //   label: "Bán hàng đa kênh",
   //   url: "/reports/multi-channel-sales",

@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getReportBackendKey } from "../../../../constants/reports/report-type.constant";
+import {
+  getReportBackendKey,
+  getReportTableConfig,
+} from "../../../../constants/reports/report-type.constant";
 import { useTableStore } from "../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 import {
@@ -8,11 +11,10 @@ import {
   mapHeadersToTableConfig,
 } from "../_api/invoice-report.api";
 
-const EMPTY_CONFIG = { columns: [] };
-
-// Columns lấy từ API theo report type (reactive — fetch ngay khi đổi type) → nạp vào table store.
+// Cột: ưu tiên backend theo report type; nếu BE không hỗ trợ / trả rỗng → fallback registry config.
 export function ReportTableConfigSync() {
   const reportType = useReportStore((s) => s.reportType);
+  const branch = useReportStore((s) => s.branch);
   const setConfig = useTableStore((s) => s.setConfig);
 
   const backendKey = getReportBackendKey(reportType);
@@ -24,8 +26,12 @@ export function ReportTableConfigSync() {
   });
 
   useEffect(() => {
-    setConfig(headers ? mapHeadersToTableConfig(headers) : EMPTY_CONFIG);
-  }, [headers, setConfig]);
+    if (headers && headers.length > 0) {
+      setConfig(mapHeadersToTableConfig(headers));
+    } else {
+      setConfig(getReportTableConfig(reportType, branch));
+    }
+  }, [headers, reportType, branch, setConfig]);
 
   return null;
 }
