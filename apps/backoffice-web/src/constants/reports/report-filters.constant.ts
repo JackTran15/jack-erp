@@ -16,6 +16,8 @@ export enum REPORT_FILTERS_LINE {
     WORK_SHIFT = 'work_shift',
     SOURCE_STORE = 'source_store',
     RECEIVING_STORE = 'receiving_store',
+    PRODUCT_TYPE = 'product_type',
+    CHECKBOX_ALLOCATE_COMBO = 'allocate_combo_revenue',
 }
 
 export const REPORT_FILTERS_LINE_METADATA = {
@@ -90,5 +92,12 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.RECEIVING_STORE]: {
         label: 'cửa hàng nhận',
         backendField: 'receivingStoreId',
+    },
+    [REPORT_FILTERS_LINE.PRODUCT_TYPE]: {
+        label: 'loại hàng hóa',
+        backendField: 'productType',
+    },
+    [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: {
+        backendField: 'allocateComboRevenue',
     },
 }

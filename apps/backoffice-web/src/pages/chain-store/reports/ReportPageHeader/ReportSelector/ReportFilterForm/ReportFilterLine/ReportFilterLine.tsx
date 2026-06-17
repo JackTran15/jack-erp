@@ -12,12 +12,14 @@ import {
 import {
   warehouseOptions,
   productGroupOptions,
+  productTypeOptions,
   statisticByOptions,
   unitOptions,
   brandOptions,
   workShiftOptions,
   receivingStoreOptions,
 } from "../../_mock/report-inventory-filter.mock";
+import { ComboAllocationCheckbox } from "./ComboAllocationCheckbox/ComboAllocationCheckbox";
 import { SourceStoreField } from "./SourceStoreField/SourceStoreField";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
 import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
@@ -165,6 +167,17 @@ export function ReportFilterLine({ line }: Props) {
             }
           />
         );
+      case REPORT_FILTERS_LINE.PRODUCT_TYPE:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.PRODUCT_TYPE] ?? "product"}
+            options={productTypeOptions}
+            placeholder="Hàng hóa"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_TYPE, v)
+            }
+          />
+        );
       case REPORT_FILTERS_LINE.STATISTIC_BY:
         return (
           <ReportSelectField
@@ -202,6 +215,18 @@ export function ReportFilterLine({ line }: Props) {
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.WORK_SHIFT, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO:
+        return (
+          <ComboAllocationCheckbox
+            value={filters[REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO] ?? false}
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO,
+                v,
+              )
             }
           />
         );

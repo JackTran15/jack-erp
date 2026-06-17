@@ -36,6 +36,8 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.BRAND]: string;
   [REPORT_FILTERS_LINE.WORK_SHIFT]: string;
   [REPORT_FILTERS_LINE.RECEIVING_STORE]: string;
+  [REPORT_FILTERS_LINE.PRODUCT_TYPE]: string;
+  [REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO]: boolean;
 }
 
 // Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.

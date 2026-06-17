@@ -15,6 +15,13 @@ export const productGroupOptions: ReportFilterOption[] = [
   { value: "dep_nam", label: "Dép nam" },
 ];
 
+// "Loại hàng hóa" — phân loại mặt hàng (single select).
+export const productTypeOptions: ReportFilterOption[] = [
+  { value: "product", label: "Hàng hóa" },
+  { value: "service", label: "Dịch vụ" },
+  { value: "combo", label: "Combo - đóng gói" },
+];
+
 // "Thống kê theo" — giá trị cố định (mirror backend ItemGroupBy: item/parent/group).
 export const statisticByOptions: ReportFilterOption[] = [
   { value: "item", label: "Hàng hóa" },
