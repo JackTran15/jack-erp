@@ -2,6 +2,7 @@ import { STORE_TYPE } from "../store.constant";
 import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import { chain_filterRegistryReportInvoiceAndOrderList, chain_tableRegistryReportInvoiceAndOrderList, single_filterRegistryReportInvoiceAndOrderList, single_tableRegistryReportInvoiceAndOrderList } from "./report-registry/report-invoice-and-order-list.registry";
+import { chain_filterRegistryReportRevenueDetailByInvoiceAndProduct, chain_tableRegistryReportRevenueDetailByInvoiceAndProduct, single_filterRegistryReportRevenueDetailByInvoiceAndProduct, single_tableRegistryReportRevenueDetailByInvoiceAndProduct } from "./report-registry/report-revenue-detail-by-invoice-and-product.registry";
 import { chain_filterRegistryReportInventoryInOutStockSummary, chain_tableRegistryReportInventoryInOutStockSummary, single_filterRegistryReportInventoryInOutStockSummary, single_tableRegistryReportInventoryInOutStockSummary } from "./report-registry/report-inventory-in-out-stock-summary.registry";
 import { chain_filterRegistryReportWarehouseVoucherDetailList, chain_tableRegistryReportWarehouseVoucherDetailList, single_filterRegistryReportWarehouseVoucherDetailList, single_tableRegistryReportWarehouseVoucherDetailList } from "./report-registry/report-warehouse-voucher-detail-list.registry";
 import { chain_filterRegistryReportInventoryInOutStockQuantityDetail, chain_tableRegistryReportInventoryInOutStockQuantityDetail, single_filterRegistryReportInventoryInOutStockQuantityDetail, single_tableRegistryReportInventoryInOutStockQuantityDetail } from "./report-registry/report-inventory-in-out-stock-quantity-detail.registry";
@@ -15,23 +16,24 @@ import type { ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 export enum REPORT_TYPE_SALES {
   DAILY_SALES_SUMMARY = 'daily_sales_summary',
   INVOICE_AND_ORDER_LIST = 'invoice_and_order_list',
-  PROMOTIONAL_INVOICE_LIST = 'promotional_invoice_list',
-  PROMOTION_BY_INVOICE_AND_PRODUCT = 'promotion_by_invoice_and_product',
   REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT = 'revenue_detail_by_invoice_and_product',
-  REVENUE_BY_TIME = 'revenue_by_time',
   REVENUE_BY_PRODUCT = 'revenue_by_product',
-  REVENUE_BY_EMPLOYEE = 'revenue_by_employee',
-  REVENUE_BY_CUSTOMER = 'revenue_by_customer',
-  REVENUE_BY_PRODUCT_AND_PROMOTION = 'revenue_by_product_and_promotion',
-  PRODUCT_REVENUE_COMPARISON_BY_TIME = 'product_revenue_comparison_by_time',
-  BRANCH_REVENUE_COMPARISON_BY_TIME = 'branch_revenue_comparison_by_time',
-  STORE_TRANSFER_SUMMARY = 'store_transfer_summary',
-  DELIVERY_QUANTITY = 'delivery_quantity',
-  PRODUCT_PRICE_FLUCTUATION = 'product_price_fluctuation',
-  EMPLOYEE_CUSTOMER_REVENUE_BY_PRODUCT = 'employee_customer_revenue_by_product',
-  EMPLOYEE_REVENUE_BY_CUSTOMER = 'employee_revenue_by_customer',
-  COMMISSION_BY_EMPLOYEE = 'commission_by_employee',
-  DISCOUNT_COST_SUMMARY = 'discount_cost_summary',
+
+  // PROMOTIONAL_INVOICE_LIST = 'promotional_invoice_list',
+  // PROMOTION_BY_INVOICE_AND_PRODUCT = 'promotion_by_invoice_and_product',
+  // REVENUE_BY_TIME = 'revenue_by_time',
+  // REVENUE_BY_EMPLOYEE = 'revenue_by_employee',
+  // REVENUE_BY_CUSTOMER = 'revenue_by_customer',
+  // REVENUE_BY_PRODUCT_AND_PROMOTION = 'revenue_by_product_and_promotion',
+  // PRODUCT_REVENUE_COMPARISON_BY_TIME = 'product_revenue_comparison_by_time',
+  // BRANCH_REVENUE_COMPARISON_BY_TIME = 'branch_revenue_comparison_by_time',
+  // STORE_TRANSFER_SUMMARY = 'store_transfer_summary',
+  // DELIVERY_QUANTITY = 'delivery_quantity',
+  // PRODUCT_PRICE_FLUCTUATION = 'product_price_fluctuation',
+  // EMPLOYEE_CUSTOMER_REVENUE_BY_PRODUCT = 'employee_customer_revenue_by_product',
+  // EMPLOYEE_REVENUE_BY_CUSTOMER = 'employee_revenue_by_customer',
+  // COMMISSION_BY_EMPLOYEE = 'commission_by_employee',
+  // DISCOUNT_COST_SUMMARY = 'discount_cost_summary',
 }
 
 export const REPORT_TYPE_SALES_METADATA = {
@@ -59,23 +61,35 @@ export const REPORT_TYPE_SALES_METADATA = {
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportInvoiceAndOrderList
     },
   },
-  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: { label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng', backendKey: 'invoice-item-revenue-detail' },
+  [REPORT_TYPE_SALES.REVENUE_DETAIL_BY_INVOICE_AND_PRODUCT]: {
+    label: 'Chi tiết doanh thu theo hóa đơn và mặt hàng',
+    backendKey: 'invoice-item-revenue-detail',
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportRevenueDetailByInvoiceAndProduct,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportRevenueDetailByInvoiceAndProduct,
+    },
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportRevenueDetailByInvoiceAndProduct,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportRevenueDetailByInvoiceAndProduct,
+    },
+  },
   [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo mặt hàng', backendKey: 'revenue-by-item' },
-  [REPORT_TYPE_SALES.PROMOTIONAL_INVOICE_LIST]: { label: 'Danh sách hóa đơn khuyến mại' },
-  [REPORT_TYPE_SALES.PROMOTION_BY_INVOICE_AND_PRODUCT]: { label: 'Khuyến mãi theo hóa đơn và hàng hóa' },
-  [REPORT_TYPE_SALES.REVENUE_BY_TIME]: { label: 'Doanh thu theo thời gian' },
-  [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT_AND_PROMOTION]: { label: 'Doanh thu theo mặt hàng và khuyến mãi' },
-  [REPORT_TYPE_SALES.PRODUCT_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu mặt hàng theo thời gian' },
-  [REPORT_TYPE_SALES.REVENUE_BY_EMPLOYEE]: { label: 'Doanh thu theo nhân viên' },
-  [REPORT_TYPE_SALES.REVENUE_BY_CUSTOMER]: { label: 'Doanh thu theo khách hàng' },
-  [REPORT_TYPE_SALES.STORE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển đơn hàng theo cửa hàng' },
-  [REPORT_TYPE_SALES.BRANCH_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu theo chi nhánh và thời gian' },
-  [REPORT_TYPE_SALES.DELIVERY_QUANTITY]: { label: 'Sổ giao hàng' },
-  [REPORT_TYPE_SALES.PRODUCT_PRICE_FLUCTUATION]: { label: 'Biến động giá hàng hóa' },
-  [REPORT_TYPE_SALES.EMPLOYEE_CUSTOMER_REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo nhân viên, khách hàng theo hàng hóa' },
-  [REPORT_TYPE_SALES.EMPLOYEE_REVENUE_BY_CUSTOMER]: { label: 'Doanh thu theo nhân viên theo khách hàng' },
-  [REPORT_TYPE_SALES.COMMISSION_BY_EMPLOYEE]: { label: 'Hoa hồng theo nhân viên' },
-  [REPORT_TYPE_SALES.DISCOUNT_COST_SUMMARY]: { label: 'Tổng hợp chi phí chiết khấu và giảm giá' },
+
+  // [REPORT_TYPE_SALES.PROMOTIONAL_INVOICE_LIST]: { label: 'Danh sách hóa đơn khuyến mại' },
+  // [REPORT_TYPE_SALES.PROMOTION_BY_INVOICE_AND_PRODUCT]: { label: 'Khuyến mãi theo hóa đơn và hàng hóa' },
+  // [REPORT_TYPE_SALES.REVENUE_BY_TIME]: { label: 'Doanh thu theo thời gian' },
+  // [REPORT_TYPE_SALES.REVENUE_BY_PRODUCT_AND_PROMOTION]: { label: 'Doanh thu theo mặt hàng và khuyến mãi' },
+  // [REPORT_TYPE_SALES.PRODUCT_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu mặt hàng theo thời gian' },
+  // [REPORT_TYPE_SALES.REVENUE_BY_EMPLOYEE]: { label: 'Doanh thu theo nhân viên' },
+  // [REPORT_TYPE_SALES.REVENUE_BY_CUSTOMER]: { label: 'Doanh thu theo khách hàng' },
+  // [REPORT_TYPE_SALES.STORE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển đơn hàng theo cửa hàng' },
+  // [REPORT_TYPE_SALES.BRANCH_REVENUE_COMPARISON_BY_TIME]: { label: 'So sánh doanh thu theo chi nhánh và thời gian' },
+  // [REPORT_TYPE_SALES.DELIVERY_QUANTITY]: { label: 'Sổ giao hàng' },
+  // [REPORT_TYPE_SALES.PRODUCT_PRICE_FLUCTUATION]: { label: 'Biến động giá hàng hóa' },
+  // [REPORT_TYPE_SALES.EMPLOYEE_CUSTOMER_REVENUE_BY_PRODUCT]: { label: 'Doanh thu theo nhân viên, khách hàng theo hàng hóa' },
+  // [REPORT_TYPE_SALES.EMPLOYEE_REVENUE_BY_CUSTOMER]: { label: 'Doanh thu theo nhân viên theo khách hàng' },
+  // [REPORT_TYPE_SALES.COMMISSION_BY_EMPLOYEE]: { label: 'Hoa hồng theo nhân viên' },
+  // [REPORT_TYPE_SALES.DISCOUNT_COST_SUMMARY]: { label: 'Tổng hợp chi phí chiết khấu và giảm giá' },
 }
 
 export enum REPORT_TYPE_MULTI_CHANNEL_SALES {
