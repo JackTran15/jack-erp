@@ -124,6 +124,9 @@ export function CrudListPage({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editSnapshot, setEditSnapshot] = useState<Record<string, unknown> | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteDialogError, setDeleteDialogError] = useState<string | null>(
+    null,
+  );
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<
     string,
     unknown
@@ -194,6 +197,7 @@ export function CrudListPage({
     setSelectedRecordIds(new Set());
     setCreateDialogOpen(false);
     setEditSnapshot(null);
+    setDeleteDialogError(null);
     setDuplicateSnapshot(null);
   }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -374,6 +378,12 @@ export function CrudListPage({
       ),
     [filteredRecords, selectedRecordIds, idField],
   );
+  const isBranchEntity = entityKey === "branches";
+  const deleteDialogDescription = isBranchEntity
+    ? selectedRows.length === 1
+      ? "Bạn có chắc muốn xoá cửa hàng này? Thao tác này sẽ xoá hẳn cửa hàng nếu chưa có phát sinh dữ liệu liên quan."
+      : `Bạn có chắc muốn xoá ${selectedRows.length} cửa hàng đã chọn? Hệ thống chỉ xoá hẳn các cửa hàng chưa có phát sinh dữ liệu liên quan.`
+    : `Xoá ${selectedRows.length} bản ghi đã chọn? Thao tác này không thể hoàn tác.`;
 
   const inventoryActionContext = useMemo<CrudListInventoryActionContext>(
     () => ({
@@ -579,6 +589,7 @@ export function CrudListPage({
 
   const handleDeleteSelected = () => {
     if (selectedRows.length === 0) return;
+    setDeleteDialogError(null);
     setDeleteDialogOpen(true);
   };
 
@@ -592,10 +603,13 @@ export function CrudListPage({
       );
       setSelectedRecordIds(new Set());
       setDeleteDialogOpen(false);
+      setDeleteDialogError(null);
       toast.success(`Đã xoá ${selectedRows.length} bản ghi.`);
       void refetchRecords();
     } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
+      const message = getUserFacingApiErrorMessage(err);
+      setDeleteDialogError(message);
+      toast.error(message);
     }
   };
 
@@ -776,15 +790,23 @@ export function CrudListPage({
         />
       )}
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setDeleteDialogError(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xoá</DialogTitle>
-            <DialogDescription>
-              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể
-              hoàn tác.
-            </DialogDescription>
+            <DialogDescription>{deleteDialogDescription}</DialogDescription>
           </DialogHeader>
+          {deleteDialogError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {deleteDialogError}
+            </div>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"

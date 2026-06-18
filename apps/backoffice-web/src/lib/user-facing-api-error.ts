@@ -69,7 +69,7 @@ function userFacingFromHttpStatus(
   if (status >= 500) {
     return "Máy chủ gặp sự cố. Vui lòng thử lại sau.";
   }
-  if (status > 0 && message && !looksLikeTechnicalMessage(message)) {
+  if (message && !looksLikeTechnicalMessage(message)) {
     return message;
   }
   return null;
@@ -116,6 +116,7 @@ export function getUserFacingApiErrorMessage(err: unknown): string {
 
 function looksLikeTechnicalMessage(message: string): boolean {
   if (message.startsWith(MISSING_PERMISSION_PREFIX)) return true;
+  if (/^an unexpected error occurred$/i.test(message)) return true;
   if (/^HTTP \d+/i.test(message)) return true;
   if (/request failed with status code \d+/i.test(message)) return true;
   return false;
