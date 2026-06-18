@@ -13,6 +13,17 @@ function httpStatusFromErrorBody(e: Record<string, unknown>): number {
   if (typeof fromStatus === "number" && Number.isFinite(fromStatus)) {
     return fromStatus;
   }
+  const httpCode = typeof e.code === "string" ? e.code.match(/^HTTP_(\d+)$/) : null;
+  if (httpCode) {
+    return Number(httpCode[1]);
+  }
+  const details = e.details;
+  if (details && typeof details === "object") {
+    const detailsStatus = (details as Record<string, unknown>).statusCode;
+    if (typeof detailsStatus === "number" && Number.isFinite(detailsStatus)) {
+      return detailsStatus;
+    }
+  }
   return 0;
 }
 
