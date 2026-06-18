@@ -49,6 +49,8 @@ import {
   ensureTrailingBlankLine,
   getPersistableLines,
 } from "../inventory-line-normalization";
+import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
+import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 // Two-phase transfer voucher: DRAFT → IN_PROGRESS (exported by source branch)
 // → COMPLETED (imported by destination branch). CANCELLED is terminal.
@@ -670,6 +672,7 @@ function TransferOrderFormDialog({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [pendingAfterUnsaved, setPendingAfterUnsaved] = useState<
     "close" | "create"
   >("close");
@@ -679,6 +682,35 @@ function TransferOrderFormDialog({
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
+
+  const handleApplyDraftImport = useCallback(
+    (importedRows: DocumentLineImportJobRow[]) => {
+      const mapped = importedRows.flatMap((row) => {
+        const normalized = row.normalizedData;
+        if (!normalized) return [];
+        const importedStorageId =
+          normalized.sourceStorageId || sourceStorageId || "";
+        return [
+          {
+            itemId: normalized.itemId,
+            itemLabel: normalized.itemCode,
+            itemName: normalized.itemName,
+            unit: normalized.unit,
+            requestedQty: normalized.quantity,
+            sourceStorageId: importedStorageId,
+            note: normalized.note,
+          },
+        ];
+      });
+      setLines(normalizeFormLines(mapped));
+      const firstStorageId = mapped.find((line) => line.sourceStorageId)?.sourceStorageId;
+      if (firstStorageId && !sourceStorageId) {
+        setSourceStorageId(firstStorageId);
+      }
+      setDirty(true);
+    },
+    [sourceStorageId],
+  );
 
   // When user picks a new source branch and we don't yet have a storage
   // resolved, auto-pick the first storage of that branch (Misa shows storage
@@ -1121,14 +1153,27 @@ function TransferOrderFormDialog({
             <button
               type="button"
               className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
-              disabled
+              disabled={isView || !sourceStorageId}
+              onClick={() => {
+                if (!sourceStorageId) return;
+                setLines((prev) =>
+                  normalizeFormLines(
+                    prev.map((line) => ({
+                      ...line,
+                      sourceStorageId: line.sourceStorageId || sourceStorageId,
+                    })),
+                  ),
+                );
+                markDirty();
+              }}
             >
               Chọn kho
             </button>
             <button
               type="button"
               className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
-              disabled
+              disabled={isView || saving}
+              onClick={() => setImportOpen(true)}
             >
               Nhập khẩu
             </button>
@@ -1173,6 +1218,32 @@ function TransferOrderFormDialog({
         onOpenChange={setUnsavedOpen}
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
+      />
+
+      <DocumentLineImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        kind="transfer-orders"
+        title="Nhập khẩu hàng hóa điều chuyển"
+        description="Nhập khẩu hàng hóa vào lệnh điều chuyển:"
+        templateFileName="NhapKhauLenhDieuChuyenHangHoa.xls"
+        errorFileName="dong-lenh-dieu-chuyen-loi.xlsx"
+        successMessage={(count) =>
+          `${count} dòng đã được đưa vào lệnh điều chuyển.`
+        }
+        columns={[
+          { key: "sku", label: "Mã SKU", rawKey: "Mã SKU", width: 130 },
+          { key: "storage", label: "Kho", rawKey: "Kho", width: 150 },
+          {
+            key: "quantity",
+            label: "Số lượng",
+            rawKey: "Số lượng",
+            width: 110,
+            align: "right",
+          },
+          { key: "note", label: "Ghi chú", rawKey: "Ghi chú", width: 220 },
+        ]}
+        onApplyDraft={handleApplyDraftImport}
       />
     </>
   );

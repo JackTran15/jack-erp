@@ -12,9 +12,12 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  NotFoundException,
 } from "@nestjs/common";
 import { Response } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import {
   Actor,
   ActorContext,
@@ -211,6 +214,20 @@ export class CsvImportController {
   @RequirePermission("goods_receipt.read")
   @RequireBranchScope()
   async downloadGoodsReceiptTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "NhapkhauHangHoaNhapKho.xls");
+  }
+
+  @Get("goods-receipts/import-template.xls")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  downloadGoodsReceiptMisaTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "NhapkhauHangHoaNhapKho.xls");
+  }
+
+  @Get("goods-receipts/generated-import-template.xlsx")
+  @RequirePermission("goods_receipt.read")
+  @RequireBranchScope()
+  async downloadGeneratedGoodsReceiptTemplate(@Res() res: Response) {
     const buffer = await this.goodsReceiptImporter.buildTemplateBuffer();
     res.setHeader(
       "Content-Type",
@@ -363,6 +380,234 @@ export class CsvImportController {
       "Content-Disposition",
       'attachment; filename="hang-hoa-loi-nhap-khau.xlsx"',
     );
+    res.send(buffer);
+  }
+
+  // ─── Goods Issues ─────────────────────────────────────────────────
+
+  @Post("goods-issues/validate")
+  @RequirePermission("inventory.write")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  validateGoodsIssue(
+    @UploadedFile() file: Express.Multer.File,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.GOODS_ISSUE,
+      file,
+      actor,
+    );
+  }
+
+  @Get("goods-issues/import-template.xls")
+  @RequirePermission("inventory.read")
+  @RequireBranchScope()
+  downloadGoodsIssueTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "NhapKhauPhieuXKDieuChuyenHangHoa.xls");
+  }
+
+  @Get("goods-issues/jobs/:id/rows")
+  @RequirePermission("inventory.read")
+  @RequireBranchScope()
+  listGoodsIssueJobRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ImportJobRowsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.listJobRows(id, query, actor);
+  }
+
+  @Delete("goods-issues/jobs/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission("inventory.write")
+  @RequireBranchScope()
+  cancelGoodsIssueJob(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.cancelJob(id, actor);
+  }
+
+  @Get("goods-issues/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.read")
+  @RequireBranchScope()
+  async exportGoodsIssueJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvImportService.exportJobErrorRowsExcelBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="dong-xuat-kho-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  // ─── Stock Transfers ──────────────────────────────────────────────
+
+  @Post("stock-transfers/validate")
+  @RequirePermission("inventory.transfer.create")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  validateStockTransfer(
+    @UploadedFile() file: Express.Multer.File,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.STOCK_TRANSFER,
+      file,
+      actor,
+    );
+  }
+
+  @Get("stock-transfers/import-template.xls")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  downloadStockTransferTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "NhapKhauChuyenKho.xls");
+  }
+
+  @Get("stock-transfers/jobs/:id/rows")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  listStockTransferJobRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ImportJobRowsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.listJobRows(id, query, actor);
+  }
+
+  @Delete("stock-transfers/jobs/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission("inventory.transfer.create")
+  @RequireBranchScope()
+  cancelStockTransferJob(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.cancelJob(id, actor);
+  }
+
+  @Get("stock-transfers/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  async exportStockTransferJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvImportService.exportJobErrorRowsExcelBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="dong-chuyen-kho-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  // ─── Transfer Orders ──────────────────────────────────────────────
+
+  @Post("transfer-orders/validate")
+  @RequirePermission("inventory.transfer.create")
+  @RequireBranchScope()
+  @UseInterceptors(FileInterceptor("file"))
+  validateTransferOrder(
+    @UploadedFile() file: Express.Multer.File,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.validate(
+      ImportJobType.TRANSFER_ORDER,
+      file,
+      actor,
+    );
+  }
+
+  @Get("transfer-orders/import-template.xls")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  downloadTransferOrderTemplate(@Res() res: Response) {
+    this.sendTemplate(res, "NhapKhauLenhDieuChuyenHangHoa.xls");
+  }
+
+  @Get("transfer-orders/jobs/:id/rows")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  listTransferOrderJobRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ImportJobRowsQueryDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.listJobRows(id, query, actor);
+  }
+
+  @Delete("transfer-orders/jobs/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission("inventory.transfer.create")
+  @RequireBranchScope()
+  cancelTransferOrderJob(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.csvImportService.cancelJob(id, actor);
+  }
+
+  @Get("transfer-orders/jobs/:id/error-rows.xlsx")
+  @RequirePermission("inventory.transfer.read")
+  @RequireBranchScope()
+  async exportTransferOrderJobErrorRows(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+    @Actor() actor: ActorContext,
+  ) {
+    const buffer = await this.csvImportService.exportJobErrorRowsExcelBuffer(
+      id,
+      actor,
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="dong-lenh-dieu-chuyen-loi.xlsx"',
+    );
+    res.send(buffer);
+  }
+
+  private sendTemplate(res: Response, fileName: string): void {
+    const builtPath = join(__dirname, "templates", fileName);
+    const sourcePath = join(
+      process.cwd(),
+      "src",
+      "modules",
+      "inventory",
+      "csv",
+      "templates",
+      fileName,
+    );
+    const path = existsSync(builtPath) ? builtPath : sourcePath;
+    if (!existsSync(path)) {
+      throw new NotFoundException("Không tìm thấy tệp mẫu nhập khẩu");
+    }
+    const buffer = readFileSync(path);
+    res.setHeader("Content-Type", "application/vnd.ms-excel");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(buffer);
   }
 }

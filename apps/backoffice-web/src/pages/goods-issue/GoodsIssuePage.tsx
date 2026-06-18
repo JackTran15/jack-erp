@@ -77,6 +77,8 @@ import {
   type OverstockWarningRow,
 } from "./OverstockConfirmDialog";
 import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
+import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
+import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -1055,6 +1057,7 @@ function GoodsIssueFormDialog({
 
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
@@ -1121,6 +1124,37 @@ function GoodsIssueFormDialog({
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
+
+  const handleApplyDraftImport = useCallback(
+    (importedRows: DocumentLineImportJobRow[]) => {
+      const mapped = importedRows.flatMap((row) => {
+        const normalized = row.normalizedData;
+        if (!normalized) return [];
+        return [
+          {
+            itemId: normalized.itemId,
+            itemLabel: normalized.itemCode,
+            itemName: normalized.itemName,
+            unit: normalized.unit,
+            storageId: normalized.storageId ?? "",
+            storageLabel: normalized.storageName ?? "",
+            locationId: normalized.locationId ?? "",
+            locationLabel: normalized.locationCode ?? "",
+            quantity: normalized.quantity,
+            unitPrice: Number(normalized.unitPrice ?? 0),
+            notes: normalized.note,
+          },
+        ];
+      });
+      setLines(normalizeFormLines(mapped));
+      if (mapped[0]?.storageId) {
+        setStorageId(mapped[0].storageId);
+        setStorageQuery(mapped[0].storageLabel);
+      }
+      setDirty(true);
+    },
+    [],
+  );
 
   const handlePurposeChange = (next: GoodsIssuePurposeUI) => {
     if (next === purpose) return;
@@ -2116,6 +2150,8 @@ function GoodsIssueFormDialog({
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover"
+                disabled={saving}
+                onClick={() => setImportOpen(true)}
               >
                 Nhập khẩu
               </button>
@@ -2278,6 +2314,40 @@ function GoodsIssueFormDialog({
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={prefillFromTransferOrder}
+      />
+
+      <DocumentLineImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        kind="goods-issues"
+        title="Nhập khẩu hàng hóa xuất kho"
+        description="Nhập khẩu hàng hóa vào phiếu xuất kho:"
+        templateFileName="NhapKhauPhieuXKDieuChuyenHangHoa.xls"
+        errorFileName="dong-xuat-kho-loi.xlsx"
+        successMessage={(count) =>
+          `${count} dòng đã được đưa vào phiếu xuất kho.`
+        }
+        columns={[
+          { key: "sku", label: "Mã SKU", rawKey: "Mã SKU", width: 130 },
+          { key: "storage", label: "Kho", rawKey: "Kho", width: 150 },
+          { key: "location", label: "Vị trí", rawKey: "Vị trí", width: 120 },
+          {
+            key: "quantity",
+            label: "Số lượng",
+            rawKey: "Số lượng",
+            width: 110,
+            align: "right",
+          },
+          {
+            key: "unitPrice",
+            label: "Đơn giá",
+            normalizedKey: "unitPrice",
+            rawKey: "Đơn giá",
+            width: 130,
+            align: "right",
+          },
+        ]}
+        onApplyDraft={handleApplyDraftImport}
       />
 
       {overstockWarnings && (

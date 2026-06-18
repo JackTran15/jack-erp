@@ -374,6 +374,12 @@ export function CrudListPage({
       ),
     [filteredRecords, selectedRecordIds, idField],
   );
+  const isBranchEntity = entityKey === "branches";
+  const deleteDialogDescription = isBranchEntity
+    ? selectedRows.length === 1
+      ? "Bạn có chắc muốn xoá cửa hàng này? Thao tác này sẽ xoá hẳn cửa hàng nếu chưa có phát sinh dữ liệu liên quan."
+      : `Bạn có chắc muốn xoá ${selectedRows.length} cửa hàng đã chọn? Hệ thống chỉ xoá hẳn các cửa hàng chưa có phát sinh dữ liệu liên quan.`
+    : `Xoá ${selectedRows.length} bản ghi đã chọn? Thao tác này không thể hoàn tác.`;
 
   const inventoryActionContext = useMemo<CrudListInventoryActionContext>(
     () => ({
@@ -780,10 +786,7 @@ export function CrudListPage({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Xác nhận xoá</DialogTitle>
-            <DialogDescription>
-              Xoá {selectedRows.length} bản ghi đã chọn? Thao tác này không thể
-              hoàn tác.
-            </DialogDescription>
+            <DialogDescription>{deleteDialogDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button

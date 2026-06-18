@@ -15,12 +15,36 @@ export class HttpError extends Error {
   }
 }
 
+function httpStatusFromErrorBody(
+  body: Record<string, unknown>,
+  fallback: number,
+): number {
+  const status = body.status;
+  if (typeof status === "number" && Number.isFinite(status)) return status;
+  const statusCode = body.statusCode;
+  if (typeof statusCode === "number" && Number.isFinite(statusCode)) {
+    return statusCode;
+  }
+  const httpCode =
+    typeof body.code === "string" ? body.code.match(/^HTTP_(\d+)$/) : null;
+  if (httpCode) return Number(httpCode[1]);
+  return fallback;
+}
+
 function toHttpError(err: unknown): never {
   if (err instanceof AxiosError && err.response) {
     const body = err.response.data;
     const apiErr: ApiError =
       body && typeof body === "object" && "message" in body
-        ? (body as ApiError)
+        ? {
+            status: httpStatusFromErrorBody(
+              body as Record<string, unknown>,
+              err.response.status,
+            ),
+            code: String((body as Record<string, unknown>).code ?? "UNKNOWN"),
+            message: String((body as Record<string, unknown>).message),
+            details: (body as Record<string, unknown>).details,
+          }
         : {
             status: err.response.status,
             code: "UNKNOWN",

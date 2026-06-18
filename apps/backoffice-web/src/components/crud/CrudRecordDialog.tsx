@@ -258,6 +258,11 @@ export function CrudRecordDialog({
       } else {
         saved = await createMutation.mutateAsync(buildPayload());
       }
+      toast.success(
+        isEdit
+          ? `Đã cập nhật ${config?.displayName ?? "bản ghi"}.`
+          : `Đã tạo ${config?.displayName ?? "bản ghi"}.`,
+      );
       onSuccess?.(saved);
       if (andNew) {
         const defaults: Record<string, unknown> = {};

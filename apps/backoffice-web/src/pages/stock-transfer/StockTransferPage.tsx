@@ -55,6 +55,8 @@ import {
   ensureTrailingBlankLine,
   getPersistableLines,
 } from "../inventory-line-normalization";
+import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
+import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -726,12 +728,45 @@ function TransferFormDialog({
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
   const markDirty = () => {
     if (!dirty) setDirty(true);
   };
+
+  const handleApplyDraftImport = useCallback(
+    (importedRows: DocumentLineImportJobRow[]) => {
+      const mapped = importedRows.flatMap((row) => {
+        const normalized = row.normalizedData;
+        if (!normalized) return [];
+        return [
+          {
+            itemId: normalized.itemId,
+            itemLabel: normalized.itemCode,
+            itemName: normalized.itemName,
+            unit: normalized.unit,
+            sourceStorageId: normalized.sourceStorageId ?? "",
+            sourceStorageLabel: normalized.sourceStorageName ?? "",
+            sourceLocationId: normalized.sourceLocationId ?? "",
+            sourceLocationLabel: normalized.sourceLocationCode ?? "",
+            destStorageId: normalized.destinationStorageId ?? "",
+            destStorageLabel: normalized.destinationStorageName ?? "",
+            destLocationId: normalized.destinationLocationId ?? "",
+            destLocationLabel: normalized.destinationLocationCode ?? "",
+            quantity: normalized.quantity,
+            unitPrice:
+              normalized.unitPrice == null ? "" : String(normalized.unitPrice),
+            notes: normalized.note,
+          },
+        ];
+      });
+      setLines(normalizeLines(mapped));
+      setDirty(true);
+    },
+    [normalizeLines],
+  );
 
   const searchItems = useCallback(
     async (query: string, page: number, pageSize?: number) => {
@@ -1305,6 +1340,46 @@ function TransferFormDialog({
             </FieldRow>
           </>
         }
+        detailActions={
+          !isView ? (
+            <>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" disabled />
+                <span>Quét mã vạch</span>
+              </label>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!defaultStorage}
+                onClick={() => {
+                  if (!defaultStorage) return;
+                  setLines((prev) =>
+                    normalizeLines(
+                      prev.map((line) => ({
+                        ...line,
+                        sourceStorageId:
+                          line.sourceStorageId || defaultStorage.id,
+                        sourceStorageLabel:
+                          line.sourceStorageLabel || defaultStorage.name,
+                      })),
+                    ),
+                  );
+                  markDirty();
+                }}
+              >
+                Chọn kho
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setImportOpen(true)}
+                className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Nhập khẩu
+              </button>
+            </>
+          ) : undefined
+        }
         detail={
           <LineItemGrid
             columns={lineColumns}
@@ -1356,6 +1431,50 @@ function TransferFormDialog({
         onOpenChange={setUnsavedOpen}
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
+      />
+
+      <DocumentLineImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        kind="stock-transfers"
+        title="Nhập khẩu hàng hóa chuyển kho"
+        description="Nhập khẩu hàng hóa vào phiếu chuyển kho:"
+        templateFileName="NhapKhauChuyenKho.xls"
+        errorFileName="dong-chuyen-kho-loi.xlsx"
+        successMessage={(count) =>
+          `${count} dòng đã được đưa vào phiếu chuyển kho.`
+        }
+        columns={[
+          { key: "sku", label: "Mã SKU", rawKey: "Mã SKU", width: 130 },
+          {
+            key: "sourceStorage",
+            label: "Kho xuất",
+            rawKey: "Kho xuất",
+            width: 140,
+          },
+          {
+            key: "destinationStorage",
+            label: "Kho nhập",
+            rawKey: "Kho nhập",
+            width: 140,
+          },
+          {
+            key: "quantity",
+            label: "Số lượng",
+            rawKey: "Số lượng",
+            width: 110,
+            align: "right",
+          },
+          {
+            key: "unitPrice",
+            label: "Đơn giá",
+            normalizedKey: "unitPrice",
+            rawKey: "Đơn giá",
+            width: 130,
+            align: "right",
+          },
+        ]}
+        onApplyDraft={handleApplyDraftImport}
       />
     </>
   );
