@@ -139,6 +139,7 @@ export const navConfig: NavModule[] = [
           { to: "/inventory/stock-transfers", label: "Chuyển kho" },
           { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển" },
           { to: "/inventory/stock-takes", label: "Kiểm kê kho" },
+          { to: "/inventory-management", label: "Tổng hợp tồn kho" },
           { to: "/inventory/item-locations", label: "Vị trí hàng hóa" },
           { to: "/inventory/item-location-details", label: "Chi tiết vị trí" },
         ],
