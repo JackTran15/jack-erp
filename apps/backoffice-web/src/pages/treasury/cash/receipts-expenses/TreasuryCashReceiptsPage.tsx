@@ -688,15 +688,16 @@ export function TreasuryCashReceiptsPage() {
           cancelLabel="Quay lại"
           onCancel={() => setConfirmDeleteItem(null)}
           onConfirm={async () => {
+            const itemToDelete = confirmDeleteItem;
+            setConfirmDeleteItem(null);
             try {
-              if (confirmDeleteItem.kind === ReceiptPaymentKind.RECEIPT) {
-                await receiptMutations.remove.mutateAsync(confirmDeleteItem.id);
+              if (itemToDelete.kind === ReceiptPaymentKind.RECEIPT) {
+                await receiptMutations.remove.mutateAsync(itemToDelete.id);
               } else {
-                await paymentMutations.remove.mutateAsync(confirmDeleteItem.id);
+                await paymentMutations.remove.mutateAsync(itemToDelete.id);
               }
-              if (selectedId === confirmDeleteItem.id) setSelectedId(null);
+              if (selectedId === itemToDelete.id) setSelectedId(null);
               closeVoucherDialogs();
-              setConfirmDeleteItem(null);
               toast.success("Đã xóa chứng từ.");
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Xóa thất bại.");

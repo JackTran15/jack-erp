@@ -361,13 +361,13 @@ export function ItemLocationsPage() {
   const handleDeactivate = useCallback(
     async (loc: InventoryLocation) => {
       setSaving(true);
+      setConfirmDelete(null);
       try {
         await apiClient.patch(`/inventory/locations/${loc.id}`, {
           isActive: false,
         });
         toast.success("Đã ngừng hoạt động vị trí.");
         if (selectedId === loc.id) setSelectedId(null);
-        setConfirmDelete(null);
         await loadLocations();
       } catch (err) {
         toast.error(getUserFacingApiErrorMessage(err));

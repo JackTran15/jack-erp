@@ -596,15 +596,16 @@ export function CrudListPage({
 
   const confirmBulkDelete = async () => {
     if (selectedRows.length === 0) return;
+    const rowsToDelete = selectedRows;
+    setDeleteDialogOpen(false);
     try {
       await Promise.all(
-        selectedRows.map((record) =>
+        rowsToDelete.map((record) =>
           deleteMutation.mutateAsync(String(record[config.idField])),
         ),
       );
       setSelectedRecordIds(new Set());
-      setDeleteDialogOpen(false);
-      toast.success(`Đã xoá ${selectedRows.length} bản ghi.`);
+      toast.success(`Đã xoá ${rowsToDelete.length} bản ghi.`);
       void refetchRecords();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));

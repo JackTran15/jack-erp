@@ -233,9 +233,9 @@ export function TransferOrdersPage() {
 
   const handleDelete = async (order: TransferOrder) => {
     setActionLoading(order.id);
+    setConfirmDelete(null);
     try {
       await apiClient.delete(`/inventory/transfer-orders/${order.id}`);
-      setConfirmDelete(null);
       if (selectedId === order.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {

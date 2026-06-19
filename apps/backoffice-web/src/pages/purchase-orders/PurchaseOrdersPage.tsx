@@ -436,9 +436,9 @@ export function PurchaseOrdersPage() {
   // the stock ledger when the doc was POSTED before marking it cancelled.
   const handleVoid = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
+    setConfirmVoid(null);
     try {
       await apiClient.delete(`/goods-receipts/${order.id}`);
-      setConfirmVoid(null);
       setDialogMode(null);
       setEditingOrder(null);
       if (selectedId === order.id) setSelectedId(null);
@@ -452,9 +452,9 @@ export function PurchaseOrdersPage() {
 
   const handleDelete = async (order: PurchaseOrder) => {
     setActionLoading(order.id);
+    setConfirmDelete(null);
     try {
       await apiClient.delete(`/goods-receipts/${order.id}`);
-      setConfirmDelete(null);
       if (selectedId === order.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {

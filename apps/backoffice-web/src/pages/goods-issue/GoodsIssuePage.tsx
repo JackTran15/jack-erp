@@ -415,11 +415,11 @@ export function GoodsIssuePage() {
 
   const handleVoid = async (issue: GoodsIssue) => {
     setActionLoading(issue.id);
+    setConfirmVoid(null);
     try {
       // Hoãn = đảo bút phiếu đã thực hiện. Cùng endpoint cancel() như "Xóa",
       // nhưng với phiếu POSTED, BE sẽ đảo bút tồn kho trước khi đánh dấu huỷ.
       await apiClient.post(`/inventory/goods-issues/${issue.id}/cancel`);
-      setConfirmVoid(null);
       if (selectedId === issue.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
@@ -431,9 +431,9 @@ export function GoodsIssuePage() {
 
   const handleDelete = async (issue: GoodsIssue) => {
     setActionLoading(issue.id);
+    setConfirmDelete(null);
     try {
       await apiClient.post(`/inventory/goods-issues/${issue.id}/cancel`);
-      setConfirmDelete(null);
       if (selectedId === issue.id) setSelectedId(null);
       await reloadAfterMutation();
     } catch (err) {
