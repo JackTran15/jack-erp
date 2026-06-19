@@ -1412,8 +1412,8 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
     { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
     { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money' },
-    { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
-    { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
+    { key: 'isPosVisible', label: 'KQHT', type: 'boolean' },
+    { key: 'isActive', label: 'KQMM', type: 'boolean' },
     // ── Display fields removed from the table (kept for form/back-compat) ──
     { key: 'categoryName', label: 'Nhóm hàng hóa', type: 'string', readOnly: true, hideInList: true },
     { key: 'itemType', label: 'Loại hàng hóa', type: 'string', hideInList: true },
@@ -1445,16 +1445,16 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   filterDefinitions: [
     {
       key: 'isActive',
-      label: 'Đang hoạt động',
+      label: 'KQMM',
       type: 'select',
       options: [
-        { label: 'Có', value: 'true' },
-        { label: 'Không', value: 'false' },
+        { label: 'Đang hoạt động', value: 'true' },
+        { label: 'Ngừng kinh doanh', value: 'false' },
       ],
     },
     {
       key: 'isPosVisible',
-      label: 'Hiển thị POS',
+      label: 'KQHT',
       type: 'select',
       options: [
         { label: 'Có', value: 'true' },

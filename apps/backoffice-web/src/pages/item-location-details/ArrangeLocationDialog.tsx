@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 import { HelpCircle, Loader2, Plus, Trash2 } from "lucide-react";
-import { AppModal, Button, Input } from "@erp/ui";
+import { AppModal, Button } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
+import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { assignArrange } from "../../api/stock-balances";
+import { assignArrange, type ArrangeLine } from "../../api/stock-balances";
 import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ItemSearchResult {
+interface ProductGroupSearchResult {
+  type: "product" | "orphan";
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  itemCount: number;
+}
+
+interface ProductVariantSearchResult {
   id: string;
   code: string;
   name: string;
@@ -38,7 +48,9 @@ interface PaginatedResponse<T> {
 
 type ArrangeRow = {
   uid: string;
-  itemId: string | null;
+  groupId: string | null;
+  groupType: "product" | "orphan" | null;
+  itemIds: string[];
   itemCode: string;
   itemName: string;
   unit: string;
@@ -46,7 +58,6 @@ type ArrangeRow = {
   storageName: string;
   locationId: string | null;
   locationCode: string;
-  quantity: string;
 };
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -55,6 +66,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  initialLocation?: {
+    id: string;
+    code: string;
+    name: string;
+    storageId: string;
+    storageName?: string;
+  } | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -62,7 +80,9 @@ interface Props {
 function emptyRow(): ArrangeRow {
   return {
     uid: crypto.randomUUID(),
-    itemId: null,
+    groupId: null,
+    groupType: null,
+    itemIds: [],
     itemCode: "",
     itemName: "",
     unit: "",
@@ -70,28 +90,26 @@ function emptyRow(): ArrangeRow {
     storageName: "",
     locationId: null,
     locationCode: "",
-    quantity: "1",
   };
 }
 
 function isRowComplete(row: ArrangeRow): boolean {
-  return Boolean(
-    row.itemId &&
-      row.storageId &&
-      row.locationId &&
-      Number.isFinite(Number(row.quantity)) &&
-      Number(row.quantity) > 0,
-  );
+  return Boolean(row.itemIds.length > 0 && row.storageId && row.locationId);
 }
 
-// A row is "empty" (not yet started) until an item is selected.
+// A row is "empty" (not yet started) until a product group is selected.
 function isRowEmpty(row: ArrangeRow): boolean {
-  return !row.itemId;
+  return row.itemIds.length === 0;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): ReactElement {
+export function ArrangeLocationDialog({
+  open,
+  onOpenChange,
+  onSaved,
+  initialLocation = null,
+}: Props): ReactElement {
   const [rows, setRows] = useState<ArrangeRow[]>(() => [emptyRow()]);
   const [submitting, setSubmitting] = useState(false);
   // Reset when closed
@@ -101,23 +119,38 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !initialLocation) return;
+    setRows([
+      {
+        ...emptyRow(),
+        storageId: initialLocation.storageId,
+        storageName: initialLocation.storageName ?? "",
+        locationId: initialLocation.id,
+        locationCode: `${initialLocation.code} · ${initialLocation.name}`,
+      },
+    ]);
+  }, [open, initialLocation]);
+
   // Always keep exactly one blank trailing row (unified grid rule).
   useTrailingEmptyRow(rows, setRows, { isEmpty: isRowEmpty, makeEmpty: emptyRow });
 
   // ─── Search functions ─────────────────────────────────────────────────────
 
-  const searchItems = useCallback(async (query: string) => {
+  const searchProductGroups = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "12" });
     if (query.trim()) params.set("search", query.trim());
-    const { data: res } = await apiClient.get<PaginatedResponse<ItemSearchResult>>(
-      `/inventory/items?${params}`,
+    const { data: res } = await apiClient.get<PaginatedResponse<ProductGroupSearchResult>>(
+      `/inventory/items/products?${params}`,
     );
     return res.data;
   }, []);
 
   const searchStorages = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "20" });
+    const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
+    if (branchId) params.set("branchId", branchId);
     const { data: res } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
@@ -127,8 +160,10 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
   const searchLocationsFor = useCallback(
     (storageId: string | null) => async (query: string) => {
       const params = new URLSearchParams({ page: "1", pageSize: "20" });
+      const branchId = getActiveBranch();
       if (query.trim()) params.set("search", query.trim());
       if (storageId) params.set("storageId", storageId);
+      if (branchId) params.set("branchId", branchId);
       const { data: res } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
@@ -156,17 +191,31 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
     setRows((prev) => [...prev, emptyRow()]);
   }, []);
 
+  const resolveGroupItemIds = useCallback(async (row: ArrangeRow) => {
+    if (!row.groupId || row.groupType !== "product") {
+      return row.itemIds;
+    }
+    const params = new URLSearchParams({ page: "1", pageSize: "200" });
+    const { data } = await apiClient.get<PaginatedResponse<ProductVariantSearchResult>>(
+      `/inventory/items/products/${row.groupId}/items?${params}`,
+    );
+    return data.data.map((item) => item.id);
+  }, []);
+
   // ─── Save ─────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
-    const lines = rows
-      .filter(isRowComplete)
-      .map((row) => ({
-        itemId: row.itemId as string,
-        storageId: row.storageId as string,
-        destinationLocationId: row.locationId as string,
-        quantity: Number(row.quantity),
-      }));
+    const lines: ArrangeLine[] = [];
+    for (const row of rows.filter(isRowComplete)) {
+      const itemIds = await resolveGroupItemIds(row);
+      for (const itemId of itemIds) {
+        lines.push({
+          itemId,
+          storageId: row.storageId as string,
+          destinationLocationId: row.locationId as string,
+        });
+      }
+    }
 
     if (lines.length === 0) {
       toast.error("Chưa có dòng nào hợp lệ để xếp");
@@ -184,7 +233,7 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
     } finally {
       setSubmitting(false);
     }
-  }, [rows, onSaved, onOpenChange]);
+  }, [rows, resolveGroupItemIds, onSaved, onOpenChange]);
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
@@ -215,12 +264,11 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
           <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
             <tr>
               <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
-              <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã SKU</th>
-              <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Tên hàng hóa</th>
+              <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Mã nhóm/SKU</th>
+              <th className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Hàng hóa</th>
               <th className="w-44 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Kho</th>
               <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Đơn vị tính</th>
               <th className="w-48 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Vị trí</th>
-              <th className="w-28 border-b px-3 py-2 text-xs font-medium text-muted-foreground">Số lượng xếp</th>
               <th className="w-10 border-b px-2 py-2" />
             </tr>
           </thead>
@@ -231,34 +279,48 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                   {idx + 1}
                 </td>
 
-                {/* Mã SKU — LookupField */}
+                {/* Mã nhóm/SKU — LookupField */}
                 <td className="border-b px-2 py-2">
-                  <LookupField<ItemSearchResult>
-                    placeholder="Tìm mã hoặc tên"
+                  <LookupField<ProductGroupSearchResult>
+                    placeholder="Tìm nhóm hoặc SKU"
                     value={row.itemCode}
                     onValueChange={(v) =>
                       updateRow(row.uid, {
                         itemCode: v,
-                        itemId: null,
+                        groupId: null,
+                        groupType: null,
+                        itemIds: [],
                         itemName: "",
                         unit: "",
                       })
                     }
                     onSelect={(item) =>
                       updateRow(row.uid, {
-                        itemId: item.id,
+                        groupId: item.id,
+                        groupType: item.type,
+                        itemIds: item.type === "orphan" ? [item.id] : [item.id],
                         itemCode: item.code,
                         itemName: item.name,
                         unit: item.unit,
                       })
                     }
-                    search={searchItems}
+                    search={searchProductGroups}
                     itemKey={(item) => item.id}
                     renderItem={(item) => item.name}
-                    renderMeta={(item) => item.code}
+                    renderMeta={(item) =>
+                      item.type === "product"
+                        ? `${item.code} · ${item.itemCount} biến thể`
+                        : item.code
+                    }
                     columns={[
                       { key: "code", label: "Mã", className: "w-[110px] font-mono text-xs", render: (item) => item.code },
                       { key: "name", label: "Tên hàng hóa", render: (item) => item.name },
+                      {
+                        key: "itemCount",
+                        label: "Biến thể",
+                        className: "w-[80px] text-right",
+                        render: (item) => (item.type === "product" ? item.itemCount : 1),
+                      },
                     ]}
                     className="w-full"
                   />
@@ -335,17 +397,6 @@ export function ArrangeLocationDialog({ open, onOpenChange, onSaved }: Props): R
                       { key: "name", label: "Tên vị trí", render: (loc) => loc.name },
                     ]}
                     className="w-full"
-                  />
-                </td>
-
-                <td className="border-b px-2 py-2">
-                  <Input
-                    type="number"
-                    min="0.000001"
-                    step="any"
-                    value={row.quantity}
-                    onChange={(e) => updateRow(row.uid, { quantity: e.target.value })}
-                    className="h-8 text-right"
                   />
                 </td>
 

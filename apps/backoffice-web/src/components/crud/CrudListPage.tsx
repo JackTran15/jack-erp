@@ -10,6 +10,7 @@ import type { FieldDefinition } from "@erp/shared-interfaces";
 import { toast } from "sonner";
 import {
   Button,
+  Badge,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -333,7 +334,12 @@ export function CrudListPage({
                   </button>
                 );
               }
-              const content = formatCell(row[field.key], field, col.format);
+              const content = formatCell(
+                row[field.key],
+                field,
+                col.format,
+                entityKey,
+              );
               if (!opensEdit) return content;
               return (
                 <button
@@ -815,8 +821,21 @@ function formatCell(
   value: unknown,
   field: FieldDefinition,
   format: ColumnFormatKind | undefined,
+  entityKey?: string,
 ): React.ReactNode {
   if (value === null || value === undefined) return "—";
+  if (entityKey === "inventory-items" && field.key === "isPosVisible") {
+    const enabled = Boolean(value);
+    return <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Có" : "Không"}</Badge>;
+  }
+  if (entityKey === "inventory-items" && field.key === "isActive") {
+    const enabled = Boolean(value);
+    return (
+      <Badge variant={enabled ? "default" : "secondary"}>
+        {enabled ? "Đang hoạt động" : "Ngừng kinh doanh"}
+      </Badge>
+    );
+  }
   if (field.type === "boolean") {
     return (
       <input

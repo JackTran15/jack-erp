@@ -2,6 +2,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsNumber,
+  IsOptional,
   IsUUID,
   Min,
   ValidateNested,
@@ -22,10 +23,16 @@ export class ArrangeLocationLineDto {
   @IsUUID()
   destinationLocationId!: string;
 
-  @ApiProperty({ description: 'Số lượng cần xếp', minimum: 0.000001 })
+  @ApiProperty({
+    description:
+      'Số lượng cần xếp. Bỏ trống để lấy toàn bộ tồn ở vị trí "Chưa xếp".',
+    minimum: 0.000001,
+    required: false,
+  })
+  @IsOptional()
   @IsNumber()
   @Min(0.000001)
-  quantity!: number;
+  quantity?: number;
 }
 
 export class ArrangeLocationDto {

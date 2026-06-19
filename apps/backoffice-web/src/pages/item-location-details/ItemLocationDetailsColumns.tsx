@@ -16,13 +16,6 @@ export function buildItemLocationColumns(
       render: (r) => rowIndexMap.get(r.id) ?? "",
     },
     {
-      key: "locationCode",
-      label: "Mã vị trí",
-      width: 130,
-      filterKind: "symbol",
-      render: (r) => r.location.code,
-    },
-    {
       key: "locationName",
       label: "Tên vị trí",
       width: 150,

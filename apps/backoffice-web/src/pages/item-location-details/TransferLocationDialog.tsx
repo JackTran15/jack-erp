@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 import { Copy, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
+import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 import { listStockBalances, type StockBalanceRow } from "../../api/stock-balances";
@@ -77,6 +78,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  selectedRows?: StockBalanceRow[];
 }
 
 const FETCH_PAGE_SIZE = 100;
@@ -103,7 +105,12 @@ const NO_STORAGE_SENTINEL: TransferRow[] = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): ReactElement {
+export function TransferLocationDialog({
+  open,
+  onOpenChange,
+  onSaved,
+  selectedRows = [],
+}: Props): ReactElement {
   // Header — Kho (storage)
   const [storageId, setStorageId] = useState("");
   const [storageLabel, setStorageLabel] = useState("");
@@ -128,7 +135,9 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
 
   const searchStorages = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "20" });
+    const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
+    if (branchId) params.set("branchId", branchId);
     const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
@@ -138,8 +147,10 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
   const searchLocationsInStorage = useCallback(
     (sid: string) => async (query: string) => {
       const params = new URLSearchParams({ page: "1", pageSize: "20" });
+      const branchId = getActiveBranch();
       if (query.trim()) params.set("search", query.trim());
       if (sid) params.set("storageId", sid);
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
@@ -147,6 +158,39 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
     },
     [],
   );
+
+  useEffect(() => {
+    if (!open || selectedRows.length === 0) return;
+    const first = selectedRows[0];
+    if (!first) return;
+    setStorageId(first.location.storageId);
+    setStorageLabel(first.location.storageName);
+    setSourceLocationId(first.location.id);
+    setSourceLocationLabel(`${first.location.code} · ${first.location.name}`);
+    setSourceLocationCode(first.location.code);
+    setDestLocationId("");
+    setDestLocationLabel("");
+    setRows(
+      selectedRows.map((r) => {
+        const quantityOnHand = Number(r.quantity);
+        return {
+          uid: crypto.randomUUID(),
+          itemId: r.itemId,
+          itemCode: r.item.code,
+          itemName: r.item.name,
+          unit: r.item.unit,
+          storageName: r.location.storageName,
+          sourceLocationId: r.location.id,
+          sourceLocationLabel: `${r.location.code} · ${r.location.name}`,
+          sourceLocationCode: r.location.code,
+          destLocationId: "",
+          destLocationLabel: "",
+          quantityOnHand,
+          qty: quantityOnHand > 0 ? String(quantityOnHand) : "",
+        };
+      }),
+    );
+  }, [open, selectedRows]);
 
   const searchItems = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "12" });

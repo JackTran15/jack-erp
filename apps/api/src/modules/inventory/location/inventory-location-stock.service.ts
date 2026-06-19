@@ -106,12 +106,14 @@ export class InventoryLocationStockService {
     return { created, skipped };
   }
 
-  /** Move the requested unassigned quantity onto a real shelf. */
+  /** Move unassigned stock onto a real shelf, then record the preferred shelf. */
   async arrange(
     dto: ArrangeLocationDto,
     actor: ActorContext,
   ): Promise<{ moved: number; transferId: string | null }> {
-    // Resolve each line's "Chưa xếp" source + its current on-hand (the amount to move).
+    // Resolve each line's "Chưa xếp" source. When the UI does not send a
+    // quantity, move all currently unassigned stock; if none exists, still write
+    // the preferred shelf mapping below.
     const resolved: {
       line: ArrangeLocationDto['lines'][number];
       qty: number;
@@ -122,14 +124,23 @@ export class InventoryLocationStockService {
         line.storageId,
         actor,
       );
+      const balance = await this.stockBalanceRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          itemId: line.itemId,
+          locationId: unassigned.id,
+        },
+      });
+      const unassignedQty = balance ? Number(balance.quantity) : 0;
       resolved.push({
         line,
-        qty: line.quantity,
+        qty: line.quantity ?? unassignedQty,
         unassignedId: unassigned.id,
       });
     }
 
     const moves: IntraWarehouseMoveLine[] = resolved
+      .filter((r) => r.qty > 0)
       .map((r) => ({
         itemId: r.line.itemId,
         quantity: r.qty,

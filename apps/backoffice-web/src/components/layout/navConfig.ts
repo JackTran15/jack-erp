@@ -35,6 +35,7 @@ export interface NavChild {
   to: string;
   label: string;
   end?: boolean;
+  badgeKey?: "importable-transfer-orders";
   /** When set, link is hidden unless the user has this permission key. */
   permission?: string;
   /** When set, link only shows in these views. Omitted = shown in every view. */
@@ -135,6 +136,11 @@ export const navConfig: NavModule[] = [
         id: "inventory-main",
         children: [
           { to: "/inventory/purchase-orders", label: "Nhập kho" },
+          {
+            to: "/inventory/transfer-in",
+            label: "Điều chuyển từ cửa hàng khác",
+            badgeKey: "importable-transfer-orders",
+          },
           { to: "/inventory/goods-issues", label: "Xuất kho" },
           { to: "/inventory/stock-transfers", label: "Chuyển kho" },
           { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển" },

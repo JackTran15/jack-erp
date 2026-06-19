@@ -263,6 +263,19 @@ export function ItemLocationsPage() {
     () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
     [locations, selectedId],
   );
+  const selectedArrangeLocation = useMemo(
+    () =>
+      selected
+        ? {
+            id: selected.id,
+            code: selected.code,
+            name: selected.name,
+            storageId: selected.storageId,
+            storageName: storageNameById.get(selected.storageId) ?? "",
+          }
+        : null,
+    [selected, storageNameById],
+  );
 
   const filteredRows = useMemo(() => {
     const rows = locations?.data ?? [];
@@ -654,6 +667,7 @@ export function ItemLocationsPage() {
         open={arrangeOpen}
         onOpenChange={setArrangeOpen}
         onSaved={() => void loadLocations()}
+        initialLocation={selectedArrangeLocation}
       />
     </>
   );

@@ -24,6 +24,9 @@ import {
 import { useLayout } from "./LayoutContext";
 import { MegaMenuPanel } from "./MegaMenuPanel";
 import { useCurrentView } from "../../store/common/branch/branch.store";
+import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
+
+type NavBadgeCounts = Partial<Record<NonNullable<NavChild["badgeKey"]>, number>>;
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,10 @@ export function AppSidebar() {
   const { sidebarCollapsed, toggleSidebar } = useLayout();
   const view = useCurrentView();
   const filteredNav = visibleNavConfig(view);
+  const transferInCountQuery = useImportableTransferOrderCount();
+  const badgeCounts: NavBadgeCounts = {
+    "importable-transfer-orders": transferInCountQuery.data ?? 0,
+  };
   const activeModule =
     activeModuleFor(location.pathname, filteredNav) ?? filteredNav[0];
 
@@ -113,6 +120,7 @@ export function AppSidebar() {
                 pathname={location.pathname}
                 openFlyoutModuleId={openFlyoutModuleId}
                 suppressRouteActiveHighlight={openFlyoutModuleId !== null}
+                badgeCounts={badgeCounts}
               />
             ))}
           </nav>
@@ -180,6 +188,7 @@ interface ModuleRowProps {
   openFlyoutModuleId: string | null;
   /** When a flyout mega-menu is open, NavLink-based rows must not use URL match for “selected” styling. */
   suppressRouteActiveHighlight: boolean;
+  badgeCounts: NavBadgeCounts;
 }
 
 function ModuleRow({
@@ -195,6 +204,7 @@ function ModuleRow({
   onCollapsedFlyoutOpen,
   openFlyoutModuleId,
   suppressRouteActiveHighlight,
+  badgeCounts,
 }: ModuleRowProps) {
   // In collapsed mode every module behaves the same: icon-only button → defaultPath
   if (collapsed) {
@@ -208,6 +218,7 @@ function ModuleRow({
         onFlyoutOpen={
           isFlyoutEnabled(module) ? () => onCollapsedFlyoutOpen(module.id) : undefined
         }
+        badgeCounts={badgeCounts}
       />
     );
   }
@@ -220,6 +231,7 @@ function ModuleRow({
         isActive={isActive}
         isFlyoutOpen={isFlyoutOpen}
         onToggleFlyout={onToggleFlyout}
+        badgeCounts={badgeCounts}
       />
     );
   }
@@ -233,6 +245,7 @@ function ModuleRow({
         module={module}
         child={allChildren[0]}
         suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+        badgeCounts={badgeCounts}
       />
     );
   }
@@ -246,6 +259,7 @@ function ModuleRow({
       onToggle={onToggle}
       pathname={pathname}
       suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+      badgeCounts={badgeCounts}
     />
   );
 }
@@ -256,13 +270,16 @@ function CollapsedModuleRow({
   module,
   isActive,
   onFlyoutOpen,
+  badgeCounts,
 }: {
   module: NavModule;
   isActive: boolean;
   onFlyoutOpen?: () => void;
+  badgeCounts: NavBadgeCounts;
 }) {
   const navigate = useNavigate();
   const Icon = module.icon;
+  const badgeCount = getModuleBadgeCount(module, badgeCounts);
 
   return (
     <Tooltip>
@@ -277,7 +294,7 @@ function CollapsedModuleRow({
             navigate(module.defaultPath);
           }}
           className={cn(
-            "flex h-10 w-full items-center justify-center rounded-md transition-colors",
+            "relative flex h-10 w-full items-center justify-center rounded-md transition-colors",
             isActive
               ? "bg-gray-700 text-white"
               : "text-gray-400 hover:bg-gray-800 hover:text-white",
@@ -286,6 +303,9 @@ function CollapsedModuleRow({
           aria-current={isActive ? "page" : undefined}
         >
           <Icon className="h-5 w-5 shrink-0" />
+          {badgeCount > 0 && (
+            <span className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-red-600" />
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
@@ -302,13 +322,16 @@ function FlyoutModuleRow({
   isActive,
   isFlyoutOpen,
   onToggleFlyout,
+  badgeCounts,
 }: {
   module: NavModule;
   isActive: boolean;
   isFlyoutOpen: boolean;
   onToggleFlyout: () => void;
+  badgeCounts: NavBadgeCounts;
 }) {
   const Icon = module.icon;
+  const badgeCount = getModuleBadgeCount(module, badgeCounts);
 
   return (
     <button
@@ -327,6 +350,7 @@ function FlyoutModuleRow({
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1 truncate text-left">{module.label}</span>
+      <CountBadge count={badgeCount} />
       <ChevronRight
         className={cn(
           "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform",
@@ -343,10 +367,12 @@ function DirectNavRow({
   module,
   child,
   suppressRouteActiveHighlight,
+  badgeCounts,
 }: {
   module: NavModule;
   child: NavChild;
   suppressRouteActiveHighlight: boolean;
+  badgeCounts: NavBadgeCounts;
 }) {
   const Icon = module.icon;
 
@@ -366,6 +392,7 @@ function DirectNavRow({
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="truncate">{module.label}</span>
+      <NavItemBadge child={child} badgeCounts={badgeCounts} />
     </NavLink>
   );
 }
@@ -379,6 +406,7 @@ interface AccordionModuleRowProps {
   onToggle: () => void;
   pathname: string;
   suppressRouteActiveHighlight: boolean;
+  badgeCounts: NavBadgeCounts;
 }
 
 function AccordionModuleRow({
@@ -388,8 +416,10 @@ function AccordionModuleRow({
   onToggle,
   pathname,
   suppressRouteActiveHighlight,
+  badgeCounts,
 }: AccordionModuleRowProps) {
   const Icon = module.icon;
+  const badgeCount = getModuleBadgeCount(module, badgeCounts);
 
   return (
     <Collapsible open={isOpen} onOpenChange={onToggle}>
@@ -406,6 +436,7 @@ function AccordionModuleRow({
         >
           <Icon className="h-4 w-4 shrink-0" />
           <span className="flex-1 truncate text-left">{module.label}</span>
+          <CountBadge count={badgeCount} />
           <ChevronDown
             className={cn(
               "h-3.5 w-3.5 shrink-0 text-gray-500 transition-transform duration-200",
@@ -422,6 +453,7 @@ function AccordionModuleRow({
             section={section}
             pathname={pathname}
             suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+            badgeCounts={badgeCounts}
           />
         ))}
       </CollapsibleContent>
@@ -435,10 +467,12 @@ function AccordionSection({
   section,
   pathname,
   suppressRouteActiveHighlight,
+  badgeCounts,
 }: {
   section: NavSection;
   pathname: string;
   suppressRouteActiveHighlight: boolean;
+  badgeCounts: NavBadgeCounts;
 }) {
   return (
     <div>
@@ -453,6 +487,7 @@ function AccordionSection({
             <AccordionItem
               child={child}
               suppressRouteActiveHighlight={suppressRouteActiveHighlight}
+              badgeCounts={badgeCounts}
             />
           </li>
         ))}
@@ -466,9 +501,11 @@ function AccordionSection({
 function AccordionItem({
   child,
   suppressRouteActiveHighlight,
+  badgeCounts,
 }: {
   child: NavChild;
   suppressRouteActiveHighlight: boolean;
+  badgeCounts: NavBadgeCounts;
 }) {
   return (
     <NavLink
@@ -494,8 +531,49 @@ function AccordionItem({
             )}
           />
           <span className="truncate">{child.label}</span>
+          <NavItemBadge child={child} badgeCounts={badgeCounts} />
         </>
       )}
     </NavLink>
   );
+}
+
+function NavItemBadge({
+  child,
+  badgeCounts,
+}: {
+  child: NavChild;
+  badgeCounts: NavBadgeCounts;
+}) {
+  const count = child.badgeKey ? (badgeCounts[child.badgeKey] ?? 0) : 0;
+  return <CountBadge count={count} className="ml-auto" />;
+}
+
+function CountBadge({
+  count,
+  className,
+}: {
+  count: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white",
+        className,
+      )}
+    >
+      {count}
+    </span>
+  );
+}
+
+function getModuleBadgeCount(module: NavModule, badgeCounts: NavBadgeCounts) {
+  return module.sections
+    .flatMap((section) => section.children)
+    .reduce((sum, child) => {
+      if (!child.badgeKey) return sum;
+      return sum + (badgeCounts[child.badgeKey] ?? 0);
+    }, 0);
 }

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { PageTabBar, type PageTabItem } from "@erp/ui";
 import type { ReactNode } from "react";
+import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
 
 export type InventoryTabId =
   | "purchase-orders"
@@ -19,7 +20,7 @@ export const INVENTORY_TABS: (PageTabItem & {
   comingSoon?: boolean;
 })[] = [
   { id: "purchase-orders", label: "Nhập kho", href: "/inventory/purchase-orders" },
-  { id: "transfer-in", label: "Điều chuyển từ cửa hàng khác", href: "#", comingSoon: true },
+  { id: "transfer-in", label: "Điều chuyển từ cửa hàng khác", href: "/inventory/transfer-in" },
   { id: "goods-issues", label: "Xuất kho", href: "/inventory/goods-issues" },
   { id: "stock-transfer", label: "Chuyển kho", href: "/inventory/stock-transfers" },
   { id: "transfer-order", label: "Lệnh điều chuyển", href: "/inventory/transfer-orders" },
@@ -30,8 +31,22 @@ export const INVENTORY_TABS: (PageTabItem & {
 ];
 
 export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
+  const transferInCountQuery = useImportableTransferOrderCount();
+
   const linkClassName =
     "font-medium text-primary-blue transition-colors hover:text-primary-blue-hover";
+  const renderLabel = (item: PageTabItem) => {
+    const count = item.id === "transfer-in" ? (transferInCountQuery.data ?? 0) : 0;
+    if (count <= 0) return item.label;
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {item.label}
+        <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-semibold leading-none text-destructive-foreground">
+          {count}
+        </span>
+      </span>
+    );
+  };
 
   return (
     <PageTabBar
@@ -49,13 +64,13 @@ export function InventoryTabBar({ activeId }: { activeId: InventoryTabId }) {
               className="cursor-not-allowed font-medium text-primary-blue/60"
               title="Sắp triển khai"
             >
-              {item.label}
+              {renderLabel(item)}
             </span>
           );
         }
         return (
           <Link to={item.href ?? "#"} className={linkClassName}>
-            {item.label}
+            {renderLabel(item)}
           </Link>
         );
       }}

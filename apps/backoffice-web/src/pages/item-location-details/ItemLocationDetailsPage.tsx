@@ -131,6 +131,42 @@ export function ItemLocationDetailsPage() {
     ? `${locationQuery.data.meta.location.storage.name} - ${locationQuery.data.meta.location.code} · ${locationQuery.data.meta.location.name}`
     : null;
   const hasSelection = selectedIds.size > 0;
+  const selectedTransferRows = useMemo<StockBalanceRow[]>(() => {
+    if (isLocationDetail) {
+      const location = locationQuery.data?.meta.location;
+      if (!location) return [];
+      return locationRows
+        .filter((row) => selectedIds.has(row.itemId))
+        .map((row) => ({
+          id: `${location.id}:${row.itemId}`,
+          itemId: row.itemId,
+          locationId: location.id,
+          quantity: row.quantity,
+          lastMovementAt: row.lastMovementAt,
+          item: {
+            id: row.itemId,
+            code: row.code,
+            name: row.name,
+            unit: row.unit,
+            categoryName: row.categoryName,
+          },
+          location: {
+            id: location.id,
+            code: location.code,
+            name: location.name,
+            storageId: location.storage.id,
+            storageName: location.storage.name,
+          },
+        }));
+    }
+    return stockRows.filter((row) => selectedIds.has(row.id));
+  }, [
+    isLocationDetail,
+    locationQuery.data?.meta.location,
+    locationRows,
+    selectedIds,
+    stockRows,
+  ]);
 
   const onModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setFilters((prev) => ({
@@ -333,6 +369,7 @@ export function ItemLocationDetailsPage() {
         open={transferOpen}
         onOpenChange={setTransferOpen}
         onSaved={reload}
+        selectedRows={selectedTransferRows}
       />
     </>
   );

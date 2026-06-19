@@ -280,6 +280,12 @@ export function PurchaseOrdersPage() {
     null,
   );
   const [confirmVoid, setConfirmVoid] = useState<PurchaseOrder | null>(null);
+  const [autoOpenTransferPicker, setAutoOpenTransferPicker] = useState(false);
+  const [autoSelectTransferOrder, setAutoSelectTransferOrder] = useState<{
+    id: string;
+    sourceBranchName?: string | null;
+    exportGoodsIssueDocumentNumber?: string | null;
+  } | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -357,9 +363,31 @@ export function PurchaseOrdersPage() {
   }, [loadStorages]);
 
   useEffect(() => {
-    const openDocumentId = (
-      location.state as { openDocumentId?: string } | null
-    )?.openDocumentId;
+    const state = location.state as {
+      openDocumentId?: string;
+      openTransferInPicker?: boolean;
+      transferOrderId?: string;
+      sourceBranchName?: string | null;
+      exportGoodsIssueDocumentNumber?: string | null;
+    } | null;
+    if (state?.openTransferInPicker) {
+      setEditingOrder(null);
+      setDialogMode("create");
+      setAutoOpenTransferPicker(true);
+      setAutoSelectTransferOrder(
+        state.transferOrderId
+          ? {
+              id: state.transferOrderId,
+              sourceBranchName: state.sourceBranchName,
+              exportGoodsIssueDocumentNumber:
+                state.exportGoodsIssueDocumentNumber,
+            }
+          : null,
+      );
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
+    const openDocumentId = state?.openDocumentId;
     if (!openDocumentId) return;
     void (async () => {
       try {
@@ -738,10 +766,14 @@ export function PurchaseOrdersPage() {
           onClose={() => {
             setDialogMode(null);
             setEditingOrder(null);
+            setAutoOpenTransferPicker(false);
+            setAutoSelectTransferOrder(null);
           }}
           onSaved={async () => {
             setDialogMode(null);
             setEditingOrder(null);
+            setAutoOpenTransferPicker(false);
+            setAutoSelectTransferOrder(null);
             await loadRecords();
           }}
           onEdit={() => setDialogMode("edit")}
@@ -749,6 +781,8 @@ export function PurchaseOrdersPage() {
           onRequestDelete={
             editingOrder ? () => setConfirmDelete(editingOrder) : undefined
           }
+          autoOpenTransferPicker={autoOpenTransferPicker}
+          autoSelectTransferOrder={autoSelectTransferOrder}
         />
       )}
 
@@ -931,6 +965,8 @@ function PurchaseOrderFormDialog({
   onEdit,
   onVoid,
   onRequestDelete,
+  autoOpenTransferPicker = false,
+  autoSelectTransferOrder,
 }: {
   mode: "create" | "edit" | "view";
   initial: PurchaseOrder | null;
@@ -944,6 +980,12 @@ function PurchaseOrderFormDialog({
   /** Void/reverse the receipt → "Hoãn" toolbar button. */
   onVoid?: () => void;
   onRequestDelete?: () => void;
+  autoOpenTransferPicker?: boolean;
+  autoSelectTransferOrder?: {
+    id: string;
+    sourceBranchName?: string | null;
+    exportGoodsIssueDocumentNumber?: string | null;
+  } | null;
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
@@ -1024,6 +1066,7 @@ function PurchaseOrderFormDialog({
   // transfer order — Save calls the transfer import endpoint instead of creating
   // a standalone goods receipt, and the detail is locked.
   const [pickerOpen, setPickerOpen] = useState(false);
+
   const [sourceTransferOrderId, setSourceTransferOrderId] = useState<
     string | null
   >(null);
@@ -1209,15 +1252,19 @@ function PurchaseOrderFormDialog({
       setNotes(
         `Nhập kho hàng hóa điều chuyển từ cửa hàng ${row.sourceBranchName}`,
       );
-      // Lines come from the transfer order; the destination bin is resolved
-      // server-side from the chosen Kho nhận, so line Kho/Vị trí stay blank.
+      const targetStorageId = defaultStorage?.id ?? "";
+      const targetStorageLabel = defaultStorage?.name ?? "";
+      if (targetStorageId) {
+        setStorageId(targetStorageId);
+        setStorageQuery(targetStorageLabel);
+      }
       const mapped: FormLine[] = detail.lines.map((l) => ({
         itemId: l.itemId,
         itemLabel: l.item?.code ?? "",
         itemName: l.item?.name ?? "",
         unit: l.item?.unit ?? "",
-        storageId: "",
-        storageLabel: "",
+        storageId: targetStorageId,
+        storageLabel: targetStorageLabel,
         locationId: "",
         locationLabel: "",
         orderedQuantity: Number(l.requestedQty),
@@ -1225,12 +1272,73 @@ function PurchaseOrderFormDialog({
         notes: l.note ?? "",
       }));
       setLines(mapped);
+      if (targetStorageId) {
+        mapped.forEach((line, index) => {
+          void getPreferredShelf(line.itemId, targetStorageId)
+            .then((shelf) => {
+              if (!shelf) return;
+              setLines((currentLines) =>
+                currentLines.map((current, lineIndex) =>
+                  lineIndex === index &&
+                  current.itemId === line.itemId &&
+                  current.storageId === targetStorageId &&
+                  !current.locationId
+                    ? {
+                        ...current,
+                        locationId: shelf.id,
+                        locationLabel: shelf.code,
+                      }
+                    : current,
+                ),
+              );
+            })
+            .catch(() => {});
+        });
+      }
       markDirty();
     },
     // markDirty/set* are stable closures over component scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [defaultStorage],
   );
+
+  useEffect(() => {
+    if (!autoOpenTransferPicker || mode !== "create") return;
+    setPurpose("TRANSFER");
+    if (!autoSelectTransferOrder?.id) {
+      setPickerOpen(true);
+      return;
+    }
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<TransferReceiptDetail>(
+          `/inventory/transfer-orders/${autoSelectTransferOrder.id}`,
+        );
+        prefillFromTransferOrder(data, {
+          id: autoSelectTransferOrder.id,
+          documentNumber: data.documentNumber ?? "",
+          requestedDate: null,
+          notes: data.notes ?? null,
+          sourceBranchId: data.sourceBranchId,
+          sourceBranchName:
+            autoSelectTransferOrder.sourceBranchName ?? data.sourceBranchId,
+          exportGoodsIssueId: null,
+          exportGoodsIssueDocumentNumber:
+            autoSelectTransferOrder.exportGoodsIssueDocumentNumber ?? null,
+          totalAmount: 0,
+          status: "IN_PROGRESS" as ImportableTransferOrderListItem["status"],
+        });
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        setPickerOpen(true);
+      }
+    })();
+  }, [
+    autoOpenTransferPicker,
+    autoSelectTransferOrder,
+    mode,
+    prefillFromTransferOrder,
+  ]);
 
   /** Unlink the transfer order — the form reverts to a plain goods receipt. */
   const clearTransferSource = () => {
@@ -1419,6 +1527,14 @@ function PurchaseOrderFormDialog({
       const resolvedLines: FormLine[] = [];
       for (const l of persistableLines) {
         let locationId = l.locationId;
+        if (!locationId) {
+          const preferred = await getPreferredShelf(l.itemId, l.storageId).catch(
+            () => null,
+          );
+          if (preferred) {
+            locationId = preferred.id;
+          }
+        }
         if (!locationId) {
           let fb = fallbackByStorage.get(l.storageId);
           if (fb === undefined) {
