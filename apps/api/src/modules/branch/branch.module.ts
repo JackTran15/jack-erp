@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganizationModule } from '../organization/organization.module';
 import { RegistrationModule } from '../registration/registration.module';
 import { CashModule } from '../accounting/cash/cash.module';
+import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { EntityRegistryService } from '../crud/entity-registry.service';
 import { BranchEntity } from './branch.entity';
 import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
@@ -20,6 +21,7 @@ import {
     forwardRef(() => OrganizationModule),
     forwardRef(() => RegistrationModule),
     CashModule,
+    DocumentNumberingModule,
   ],
   controllers: [BranchController],
   providers: [

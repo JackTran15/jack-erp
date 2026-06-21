@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { CrudListPage } from "../../components/crud/CrudListPage";
-import { InventoryExportSelectDialog } from "./_components/InventoryExportSelectDialog";
+import { ProductSelectDialog } from "../../components/shared/product-select/ProductSelectDialog";
 import { ImportInventoryDialog } from "./_components/import/ImportInventoryDialog";
 import {
   downloadInventoryExport,
@@ -51,11 +51,15 @@ export function InventoryItemsPage() {
               />
             ) : null}
             {exportSelectOpen ? (
-              <InventoryExportSelectDialog
+              <ProductSelectDialog
                 open
                 onOpenChange={setExportSelectOpen}
-                onConfirm={(_allIds, productIds, standaloneItemIds) => {
-                  downloadInventoryExportSelected(standaloneItemIds, productIds)
+                confirmLabel="Xuất khẩu"
+                onConfirm={(result) => {
+                  downloadInventoryExportSelected(
+                    result.standaloneItemIds,
+                    result.fullySelectedProductIds,
+                  )
                     .then(() => toast.success("Đã tải tệp xuất khẩu"))
                     .catch((err: unknown) =>
                       toast.error(

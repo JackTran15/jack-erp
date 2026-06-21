@@ -37,6 +37,10 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -673,6 +677,8 @@ function TransferOrderFormDialog({
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // Multi-select product picker (adds N lines).
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [pendingAfterUnsaved, setPendingAfterUnsaved] = useState<
     "close" | "create"
   >("close");
@@ -933,18 +939,56 @@ function TransferOrderFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
+  // Fill the line at `idx` from a selected item — used by the inline typeahead.
+  const fillLineFromItem = (
+    idx: number,
+    item: { id: string; code: string; name: string; unit: string },
+  ) => {
+    setLines((prev) =>
+      normalizeFormLines(
+        prev.map((l, i) =>
+          i === idx
+            ? {
+                ...l,
+                itemId: item.id,
+                itemLabel: item.code,
+                itemName: item.name,
+                unit: item.unit,
+              }
+            : l,
+        ),
+      ),
+    );
+    markDirty();
+  };
+
+  // Append N lines from the multi-select picker (dedupe by itemId).
+  const addLinesFromPicker = (result: ProductSelectResult) => {
+    const existing = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const fresh: FormLine[] = result.lines
+      .filter((s) => s.itemId && !existing.has(s.itemId))
+      .map((s) => ({
+        ...emptyLine(),
+        itemId: s.itemId,
+        itemLabel: s.sku,
+        itemName: s.name,
+        unit: s.unit,
+      }));
+    if (fresh.length === 0) return;
+    setLines(normalizeFormLines([...getPersistableFormLines(lines), ...fresh]));
+    markDirty();
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 180,
+      width: 360,
       placeholder: "Tìm mã hoặc tên",
       renderEditor: (row, idx) => (
         <LookupField
           portalToBody
-          enableSearchModal
-          searchModalTitle="Chọn hàng hóa"
-          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
@@ -956,24 +1000,7 @@ function TransferOrderFormDialog({
             );
             markDirty();
           }}
-          onSelect={(item) => {
-            setLines((prev) =>
-              normalizeFormLines(
-                prev.map((l, i) =>
-                  i === idx
-                    ? {
-                        ...l,
-                        itemId: item.id,
-                        itemLabel: item.code,
-                        itemName: item.name,
-                        unit: item.unit,
-                      }
-                    : l,
-                ),
-              ),
-            );
-            markDirty();
-          }}
+          onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
           itemKey={(item) => item.id}
           renderItem={(item) => item.name}
@@ -991,14 +1018,14 @@ function TransferOrderFormDialog({
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 240,
+      width: 280,
       type: "readonly",
       getValue: (row) => row.itemName,
     },
     {
       key: "sourceStorageId",
       label: "Kho",
-      width: 200,
+      width: 220,
       renderEditor: (row, idx) => (
         <select
           className="h-full w-full bg-transparent px-2 text-sm outline-none disabled:opacity-60"
@@ -1024,7 +1051,7 @@ function TransferOrderFormDialog({
     {
       key: "unit",
       label: "Đơn vị tính",
-      width: 110,
+      width: 100,
       type: "readonly",
       getValue: (row) => row.unit,
     },
@@ -1039,6 +1066,7 @@ function TransferOrderFormDialog({
     {
       key: "note",
       label: "Ghi chú",
+      width: 200,
       placeholder: "Nhập ghi chú",
     },
   ];
@@ -1245,6 +1273,14 @@ function TransferOrderFormDialog({
         ]}
         onApplyDraft={handleApplyDraftImport}
       />
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          onConfirm={addLinesFromPicker}
+        />
+      )}
     </>
   );
 }

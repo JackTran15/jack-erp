@@ -794,6 +794,35 @@ describe('InventoryLocationStockService', () => {
     });
   });
 
+  describe('getPreferredShelfBatch', () => {
+    it('resolves one row per pair in original order and dedups repeated pairs', async () => {
+      const shelfA = { id: 'loc-a', code: 'A-01', name: 'Kệ A-01' };
+      const spy = jest
+        .spyOn(service, 'getPreferredShelf')
+        .mockImplementation(async (itemId: string, storageId: string) =>
+          itemId === 'item-1' && storageId === 'storage-1' ? shelfA : null,
+        );
+
+      const pairs = [
+        { itemId: 'item-1', storageId: 'storage-1' },
+        { itemId: 'item-2', storageId: 'storage-1' },
+        { itemId: 'item-1', storageId: 'storage-1' }, // duplicate
+      ];
+
+      await expect(
+        service.getPreferredShelfBatch(pairs, actor),
+      ).resolves.toEqual([
+        { itemId: 'item-1', storageId: 'storage-1', shelf: shelfA },
+        { itemId: 'item-2', storageId: 'storage-1', shelf: null },
+        { itemId: 'item-1', storageId: 'storage-1', shelf: shelfA },
+      ]);
+
+      // Three inputs, two distinct pairs → resolved once each.
+      expect(spy).toHaveBeenCalledTimes(2);
+      spy.mockRestore();
+    });
+  });
+
   describe('arrange', () => {
     it('moves only the requested quantity from the unassigned location', async () => {
       await service.arrange(

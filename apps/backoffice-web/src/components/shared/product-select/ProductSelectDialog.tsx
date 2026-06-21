@@ -1,27 +1,69 @@
 import { AppModal, Button, Input } from "@erp/ui";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 
-import { useCrudRecords } from "../../../components/crud";
-import { PaginationControls } from "../../../components/table/PaginationControls";
+import { useCrudRecords } from "../../crud";
+import { PaginationControls } from "../../table/PaginationControls";
+import { QuickEntryDialog } from "./QuickEntryDialog";
 import {
-  useInventoryProductGroups,
-  useInventoryProductItems,
+  fetchProductVariants,
+  useProductGroups,
+  useProductVariants,
   type ProductGroupRow,
   type ProductVariantRow,
-} from "./useInventoryProductGroups";
+} from "./useProductSearch";
+
+export interface SelectedProduct {
+  itemId: string;
+  sku: string;
+  name: string;
+  unit: string;
+  categoryName: string | null;
+  purchasePrice: number;
+  sellingPrice: number;
+  variantLabel: string | null;
+}
+
+export interface SelectedLine extends SelectedProduct {
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface ProductSelectResult {
+  /** Full line-level data (qty + price) for every selected item, incl. resolved fully-selected products. */
+  lines: SelectedLine[];
+  /** Product ids whose all variants are selected. */
+  fullySelectedProductIds: string[];
+  /** Item ids selected but not part of a fully-selected product. */
+  standaloneItemIds: string[];
+  /** Every directly-selected item id (excludes not-yet-loaded auto-selected variants). */
+  allSelectedItemIds: string[];
+}
+
+type UnitPriceSource = "purchasePrice" | "sellingPrice" | "none";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  title?: string;
+  confirmLabel?: string;
+  categoryFilter?: boolean;
   initialSelectedIds?: Set<string>;
-  onConfirm: (allSelectedIds: Set<string>, productIds: string[], standaloneItemIds: string[]) => void;
+  /** Show editable quantity + unit price columns and the "Nhập nhanh" action. */
+  showQuantityPrice?: boolean;
+  defaultUnitPriceSource?: UnitPriceSource;
+  defaultQuantity?: number;
+  onConfirm: (result: ProductSelectResult) => void;
 }
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
 const VARIANT_PAGE_SIZE = 50;
+
+interface LineValue {
+  quantity?: number;
+  unitPrice?: number;
+}
 
 function formatMoney(val: unknown): string {
   const n = Number(val);
@@ -29,12 +71,44 @@ function formatMoney(val: unknown): string {
   return n.toLocaleString("vi-VN") + " ₫";
 }
 
+function orphanToSelected(row: ProductGroupRow): SelectedProduct {
+  return {
+    itemId: row.id,
+    sku: row.code,
+    name: row.name,
+    unit: row.unit,
+    categoryName: row.categoryName,
+    purchasePrice: row.purchasePrice,
+    sellingPrice: row.sellingPrice,
+    variantLabel: null,
+  };
+}
+
+function variantToSelected(v: ProductVariantRow): SelectedProduct {
+  return {
+    itemId: v.id,
+    sku: v.code,
+    name: v.name,
+    unit: v.unit,
+    categoryName: v.categoryName,
+    purchasePrice: v.purchasePrice,
+    sellingPrice: v.sellingPrice,
+    variantLabel: v.variantLabel,
+  };
+}
+
 // ─── Main dialog ───────────────────────────────────────────────────────────
 
-export function InventoryExportSelectDialog({
+export function ProductSelectDialog({
   open,
   onOpenChange,
+  title = "Chọn hàng hóa",
+  confirmLabel = "Chọn",
+  categoryFilter = true,
   initialSelectedIds,
+  showQuantityPrice = false,
+  defaultUnitPriceSource = "none",
+  defaultQuantity = 1,
   onConfirm,
 }: Props) {
   const [categoryId, setCategoryId] = useState("");
@@ -48,18 +122,27 @@ export function InventoryExportSelectDialog({
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
     () => initialSelectedIds ? new Set(initialSelectedIds) : new Set(),
   );
+  // Per-item quantity/price overrides + a "Nhập nhanh" bulk value applied to all
+  const [lineValues, setLineValues] = useState<Map<string, LineValue>>(new Map());
+  const [bulkValue, setBulkValue] = useState<LineValue | null>(null);
+  const [quickEntryOpen, setQuickEntryOpen] = useState(false);
+  // Product id whose per-group "Nhập nhanh" dialog is open, or null.
+  const [quickEntryGroup, setQuickEntryGroup] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   // Cache loaded variants per productId so we can compute checkbox state
   const variantCache = useRef<Map<string, ProductVariantRow[]>>(new Map());
+  // Accumulate full data for every item rendered, so confirm can return rich rows
+  const itemDataById = useRef<Map<string, SelectedProduct>>(new Map());
 
   const categoriesQuery = useCrudRecords(
     "inventory-item-categories",
     { page: 1, pageSize: 100, sortBy: "name", sortOrder: "asc" },
-    true,
+    categoryFilter,
   );
   const categories = (categoriesQuery.data?.data ?? []) as Record<string, unknown>[];
 
-  const groupsQuery = useInventoryProductGroups({
+  const groupsQuery = useProductGroups({
     page,
     pageSize,
     search: committedSearch || undefined,
@@ -68,6 +151,48 @@ export function InventoryExportSelectDialog({
 
   const rows = groupsQuery.data?.data ?? [];
   const total = groupsQuery.data?.total ?? 0;
+
+  // Cache orphan item data as rows render
+  rows.forEach((row) => {
+    if (row.type === "orphan") itemDataById.current.set(row.id, orphanToSelected(row));
+  });
+
+  const defaultUnitPrice = useCallback(
+    (data: SelectedProduct): number => {
+      if (defaultUnitPriceSource === "purchasePrice") return data.purchasePrice ?? 0;
+      if (defaultUnitPriceSource === "sellingPrice") return data.sellingPrice ?? 0;
+      return 0;
+    },
+    [defaultUnitPriceSource],
+  );
+
+  const getQty = useCallback(
+    (id: string): number =>
+      lineValues.get(id)?.quantity ?? bulkValue?.quantity ?? defaultQuantity,
+    [lineValues, bulkValue, defaultQuantity],
+  );
+
+  const getPrice = useCallback(
+    (id: string, data: SelectedProduct): number =>
+      lineValues.get(id)?.unitPrice ?? bulkValue?.unitPrice ?? defaultUnitPrice(data),
+    [lineValues, bulkValue, defaultUnitPrice],
+  );
+
+  const setQty = useCallback((id: string, quantity: number) => {
+    setLineValues((prev) => {
+      const next = new Map(prev);
+      next.set(id, { ...next.get(id), quantity });
+      return next;
+    });
+  }, []);
+
+  const setPrice = useCallback((id: string, unitPrice: number) => {
+    setLineValues((prev) => {
+      const next = new Map(prev);
+      next.set(id, { ...next.get(id), unitPrice });
+      return next;
+    });
+  }, []);
 
   function commitSearch() {
     setCommittedSearch(searchInput.trim());
@@ -241,27 +366,93 @@ export function InventoryExportSelectDialog({
     return productIds.size;
   }, [selectedItemIds, autoSelectIds]);
 
-  function handleExport() {
-    // Items directly selected (orphans + individually checked variants from expanded rows)
-    // minus any that already belong to a fully-selected product (avoid duplication)
+  // "Nhập nhanh" — set quantity + price for every selected item (uniform override)
+  function applyQuickEntry(quantity: number, unitPrice: number) {
+    setBulkValue({ quantity, unitPrice });
+    setLineValues(new Map());
+  }
+
+  // Per-group "Nhập nhanh" — set quantity + price only for the SELECTED variants
+  // of one product group (others untouched). Resolves an auto-selected (collapsed)
+  // group's variants first so its items can be addressed by id.
+  async function applyGroupQuickEntry(productId: string, quantity: number, unitPrice: number) {
+    let variants = variantCache.current.get(productId) ?? [];
+    if (autoSelectIds.has(productId) && variants.length === 0) {
+      variants = await ensureAllVariants(productId);
+    }
+    const ids = variants
+      .map((v) => v.id)
+      .filter((id) => selectedItemIds.has(id) || autoSelectIds.has(productId));
+    if (ids.length === 0) return;
+    setLineValues((prev) => {
+      const next = new Map(prev);
+      ids.forEach((id) => next.set(id, { quantity, unitPrice }));
+      return next;
+    });
+  }
+
+  // Fetch all variant pages of a product (used to resolve auto-selected products on confirm)
+  async function ensureAllVariants(productId: string): Promise<ProductVariantRow[]> {
+    const first = await fetchProductVariants({ productId, page: 1, pageSize: VARIANT_PAGE_SIZE });
+    let all = [...first.data];
+    let p = 2;
+    while (all.length < first.total) {
+      const next = await fetchProductVariants({ productId, page: p, pageSize: VARIANT_PAGE_SIZE });
+      if (next.data.length === 0) break;
+      all = all.concat(next.data);
+      p += 1;
+    }
+    variantCache.current.set(productId, all);
+    all.forEach((v) => itemDataById.current.set(v.id, variantToSelected(v)));
+    return all;
+  }
+
+  async function handleConfirm() {
+    const fullySelectedProductIds = [...autoSelectIds];
     const cachedProductItemIds = new Set<string>();
     for (const productId of autoSelectIds) {
       variantCache.current.get(productId)?.forEach((v) => cachedProductItemIds.add(v.id));
     }
     const standaloneItemIds = [...selectedItemIds].filter((id) => !cachedProductItemIds.has(id));
+    const allSelectedItemIds = [...selectedItemIds];
+
+    // Resolve every selected item to full line data. Only the line-picker mode needs
+    // auto-selected (unexpanded) products expanded into their variants.
+    const lineItemIds = new Set<string>(selectedItemIds);
+    if (showQuantityPrice && autoSelectIds.size > 0) {
+      setResolving(true);
+      try {
+        for (const productId of autoSelectIds) {
+          const variants = await ensureAllVariants(productId);
+          variants.forEach((v) => lineItemIds.add(v.id));
+        }
+      } finally {
+        setResolving(false);
+      }
+    }
+
+    const lines: SelectedLine[] = [];
+    for (const id of lineItemIds) {
+      const data = itemDataById.current.get(id);
+      if (!data) continue;
+      lines.push({ ...data, quantity: getQty(id), unitPrice: getPrice(id, data) });
+    }
 
     onOpenChange(false);
-    onConfirm(selectedItemIds, [...autoSelectIds], standaloneItemIds);
+    onConfirm({ lines, fullySelectedProductIds, standaloneItemIds, allSelectedItemIds });
   }
 
+  const colCount = showQuantityPrice ? 11 : 9;
+
   return (
+    <>
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
       preventOutsideClose
-      title="Chọn hàng hóa"
+      title={title}
       description={null}
-      defaultWidth={960}
+      defaultWidth={showQuantityPrice ? 1100 : 960}
       defaultHeight={660}
       minWidth={640}
       minHeight={420}
@@ -277,14 +468,14 @@ export function InventoryExportSelectDialog({
             hàng hóa).
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={resolving}>
               Hủy bỏ
             </Button>
             <Button
-              disabled={totalSelectedCount === 0}
-              onClick={handleExport}
+              disabled={totalSelectedCount === 0 || resolving}
+              onClick={handleConfirm}
             >
-              Xuất khẩu ({totalSelectedCount})
+              {resolving ? "Đang xử lý…" : `${confirmLabel} (${totalSelectedCount})`}
             </Button>
           </div>
         </div>
@@ -292,19 +483,21 @@ export function InventoryExportSelectDialog({
     >
       {/* Filters */}
       <div className="flex shrink-0 items-center gap-2">
-        <select
-          className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm"
-          value={categoryId}
-          onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
-          aria-label="Lọc theo nhóm hàng hóa"
-        >
-          <option value="">— Tất cả nhóm —</option>
-          {categories.map((c) => (
-            <option key={String(c.id)} value={String(c.id)}>
-              {String(c.name)}
-            </option>
-          ))}
-        </select>
+        {categoryFilter && (
+          <select
+            className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm"
+            value={categoryId}
+            onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
+            aria-label="Lọc theo nhóm hàng hóa"
+          >
+            <option value="">— Tất cả nhóm —</option>
+            {categories.map((c) => (
+              <option key={String(c.id)} value={String(c.id)}>
+                {String(c.name)}
+              </option>
+            ))}
+          </select>
+        )}
         <Input
           type="search"
           value={searchInput}
@@ -317,6 +510,19 @@ export function InventoryExportSelectDialog({
           <Search className="h-4 w-4" aria-hidden />
           Tìm kiếm
         </Button>
+        {showQuantityPrice && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 gap-1.5"
+            disabled={totalSelectedCount === 0}
+            onClick={() => setQuickEntryOpen(true)}
+          >
+            <Zap className="h-4 w-4" aria-hidden />
+            Nhập nhanh
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -342,16 +548,22 @@ export function InventoryExportSelectDialog({
                 <th className="px-3 py-2 text-left font-medium">Thương hiệu</th>
                 <th className="px-3 py-2 text-right font-medium">Giá mua TB</th>
                 <th className="px-3 py-2 text-right font-medium">Giá bán TB</th>
+                {showQuantityPrice && (
+                  <>
+                    <th className="px-3 py-2 text-right font-medium">Số lượng</th>
+                    <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {groupsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Đang tải…</td>
+                  <td colSpan={colCount} className="py-8 text-center text-sm text-muted-foreground">Đang tải…</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Không có hàng hóa phù hợp.</td>
+                  <td colSpan={colCount} className="py-8 text-center text-sm text-muted-foreground">Không có hàng hóa phù hợp.</td>
                 </tr>
               ) : (
                 rows.map((row) => (
@@ -367,6 +579,13 @@ export function InventoryExportSelectDialog({
                     onToggleItem={toggleItem}
                     onVariantsAutoLoaded={onVariantsAutoLoaded}
                     variantCache={variantCache}
+                    itemDataById={itemDataById}
+                    showQuantityPrice={showQuantityPrice}
+                    getQty={getQty}
+                    getPrice={getPrice}
+                    setQty={setQty}
+                    setPrice={setPrice}
+                    onGroupQuickEntry={setQuickEntryGroup}
                   />
                 ))
               )}
@@ -383,22 +602,103 @@ export function InventoryExportSelectDialog({
         />
       </div>
     </AppModal>
+    {quickEntryOpen && (
+      <QuickEntryDialog
+        open
+        onOpenChange={setQuickEntryOpen}
+        onApply={applyQuickEntry}
+      />
+    )}
+    {quickEntryGroup && (
+      <QuickEntryDialog
+        open
+        title="Nhập nhanh cho hàng đã chọn trong nhóm"
+        onOpenChange={() => setQuickEntryGroup(null)}
+        onApply={(q, p) => {
+          void applyGroupQuickEntry(quickEntryGroup, q, p);
+          setQuickEntryGroup(null);
+        }}
+      />
+    )}
+    </>
   );
 }
 
 // ─── Product / orphan row ──────────────────────────────────────────────────
 
-interface ProductOrOrphanRowProps {
+interface RowSharedProps {
+  selectedItemIds: Set<string>;
+  onToggleItem: (id: string, checked: boolean) => void;
+  showQuantityPrice: boolean;
+  getQty: (id: string) => number;
+  getPrice: (id: string, data: SelectedProduct) => number;
+  setQty: (id: string, quantity: number) => void;
+  setPrice: (id: string, unitPrice: number) => void;
+}
+
+interface ProductOrOrphanRowProps extends RowSharedProps {
   row: ProductGroupRow;
   expanded: boolean;
   autoSelect: boolean;
-  selectedItemIds: Set<string>;
   getProductCheckState: (row: ProductGroupRow) => { checked: boolean; indeterminate: boolean };
   onToggleExpand: (id: string) => void;
   onProductCheckChange: (row: ProductGroupRow, checked: boolean) => void;
-  onToggleItem: (id: string, checked: boolean) => void;
   onVariantsAutoLoaded: (productId: string, variants: ProductVariantRow[]) => void;
+  /** Open the per-group "Nhập nhanh" dialog for this product id. */
+  onGroupQuickEntry: (productId: string) => void;
   variantCache: { current: Map<string, ProductVariantRow[]> };
+  itemDataById: { current: Map<string, SelectedProduct> };
+}
+
+function QtyPriceCells({
+  id,
+  data,
+  selected,
+  getQty,
+  getPrice,
+  setQty,
+  setPrice,
+}: {
+  id: string;
+  data: SelectedProduct;
+  selected: boolean;
+  getQty: (id: string) => number;
+  getPrice: (id: string, data: SelectedProduct) => number;
+  setQty: (id: string, quantity: number) => void;
+  setPrice: (id: string, unitPrice: number) => void;
+}) {
+  if (!selected) {
+    return (
+      <>
+        <td className="px-3 py-1.5" />
+        <td className="px-3 py-1.5" />
+      </>
+    );
+  }
+  return (
+    <>
+      <td className="px-2 py-1.5 text-right">
+        <Input
+          type="number"
+          min={0}
+          value={getQty(id)}
+          onChange={(e) => setQty(id, Number(e.target.value) || 0)}
+          className="h-7 w-20 text-right"
+          aria-label={`Số lượng ${data.sku}`}
+        />
+      </td>
+      <td className="px-2 py-1.5 text-right">
+        <Input
+          type="number"
+          min={0}
+          value={getPrice(id, data)}
+          onChange={(e) => setPrice(id, Number(e.target.value) || 0)}
+          className="h-7 w-28 text-right"
+          aria-label={`Đơn giá ${data.sku}`}
+        />
+      </td>
+    </>
+  );
 }
 
 function ProductOrOrphanRow({
@@ -411,7 +711,14 @@ function ProductOrOrphanRow({
   onProductCheckChange,
   onToggleItem,
   onVariantsAutoLoaded,
+  onGroupQuickEntry,
   variantCache,
+  itemDataById,
+  showQuantityPrice,
+  getQty,
+  getPrice,
+  setQty,
+  setPrice,
 }: ProductOrOrphanRowProps) {
   if (row.type === "orphan") {
     return (
@@ -432,6 +739,17 @@ function ProductOrOrphanRow({
         <td className="px-3 py-2 text-muted-foreground">{row.brand ?? "—"}</td>
         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.purchasePrice)}</td>
         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.sellingPrice)}</td>
+        {showQuantityPrice && (
+          <QtyPriceCells
+            id={row.id}
+            data={orphanToSelected(row)}
+            selected={selectedItemIds.has(row.id)}
+            getQty={getQty}
+            getPrice={getPrice}
+            setQty={setQty}
+            setPrice={setPrice}
+          />
+        )}
       </tr>
     );
   }
@@ -474,6 +792,18 @@ function ProductOrOrphanRow({
         <td className="px-3 py-2 text-muted-foreground font-normal">{row.brand ?? "—"}</td>
         <td className="px-3 py-2 text-right tabular-nums font-normal">{formatMoney(row.purchasePrice)}</td>
         <td className="px-3 py-2 text-right tabular-nums font-normal">{formatMoney(row.sellingPrice)}</td>
+        {showQuantityPrice && (
+          <td colSpan={2} className="px-3 py-2 text-right">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              onClick={() => onGroupQuickEntry(row.id)}
+            >
+              <Zap className="h-3.5 w-3.5" aria-hidden />
+              Nhập nhanh
+            </button>
+          </td>
+        )}
       </tr>
 
       {expanded && (
@@ -484,6 +814,12 @@ function ProductOrOrphanRow({
           onToggleItem={onToggleItem}
           onVariantsAutoLoaded={onVariantsAutoLoaded}
           variantCache={variantCache}
+          itemDataById={itemDataById}
+          showQuantityPrice={showQuantityPrice}
+          getQty={getQty}
+          getPrice={getPrice}
+          setQty={setQty}
+          setPrice={setPrice}
         />
       )}
     </>
@@ -492,13 +828,12 @@ function ProductOrOrphanRow({
 
 // ─── Variant rows (lazy-loaded, writes to cache) ──────────────────────────
 
-interface VariantRowsWithCacheProps {
+interface VariantRowsWithCacheProps extends RowSharedProps {
   productId: string;
   autoSelect: boolean;
-  selectedItemIds: Set<string>;
-  onToggleItem: (id: string, checked: boolean) => void;
   onVariantsAutoLoaded: (productId: string, variants: ProductVariantRow[]) => void;
   variantCache: { current: Map<string, ProductVariantRow[]> };
+  itemDataById: { current: Map<string, SelectedProduct> };
 }
 
 function VariantRowsWithCache({
@@ -508,10 +843,16 @@ function VariantRowsWithCache({
   onToggleItem,
   onVariantsAutoLoaded,
   variantCache,
+  itemDataById,
+  showQuantityPrice,
+  getQty,
+  getPrice,
+  setQty,
+  setPrice,
 }: VariantRowsWithCacheProps) {
   const [page, setPage] = useState(1);
 
-  const query = useInventoryProductItems(
+  const query = useProductVariants(
     { productId, page, pageSize: VARIANT_PAGE_SIZE },
     true,
   );
@@ -526,6 +867,7 @@ function VariantRowsWithCache({
     const merged = [...existing];
     rows.forEach((v, i) => { merged[offset + i] = v; });
     variantCache.current.set(productId, merged.filter(Boolean));
+    rows.forEach((v) => itemDataById.current.set(v.id, variantToSelected(v)));
   }
 
   // Auto-select on first load
@@ -540,7 +882,7 @@ function VariantRowsWithCache({
   if (query.isLoading) {
     return (
       <tr>
-        <td colSpan={9} className="py-2 pl-10 text-xs text-muted-foreground">Đang tải…</td>
+        <td colSpan={showQuantityPrice ? 11 : 9} className="py-2 pl-10 text-xs text-muted-foreground">Đang tải…</td>
       </tr>
     );
   }
@@ -570,12 +912,23 @@ function VariantRowsWithCache({
           <td className="px-3 py-1.5 text-sm text-muted-foreground">{v.brand ?? "—"}</td>
           <td className="px-3 py-1.5 text-right text-sm tabular-nums">{formatMoney(v.purchasePrice)}</td>
           <td className="px-3 py-1.5 text-right text-sm tabular-nums">{formatMoney(v.sellingPrice)}</td>
+          {showQuantityPrice && (
+            <QtyPriceCells
+              id={v.id}
+              data={variantToSelected(v)}
+              selected={selectedItemIds.has(v.id)}
+              getQty={getQty}
+              getPrice={getPrice}
+              setQty={setQty}
+              setPrice={setPrice}
+            />
+          )}
         </tr>
       ))}
 
       {total > VARIANT_PAGE_SIZE && (
         <tr>
-          <td colSpan={9} className="px-10 py-1">
+          <td colSpan={showQuantityPrice ? 11 : 9} className="px-10 py-1">
             <PaginationControls
               page={page}
               pageSize={VARIANT_PAGE_SIZE}

@@ -39,7 +39,16 @@ import { InventoryLocationController } from './inventory-location.controller';
 import { InventoryLocationStockController } from './inventory-location-stock.controller';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 import { InventoryItemV2Controller } from './controllers/inventory-item-v2.controller';
+import { StorageDefaultReceivingController } from './controllers/storage-default-receiving.controller';
+import { ResolveItemLocationsController } from './controllers/resolve-item-locations.controller';
+import { ItemCategoryTreeController } from './controllers/item-category-tree.controller';
+import { ProductGroupSearchController } from './controllers/product-group-search.controller';
 import { SearchInventoryItemsV2Handler } from './queries/search-inventory-items-v2.handler';
+import { ResolveItemLocationsHandler } from './queries/resolve-item-locations.handler';
+import { SearchItemCategoryTreeHandler } from './queries/search-item-category-tree.handler';
+import { SearchProductGroupsHandler } from './queries/search-product-groups.handler';
+import { SetDefaultReceivingWarehouseHandler } from './commands/set-default-receiving-warehouse.handler';
+import { ProductLocationService } from './services/product-location.service';
 import {
   INVENTORY_ITEM_ENTITY_CONFIG,
   INVENTORY_ITEM_SERVICE_TOKEN,
@@ -101,14 +110,27 @@ import { BrandEntity } from "./brand.entity";
     CqrsModule,
   ],
   controllers: [
-    InventoryLocationController,
+    // Stock controller must register before InventoryLocationController so its
+    // static `inventory/locations/preferred-shelf` route is matched ahead of the
+    // dynamic `inventory/locations/:id` route (Express 5 matches in registration
+    // order; inline regex param constraints are unsupported in path-to-regexp v8).
     InventoryLocationStockController,
+    InventoryLocationController,
     InventoryItemV2Controller,
+    StorageDefaultReceivingController,
+    ResolveItemLocationsController,
+    ItemCategoryTreeController,
+    ProductGroupSearchController,
   ],
   providers: [
     InventoryLocationService,
     InventoryLocationStockService,
     SearchInventoryItemsV2Handler,
+    ResolveItemLocationsHandler,
+    SearchItemCategoryTreeHandler,
+    SearchProductGroupsHandler,
+    SetDefaultReceivingWarehouseHandler,
+    ProductLocationService,
     ItemProviderService,
     ItemBarcodeService,
     ItemStockThresholdService,
@@ -155,6 +177,7 @@ import { BrandEntity } from "./brand.entity";
     ItemBarcodeService,
     ItemStockThresholdService,
     InventoryItemCrudService,
+    ProductLocationService,
   ],
 })
 export class InventoryLocationModule implements OnModuleInit {

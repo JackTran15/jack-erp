@@ -11,6 +11,7 @@ import {
   GoodsReceiptStatus,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
+  DocCounterpartyKind,
 } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
@@ -38,6 +39,24 @@ export class GoodsReceiptEntity extends BaseEntity {
 
   @Column({ name: 'provider_id', type: 'uuid', nullable: true })
   providerId?: string;
+
+  @Column({
+    name: 'counterparty_kind',
+    type: 'enum',
+    enum: DocCounterpartyKind,
+    enumName: 'doc_counterparty_kind_enum',
+    nullable: true,
+    comment: 'Đối tượng kind for v2 receipts: supplier (NCC) or customer (KH)',
+  })
+  counterpartyKind?: DocCounterpartyKind | null;
+
+  @Column({
+    name: 'counterparty_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Id of the provider or customer, per counterpartyKind',
+  })
+  counterpartyId?: string | null;
 
   @Column({ name: 'delivered_by', length: 200, nullable: true })
   deliveredBy?: string;

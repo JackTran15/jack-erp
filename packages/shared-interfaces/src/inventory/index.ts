@@ -99,6 +99,8 @@ export type {
 } from "./stock-by-location";
 
 export * from "./import-excel";
+export * from "./item-labels";
+export * from "./counterparty-kind";
 
 export enum ImportJobStatus {
   PENDING = "PENDING",

@@ -979,3 +979,226 @@ flowchart LR
   T1 --> T3["TKT-BAR-03 FE auto-add wiring"]
 ```
 
+## EPIC-18062026 Warehouse & Inventory Overhaul (4 epics)
+
+Bộ 4 epic làm mới nghiệp vụ kho theo CQRS, **toàn bộ UI ở backoffice-web**. Quyết định nền: vị trí giữ **cấp variant** + ràng buộc "mọi variant cùng mẫu mã nằm 1 vị trí" (enforce ở command); kho có cờ **`isDefaultReceiving`** riêng (1/chi nhánh) tách khỏi showroom `isMainStorage` (không xoá được); **API mới hoàn toàn** (command + query CQRS), endpoint cũ giữ nguyên. Đối tượng tìm kiếm = **NCC + KH + Nhân viên**; dialog nhóm hàng trả **cây** (Nhóm hàng → Mẫu mã → Variant).
+
+### Epic dependency graph (warehouse overhaul)
+
+```mermaid
+flowchart LR
+  A["EPIC-A Inventory Foundation"] --> B["EPIC-B Chuyển kho v2"]
+  A --> C["EPIC-C Nhập kho v2"]
+  A --> D["EPIC-D Xuất kho v2"]
+  C -.mirror.-> D
+```
+
+### EPIC-18062026 Inventory Foundation (schema + query/command + component dùng chung)
+
+- [EPIC-18062026 Inventory Foundation](./epics/EPIC-18062026-inventory-foundation.md)
+- Nền tảng dùng chung: nhóm hàng phân cấp (feature 1), kho nhập hàng mặc định + chặn xoá showroom + đổi nhãn (feature 2), query resolve vị trí theo list variant (feature 8/9/11), component tìm đối tượng (feature 8/9), dialog tìm hàng theo nhóm (feature 8/9/11), chuẩn hoá nhãn SKU/Mẫu mã/Hàng hoá (feature 15).
+
+| Ticket                                                                       | Mô tả                                                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [TKT-FND-01](./tickets/TKT-FND-01-category-hierarchy-tree-query.md)          | Nhóm hàng phân cấp (map `parent_group_id`) + query cây cha→con               |
+| [TKT-FND-02](./tickets/TKT-FND-02-default-receiving-warehouse.md)            | Cờ `isDefaultReceiving` (1/branch) + chặn xoá showroom + đổi nhãn            |
+| [TKT-FND-03](./tickets/TKT-FND-03-resolve-item-locations-query.md)           | ProductLocationService (product-uniform) + ResolveItemLocations query        |
+| [TKT-FND-04](./tickets/TKT-FND-04-counterparty-search-shared.md)             | SearchCounterparties (NCC+KH+NV) + dialog dùng chung                          |
+| [TKT-FND-05](./tickets/TKT-FND-05-product-group-search-shared.md)            | SearchProductGroups (cây) + dialog collapse multi-select                      |
+| [TKT-FND-06](./tickets/TKT-FND-06-sku-naming-relabel.md)                     | Chuẩn hoá nhãn SKU / Mẫu mã / Hàng hoá                                        |
+
+```mermaid
+flowchart LR
+  F2["FND-02 Default WH"] --> F3["FND-03 Resolve locations"]
+  F1["FND-01 Category tree"] --> F5["FND-05 Product-group dialog"]
+  F6["FND-06 SKU relabel"] --> F5
+  F4["FND-04 Counterparty search"]
+```
+
+### EPIC-18062026 Chuyển kho v2 (feature 11)
+
+- [EPIC-18062026 Chuyển kho v2](./epics/EPIC-18062026-stock-transfer-v2.md)
+- Backoffice: chọn kho nguồn/đích, quét mã vạch, autofill vị trí xuất theo hàng hoá (fallback kho mặc định), dialog chọn hàng theo nhóm. Tạo/post qua command CQRS v2; endpoint cũ giữ nguyên.
+
+| Ticket                                                                  | Mô tả                                                            |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [TKT-STX-01](./tickets/TKT-STX-01-be-stock-transfer-v2-commands.md)     | BE: Create/Post StockTransfer v2 (CQRS command) + events         |
+| [TKT-STX-02](./tickets/TKT-STX-02-fe-stock-transfer-backoffice.md)      | FE: trang Chuyển kho backoffice (scan, autofill, dialog nhóm)    |
+| [TKT-STX-03](./tickets/TKT-STX-03-tests-e2e-dod.md)                     | E2E + tests + DoD                                                |
+
+```mermaid
+flowchart LR
+  A["EPIC-A Foundation"] --> S1["STX-01 BE commands"]
+  S1 --> S2["STX-02 FE page"]
+  S1 --> S3["STX-03 E2E"]
+  S2 --> S3
+```
+
+### EPIC-18062026 Nhập kho v2 (feature 8)
+
+- [EPIC-18062026 Nhập kho v2](./epics/EPIC-18062026-goods-receipt-v2.md)
+- Backoffice: đối tượng NCC & KH (tìm nâng cao), chọn hàng theo nhóm/mẫu mã (multi-select), autofill Kho/Vị trí theo chi nhánh, bảng dòng hàng min-width. Tạo/post qua command CQRS v2.
+
+| Ticket                                                                  | Mô tả                                                                 |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [TKT-GRV-01](./tickets/TKT-GRV-01-be-goods-receipt-v2-commands.md)      | BE: Create/Post GoodsReceipt v2 (CQRS) + cột đối tượng + events        |
+| [TKT-GRV-02](./tickets/TKT-GRV-02-fe-goods-receipt-backoffice.md)       | FE: trang Nhập kho backoffice (đối tượng, nhóm hàng, autofill, min-width) |
+| [TKT-GRV-03](./tickets/TKT-GRV-03-tests-e2e-dod.md)                     | E2E + tests + DoD                                                      |
+
+```mermaid
+flowchart LR
+  A["EPIC-A Foundation"] --> G1["GRV-01 BE commands"]
+  G1 --> G2["GRV-02 FE page"]
+  G1 --> G3["GRV-03 E2E"]
+  G2 --> G3
+```
+
+### EPIC-18062026 Xuất kho v2 (feature 9)
+
+- [EPIC-18062026 Xuất kho v2](./epics/EPIC-18062026-goods-issue-v2.md)
+- Backoffice: mirror Nhập kho — đối tượng NCC & KH, chọn hàng theo nhóm/mẫu mã, autofill vị trí xuất theo chi nhánh, min-width. Tạo/post qua command CQRS v2 (ledger GOODS_ISSUE + giá vốn bình quân).
+
+| Ticket                                                                | Mô tả                                                          |
+| --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [TKT-GIV-01](./tickets/TKT-GIV-01-be-goods-issue-v2-commands.md)      | BE: Create/Post GoodsIssue v2 (CQRS) + cột đối tượng + events    |
+| [TKT-GIV-02](./tickets/TKT-GIV-02-fe-goods-issue-backoffice.md)       | FE: trang Xuất kho backoffice (mirror Nhập kho)                  |
+| [TKT-GIV-03](./tickets/TKT-GIV-03-tests-e2e-dod.md)                   | E2E + tests + DoD                                               |
+
+```mermaid
+flowchart LR
+  A["EPIC-A Foundation"] --> I1["GIV-01 BE commands"]
+  C["EPIC-C GRV-01"] -.mirror.-> I1
+  I1 --> I2["GIV-02 FE page"]
+  I1 --> I3["GIV-03 E2E"]
+  I2 --> I3
+```
+
+### EPIC-19062026 Dialog chọn hàng (multi-select + Nhập nhanh) + gỡ trang v2
+
+- [EPIC-19062026 Inventory line product picker](./epics/EPIC-19062026-inventory-line-product-picker.md)
+- FE-only. Đưa dialog chọn hàng theo nhóm (multi-select, layout #3/#4, có **Nhập nhanh** Số lượng+Đơn giá) vào **3 trang v1** Nhập/Xuất/Chuyển kho qua **icon search trên từng dòng**; chọn N hàng → thêm N dòng. Tổng quát hoá `InventoryExportSelectDialog` → `ProductSelectDialog` dùng chung (dùng lại `GET /inventory/items/products(/{id}/items)`, không thêm BE). **Gỡ 3 trang `*-v2`** (route+nav), giữ backend v2. Supersedes phần FE của các epic Nhập/Xuất/Chuyển kho v2.
+
+| Ticket                                                                       | Mô tả                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [TKT-ILP-01](./tickets/TKT-ILP-01-extract-product-select-dialog.md)          | Trích & tổng quát hoá `ProductSelectDialog` (từ InventoryExportSelectDialog) |
+| [TKT-ILP-02](./tickets/TKT-ILP-02-quantity-price-quick-entry.md)             | Thêm cột Số lượng/Đơn giá + "Nhập nhanh"                            |
+| [TKT-ILP-03](./tickets/TKT-ILP-03-integrate-goods-receipt.md)                | Tích hợp vào Nhập kho (PurchaseOrdersPage)                          |
+| [TKT-ILP-04](./tickets/TKT-ILP-04-integrate-goods-issue.md)                  | Tích hợp vào Xuất kho (GoodsIssuePage)                              |
+| [TKT-ILP-05](./tickets/TKT-ILP-05-integrate-stock-transfer.md)               | Tích hợp vào Chuyển kho (StockTransferPage)                         |
+| [TKT-ILP-06](./tickets/TKT-ILP-06-remove-v2-pages.md)                        | Gỡ 3 trang v2 (FE) + cleanup component mồ côi                        |
+
+```mermaid
+flowchart LR
+  T1["ILP-01 Extract dialog"] --> T2["ILP-02 Qty/Price + Nhập nhanh"]
+  T2 --> T3["ILP-03 Nhập kho"]
+  T2 --> T4["ILP-04 Xuất kho"]
+  T2 --> T5["ILP-05 Chuyển kho"]
+  T3 --> T6["ILP-06 Gỡ trang v2"]
+  T4 --> T6
+  T5 --> T6
+```
+
+### EPIC-21062026 ProductSelectDialog single-fill — thay modal "Chọn hàng hóa" cũ
+
+- [EPIC-21062026 Product picker single-fill](./epics/EPIC-21062026-product-picker-single-fill.md)
+- FE-only, **follow-up/hoàn tất EPIC-19062026**: ô SKU sản phẩm vẫn còn modal cũ `LookupSearchModal` ("Chọn hàng hóa", chọn-1) vì EPIC-19062026 chỉ thêm dialog multi vào nút riêng mà **chưa gỡ modal cũ**. Thêm `selectionMode="single"` cho `ProductSelectDialog`, dùng prop `onSearchButtonClick` (đã có sẵn trong `LookupField`) để nút full-search/dòng mở dialog single điền **đúng dòng đang sửa**. Áp dụng **cả 5 trang** line-editor (Nhập/Xuất/Chuyển kho + Lệnh chuyển + Kiểm kê); giữ nút multi nơi đã có. **Giữ nguyên** `LookupSearchModal`/`enableSearchModal` — chúng còn dùng cho các lookup khác (kho/vị trí/đối tượng/…). Không đổi backend.
+
+| Ticket                                                                          | Mô tả                                                                |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [TKT-PSF-01](./tickets/TKT-PSF-01-product-select-single-mode.md)                | `ProductSelectDialog`: thêm `selectionMode="single"` + fix default title |
+| [TKT-PSF-02](./tickets/TKT-PSF-02-lookupfield-delegate-search.md)               | `LookupField`: dùng `onSearchButtonClick` (đã có sẵn) cho ô SKU sản phẩm |
+| [TKT-PSF-03](./tickets/TKT-PSF-03-integrate-existing-pages.md)                  | Single-fill 3 trang đã có dialog (Nhập/Xuất/Chuyển kho)             |
+| [TKT-PSF-04](./tickets/TKT-PSF-04-integrate-remaining-pages.md)                 | Single-fill 2 trang còn lại (Lệnh chuyển/Kiểm kê)                   |
+| [TKT-PSF-05](./tickets/TKT-PSF-05-remove-lookup-search-modal.md)                | Verify product pickers migrated + build (LookupSearchModal giữ nguyên) |
+
+```mermaid
+flowchart LR
+  P1["PSF-01 Dialog single mode"] --> P3["PSF-03 3 trang đã có"]
+  P1 --> P4["PSF-04 2 trang còn lại"]
+  P2["PSF-02 LookupField delegate"] --> P3
+  P2 --> P4
+  P3 --> P5["PSF-05 Verify + build"]
+  P4 --> P5
+```
+
+### EPIC-21062026 ProductSelectDialog: per-row multi + "Nhập nhanh" theo nhóm
+
+- [EPIC-21062026 Product picker multi + per-group quick-entry](./epics/EPIC-21062026-product-picker-multi-quick-entry.md)
+- FE-only, **supersede per-row single-fill** của EPIC-21062026-single-fill: nút search ô SKU/dòng đổi từ single-fill sang `ProductSelectDialog` **multi** đầy đủ (group checkbox chọn cả variant, header select-all/trang, cột Số lượng/Đơn giá, thêm N dòng). **Mới:** mỗi nhóm có link "Nhập nhanh" áp Số lượng/Đơn giá cho **các variant đã chọn trong nhóm** (ref ảnh #5). Áp cho cả 5 trang (2 trang Lệnh chuyển/Kiểm kê thêm mapper multi). Gỡ code `selectionMode`/`isSingle`. Không đổi backend.
+
+| Ticket                                                              | Mô tả                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [TKT-PMP-01](./tickets/TKT-PMP-01-per-group-quick-entry.md)        | Per-group "Nhập nhanh" (áp variant đã chọn trong nhóm) + title cấu hình |
+| [TKT-PMP-02](./tickets/TKT-PMP-02-existing-pages-multi.md)         | 3 trang: per-row search → multi, gỡ single-fill                     |
+| [TKT-PMP-03](./tickets/TKT-PMP-03-remaining-pages-multi.md)        | 2 trang còn lại: thêm dialog multi + addLinesFromPicker             |
+| [TKT-PMP-04](./tickets/TKT-PMP-04-remove-single-mode.md)           | Gỡ dead `selectionMode`/`isSingle` + verify build                   |
+
+```mermaid
+flowchart LR
+  M1["PMP-01 Per-group Nhập nhanh"] --> M2["PMP-02 3 trang multi"]
+  M1 --> M3["PMP-03 2 trang multi"]
+  M2 --> M4["PMP-04 Gỡ single-mode + verify"]
+  M3 --> M4
+```
+
+### EPIC-21062026 Warehouse Code Auto-Generation + Branch Showroom Flow
+
+- [EPIC-21062026 Warehouse code auto-gen + branch showroom flow](./epics/EPIC-21062026-warehouse-code-autogen.md)
+- Mã kho (`storages.code`) → **chỉ hiển thị, không sửa**; tự sinh qua `DocumentNumberingService` (prefix `WH`, 6 chữ số, liên tục — `WH000001`) ở mọi creation path (CRUD form + endpoint chuyên dụng + branch flow). Luồng tạo chi nhánh: showroom storage có **mã WH** + **`isDefaultReceiving=true`**. Migration tay backfill mã cho storage cũ `code IS NULL` + đẩy counter `WAREHOUSE` lên high-water mark. Reuse pattern auto-code của nhà cung cấp NCC (`provider-crud.service.ts`).
+
+| Ticket                                                              | Mô tả                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [TKT-WHC-01](./tickets/TKT-WHC-01-warehouse-document-type.md)      | `DocumentType.WAREHOUSE` + `DEFAULT_DOC_NUMBER_CONFIG` (prefix WH)  |
+| [TKT-WHC-02](./tickets/TKT-WHC-02-storage-code-autogen.md)         | Auto-gen mã kho (CRUD + endpoint) + `code` thành `readOnly` (BE)    |
+| [TKT-WHC-03](./tickets/TKT-WHC-03-branch-showroom-flow.md)         | Branch flow: showroom WH-code + `isDefaultReceiving=true`           |
+| [TKT-WHC-04](./tickets/TKT-WHC-04-backfill-migration.md)           | Migration backfill mã kho NULL + seed counter high-water           |
+| [TKT-WHC-05](./tickets/TKT-WHC-05-openapi-regen.md)                | `openapi:generate` + commit api-client snapshot                    |
+| [TKT-WHC-06](./tickets/TKT-WHC-06-fe-readonly-code.md)             | FE: Mã kho read-only trong form Kho lưu trữ (create/edit)          |
+
+```mermaid
+flowchart LR
+  W1["WHC-01 DocumentType.WAREHOUSE"] --> W2["WHC-02 Auto-gen code BE"]
+  W1 --> W3["WHC-03 Branch showroom flow"]
+  W1 --> W4["WHC-04 Backfill migration"]
+  W1 --> W5["WHC-05 openapi regen"]
+  W2 --> W5
+  W2 --> W6["WHC-06 FE read-only code"]
+  W5 --> W6
+```
+
+### EPIC-21062026 LineItemGrid Column Min-Width + Horizontal Scroll
+
+- [EPIC-21062026 LineItemGrid min-width + scroll ngang](./epics/EPIC-21062026-line-item-grid-min-width.md)
+- Bảng CHI TIẾT (line items) dùng chung `LineItemGrid` (`@erp/ui`) đang **chật chội/cắt chữ** vì cột chỉ có `width` (gợi ý, bị nén) mà không có sàn `minWidth`. Thêm `minWidth` opt-in cho `LineColumn`/`LineItemGrid` để cột không nén và bảng **scroll ngang** khi vượt container. **Pilot trên Nhập kho** với bộ tuned (SKU 360 · Tên 280 · Kho 220 · Vị trí 220 · ĐVT 100 · SL 110 · Đơn giá 140 · Thành tiền 150 · Ghi chú 200); roll-out Xuất/Chuyển kho ở phase sau. Frontend-only — không đụng data model/migration/event/API.
+
+| Ticket                                                          | Mô tả                                                              |
+| -------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [TKT-LIG-01](./tickets/TKT-LIG-01-grid-min-width-support.md)   | `LineItemGrid`: thêm `minWidth` + scroll ngang (@erp/ui)          |
+| [TKT-LIG-02](./tickets/TKT-LIG-02-goods-receipt-apply.md)      | Nhập kho (pilot): áp min-width tuned cho `lineColumns`            |
+| [TKT-LIG-03](./tickets/TKT-LIG-03-rollout-issue-transfer.md)   | Roll-out Xuất kho + Chuyển Kho (deferred, sau khi pilot duyệt)    |
+
+```mermaid
+flowchart LR
+  L1["LIG-01 Grid minWidth + scroll"] --> L2["LIG-02 Nhập kho pilot"]
+  L2 -. "sau khi duyệt pilot" .-> L3["LIG-03 Roll-out Xuất/Chuyển kho"]
+```
+
+### EPIC-21062026 Counterparty picker redesign — type filter + richer columns
+
+- [EPIC-21062026 Counterparty picker redesign](./epics/EPIC-21062026-counterparty-picker-redesign.md)
+- Redesign dialog "Chọn đối tượng" cho khớp UI tham chiếu: thêm **dropdown "Loại đối tượng"** (Nhà cung cấp / Khách hàng / Nhân viên) + cột (Mã · Tên · Loại · Điện thoại · Địa chỉ), dùng endpoint CQRS có sẵn `POST /v2/counterparties/search`. Vẫn **single-select** ("chọn nhiều" = chọn *loại* để tìm, không phải multi-row). **Bỏ "Đối tác giao hàng"** (không có entity riêng — chỉ là provider theo prefix `DTGH-`), **không migration**. Backend đã có sẵn → chỉ regen OpenAPI + check permission. Migrate 2 picker: Nhập kho, Xuất kho. **Treasury để nguyên** (`VoucherEntitySearchModal` đã đúng UI này trên endpoint `/cash-vouchers/partners`). Frontend-only.
+
+| Ticket                                                                       | Mô tả                                                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-CPP-01](./tickets/TKT-CPP-01-backend-counterparty-search-openapi.md)    | BE: finalize `/v2/counterparties/search` + regen OpenAPI + check permission    |
+| [TKT-CPP-02](./tickets/TKT-CPP-02-fe-counterparty-picker-dialog.md)          | FE: `CounterpartyPickerField/Modal` + hook `useCounterpartySearch`             |
+| [TKT-CPP-03](./tickets/TKT-CPP-03-fe-migrate-consumers.md)                   | FE: migrate Nhập kho / Xuất kho sang picker mới                                |
+| [TKT-CPP-04](./tickets/TKT-CPP-04-fe-inline-all-types.md)                    | FE: inline type-ahead search tất cả loại (mixed NCC/KH/NV)                     |
+
+```mermaid
+flowchart LR
+  C1["CPP-01 BE endpoint + OpenAPI"] --> C2["CPP-02 Picker dialog + hook"]
+  C2 --> C3["CPP-03 Migrate 2 consumers"]
+  C3 --> C4["CPP-04 Inline all-types search"]
+```
+

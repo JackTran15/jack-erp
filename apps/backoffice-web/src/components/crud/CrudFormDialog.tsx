@@ -5,6 +5,7 @@ import { HelpCircle, Save, X } from "lucide-react";
 import { apiClient } from "../../lib/api-axios";
 import { formatCrudEnumOption } from "../../lib/crud-display";
 import { SearchListingInput } from "../forms/SearchListingInput";
+import { TreeSelectInput } from "../forms/TreeSelectInput";
 
 type SearchSelection = {
   id: string;
@@ -376,6 +377,7 @@ export function CrudFormDialog({
             field={f}
             value={values[f.key]}
             error={errors[f.key]}
+            currentRecordId={isEdit ? String(record?.[config.idField] ?? "") : undefined}
             onChange={(v) => handleChange(f.key, v)}
           />
         ))}
@@ -389,12 +391,15 @@ function FieldInput({
   field,
   value,
   error,
+  currentRecordId,
   onChange,
 }: {
   entityKey: string;
   field: FieldDefinition;
   value: unknown;
   error?: string;
+  /** Current record's id — excludes self (and descendants) from relation tree pickers. */
+  currentRecordId?: string;
   onChange: (v: unknown) => void;
 }) {
   const id = `field-${field.key}`;
@@ -462,6 +467,21 @@ function FieldInput({
           renderMeta={searchConfig.renderMeta}
           placeholder={searchConfig.placeholder}
           required={field.required}
+        />
+      </FieldRow>
+    );
+  }
+
+  if (field.type === "relation" && field.relationEntity) {
+    return (
+      <FieldRow label={field.label} required={field.required} error={error}>
+        <TreeSelectInput
+          inputId={id}
+          value={typeof value === "string" ? value : ""}
+          onChange={(selectedId) => onChange(selectedId || undefined)}
+          entityKey={field.relationEntity}
+          excludeId={currentRecordId}
+          placeholder={`Tìm ${field.label.toLowerCase()}…`}
         />
       </FieldRow>
     );
