@@ -11,10 +11,12 @@ import {
   PaginationQuery,
   PaginatedResponse,
   LocationType,
+  DocumentType,
 } from '@erp/shared-interfaces';
 import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { BranchService } from '../../branch/branch.service';
+import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { ItemEntity } from './item.entity';
 import { ItemCategoryEntity } from './item-category.entity';
 import { BrandEntity } from './brand.entity';
@@ -63,6 +65,7 @@ export class InventoryLocationService {
     @InjectRepository(StorageManagerAssignmentEntity)
     private readonly assignmentRepo: Repository<StorageManagerAssignmentEntity>,
     private readonly branchService: BranchService,
+    private readonly docNumbering: DocumentNumberingService,
   ) {}
 
   // ─── Items ───────────────────────────────────────────────────────────
@@ -442,10 +445,19 @@ export class InventoryLocationService {
       );
     }
 
+    // Generate the warehouse code outside the storage transaction: the
+    // numbering service runs its own SERIALIZABLE counter transaction.
+    const code = await this.docNumbering.generate(
+      DocumentType.WAREHOUSE,
+      dto.branchId,
+      actor,
+    );
+
     return this.storageRepo.manager.transaction(async (manager) => {
       const storage = await manager.save(
         manager.create(StorageEntity, {
           name: dto.name,
+          code,
           branchId: dto.branchId,
           isMainStorage: dto.isMainStorage ?? false,
           organizationId: actor.organizationId,

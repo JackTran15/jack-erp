@@ -56,6 +56,10 @@ import {
   getPersistableLines,
 } from "../inventory-line-normalization";
 import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -729,6 +733,7 @@ function TransferFormDialog({
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
@@ -968,12 +973,60 @@ function TransferFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
+  // Multi-select product picker → append one line per chosen item (dedupe by itemId),
+  // pre-filling Số lượng/Đơn giá from the dialog and the source warehouse from the default.
+  const addLinesFromPicker = (result: ProductSelectResult) => {
+    const existing = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const sourceStorageId = defaultStorage?.id ?? "";
+    const sourceStorageLabel = defaultStorage?.name ?? "";
+    const fresh: FormLine[] = result.lines
+      .filter((s) => s.itemId && !existing.has(s.itemId))
+      .map((s) => ({
+        ...emptyLine(),
+        itemId: s.itemId,
+        itemLabel: s.sku,
+        itemName: s.name,
+        unit: s.unit,
+        sourceStorageId,
+        sourceStorageLabel,
+        quantity: s.quantity > 0 ? s.quantity : 1,
+        unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : "",
+      }));
+    if (fresh.length === 0) return;
+    const base = getPersistableFormLines(lines);
+    setLines(normalizeLines([...base, ...fresh]));
+    markDirty();
+  };
+
+  // Fill the line at `idx` from a selected item — shared by the inline
+  // typeahead (onSelect) and the single-fill ProductSelectDialog.
+  const fillLineFromItem = (
+    idx: number,
+    item: { id: string; code: string; name: string; unit: string },
+  ) => {
+    setLines((prev) =>
+      prev.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              itemId: item.id,
+              itemLabel: item.code,
+              itemName: item.name,
+              unit: item.unit,
+            }
+          : l,
+      ),
+    );
+    markDirty();
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 180,
+      width: 360,
       renderEditor: (row, idx) => (
+        <div className="flex h-full items-center gap-1">
         <LookupField
           placeholder="Tìm mã/tên"
           value={row.itemLabel}
@@ -985,26 +1038,9 @@ function TransferFormDialog({
             );
             markDirty();
           }}
-          onSelect={(item) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      itemName: item.name,
-                      unit: item.unit,
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
-          enableSearchModal
-          searchModalTitle="Chọn mặt hàng"
-          searchModalPlaceholder="Nhập mã hoặc tên mặt hàng"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           itemKey={(it) => it.id}
           renderItem={(it) => it.name}
           renderMeta={(it) => `${it.code} · ${it.unit}`}
@@ -1014,21 +1050,22 @@ function TransferFormDialog({
             { key: "unit", label: "ĐVT", className: "w-[60px]", render: (it) => it.unit },
           ]}
           disabled={isView}
-          className="h-full"
+          className="h-full flex-1"
         />
+        </div>
       ),
     },
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 200,
+      width: 280,
       type: "readonly",
       getValue: (r) => r.itemName,
     },
     {
       key: "sourceStorageLabel",
       label: "Kho xuất",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Chọn kho"
@@ -1076,7 +1113,7 @@ function TransferFormDialog({
     {
       key: "sourceLocationLabel",
       label: "Vị trí xuất",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Mặc định"
@@ -1120,7 +1157,7 @@ function TransferFormDialog({
     {
       key: "destStorageLabel",
       label: "Kho nhập",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Chọn kho"
@@ -1167,7 +1204,7 @@ function TransferFormDialog({
     {
       key: "destLocationLabel",
       label: "Vị trí nhập",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Mặc định"
@@ -1208,11 +1245,11 @@ function TransferFormDialog({
         />
       ),
     },
-    { key: "unit", label: "ĐVT", width: 70, type: "readonly", getValue: (r) => r.unit || "—" },
+    { key: "unit", label: "ĐVT", width: 100, type: "readonly", getValue: (r) => r.unit || "—" },
     {
       key: "quantity",
       label: "Số lượng",
-      width: 100,
+      width: 110,
       type: "number",
       align: "right",
       filterSymbol: "≤",
@@ -1220,7 +1257,7 @@ function TransferFormDialog({
     {
       key: "unitPrice",
       label: "Đơn giá",
-      width: 120,
+      width: 140,
       align: "right",
       renderEditor: (row, idx) => (
         <Input
@@ -1243,12 +1280,12 @@ function TransferFormDialog({
     {
       key: "lineValue",
       label: "Thành tiền",
-      width: 130,
+      width: 150,
       type: "readonly",
       align: "right",
       getValue: (r) => (r.itemId ? formatMoneyInteger(lineAmount(r)) : ""),
     },
-    { key: "notes", label: "Ghi chú", width: 160 },
+    { key: "notes", label: "Ghi chú", width: 200 },
   ];
 
   return (
@@ -1432,6 +1469,16 @@ function TransferFormDialog({
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
       />
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          showQuantityPrice
+          defaultUnitPriceSource="none"
+          onConfirm={addLinesFromPicker}
+        />
+      )}
 
       <DocumentLineImportDialog
         open={importOpen}

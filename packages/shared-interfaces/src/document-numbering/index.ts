@@ -26,6 +26,7 @@ export enum DocumentType {
   CUSTOMER = 'CUSTOMER', // KH
   SUPPLIER = 'SUPPLIER', // NCC
   DELIVERY_PARTNER = 'DELIVERY_PARTNER', // DTGH
+  WAREHOUSE = 'WAREHOUSE', // WH
 }
 
 export interface DocumentNumberRule {

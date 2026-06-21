@@ -37,6 +37,10 @@ import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { StockByLocationResponseDto } from './dto/stock-by-location.response.dto';
 import { ArrangeLocationDto } from './dto/arrange-location.dto';
 import { PreferredShelfResponseDto } from './dto/preferred-shelf.response.dto';
+import {
+  BatchPreferredShelfRequestDto,
+  BatchPreferredShelfResponseDto,
+} from './dto/batch-preferred-shelf.dto';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 
 class AddItemToLocationDto {
@@ -90,6 +94,23 @@ export class InventoryLocationStockController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getPreferredShelf(itemId, storageId, actor);
+  }
+
+  @Post('preferred-shelf/batch')
+  @HttpCode(200)
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Resolve preferred shelves for many (itemId, storageId) pairs in one request',
+  })
+  @ApiResponse({ status: 200, type: BatchPreferredShelfResponseDto })
+  async batchPreferredShelf(
+    @Body() dto: BatchPreferredShelfRequestDto,
+    @Actor() actor: ActorContext,
+  ): Promise<BatchPreferredShelfResponseDto> {
+    const data = await this.service.getPreferredShelfBatch(dto.pairs, actor);
+    return { data };
   }
 
   @Get(':locationId/stock-items')

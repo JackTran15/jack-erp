@@ -1,4 +1,4 @@
-import { Entity, Column, Unique } from 'typeorm';
+import { Entity, Column, Unique, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 
 export enum ItemCategoryStatus {
@@ -27,4 +27,16 @@ export class ItemCategoryEntity extends BaseEntity {
     comment: 'Business status of the category in catalogs',
   })
   status: ItemCategoryStatus;
+
+  @Column({
+    name: 'parent_group_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Self-FK to the parent category; null for a root group',
+  })
+  parentGroupId?: string | null;
+
+  @ManyToOne(() => ItemCategoryEntity, { nullable: true })
+  @JoinColumn({ name: 'parent_group_id' })
+  parent?: ItemCategoryEntity;
 }

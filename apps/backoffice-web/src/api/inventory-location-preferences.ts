@@ -6,13 +6,24 @@ export interface PreferredShelf {
   name: string;
 }
 
-export async function getPreferredShelf(
-  itemId: string,
-  storageId: string,
-): Promise<PreferredShelf | null> {
-  return requireErpData<PreferredShelf | null>(
-    await erpApi.GET("/inventory/locations/preferred-shelf", {
-      params: { query: { itemId, storageId } },
+export interface PreferredShelfPair {
+  itemId: string;
+  storageId: string;
+}
+
+export interface PreferredShelfBatchRow {
+  itemId: string;
+  storageId: string;
+  shelf: PreferredShelf | null;
+}
+
+export async function getPreferredShelfBatch(
+  pairs: PreferredShelfPair[],
+): Promise<PreferredShelfBatchRow[]> {
+  const { data } = requireErpData<{ data: PreferredShelfBatchRow[] }>(
+    await erpApi.POST("/inventory/locations/preferred-shelf/batch", {
+      body: { pairs },
     }),
   );
+  return data;
 }

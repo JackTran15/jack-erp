@@ -15,6 +15,7 @@ import { ExcelParserService } from './excel-parser.service';
 import { ExcelImportItemService } from './excel-import-item.service';
 import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
 import { ExcelImportGoodsReceiptService } from './excel-import-goods-receipt.service';
+import { ExcelImportDocumentLinesService } from './excel-import-document-lines.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 
 describe('CsvImportService.cancelJob', () => {
@@ -52,6 +53,7 @@ describe('CsvImportService.cancelJob', () => {
         { provide: ExcelImportItemService, useValue: {} },
         { provide: ExcelImportStockTakeService, useValue: {} },
         { provide: ExcelImportGoodsReceiptService, useValue: {} },
+        { provide: ExcelImportDocumentLinesService, useValue: {} },
         {
           provide: InventoryImportWorkbookService,
           useValue: { buildItemsWorkbookBuffer: jest.fn() },

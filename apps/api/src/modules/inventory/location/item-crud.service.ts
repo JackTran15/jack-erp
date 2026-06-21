@@ -132,6 +132,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       return {
         ...rest,
         categoryName: category?.name ?? '',
+        productCode: product?.code ?? '',
         productName: product?.name ?? '',
         variantLabel: row.variantLabel ?? '',
       };
@@ -1421,7 +1422,8 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'categoryId', label: 'ID Danh mục', type: 'string', hideInList: true },
     { key: 'description', label: 'Mô tả', type: 'string', hideInList: true },
     { key: 'productId', label: 'ID Sản phẩm', type: 'string', hideInList: true },
-    { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true, hideInList: true },
+    { key: 'productCode', label: 'Mã SKU mẫu mã', type: 'string', readOnly: true, hideInList: true },
+    { key: 'productName', label: 'Tên mẫu mã', type: 'string', readOnly: true, hideInList: true },
     { key: 'colors', label: 'Màu sắc', type: 'tags', hideInList: true },
     { key: 'sizes', label: 'Size', type: 'tags', hideInList: true },
     { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true, hideInList: true },

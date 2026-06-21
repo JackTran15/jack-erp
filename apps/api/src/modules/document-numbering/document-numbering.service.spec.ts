@@ -169,6 +169,38 @@ describe('DocumentNumberingService', () => {
         service.generate(DocumentType.INVOICE, undefined, actor),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('auto-creates a continuous WAREHOUSE rule and formats as WHxxxxxx', async () => {
+      // No rule yet -> ensureDefaultActiveRule builds one from the WAREHOUSE config.
+      ruleRepo.findOne.mockResolvedValue(null);
+
+      const mockCounterRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((dto: any) => ({ id: 'counter-wh', ...dto })),
+        save: jest.fn((entity: any) => Promise.resolve(entity)),
+      };
+      dataSource.transaction.mockImplementation(
+        async (_isolation: string, work: (manager: any) => Promise<any>) =>
+          work({ getRepository: () => mockCounterRepo }),
+      );
+
+      const result = await service.generate(
+        DocumentType.WAREHOUSE,
+        undefined,
+        actor,
+      );
+
+      expect(result).toBe('WH000001');
+      expect(ruleRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentType: DocumentType.WAREHOUSE,
+          prefix: 'WH',
+          includeDate: false,
+          sequenceLength: 6,
+          resetPolicy: ResetPolicy.NEVER,
+        }),
+      );
+    });
   });
 
   // =========================================================================

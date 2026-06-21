@@ -38,6 +38,10 @@ import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
 import { LocationEntity } from './location.entity';
 import { StockByLocationQueryDto } from './dto/stock-by-location.query.dto';
 import { ArrangeLocationDto } from './dto/arrange-location.dto';
+import {
+  BatchPreferredShelfRowDto,
+  PreferredShelfPairDto,
+} from './dto/batch-preferred-shelf.dto';
 import { BatchAssignItemsDto } from './inventory-location-stock.controller';
 import { InventoryLocationService } from './inventory-location.service';
 
@@ -589,6 +593,7 @@ export class InventoryLocationStockService {
     const item = await this.dataSource.getRepository(ItemEntity).findOne({
       where: { id: itemId, organizationId: actor.organizationId },
     });
+
     if (!item) return null;
 
     const psls = await this.pslService.listByItem(itemId, actor);
@@ -617,6 +622,7 @@ export class InventoryLocationStockService {
         lastMovementAt: 'DESC',
       },
     });
+
     for (const balance of balances) {
       const location = await this.findAccessibleShelf(
         balance.locationId,
@@ -627,6 +633,36 @@ export class InventoryLocationStockService {
     }
 
     return null;
+  }
+
+  async getPreferredShelfBatch(
+    pairs: PreferredShelfPairDto[],
+    actor: ActorContext,
+  ): Promise<BatchPreferredShelfRowDto[]> {
+    // Resolve each distinct (itemId, storageId) once, then re-expand to the
+    // original request order so the caller can map results back by index.
+    const keyOf = (p: { itemId: string; storageId: string }) =>
+      `${p.itemId}:${p.storageId}`;
+    const unique = new Map<string, PreferredShelfPairDto>();
+    for (const pair of pairs) unique.set(keyOf(pair), pair);
+
+    const resolved = await Promise.all(
+      [...unique.values()].map(async (pair) => ({
+        key: keyOf(pair),
+        shelf: await this.getPreferredShelf(
+          pair.itemId,
+          pair.storageId,
+          actor,
+        ),
+      })),
+    );
+    const shelfByKey = new Map(resolved.map((r) => [r.key, r.shelf]));
+
+    return pairs.map((pair) => ({
+      itemId: pair.itemId,
+      storageId: pair.storageId,
+      shelf: shelfByKey.get(keyOf(pair)) ?? null,
+    }));
   }
 
   private async findAccessibleShelf(
