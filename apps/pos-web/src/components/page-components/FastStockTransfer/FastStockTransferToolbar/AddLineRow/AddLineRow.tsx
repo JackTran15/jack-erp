@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { PosSelect } from "@erp/pos/components/common/PosSelect/PosSelect";
 import { FastStockTransferCarrierSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferCarrierSearchInput/FastStockTransferCarrierSearchInput";
 import { FastStockTransferProductSearchInput } from "@erp/pos/components/page-components/FastStockTransfer/FastStockTransferToolbar/AddLineRow/FastStockTransferProductSearchInput/FastStockTransferProductSearchInput";
@@ -42,9 +42,15 @@ export function AddLineRow() {
     focusedForDirectionRef.current = direction;
   }, [direction, isLoading, isSessionClosed, isMutating]);
 
-  const locationItems = toolbarDraft.product
-    ? catalogLocationsForLine(toolbarDraft.product)
-    : [];
+  const locationItems = useMemo(() => {
+    const catalogLocs = toolbarDraft.product
+      ? catalogLocationsForLine(toolbarDraft.product)
+      : [];
+    const loc = toolbarDraft.location;
+    if (!loc) return catalogLocs;
+    const inList = catalogLocs.some((l) => l.locationId === loc.locationId);
+    return inList ? catalogLocs : [loc, ...catalogLocs];
+  }, [toolbarDraft.location, toolbarDraft.product]);
 
   return (
     <div className="flex flex-wrap items-end gap-4">

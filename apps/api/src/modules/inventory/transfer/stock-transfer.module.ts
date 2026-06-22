@@ -16,6 +16,7 @@ import { StockTransferV2Controller } from './controllers/stock-transfer-v2.contr
 import { StockTransferCommandV2Controller } from './controllers/stock-transfer-command-v2.controller';
 import { SearchStockTransfersV2Handler } from './queries/search-stock-transfers-v2.handler';
 import { CreateStockTransferV2Handler } from './commands/create-stock-transfer-v2.handler';
+import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 
 @Module({
   imports: [
@@ -41,7 +42,8 @@ import { CreateStockTransferV2Handler } from './commands/create-stock-transfer-v
     StockTransferService,
     SearchStockTransfersV2Handler,
     CreateStockTransferV2Handler,
+    StorageDefaultLocationResolverService,
   ],
-  exports: [StockTransferService],
+  exports: [StockTransferService, StorageDefaultLocationResolverService],
 })
 export class StockTransferModule {}

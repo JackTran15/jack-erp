@@ -145,7 +145,12 @@ export interface TempWarehouseTransferRequestedPayload {
   destinationLocationId: string;
   sourceBranchId: string;
   destinationBranchId: string;
-  lines: { tempWarehouseLineId: string; itemId: string; quantity: number }[];
+  lines: {
+    tempWarehouseLineId: string;
+    itemId: string;
+    quantity: number;
+    sourceLocationId?: string;
+  }[];
   actor: {
     userId: string;
     organizationId: string;

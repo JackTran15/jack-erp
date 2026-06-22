@@ -1,11 +1,13 @@
 import { UseQueryResult, useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { INVENTORY_KEYS } from "@erp/pos/constants/react-query-key.constant";
-import { inventoryService } from "@erp/pos/services/inventory.service";
+import type { PreferredShelfPair } from "@erp/pos/dtos/inventory.dto";
 import type {
   InventoryShowroomOption,
   InventoryStorageOption,
 } from "@erp/pos/interfaces/inventory-location.interface";
+import { inventoryService } from "@erp/pos/services/inventory.service";
 
 export function useBranchStorages(
   branchId: string | null,
@@ -27,4 +29,11 @@ export function useBranchShowrooms(
     enabled: Boolean(branchId),
     staleTime: 30_000,
   });
+}
+
+export function useLookupPreferredShelf() {
+  return useCallback(async (pairs: ReadonlyArray<PreferredShelfPair>) => {
+    if (!pairs.length) return [];
+    return inventoryService.batchPreferredShelf(pairs);
+  }, []);
 }

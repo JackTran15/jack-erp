@@ -196,7 +196,7 @@ describe('PosCatalogService.getCatalog', () => {
     service = module.get(PosCatalogService);
   });
 
-  it('matches name, SKU code and barcode (ILIKE) when a search term is given', async () => {
+  it('matches name, SKU code and barcode (ILIKE) via items-first LEFT JOIN', async () => {
     query.mockResolvedValue([]);
 
     await service.getCatalog('branch-1', actor, '893');
@@ -204,11 +204,41 @@ describe('PosCatalogService.getCatalog', () => {
     expect(query).toHaveBeenCalledTimes(1);
     const [sql, params] = query.mock.calls[0];
     expect(params).toEqual(['org-1', 'branch-1', '%893%']);
+    expect(sql).toContain('FROM items i');
+    expect(sql).toContain('LEFT JOIN stock_balances sb');
     expect(sql).toContain('i.name ILIKE $3');
     expect(sql).toContain('i.code ILIKE $3');
-    // Barcode partial match via item_barcodes EXISTS subquery.
     expect(sql).toContain('item_barcodes');
     expect(sql).toContain('b.code ILIKE $3');
+    expect(sql).toContain('i.is_pos_visible = true');
+  });
+
+  it('returns a zero-stock line when search matches but branch has no stock', async () => {
+    query.mockResolvedValue([
+      {
+        itemId: 'I9',
+        productId: null,
+        code: 'ABA2777-D-38',
+        name: 'Giày nam ABA2777-D-38',
+        unit: 'đôi',
+        sellingPrice: '100',
+        locationId: null,
+        locationName: null,
+        quantity: null,
+        isShowroom: null,
+      },
+    ]);
+
+    const res = await service.getCatalog('branch-1', actor, 'ABA');
+
+    expect(res).toHaveLength(1);
+    expect(res[0]).toMatchObject({
+      itemId: 'I9',
+      code: 'ABA2777-D-38',
+      quantityOnHand: 0,
+      defaultLocationId: '',
+    });
+    expect(res[0].locations).toEqual([]);
   });
 
   it('omits the search clause (and the pattern param) when no term is given', async () => {

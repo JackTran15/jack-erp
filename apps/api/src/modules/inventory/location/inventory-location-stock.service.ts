@@ -636,6 +636,26 @@ export class InventoryLocationStockService {
       if (location) return location;
     }
 
+    const defaultShelf = await this.locationRepo.findOne({
+      where: {
+        storageId,
+        organizationId: actor.organizationId,
+        isActive: true,
+        isUnassigned: false,
+        isDefault: true,
+        ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
+      },
+      relations: { storage: true },
+      select: { id: true, code: true, name: true },
+    });
+    if (defaultShelf) {
+      return {
+        id: defaultShelf.id,
+        code: defaultShelf.code,
+        name: defaultShelf.name,
+      };
+    }
+
     return null;
   }
 

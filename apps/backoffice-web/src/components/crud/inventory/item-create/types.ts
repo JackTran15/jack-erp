@@ -41,4 +41,6 @@ export interface InventoryItemCreateFormProps {
   mode?: "create" | "edit";
   /** Raw record used to hydrate extras / conversion units / providers in edit mode. */
   initialRecord?: Record<string, unknown>;
+  /** When set, overrides default cancel navigation (e.g. restore list paging). */
+  onCancel?: () => void;
 }
