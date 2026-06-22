@@ -3,6 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { GoodsReceiptEntity } from '../goods-receipt.entity';
+import {
+  attachCounterparties,
+  counterpartyNameSql,
+} from '../../location/services/counterparty-name.util';
 import { SearchGoodsReceiptsV2Query } from './search-goods-receipts-v2.query';
 
 /**
@@ -46,7 +50,7 @@ export class SearchGoodsReceiptsV2Handler
 
     new FilterBuilder(qb)
       .applyString('gr.documentNumber', dto.documentNumber)
-      .applyString('provider.name', dto.party)
+      .applyString(counterpartyNameSql('gr'), dto.party)
       .applyString('gr.description', dto.description)
       .applyString('gr.reason', dto.reason)
       .applyEnum('gr.purpose', dto.purpose?.value)
@@ -58,6 +62,10 @@ export class SearchGoodsReceiptsV2Handler
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+
+    // Inline the resolved "Đối tượng" so customer/employee counterparties (no
+    // provider join) render their name instead of "—".
+    await attachCounterparties(this.repo.manager, data, actor.organizationId);
 
     return { data, total, page, limit };
   }

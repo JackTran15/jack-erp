@@ -5,6 +5,10 @@ import { TransferStatus } from '@erp/shared-interfaces';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { StockTransferEntity } from '../stock-transfer.entity';
 import { UserEntity } from '../../../auth/user.entity';
+import {
+  attachCounterparties,
+  counterpartyNameSql,
+} from '../../location/services/counterparty-name.util';
 import { SearchStockTransfersV2Query } from './search-stock-transfers-v2.query';
 
 /**
@@ -15,9 +19,13 @@ import { SearchStockTransfersV2Query } from './search-stock-transfers-v2.query';
 const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.line_value), 0)
    FROM stock_transfer_lines l WHERE l.transfer_id = st.id)`;
 
-/** Đối tượng (party) — the transporter user's full name, via correlated subquery. */
+/** Người vận chuyển — transporter user's full name (legacy fallback Đối tượng). */
 const TRANSPORTER_NAME_SUBQUERY = `(SELECT (u.first_name || ' ' || u.last_name)
    FROM users u WHERE u.id = st.transporter_user_id AND u.organization_id = st.organization_id)`;
+
+/** Đối tượng (party) — counterparty (supplier/customer/employee), else the
+ *  legacy transporter name for transfers created before the counterparty field. */
+const PARTY_EXPRESSION = `COALESCE(${counterpartyNameSql('st')}, ${TRANSPORTER_NAME_SUBQUERY})`;
 
 /** Ngày — transfer date, falling back to created date for legacy rows. */
 const DATE_COLUMN = `COALESCE(st.transferred_at, st.created_at)`;
@@ -59,7 +67,7 @@ export class SearchStockTransfersV2Handler
 
     new FilterBuilder(qb)
       .applyString('st.documentNumber', dto.documentNumber)
-      .applyString(TRANSPORTER_NAME_SUBQUERY, dto.party)
+      .applyString(PARTY_EXPRESSION, dto.party)
       .applyString('st.notes', dto.notes)
       .applyDateCompare(DATE_COLUMN, dto.date)
       .applyDateRange(DATE_COLUMN, dto.dateRange)
@@ -104,6 +112,10 @@ export class SearchStockTransfersV2Handler
         0,
       );
     }
+
+    // Inline the resolved "Đối tượng"; legacy transfers (no counterparty) keep
+    // null and fall back to the transporter on the FE.
+    await attachCounterparties(this.repo.manager, data, actor.organizationId);
 
     return { data, total, page, limit };
   }

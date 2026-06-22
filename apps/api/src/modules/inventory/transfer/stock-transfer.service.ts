@@ -11,6 +11,7 @@ import {
   TransferStatus,
   StockMovementType,
   DocumentType,
+  DocCounterpartyKind,
   PaginatedResponse,
   PaginationQuery,
 } from '@erp/shared-interfaces';
@@ -25,6 +26,8 @@ import { StorageEntity } from '../location/storage.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
+import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
+import { attachCounterparties } from '../location/services/counterparty-name.util';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 /** A fully-resolved intra-warehouse move line: source/dest are concrete location ids. */
@@ -44,6 +47,10 @@ export interface CreateTransferDto {
   notes?: string;
   /** Person responsible for transporting the goods (validated to belong to the org). */
   transporterUserId?: string;
+  /** "Đối tượng" kind (supplier | customer | employee); validated when set. */
+  counterpartyKind?: DocCounterpartyKind;
+  /** Id of the provider / customer / employee, per counterpartyKind. */
+  counterpartyId?: string;
   /** Attachment ids (Tài liệu đính kèm). */
   attachmentIds?: string[];
   /** ISO timestamp the transfer takes place; defaults to posting time when omitted. */
@@ -70,6 +77,8 @@ export interface CreateTransferDto {
 export interface BranchScopedTransferInput {
   notes?: string;
   transporterUserId?: string;
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
   attachmentIds?: string[];
   transferredAt?: string;
   lines: {
@@ -167,6 +176,8 @@ export class StockTransferService {
       status: TransferStatus.DRAFT,
       notes: dto.notes,
       transporterUserId: dto.transporterUserId,
+      counterpartyKind: dto.counterpartyKind ?? null,
+      counterpartyId: dto.counterpartyId ?? null,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
       createdBy: actor.userId,
@@ -271,6 +282,14 @@ export class StockTransferService {
       }
     }
 
+    // Validate the "Đối tượng" (supplier/customer/employee) exists in the org.
+    // Transfers have no provider_id column, so only the kind+id are kept.
+    const counterparty = await resolveDocCounterparty(
+      this.dataSource.manager,
+      { counterpartyKind: dto.counterpartyKind, counterpartyId: dto.counterpartyId },
+      actor.organizationId,
+    );
+
     // Resolve each storage's default shelf once — concrete bins only (not "Chưa xếp").
     const defaultByStorage = new Map<string, string>();
     const resolveDefaultLocation = async (storageId: string): Promise<string> => {
@@ -357,6 +376,8 @@ export class StockTransferService {
       sourceBranchId: actor.branchId,
       destinationBranchId: actor.branchId,
       transporterUserId: dto.transporterUserId,
+      counterpartyKind: counterparty.counterpartyKind ?? undefined,
+      counterpartyId: counterparty.counterpartyId ?? undefined,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt,
       notes: dto.notes,
@@ -440,6 +461,8 @@ export class StockTransferService {
       sourceBranchId: resolved.sourceBranchId,
       destinationBranchId: resolved.destinationBranchId,
       transporterUserId: resolved.transporterUserId,
+      counterpartyKind: resolved.counterpartyKind ?? null,
+      counterpartyId: resolved.counterpartyId ?? null,
       attachmentIds: resolved.attachmentIds ?? [],
       transferredAt: resolved.transferredAt
         ? new Date(resolved.transferredAt)
@@ -863,6 +886,7 @@ export class StockTransferService {
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, organizationId);
     await this.attachTransporters([transfer], organizationId);
+    await attachCounterparties(this.transferRepo.manager, [transfer], organizationId);
     return transfer;
   }
 
@@ -885,6 +909,7 @@ export class StockTransferService {
     });
 
     await this.attachTransporters(data, query.organizationId);
+    await attachCounterparties(this.transferRepo.manager, data, query.organizationId);
 
     return { data, total, page: query.page, pageSize: query.pageSize };
   }

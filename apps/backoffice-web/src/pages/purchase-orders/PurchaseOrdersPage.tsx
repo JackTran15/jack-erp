@@ -120,6 +120,13 @@ interface GoodsReceipt {
   provider?: { id: string; code: string; name: string } | null;
   counterpartyKind?: "supplier" | "customer" | "employee" | null;
   counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API for all kinds (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   deliveredBy?: string | null;
   reason?: string | null;
   description?: string | null;
@@ -557,6 +564,7 @@ export function PurchaseOrdersPage() {
       label: "Đối tượng",
       width: 180,
       render: (row) =>
+        row.counterparty?.name ??
         row.provider?.name ??
         (row.providerId
           ? (providerNameById.get(row.providerId) ?? row.providerId)
@@ -1000,6 +1008,13 @@ function PurchaseOrderFormDialog({
   ) => fillPreferredShelfBatch([{ idx, itemId, storageId }]);
 
   const initialProvider = useMemo(() => {
+    // Prefer the resolved counterparty — the only source of a name for customer
+    // / employee đối tượng (those have no provider_id and aren't in `providers`).
+    if (initial?.counterparty)
+      return {
+        code: initial.counterparty.code ?? "",
+        name: initial.counterparty.name,
+      };
     if (!initial || !initial.providerId) return { code: "", name: "" };
     if (initial.provider)
       return { code: initial.provider.code, name: initial.provider.name };

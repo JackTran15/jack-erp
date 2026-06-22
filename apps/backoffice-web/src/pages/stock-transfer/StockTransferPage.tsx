@@ -7,6 +7,7 @@ import {
   formatMoneyInteger,
   Input,
   LineItemGrid,
+  MoneyInput,
   PageToolbar,
   PeriodFilter,
   resolvePeriodRange,
@@ -38,6 +39,7 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
 import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
@@ -61,6 +63,7 @@ import { DocumentLineImportDialog } from "../inventory/_components/document-impo
 import {
   ProductSelectDialog,
   type ProductSelectResult,
+  type SelectedLine,
 } from "../../components/shared/product-select/ProductSelectDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
@@ -124,6 +127,15 @@ interface Transfer {
   notes?: string;
   transporterUserId?: string;
   transporter?: { id: string; fullName: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   attachmentIds?: string[];
   transferredAt?: string;
   /** Tổng tiền (∑ line_value), inlined by the v2 search handler. */
@@ -167,13 +179,6 @@ interface InventoryStorage {
   name: string;
   branchId: string;
   isMainStorage?: boolean;
-}
-
-interface EmployeeOption {
-  id: string;
-  code: string | null;
-  firstName: string;
-  lastName: string;
 }
 
 export function StockTransferPage() {
@@ -413,7 +418,10 @@ export function StockTransferPage() {
       key: "party",
       label: "Đối tượng",
       width: 200,
-      render: (row) => row.transporter?.fullName ?? "—",
+      // Counterparty (NCC/KH/NV) for new transfers; legacy rows fall back to the
+      // transporter user's name.
+      render: (row) =>
+        row.counterparty?.name ?? row.transporter?.fullName ?? "—",
     },
     {
       key: "totalAmount",
@@ -683,12 +691,20 @@ function TransferFormDialog({
     [makeEmptyLine],
   );
 
-  const [transporterUserId, setTransporterUserId] = useState(
-    initial?.transporterUserId ?? "",
+  // "Đối tượng" — supplier / customer / employee (replaces the old transporter
+  // picker). Rehydrate from the resolved counterparty when re-opening a phiếu.
+  const [counterpartyId, setCounterpartyId] = useState(
+    initial?.counterparty?.id ?? initial?.counterpartyId ?? "",
   );
-  const [transporterLabel, setTransporterLabel] = useState(
-    initial?.transporter?.fullName ?? "",
+  const [counterpartyCode, setCounterpartyCode] = useState(
+    initial?.counterparty?.code ?? "",
   );
+  const [counterpartyName, setCounterpartyName] = useState(
+    initial?.counterparty?.name ?? "",
+  );
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >(initial?.counterpartyKind ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(
     (initial?.transferredAt ?? initial?.createdAt ?? new Date().toISOString()).slice(
@@ -823,30 +839,6 @@ function TransferFormDialog({
     [],
   );
 
-  // Transporter picker — employees are users (mã NV = user code).
-  const searchEmployees = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      const effectivePageSize = pageSize ?? 20;
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(effectivePageSize),
-      });
-      if (query.trim()) params.set("search", query.trim());
-      const { data } = await apiClient.get<PaginatedResponse<EmployeeOption>>(
-        `/admin/users?${params}`,
-      );
-      const fetched = data.page * data.pageSize;
-      return {
-        items: data.data,
-        hasMore: fetched < data.total,
-        total: data.total,
-      };
-    },
-    [],
-  );
-
-  const employeeLabel = (e: EmployeeOption) =>
-    `${e.code ? `${e.code} · ` : ""}${e.firstName} ${e.lastName}`.trim();
 
   // Kho picker is fed from the page-level cached storages (already scoped to
   // the active branch), filtered/paged client-side.
@@ -897,7 +889,8 @@ function TransferFormDialog({
           : undefined;
       const payload = {
         notes: notes || undefined,
-        transporterUserId: transporterUserId || undefined,
+        counterpartyKind: counterpartyKind || undefined,
+        counterpartyId: counterpartyId || undefined,
         transferredAt,
         lines: persistableLines.map((l) => ({
           itemId: l.itemId,
@@ -926,7 +919,17 @@ function TransferFormDialog({
     } finally {
       setSaving(false);
     }
-  }, [lines, notes, transporterUserId, docDate, docTime, initial, mode, onSaved]);
+  }, [
+    lines,
+    notes,
+    counterpartyKind,
+    counterpartyId,
+    docDate,
+    docTime,
+    initial,
+    mode,
+    onSaved,
+  ]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -954,8 +957,10 @@ function TransferFormDialog({
       label: "Thêm mới",
       icon: Plus,
       onClick: () => {
-        setTransporterUserId("");
-        setTransporterLabel("");
+        setCounterpartyId("");
+        setCounterpartyCode("");
+        setCounterpartyName("");
+        setCounterpartyKind("");
         setNotes("");
         setLines([makeEmptyLine()]);
         setDirty(false);
@@ -976,14 +981,34 @@ function TransferFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
-  // Multi-select product picker → append one line per chosen item (dedupe by itemId),
-  // pre-filling Số lượng/Đơn giá from the dialog and the source warehouse from the default.
+  // Multi-select product picker → for each chosen item, update Số lượng/Đơn giá
+  // on the existing line if the item is already in the grid, otherwise append a
+  // new line (source warehouse from the default). Quantity always follows the
+  // dialog; unit price only overwrites when the dialog provides a positive value
+  // so re-selecting to bump quantity doesn't wipe a price already entered.
   const addLinesFromPicker = (result: ProductSelectResult) => {
-    const existing = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const picked = new Map<string, SelectedLine>(
+      result.lines.filter((s) => s.itemId).map((s) => [s.itemId, s]),
+    );
+    if (picked.size === 0) return;
+
     const sourceStorageId = defaultStorage?.id ?? "";
     const sourceStorageLabel = defaultStorage?.name ?? "";
-    const fresh: FormLine[] = result.lines
-      .filter((s) => s.itemId && !existing.has(s.itemId))
+    const base = getPersistableFormLines(lines);
+    const existing = new Set(base.map((l) => l.itemId).filter(Boolean));
+
+    const updated = base.map((l) => {
+      const s = l.itemId ? picked.get(l.itemId) : undefined;
+      if (!s) return l;
+      return {
+        ...l,
+        quantity: s.quantity > 0 ? s.quantity : l.quantity,
+        unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : l.unitPrice,
+      };
+    });
+
+    const fresh: FormLine[] = [...picked.values()]
+      .filter((s) => !existing.has(s.itemId))
       .map((s) => ({
         ...emptyLine(),
         itemId: s.itemId,
@@ -995,9 +1020,8 @@ function TransferFormDialog({
         quantity: s.quantity > 0 ? s.quantity : 1,
         unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : "",
       }));
-    if (fresh.length === 0) return;
-    const base = getPersistableFormLines(lines);
-    setLines(normalizeLines([...base, ...fresh]));
+
+    setLines(normalizeLines([...updated, ...fresh]));
     markDirty();
   };
 
@@ -1055,8 +1079,14 @@ function TransferFormDialog({
       ...l,
       sourceStorageId: source.id,
       sourceStorageLabel: source.name,
+      // Locations are storage-scoped — drop the previous warehouse's shelf so
+      // fillTransferLocations either repopulates a valid one or leaves it blank.
+      sourceLocationId: "",
+      sourceLocationLabel: "",
       destStorageId: dest.id,
       destStorageLabel: dest.name,
+      destLocationId: "",
+      destLocationLabel: "",
     }));
     setLines(updated);
     markDirty();
@@ -1343,6 +1373,22 @@ function TransferFormDialog({
       type: "number",
       align: "right",
       filterSymbol: "≤",
+      renderEditor: (row, idx) => (
+        <MoneyInput
+          className="h-full border-0"
+          value={row.quantity}
+          onChange={(v) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, quantity: v === "" ? 0 : v } : l,
+              ),
+            );
+            markDirty();
+          }}
+          disabled={isView}
+          aria-label="Số lượng"
+        />
+      ),
     },
     {
       key: "unitPrice",
@@ -1350,16 +1396,17 @@ function TransferFormDialog({
       width: 140,
       align: "right",
       renderEditor: (row, idx) => (
-        <Input
-          type="number"
-          min={0}
-          className="h-full border-0 text-right tabular-nums"
+        <MoneyInput
+          className="h-full border-0"
           placeholder="Tự tính"
-          value={row.unitPrice}
-          onChange={(e) => {
-            const val = e.target.value;
+          value={row.unitPrice === "" ? "" : Number(row.unitPrice)}
+          onChange={(v) => {
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, unitPrice: val } : l)),
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, unitPrice: v === "" ? "" : String(v) }
+                  : l,
+              ),
             );
             markDirty();
           }}
@@ -1389,33 +1436,40 @@ function TransferFormDialog({
         toolbarItems={dialogToolbar}
         generalInfo={
           <>
-            <FieldRow label="Người vận chuyển">
-              <LookupField
-                placeholder="Chọn người vận chuyển"
-                value={transporterLabel}
-                onValueChange={(v) => {
-                  setTransporterLabel(v);
-                  setTransporterUserId("");
-                  markDirty();
-                }}
-                onSelect={(e) => {
-                  setTransporterUserId(e.id);
-                  setTransporterLabel(employeeLabel(e));
-                  markDirty();
-                }}
-                search={searchEmployees}
-                enableSearchModal
-                searchModalTitle="Chọn người vận chuyển"
-                searchModalPlaceholder="Nhập mã hoặc tên nhân viên"
-                itemKey={(e) => e.id}
-                renderItem={(e) => `${e.firstName} ${e.lastName}`.trim()}
-                renderMeta={(e) => e.code ?? ""}
-                columns={[
-                  { key: "code", label: "Mã NV", className: "w-[100px] font-mono", render: (e) => e.code ?? "" },
-                  { key: "name", label: "Họ tên", render: (e) => `${e.firstName} ${e.lastName}`.trim() },
-                ]}
-                disabled={isView}
-              />
+            <FieldRow label="Đối tượng">
+              <div className="flex items-stretch gap-2">
+                <CounterpartyPickerField
+                  defaultType="all"
+                  allowedTypes={["supplier", "customer", "employee"]}
+                  className="w-[180px]"
+                  dropdownMinWidth={500}
+                  modalTitle="Chọn đối tượng"
+                  modalPlaceholder="Nhập mã hoặc tên đối tượng"
+                  value={counterpartyCode}
+                  onValueChange={(v) => {
+                    setCounterpartyCode(v);
+                    setCounterpartyId("");
+                    setCounterpartyName("");
+                    setCounterpartyKind("");
+                    markDirty();
+                  }}
+                  onSelect={(c) => {
+                    setCounterpartyId(c.id);
+                    setCounterpartyCode(c.code ?? "");
+                    setCounterpartyName(c.name);
+                    setCounterpartyKind(c.kind);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+                <Input
+                  className="flex-1"
+                  placeholder="Tên đối tượng"
+                  value={counterpartyName}
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
             </FieldRow>
             <FieldRow label="Diễn giải">
               <Input

@@ -1,4 +1,4 @@
-import { AppModal, Button, Input } from "@erp/ui";
+import { AppModal, Button, MoneyInput } from "@erp/ui";
 import { useState } from "react";
 
 interface Props {
@@ -16,11 +16,11 @@ export function QuickEntryDialog({
   onApply,
   title = "Nhập nhanh cho tất cả hàng hoá",
 }: Props) {
-  const [quantity, setQuantity] = useState("1");
-  const [unitPrice, setUnitPrice] = useState("");
+  const [quantity, setQuantity] = useState<number | "">(1);
+  const [unitPrice, setUnitPrice] = useState<number | "">("");
 
   function handleApply() {
-    onApply(Number(quantity) || 0, Number(unitPrice) || 0);
+    onApply(quantity === "" ? 0 : quantity, unitPrice === "" ? 0 : unitPrice);
     onOpenChange(false);
   }
 
@@ -48,22 +48,18 @@ export function QuickEntryDialog({
     >
       <label className="flex items-center gap-3 text-sm">
         <span className="w-20 shrink-0 text-muted-foreground">Số lượng</span>
-        <Input
-          type="number"
-          min={0}
+        <MoneyInput
           value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          onChange={setQuantity}
           className="h-9 flex-1"
           autoFocus
         />
       </label>
       <label className="flex items-center gap-3 text-sm">
         <span className="w-20 shrink-0 text-muted-foreground">Đơn giá</span>
-        <Input
-          type="number"
-          min={0}
+        <MoneyInput
           value={unitPrice}
-          onChange={(e) => setUnitPrice(e.target.value)}
+          onChange={setUnitPrice}
           onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
           className="h-9 flex-1"
         />

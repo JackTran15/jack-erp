@@ -1594,6 +1594,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/preferred-shelf/transfer-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve preferred shelves at both source and destination storage for many transfer lines in one request */
+        post: operations["InventoryLocationStockController_batchTransferPreferredShelf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/{locationId}/stock-items": {
         parameters: {
             query?: never;
@@ -6567,6 +6584,30 @@ export interface components {
         BatchPreferredShelfResponseDto: {
             data: components["schemas"]["BatchPreferredShelfRowDto"][];
         };
+        TransferPreferredShelfPairDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            sourceStorageId: string;
+            /** Format: uuid */
+            destStorageId: string;
+        };
+        BatchTransferPreferredShelfRequestDto: {
+            pairs: components["schemas"]["TransferPreferredShelfPairDto"][];
+        };
+        BatchTransferPreferredShelfRowDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            sourceStorageId: string;
+            /** Format: uuid */
+            destStorageId: string;
+            sourceShelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+            destShelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+        };
+        BatchTransferPreferredShelfResponseDto: {
+            data: components["schemas"]["BatchTransferPreferredShelfRowDto"][];
+        };
         StockByLocationProviderDto: {
             /** Format: uuid */
             providerId: string;
@@ -7477,6 +7518,9 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             transporterUserId?: string;
+            /** @enum {string|null} */
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
+            counterpartyId?: string | null;
             /** Format: date-time */
             transferredAt?: string;
             attachmentIds: string[];
@@ -7486,6 +7530,12 @@ export interface components {
                 id: string;
                 fullName: string;
             };
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById. Legacy transfers (no
+             *     counterparty) keep null and fall back to {@link transporter} on the FE.
+             */
+            counterparty?: Record<string, never> | null;
             /**
              * @description Transient (not a column): sum of line_value across the transfer's lines,
              *     inlined by the v2 search handler so the FE can render Tổng tiền + footer.
@@ -7604,6 +7654,10 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             transporterUserId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             attachmentIds?: string[];
             transferredAt?: string;
             lines: components["schemas"]["StockTransferV2LineDto"][];
@@ -7862,6 +7916,7 @@ export interface components {
             supersededById?: string | null;
             transferId?: string | null;
             notes?: string | null;
+            sourceLocationId?: string | null;
             session?: components["schemas"]["TempWarehouseSessionEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -7894,6 +7949,11 @@ export interface components {
              */
             carrierUserId?: string;
             notes?: string;
+            /**
+             * Format: uuid
+             * @description Shelf/location on the source side of the movement
+             */
+            sourceLocationId?: string;
         };
         UpdateTempWarehouseLineDto: {
             /**
@@ -7904,6 +7964,8 @@ export interface components {
             /** Format: uuid */
             carrierUserId?: string | null;
             notes?: string | null;
+            /** Format: uuid */
+            sourceLocationId?: string | null;
         };
         CloseTempWarehouseSessionDto: {
             /** @enum {string} */
@@ -8963,7 +9025,7 @@ export interface components {
             providerId?: string;
             provider?: components["schemas"]["ProviderEntity"];
             /** @enum {string|null} */
-            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
             counterpartyId?: string | null;
             reason: string;
             reasonId?: string;
@@ -8989,6 +9051,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             lines: components["schemas"]["GoodsIssueLineEntity"][];
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById so customer and employee
+             *     counterparties (no provider join) render their name instead of "—".
+             */
+            counterparty?: Record<string, never> | null;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -9050,7 +9118,7 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer";
+            counterpartyKind?: "supplier" | "customer" | "employee";
             /** Format: uuid */
             counterpartyId?: string;
             /** @enum {string} */
@@ -9128,6 +9196,15 @@ export interface components {
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
+            /**
+             * @description Đối tượng kind (supplier | customer | employee). When set, the service
+             *      validates the counterparty and routes supplier→provider_id, customer /
+             *      employee→counterparty cols (provider_id null).
+             * @enum {string}
+             */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
@@ -9165,7 +9242,7 @@ export interface components {
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             providerId?: string;
             /** @enum {string|null} */
-            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
             counterpartyId?: string | null;
             deliveredBy?: string;
             reason?: string;
@@ -9194,6 +9271,13 @@ export interface components {
             lines: components["schemas"]["GoodsReceiptLineEntity"][];
             provider?: components["schemas"]["ProviderEntity"];
             location?: components["schemas"]["LocationEntity"];
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById so the FE renders supplier,
+             *     customer and employee counterparties alike (provider_id is null for the
+             *     latter two).
+             */
+            counterparty?: Record<string, never> | null;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -9233,6 +9317,10 @@ export interface components {
             purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
@@ -9273,7 +9361,7 @@ export interface components {
             /** @enum {string} */
             purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer";
+            counterpartyKind?: "supplier" | "customer" | "employee";
             /** Format: uuid */
             counterpartyId?: string;
             receivedAt: string;
@@ -12642,6 +12730,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchPreferredShelfResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryLocationStockController_batchTransferPreferredShelf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTransferPreferredShelfRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchTransferPreferredShelfResponseDto"];
                 };
             };
         };

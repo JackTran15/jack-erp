@@ -54,6 +54,7 @@ sequenceDiagram
 - [TKT-TWF-02 FE: getTransferPreferredShelfBatch client](../tickets/TKT-TWF-02-fe-transfer-shelf-client.md)
 - [TKT-TWF-03 FE: combined Chọn kho dialog + apply-to-all + fill](../tickets/TKT-TWF-03-fe-choose-warehouses-dialog-fill.md)
 - [TKT-TWF-04 FE: auto-add line on item select (transfer grid)](../tickets/TKT-TWF-04-fe-auto-add-line-on-select.md)
+- [TKT-TWF-05 FE: clear stale Vị trí when "Chọn kho" changes warehouse (bug-fix)](../tickets/TKT-TWF-05-fe-clear-stale-location-on-warehouse-change.md)
 
 ## Dependencies
 
@@ -67,6 +68,7 @@ flowchart LR
   T1["TWF-01 BE endpoint + OpenAPI"] --> T2["TWF-02 FE client"]
   T2 --> T3["TWF-03 Dialog + fill"]
   T3 --> T4["TWF-04 Auto-add line"]
+  T3 --> T5["TWF-05 Clear stale Vị trí (bug-fix)"]
 ```
 
 ## Out of scope
