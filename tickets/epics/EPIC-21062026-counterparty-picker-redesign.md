@@ -52,6 +52,7 @@ sequenceDiagram
 - [TKT-CPP-02 FE: CounterpartyPickerField/Modal + useCounterpartySearch hook](../tickets/TKT-CPP-02-fe-counterparty-picker-dialog.md)
 - [TKT-CPP-03 FE: migrate Nhập kho / Xuất kho to the new picker](../tickets/TKT-CPP-03-fe-migrate-consumers.md)
 - [TKT-CPP-04 FE: inline field type-ahead searches all types (mixed)](../tickets/TKT-CPP-04-fe-inline-all-types.md)
+- [TKT-CPP-05 BE: fix employee type returning nothing (uuid/varchar join cast)](../tickets/TKT-CPP-05-be-employee-search-uuid-cast.md)
 
 ## Dependencies
 

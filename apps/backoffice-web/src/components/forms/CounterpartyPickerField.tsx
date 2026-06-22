@@ -49,19 +49,26 @@ export function CounterpartyPickerField({
   const search = useCounterpartySearch();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Inline type-ahead searches the field's default type; switching types is the
-  // modal's job (it carries the "Loại đối tượng" dropdown).
+  // Inline type-ahead searches across the allowed types (default: all). When the
+  // field is restricted to a single type we query that type directly; otherwise
+  // we query "all" and filter to allowedTypes so disallowed kinds (e.g. employees
+  // on a goods document) never appear inline.
   const inlineSearch = useCallback(
     async (query: string, page: number, pageSize?: number) => {
       const ps = pageSize ?? INLINE_PAGE_SIZE;
-      const res = await search(defaultType, query, page, ps);
+      const inlineType: CounterpartySearchType =
+        allowedTypes && allowedTypes.length === 1 ? allowedTypes[0]! : "all";
+      const res = await search(inlineType, query, page, ps);
+      const items = allowedTypes
+        ? res.data.filter((c) => allowedTypes.includes(c.kind))
+        : res.data;
       return {
-        items: res.data,
+        items,
         hasMore: page * ps < res.total,
         total: res.total,
       };
     },
-    [search, defaultType],
+    [search, allowedTypes],
   );
 
   return (

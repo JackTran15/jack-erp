@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+  DocCounterpartyKind,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
 } from '@erp/shared-interfaces';
@@ -26,6 +27,14 @@ export class UpdateGoodsReceiptDto {
   @IsOptional()
   @IsUUID()
   providerId?: string;
+
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
 
   @IsOptional()
   @IsString()

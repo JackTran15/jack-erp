@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
+import {
+  DocCounterpartyKind,
+  GoodsIssuePurpose,
+  GoodsIssueStatus,
+} from '@erp/shared-interfaces';
 import { GoodsIssueService } from './goods-issue.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
@@ -36,9 +40,11 @@ describe('GoodsIssueService', () => {
     };
     const manager = {
       update: jest.fn().mockResolvedValue(undefined),
+      findOne: jest.fn(),
     };
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(manager)),
+      manager,
       _manager: manager,
     };
     ledgerService = {
@@ -108,6 +114,58 @@ describe('GoodsIssueService', () => {
       expect(created.references).toEqual([]);
       expect(created.deliverer).toBeNull();
       expect(created.occurredAt).toBeNull();
+    });
+
+    it('routes a customer counterparty to counterparty columns, provider_id null', async () => {
+      (dataSource.manager.findOne as jest.Mock).mockResolvedValue({ id: 'cust-1' });
+      await service.create(
+        {
+          locationId: 'loc-A01',
+          counterpartyKind: DocCounterpartyKind.CUSTOMER,
+          counterpartyId: 'cust-1',
+          purpose: GoodsIssuePurpose.OTHER,
+          lines: [{ itemId: 'item-1', quantity: 1 }],
+        },
+        actor,
+      );
+      const created = giRepo.create.mock.calls[0][0];
+      expect(created.providerId).toBeUndefined();
+      expect(created.counterpartyKind).toBe(DocCounterpartyKind.CUSTOMER);
+      expect(created.counterpartyId).toBe('cust-1');
+    });
+
+    it('routes a supplier counterparty to provider_id', async () => {
+      (dataSource.manager.findOne as jest.Mock).mockResolvedValue({ id: 'prov-1' });
+      await service.create(
+        {
+          locationId: 'loc-A01',
+          counterpartyKind: DocCounterpartyKind.SUPPLIER,
+          counterpartyId: 'prov-1',
+          purpose: GoodsIssuePurpose.OTHER,
+          lines: [{ itemId: 'item-1', quantity: 1 }],
+        },
+        actor,
+      );
+      const created = giRepo.create.mock.calls[0][0];
+      expect(created.providerId).toBe('prov-1');
+      expect(created.counterpartyKind).toBe(DocCounterpartyKind.SUPPLIER);
+      expect(created.counterpartyId).toBe('prov-1');
+    });
+
+    it('rejects a counterparty that does not exist in the org', async () => {
+      (dataSource.manager.findOne as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.create(
+          {
+            locationId: 'loc-A01',
+            counterpartyKind: DocCounterpartyKind.CUSTOMER,
+            counterpartyId: 'missing',
+            purpose: GoodsIssuePurpose.OTHER,
+            lines: [{ itemId: 'item-1', quantity: 1 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Customer counterparty not found in organization');
     });
 
     it('rejects a transfer to the active branch', async () => {

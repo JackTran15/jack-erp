@@ -38,6 +38,8 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
+import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   buildV2Body,
@@ -731,6 +733,7 @@ function TransferFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [chooseWarehousesOpen, setChooseWarehousesOpen] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
@@ -998,14 +1001,89 @@ function TransferFormDialog({
     markDirty();
   };
 
+  // Resolve the preferred shelf at both the source and destination storage for
+  // the given lines (those with an item + both warehouses) and fill the two Vị
+  // trí columns. Best-effort: a failed lookup leaves locations untouched.
+  const fillTransferLocations = async (targetLines: FormLine[]) => {
+    const keyOf = (l: {
+      itemId: string;
+      sourceStorageId: string;
+      destStorageId: string;
+    }) => `${l.itemId}:${l.sourceStorageId}:${l.destStorageId}`;
+    const pairs = targetLines
+      .filter((l) => l.itemId && l.sourceStorageId && l.destStorageId)
+      .map((l) => ({
+        itemId: l.itemId,
+        sourceStorageId: l.sourceStorageId,
+        destStorageId: l.destStorageId,
+      }));
+    if (pairs.length === 0) return;
+
+    let rows;
+    try {
+      rows = await getTransferPreferredShelfBatch(pairs);
+    } catch {
+      return;
+    }
+    const byKey = new Map(rows.map((r) => [keyOf(r), r]));
+    setLines((prev) =>
+      prev.map((l) => {
+        const r = byKey.get(keyOf(l));
+        if (!r) return l;
+        return {
+          ...l,
+          sourceLocationId: r.sourceShelf?.id ?? l.sourceLocationId,
+          sourceLocationLabel: r.sourceShelf
+            ? `${r.sourceShelf.code} · ${r.sourceShelf.name}`
+            : l.sourceLocationLabel,
+          destLocationId: r.destShelf?.id ?? l.destLocationId,
+          destLocationLabel: r.destShelf
+            ? `${r.destShelf.code} · ${r.destShelf.name}`
+            : l.destLocationLabel,
+        };
+      }),
+    );
+  };
+
+  // "Chọn kho" → apply source + dest warehouse to every line (overwrite), then
+  // auto-fill both Vị trí.
+  const applyTransferWarehouses = (
+    source: { id: string; name: string },
+    dest: { id: string; name: string },
+  ) => {
+    const updated = lines.map((l) => ({
+      ...l,
+      sourceStorageId: source.id,
+      sourceStorageLabel: source.name,
+      destStorageId: dest.id,
+      destStorageLabel: dest.name,
+    }));
+    setLines(updated);
+    markDirty();
+    void fillTransferLocations(updated);
+  };
+
   // Fill the line at `idx` from a selected item — shared by the inline
-  // typeahead (onSelect) and the single-fill ProductSelectDialog.
+  // typeahead (onSelect) and the single-fill ProductSelectDialog. Selecting an
+  // item on the last row appends a fresh blank line carrying the current
+  // warehouses, then auto-fills that line's locations.
   const fillLineFromItem = (
     idx: number,
     item: { id: string; code: string; name: string; unit: string },
   ) => {
-    setLines((prev) =>
-      prev.map((l, i) =>
+    const current = lines[idx];
+    const filledLine = current
+      ? {
+          ...current,
+          itemId: item.id,
+          itemLabel: item.code,
+          itemName: item.name,
+          unit: item.unit,
+        }
+      : null;
+    setLines((prev) => {
+      const appendBlank = idx === prev.length - 1 && !prev[idx]?.itemId;
+      const mapped = prev.map((l, i) =>
         i === idx
           ? {
               ...l,
@@ -1015,9 +1093,21 @@ function TransferFormDialog({
               unit: item.unit,
             }
           : l,
-      ),
-    );
+      );
+      if (appendBlank) {
+        const f = mapped[idx]!;
+        mapped.push({
+          ...emptyLine(),
+          sourceStorageId: f.sourceStorageId,
+          sourceStorageLabel: f.sourceStorageLabel,
+          destStorageId: f.destStorageId,
+          destStorageLabel: f.destStorageLabel,
+        });
+      }
+      return normalizeLines(mapped);
+    });
     markDirty();
+    if (filledLine) void fillTransferLocations([filledLine]);
   };
 
   const lineColumns: LineColumn<FormLine>[] = [
@@ -1387,22 +1477,8 @@ function TransferFormDialog({
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!defaultStorage}
-                onClick={() => {
-                  if (!defaultStorage) return;
-                  setLines((prev) =>
-                    normalizeLines(
-                      prev.map((line) => ({
-                        ...line,
-                        sourceStorageId:
-                          line.sourceStorageId || defaultStorage.id,
-                        sourceStorageLabel:
-                          line.sourceStorageLabel || defaultStorage.name,
-                      })),
-                    ),
-                  );
-                  markDirty();
-                }}
+                disabled={storages.length === 0}
+                onClick={() => setChooseWarehousesOpen(true)}
               >
                 Chọn kho
               </button>
@@ -1477,6 +1553,15 @@ function TransferFormDialog({
           showQuantityPrice
           defaultUnitPriceSource="none"
           onConfirm={addLinesFromPicker}
+        />
+      )}
+
+      {chooseWarehousesOpen && (
+        <ChooseTransferWarehousesDialog
+          storages={storages.map((s) => ({ id: s.id, name: s.name }))}
+          defaultSourceId={defaultStorage?.id}
+          onClose={() => setChooseWarehousesOpen(false)}
+          onConfirm={({ source, dest }) => applyTransferWarehouses(source, dest)}
         />
       )}
 

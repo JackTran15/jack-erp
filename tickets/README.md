@@ -1194,11 +1194,31 @@ flowchart LR
 | [TKT-CPP-02](./tickets/TKT-CPP-02-fe-counterparty-picker-dialog.md)          | FE: `CounterpartyPickerField/Modal` + hook `useCounterpartySearch`             |
 | [TKT-CPP-03](./tickets/TKT-CPP-03-fe-migrate-consumers.md)                   | FE: migrate Nhập kho / Xuất kho sang picker mới                                |
 | [TKT-CPP-04](./tickets/TKT-CPP-04-fe-inline-all-types.md)                    | FE: inline type-ahead search tất cả loại (mixed NCC/KH/NV)                     |
+| [TKT-CPP-05](./tickets/TKT-CPP-05-be-employee-search-uuid-cast.md)           | BE: fix type=employee không lên (uuid/varchar join cast)                       |
 
 ```mermaid
 flowchart LR
   C1["CPP-01 BE endpoint + OpenAPI"] --> C2["CPP-02 Picker dialog + hook"]
   C2 --> C3["CPP-03 Migrate 2 consumers"]
   C3 --> C4["CPP-04 Inline all-types search"]
+```
+
+### EPIC-21062026 Chuyển kho — chọn kho xuất/nhập + auto-fill vị trí + auto-thêm dòng
+
+- [EPIC-21062026 Chuyển kho — chọn kho + auto-fill](./epics/EPIC-21062026-transfer-warehouse-fill.md)
+- Dialog **"Chọn kho"** chọn Kho xuất + Kho nhập một lần → áp cho **tất cả dòng** (ghi đè) + auto-fill **cả 2 Vị trí** qua endpoint riêng `POST /inventory/locations/preferred-shelf/transfer-batch` (preferred shelf ở cả kho xuất + kho nhập, KHÔNG dùng lại `/preferred-shelf/batch` 1-kho). Auto **thêm dòng mới khi chọn item** (chỉ Chuyển kho). Không entity/migration/event. Reuse `getPreferredShelf`.
+
+| Ticket                                                                          | Mô tả                                                              |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [TKT-TWF-01](./tickets/TKT-TWF-01-be-transfer-preferred-shelf-batch.md)         | BE: endpoint `preferred-shelf/transfer-batch` (source+dest)       |
+| [TKT-TWF-02](./tickets/TKT-TWF-02-fe-transfer-shelf-client.md)                  | FE: client `getTransferPreferredShelfBatch`                       |
+| [TKT-TWF-03](./tickets/TKT-TWF-03-fe-choose-warehouses-dialog-fill.md)          | FE: dialog Chọn kho (xuất+nhập) + áp tất cả dòng + fill vị trí    |
+| [TKT-TWF-04](./tickets/TKT-TWF-04-fe-auto-add-line-on-select.md)                | FE: auto thêm dòng khi chọn item (grid Chuyển kho)               |
+
+```mermaid
+flowchart LR
+  W1["TWF-01 BE endpoint + OpenAPI"] --> W2["TWF-02 FE client"]
+  W2 --> W3["TWF-03 Dialog + fill"]
+  W3 --> W4["TWF-04 Auto-add line"]
 ```
 

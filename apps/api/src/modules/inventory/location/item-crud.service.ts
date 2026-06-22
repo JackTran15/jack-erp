@@ -1406,9 +1406,9 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   idField: 'id',
   fields: [
     // ── List-visible fields (shown in table, order matches the UI) ────────
-    { key: 'code', label: 'Mã SKU', type: 'string' },
+    { key: 'code', label: 'SKU mẫu mã', type: 'string' },
     { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true, hideInList: true },
-    { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
+    { key: 'name', label: 'Tên mẫu mã', type: 'string', required: true },
     { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
     { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
