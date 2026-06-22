@@ -566,6 +566,7 @@ function formatDocumentTypeLabel(documentType: DocumentType): string {
     [DocumentType.EMPLOYEE]: "Nhân viên",
     [DocumentType.SUPPLIER]: "Nhà cung cấp",
     [DocumentType.DELIVERY_PARTNER]: "Đối tác giao hàng",
+    [DocumentType.WAREHOUSE]: "Kho lưu trữ",
   };
   return labels[documentType];
 }
@@ -609,6 +610,7 @@ function defaultPrefix(documentType: DocumentType): string {
     [DocumentType.EMPLOYEE]: "NV",
     [DocumentType.SUPPLIER]: "NCC",
     [DocumentType.DELIVERY_PARTNER]: "DTGH",
+    [DocumentType.WAREHOUSE]: "WH",
   };
   return prefixMap[documentType];
 }

@@ -794,6 +794,86 @@ describe('InventoryLocationStockService', () => {
     });
   });
 
+  describe('getPreferredShelfBatch', () => {
+    it('resolves one row per pair in original order and dedups repeated pairs', async () => {
+      const shelfA = { id: 'loc-a', code: 'A-01', name: 'Kệ A-01' };
+      const spy = jest
+        .spyOn(service, 'getPreferredShelf')
+        .mockImplementation(async (itemId: string, storageId: string) =>
+          itemId === 'item-1' && storageId === 'storage-1' ? shelfA : null,
+        );
+
+      const pairs = [
+        { itemId: 'item-1', storageId: 'storage-1' },
+        { itemId: 'item-2', storageId: 'storage-1' },
+        { itemId: 'item-1', storageId: 'storage-1' }, // duplicate
+      ];
+
+      await expect(
+        service.getPreferredShelfBatch(pairs, actor),
+      ).resolves.toEqual([
+        { itemId: 'item-1', storageId: 'storage-1', shelf: shelfA },
+        { itemId: 'item-2', storageId: 'storage-1', shelf: null },
+        { itemId: 'item-1', storageId: 'storage-1', shelf: shelfA },
+      ]);
+
+      // Three inputs, two distinct pairs → resolved once each.
+      expect(spy).toHaveBeenCalledTimes(2);
+      spy.mockRestore();
+    });
+  });
+
+  describe('getPreferredShelfTransferBatch', () => {
+    it('resolves source+dest shelves per pair, in order, deduping repeats', async () => {
+      const shelfSrc = { id: 'loc-src', code: 'S-01', name: 'Kệ nguồn' };
+      const shelfDst = { id: 'loc-dst', code: 'D-01', name: 'Kệ đích' };
+      const spy = jest
+        .spyOn(service, 'getPreferredShelf')
+        .mockImplementation(async (itemId: string, storageId: string) => {
+          if (itemId !== 'item-1') return null;
+          if (storageId === 'src-1') return shelfSrc;
+          if (storageId === 'dst-1') return shelfDst;
+          return null;
+        });
+
+      const pairs = [
+        { itemId: 'item-1', sourceStorageId: 'src-1', destStorageId: 'dst-1' },
+        { itemId: 'item-2', sourceStorageId: 'src-1', destStorageId: 'dst-1' },
+        { itemId: 'item-1', sourceStorageId: 'src-1', destStorageId: 'dst-1' }, // duplicate
+      ];
+
+      await expect(
+        service.getPreferredShelfTransferBatch(pairs, actor),
+      ).resolves.toEqual([
+        {
+          itemId: 'item-1',
+          sourceStorageId: 'src-1',
+          destStorageId: 'dst-1',
+          sourceShelf: shelfSrc,
+          destShelf: shelfDst,
+        },
+        {
+          itemId: 'item-2',
+          sourceStorageId: 'src-1',
+          destStorageId: 'dst-1',
+          sourceShelf: null,
+          destShelf: null,
+        },
+        {
+          itemId: 'item-1',
+          sourceStorageId: 'src-1',
+          destStorageId: 'dst-1',
+          sourceShelf: shelfSrc,
+          destShelf: shelfDst,
+        },
+      ]);
+
+      // Two distinct pairs × (source + dest) = 4 resolutions.
+      expect(spy).toHaveBeenCalledTimes(4);
+      spy.mockRestore();
+    });
+  });
+
   describe('arrange', () => {
     it('moves only the requested quantity from the unassigned location', async () => {
       await service.arrange(

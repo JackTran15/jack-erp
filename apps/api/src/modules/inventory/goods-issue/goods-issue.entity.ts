@@ -3,6 +3,7 @@ import {
   GoodsIssuePurpose,
   GoodsIssueReferenceType,
   GoodsIssueStatus,
+  DocCounterpartyKind,
 } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { BranchEntity } from '../../branch/branch.entity';
@@ -32,6 +33,24 @@ export class GoodsIssueEntity extends BaseEntity {
   @ManyToOne(() => ProviderEntity, { eager: true, nullable: true })
   @JoinColumn({ name: 'provider_id' })
   provider?: ProviderEntity;
+
+  @Column({
+    name: 'counterparty_kind',
+    type: 'enum',
+    enum: DocCounterpartyKind,
+    enumName: 'doc_counterparty_kind_enum',
+    nullable: true,
+    comment: 'Đối tượng kind for v2 issues: supplier (NCC) or customer (KH)',
+  })
+  counterpartyKind?: DocCounterpartyKind | null;
+
+  @Column({
+    name: 'counterparty_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Id of the provider or customer, per counterpartyKind',
+  })
+  counterpartyId?: string | null;
 
   @Column({ comment: 'Denormalized reason text (auto-filled from reasonRef.name or targetBranch.name)' })
   reason: string;

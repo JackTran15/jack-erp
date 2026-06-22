@@ -227,6 +227,13 @@ export const INVENTORY_ITEM_CATEGORY_ENTITY_CONFIG: CrudEntityConfig = {
   fields: [
     { key: 'code', label: 'Mã nhóm hàng', type: 'string' },
     { key: 'name', label: 'Tên nhóm hàng', type: 'string', required: true },
+    {
+      key: 'parentGroupId',
+      label: 'Nhóm cha',
+      type: 'relation',
+      relationEntity: 'inventory-item-categories',
+      hideInList: true,
+    },
     { key: 'description', label: 'Mô tả', type: 'string' },
     {
       key: 'status',

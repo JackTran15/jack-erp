@@ -38,6 +38,7 @@ import { PromotionModule } from './modules/promotion/promotion.module';
 import { JobPositionModule } from './modules/hr/job-position/job-position.module';
 import { InventoryReportsModule } from './modules/inventory-reports/inventory-reports.module';
 import { AdminSearchModule } from './modules/admin-search/admin-search.module';
+import { CounterpartyModule } from './modules/counterparty/counterparty.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { AdminSearchModule } from './modules/admin-search/admin-search.module';
     JobPositionModule,
     InventoryReportsModule,
     AdminSearchModule,
+    CounterpartyModule,
   ],
 })
 export class AppModule {}

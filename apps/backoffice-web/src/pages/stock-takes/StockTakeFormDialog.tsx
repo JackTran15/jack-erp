@@ -33,6 +33,10 @@ import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { LookupField } from "../../components/forms/LookupField";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import type { StockTakeDraft } from "./CreateStockTakeDialog";
 import { StockTakeImportDialog } from "./_components/import/StockTakeImportDialog";
 import type {
@@ -298,6 +302,9 @@ export function StockTakeFormDialog({
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // Single-fill picker: fills the row whose search button was clicked (visible index).
+  // Multi-select product picker (adds N rows).
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   // "Tham chiếu": the NK/XK documents auto-generated when this stock-take was
@@ -615,6 +622,34 @@ export function StockTakeFormDialog({
       }
     },
     [effectiveStorageId, resolveItemDefaults, isNew, stockTake, markDirty],
+  );
+
+  // Append N rows from the multi-select picker. Each picked item resolves its
+  // location/expected via handlePickItem, which fills the trailing-empty row and
+  // appends a fresh one — so the target index advances by one each iteration.
+  const addItemsFromPicker = useCallback(
+    async (result: ProductSelectResult) => {
+      const existing = new Set(rows.map((r) => r.itemId).filter(Boolean));
+      const picked = result.lines.filter(
+        (s) => s.itemId && !existing.has(s.itemId),
+      );
+      if (picked.length === 0) return;
+      const startIdx = Math.max(0, rows.length - 1); // current trailing-empty row
+      for (let i = 0; i < picked.length; i++) {
+        const s = picked[i]!;
+        await handlePickItem(
+          {
+            id: s.itemId,
+            code: s.sku,
+            name: s.name,
+            unit: s.unit,
+            purchasePrice: s.purchasePrice,
+          },
+          startIdx + i,
+        );
+      }
+    },
+    [rows, handlePickItem],
   );
 
   const handleDeleteRow = useCallback(
@@ -1099,15 +1134,13 @@ export function StockTakeFormDialog({
     {
       key: "itemCode",
       label: "Mã SKU",
-      width: 200,
+      width: 360,
       placeholder: "Tìm mã hoặc tên",
       footer: `Số dòng = ${countedRows.length}`,
       renderEditor: (row, idx) => (
         <LookupField
           portalToBody
-          enableSearchModal
-          searchModalTitle="Chọn hàng hóa"
-          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemCode}
@@ -1164,14 +1197,14 @@ export function StockTakeFormDialog({
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 240,
+      width: 280,
       type: "readonly",
       getValue: (r) => r.itemName,
     },
     {
       key: "locationCode",
       label: "Vị trí",
-      width: 140,
+      width: 220,
       placeholder: "Vị trí",
       renderEditor: (row, idx) => (
         <LookupField
@@ -1217,7 +1250,7 @@ export function StockTakeFormDialog({
     {
       key: "unit",
       label: "Đơn vị tính",
-      width: 80,
+      width: 100,
       type: "readonly",
       getValue: (r) => r.unit,
     },
@@ -1836,6 +1869,14 @@ export function StockTakeFormDialog({
           onApplyDraft={handleApplyDraftImport}
         />
       ) : null}
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          onConfirm={(r) => void addItemsFromPicker(r)}
+        />
+      )}
     </>
   );
 }

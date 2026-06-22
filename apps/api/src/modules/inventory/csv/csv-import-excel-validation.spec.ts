@@ -14,6 +14,7 @@ import { ExcelImportItemService } from './excel-import-item.service';
 import { InventoryImportWorkbookService } from './import-workbook/inventory-import-workbook.service';
 import { ExcelImportStockTakeService } from './excel-import-stock-take.service';
 import { ExcelImportGoodsReceiptService } from './excel-import-goods-receipt.service';
+import { ExcelImportDocumentLinesService } from './excel-import-document-lines.service';
 import {
   ImportDuplicateMode,
   InventoryImportExcelField,
@@ -72,6 +73,7 @@ describe('CsvImportService.validateExcelItemRow', () => {
         },
         { provide: ExcelImportStockTakeService, useValue: noopService },
         { provide: ExcelImportGoodsReceiptService, useValue: noopService },
+        { provide: ExcelImportDocumentLinesService, useValue: noopService },
       ],
     }).compile();
 

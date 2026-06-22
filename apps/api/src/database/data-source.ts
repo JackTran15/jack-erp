@@ -27,5 +27,10 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASS || 'erp_secret',
   entities: [path.join(__dirname, '..', '**', '*.entity.{ts,js}')],
   migrations: [path.join(__dirname, 'migrations', '*.{ts,js}')],
+  // Commit each migration in its own transaction. Postgres forbids using a
+  // newly-added enum value in the same transaction it was added in, so an
+  // "ALTER TYPE ... ADD VALUE" migration must commit before a later migration
+  // can reference that value (e.g. WAREHOUSE -> BackfillStorageCode).
+  migrationsTransactionMode: 'each',
   synchronize: false,
 });

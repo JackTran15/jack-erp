@@ -9,11 +9,13 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import {
   BranchStatus,
+  DocumentType,
   PaginationQuery,
   PaginatedResponse,
 } from "@erp/shared-interfaces";
 import { ActorContext } from "../../common/decorators/actor-context.decorator";
 import { OrganizationService } from "../organization/organization.service";
+import { DocumentNumberingService } from "../document-numbering/document-numbering.service";
 import { BranchCashProvisioningService } from "../accounting/cash/branch-cash-provisioning.service";
 import { BranchEntity } from "./branch.entity";
 import { UserBranchAssignmentEntity } from "./user-branch-assignment.entity";
@@ -34,6 +36,7 @@ export class BranchService {
     private readonly assignmentRepo: Repository<UserBranchAssignmentEntity>,
     private readonly orgService: OrganizationService,
     private readonly branchCashProvisioning: BranchCashProvisioningService,
+    private readonly docNumbering: DocumentNumberingService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -62,6 +65,14 @@ export class BranchService {
       where: { organizationId: actor.organizationId },
     });
     const isMainBranch = branchCount === 0;
+
+    // Issue the showroom storage code outside the transaction: the numbering
+    // service runs its own SERIALIZABLE counter transaction.
+    const showroomStorageCode = await this.docNumbering.generate(
+      DocumentType.WAREHOUSE,
+      actor.branchId,
+      actor,
+    );
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(BranchEntity);
@@ -92,7 +103,9 @@ export class BranchService {
       const storage = await manager.save(
         manager.create(StorageEntity, {
           name: showroomName,
+          code: showroomStorageCode,
           isMainStorage: true,
+          isDefaultReceiving: true,
           branchId: branch.id,
           organizationId: branch.organizationId,
           createdBy: actor.userId,

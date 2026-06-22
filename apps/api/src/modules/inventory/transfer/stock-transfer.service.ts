@@ -246,6 +246,9 @@ export class StockTransferService {
         throw new NotFoundException(`Line ${idx + 1}: destination storage not found`);
       }
       if (src.branchId !== actor.branchId || dst.branchId !== actor.branchId) {
+        console.error(
+          `Line ${idx + 1}: source storage branch ${src.branchId} or destination ` +`storage branch ${dst.branchId} does not match actor branch ${actor.branchId}`,
+        );
         throw new BadRequestException(
           'Stock transfer is only allowed between storages in the same branch',
         );

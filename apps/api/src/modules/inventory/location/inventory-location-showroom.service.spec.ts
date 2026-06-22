@@ -42,6 +42,7 @@ describe('InventoryLocationService.createShowroom', () => {
       {} as never, // locationRepo
       {} as never, // assignmentRepo
       branchService as never,
+      {} as never, // docNumbering
     );
   });
 

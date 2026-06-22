@@ -13,6 +13,17 @@ export interface LineColumn<R> {
   group?: string;
   type?: LineColumnType;
   width?: number | string;
+  /**
+   * Floor width for the column. Unlike `width` (a hint the auto-layout table
+   * compresses when space is tight), `minWidth` prevents the column from
+   * shrinking below this value — once the columns' min-widths sum past the
+   * container, the grid scrolls horizontally instead of cramming.
+   *
+   * Defaults to `width` when omitted, so any column with a width already
+   * resists compression. Set explicitly only to floor at a value different
+   * from `width`.
+   */
+  minWidth?: number | string;
   /** Cell value to display (defaults to row[key]). */
   getValue?: (row: R) => string | number | undefined;
   /** Render the editor for this cell. If absent, an Input is used. */
@@ -60,6 +71,17 @@ function alignClass(a: LineColumn<unknown>["align"]) {
   if (a === "right") return "text-right";
   if (a === "center") return "text-center";
   return "text-left";
+}
+
+/** Inline width/min-width style applied to every cell of a column (header + body). */
+function sizeStyle(col: Pick<LineColumn<unknown>, "width" | "minWidth">): React.CSSProperties {
+  const style: React.CSSProperties = {};
+  if (col.width != null) style.width = col.width;
+  // Floor defaults to `width`: columns don't compress below their width, so the
+  // grid scrolls horizontally instead of cramming. Set `minWidth` to override.
+  const min = col.minWidth ?? col.width;
+  if (min != null) style.minWidth = min;
+  return style;
 }
 
 function buildHeaderGroups<R>(columns: LineColumn<R>[]) {
@@ -153,14 +175,10 @@ export function LineItemGrid<R>({
                         "h-16 border-r bg-muted px-2 text-center text-sm font-semibold text-foreground",
                         group.columns[0].className,
                       )}
-                      style={
-                        {
-                          ...stickyHeaderStyle(0),
-                          ...(group.columns[0].width
-                            ? { width: group.columns[0].width }
-                            : {}),
-                        }
-                      }
+                      style={{
+                        ...stickyHeaderStyle(0),
+                        ...sizeStyle(group.columns[0]),
+                      }}
                     >
                       {group.columns[0].label}
                     </th>
@@ -175,7 +193,7 @@ export function LineItemGrid<R>({
                     )}
                     style={{
                       ...stickyHeaderStyle(0),
-                      ...(col.width ? { width: col.width } : {}),
+                      ...sizeStyle(col),
                     }}
                   >
                     {col.label}
@@ -205,7 +223,7 @@ export function LineItemGrid<R>({
                         )}
                         style={{
                           ...stickyHeaderStyle(HEADER_ROW_HEIGHT),
-                          ...(col.width ? { width: col.width } : {}),
+                          ...sizeStyle(col),
                         }}
                       >
                         {col.label}
@@ -221,7 +239,7 @@ export function LineItemGrid<R>({
               <th
                 key={col.key}
                 className="h-8 border-r bg-background p-0"
-                style={stickyHeaderStyle(filterRowTop)}
+                style={{ ...stickyHeaderStyle(filterRowTop), ...sizeStyle(col) }}
               >
                 <div className="flex h-8 min-w-0 items-stretch">
                   <span className="inline-flex w-7 shrink-0 items-center justify-center border-r bg-muted/30 font-mono text-xs font-semibold text-muted-foreground">
@@ -279,6 +297,7 @@ export function LineItemGrid<R>({
                         col.className,
                         col.onCellClick && "cursor-pointer",
                       )}
+                      style={sizeStyle(col)}
                       onClick={
                         col.onCellClick
                           ? () => col.onCellClick?.(row, rowIndex)

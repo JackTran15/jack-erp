@@ -6,11 +6,20 @@ import { BranchEntity } from '../../branch/branch.entity';
 @Entity('storages')
 @Unique(['branchId', 'name'])
 export class StorageEntity extends BaseEntity {
+  @Column({ nullable: true, comment: 'User-facing warehouse code (Mã kho)' })
+  code?: string;
+
   @Column({ comment: 'Storage name (e.g. Main Warehouse, Back Storage)' })
   name: string;
 
-  @Column({ name: 'is_main_storage', default: false, comment: 'If true, this is the branchs default storage for receiving goods' })
+  @Column({ type: 'text', nullable: true, comment: 'Free-text description (Diễn giải)' })
+  description?: string;
+
+  @Column({ name: 'is_main_storage', default: false, comment: 'If true, this is the auto-generated showroom storage (not deletable)' })
   isMainStorage: boolean;
+
+  @Column({ name: 'is_default_receiving', default: false, comment: "Branch's single default warehouse for inbound goods" })
+  isDefaultReceiving: boolean;
 
   @ManyToOne(() => BranchEntity)
   @JoinColumn({ name: 'branch_id' })

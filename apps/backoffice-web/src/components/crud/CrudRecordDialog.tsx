@@ -13,6 +13,7 @@ import {
   Textarea,
 } from "@erp/ui";
 import { HelpButton } from "../HelpButton";
+import { apiClient } from "../../lib/api-axios";
 import { useCrudConfig, useCrudCreate, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
@@ -178,6 +179,7 @@ export function CrudRecordDialog({
 }: Props) {
   const isEdit = recordId !== null;
   const isSupplier = entityKey === "inventory-providers";
+  const isStorage = entityKey === "inventory-storages";
   const isSimple = SIMPLE_DIALOG_ENTITIES.has(entityKey);
 
   const { data: config } = useCrudConfig(entityKey);
@@ -205,6 +207,10 @@ export function CrudRecordDialog({
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Storage: the default-receiving flag is toggled through a dedicated endpoint
+  // (one-per-branch invariant), not the generic PATCH — track it separately.
+  const [storageDefaultReceiving, setStorageDefaultReceiving] = useState(false);
+  const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
 
   useEffect(() => {
     if (!config) return;
@@ -218,14 +224,16 @@ export function CrudRecordDialog({
         }
       }
       setValues(next);
+      if (isStorage) setStorageDefaultReceiving(Boolean(record.isDefaultReceiving));
     } else {
       const defaults: Record<string, unknown> = {};
       editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
       if (isSupplier) defaults.type = "organization";
       setValues(defaults);
+      if (isStorage) setStorageDefaultReceiving(false);
     }
     setErrors({});
-  }, [open, record, config, editableFields, isEdit, isSupplier]);
+  }, [open, record, config, editableFields, isEdit, isSupplier, isStorage]);
 
   const validate = () => {
     const next: Record<string, string> = {};
@@ -258,6 +266,17 @@ export function CrudRecordDialog({
       } else {
         saved = await createMutation.mutateAsync(buildPayload());
       }
+      // Storage: apply the default-receiving flag via the dedicated endpoint.
+      // Only a false→true transition needs a call (it clears the previous default
+      // in the same branch transactionally). Already-default storages are no-ops.
+      if (isStorage && storageDefaultReceiving && !wasStorageDefault) {
+        const targetId = isEdit && recordId ? recordId : String(saved.id ?? "");
+        if (targetId) {
+          await apiClient.post(
+            `/v2/inventory/storages/${targetId}/set-default-receiving`,
+          );
+        }
+      }
       toast.success(
         isEdit
           ? `Đã cập nhật ${config?.displayName ?? "bản ghi"}.`
@@ -269,6 +288,7 @@ export function CrudRecordDialog({
         editableFields.forEach((f) => { defaults[f.key] = f.type === "boolean" ? false : ""; });
         if (isSupplier) defaults.type = "organization";
         setValues(defaults);
+        if (isStorage) setStorageDefaultReceiving(false);
         setErrors({});
       } else {
         onClose();
@@ -370,7 +390,7 @@ export function CrudRecordDialog({
       title={title}
       footer={modalFooter}
       defaultWidth={isSupplier ? 720 : 560}
-      defaultHeight={isSupplier ? 620 : 480}
+      defaultHeight={isSupplier ? 620 : isStorage ? 540 : 480}
       preventOutsideClose={isSaving}
       bodyClassName="overflow-auto"
     >
@@ -386,23 +406,70 @@ export function CrudRecordDialog({
             isSaving={isSaving}
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {editableFields.map((field) => (
-              <CrudFieldInput
-                key={field.key}
-                inputIdPrefix="dialog"
-                field={field}
-                value={values[field.key]}
-                error={errors[field.key]}
-                entityKey={entityKey}
-                currentRecordId={recordId ?? undefined}
-                onChange={(v) => {
-                  setValues((p) => ({ ...p, [field.key]: v }));
-                  setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              {isStorage && (
+                <FormField label="Mã kho" htmlFor="dialog-storage-code">
+                  <Input
+                    id="dialog-storage-code"
+                    type="text"
+                    value={isEdit ? String(record?.code ?? "") : ""}
+                    placeholder={isEdit ? undefined : "Tự động sinh khi lưu"}
+                    disabled
+                  />
+                </FormField>
+              )}
+              {editableFields.map((field) => (
+                <CrudFieldInput
+                  key={field.key}
+                  inputIdPrefix="dialog"
+                  field={field}
+                  value={values[field.key]}
+                  error={errors[field.key]}
+                  entityKey={entityKey}
+                  currentRecordId={recordId ?? undefined}
+                  onChange={(v) => {
+                    setValues((p) => ({ ...p, [field.key]: v }));
+                    setErrors((p) => { const n = { ...p }; delete n[field.key]; return n; });
+                  }}
+                />
+              ))}
+            </div>
+            {isStorage && (
+              <div className="mt-4 space-y-3 border-t border-border pt-4">
+                {isEdit && (
+                  <div className="grid grid-cols-[140px_1fr] items-start gap-3">
+                    <span className="text-sm font-medium leading-snug text-muted-foreground">
+                      Loại kho
+                    </span>
+                    <span className="text-sm leading-snug">
+                      {record?.isMainStorage
+                        ? "Bán hàng (Kho bán hàng mặc định chương trình tự sinh)"
+                        : "Kho lưu trữ"}
+                    </span>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-input accent-primary disabled:cursor-not-allowed disabled:opacity-70"
+                    checked={storageDefaultReceiving}
+                    disabled={wasStorageDefault}
+                    onChange={(e) => setStorageDefaultReceiving(e.target.checked)}
+                  />
+                  <span className="cursor-pointer select-none font-medium">
+                    Kho nhập hàng mặc định
+                  </span>
+                </label>
+                {wasStorageDefault && (
+                  <p className="text-xs text-muted-foreground">
+                    Đây đang là kho nhập hàng mặc định của chi nhánh. Để đổi, hãy
+                    mở một kho khác và tích chọn ô này.
+                  </p>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </AppModal>

@@ -903,6 +903,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cash/accounts/my": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_getMyBranchAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash/accounts/by-branch/{branchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashController_listAccountsByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash/accounts/{id}": {
         parameters: {
             query?: never;
@@ -1528,6 +1560,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/preferred-shelf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa */
+        get: operations["InventoryLocationStockController_getPreferredShelf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/preferred-shelf/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve preferred shelves for many (itemId, storageId) pairs in one request */
+        post: operations["InventoryLocationStockController_batchPreferredShelf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/{locationId}/stock-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List items + stock tại 1 location (kể cả stock âm) */
+        get: operations["InventoryLocationStockController_listStockByLocation"];
+        put?: never;
+        /** Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement. */
+        post: operations["InventoryLocationStockController_addItemToLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/stock-items/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction. */
+        post: operations["InventoryLocationStockController_assignBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/arrange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xếp vị trí: chuyển số lượng hàng từ "Chưa xếp" của kho lên kệ thật + ghi vị trí ưu tiên (PSL). */
+        post: operations["InventoryLocationStockController_arrange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/locations/{locationId}/stock-items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0) */
+        delete: operations["InventoryLocationStockController_removeItemFromLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/items": {
         parameters: {
             query?: never;
@@ -1960,92 +2095,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/inventory/locations/preferred-shelf": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa */
-        get: operations["InventoryLocationStockController_getPreferredShelf"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/locations/{locationId}/stock-items": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List items + stock tại 1 location (kể cả stock âm) */
-        get: operations["InventoryLocationStockController_listStockByLocation"];
-        put?: never;
-        /** Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement. */
-        post: operations["InventoryLocationStockController_addItemToLocation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/locations/stock-items/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction. */
-        post: operations["InventoryLocationStockController_assignBatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/locations/arrange": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Xếp vị trí: chuyển số lượng hàng từ "Chưa xếp" của kho lên kệ thật + ghi vị trí ưu tiên (PSL). */
-        post: operations["InventoryLocationStockController_arrange"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/inventory/locations/{locationId}/stock-items/{itemId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0) */
-        delete: operations["InventoryLocationStockController_removeItemFromLocation"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v2/inventory-items/search": {
         parameters: {
             query?: never;
@@ -2057,6 +2106,74 @@ export interface paths {
         put?: never;
         /** Product-grouped inventory item search (server-side filters) */
         post: operations["InventoryItemV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/storages/{id}/set-default-receiving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a storage as the active branch's single default receiving warehouse */
+        post: operations["StorageDefaultReceivingController_setDefaultReceiving_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/items/resolve-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a suggested location per variant for a branch (or explicit storage) */
+        post: operations["ResolveItemLocationsController_resolve_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/item-categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** List item categories as a parent → child tree */
+        post: operations["ItemCategoryTreeController_tree_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/product-groups/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search products grouped as category → model → variant */
+        post: operations["ProductGroupSearchController_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2446,6 +2563,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["StockTransferV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/stock/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create + post a stock transfer (v2, per-product uniform source bin) */
+        post: operations["StockTransferCommandV2Controller_create_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3069,6 +3203,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/imports/goods-receipts/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadGoodsReceiptMisaTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-receipts/generated-import-template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadGeneratedGoodsReceiptTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/imports/goods-receipts/jobs/{id}/rows": {
         parameters: {
             query?: never;
@@ -3221,6 +3387,246 @@ export interface paths {
             cookie?: never;
         };
         get: operations["CsvImportController_exportJobErrorRowsExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-issues/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateGoodsIssue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-issues/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadGoodsIssueTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-issues/jobs/{id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_listGoodsIssueJobRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-issues/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CsvImportController_cancelGoodsIssueJob"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/goods-issues/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportGoodsIssueJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-transfers/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateStockTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-transfers/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadStockTransferTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-transfers/jobs/{id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_listStockTransferJobRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-transfers/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CsvImportController_cancelStockTransferJob"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/stock-transfers/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportStockTransferJobErrorRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/transfer-orders/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CsvImportController_validateTransferOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/transfer-orders/import-template.xls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_downloadTransferOrderTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/transfer-orders/jobs/{id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_listTransferOrderJobRows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/transfer-orders/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CsvImportController_cancelTransferOrderJob"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/imports/transfer-orders/jobs/{id}/error-rows.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CsvImportController_exportTransferOrderJobErrorRows"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4461,6 +4867,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/inventory/goods-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a DRAFT goods issue (v2, with Đối tượng) */
+        post: operations["GoodsIssueCommandV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/inventory/goods-issues/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post a v2 DRAFT goods issue (DRAFT → POSTED) */
+        post: operations["GoodsIssueCommandV2Controller_post_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/issue-reasons": {
         parameters: {
             query?: never;
@@ -4551,6 +4991,40 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["GoodsReceiptV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a DRAFT goods receipt (v2, with Đối tượng) */
+        post: operations["GoodsReceiptCommandV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/goods-receipts/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post a v2 DRAFT goods receipt (DRAFT → POSTED) */
+        post: operations["GoodsReceiptCommandV2Controller_post_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4894,6 +5368,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["AdminSearchV2Controller_searchItemCategories_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/counterparties/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unified search across suppliers, customers and employees */
+        post: operations["CounterpartyController_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5717,7 +6208,7 @@ export interface components {
         };
         CreateDocumentNumberRuleDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
             branchId?: string;
             prefix: string;
             suffix?: string;
@@ -5729,7 +6220,7 @@ export interface components {
         };
         DocumentNumberRuleEntity: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
             prefix: string;
             suffix?: string;
             includeDate: boolean;
@@ -5761,7 +6252,7 @@ export interface components {
         };
         GenerateDocumentNumberDto: {
             /** @enum {string} */
-            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER";
+            documentType: "INVOICE" | "SALE" | "RETURN" | "TRANSFER" | "ADJUSTMENT" | "JOURNAL" | "PAYABLE" | "RECEIVABLE" | "PURCHASE_ORDER" | "GOODS_ISSUE" | "GOODS_RECEIPT" | "STOCK_TAKE" | "EMPLOYEE" | "QUOTATION" | "TRANSFER_ORDER" | "STOCK_COUNT" | "CASH_RECEIPT" | "CASH_PAYMENT" | "CASH_COUNT" | "BANK_RECEIPT" | "BANK_PAYMENT" | "EXPENSE" | "RECONCILIATION" | "DEBT_OFFSET" | "CUSTOMER" | "SUPPLIER" | "DELIVERY_PARTNER" | "WAREHOUSE";
             branchId?: string;
         };
         CreateMembershipCardInlineDto: {
@@ -6051,6 +6542,123 @@ export interface components {
         IgnoreDeadLetterDto: {
             reason?: string;
         };
+        PreferredShelfResponseDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+        };
+        PreferredShelfPairDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            storageId: string;
+        };
+        BatchPreferredShelfRequestDto: {
+            pairs: components["schemas"]["PreferredShelfPairDto"][];
+        };
+        BatchPreferredShelfRowDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            storageId: string;
+            shelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+        };
+        BatchPreferredShelfResponseDto: {
+            data: components["schemas"]["BatchPreferredShelfRowDto"][];
+        };
+        StockByLocationProviderDto: {
+            /** Format: uuid */
+            providerId: string;
+            providerName: string;
+            isPrimary: boolean;
+        };
+        StockByLocationItemDto: {
+            /** Format: uuid */
+            itemId: string;
+            code: string;
+            name: string;
+            unit: string;
+            /** Format: uuid */
+            categoryId?: string | null;
+            categoryName?: string | null;
+            /** Format: uuid */
+            productId?: string | null;
+            variantLabel?: string | null;
+            isPosVisible: boolean;
+            isActive: boolean;
+            sellingPrice: number;
+            purchasePrice: number;
+            barcodes: string[];
+            providers: components["schemas"]["StockByLocationProviderDto"][];
+            quantity: number;
+            minQty?: number | null;
+            maxQty?: number | null;
+            belowMin: boolean;
+            /** Format: date-time */
+            lastMovementAt?: string | null;
+        };
+        StockByLocationStorageRefDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        StockByLocationBranchRefDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        StockByLocationLocationRefDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "SHELF" | "RACK" | "BIN" | "ZONE";
+            isActive: boolean;
+            storage: components["schemas"]["StockByLocationStorageRefDto"];
+            branch: components["schemas"]["StockByLocationBranchRefDto"];
+        };
+        StockByLocationMetaDto: {
+            location: components["schemas"]["StockByLocationLocationRefDto"];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        StockByLocationResponseDto: {
+            data: components["schemas"]["StockByLocationItemDto"][];
+            meta: components["schemas"]["StockByLocationMetaDto"];
+        };
+        AddItemToLocationDto: Record<string, never>;
+        BatchAssignItemRowDto: {
+            itemId: string;
+            locationId: string;
+        };
+        BatchAssignItemsDto: {
+            rows: components["schemas"]["BatchAssignItemRowDto"][];
+        };
+        ArrangeLocationLineDto: {
+            /**
+             * Format: uuid
+             * @description Hàng hoá (item) cần xếp
+             */
+            itemId: string;
+            /**
+             * Format: uuid
+             * @description Kho chứa vị trí "Chưa xếp" (nguồn) và kệ đích
+             */
+            storageId: string;
+            /**
+             * Format: uuid
+             * @description Vị trí kệ đích để xếp hàng lên
+             */
+            destinationLocationId: string;
+            /** @description Số lượng cần xếp */
+            quantity: number;
+        };
+        ArrangeLocationDto: {
+            lines: components["schemas"]["ArrangeLocationLineDto"][];
+        };
         CreateItemBarcodeInput: {
             code: string;
             notes?: string;
@@ -6122,6 +6730,8 @@ export interface components {
             description?: string;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            parentGroupId?: string | null;
+            parent?: components["schemas"]["ItemCategoryEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -6233,8 +6843,11 @@ export interface components {
             createdBy: string;
         };
         StorageEntity: {
+            code?: string;
             name: string;
+            description?: string;
             isMainStorage: boolean;
+            isDefaultReceiving: boolean;
             branch?: components["schemas"]["BranchEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -6527,104 +7140,6 @@ export interface components {
             /** Format: uuid */
             storageId: string;
         };
-        PreferredShelfResponseDto: {
-            /** Format: uuid */
-            id: string;
-            code: string;
-            name: string;
-        };
-        StockByLocationProviderDto: {
-            /** Format: uuid */
-            providerId: string;
-            providerName: string;
-            isPrimary: boolean;
-        };
-        StockByLocationItemDto: {
-            /** Format: uuid */
-            itemId: string;
-            code: string;
-            name: string;
-            unit: string;
-            /** Format: uuid */
-            categoryId?: string | null;
-            categoryName?: string | null;
-            /** Format: uuid */
-            productId?: string | null;
-            variantLabel?: string | null;
-            isPosVisible: boolean;
-            isActive: boolean;
-            sellingPrice: number;
-            purchasePrice: number;
-            barcodes: string[];
-            providers: components["schemas"]["StockByLocationProviderDto"][];
-            quantity: number;
-            minQty?: number | null;
-            maxQty?: number | null;
-            belowMin: boolean;
-            /** Format: date-time */
-            lastMovementAt?: string | null;
-        };
-        StockByLocationStorageRefDto: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-        };
-        StockByLocationBranchRefDto: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-        };
-        StockByLocationLocationRefDto: {
-            /** Format: uuid */
-            id: string;
-            code: string;
-            name: string;
-            /** @enum {string} */
-            type: "SHELF" | "RACK" | "BIN" | "ZONE";
-            isActive: boolean;
-            storage: components["schemas"]["StockByLocationStorageRefDto"];
-            branch: components["schemas"]["StockByLocationBranchRefDto"];
-        };
-        StockByLocationMetaDto: {
-            location: components["schemas"]["StockByLocationLocationRefDto"];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        StockByLocationResponseDto: {
-            data: components["schemas"]["StockByLocationItemDto"][];
-            meta: components["schemas"]["StockByLocationMetaDto"];
-        };
-        AddItemToLocationDto: Record<string, never>;
-        BatchAssignItemRowDto: {
-            itemId: string;
-            locationId: string;
-        };
-        BatchAssignItemsDto: {
-            rows: components["schemas"]["BatchAssignItemRowDto"][];
-        };
-        ArrangeLocationLineDto: {
-            /**
-             * Format: uuid
-             * @description Hàng hoá (item) cần xếp
-             */
-            itemId: string;
-            /**
-             * Format: uuid
-             * @description Kho chứa vị trí "Chưa xếp" (nguồn) và kệ đích
-             */
-            storageId: string;
-            /**
-             * Format: uuid
-             * @description Vị trí kệ đích để xếp hàng lên
-             */
-            destinationLocationId: string;
-            /** @description Số lượng cần xếp */
-            quantity: number;
-        };
-        ArrangeLocationDto: {
-            lines: components["schemas"]["ArrangeLocationLineDto"][];
-        };
         StringFilterDto: {
             /** @enum {string} */
             operator: "*" | "=" | "+" | "-" | "!";
@@ -6682,6 +7197,108 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        ResolveItemLocationsDto: {
+            /** @description Variant item ids to resolve a location for */
+            variantItemIds: string[];
+            /**
+             * Format: uuid
+             * @description Branch whose default receiving warehouse is used when storageId is omitted
+             */
+            branchId: string;
+            /**
+             * Format: uuid
+             * @description Target storage; when provided, resolution uses this storage and ignores the branch default
+             */
+            storageId?: string;
+        };
+        ResolvedItemLocationDto: {
+            itemId: string;
+            productId: string | null;
+            storageId: string | null;
+            locationId: string | null;
+            locationCode: string | null;
+            locationName: string | null;
+            /** @enum {string} */
+            source: "preferred" | "stock" | "default" | "none";
+        };
+        ResolveItemLocationsResponseDto: {
+            data: components["schemas"]["ResolvedItemLocationDto"][];
+        };
+        SearchItemCategoryTreeDto: {
+            /** @description Match on category name or code */
+            search?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        ItemCategoryTreeNodeDto: {
+            id: string;
+            code: string | null;
+            name: string;
+            description: string | null;
+            parentGroupId: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            children: components["schemas"]["ItemCategoryTreeNodeDto"][];
+        };
+        SearchItemCategoryTreeResponseDto: {
+            data: components["schemas"]["ItemCategoryTreeNodeDto"][];
+        };
+        SearchProductGroupsDto: {
+            /** @description Match on model (product code or name) */
+            model?: string;
+            /**
+             * Format: uuid
+             * @description Restrict to products with a variant in this category
+             */
+            categoryId?: string;
+            /**
+             * Format: uuid
+             * @description When set, each variant carries on-hand quantity for this branch
+             */
+            branchId?: string;
+            /** @default 1 */
+            page: Record<string, never>;
+            /**
+             * @description Page size in number of models (products)
+             * @default 20
+             */
+            pageSize: Record<string, never>;
+        };
+        ProductGroupCategoryDto: {
+            id: string | null;
+            name: string;
+        };
+        ProductGroupVariantDto: {
+            itemId: string;
+            /** @description Variant SKU (Mã SKU) */
+            sku: string;
+            /** @description Comma-joined barcodes of the variant ("" if none) */
+            barcode: string;
+            /** @description Variant name (Tên hàng hoá) */
+            name: string;
+            unit: string;
+            /** @description On-hand quantity in the requested branch (0 when branchId omitted) */
+            quantityOnHand: number;
+        };
+        ProductGroupProductDto: {
+            id: string;
+            /** @description Model SKU (Mã SKU mẫu mã) */
+            code: string | null;
+            /** @description Model name (Tên mẫu mã) */
+            name: string;
+            variants: components["schemas"]["ProductGroupVariantDto"][];
+        };
+        ProductGroupNodeDto: {
+            category: components["schemas"]["ProductGroupCategoryDto"];
+            products: components["schemas"]["ProductGroupProductDto"][];
+        };
+        SearchProductGroupsResponseDto: {
+            data: components["schemas"]["ProductGroupNodeDto"][];
+            /** @description Total matched models (products) */
+            total: number;
+            page: number;
+            pageSize: number;
         };
         InstantAverageCostDto: {
             /** Format: uuid */
@@ -6961,6 +7578,35 @@ export interface components {
             dateRange?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(line_value)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        StockTransferV2LineDto: {
+            /** Format: uuid */
+            itemId: string;
+            quantity: number;
+            /**
+             * Format: uuid
+             * @description Kho xuất — source storage for this line (branch-scoped path).
+             */
+            sourceStorageId: string;
+            /**
+             * Format: uuid
+             * @description Kho nhập — destination storage for this line.
+             */
+            destinationStorageId: string;
+            /** Format: uuid */
+            sourceLocationId?: string;
+            /** Format: uuid */
+            destinationLocationId?: string;
+            unitPrice?: number;
+            notes?: string;
+        };
+        CreateStockTransferV2Dto: {
+            notes?: string;
+            /** Format: uuid */
+            transporterUserId?: string;
+            attachmentIds?: string[];
+            transferredAt?: string;
+            lines: components["schemas"]["StockTransferV2LineDto"][];
         };
         CreatePayableDto: {
             vendorName: string;
@@ -7271,7 +7917,7 @@ export interface components {
         };
         InventoryImportJobEntity: {
             /** @enum {string} */
-            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT";
+            type: "ITEMS" | "OPENING_BALANCES" | "ADJUSTMENTS" | "STOCK_TAKE" | "LOCATIONS" | "GOODS_RECEIPT" | "GOODS_ISSUE" | "STOCK_TRANSFER" | "TRANSFER_ORDER";
             referenceId?: string | null;
             fileName: string;
             fileChecksum: string;
@@ -8316,6 +8962,9 @@ export interface components {
             location?: components["schemas"]["LocationEntity"];
             providerId?: string;
             provider?: components["schemas"]["ProviderEntity"];
+            /** @enum {string|null} */
+            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyId?: string | null;
             reason: string;
             reasonId?: string;
             reasonRef?: components["schemas"]["IssueReasonEntity"];
@@ -8384,6 +9033,38 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        GoodsIssueV2LineDto: {
+            /** Format: uuid */
+            itemId: string;
+            /**
+             * Format: uuid
+             * @description Per-line bin; falls back to header locationId when omitted.
+             */
+            locationId?: string;
+            quantity: number;
+            unitPrice?: number;
+            notes?: string;
+        };
+        CreateGoodsIssueV2Dto: {
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer";
+            /** Format: uuid */
+            counterpartyId?: string;
+            /** @enum {string} */
+            purpose?: "OTHER" | "SALE" | "TRANSFER_OUT" | "DISPOSAL" | "STOCK_TAKE";
+            /** Format: uuid */
+            reasonId?: string;
+            /** Format: uuid */
+            targetBranchId?: string;
+            reason?: string;
+            notes?: string;
+            deliverer?: string;
+            references?: string[];
+            occurredAt?: string;
+            lines: components["schemas"]["GoodsIssueV2LineDto"][];
         };
         CreateIssueReasonDto: {
             /**
@@ -8483,6 +9164,9 @@ export interface components {
             /** @enum {string} */
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             providerId?: string;
+            /** @enum {string|null} */
+            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyId?: string | null;
             deliveredBy?: string;
             reason?: string;
             description?: string;
@@ -8584,6 +9268,30 @@ export interface components {
             date?: components["schemas"]["DateRangeFilterDto"];
             /** @description Tổng tiền (computed line total: SUM(quantity * unit_price)) */
             totalAmount?: components["schemas"]["CompareFilterDto"];
+        };
+        CreateGoodsReceiptV2Dto: {
+            /** @enum {string} */
+            purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer";
+            /** Format: uuid */
+            counterpartyId?: string;
+            receivedAt: string;
+            /**
+             * Format: uuid
+             * @description Header location; derived from the first line when omitted.
+             */
+            locationId?: string;
+            deliveredBy?: string;
+            reason?: string;
+            description?: string;
+            references?: string[];
+            attachmentIds?: string[];
+            /** @enum {string} */
+            paymentMethod?: "CASH" | "CREDIT";
+            /** Format: uuid */
+            cashAccountId?: string;
+            lines: components["schemas"]["GoodsReceiptLineDto"][];
         };
         CreateTransferOrderDto: Record<string, never>;
         TransferOrderEntity: {
@@ -8812,6 +9520,34 @@ export interface components {
             name?: components["schemas"]["StringFilterDto"];
             /** @description Ngày tạo (creation date range) */
             createdAt?: components["schemas"]["DateRangeFilterDto"];
+        };
+        SearchCounterpartiesDto: {
+            /**
+             * @default all
+             * @enum {string}
+             */
+            type: "supplier" | "customer" | "employee" | "all";
+            /** @description Match on name or code */
+            search?: string;
+            /** @default 1 */
+            page: Record<string, never>;
+            /** @default 20 */
+            pageSize: Record<string, never>;
+        };
+        CounterpartyOptionDto: {
+            /** @enum {string} */
+            kind: "supplier" | "customer" | "employee";
+            id: string;
+            code: string | null;
+            name: string;
+            phone: string | null;
+            address: string | null;
+        };
+        SearchCounterpartiesResponseDto: {
+            data: components["schemas"]["CounterpartyOptionDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
         };
     };
     responses: never;
@@ -10660,6 +11396,48 @@ export interface operations {
             };
         };
     };
+    CashController_getMyBranchAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashAccountEntity"];
+                };
+            };
+        };
+    };
+    CashController_listAccountsByBranch: {
+        parameters: {
+            query?: {
+                page?: string;
+                pageSize?: string;
+                type?: string;
+            };
+            header?: never;
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CashController_getAccount: {
         parameters: {
             query?: never;
@@ -11822,6 +12600,190 @@ export interface operations {
             };
         };
     };
+    InventoryLocationStockController_getPreferredShelf: {
+        parameters: {
+            query: {
+                itemId: string;
+                storageId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Vị trí ưu tiên hoặc null nếu chưa được cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferredShelfResponseDto"] | null;
+                };
+            };
+        };
+    };
+    InventoryLocationStockController_batchPreferredShelf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchPreferredShelfRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchPreferredShelfResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryLocationStockController_listStockByLocation: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                /** @description Sort field */
+                sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
+                sortOrder?: "asc" | "desc";
+                /** @description Partial match on item code & name */
+                search?: string;
+                /** @description Exact match on item_barcodes.code */
+                barcode?: string;
+                categoryId?: string;
+                providerId?: string;
+                isPosVisible?: boolean;
+                isActive?: boolean;
+                stockState?: "all" | "positive" | "zero" | "negative" | "below-min";
+            };
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockByLocationResponseDto"];
+                };
+            };
+            /** @description Thiếu permission inventory.read hoặc sai branch scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location không tồn tại hoặc không thuộc tổ chức */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_addItemToLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddItemToLocationDto"];
+            };
+        };
+        responses: {
+            /** @description Đã thêm hàng hóa vào vị trí */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_assignBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAssignItemsDto"];
+            };
+        };
+        responses: {
+            /** @description Kết quả: { created, skipped } */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_arrange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArrangeLocationDto"];
+            };
+        };
+        responses: {
+            /** @description Kết quả: { moved, transferId } */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryLocationStockController_removeItemFromLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     InventoryLocationController_listItems: {
         parameters: {
             query?: {
@@ -12737,167 +13699,6 @@ export interface operations {
             };
         };
     };
-    InventoryLocationStockController_getPreferredShelf: {
-        parameters: {
-            query: {
-                itemId: string;
-                storageId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Vị trí ưu tiên hoặc null nếu chưa được cấu hình */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PreferredShelfResponseDto"] | null;
-                };
-            };
-        };
-    };
-    InventoryLocationStockController_listStockByLocation: {
-        parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                /** @description Sort field */
-                sortBy?: "code" | "name" | "quantity" | "lastMovementAt";
-                sortOrder?: "asc" | "desc";
-                /** @description Partial match on item code & name */
-                search?: string;
-                /** @description Exact match on item_barcodes.code */
-                barcode?: string;
-                categoryId?: string;
-                providerId?: string;
-                isPosVisible?: boolean;
-                isActive?: boolean;
-                stockState?: "all" | "positive" | "zero" | "negative" | "below-min";
-            };
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StockByLocationResponseDto"];
-                };
-            };
-            /** @description Thiếu permission inventory.read hoặc sai branch scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location không tồn tại hoặc không thuộc tổ chức */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryLocationStockController_addItemToLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddItemToLocationDto"];
-            };
-        };
-        responses: {
-            /** @description Đã thêm hàng hóa vào vị trí */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryLocationStockController_assignBatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchAssignItemsDto"];
-            };
-        };
-        responses: {
-            /** @description Kết quả: { created, skipped } */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryLocationStockController_arrange: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ArrangeLocationDto"];
-            };
-        };
-        responses: {
-            /** @description Kết quả: { moved, transferId } */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InventoryLocationStockController_removeItemFromLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-                itemId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     InventoryItemV2Controller_search_v2: {
         parameters: {
             query?: never;
@@ -12917,6 +13718,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InventoryItemSearchV2ResponseDto"];
+                };
+            };
+        };
+    };
+    StorageDefaultReceivingController_setDefaultReceiving_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ResolveItemLocationsController_resolve_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveItemLocationsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveItemLocationsResponseDto"];
+                };
+            };
+        };
+    };
+    ItemCategoryTreeController_tree_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchItemCategoryTreeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchItemCategoryTreeResponseDto"];
+                };
+            };
+        };
+    };
+    ProductGroupSearchController_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchProductGroupsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchProductGroupsResponseDto"];
                 };
             };
         };
@@ -13155,7 +14044,7 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13679,6 +14568,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["StockTransferSearchV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    StockTransferCommandV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStockTransferV2Dto"];
             };
         };
         responses: {
@@ -14692,6 +15604,40 @@ export interface operations {
             };
         };
     };
+    CsvImportController_downloadGoodsReceiptMisaTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_downloadGeneratedGoodsReceiptTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CsvImportController_listGoodsReceiptJobRows: {
         parameters: {
             query?: {
@@ -14904,6 +15850,306 @@ export interface operations {
         };
     };
     CsvImportController_exportJobErrorRowsExcel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_validateGoodsIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_downloadGoodsIssueTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_listGoodsIssueJobRows: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_cancelGoodsIssueJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportGoodsIssueJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_validateStockTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_downloadStockTransferTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_listStockTransferJobRows: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_cancelStockTransferJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportStockTransferJobErrorRows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_validateTransferOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CsvImportController_downloadTransferOrderTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_listTransferOrderJobRows: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                sortBy?: string;
+                sortOrder?: "asc" | "desc";
+                search?: string;
+                filters?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_cancelTransferOrderJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CsvImportController_exportTransferOrderJobErrorRows: {
         parameters: {
             query?: never;
             header?: never;
@@ -17135,6 +18381,48 @@ export interface operations {
             };
         };
     };
+    GoodsIssueCommandV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsIssueV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsIssueCommandV2Controller_post_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     IssueReasonController_list: {
         parameters: {
             query?: {
@@ -17392,6 +18680,48 @@ export interface operations {
                 "application/json": components["schemas"]["GoodsReceiptSearchV2Dto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    GoodsReceiptCommandV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoodsReceiptV2Dto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GoodsReceiptCommandV2Controller_post_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
@@ -18021,6 +19351,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CounterpartyController_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchCounterpartiesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchCounterpartiesResponseDto"];
                 };
             };
         };

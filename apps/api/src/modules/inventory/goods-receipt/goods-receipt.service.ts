@@ -44,6 +44,7 @@ import {
 } from '../supplier-debt/supplier-debt.entity';
 import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
+import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -75,6 +76,11 @@ export class GoodsReceiptService {
 
   async create(dto: CreateGoodsReceiptDto, actor: ActorContext): Promise<GoodsReceiptEntity> {
     this.validateBusinessRules(dto, actor.branchId);
+    const counterparty = await resolveDocCounterparty(
+      this.dataSource.manager,
+      dto,
+      actor.organizationId,
+    );
     const documentNumber = await this.documentNumberingService.generate(
       DocumentType.GOODS_RECEIPT,
       actor.branchId,
@@ -88,7 +94,9 @@ export class GoodsReceiptService {
       documentNumber,
       status: GoodsReceiptStatus.DRAFT,
       purpose: dto.purpose,
-      providerId: dto.providerId,
+      providerId: counterparty.providerId,
+      counterpartyKind: counterparty.counterpartyKind,
+      counterpartyId: counterparty.counterpartyId,
       deliveredBy: dto.deliveredBy,
       reason: dto.reason,
       description: dto.description,
@@ -165,7 +173,21 @@ export class GoodsReceiptService {
     }
 
     if (dto.purpose !== undefined) receipt.purpose = dto.purpose;
-    if (dto.providerId !== undefined) receipt.providerId = dto.providerId;
+    if (dto.counterpartyKind !== undefined || dto.counterpartyId !== undefined) {
+      const counterparty = await resolveDocCounterparty(
+        this.dataSource.manager,
+        dto,
+        actor.organizationId,
+      );
+      // providerId column is nullable; clear it for customer/employee đối tượng.
+      receipt.providerId = (counterparty.providerId ?? null) as unknown as
+        | string
+        | undefined;
+      receipt.counterpartyKind = counterparty.counterpartyKind;
+      receipt.counterpartyId = counterparty.counterpartyId;
+    } else if (dto.providerId !== undefined) {
+      receipt.providerId = dto.providerId;
+    }
     if (dto.deliveredBy !== undefined) receipt.deliveredBy = dto.deliveredBy;
     if (dto.reason !== undefined) receipt.reason = dto.reason;
     if (dto.description !== undefined) receipt.description = dto.description;
@@ -562,8 +584,12 @@ export class GoodsReceiptService {
     dto: CreateGoodsReceiptDto,
     currentBranchId?: string,
   ): void {
-    if (dto.purpose === GoodsReceiptPurpose.OTHER && !dto.providerId) {
-      throw new BadRequestException('Cần chọn đối tượng (NCC) khi mục đích là "Khác"');
+    if (
+      dto.purpose === GoodsReceiptPurpose.OTHER &&
+      !dto.providerId &&
+      !dto.counterpartyId
+    ) {
+      throw new BadRequestException('Cần chọn đối tượng khi mục đích là "Khác"');
     }
     if (dto.purpose === GoodsReceiptPurpose.TRANSFER_IN) {
       if (currentBranchId && dto.sourceBranchId === currentBranchId) {
