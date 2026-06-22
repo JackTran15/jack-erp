@@ -96,7 +96,8 @@ describe('SearchGoodsReceiptsV2Handler', () => {
     expect(andWhereSql).toEqual(
       expect.arrayContaining([
         expect.stringContaining('gr.documentNumber ILIKE'),
-        expect.stringContaining('provider.name ILIKE'),
+        // Party filter resolves the đối tượng name across all 3 kinds.
+        expect.stringContaining('gr.counterparty_kind'),
         expect.stringContaining('SUM(l.quantity * l.unit_price)'),
       ]),
     );

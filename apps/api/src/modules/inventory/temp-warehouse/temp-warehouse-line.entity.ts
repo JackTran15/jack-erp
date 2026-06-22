@@ -62,6 +62,15 @@ export class TempWarehouseLineEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes?: string | null;
 
+  @Column({
+    name: 'source_location_id',
+    type: 'uuid',
+    nullable: true,
+    comment:
+      'Shelf on the source side of the movement (warehouse or showroom location picked in POS)',
+  })
+  sourceLocationId?: string | null;
+
   @ManyToOne(() => TempWarehouseSessionEntity, (s) => s.lines)
   @JoinColumn({ name: 'session_id' })
   session?: TempWarehouseSessionEntity;

@@ -7,6 +7,7 @@ import {
   formatMoneyInteger,
   Input,
   LineItemGrid,
+  MoneyInput,
   PageToolbar,
   PeriodFilter,
   resolvePeriodRange,
@@ -38,6 +39,9 @@ import { BaseDataTable, type TableColumn } from "../../components/table/BaseData
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
+import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
+import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
 import {
   buildV2Body,
@@ -56,6 +60,11 @@ import {
   getPersistableLines,
 } from "../inventory-line-normalization";
 import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+  type SelectedLine,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
 
 type TransferStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
@@ -118,6 +127,15 @@ interface Transfer {
   notes?: string;
   transporterUserId?: string;
   transporter?: { id: string; fullName: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   attachmentIds?: string[];
   transferredAt?: string;
   /** Tổng tiền (∑ line_value), inlined by the v2 search handler. */
@@ -161,13 +179,6 @@ interface InventoryStorage {
   name: string;
   branchId: string;
   isMainStorage?: boolean;
-}
-
-interface EmployeeOption {
-  id: string;
-  code: string | null;
-  firstName: string;
-  lastName: string;
 }
 
 export function StockTransferPage() {
@@ -407,7 +418,10 @@ export function StockTransferPage() {
       key: "party",
       label: "Đối tượng",
       width: 200,
-      render: (row) => row.transporter?.fullName ?? "—",
+      // Counterparty (NCC/KH/NV) for new transfers; legacy rows fall back to the
+      // transporter user's name.
+      render: (row) =>
+        row.counterparty?.name ?? row.transporter?.fullName ?? "—",
     },
     {
       key: "totalAmount",
@@ -677,12 +691,20 @@ function TransferFormDialog({
     [makeEmptyLine],
   );
 
-  const [transporterUserId, setTransporterUserId] = useState(
-    initial?.transporterUserId ?? "",
+  // "Đối tượng" — supplier / customer / employee (replaces the old transporter
+  // picker). Rehydrate from the resolved counterparty when re-opening a phiếu.
+  const [counterpartyId, setCounterpartyId] = useState(
+    initial?.counterparty?.id ?? initial?.counterpartyId ?? "",
   );
-  const [transporterLabel, setTransporterLabel] = useState(
-    initial?.transporter?.fullName ?? "",
+  const [counterpartyCode, setCounterpartyCode] = useState(
+    initial?.counterparty?.code ?? "",
   );
+  const [counterpartyName, setCounterpartyName] = useState(
+    initial?.counterparty?.name ?? "",
+  );
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >(initial?.counterpartyKind ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(
     (initial?.transferredAt ?? initial?.createdAt ?? new Date().toISOString()).slice(
@@ -727,8 +749,10 @@ function TransferFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [chooseWarehousesOpen, setChooseWarehousesOpen] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
@@ -815,30 +839,6 @@ function TransferFormDialog({
     [],
   );
 
-  // Transporter picker — employees are users (mã NV = user code).
-  const searchEmployees = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      const effectivePageSize = pageSize ?? 20;
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(effectivePageSize),
-      });
-      if (query.trim()) params.set("search", query.trim());
-      const { data } = await apiClient.get<PaginatedResponse<EmployeeOption>>(
-        `/admin/users?${params}`,
-      );
-      const fetched = data.page * data.pageSize;
-      return {
-        items: data.data,
-        hasMore: fetched < data.total,
-        total: data.total,
-      };
-    },
-    [],
-  );
-
-  const employeeLabel = (e: EmployeeOption) =>
-    `${e.code ? `${e.code} · ` : ""}${e.firstName} ${e.lastName}`.trim();
 
   // Kho picker is fed from the page-level cached storages (already scoped to
   // the active branch), filtered/paged client-side.
@@ -889,7 +889,8 @@ function TransferFormDialog({
           : undefined;
       const payload = {
         notes: notes || undefined,
-        transporterUserId: transporterUserId || undefined,
+        counterpartyKind: counterpartyKind || undefined,
+        counterpartyId: counterpartyId || undefined,
         transferredAt,
         lines: persistableLines.map((l) => ({
           itemId: l.itemId,
@@ -918,7 +919,17 @@ function TransferFormDialog({
     } finally {
       setSaving(false);
     }
-  }, [lines, notes, transporterUserId, docDate, docTime, initial, mode, onSaved]);
+  }, [
+    lines,
+    notes,
+    counterpartyKind,
+    counterpartyId,
+    docDate,
+    docTime,
+    initial,
+    mode,
+    onSaved,
+  ]);
 
   const requestClose = () => {
     if (dirtyRef.current && !isView) {
@@ -946,8 +957,10 @@ function TransferFormDialog({
       label: "Thêm mới",
       icon: Plus,
       onClick: () => {
-        setTransporterUserId("");
-        setTransporterLabel("");
+        setCounterpartyId("");
+        setCounterpartyCode("");
+        setCounterpartyName("");
+        setCounterpartyKind("");
         setNotes("");
         setLines([makeEmptyLine()]);
         setDirty(false);
@@ -968,12 +981,172 @@ function TransferFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
+  // Multi-select product picker → for each chosen item, update Số lượng/Đơn giá
+  // on the existing line if the item is already in the grid, otherwise append a
+  // new line (source warehouse from the default). Quantity always follows the
+  // dialog; unit price only overwrites when the dialog provides a positive value
+  // so re-selecting to bump quantity doesn't wipe a price already entered.
+  const addLinesFromPicker = (result: ProductSelectResult) => {
+    const picked = new Map<string, SelectedLine>(
+      result.lines.filter((s) => s.itemId).map((s) => [s.itemId, s]),
+    );
+    if (picked.size === 0) return;
+
+    const sourceStorageId = defaultStorage?.id ?? "";
+    const sourceStorageLabel = defaultStorage?.name ?? "";
+    const base = getPersistableFormLines(lines);
+    const existing = new Set(base.map((l) => l.itemId).filter(Boolean));
+
+    const updated = base.map((l) => {
+      const s = l.itemId ? picked.get(l.itemId) : undefined;
+      if (!s) return l;
+      return {
+        ...l,
+        quantity: s.quantity > 0 ? s.quantity : l.quantity,
+        unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : l.unitPrice,
+      };
+    });
+
+    const fresh: FormLine[] = [...picked.values()]
+      .filter((s) => !existing.has(s.itemId))
+      .map((s) => ({
+        ...emptyLine(),
+        itemId: s.itemId,
+        itemLabel: s.sku,
+        itemName: s.name,
+        unit: s.unit,
+        sourceStorageId,
+        sourceStorageLabel,
+        quantity: s.quantity > 0 ? s.quantity : 1,
+        unitPrice: s.unitPrice > 0 ? String(s.unitPrice) : "",
+      }));
+
+    setLines(normalizeLines([...updated, ...fresh]));
+    markDirty();
+  };
+
+  // Resolve the preferred shelf at both the source and destination storage for
+  // the given lines (those with an item + both warehouses) and fill the two Vị
+  // trí columns. Best-effort: a failed lookup leaves locations untouched.
+  const fillTransferLocations = async (targetLines: FormLine[]) => {
+    const keyOf = (l: {
+      itemId: string;
+      sourceStorageId: string;
+      destStorageId: string;
+    }) => `${l.itemId}:${l.sourceStorageId}:${l.destStorageId}`;
+    const pairs = targetLines
+      .filter((l) => l.itemId && l.sourceStorageId && l.destStorageId)
+      .map((l) => ({
+        itemId: l.itemId,
+        sourceStorageId: l.sourceStorageId,
+        destStorageId: l.destStorageId,
+      }));
+    if (pairs.length === 0) return;
+
+    let rows;
+    try {
+      rows = await getTransferPreferredShelfBatch(pairs);
+    } catch {
+      return;
+    }
+    const byKey = new Map(rows.map((r) => [keyOf(r), r]));
+    setLines((prev) =>
+      prev.map((l) => {
+        const r = byKey.get(keyOf(l));
+        if (!r) return l;
+        return {
+          ...l,
+          sourceLocationId: r.sourceShelf?.id ?? l.sourceLocationId,
+          sourceLocationLabel: r.sourceShelf
+            ? `${r.sourceShelf.code} · ${r.sourceShelf.name}`
+            : l.sourceLocationLabel,
+          destLocationId: r.destShelf?.id ?? l.destLocationId,
+          destLocationLabel: r.destShelf
+            ? `${r.destShelf.code} · ${r.destShelf.name}`
+            : l.destLocationLabel,
+        };
+      }),
+    );
+  };
+
+  // "Chọn kho" → apply source + dest warehouse to every line (overwrite), then
+  // auto-fill both Vị trí.
+  const applyTransferWarehouses = (
+    source: { id: string; name: string },
+    dest: { id: string; name: string },
+  ) => {
+    const updated = lines.map((l) => ({
+      ...l,
+      sourceStorageId: source.id,
+      sourceStorageLabel: source.name,
+      // Locations are storage-scoped — drop the previous warehouse's shelf so
+      // fillTransferLocations either repopulates a valid one or leaves it blank.
+      sourceLocationId: "",
+      sourceLocationLabel: "",
+      destStorageId: dest.id,
+      destStorageLabel: dest.name,
+      destLocationId: "",
+      destLocationLabel: "",
+    }));
+    setLines(updated);
+    markDirty();
+    void fillTransferLocations(updated);
+  };
+
+  // Fill the line at `idx` from a selected item — shared by the inline
+  // typeahead (onSelect) and the single-fill ProductSelectDialog. Selecting an
+  // item on the last row appends a fresh blank line carrying the current
+  // warehouses, then auto-fills that line's locations.
+  const fillLineFromItem = (
+    idx: number,
+    item: { id: string; code: string; name: string; unit: string },
+  ) => {
+    const current = lines[idx];
+    const filledLine = current
+      ? {
+          ...current,
+          itemId: item.id,
+          itemLabel: item.code,
+          itemName: item.name,
+          unit: item.unit,
+        }
+      : null;
+    setLines((prev) => {
+      const appendBlank = idx === prev.length - 1 && !prev[idx]?.itemId;
+      const mapped = prev.map((l, i) =>
+        i === idx
+          ? {
+              ...l,
+              itemId: item.id,
+              itemLabel: item.code,
+              itemName: item.name,
+              unit: item.unit,
+            }
+          : l,
+      );
+      if (appendBlank) {
+        const f = mapped[idx]!;
+        mapped.push({
+          ...emptyLine(),
+          sourceStorageId: f.sourceStorageId,
+          sourceStorageLabel: f.sourceStorageLabel,
+          destStorageId: f.destStorageId,
+          destStorageLabel: f.destStorageLabel,
+        });
+      }
+      return normalizeLines(mapped);
+    });
+    markDirty();
+    if (filledLine) void fillTransferLocations([filledLine]);
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 180,
+      width: 360,
       renderEditor: (row, idx) => (
+        <div className="flex h-full items-center gap-1">
         <LookupField
           placeholder="Tìm mã/tên"
           value={row.itemLabel}
@@ -985,26 +1158,9 @@ function TransferFormDialog({
             );
             markDirty();
           }}
-          onSelect={(item) => {
-            setLines((prev) =>
-              prev.map((l, i) =>
-                i === idx
-                  ? {
-                      ...l,
-                      itemId: item.id,
-                      itemLabel: item.code,
-                      itemName: item.name,
-                      unit: item.unit,
-                    }
-                  : l,
-              ),
-            );
-            markDirty();
-          }}
+          onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
-          enableSearchModal
-          searchModalTitle="Chọn mặt hàng"
-          searchModalPlaceholder="Nhập mã hoặc tên mặt hàng"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           itemKey={(it) => it.id}
           renderItem={(it) => it.name}
           renderMeta={(it) => `${it.code} · ${it.unit}`}
@@ -1014,21 +1170,22 @@ function TransferFormDialog({
             { key: "unit", label: "ĐVT", className: "w-[60px]", render: (it) => it.unit },
           ]}
           disabled={isView}
-          className="h-full"
+          className="h-full flex-1"
         />
+        </div>
       ),
     },
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 200,
+      width: 280,
       type: "readonly",
       getValue: (r) => r.itemName,
     },
     {
       key: "sourceStorageLabel",
       label: "Kho xuất",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Chọn kho"
@@ -1076,7 +1233,7 @@ function TransferFormDialog({
     {
       key: "sourceLocationLabel",
       label: "Vị trí xuất",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Mặc định"
@@ -1120,7 +1277,7 @@ function TransferFormDialog({
     {
       key: "destStorageLabel",
       label: "Kho nhập",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Chọn kho"
@@ -1167,7 +1324,7 @@ function TransferFormDialog({
     {
       key: "destLocationLabel",
       label: "Vị trí nhập",
-      width: 150,
+      width: 220,
       renderEditor: (row, idx) => (
         <LookupField
           placeholder="Mặc định"
@@ -1208,31 +1365,48 @@ function TransferFormDialog({
         />
       ),
     },
-    { key: "unit", label: "ĐVT", width: 70, type: "readonly", getValue: (r) => r.unit || "—" },
+    { key: "unit", label: "ĐVT", width: 100, type: "readonly", getValue: (r) => r.unit || "—" },
     {
       key: "quantity",
       label: "Số lượng",
-      width: 100,
+      width: 110,
       type: "number",
       align: "right",
       filterSymbol: "≤",
+      renderEditor: (row, idx) => (
+        <MoneyInput
+          className="h-full border-0"
+          value={row.quantity}
+          onChange={(v) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx ? { ...l, quantity: v === "" ? 0 : v } : l,
+              ),
+            );
+            markDirty();
+          }}
+          disabled={isView}
+          aria-label="Số lượng"
+        />
+      ),
     },
     {
       key: "unitPrice",
       label: "Đơn giá",
-      width: 120,
+      width: 140,
       align: "right",
       renderEditor: (row, idx) => (
-        <Input
-          type="number"
-          min={0}
-          className="h-full border-0 text-right tabular-nums"
+        <MoneyInput
+          className="h-full border-0"
           placeholder="Tự tính"
-          value={row.unitPrice}
-          onChange={(e) => {
-            const val = e.target.value;
+          value={row.unitPrice === "" ? "" : Number(row.unitPrice)}
+          onChange={(v) => {
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, unitPrice: val } : l)),
+              prev.map((l, i) =>
+                i === idx
+                  ? { ...l, unitPrice: v === "" ? "" : String(v) }
+                  : l,
+              ),
             );
             markDirty();
           }}
@@ -1243,12 +1417,12 @@ function TransferFormDialog({
     {
       key: "lineValue",
       label: "Thành tiền",
-      width: 130,
+      width: 150,
       type: "readonly",
       align: "right",
       getValue: (r) => (r.itemId ? formatMoneyInteger(lineAmount(r)) : ""),
     },
-    { key: "notes", label: "Ghi chú", width: 160 },
+    { key: "notes", label: "Ghi chú", width: 200 },
   ];
 
   return (
@@ -1262,33 +1436,40 @@ function TransferFormDialog({
         toolbarItems={dialogToolbar}
         generalInfo={
           <>
-            <FieldRow label="Người vận chuyển">
-              <LookupField
-                placeholder="Chọn người vận chuyển"
-                value={transporterLabel}
-                onValueChange={(v) => {
-                  setTransporterLabel(v);
-                  setTransporterUserId("");
-                  markDirty();
-                }}
-                onSelect={(e) => {
-                  setTransporterUserId(e.id);
-                  setTransporterLabel(employeeLabel(e));
-                  markDirty();
-                }}
-                search={searchEmployees}
-                enableSearchModal
-                searchModalTitle="Chọn người vận chuyển"
-                searchModalPlaceholder="Nhập mã hoặc tên nhân viên"
-                itemKey={(e) => e.id}
-                renderItem={(e) => `${e.firstName} ${e.lastName}`.trim()}
-                renderMeta={(e) => e.code ?? ""}
-                columns={[
-                  { key: "code", label: "Mã NV", className: "w-[100px] font-mono", render: (e) => e.code ?? "" },
-                  { key: "name", label: "Họ tên", render: (e) => `${e.firstName} ${e.lastName}`.trim() },
-                ]}
-                disabled={isView}
-              />
+            <FieldRow label="Đối tượng">
+              <div className="flex items-stretch gap-2">
+                <CounterpartyPickerField
+                  defaultType="all"
+                  allowedTypes={["supplier", "customer", "employee"]}
+                  className="w-[180px]"
+                  dropdownMinWidth={500}
+                  modalTitle="Chọn đối tượng"
+                  modalPlaceholder="Nhập mã hoặc tên đối tượng"
+                  value={counterpartyCode}
+                  onValueChange={(v) => {
+                    setCounterpartyCode(v);
+                    setCounterpartyId("");
+                    setCounterpartyName("");
+                    setCounterpartyKind("");
+                    markDirty();
+                  }}
+                  onSelect={(c) => {
+                    setCounterpartyId(c.id);
+                    setCounterpartyCode(c.code ?? "");
+                    setCounterpartyName(c.name);
+                    setCounterpartyKind(c.kind);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+                <Input
+                  className="flex-1"
+                  placeholder="Tên đối tượng"
+                  value={counterpartyName}
+                  readOnly
+                  tabIndex={-1}
+                />
+              </div>
             </FieldRow>
             <FieldRow label="Diễn giải">
               <Input
@@ -1350,22 +1531,8 @@ function TransferFormDialog({
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!defaultStorage}
-                onClick={() => {
-                  if (!defaultStorage) return;
-                  setLines((prev) =>
-                    normalizeLines(
-                      prev.map((line) => ({
-                        ...line,
-                        sourceStorageId:
-                          line.sourceStorageId || defaultStorage.id,
-                        sourceStorageLabel:
-                          line.sourceStorageLabel || defaultStorage.name,
-                      })),
-                    ),
-                  );
-                  markDirty();
-                }}
+                disabled={storages.length === 0}
+                onClick={() => setChooseWarehousesOpen(true)}
               >
                 Chọn kho
               </button>
@@ -1432,6 +1599,25 @@ function TransferFormDialog({
         onChoose={(c) => void handleUnsavedChoice(c)}
         saveDisabled={actionLoading || saving}
       />
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          showQuantityPrice
+          defaultUnitPriceSource="none"
+          onConfirm={addLinesFromPicker}
+        />
+      )}
+
+      {chooseWarehousesOpen && (
+        <ChooseTransferWarehousesDialog
+          storages={storages.map((s) => ({ id: s.id, name: s.name }))}
+          defaultSourceId={defaultStorage?.id}
+          onClose={() => setChooseWarehousesOpen(false)}
+          onConfirm={({ source, dest }) => applyTransferWarehouses(source, dest)}
+        />
+      )}
 
       <DocumentLineImportDialog
         open={importOpen}

@@ -15,7 +15,11 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
-import { GoodsIssuePurpose, GoodsIssueStatus } from '@erp/shared-interfaces';
+import {
+  DocCounterpartyKind,
+  GoodsIssuePurpose,
+  GoodsIssueStatus,
+} from '@erp/shared-interfaces';
 import {
   IsString,
   IsUUID,
@@ -63,6 +67,16 @@ class CreateGoodsIssueDto {
   @IsOptional()
   @IsUUID()
   providerId?: string;
+
+  /** Đối tượng kind (supplier | customer). When set, the service validates the
+   *  counterparty and routes supplier→provider_id, customer→counterparty cols. */
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
 
   @IsOptional()
   @IsEnum(GoodsIssuePurpose)

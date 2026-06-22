@@ -2888,6 +2888,74 @@
         ]
       }
     },
+    "/cash/accounts/my": {
+      "get": {
+        "operationId": "CashController_getMyBranchAccount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashAccountEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      }
+    },
+    "/cash/accounts/by-branch/{branchId}": {
+      "get": {
+        "operationId": "CashController_listAccountsByBranch",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Cash"
+        ]
+      }
+    },
     "/cash/accounts/{id}": {
       "get": {
         "operationId": "CashController_getAccount",
@@ -4650,6 +4718,387 @@
         ]
       }
     },
+    "/inventory/locations/preferred-shelf": {
+      "get": {
+        "operationId": "InventoryLocationStockController_getPreferredShelf",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vị trí ưu tiên hoặc null nếu chưa được cấu hình",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PreferredShelfResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/preferred-shelf/batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_batchPreferredShelf",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchPreferredShelfRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchPreferredShelfResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve preferred shelves for many (itemId, storageId) pairs in one request",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/preferred-shelf/transfer-batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_batchTransferPreferredShelf",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTransferPreferredShelfRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchTransferPreferredShelfResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve preferred shelves at both source and destination storage for many transfer lines in one request",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/{locationId}/stock-items": {
+      "get": {
+        "operationId": "InventoryLocationStockController_listStockByLocation",
+        "parameters": [
+          {
+            "name": "locationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Sort field",
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "code",
+                "name",
+                "quantity",
+                "lastMovementAt"
+              ]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Partial match on item code & name",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "barcode",
+            "required": false,
+            "in": "query",
+            "description": "Exact match on item_barcodes.code",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isPosVisible",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "stockState",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "positive",
+                "zero",
+                "negative",
+                "below-min"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockByLocationResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Thiếu permission inventory.read hoặc sai branch scope"
+          },
+          "404": {
+            "description": "Location không tồn tại hoặc không thuộc tổ chức"
+          }
+        },
+        "summary": "List items + stock tại 1 location (kể cả stock âm)",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryLocationStockController_addItemToLocation",
+        "parameters": [
+          {
+            "name": "locationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddItemToLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Đã thêm hàng hóa vào vị trí"
+          }
+        },
+        "summary": "Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/stock-items/batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_assignBatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAssignItemsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kết quả: { created, skipped }"
+          }
+        },
+        "summary": "Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/arrange": {
+      "post": {
+        "operationId": "InventoryLocationStockController_arrange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArrangeLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kết quả: { moved, transferId }"
+          }
+        },
+        "summary": "Xếp vị trí: chuyển số lượng hàng từ \"Chưa xếp\" của kho lên kệ thật + ghi vị trí ưu tiên (PSL).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/locations/{locationId}/stock-items/{itemId}": {
+      "delete": {
+        "operationId": "InventoryLocationStockController_removeItemFromLocation",
+        "parameters": [
+          {
+            "name": "locationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0)",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/items": {
       "post": {
         "operationId": "InventoryLocationController_createItem",
@@ -6031,323 +6480,6 @@
         ]
       }
     },
-    "/inventory/locations/preferred-shelf": {
-      "get": {
-        "operationId": "InventoryLocationStockController_getPreferredShelf",
-        "parameters": [
-          {
-            "name": "itemId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "storageId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Vị trí ưu tiên hoặc null nếu chưa được cấu hình",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "nullable": true,
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/PreferredShelfResponseDto"
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "summary": "Lấy vị trí lưu kho ưu tiên (preferred shelf) của hàng hóa",
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
-    "/inventory/locations/{locationId}/stock-items": {
-      "get": {
-        "operationId": "InventoryLocationStockController_listStockByLocation",
-        "parameters": [
-          {
-            "name": "locationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "description": "Sort field",
-            "schema": {
-              "default": "name",
-              "type": "string",
-              "enum": [
-                "code",
-                "name",
-                "quantity",
-                "lastMovementAt"
-              ]
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "asc",
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Partial match on item code & name",
-            "schema": {
-              "minLength": 1,
-              "maxLength": 100,
-              "type": "string"
-            }
-          },
-          {
-            "name": "barcode",
-            "required": false,
-            "in": "query",
-            "description": "Exact match on item_barcodes.code",
-            "schema": {
-              "minLength": 1,
-              "maxLength": 100,
-              "type": "string"
-            }
-          },
-          {
-            "name": "categoryId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "providerId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "isPosVisible",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "isActive",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "stockState",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": "all",
-              "type": "string",
-              "enum": [
-                "all",
-                "positive",
-                "zero",
-                "negative",
-                "below-min"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StockByLocationResponseDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Thiếu permission inventory.read hoặc sai branch scope"
-          },
-          "404": {
-            "description": "Location không tồn tại hoặc không thuộc tổ chức"
-          }
-        },
-        "summary": "List items + stock tại 1 location (kể cả stock âm)",
-        "tags": [
-          "inventory"
-        ]
-      },
-      "post": {
-        "operationId": "InventoryLocationStockController_addItemToLocation",
-        "parameters": [
-          {
-            "name": "locationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddItemToLocationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Đã thêm hàng hóa vào vị trí"
-          }
-        },
-        "summary": "Bind hàng hóa vào vị trí (tạo stock_balance = 0 + PSL). Không ghi stock movement.",
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
-    "/inventory/locations/stock-items/batch": {
-      "post": {
-        "operationId": "InventoryLocationStockController_assignBatch",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BatchAssignItemsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Kết quả: { created, skipped }"
-          }
-        },
-        "summary": "Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.",
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
-    "/inventory/locations/arrange": {
-      "post": {
-        "operationId": "InventoryLocationStockController_arrange",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ArrangeLocationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Kết quả: { moved, transferId }"
-          }
-        },
-        "summary": "Xếp vị trí: chuyển số lượng hàng từ \"Chưa xếp\" của kho lên kệ thật + ghi vị trí ưu tiên (PSL).",
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
-    "/inventory/locations/{locationId}/stock-items/{itemId}": {
-      "delete": {
-        "operationId": "InventoryLocationStockController_removeItemFromLocation",
-        "parameters": [
-          {
-            "name": "locationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "itemId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "summary": "Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0)",
-        "tags": [
-          "inventory"
-        ]
-      }
-    },
     "/v2/inventory-items/search": {
       "post": {
         "operationId": "InventoryItemV2Controller_search_v2",
@@ -6377,6 +6509,126 @@
         "summary": "Product-grouped inventory item search (server-side filters)",
         "tags": [
           "InventoryItemV2"
+        ]
+      }
+    },
+    "/v2/inventory/storages/{id}/set-default-receiving": {
+      "post": {
+        "operationId": "StorageDefaultReceivingController_setDefaultReceiving_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Set a storage as the active branch's single default receiving warehouse",
+        "tags": [
+          "inventory/storages"
+        ]
+      }
+    },
+    "/v2/inventory/items/resolve-locations": {
+      "post": {
+        "operationId": "ResolveItemLocationsController_resolve_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveItemLocationsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveItemLocationsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve a suggested location per variant for a branch (or explicit storage)",
+        "tags": [
+          "inventory/items"
+        ]
+      }
+    },
+    "/v2/inventory/item-categories/tree": {
+      "post": {
+        "operationId": "ItemCategoryTreeController_tree_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchItemCategoryTreeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchItemCategoryTreeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List item categories as a parent → child tree",
+        "tags": [
+          "inventory/item-categories"
+        ]
+      }
+    },
+    "/v2/inventory/product-groups/search": {
+      "post": {
+        "operationId": "ProductGroupSearchController_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchProductGroupsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchProductGroupsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search products grouped as category → model → variant",
+        "tags": [
+          "inventory/product-groups"
         ]
       }
     },
@@ -7046,7 +7298,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -7936,6 +8188,38 @@
         },
         "tags": [
           "StockTransferV2"
+        ]
+      }
+    },
+    "/v2/inventory/stock/transfers": {
+      "post": {
+        "operationId": "StockTransferCommandV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockTransferV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create + post a stock transfer (v2, per-product uniform source bin)",
+        "tags": [
+          "inventory/stock/transfers"
         ]
       }
     },
@@ -9634,6 +9918,34 @@
         ]
       }
     },
+    "/inventory/imports/goods-receipts/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadGoodsReceiptMisaTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-receipts/generated-import-template.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_downloadGeneratedGoodsReceiptTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
     "/inventory/imports/goods-receipts/jobs/{id}/rows": {
       "get": {
         "operationId": "CsvImportController_listGoodsReceiptJobRows",
@@ -10036,6 +10348,492 @@
     "/inventory/imports/jobs/{id}/error-rows.xlsx": {
       "get": {
         "operationId": "CsvImportController_exportJobErrorRowsExcel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-issues/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateGoodsIssue",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-issues/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadGoodsIssueTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-issues/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CsvImportController_listGoodsIssueJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-issues/jobs/{id}": {
+      "delete": {
+        "operationId": "CsvImportController_cancelGoodsIssueJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/goods-issues/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportGoodsIssueJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-transfers/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateStockTransfer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-transfers/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadStockTransferTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-transfers/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CsvImportController_listStockTransferJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-transfers/jobs/{id}": {
+      "delete": {
+        "operationId": "CsvImportController_cancelStockTransferJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/stock-transfers/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportStockTransferJobErrorRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/transfer-orders/validate": {
+      "post": {
+        "operationId": "CsvImportController_validateTransferOrder",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/transfer-orders/import-template.xls": {
+      "get": {
+        "operationId": "CsvImportController_downloadTransferOrderTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/transfer-orders/jobs/{id}/rows": {
+      "get": {
+        "operationId": "CsvImportController_listTransferOrderJobRows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filters",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/transfer-orders/jobs/{id}": {
+      "delete": {
+        "operationId": "CsvImportController_cancelTransferOrderJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CsvImport"
+        ]
+      }
+    },
+    "/inventory/imports/transfer-orders/jobs/{id}/error-rows.xlsx": {
+      "get": {
+        "operationId": "CsvImportController_exportTransferOrderJobErrorRows",
         "parameters": [
           {
             "name": "id",
@@ -13729,6 +14527,62 @@
         ]
       }
     },
+    "/v2/inventory/goods-issues": {
+      "post": {
+        "operationId": "GoodsIssueCommandV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoodsIssueV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a DRAFT goods issue (v2, with Đối tượng)",
+        "tags": [
+          "inventory/goods-issues"
+        ]
+      }
+    },
+    "/v2/inventory/goods-issues/{id}/post": {
+      "post": {
+        "operationId": "GoodsIssueCommandV2Controller_post_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Post a v2 DRAFT goods issue (DRAFT → POSTED)",
+        "tags": [
+          "inventory/goods-issues"
+        ]
+      }
+    },
     "/inventory/issue-reasons": {
       "get": {
         "operationId": "IssueReasonController_list",
@@ -14169,6 +15023,62 @@
         },
         "tags": [
           "GoodsReceiptV2"
+        ]
+      }
+    },
+    "/v2/goods-receipts": {
+      "post": {
+        "operationId": "GoodsReceiptCommandV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoodsReceiptV2Dto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a DRAFT goods receipt (v2, with Đối tượng)",
+        "tags": [
+          "inventory/goods-receipts"
+        ]
+      }
+    },
+    "/v2/goods-receipts/{id}/post": {
+      "post": {
+        "operationId": "GoodsReceiptCommandV2Controller_post_v2",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Post a v2 DRAFT goods receipt (DRAFT → POSTED)",
+        "tags": [
+          "inventory/goods-receipts"
         ]
       }
     },
@@ -15690,6 +16600,38 @@
         },
         "tags": [
           "AdminSearchV2"
+        ]
+      }
+    },
+    "/v2/counterparties/search": {
+      "post": {
+        "operationId": "CounterpartyController_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCounterpartiesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCounterpartiesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unified search across suppliers, customers and employees",
+        "tags": [
+          "counterparties"
         ]
       }
     }
@@ -18313,7 +19255,8 @@
               "DEBT_OFFSET",
               "CUSTOMER",
               "SUPPLIER",
-              "DELIVERY_PARTNER"
+              "DELIVERY_PARTNER",
+              "WAREHOUSE"
             ]
           },
           "branchId": {
@@ -18386,7 +19329,8 @@
               "DEBT_OFFSET",
               "CUSTOMER",
               "SUPPLIER",
-              "DELIVERY_PARTNER"
+              "DELIVERY_PARTNER",
+              "WAREHOUSE"
             ],
             "type": "string"
           },
@@ -18523,7 +19467,8 @@
               "DEBT_OFFSET",
               "CUSTOMER",
               "SUPPLIER",
-              "DELIVERY_PARTNER"
+              "DELIVERY_PARTNER",
+              "WAREHOUSE"
             ]
           },
           "branchId": {
@@ -19462,6 +20407,501 @@
           }
         }
       },
+      "PreferredShelfResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "PreferredShelfPairDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "itemId",
+          "storageId"
+        ]
+      },
+      "BatchPreferredShelfRequestDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreferredShelfPairDto"
+            }
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "BatchPreferredShelfRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "storageId",
+          "shelf"
+        ]
+      },
+      "BatchPreferredShelfResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchPreferredShelfRowDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TransferPreferredShelfPairDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destStorageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "itemId",
+          "sourceStorageId",
+          "destStorageId"
+        ]
+      },
+      "BatchTransferPreferredShelfRequestDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferPreferredShelfPairDto"
+            }
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "BatchTransferPreferredShelfRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceShelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          },
+          "destShelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "sourceStorageId",
+          "destStorageId",
+          "sourceShelf",
+          "destShelf"
+        ]
+      },
+      "BatchTransferPreferredShelfResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchTransferPreferredShelfRowDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "StockByLocationProviderDto": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "providerName": {
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "providerId",
+          "providerName",
+          "isPrimary"
+        ]
+      },
+      "StockByLocationItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "variantLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPosVisible": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sellingPrice": {
+            "type": "number"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockByLocationProviderDto"
+            }
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "minQty": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxQty": {
+            "type": "number",
+            "nullable": true
+          },
+          "belowMin": {
+            "type": "boolean"
+          },
+          "lastMovementAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "isPosVisible",
+          "isActive",
+          "sellingPrice",
+          "purchasePrice",
+          "barcodes",
+          "providers",
+          "quantity",
+          "belowMin"
+        ]
+      },
+      "StockByLocationStorageRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StockByLocationBranchRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "StockByLocationLocationRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "SHELF",
+              "RACK",
+              "BIN",
+              "ZONE"
+            ],
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StockByLocationStorageRefDto"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/StockByLocationBranchRefDto"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "type",
+          "isActive",
+          "storage",
+          "branch"
+        ]
+      },
+      "StockByLocationMetaDto": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/StockByLocationLocationRefDto"
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "location",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "StockByLocationResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockByLocationItemDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/StockByLocationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "AddItemToLocationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "BatchAssignItemRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "locationId"
+        ]
+      },
+      "BatchAssignItemsDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchAssignItemRowDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
+      "ArrangeLocationLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Hàng hoá (item) cần xếp"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Kho chứa vị trí \"Chưa xếp\" (nguồn) và kệ đích"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Vị trí kệ đích để xếp hàng lên"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Số lượng cần xếp"
+          }
+        },
+        "required": [
+          "itemId",
+          "storageId",
+          "destinationLocationId",
+          "quantity"
+        ]
+      },
+      "ArrangeLocationDto": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArrangeLocationLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
       "CreateItemBarcodeInput": {
         "type": "object",
         "properties": {
@@ -19718,6 +21158,13 @@
               "ACTIVE",
               "INACTIVE"
             ]
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "parent": {
+            "$ref": "#/components/schemas/ItemCategoryEntity"
           },
           "id": {
             "type": "string"
@@ -20046,10 +21493,19 @@
       "StorageEntity": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "isMainStorage": {
+            "type": "boolean"
+          },
+          "isDefaultReceiving": {
             "type": "boolean"
           },
           "branch": {
@@ -20082,6 +21538,7 @@
         "required": [
           "name",
           "isMainStorage",
+          "isDefaultReceiving",
           "id",
           "organizationId",
           "createdAt",
@@ -21005,333 +22462,6 @@
           "storageId"
         ]
       },
-      "PreferredShelfResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name"
-        ]
-      },
-      "StockByLocationProviderDto": {
-        "type": "object",
-        "properties": {
-          "providerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "providerName": {
-            "type": "string"
-          },
-          "isPrimary": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "providerId",
-          "providerName",
-          "isPrimary"
-        ]
-      },
-      "StockByLocationItemDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "unit": {
-            "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "categoryName": {
-            "type": "string",
-            "nullable": true
-          },
-          "productId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "variantLabel": {
-            "type": "string",
-            "nullable": true
-          },
-          "isPosVisible": {
-            "type": "boolean"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "sellingPrice": {
-            "type": "number"
-          },
-          "purchasePrice": {
-            "type": "number"
-          },
-          "barcodes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "providers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockByLocationProviderDto"
-            }
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "minQty": {
-            "type": "number",
-            "nullable": true
-          },
-          "maxQty": {
-            "type": "number",
-            "nullable": true
-          },
-          "belowMin": {
-            "type": "boolean"
-          },
-          "lastMovementAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "itemId",
-          "code",
-          "name",
-          "unit",
-          "isPosVisible",
-          "isActive",
-          "sellingPrice",
-          "purchasePrice",
-          "barcodes",
-          "providers",
-          "quantity",
-          "belowMin"
-        ]
-      },
-      "StockByLocationStorageRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "StockByLocationBranchRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "StockByLocationLocationRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "enum": [
-              "SHELF",
-              "RACK",
-              "BIN",
-              "ZONE"
-            ],
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "storage": {
-            "$ref": "#/components/schemas/StockByLocationStorageRefDto"
-          },
-          "branch": {
-            "$ref": "#/components/schemas/StockByLocationBranchRefDto"
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name",
-          "type",
-          "isActive",
-          "storage",
-          "branch"
-        ]
-      },
-      "StockByLocationMetaDto": {
-        "type": "object",
-        "properties": {
-          "location": {
-            "$ref": "#/components/schemas/StockByLocationLocationRefDto"
-          },
-          "total": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "pageSize": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "location",
-          "total",
-          "page",
-          "pageSize"
-        ]
-      },
-      "StockByLocationResponseDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StockByLocationItemDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/StockByLocationMetaDto"
-          }
-        },
-        "required": [
-          "data",
-          "meta"
-        ]
-      },
-      "AddItemToLocationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "BatchAssignItemRowDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string"
-          },
-          "locationId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "itemId",
-          "locationId"
-        ]
-      },
-      "BatchAssignItemsDto": {
-        "type": "object",
-        "properties": {
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BatchAssignItemRowDto"
-            }
-          }
-        },
-        "required": [
-          "rows"
-        ]
-      },
-      "ArrangeLocationLineDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Hàng hoá (item) cần xếp"
-          },
-          "storageId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Kho chứa vị trí \"Chưa xếp\" (nguồn) và kệ đích"
-          },
-          "destinationLocationId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Vị trí kệ đích để xếp hàng lên"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 1e-06,
-            "description": "Số lượng cần xếp"
-          }
-        },
-        "required": [
-          "itemId",
-          "storageId",
-          "destinationLocationId",
-          "quantity"
-        ]
-      },
-      "ArrangeLocationDto": {
-        "type": "object",
-        "properties": {
-          "lines": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ArrangeLocationLineDto"
-            }
-          }
-        },
-        "required": [
-          "lines"
-        ]
-      },
       "StringFilterDto": {
         "type": "object",
         "properties": {
@@ -21543,6 +22673,325 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "ResolveItemLocationsDto": {
+        "type": "object",
+        "properties": {
+          "variantItemIds": {
+            "minItems": 1,
+            "description": "Variant item ids to resolve a location for",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Branch whose default receiving warehouse is used when storageId is omitted"
+          },
+          "storageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Target storage; when provided, resolution uses this storage and ignores the branch default"
+          }
+        },
+        "required": [
+          "variantItemIds",
+          "branchId"
+        ]
+      },
+      "ResolvedItemLocationDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true
+          },
+          "storageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "preferred",
+              "stock",
+              "default",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "productId",
+          "storageId",
+          "locationId",
+          "locationCode",
+          "locationName",
+          "source"
+        ]
+      },
+      "ResolveItemLocationsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedItemLocationDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SearchItemCategoryTreeDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Match on category name or code"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "ItemCategoryTreeNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemCategoryTreeNodeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "parentGroupId",
+          "status",
+          "children"
+        ]
+      },
+      "SearchItemCategoryTreeResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemCategoryTreeNodeDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SearchProductGroupsDto": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Match on model (product code or name)"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Restrict to products with a variant in this category"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "When set, each variant carries on-hand quantity for this branch"
+          },
+          "page": {
+            "type": "object",
+            "default": 1,
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "object",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Page size in number of models (products)"
+          }
+        }
+      },
+      "ProductGroupCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ProductGroupVariantDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string",
+            "description": "Variant SKU (Mã SKU)"
+          },
+          "barcode": {
+            "type": "string",
+            "description": "Comma-joined barcodes of the variant (\"\" if none)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Variant name (Tên hàng hoá)"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantityOnHand": {
+            "type": "number",
+            "description": "On-hand quantity in the requested branch (0 when branchId omitted)"
+          }
+        },
+        "required": [
+          "itemId",
+          "sku",
+          "barcode",
+          "name",
+          "unit",
+          "quantityOnHand"
+        ]
+      },
+      "ProductGroupProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Model SKU (Mã SKU mẫu mã)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Model name (Tên mẫu mã)"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductGroupVariantDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "variants"
+        ]
+      },
+      "ProductGroupNodeDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ProductGroupCategoryDto"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductGroupProductDto"
+            }
+          }
+        },
+        "required": [
+          "category",
+          "products"
+        ]
+      },
+      "SearchProductGroupsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductGroupNodeDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Total matched models (products)"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "pageSize"
         ]
       },
       "InstantAverageCostDto": {
@@ -22086,6 +23535,19 @@
           "transporterUserId": {
             "type": "string"
           },
+          "counterpartyKind": {
+            "nullable": true,
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ],
+            "type": "string"
+          },
+          "counterpartyId": {
+            "type": "string",
+            "nullable": true
+          },
           "transferredAt": {
             "format": "date-time",
             "type": "string"
@@ -22119,6 +23581,11 @@
               "id",
               "fullName"
             ]
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById. Legacy transfers (no\ncounterparty) keep null and fall back to {@link transporter} on the FE."
           },
           "totalAmount": {
             "type": "number",
@@ -22235,7 +23702,7 @@
           },
           "quantity": {
             "type": "number",
-            "minimum": 1e-06,
+            "minimum": 0.000001,
             "description": "Quantity to transfer (must be > 0)"
           },
           "sourceLocationId": {
@@ -22358,6 +23825,93 @@
             ]
           }
         }
+      },
+      "StockTransferV2LineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.001
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "description": "Kho xuất — source storage for this line (branch-scoped path).",
+            "format": "uuid"
+          },
+          "destinationStorageId": {
+            "type": "string",
+            "description": "Kho nhập — destination storage for this line.",
+            "format": "uuid"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationLocationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity",
+          "sourceStorageId",
+          "destinationStorageId"
+        ]
+      },
+      "CreateStockTransferV2Dto": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string"
+          },
+          "transporterUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "transferredAt": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockTransferV2LineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
       },
       "CreatePayableDto": {
         "type": "object",
@@ -23179,6 +24733,10 @@
             "type": "string",
             "nullable": true
           },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true
+          },
           "session": {
             "$ref": "#/components/schemas/TempWarehouseSessionEntity"
           },
@@ -23246,6 +24804,11 @@
           },
           "notes": {
             "type": "string"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Shelf/location on the source side of the movement"
           }
         },
         "required": [
@@ -23269,6 +24832,11 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           }
         }
       },
@@ -23322,7 +24890,10 @@
               "ADJUSTMENTS",
               "STOCK_TAKE",
               "LOCATIONS",
-              "GOODS_RECEIPT"
+              "GOODS_RECEIPT",
+              "GOODS_ISSUE",
+              "STOCK_TRANSFER",
+              "TRANSFER_ORDER"
             ]
           },
           "referenceId": {
@@ -26585,6 +28156,19 @@
           "provider": {
             "$ref": "#/components/schemas/ProviderEntity"
           },
+          "counterpartyKind": {
+            "nullable": true,
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ],
+            "type": "string"
+          },
+          "counterpartyId": {
+            "type": "string",
+            "nullable": true
+          },
           "reason": {
             "type": "string"
           },
@@ -26666,6 +28250,11 @@
             "items": {
               "$ref": "#/components/schemas/GoodsIssueLineEntity"
             }
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so customer and employee\ncounterparties (no provider join) render their name instead of \"—\"."
           },
           "id": {
             "type": "string"
@@ -26824,6 +28413,102 @@
           }
         }
       },
+      "GoodsIssueV2LineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Per-line bin; falls back to header locationId when omitted.",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateGoodsIssueV2Dto": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "SALE",
+              "TRANSFER_OUT",
+              "DISPOSAL",
+              "STOCK_TAKE"
+            ]
+          },
+          "reasonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetBranchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "deliverer": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurredAt": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsIssueV2LineDto"
+            }
+          }
+        },
+        "required": [
+          "locationId",
+          "lines"
+        ]
+      },
       "CreateIssueReasonDto": {
         "type": "object",
         "properties": {
@@ -26971,6 +28656,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "counterpartyKind": {
+            "type": "string",
+            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "deliveredBy": {
             "type": "string",
             "maxLength": 200
@@ -27080,6 +28778,19 @@
           "providerId": {
             "type": "string"
           },
+          "counterpartyKind": {
+            "nullable": true,
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ],
+            "type": "string"
+          },
+          "counterpartyId": {
+            "type": "string",
+            "nullable": true
+          },
           "deliveredBy": {
             "type": "string"
           },
@@ -27164,6 +28875,11 @@
           },
           "location": {
             "$ref": "#/components/schemas/LocationEntity"
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so the FE renders supplier,\ncustomer and employee counterparties alike (provider_id is null for the\nlatter two)."
           },
           "id": {
             "type": "string"
@@ -27295,6 +29011,18 @@
             "type": "string",
             "format": "uuid"
           },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "deliveredBy": {
             "type": "string",
             "maxLength": 200
@@ -27421,6 +29149,86 @@
             ]
           }
         }
+      },
+      "CreateGoodsReceiptV2Dto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "OTHER",
+              "TRANSFER_IN",
+              "STOCK_TAKE"
+            ]
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receivedAt": {
+            "type": "string"
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Header location; derived from the first line when omitted.",
+            "format": "uuid"
+          },
+          "deliveredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ]
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "receivedAt",
+          "lines"
+        ]
       },
       "CreateTransferOrderDto": {
         "type": "object",
@@ -28091,6 +29899,101 @@
             ]
           }
         }
+      },
+      "SearchCounterpartiesDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "default": "all",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee",
+              "all"
+            ],
+            "type": "string"
+          },
+          "search": {
+            "type": "string",
+            "description": "Match on name or code"
+          },
+          "page": {
+            "type": "object",
+            "default": 1,
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "object",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "CounterpartyOptionDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address"
+        ]
+      },
+      "SearchCounterpartiesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CounterpartyOptionDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "pageSize"
+        ]
       }
     }
   }

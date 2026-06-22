@@ -52,6 +52,15 @@ import { formatCrudFieldValue } from "../../lib/crud-display";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { CrudRecordDialog } from "./CrudRecordDialog";
 import { formatCustomerStatus } from "../../lib/customer-display";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+} from "lucide-react";
+import { flattenCategoryTree, collectParentIds } from "./itemCategoryTree";
+import { useItemCategoryTree } from "./useItemCategoryTree";
+import { useCrudListReturnState } from "./useCrudListReturnState";
 
 /** Entity keys that open create/edit as a dialog instead of navigating to a new page. */
 const DIALOG_MODE_ENTITIES = new Set([
@@ -107,18 +116,6 @@ export function CrudListPage({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [sortBy, setSortBy] = useState<string | undefined>(initialSort?.sortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    initialSort?.sortOrder ?? "desc",
-  );
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [columnFilters, setColumnFilters] = useState<
-    Record<string, ColumnFilter>
-  >({});
-
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
     new Set(),
   );
@@ -129,6 +126,37 @@ export function CrudListPage({
     string,
     unknown
   > | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
+  const resetListUiState = useCallback(() => {
+    setSelectedRecordIds(new Set());
+    setCreateDialogOpen(false);
+    setEditSnapshot(null);
+    setDuplicateSnapshot(null);
+    setCollapsedIds(new Set());
+  }, []);
+
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
+    search,
+    setSearch,
+    searchInput,
+    setSearchInput,
+    columnFilters,
+    setColumnFilters,
+    goToEdit,
+  } = useCrudListReturnState({
+    entityKey,
+    initialSort,
+    onEntityReset: resetListUiState,
+  });
 
   // Dialog-mode create/edit (for entities in DIALOG_MODE_ENTITIES)
   const [crudDialogOpen, setCrudDialogOpen] = useState(false);
@@ -144,6 +172,18 @@ export function CrudListPage({
     setCrudDialogOpen(true);
   };
   const useDialogMode = entityKey ? DIALOG_MODE_ENTITIES.has(entityKey) : false;
+
+  // Nhóm hàng hoá renders as a collapsible parent → child tree instead of the
+  // flat paginated list. Ids in `collapsedIds` have their children hidden.
+  const isCategoryTree = entityKey === "inventory-item-categories";
+  const toggleCategoryCollapse = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const {
     data: config,
@@ -170,33 +210,60 @@ export function CrudListPage({
   const v2Query = useCrudV2Search(
     entityKey ?? "",
     v2Body,
-    Boolean(v2 && config),
+    Boolean(v2 && config) && !isCategoryTree,
   );
 
-  const records = v2 ? v2Query.data : recordsQuery.data;
-  const loading = v2 ? v2Query.isLoading : recordsQuery.isLoading;
+  // Tree data source (Nhóm hàng hoá only). Search is driven by the code/name
+  // column filters; the backend prunes the tree and keeps matching branches.
+  const treeSearch = (
+    debouncedColumnFilters.name?.value ||
+    debouncedColumnFilters.code?.value ||
+    ""
+  ).trim();
+  const treeQuery = useItemCategoryTree(
+    { search: treeSearch || undefined },
+    isCategoryTree && Boolean(config),
+  );
+  const treeNodes = useMemo(
+    () => treeQuery.data?.data ?? [],
+    [treeQuery.data],
+  );
+  // When searching, the returned tree is already pruned to matches — show it
+  // fully expanded so every match is visible regardless of collapse state.
+  const treeVisibleRows = useMemo(
+    () => flattenCategoryTree(treeNodes, treeSearch ? undefined : collapsedIds),
+    [treeNodes, collapsedIds, treeSearch],
+  );
+  const treeAllRows = useMemo(() => flattenCategoryTree(treeNodes), [treeNodes]);
+  const categoryTreeRecords = useMemo(
+    () => ({
+      data: treeAllRows,
+      total: treeAllRows.length,
+      page: 1,
+      limit: treeAllRows.length,
+    }),
+    [treeAllRows],
+  );
+
+  const records = isCategoryTree
+    ? categoryTreeRecords
+    : v2
+      ? v2Query.data
+      : recordsQuery.data;
+  const loading = isCategoryTree
+    ? treeQuery.isLoading
+    : v2
+      ? v2Query.isLoading
+      : recordsQuery.isLoading;
   const refetchRecords = () => {
-    if (v2) void v2Query.refetch();
+    if (isCategoryTree) void treeQuery.refetch();
+    else if (v2) void v2Query.refetch();
     else void recordsQuery.refetch();
   };
 
   const createMutation = useCrudCreate(entityKey ?? "");
   const updateMutation = useCrudUpdate(entityKey ?? "");
   const deleteMutation = useCrudDelete(entityKey ?? "");
-
-  useEffect(() => {
-    setPage(1);
-    setPageSize(20);
-    setSortBy(initialSort?.sortBy);
-    setSortOrder(initialSort?.sortOrder ?? "desc");
-    setSearch("");
-    setSearchInput("");
-    setColumnFilters({});
-    setSelectedRecordIds(new Set());
-    setCreateDialogOpen(false);
-    setEditSnapshot(null);
-    setDuplicateSnapshot(null);
-  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!records) {
@@ -214,6 +281,8 @@ export function CrudListPage({
   }, [records, config?.idField]);
 
   const filteredRecords = useMemo(() => {
+    // Tree mode renders the collapse-aware flattened rows.
+    if (isCategoryTree) return treeVisibleRows;
     const source = records?.data ?? [];
     // v2 entities are filtered server-side — render the rows as-is.
     if (v2) return source;
@@ -229,7 +298,7 @@ export function CrudListPage({
         return applyColumnFilter(comparable, filter);
       }),
     );
-  }, [records?.data, config?.fields, columnFilters, v2]);
+  }, [records?.data, config?.fields, columnFilters, v2, isCategoryTree, treeVisibleRows]);
 
   useEffect(() => {
     const visibleIds = new Set(
@@ -314,6 +383,42 @@ export function CrudListPage({
               ? `max-w-[${widthPx}px] text-right tabular-nums`
               : `max-w-[${widthPx}px]`,
             render: (row) => {
+              if (isCategoryTree && field.key === "code") {
+                const depth = Number(row.__depth ?? 0);
+                const hasChildren = Boolean(row.__hasChildren);
+                const collapsed = Boolean(row.__collapsed);
+                return (
+                  <div
+                    className="flex items-center"
+                    style={{ paddingLeft: depth * 18 }}
+                  >
+                    {hasChildren ? (
+                      <button
+                        type="button"
+                        aria-label={collapsed ? "Mở rộng" : "Thu gọn"}
+                        className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleCategoryCollapse(
+                            String(row[config?.idField ?? "id"]),
+                          );
+                        }}
+                      >
+                        {collapsed ? (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="mr-1 inline-block h-4 w-4 shrink-0" />
+                    )}
+                    <span className={hasChildren ? "font-semibold" : undefined}>
+                      {formatCell(row[field.key], field, col.format)}
+                    </span>
+                  </div>
+                );
+              }
               if (
                 entityKey === "inventory-item-categories" &&
                 field.key === "name"
@@ -321,7 +426,9 @@ export function CrudListPage({
                 return (
                   <button
                     type="button"
-                    className="text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
+                    className={`text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline${
+                      row.__hasChildren ? " font-semibold" : ""
+                    }`}
                     onClick={(event) => {
                       event.stopPropagation();
                       setEditSnapshot({ ...row });
@@ -347,9 +454,7 @@ export function CrudListPage({
                   className="text-left font-medium text-primary hover:underline"
                   onClick={(event) => {
                     event.stopPropagation();
-                    navigate(
-                      `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
-                    );
+                    goToEdit(String(row[config?.idField ?? "id"]));
                   }}
                 >
                   {content}
@@ -365,8 +470,10 @@ export function CrudListPage({
       config?.idField,
       entityKey,
       filterDefinitionByKey,
-      navigate,
+      goToEdit,
       v2,
+      isCategoryTree,
+      toggleCategoryCollapse,
     ],
   );
 
@@ -629,7 +736,7 @@ export function CrudListPage({
             openEditDialog(id);
             return;
           }
-          void navigate(`/admin/${entityKey}/${id}/edit`);
+          void goToEdit(id);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,
@@ -657,6 +764,24 @@ export function CrudListPage({
       },
     ),
   );
+
+  // Tree view gets expand-all / collapse-all actions appended to the toolbar.
+  if (isCategoryTree) {
+    toolbarItems.push(
+      {
+        id: "category-expand-all",
+        label: "Mở rộng",
+        icon: ChevronsUpDown,
+        onClick: () => setCollapsedIds(new Set()),
+      },
+      {
+        id: "category-collapse-all",
+        label: "Thu gọn",
+        icon: ChevronsDownUp,
+        onClick: () => setCollapsedIds(new Set(collectParentIds(treeNodes))),
+      },
+    );
+  }
 
   const breadcrumbs = resolveBackofficeBreadcrumbs(location.pathname);
 
@@ -728,7 +853,7 @@ export function CrudListPage({
           ),
         }}
         footer={
-          records && !loading ? (
+          isCategoryTree ? null : records && !loading ? (
             <PaginationControls
               page={page}
               pageSize={pageSize}

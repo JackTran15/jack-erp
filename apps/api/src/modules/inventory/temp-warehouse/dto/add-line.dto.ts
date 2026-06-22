@@ -29,4 +29,11 @@ export class AddTempWarehouseLineDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'Shelf/location on the source side of the movement',
+  })
+  @IsOptional()
+  @IsUUID()
+  sourceLocationId?: string;
 }

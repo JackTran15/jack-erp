@@ -14,3 +14,5 @@ test_logs/
 # CLAUDE.local.md
 # personal_note_run.txt
 # **.md
+# Added by code-review-graph
+.code-review-graph/

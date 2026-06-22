@@ -11,11 +11,13 @@ import {
   GoodsReceiptStatus,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
+  DocCounterpartyKind,
 } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { ProviderEntity } from '../location/provider.entity';
 import { LocationEntity } from '../location/location.entity';
+import { CounterpartyDisplay } from '../location/services/counterparty-name.util';
 
 export enum GoodsReceiptPaymentMethod {
   CASH = 'CASH',
@@ -38,6 +40,24 @@ export class GoodsReceiptEntity extends BaseEntity {
 
   @Column({ name: 'provider_id', type: 'uuid', nullable: true })
   providerId?: string;
+
+  @Column({
+    name: 'counterparty_kind',
+    type: 'enum',
+    enum: DocCounterpartyKind,
+    enumName: 'doc_counterparty_kind_enum',
+    nullable: true,
+    comment: 'Đối tượng kind for v2 receipts: supplier (NCC) or customer (KH)',
+  })
+  counterpartyKind?: DocCounterpartyKind | null;
+
+  @Column({
+    name: 'counterparty_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Id of the provider or customer, per counterpartyKind',
+  })
+  counterpartyId?: string | null;
 
   @Column({ name: 'delivered_by', length: 200, nullable: true })
   deliveredBy?: string;
@@ -118,4 +138,12 @@ export class GoodsReceiptEntity extends BaseEntity {
   @ManyToOne(() => LocationEntity, { eager: true })
   @JoinColumn({ name: 'location_id' })
   location?: LocationEntity;
+
+  /**
+   * Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+   * inlined by the v2 search handler / getById so the FE renders supplier,
+   * customer and employee counterparties alike (provider_id is null for the
+   * latter two).
+   */
+  counterparty?: CounterpartyDisplay | null;
 }

@@ -1,6 +1,7 @@
 import { Entity, Column, OneToMany, Index } from 'typeorm';
-import { TransferStatus } from '@erp/shared-interfaces';
+import { TransferStatus, DocCounterpartyKind } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
+import { CounterpartyDisplay } from '../location/services/counterparty-name.util';
 import { StockTransferLineEntity } from './stock-transfer-line.entity';
 
 /** Document authorizing movement of inventory between locations/branches. Workflow: DRAFT → POSTED (or CANCELLED). */
@@ -38,8 +39,26 @@ export class StockTransferEntity extends BaseEntity {
   @Column({ name: 'posted_at', type: 'timestamptz', nullable: true, comment: 'When the transfer was posted and ledger entries created' })
   postedAt?: Date;
 
-  @Column({ name: 'transporter_user_id', type: 'uuid', nullable: true, comment: 'User responsible for transporting the goods (Người vận chuyển)' })
+  @Column({ name: 'transporter_user_id', type: 'uuid', nullable: true, comment: 'User responsible for transporting the goods (Người vận chuyển); legacy — superseded by the counterparty Đối tượng' })
   transporterUserId?: string;
+
+  @Column({
+    name: 'counterparty_kind',
+    type: 'enum',
+    enum: DocCounterpartyKind,
+    enumName: 'doc_counterparty_kind_enum',
+    nullable: true,
+    comment: 'Đối tượng kind: supplier (NCC) | customer (KH) | employee (NV)',
+  })
+  counterpartyKind?: DocCounterpartyKind | null;
+
+  @Column({
+    name: 'counterparty_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Id of the provider / customer / employee, per counterpartyKind',
+  })
+  counterpartyId?: string | null;
 
   @Column({ name: 'transferred_at', type: 'timestamptz', nullable: true, comment: 'When the transfer takes place (Ngày + Giờ chuyển); defaults to posting time' })
   transferredAt?: Date;
@@ -61,6 +80,13 @@ export class StockTransferEntity extends BaseEntity {
    * row by list()/getById() so the FE renders the name without a second lookup.
    */
   transporter?: { id: string; fullName: string } | null;
+
+  /**
+   * Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+   * inlined by the v2 search handler / getById. Legacy transfers (no
+   * counterparty) keep null and fall back to {@link transporter} on the FE.
+   */
+  counterparty?: CounterpartyDisplay | null;
 
   /**
    * Transient (not a column): sum of line_value across the transfer's lines,

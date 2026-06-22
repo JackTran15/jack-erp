@@ -38,11 +38,12 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { getPreferredShelf } from "../../api/inventory-location-preferences";
+import { getPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
+import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import {
   QuickCreateItemDialog,
   QuickCreateIssueReasonDialog,
@@ -79,6 +80,10 @@ import {
 import type { IssuableTransferOrderListItem } from "@erp/shared-interfaces";
 import { DocumentLineImportDialog } from "../inventory/_components/document-import/DocumentLineImportDialog";
 import type { DocumentLineImportJobRow } from "../inventory/_components/document-import/document-line-import.types";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 
 type GoodsIssueStatus = "DRAFT" | "APPROVED" | "POSTED" | "CANCELLED";
 
@@ -124,6 +129,15 @@ interface GoodsIssue {
   customerName?: string;
   providerId?: string | null;
   provider?: { id: string; code: string; name: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API for all kinds (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   locationId: string;
   location?: { id: string; code: string; name: string; storageId?: string } | null;
   purpose?: GoodsIssuePurposeUI;
@@ -556,9 +570,10 @@ export function GoodsIssuePage() {
       label: "Đối tượng",
       width: 180,
       render: (row) => {
-        // Prefer the explicit provider pick stored on the row. Fall back to
-        // targetBranch for TRANSFER_OUT phiếu created before provider was
-        // added, and finally to the page-level provider name cache.
+        // Prefer the resolved counterparty (covers NCC/KH/NV). Then the explicit
+        // provider pick, the targetBranch for TRANSFER_OUT, and finally the
+        // page-level name cache / legacy customer name.
+        if (row.counterparty?.name) return row.counterparty.name;
         if (row.provider?.name) return row.provider.name;
         if (row.providerId)
           return customerNameById.get(row.providerId) ?? row.providerId;
@@ -924,31 +939,60 @@ function GoodsIssueFormDialog({
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
-  const fillPreferredShelf = (idx: number, itemId: string, storageId: string) => {
-    void getPreferredShelf(itemId, storageId)
-      .then((shelf) => {
-        if (!shelf) return;
+  // Resolve preferred shelves for many lines in a single request, then apply
+  // each result back to its row. The (idx, itemId, storageId) guard prevents a
+  // stale response from overwriting a row the user has since changed.
+  const fillPreferredShelfBatch = (
+    rows: { idx: number; itemId: string; storageId: string }[],
+  ) => {
+    const valid = rows.filter((r) => r.itemId && r.storageId);
+    if (valid.length === 0) return;
+    const pairs = [
+      ...new Map(
+        valid.map((r) => [
+          `${r.itemId}:${r.storageId}`,
+          { itemId: r.itemId, storageId: r.storageId },
+        ]),
+      ).values(),
+    ];
+    void getPreferredShelfBatch(pairs)
+      .then((results) => {
+        const shelfByKey = new Map(
+          results.map((r) => [`${r.itemId}:${r.storageId}`, r.shelf]),
+        );
         setLines((currentLines) =>
-          currentLines.map((line, lineIdx) =>
-            lineIdx === idx &&
-            line.itemId === itemId &&
-            line.storageId === storageId
-              ? {
-                  ...line,
-                  locationId: shelf.id,
-                  locationLabel: shelf.code,
-                }
-              : line,
-          ),
+          currentLines.map((line, lineIdx) => {
+            const match = valid.find(
+              (r) =>
+                r.idx === lineIdx &&
+                line.itemId === r.itemId &&
+                line.storageId === r.storageId,
+            );
+            if (!match) return line;
+            const shelf = shelfByKey.get(`${match.itemId}:${match.storageId}`);
+            if (!shelf) return line;
+            return { ...line, locationId: shelf.id, locationLabel: shelf.code };
+          }),
         );
       })
       .catch(() => {});
   };
 
+  const fillPreferredShelf = (idx: number, itemId: string, storageId: string) =>
+    fillPreferredShelfBatch([{ idx, itemId, storageId }]);
+
   // Resolve the eager-loaded provider first, then fall back to a customer lookup
   // for legacy rows that pre-date the provider column.
   const initialCustomer = useMemo(() => {
     if (!initial) return { id: "", code: "", name: "" };
+    // Prefer the resolved counterparty — the only source of a name for customer
+    // / employee đối tượng (those have no provider and aren't in `customers`).
+    if (initial.counterparty)
+      return {
+        id: initial.counterparty.id,
+        code: initial.counterparty.code ?? "",
+        name: initial.counterparty.name,
+      };
     if (initial.provider) {
       return {
         id: initial.provider.id,
@@ -979,6 +1023,12 @@ function GoodsIssueFormDialog({
   const [customerId, setCustomerId] = useState(initialCustomer.id);
   const [customerCode, setCustomerCode] = useState(initialCustomer.code);
   const [customerName, setCustomerName] = useState(initialCustomer.name);
+  // Đối tượng kind for the new counterparty routing. Rehydrate from the saved
+  // doc so re-saving an edited phiếu keeps its kind; legacy provider rows
+  // without a kind are treated as suppliers.
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >(initial?.counterpartyKind ?? (initial?.providerId ? "supplier" : ""));
   // Storage derived from the saved location's parent. Cached storages let us
   // resolve a name immediately on open; the picker will reset both if user
   // changes warehouse later. For a new (create) phiếu, default to the active
@@ -1058,6 +1108,7 @@ function GoodsIssueFormDialog({
 
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   /** Line index that triggered the quick-create-location dialog, or null. */
   const [quickLocationLineIdx, setQuickLocationLineIdx] = useState<number | null>(null);
@@ -1225,23 +1276,6 @@ function GoodsIssueFormDialog({
     setReferences([]);
     markDirty();
   };
-
-  const searchCustomers = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      const effectivePageSize = pageSize ?? 8;
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(effectivePageSize),
-        search: query.trim(),
-      });
-      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-        `/inventory/providers?${params}`,
-      );
-      const fetched = data.page * data.pageSize;
-      return { items: data.data, hasMore: fetched < data.total, total: data.total };
-    },
-    [],
-  );
 
   const searchStorages = useCallback(
     async (query: string, page: number, pageSize?: number) => {
@@ -1495,7 +1529,8 @@ function GoodsIssueFormDialog({
       } else {
         await apiClient.post("/inventory/goods-issues", {
           locationId: headerLocationId,
-          providerId: customerId || undefined,
+          counterpartyKind: counterpartyKind || undefined,
+          counterpartyId: customerId || undefined,
           purpose,
           reasonId:
             (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
@@ -1522,6 +1557,7 @@ function GoodsIssueFormDialog({
     }
   }, [
     customerId,
+    counterpartyKind,
     lines,
     notes,
     deliveryPerson,
@@ -1616,18 +1652,138 @@ function GoodsIssueFormDialog({
   // whole detail (add/delete row + every cell). View mode is read-only too.
   const detailLocked = isView || sourceTransferOrderId !== null;
 
+  // Multi-select product picker → append one line per chosen item (dedupe by itemId),
+  // pre-filling Số lượng/Đơn giá from the dialog and the warehouse from "Chọn kho"/default.
+  // Lines without an explicit price get the instant average cost (mirrors single-select onSelect).
+  const addLinesFromPicker = (result: ProductSelectResult) => {
+    const existing = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const fallbackStorageId = storageId || defaultStorage?.id || "";
+    const fallbackStorageLabel = storageQuery || defaultStorage?.name || "";
+    const fresh: FormLine[] = result.lines
+      .filter((s) => s.itemId && !existing.has(s.itemId))
+      .map((s) => ({
+        itemId: s.itemId,
+        itemLabel: s.sku,
+        itemName: s.name,
+        unit: s.unit,
+        storageId: fallbackStorageId,
+        storageLabel: fallbackStorageLabel,
+        locationId: "",
+        locationLabel: "",
+        quantity: s.quantity > 0 ? s.quantity : 1,
+        unitPrice: s.unitPrice > 0 ? s.unitPrice : 0,
+        notes: "",
+      }));
+    if (fresh.length === 0) return;
+    const base = getPersistableFormLines(lines);
+    const startIdx = base.length;
+    setLines(normalizeFormLines([...base, ...fresh]));
+    markDirty();
+    fillPreferredShelfBatch(
+      fresh.map((line, i) => ({
+        idx: startIdx + i,
+        itemId: line.itemId,
+        storageId: line.storageId,
+      })),
+    );
+    fresh.forEach((line, i) => {
+      const idx = startIdx + i;
+      if (line.itemId && line.unitPrice <= 0) {
+        void getInstantAverageCost(line.itemId)
+          .then((unitCost) => {
+            setLines((current) =>
+              current.map((l, i2) =>
+                i2 === idx && l.itemId === line.itemId && !(l.unitPrice > 0)
+                  ? { ...l, unitPrice: unitCost }
+                  : l,
+              ),
+            );
+          })
+          .catch(() => {});
+      }
+    });
+  };
+
+  // Fill the line at `idx` from a selected item — shared by the inline
+  // typeahead (onSelect) and the single-fill ProductSelectDialog.
+  const fillLineFromItem = (
+    idx: number,
+    item: {
+      id: string;
+      code: string;
+      name: string;
+      unit: string;
+      purchasePrice?: number | string | null;
+    },
+  ) => {
+    const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
+    let selectedStorageId = "";
+    let selectedStorageLabel = "";
+    setLines((prev) => {
+      const updated = prev.map((l, i) => {
+        if (i !== idx) return l;
+        selectedStorageId = l.storageId;
+        selectedStorageLabel = l.storageLabel;
+        if (!selectedStorageId) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (prev[j].storageId) {
+              selectedStorageId = prev[j].storageId;
+              selectedStorageLabel = prev[j].storageLabel;
+              break;
+            }
+          }
+        }
+        if (!selectedStorageId) {
+          selectedStorageId = storageId;
+          selectedStorageLabel = storageQuery;
+        }
+        return {
+          ...l,
+          itemId: item.id,
+          itemLabel: item.code,
+          itemName: item.name,
+          unit: item.unit,
+          storageId: selectedStorageId,
+          storageLabel: selectedStorageLabel,
+          locationId: "",
+          locationLabel: "",
+          unitPrice: defaultUnitPrice,
+        };
+      });
+
+      if (selectedStorageId) {
+        fillPreferredShelf(idx, item.id, selectedStorageId);
+      }
+
+      return normalizeFormLines(updated);
+    });
+    void getInstantAverageCost(item.id)
+      .then((unitCost) => {
+        setLines((current) =>
+          current.map((line, lineIdx) =>
+            lineIdx === idx && line.itemId === item.id
+              ? { ...line, unitPrice: unitCost }
+              : line,
+          ),
+        );
+      })
+      .catch(() => {
+        // Keep purchase price fallback already shown in the row.
+      });
+    markDirty();
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 220,
+      width: 360,
       placeholder: "Tìm mã hoặc tên",
       renderEditor: (row, idx) => (
+        <div className="flex h-full items-center gap-1">
         <LookupField
           portalToBody
-          enableSearchModal
-          searchModalTitle="Chọn hàng hóa"
-          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
@@ -1648,63 +1804,7 @@ function GoodsIssueFormDialog({
             );
             markDirty();
           }}
-          onSelect={(item) => {
-            const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-            let selectedStorageId = "";
-            let selectedStorageLabel = "";
-            setLines((prev) => {
-              const updated = prev.map((l, i) => {
-                if (i !== idx) return l;
-                selectedStorageId = l.storageId;
-                selectedStorageLabel = l.storageLabel;
-                if (!selectedStorageId) {
-                  for (let j = i - 1; j >= 0; j--) {
-                    if (prev[j].storageId) {
-                      selectedStorageId = prev[j].storageId;
-                      selectedStorageLabel = prev[j].storageLabel;
-                      break;
-                    }
-                  }
-                }
-                if (!selectedStorageId) {
-                  selectedStorageId = storageId;
-                  selectedStorageLabel = storageQuery;
-                }
-                return {
-                  ...l,
-                  itemId: item.id,
-                  itemLabel: item.code,
-                  itemName: item.name,
-                  unit: item.unit,
-                  storageId: selectedStorageId,
-                  storageLabel: selectedStorageLabel,
-                  locationId: "",
-                  locationLabel: "",
-                  unitPrice: defaultUnitPrice,
-                };
-              });
-
-              if (selectedStorageId) {
-                fillPreferredShelf(idx, item.id, selectedStorageId);
-              }
-
-              return normalizeFormLines(updated);
-            });
-            void getInstantAverageCost(item.id)
-              .then((unitCost) => {
-                setLines((current) =>
-                  current.map((line, lineIdx) =>
-                    lineIdx === idx && line.itemId === item.id
-                      ? { ...line, unitPrice: unitCost }
-                      : line,
-                  ),
-                );
-              })
-              .catch(() => {
-                // Keep purchase price fallback already shown in the row.
-              });
-            markDirty();
-          }}
+          onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
           itemKey={(item) => item.id}
           renderItem={(item) => item.name}
@@ -1716,21 +1816,22 @@ function GoodsIssueFormDialog({
           ]}
           disabled={detailLocked}
           onCreateNew={detailLocked ? undefined : () => setQuickItemLineIdx(idx)}
-          className="h-full"
+          className="h-full flex-1"
         />
+        </div>
       ),
     },
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 220,
+      width: 280,
       type: "readonly",
       getValue: (row) => row.itemName,
     },
     {
       key: "warehouse",
       label: "Kho",
-      width: 160,
+      width: 220,
       placeholder: "Chọn kho",
       renderEditor: (row, idx) => (
         <LookupField
@@ -1791,7 +1892,7 @@ function GoodsIssueFormDialog({
     {
       key: "position",
       label: "Vị trí",
-      width: 160,
+      width: 220,
       placeholder: "Chọn vị trí",
       renderEditor: (row, idx) => (
         <LookupField<InventoryLocation>
@@ -1841,14 +1942,14 @@ function GoodsIssueFormDialog({
     {
       key: "unit",
       label: "Đơn vị tính",
-      width: 90,
+      width: 100,
       type: "readonly",
       getValue: (r) => r.unit || "Đôi",
     },
     {
       key: "quantity",
       label: "Số lượng",
-      width: 100,
+      width: 110,
       type: "number",
       align: "right",
       filterSymbol: "≤",
@@ -1856,7 +1957,7 @@ function GoodsIssueFormDialog({
     {
       key: "unitPrice",
       label: "Đơn giá",
-      width: 120,
+      width: 140,
       align: "right",
       filterSymbol: "≤",
       renderEditor: (row, idx) => (
@@ -1985,38 +2086,28 @@ function GoodsIssueFormDialog({
           <>
             <FieldRow label="Đối tượng">
               <div className="flex items-stretch gap-2">
-                <LookupField
-                  enableSearchModal
-                  searchModalTitle="Chọn đối tượng"
-                  searchModalPlaceholder="Nhập mã hoặc tên khách hàng"
+                <CounterpartyPickerField
+                  defaultType="customer"
+                  allowedTypes={["supplier", "customer", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
+                  modalTitle="Chọn đối tượng"
+                  modalPlaceholder="Nhập mã hoặc tên đối tượng"
                   value={customerCode}
                   onValueChange={(v) => {
                     setCustomerCode(v);
                     setCustomerId("");
                     setCustomerName("");
+                    setCounterpartyKind("");
                     markDirty();
                   }}
                   onSelect={(c) => {
                     setCustomerId(c.id);
-                    setCustomerCode(c.code);
+                    setCustomerCode(c.code ?? "");
                     setCustomerName(c.name);
+                    setCounterpartyKind(c.kind);
                     markDirty();
                   }}
-                  search={searchCustomers}
-                  itemKey={(c) => c.id}
-                  renderItem={(c) => c.name}
-                  renderMeta={(c) => c.code}
-                  columns={[
-                    {
-                      key: "code",
-                      label: "Mã",
-                      className: "w-[160px] font-mono",
-                      render: (p) => p.code,
-                    },
-                    { key: "name", label: "Tên", render: (p) => p.name },
-                  ]}
                   disabled={isView}
                   onCreateNew={isView ? undefined : () => setQuickCustomerOpen(true)}
                 />
@@ -2319,6 +2410,16 @@ function GoodsIssueFormDialog({
             );
             markDirty();
           }}
+        />
+      )}
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          showQuantityPrice
+          defaultUnitPriceSource="none"
+          onConfirm={addLinesFromPicker}
         />
       )}
 

@@ -4,6 +4,7 @@ export function parseAccessTokenPayload(
 ): {
   userId: string;
   branchIds: string[];
+  branchId: string | null;
   organizationId: string | null;
   exp: number | null;
 } | null {
@@ -20,6 +21,7 @@ export function parseAccessTokenPayload(
       organizationId?: string;
       exp?: number;
       branchIds?: string[];
+      branchId?: string;
     };
     if (typeof o.userId !== "string") return null;
     const branchIds = Array.isArray(o.branchIds)
@@ -30,6 +32,7 @@ export function parseAccessTokenPayload(
       organizationId: typeof o.organizationId === "string" ? o.organizationId : null,
       exp: typeof o.exp === "number" ? o.exp : null,
       branchIds,
+      branchId: typeof o.branchId === "string" ? o.branchId : null,
     };
   } catch {
     return null;

@@ -63,6 +63,7 @@ export interface TempWarehouseLine {
   status: TempWarehouseLineStatus;
   supersededById: string | null;
   notes: string | null;
+  sourceLocationId: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -113,12 +114,14 @@ export interface AddTempWarehouseLineBody {
   direction?: TempWarehouseDirection;
   carrierUserId?: string;
   notes?: string;
+  sourceLocationId?: string;
 }
 
 export interface UpdateTempWarehouseLineBody {
   itemId?: string;
   carrierUserId?: string | null;
   notes?: string | null;
+  sourceLocationId?: string | null;
 }
 
 export interface CloseTempWarehouseSessionBody {

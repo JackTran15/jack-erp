@@ -37,7 +37,7 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { getPreferredShelf } from "../../api/inventory-location-preferences";
+import { getPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import {
   SelectTransferReceiptDialog,
   type TransferReceiptDetail,
@@ -51,6 +51,7 @@ import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { SearchListingInput } from "../../components/forms/SearchListingInput";
 import { LookupField } from "../../components/forms/LookupField";
+import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import {
   QuickCreateItemDialog,
   QuickCreateLocationDialog,
@@ -81,6 +82,10 @@ import {
 } from "../../components/crud/crudV2Search";
 import { GoodsReceiptImportDialog } from "./import/GoodsReceiptImportDialog";
 import type { GoodsReceiptImportJobRow } from "./import/import-goods-receipt.types";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 
 type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
 type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
@@ -113,6 +118,15 @@ interface GoodsReceipt {
   providerId?: string | null;
   providerName?: string;
   provider?: { id: string; code: string; name: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API for all kinds (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   deliveredBy?: string | null;
   reason?: string | null;
   description?: string | null;
@@ -578,6 +592,7 @@ export function PurchaseOrdersPage() {
       label: "Đối tượng",
       width: 180,
       render: (row) =>
+        row.counterparty?.name ??
         row.provider?.name ??
         (row.providerId
           ? (providerNameById.get(row.providerId) ?? row.providerId)
@@ -989,32 +1004,59 @@ function PurchaseOrderFormDialog({
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
-  const fillPreferredShelf = (
-    idx: number,
-    itemId: string,
-    storageId: string,
+  // Resolve preferred shelves for many lines in a single request, then apply
+  // each result back to its row. The (idx, itemId, storageId) guard prevents a
+  // stale response from overwriting a row the user has since changed.
+  const fillPreferredShelfBatch = (
+    rows: { idx: number; itemId: string; storageId: string }[],
   ) => {
-    void getPreferredShelf(itemId, storageId)
-      .then((shelf) => {
-        if (!shelf) return;
+    const valid = rows.filter((r) => r.itemId && r.storageId);
+    if (valid.length === 0) return;
+    const pairs = [
+      ...new Map(
+        valid.map((r) => [
+          `${r.itemId}:${r.storageId}`,
+          { itemId: r.itemId, storageId: r.storageId },
+        ]),
+      ).values(),
+    ];
+    void getPreferredShelfBatch(pairs)
+      .then((results) => {
+        const shelfByKey = new Map(
+          results.map((r) => [`${r.itemId}:${r.storageId}`, r.shelf]),
+        );
         setLines((currentLines) =>
-          currentLines.map((line, lineIdx) =>
-            lineIdx === idx &&
-            line.itemId === itemId &&
-            line.storageId === storageId
-              ? {
-                  ...line,
-                  locationId: shelf.id,
-                  locationLabel: shelf.code,
-                }
-              : line,
-          ),
+          currentLines.map((line, lineIdx) => {
+            const match = valid.find(
+              (r) =>
+                r.idx === lineIdx &&
+                line.itemId === r.itemId &&
+                line.storageId === r.storageId,
+            );
+            if (!match) return line;
+            const shelf = shelfByKey.get(`${match.itemId}:${match.storageId}`);
+            if (!shelf) return line;
+            return { ...line, locationId: shelf.id, locationLabel: shelf.code };
+          }),
         );
       })
       .catch(() => {});
   };
 
+  const fillPreferredShelf = (
+    idx: number,
+    itemId: string,
+    storageId: string,
+  ) => fillPreferredShelfBatch([{ idx, itemId, storageId }]);
+
   const initialProvider = useMemo(() => {
+    // Prefer the resolved counterparty — the only source of a name for customer
+    // / employee đối tượng (those have no provider_id and aren't in `providers`).
+    if (initial?.counterparty)
+      return {
+        code: initial.counterparty.code ?? "",
+        name: initial.counterparty.name,
+      };
     if (!initial || !initial.providerId) return { code: "", name: "" };
     if (initial.provider)
       return { code: initial.provider.code, name: initial.provider.name };
@@ -1024,9 +1066,16 @@ function PurchaseOrderFormDialog({
       : { code: initial.providerId ?? "", name: "" };
   }, [initial, providers]);
 
-  const [providerId, setProviderId] = useState(initial?.providerId ?? "");
+  const [providerId, setProviderId] = useState(
+    initial?.counterpartyId ?? initial?.providerId ?? "",
+  );
   const [providerCode, setProviderCode] = useState(initialProvider.code);
   const [providerName, setProviderName] = useState(initialProvider.name);
+  // Đối tượng kind (supplier | customer | employee). Legacy rows with a
+  // provider but no kind are treated as suppliers.
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >(initial?.counterpartyKind ?? (initial?.providerId ? "supplier" : ""));
   /**
    * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
    * the receipt header for legacy reasons, but the UI lets users pick a
@@ -1170,6 +1219,7 @@ function PurchaseOrderFormDialog({
   >(null);
   const [quickItemLineIdx, setQuickItemLineIdx] = useState<number | null>(null);
   const [chooseKhoOpen, setChooseKhoOpen] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [storageCache, setStorageCache] = useState<
     Array<{ id: string; name: string; branchId: string }>
@@ -1376,26 +1426,40 @@ function PurchaseOrderFormDialog({
     [],
   );
 
-  const searchProviders = useCallback(
-    async (query: string, page: number, pageSize?: number) => {
-      const effectivePageSize = pageSize ?? 8;
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(effectivePageSize),
-        search: query.trim(),
-      });
-      const { data } = await apiClient.get<
-        PaginatedResponse<InventoryProvider>
-      >(`/inventory/providers?${params}`);
-      const fetched = data.page * data.pageSize;
-      return {
-        items: data.data,
-        hasMore: fetched < data.total,
-        total: data.total,
-      };
-    },
-    [],
-  );
+  // Multi-select product picker → append one line per chosen item (dedupe by itemId),
+  // pre-filling Số lượng/Đơn giá from the dialog and the warehouse from "Chọn kho"/default.
+  const addLinesFromPicker = (result: ProductSelectResult) => {
+    const existing = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const fallbackStorageId = storageId || defaultStorage?.id || "";
+    const fallbackStorageLabel = storageQuery || defaultStorage?.name || "";
+    const fresh: FormLine[] = result.lines
+      .filter((s) => s.itemId && !existing.has(s.itemId))
+      .map((s) => ({
+        itemId: s.itemId,
+        itemLabel: s.sku,
+        itemName: s.name,
+        unit: s.unit,
+        storageId: fallbackStorageId,
+        storageLabel: fallbackStorageLabel,
+        locationId: "",
+        locationLabel: "",
+        orderedQuantity: s.quantity > 0 ? s.quantity : 1,
+        unitPrice: s.unitPrice > 0 ? s.unitPrice : Number(s.purchasePrice ?? 0) || 0,
+        notes: "",
+      }));
+    if (fresh.length === 0) return;
+    const base = getPersistableFormLines(lines);
+    const startIdx = base.length;
+    setLines(normalizeFormLines([...base, ...fresh]));
+    markDirty();
+    fillPreferredShelfBatch(
+      fresh.map((line, i) => ({
+        idx: startIdx + i,
+        itemId: line.itemId,
+        storageId: line.storageId,
+      })),
+    );
+  };
 
   const searchStorages = useCallback(
     async (query: string, page: number, pageSize?: number) => {
@@ -1570,7 +1634,8 @@ function PurchaseOrderFormDialog({
       const headerLocationId = resolvedLines[0]?.locationId ?? "";
       const payload = {
         purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
-        providerId: providerId || undefined,
+        counterpartyKind: counterpartyKind || undefined,
+        counterpartyId: providerId || undefined,
         deliveredBy: deliveryPerson || undefined,
         reason: reason || undefined,
         description: notes || undefined,
@@ -1726,18 +1791,74 @@ function PurchaseOrderFormDialog({
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
 
+  // Fill the line at `idx` from a selected item — shared by the inline
+  // typeahead (onSelect) and the single-fill ProductSelectDialog.
+  const fillLineFromItem = (
+    idx: number,
+    item: {
+      id: string;
+      code: string;
+      name: string;
+      unit: string;
+      purchasePrice?: number | string | null;
+    },
+  ) => {
+    const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
+    let selectedStorageId = "";
+    let selectedStorageLabel = "";
+    setLines((prev) => {
+      const updated = prev.map((l, i) => {
+        if (i !== idx) return l;
+        selectedStorageId = l.storageId;
+        selectedStorageLabel = l.storageLabel;
+        if (!selectedStorageId) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (prev[j].storageId) {
+              selectedStorageId = prev[j].storageId;
+              selectedStorageLabel = prev[j].storageLabel;
+              break;
+            }
+          }
+        }
+        if (!selectedStorageId) {
+          selectedStorageId = storageId;
+          selectedStorageLabel = storageQuery;
+        }
+        return {
+          ...l,
+          itemId: item.id,
+          itemLabel: item.code,
+          itemName: item.name,
+          unit: item.unit,
+          storageId: selectedStorageId,
+          storageLabel: selectedStorageLabel,
+          locationId: "",
+          locationLabel: "",
+          unitPrice: defaultUnitPrice,
+        };
+      });
+
+      if (selectedStorageId) {
+        fillPreferredShelf(idx, item.id, selectedStorageId);
+      }
+
+      return normalizeFormLines(updated);
+    });
+    markDirty();
+  };
+
   const lineColumns: LineColumn<FormLine>[] = [
     {
       key: "itemLabel",
       label: "Mã SKU",
-      width: 220,
+      width: 360,
+      minWidth: 360,
       placeholder: "Tìm mã hoặc tên",
       renderEditor: (row, idx) => (
+        <div className="flex h-full items-center gap-1">
         <LookupField
           portalToBody
-          enableSearchModal
-          searchModalTitle="Chọn hàng hóa"
-          searchModalPlaceholder="Nhập mã SKU hoặc tên hàng hóa"
+          onSearchButtonClick={() => setProductPickerOpen(true)}
           dropdownMinWidth={520}
           placeholder="Tìm mã hoặc tên"
           value={row.itemLabel}
@@ -1758,50 +1879,7 @@ function PurchaseOrderFormDialog({
             );
             markDirty();
           }}
-          onSelect={(item) => {
-            const defaultUnitPrice = Number(item.purchasePrice ?? 0) || 0;
-            let selectedStorageId = "";
-            let selectedStorageLabel = "";
-            setLines((prev) => {
-              const updated = prev.map((l, i) => {
-                if (i !== idx) return l;
-                selectedStorageId = l.storageId;
-                selectedStorageLabel = l.storageLabel;
-                if (!selectedStorageId) {
-                  for (let j = i - 1; j >= 0; j--) {
-                    if (prev[j].storageId) {
-                      selectedStorageId = prev[j].storageId;
-                      selectedStorageLabel = prev[j].storageLabel;
-                      break;
-                    }
-                  }
-                }
-                if (!selectedStorageId) {
-                  selectedStorageId = storageId;
-                  selectedStorageLabel = storageQuery;
-                }
-                return {
-                  ...l,
-                  itemId: item.id,
-                  itemLabel: item.code,
-                  itemName: item.name,
-                  unit: item.unit,
-                  storageId: selectedStorageId,
-                  storageLabel: selectedStorageLabel,
-                  locationId: "",
-                  locationLabel: "",
-                  unitPrice: defaultUnitPrice,
-                };
-              });
-
-              if (selectedStorageId) {
-                fillPreferredShelf(idx, item.id, selectedStorageId);
-              }
-
-              return normalizeFormLines(updated);
-            });
-            markDirty();
-          }}
+          onSelect={(item) => fillLineFromItem(idx, item)}
           search={searchItems}
           itemKey={(item) => item.id}
           renderItem={(item) => item.name}
@@ -1823,21 +1901,24 @@ function PurchaseOrderFormDialog({
           ]}
           disabled={linesLocked}
           onCreateNew={linesLocked ? undefined : () => setQuickItemLineIdx(idx)}
-          className="h-full"
+          className="h-full flex-1"
         />
+        </div>
       ),
     },
     {
       key: "itemName",
       label: "Tên hàng hóa",
-      width: 220,
+      width: 280,
+      minWidth: 280,
       type: "readonly",
       getValue: (row) => row.itemName,
     },
     {
       key: "warehouse",
       label: "Kho",
-      width: 160,
+      width: 220,
+      minWidth: 220,
       placeholder: "Chọn kho",
       renderEditor: (row, idx) => (
         <LookupField
@@ -1899,7 +1980,8 @@ function PurchaseOrderFormDialog({
     {
       key: "position",
       label: "Vị trí",
-      width: 160,
+      width: 220,
+      minWidth: 220,
       placeholder: "Chọn vị trí",
       renderEditor: (row, idx) => (
         <LookupField<InventoryLocation>
@@ -1956,14 +2038,16 @@ function PurchaseOrderFormDialog({
     {
       key: "unit",
       label: "Đơn vị tính",
-      width: 90,
+      width: 100,
+      minWidth: 100,
       type: "readonly",
       getValue: (r) => r.unit || "Đôi",
     },
     {
       key: "orderedQuantity",
       label: "Số lượng",
-      width: 100,
+      width: 110,
+      minWidth: 110,
       type: "number",
       align: "right",
       filterSymbol: "≤",
@@ -1971,7 +2055,8 @@ function PurchaseOrderFormDialog({
     {
       key: "unitPrice",
       label: "Đơn giá",
-      width: 120,
+      width: 140,
+      minWidth: 140,
       align: "right",
       filterSymbol: "≤",
       renderEditor: (row, idx) => (
@@ -1993,14 +2078,15 @@ function PurchaseOrderFormDialog({
     {
       key: "lineTotal",
       label: "Thành tiền",
-      width: 130,
+      width: 150,
+      minWidth: 150,
       type: "readonly",
       align: "right",
       filterSymbol: "≤",
       getValue: (r) =>
         formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
     },
-    { key: "notes", label: "Ghi chú", width: 160 },
+    { key: "notes", label: "Ghi chú", width: 200, minWidth: 200 },
   ];
 
   return (
@@ -2102,38 +2188,28 @@ function PurchaseOrderFormDialog({
           <>
             <FieldRow label="Đối tượng">
               <div className="flex items-stretch gap-2">
-                <LookupField
-                  enableSearchModal
-                  searchModalTitle="Chọn đối tượng"
-                  searchModalPlaceholder="Nhập mã hoặc tên nhà cung cấp"
+                <CounterpartyPickerField
+                  defaultType="supplier"
+                  allowedTypes={["supplier", "customer", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
+                  modalTitle="Chọn đối tượng"
+                  modalPlaceholder="Nhập mã hoặc tên đối tượng"
                   value={providerCode}
                   onValueChange={(v) => {
                     setProviderCode(v);
                     setProviderId("");
                     setProviderName("");
+                    setCounterpartyKind("");
                     markDirty();
                   }}
-                  onSelect={(p) => {
-                    setProviderId(p.id);
-                    setProviderCode(p.code);
-                    setProviderName(p.name);
+                  onSelect={(c) => {
+                    setProviderId(c.id);
+                    setProviderCode(c.code ?? "");
+                    setProviderName(c.name);
+                    setCounterpartyKind(c.kind);
                     markDirty();
                   }}
-                  search={searchProviders}
-                  itemKey={(p) => p.id}
-                  renderItem={(p) => p.name}
-                  renderMeta={(p) => p.code}
-                  columns={[
-                    {
-                      key: "code",
-                      label: "Mã",
-                      className: "w-[160px] font-mono",
-                      render: (p) => p.code,
-                    },
-                    { key: "name", label: "Tên", render: (p) => p.name },
-                  ]}
                   disabled={isView}
                   onCreateNew={
                     isView ? undefined : () => setQuickProviderOpen(true)
@@ -2432,6 +2508,16 @@ function PurchaseOrderFormDialog({
             );
             markDirty();
           }}
+        />
+      )}
+
+      {productPickerOpen && (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          showQuantityPrice
+          defaultUnitPriceSource="purchasePrice"
+          onConfirm={addLinesFromPicker}
         />
       )}
 

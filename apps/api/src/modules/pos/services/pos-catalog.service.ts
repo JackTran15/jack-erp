@@ -32,22 +32,16 @@ export class PosCatalogService {
     const raw = search?.trim() ?? '';
     const safeSearch = raw.replace(/[%_\\]/g, '');
 
-    const params: string[] = [orgId, branchId];
-    let searchClause = '';
     if (safeSearch.length > 0) {
-      const pattern = `%${safeSearch}%`;
-      params.push(pattern);
-      searchClause = `AND (
-                i.name ILIKE $3
-                OR i.code ILIKE $3
-                OR EXISTS (
-                  SELECT 1 FROM item_barcodes b
-                  WHERE b.item_id = i.id
-                    AND b.organization_id = i.organization_id
-                    AND b.code ILIKE $3
-                )
-              )`;
+      return this.searchCatalogByTerm(
+        branchId,
+        orgId,
+        `%${safeSearch}%`,
+        direction,
+      );
     }
+
+    const params: string[] = [orgId, branchId];
 
     const rows: Array<{
       itemId: string;
@@ -84,17 +78,94 @@ export class PosCatalogService {
          AND sb.branch_id = $2
          AND i.is_active = true
          AND i.is_pos_visible = true
-         ${searchClause}
        ORDER BY i.name ASC, sb.location_id ASC`,
       params,
     );
 
+    return this.aggregateStockRows(rows, direction);
+  }
+
+  /**
+   * ILIKE search from items — LEFT JOIN stock_balances so hàng khớp tên/SKU/mã vạch
+   * vẫn trả về dù chưa có tồn tại chi nhánh (giống lookupByCode).
+   */
+  private async searchCatalogByTerm(
+    branchId: string,
+    orgId: string,
+    pattern: string,
+    direction?: PosCatalogDirection,
+  ): Promise<PosCatalogLineDto[]> {
+    const rows = await this.dataSource.query(
+      `SELECT i.id                  AS "itemId",
+              i.product_id          AS "productId",
+              i.code,
+              i.name,
+              i.unit,
+              i.selling_price::text AS "sellingPrice",
+              sb.location_id        AS "locationId",
+              l.name                AS "locationName",
+              sb.quantity::text     AS "quantity",
+              CASE
+                WHEN sb.location_id IS NULL THEN NULL
+                ELSE EXISTS (
+                  SELECT 1 FROM showrooms sr
+                  WHERE sr.storage_id = l.storage_id
+                    AND sr.organization_id = sb.organization_id
+                )
+              END AS "isShowroom"
+       FROM items i
+       LEFT JOIN item_barcodes b
+         ON b.item_id = i.id AND b.organization_id = i.organization_id
+       LEFT JOIN stock_balances sb
+         ON sb.item_id = i.id
+        AND sb.organization_id = i.organization_id
+        AND sb.branch_id = $2
+       LEFT JOIN locations l
+         ON l.id = sb.location_id
+       WHERE i.organization_id = $1
+         AND i.is_active = true
+         AND i.is_pos_visible = true
+         AND (
+           i.name ILIKE $3
+           OR i.code ILIKE $3
+           OR b.code ILIKE $3
+           OR EXISTS (
+             SELECT 1 FROM products p
+             WHERE p.id = i.product_id
+               AND p.organization_id = i.organization_id
+               AND (p.code ILIKE $3 OR p.name ILIKE $3)
+           )
+         )
+       ORDER BY i.name ASC, sb.location_id ASC`,
+      [orgId, branchId, pattern],
+    );
+
+    return this.aggregateStockRows(rows, direction);
+  }
+
+  private aggregateStockRows(
+    rows: Array<{
+      itemId: string;
+      productId: string | null;
+      locationId: string | null;
+      locationName: string | null;
+      quantity: string | null;
+      isShowroom?: boolean | null;
+      code: string;
+      name: string;
+      unit: string;
+      sellingPrice: string;
+    }>,
+    direction?: PosCatalogDirection,
+  ): PosCatalogLineDto[] {
     const filteredRows = direction
-      ? rows.filter((r) =>
-          direction === PosCatalogDirection.SHOWROOM
+      ? rows.filter((r) => {
+          if (!r.locationId) return true;
+          if (r.isShowroom == null) return true;
+          return direction === PosCatalogDirection.SHOWROOM
             ? r.isShowroom === true
-            : r.isShowroom === false,
-        )
+            : r.isShowroom === false;
+        })
       : rows;
 
     const byItem = new Map<
@@ -108,11 +179,11 @@ export class PosCatalogService {
         sellingPrice: number;
         quantityOnHand: number;
         locations: { locationId: string; name: string; quantity: number }[];
+        locationIds: Set<string>;
       }
     >();
 
     for (const r of filteredRows) {
-      const qty = Number(r.quantity);
       if (!byItem.has(r.itemId)) {
         byItem.set(r.itemId, {
           itemId: r.itemId,
@@ -123,9 +194,13 @@ export class PosCatalogService {
           sellingPrice: Number(r.sellingPrice) || 0,
           quantityOnHand: 0,
           locations: [],
+          locationIds: new Set<string>(),
         });
       }
       const a = byItem.get(r.itemId)!;
+      if (!r.locationId || a.locationIds.has(r.locationId)) continue;
+      a.locationIds.add(r.locationId);
+      const qty = Number(r.quantity) || 0;
       a.quantityOnHand += qty;
       a.locations.push({
         locationId: r.locationId,
@@ -140,7 +215,6 @@ export class PosCatalogService {
         (x, y) =>
           y.quantity - x.quantity || x.locationId.localeCompare(y.locationId),
       );
-      const defaultLocationId = locs[0]!.locationId;
       result.push({
         itemId: a.itemId,
         productId: a.productId,
@@ -150,7 +224,7 @@ export class PosCatalogService {
         sellingPrice: a.sellingPrice,
         quantityOnHand: a.quantityOnHand,
         locations: locs,
-        defaultLocationId,
+        defaultLocationId: locs[0]?.locationId ?? '',
       });
     }
 
@@ -213,70 +287,6 @@ export class PosCatalogService {
       [orgId, branchId, code],
     );
 
-    const byItem = new Map<
-      string,
-      {
-        itemId: string;
-        productId: string | null;
-        code: string;
-        name: string;
-        unit: string;
-        sellingPrice: number;
-        quantityOnHand: number;
-        locations: { locationId: string; name: string; quantity: number }[];
-        locationIds: Set<string>;
-      }
-    >();
-
-    for (const r of rows) {
-      if (!byItem.has(r.itemId)) {
-        byItem.set(r.itemId, {
-          itemId: r.itemId,
-          productId: r.productId ?? null,
-          code: r.code,
-          name: r.name,
-          unit: r.unit,
-          sellingPrice: Number(r.sellingPrice) || 0,
-          quantityOnHand: 0,
-          locations: [],
-          locationIds: new Set<string>(),
-        });
-      }
-      const a = byItem.get(r.itemId)!;
-      // The barcode join can fan out an item across multiple barcode rows;
-      // dedupe stock_balances locations so quantities are not double-counted.
-      if (r.locationId && !a.locationIds.has(r.locationId)) {
-        a.locationIds.add(r.locationId);
-        const qty = Number(r.quantity) || 0;
-        a.quantityOnHand += qty;
-        a.locations.push({
-          locationId: r.locationId,
-          name: r.locationName ?? '',
-          quantity: qty,
-        });
-      }
-    }
-
-    const result: PosCatalogLineDto[] = [];
-    for (const a of byItem.values()) {
-      const locs = [...a.locations].sort(
-        (x, y) =>
-          y.quantity - x.quantity || x.locationId.localeCompare(y.locationId),
-      );
-      result.push({
-        itemId: a.itemId,
-        productId: a.productId,
-        code: a.code,
-        name: a.name,
-        unit: a.unit,
-        sellingPrice: a.sellingPrice,
-        quantityOnHand: a.quantityOnHand,
-        locations: locs,
-        defaultLocationId: locs[0]?.locationId ?? '',
-      });
-    }
-
-    result.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-    return result;
+    return this.aggregateStockRows(rows);
   }
 }

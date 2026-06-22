@@ -4,6 +4,10 @@ import { Repository } from 'typeorm';
 import { GoodsIssueStatus } from '@erp/shared-interfaces';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { GoodsIssueEntity } from '../goods-issue.entity';
+import {
+  attachCounterparties,
+  counterpartyNameSql,
+} from '../../location/services/counterparty-name.util';
 import { SearchGoodsIssuesV2Query } from './search-goods-issues-v2.query';
 
 /**
@@ -14,8 +18,9 @@ import { SearchGoodsIssuesV2Query } from './search-goods-issues-v2.query';
 const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.quantity * l.unit_price), 0)
    FROM goods_issue_lines l WHERE l.goods_issue_id = gi.id)`;
 
-/** Đối tượng (party) — provider, else the transfer target branch. */
-const PARTY_EXPRESSION = `COALESCE(provider.name, targetBranch.name)`;
+/** Đối tượng (party) — counterparty (supplier/customer/employee), else the
+ *  transfer target branch (for purpose=TRANSFER_OUT). */
+const PARTY_EXPRESSION = `COALESCE(${counterpartyNameSql('gi')}, targetBranch.name)`;
 
 @QueryHandler(SearchGoodsIssuesV2Query)
 export class SearchGoodsIssuesV2Handler
@@ -66,6 +71,10 @@ export class SearchGoodsIssuesV2Handler
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+
+    // Inline the resolved "Đối tượng"; TRANSFER_OUT rows keep targetBranch as
+    // their party (counterparty is null there).
+    await attachCounterparties(this.repo.manager, data, actor.organizationId);
 
     return { data, total, page, limit };
   }

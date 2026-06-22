@@ -132,6 +132,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       return {
         ...rest,
         categoryName: category?.name ?? '',
+        productCode: product?.code ?? '',
         productName: product?.name ?? '',
         variantLabel: row.variantLabel ?? '',
       };
@@ -260,14 +261,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       }
     }
 
-    // Product-level update: add any new variant combos. The edit form can also
-    // carry virtual colors/sizes for a real item ID; only the product fallback
-    // response includes _productId equal to the route id.
-    if (
-      (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) &&
-      normalized._productId === id
-    ) {
-      return this.updateProductWithVariants(id, normalized, actor);
+    const productId = await this.resolveProductIdForUpdate(id, normalized, actor);
+    if (productId && this.hasProductLevelPatch(normalized)) {
+      return this.updateProductWithVariants(productId, normalized, actor);
     }
 
     // Only reconcile nested collections that were explicitly provided — a patch
@@ -694,6 +690,38 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
 
     return { productId: product.id, itemsCreated };
+  }
+
+  /** Route id may be a product UUID (list) or a variant item UUID (deep link). */
+  private async resolveProductIdForUpdate(
+    id: string,
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<string | null> {
+    if (typeof payload._productId === 'string') {
+      return payload._productId;
+    }
+
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+    const productExists = await productRepo.exist({
+      where: { id, organizationId: actor.organizationId },
+    });
+    if (productExists) return id;
+
+    const item = await this.repository.findOne({
+      where: { id, organizationId: actor.organizationId },
+      select: { id: true, productId: true },
+    });
+    return item?.productId ?? null;
+  }
+
+  private hasProductLevelPatch(payload: Record<string, any>): boolean {
+    return (
+      Array.isArray(payload.colors) ||
+      Array.isArray(payload.sizes) ||
+      Array.isArray(payload.variants) ||
+      Object.keys(pickProductVariantSharedItemFields(payload)).length > 0
+    );
   }
 
   private async updateProductWithVariants(
@@ -1405,9 +1433,9 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   idField: 'id',
   fields: [
     // ── List-visible fields (shown in table, order matches the UI) ────────
-    { key: 'code', label: 'Mã SKU', type: 'string' },
+    { key: 'code', label: 'SKU mẫu mã', type: 'string' },
     { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true, hideInList: true },
-    { key: 'name', label: 'Tên hàng hóa', type: 'string', required: true },
+    { key: 'name', label: 'Tên mẫu mã', type: 'string', required: true },
     { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
     { key: 'brand', label: 'Thương hiệu', type: 'string' },
     { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
@@ -1421,7 +1449,8 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
     { key: 'categoryId', label: 'ID Danh mục', type: 'string', hideInList: true },
     { key: 'description', label: 'Mô tả', type: 'string', hideInList: true },
     { key: 'productId', label: 'ID Sản phẩm', type: 'string', hideInList: true },
-    { key: 'productName', label: 'Tên sản phẩm', type: 'string', readOnly: true, hideInList: true },
+    { key: 'productCode', label: 'Mã SKU mẫu mã', type: 'string', readOnly: true, hideInList: true },
+    { key: 'productName', label: 'Tên mẫu mã', type: 'string', readOnly: true, hideInList: true },
     { key: 'colors', label: 'Màu sắc', type: 'tags', hideInList: true },
     { key: 'sizes', label: 'Size', type: 'tags', hideInList: true },
     { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true, hideInList: true },

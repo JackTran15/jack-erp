@@ -11,6 +11,7 @@ import { BranchEntity } from './branch.entity';
 import { UserBranchAssignmentEntity } from './user-branch-assignment.entity';
 import { BranchService } from './branch.service';
 import { OrganizationService } from '../organization/organization.service';
+import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { BranchCashProvisioningService } from '../accounting/cash/branch-cash-provisioning.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { StorageEntity } from '../inventory/location/storage.entity';
@@ -53,6 +54,7 @@ describe('BranchService', () => {
     remove: jest.Mock;
   };
   let orgService: { setMainBranch: jest.Mock };
+  let docNumbering: { generate: jest.Mock };
   let manager: {
     getRepository: jest.Mock;
     create: jest.Mock;
@@ -78,6 +80,7 @@ describe('BranchService', () => {
       remove: jest.fn(),
     };
     orgService = { setMainBranch: jest.fn() };
+    docNumbering = { generate: jest.fn().mockResolvedValue('WH000099') };
 
     // Fake EntityManager: create() tags rows with their entity class so tests can
     // find the StorageEntity/ShowroomEntity payloads; save() stamps a per-class id.
@@ -132,6 +135,7 @@ describe('BranchService', () => {
           useValue: assignmentRepo,
         },
         { provide: OrganizationService, useValue: orgService },
+        { provide: DocumentNumberingService, useValue: docNumbering },
         {
           provide: BranchCashProvisioningService,
           useValue: { ensureBranchCashFund: jest.fn() },
@@ -191,8 +195,11 @@ describe('BranchService', () => {
       expect(storageCall?.[1]).toMatchObject({
         name: 'HQ - Showroom',
         isMainStorage: true,
+        isDefaultReceiving: true,
+        code: 'WH000099',
         branchId: 'branch-new',
       });
+      expect(docNumbering.generate).toHaveBeenCalled();
 
       const showroomCall = manager.create.mock.calls.find(
         (c) => c[0] === ShowroomEntity,

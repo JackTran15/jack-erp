@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+  DocCounterpartyKind,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
 } from '@erp/shared-interfaces';
@@ -75,6 +76,17 @@ export class CreateGoodsReceiptDto {
   @IsOptional()
   @IsUUID()
   providerId?: string;
+
+  /** Đối tượng kind (supplier | customer | employee). When set, the service
+   *  validates the counterparty and routes supplier→provider_id, customer /
+   *  employee→counterparty cols (provider_id null). */
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
 
   @IsOptional()
   @IsString()

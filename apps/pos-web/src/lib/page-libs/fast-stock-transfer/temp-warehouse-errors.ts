@@ -40,6 +40,8 @@ const TEMP_WAREHOUSE_ERROR_MESSAGES: Record<string, string> = {
     "Một hoặc nhiều dòng không còn trong phiên. Vui lòng làm mới danh sách.",
   TEMP_WAREHOUSE_LINES_NOT_TRANSFERABLE:
     "Một hoặc nhiều dòng đã chuyển hoặc không còn trạng thái hoạt động. Vui lòng làm mới danh sách.",
+  TEMP_WAREHOUSE_NO_TRANSFERABLE_LINES:
+    "Các dòng đã chọn đều đã bị xoá hoặc đã chuyển. Vui lòng làm mới và chọn lại.",
   TEMP_WAREHOUSE_SESSION_CLOSED:
     "Phiên kho tạm đã đóng — không thể chuyển kho từng phần.",
   TEMP_WAREHOUSE_SESSION_NOT_FOUND: "Không tìm thấy phiên kho tạm.",

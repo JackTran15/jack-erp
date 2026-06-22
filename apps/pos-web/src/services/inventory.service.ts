@@ -1,3 +1,7 @@
+import type {
+  PreferredShelfPair,
+  PreferredShelfRowResult,
+} from "@erp/pos/dtos/inventory.dto";
 import { http } from "@erp/pos/lib/common/http";
 import type {
   PaginatedResponse,
@@ -42,6 +46,16 @@ export const inventoryService = {
   ): Promise<ReadonlyArray<InventoryShowroomOption>> => {
     const result = await http.get<PaginatedResponse<InventoryShowroomOption>>(
       `/inventory/showrooms?${buildListQuery(branchId)}`,
+    );
+    return result.data;
+  },
+
+  batchPreferredShelf: async (
+    pairs: ReadonlyArray<PreferredShelfPair>,
+  ): Promise<PreferredShelfRowResult[]> => {
+    const result = await http.post<{ data: PreferredShelfRowResult[] }>(
+      "/inventory/locations/preferred-shelf/batch",
+      { pairs },
     );
     return result.data;
   },

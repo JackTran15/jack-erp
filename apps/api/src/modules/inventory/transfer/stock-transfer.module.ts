@@ -13,7 +13,10 @@ import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { StockTransferService } from './stock-transfer.service';
 import { StockTransferController } from './stock-transfer.controller';
 import { StockTransferV2Controller } from './controllers/stock-transfer-v2.controller';
+import { StockTransferCommandV2Controller } from './controllers/stock-transfer-command-v2.controller';
 import { SearchStockTransfersV2Handler } from './queries/search-stock-transfers-v2.handler';
+import { CreateStockTransferV2Handler } from './commands/create-stock-transfer-v2.handler';
+import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 
 @Module({
   imports: [
@@ -30,8 +33,17 @@ import { SearchStockTransfersV2Handler } from './queries/search-stock-transfers-
     DocumentNumberingModule,
     ItemCostSnapshotModule,
   ],
-  controllers: [StockTransferController, StockTransferV2Controller],
-  providers: [StockTransferService, SearchStockTransfersV2Handler],
-  exports: [StockTransferService],
+  controllers: [
+    StockTransferController,
+    StockTransferV2Controller,
+    StockTransferCommandV2Controller,
+  ],
+  providers: [
+    StockTransferService,
+    SearchStockTransfersV2Handler,
+    CreateStockTransferV2Handler,
+    StorageDefaultLocationResolverService,
+  ],
+  exports: [StockTransferService, StorageDefaultLocationResolverService],
 })
 export class StockTransferModule {}

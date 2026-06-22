@@ -11,6 +11,7 @@ import {
   TransferStatus,
   StockMovementType,
   DocumentType,
+  DocCounterpartyKind,
   PaginatedResponse,
   PaginationQuery,
 } from '@erp/shared-interfaces';
@@ -24,6 +25,9 @@ import { LocationEntity } from '../location/location.entity';
 import { StorageEntity } from '../location/storage.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
+import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
+import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
+import { attachCounterparties } from '../location/services/counterparty-name.util';
 import { CreateIntraWarehouseTransferDto } from './create-intra-warehouse-transfer.dto';
 
 /** A fully-resolved intra-warehouse move line: source/dest are concrete location ids. */
@@ -36,13 +40,17 @@ export interface IntraWarehouseMoveLine {
 }
 
 export interface CreateTransferDto {
-  sourceLocationId: string;
+  sourceLocationId?: string;
   destinationLocationId: string;
   sourceBranchId: string;
   destinationBranchId: string;
   notes?: string;
   /** Person responsible for transporting the goods (validated to belong to the org). */
   transporterUserId?: string;
+  /** "Đối tượng" kind (supplier | customer | employee); validated when set. */
+  counterpartyKind?: DocCounterpartyKind;
+  /** Id of the provider / customer / employee, per counterpartyKind. */
+  counterpartyId?: string;
   /** Attachment ids (Tài liệu đính kèm). */
   attachmentIds?: string[];
   /** ISO timestamp the transfer takes place; defaults to posting time when omitted. */
@@ -69,6 +77,8 @@ export interface CreateTransferDto {
 export interface BranchScopedTransferInput {
   notes?: string;
   transporterUserId?: string;
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
   attachmentIds?: string[];
   transferredAt?: string;
   lines: {
@@ -118,6 +128,7 @@ export class StockTransferService {
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly itemCostSnapshotService: ItemCostSnapshotService,
+    private readonly storageDefaultLocationResolver: StorageDefaultLocationResolverService,
   ) {}
 
   async create(
@@ -165,6 +176,8 @@ export class StockTransferService {
       status: TransferStatus.DRAFT,
       notes: dto.notes,
       transporterUserId: dto.transporterUserId,
+      counterpartyKind: dto.counterpartyKind ?? null,
+      counterpartyId: dto.counterpartyId ?? null,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
       createdBy: actor.userId,
@@ -194,8 +207,8 @@ export class StockTransferService {
    * Normalize a branch-scoped (Kho → Kho) transfer request coming from the HTTP
    * surface: every line must name a source and destination storage, all storages
    * must belong to the actor's current branch (cross-branch transfers are the
-   * transfer-order module's job), each missing Vị trí resolves to its storage's
-   * unassigned ("Chưa xếp") location, and each line is valued (snapshot cost when
+   * transfer-order module's job), each missing Vị trí resolves to a concrete
+   * active shelf (never the "Chưa xếp" bin), and each line is valued (snapshot cost when
    * the unit price is left blank). Returns a fully-resolved {@link CreateTransferDto}.
    */
   private async resolveBranchScopedTransfer(
@@ -246,6 +259,9 @@ export class StockTransferService {
         throw new NotFoundException(`Line ${idx + 1}: destination storage not found`);
       }
       if (src.branchId !== actor.branchId || dst.branchId !== actor.branchId) {
+        console.error(
+          `Line ${idx + 1}: source storage branch ${src.branchId} or destination ` +`storage branch ${dst.branchId} does not match actor branch ${actor.branchId}`,
+        );
         throw new BadRequestException(
           'Stock transfer is only allowed between storages in the same branch',
         );
@@ -266,26 +282,27 @@ export class StockTransferService {
       }
     }
 
-    // Resolve each storage's unassigned location once.
-    const unassignedByStorage = new Map<string, string>();
+    // Validate the "Đối tượng" (supplier/customer/employee) exists in the org.
+    // Transfers have no provider_id column, so only the kind+id are kept.
+    const counterparty = await resolveDocCounterparty(
+      this.dataSource.manager,
+      { counterpartyKind: dto.counterpartyKind, counterpartyId: dto.counterpartyId },
+      actor.organizationId,
+    );
+
+    // Resolve each storage's default shelf once — concrete bins only (not "Chưa xếp").
+    const defaultByStorage = new Map<string, string>();
     const resolveDefaultLocation = async (storageId: string): Promise<string> => {
-      const cached = unassignedByStorage.get(storageId);
+      const cached = defaultByStorage.get(storageId);
       if (cached) return cached;
-      const loc = await this.locationRepo.findOne({
-        where: {
-          storageId,
-          isUnassigned: true,
-          organizationId: actor.organizationId,
-        },
-      });
-      if (!loc) {
-        const name = storageById.get(storageId)?.name ?? storageId;
-        throw new BadRequestException(
-          `Storage "${name}" has no default location to transfer through`,
-        );
-      }
-      unassignedByStorage.set(storageId, loc.id);
-      return loc.id;
+
+      const locationId = await this.storageDefaultLocationResolver.resolveStorageTransferLocation(
+        storageId,
+        actor.organizationId,
+        { errorLabel: storageById.get(storageId)?.name ?? storageId },
+      );
+      defaultByStorage.set(storageId, locationId);
+      return locationId;
     };
 
     // Unit price falls back to the snapshot purchase cost when left blank.
@@ -298,7 +315,8 @@ export class StockTransferService {
     const lines: CreateTransferDto['lines'] = [];
     for (const [idx, l] of dto.lines.entries()) {
       const sourceLocationId =
-        l.sourceLocationId ?? (await resolveDefaultLocation(l.sourceStorageId!));
+        l.sourceLocationId ??
+        (await resolveDefaultLocation(l.sourceStorageId!));
       if (l.sourceLocationId) {
         const srcLoc = await this.locationRepo.findOne({
           where: {
@@ -329,7 +347,11 @@ export class StockTransferService {
             `Line ${idx + 1}: destination location not found`,
           );
       }
-      if (sourceLocationId === destinationLocationId) {
+      if (
+        sourceLocationId &&
+        destinationLocationId &&
+        sourceLocationId === destinationLocationId
+      ) {
         throw new BadRequestException(
           `Line ${idx + 1}: source and destination must be different`,
         );
@@ -349,11 +371,13 @@ export class StockTransferService {
     }
 
     return {
-      sourceLocationId: lines[0].sourceLocationId!,
+      sourceLocationId: lines.find((l) => l.sourceLocationId)?.sourceLocationId,
       destinationLocationId: lines[0].destinationLocationId!,
       sourceBranchId: actor.branchId,
       destinationBranchId: actor.branchId,
       transporterUserId: dto.transporterUserId,
+      counterpartyKind: counterparty.counterpartyKind ?? undefined,
+      counterpartyId: counterparty.counterpartyId ?? undefined,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt,
       notes: dto.notes,
@@ -377,14 +401,18 @@ export class StockTransferService {
   async createAndPost(
     dto: BranchScopedTransferInput,
     actor: ActorContext,
+    opts: { validateOnHand?: boolean } = {},
   ): Promise<StockTransferEntity> {
     // HTTP path: each line carries its own Kho xuất/Kho nhập. Resolve them to
     // concrete locations, enforce same-branch, and value each line before the
     // shared create()/post() runs.
+    const { validateOnHand } = opts;
     const resolved = await this.resolveBranchScopedTransfer(dto, actor);
     const draft = await this.create(resolved, actor);
     try {
-      return await this.post(draft.id, actor, { validateOnHand: true });
+      return await this.post(draft.id, actor, {
+        validateOnHand: validateOnHand ?? true,
+      });
     } catch (err) {
       // Roll back the just-created DRAFT so no orphan (without ledger) lingers.
       await this.transferRepo.delete({ id: draft.id }).catch((cleanupErr) => {
@@ -433,6 +461,8 @@ export class StockTransferService {
       sourceBranchId: resolved.sourceBranchId,
       destinationBranchId: resolved.destinationBranchId,
       transporterUserId: resolved.transporterUserId,
+      counterpartyKind: resolved.counterpartyKind ?? null,
+      counterpartyId: resolved.counterpartyId ?? null,
       attachmentIds: resolved.attachmentIds ?? [],
       transferredAt: resolved.transferredAt
         ? new Date(resolved.transferredAt)
@@ -856,6 +886,7 @@ export class StockTransferService {
   ): Promise<StockTransferEntity> {
     const transfer = await this.findOrFail(id, organizationId);
     await this.attachTransporters([transfer], organizationId);
+    await attachCounterparties(this.transferRepo.manager, [transfer], organizationId);
     return transfer;
   }
 
@@ -878,6 +909,7 @@ export class StockTransferService {
     });
 
     await this.attachTransporters(data, query.organizationId);
+    await attachCounterparties(this.transferRepo.manager, data, query.organizationId);
 
     return { data, total, page: query.page, pageSize: query.pageSize };
   }

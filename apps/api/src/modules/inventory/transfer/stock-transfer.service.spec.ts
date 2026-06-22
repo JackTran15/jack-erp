@@ -12,6 +12,7 @@ import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ItemCostSnapshotService } from '../location/item-cost-snapshot.service';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 
 describe('StockTransferService', () => {
   let service: StockTransferService;
@@ -25,6 +26,7 @@ describe('StockTransferService', () => {
   let docNumbering: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let balanceQb: Record<string, jest.Mock>;
+  let storageDefaultLocationResolver: { resolveStorageTransferLocation: jest.Mock };
 
   const actor = {
     userId: 'user-1',
@@ -108,6 +110,9 @@ describe('StockTransferService', () => {
     dataSource = {
       transaction: jest.fn().mockImplementation((cb) => cb(mockManager)),
     };
+    storageDefaultLocationResolver = {
+      resolveStorageTransferLocation: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -121,6 +126,10 @@ describe('StockTransferService', () => {
         { provide: StockLedgerService, useValue: ledgerService },
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: ItemCostSnapshotService, useValue: itemCostSnapshotService },
+        {
+          provide: StorageDefaultLocationResolverService,
+          useValue: storageDefaultLocationResolver,
+        },
       ],
     }).compile();
 
@@ -432,10 +441,9 @@ describe('StockTransferService', () => {
     };
 
     function mockDefaultLocations() {
-      // resolveDefaultLocation: source storage first, then destination storage.
-      locationRepo.findOne
-        .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
-        .mockResolvedValueOnce({ id: 'loc-B', storageId: 'storage-B' });
+      storageDefaultLocationResolver.resolveStorageTransferLocation
+        .mockResolvedValueOnce('loc-A')
+        .mockResolvedValueOnce('loc-B');
     }
 
     it('happy path: posts both legs in one transaction against the source/dest defaults', async () => {
@@ -482,12 +490,16 @@ describe('StockTransferService', () => {
       expect(ledgerService.recordBatchMovements).not.toHaveBeenCalled();
     });
 
-    it('rejects when a storage has no default location', async () => {
+    it('rejects when a storage has no active location', async () => {
       storageRepo.find.mockResolvedValue([storageA, storageB]);
-      locationRepo.findOne.mockResolvedValueOnce(null); // source storage default missing
+      storageDefaultLocationResolver.resolveStorageTransferLocation.mockRejectedValue(
+        new BadRequestException(
+          'Kho "Kho A" chưa có vị trí lưu cụ thể — vui lòng chọn kệ hoặc tạo ít nhất một vị trí (không phải "Chưa xếp")',
+        ),
+      );
 
       await expect(service.createAndPost(khoToKhoDto, actor)).rejects.toThrow(
-        /no default location/,
+        /vị trí lưu cụ thể/,
       );
     });
 
@@ -567,9 +579,9 @@ describe('StockTransferService', () => {
     };
 
     function mockDefaultLocations() {
-      locationRepo.findOne
-        .mockResolvedValueOnce({ id: 'loc-A', storageId: 'storage-A' })
-        .mockResolvedValueOnce({ id: 'loc-B', storageId: 'storage-B' });
+      storageDefaultLocationResolver.resolveStorageTransferLocation
+        .mockResolvedValueOnce('loc-A')
+        .mockResolvedValueOnce('loc-B');
     }
 
     it('reverses the original legs and posts the edited legs, keeping the document number', async () => {

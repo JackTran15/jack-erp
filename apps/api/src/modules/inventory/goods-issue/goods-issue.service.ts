@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Not, Repository } from 'typeorm';
 import {
+  DocCounterpartyKind,
   GoodsIssuePurpose,
   GoodsIssueReferenceType,
   GoodsIssueStatus,
@@ -21,12 +22,18 @@ import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
+import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
+import { attachCounterparties } from '../location/services/counterparty-name.util';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
 export interface CreateGoodsIssueDto {
   locationId: string;
   providerId?: string;
+  /** Đối tượng kind (supplier | customer). When set, the counterparty is
+   *  validated and routed: supplier→provider_id, customer→counterparty cols. */
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
   purpose?: GoodsIssuePurpose;
   reasonId?: string;
   targetBranchId?: string;
@@ -104,13 +111,21 @@ export class GoodsIssueService {
       actor,
     );
 
+    const counterparty = await resolveDocCounterparty(
+      this.dataSource.manager,
+      dto,
+      actor.organizationId,
+    );
+
     const gi = this.giRepo.create({
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
       documentNumber,
       locationId: dto.locationId,
-      providerId: dto.providerId,
+      providerId: counterparty.providerId,
+      counterpartyKind: counterparty.counterpartyKind,
+      counterpartyId: counterparty.counterpartyId,
       purpose,
       reason: reasonText,
       reasonId,
@@ -289,7 +304,9 @@ export class GoodsIssueService {
   }
 
   async getById(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    return this.findOrFail(id, actor.organizationId, actor.branchId);
+    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
+    return gi;
   }
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {
