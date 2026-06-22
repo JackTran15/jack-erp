@@ -129,6 +129,15 @@ interface GoodsIssue {
   customerName?: string;
   providerId?: string | null;
   provider?: { id: string; code: string; name: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
+  /** Resolved "Đối tượng" inlined by the API for all kinds (NCC/KH/NV). */
+  counterparty?: {
+    kind: "supplier" | "customer" | "employee";
+    id: string;
+    code: string | null;
+    name: string;
+  } | null;
   locationId: string;
   location?: { id: string; code: string; name: string; storageId?: string } | null;
   purpose?: GoodsIssuePurposeUI;
@@ -560,9 +569,10 @@ export function GoodsIssuePage() {
       label: "Đối tượng",
       width: 180,
       render: (row) => {
-        // Prefer the explicit provider pick stored on the row. Fall back to
-        // targetBranch for TRANSFER_OUT phiếu created before provider was
-        // added, and finally to the page-level provider name cache.
+        // Prefer the resolved counterparty (covers NCC/KH/NV). Then the explicit
+        // provider pick, the targetBranch for TRANSFER_OUT, and finally the
+        // page-level name cache / legacy customer name.
+        if (row.counterparty?.name) return row.counterparty.name;
         if (row.provider?.name) return row.provider.name;
         if (row.providerId)
           return customerNameById.get(row.providerId) ?? row.providerId;
@@ -974,6 +984,14 @@ function GoodsIssueFormDialog({
   // for legacy rows that pre-date the provider column.
   const initialCustomer = useMemo(() => {
     if (!initial) return { id: "", code: "", name: "" };
+    // Prefer the resolved counterparty — the only source of a name for customer
+    // / employee đối tượng (those have no provider and aren't in `customers`).
+    if (initial.counterparty)
+      return {
+        id: initial.counterparty.id,
+        code: initial.counterparty.code ?? "",
+        name: initial.counterparty.name,
+      };
     if (initial.provider) {
       return {
         id: initial.provider.id,
@@ -1004,10 +1022,12 @@ function GoodsIssueFormDialog({
   const [customerId, setCustomerId] = useState(initialCustomer.id);
   const [customerCode, setCustomerCode] = useState(initialCustomer.code);
   const [customerName, setCustomerName] = useState(initialCustomer.name);
-  // Đối tượng kind for the new counterparty routing.
+  // Đối tượng kind for the new counterparty routing. Rehydrate from the saved
+  // doc so re-saving an edited phiếu keeps its kind; legacy provider rows
+  // without a kind are treated as suppliers.
   const [counterpartyKind, setCounterpartyKind] = useState<
     "supplier" | "customer" | "employee" | ""
-  >("");
+  >(initial?.counterpartyKind ?? (initial?.providerId ? "supplier" : ""));
   // Storage derived from the saved location's parent. Cached storages let us
   // resolve a name immediately on open; the picker will reset both if user
   // changes warehouse later. For a new (create) phiếu, default to the active
@@ -1525,6 +1545,7 @@ function GoodsIssueFormDialog({
     }
   }, [
     customerId,
+    counterpartyKind,
     lines,
     notes,
     deliveryPerson,

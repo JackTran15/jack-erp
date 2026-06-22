@@ -16,7 +16,7 @@ import { PermissionGuard } from '../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PaginationQueryDto } from '../../crud/dto';
-import { TransferStatus } from '@erp/shared-interfaces';
+import { TransferStatus, DocCounterpartyKind } from '@erp/shared-interfaces';
 import {
   IsString,
   IsUUID,
@@ -24,6 +24,7 @@ import {
   IsEnum,
   IsArray,
   IsISO8601,
+  ValidateIf,
   ValidateNested,
   IsNumber,
   Min,
@@ -72,6 +73,14 @@ class CreateTransferDto {
   @IsOptional()
   @IsUUID()
   transporterUserId?: string;
+
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @ValidateIf((o) => o.counterpartyKind !== undefined)
+  @IsUUID()
+  counterpartyId?: string;
 
   @IsOptional()
   @IsArray()

@@ -101,7 +101,9 @@ describe('SearchGoodsIssuesV2Handler', () => {
     const andWhereSql = qb.andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(andWhereSql).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('COALESCE(provider.name, targetBranch.name) ILIKE'),
+        // Party = counterparty name (3 kinds) COALESCE'd with the target branch.
+        expect.stringContaining('gi.counterparty_kind'),
+        expect.stringContaining('targetBranch.name'),
         expect.stringContaining('gi.notes ILIKE'),
         expect.stringContaining('SUM(l.quantity * l.unit_price)'),
       ]),

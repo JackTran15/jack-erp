@@ -23,6 +23,7 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
+import { attachCounterparties } from '../location/services/counterparty-name.util';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
@@ -303,7 +304,9 @@ export class GoodsIssueService {
   }
 
   async getById(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
-    return this.findOrFail(id, actor.organizationId, actor.branchId);
+    const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    await attachCounterparties(this.giRepo.manager, [gi], actor.organizationId);
+    return gi;
   }
 
   async list(query: GoodsIssueQuery): Promise<PaginatedResponse<GoodsIssueEntity>> {
