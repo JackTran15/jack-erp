@@ -1004,6 +1004,10 @@ function GoodsIssueFormDialog({
   const [customerId, setCustomerId] = useState(initialCustomer.id);
   const [customerCode, setCustomerCode] = useState(initialCustomer.code);
   const [customerName, setCustomerName] = useState(initialCustomer.name);
+  // Đối tượng kind for the new counterparty routing.
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >("");
   // Storage derived from the saved location's parent. Cached storages let us
   // resolve a name immediately on open; the picker will reset both if user
   // changes warehouse later. For a new (create) phiếu, default to the active
@@ -1493,7 +1497,8 @@ function GoodsIssueFormDialog({
       } else {
         await apiClient.post("/inventory/goods-issues", {
           locationId: headerLocationId,
-          providerId: customerId || undefined,
+          counterpartyKind: counterpartyKind || undefined,
+          counterpartyId: customerId || undefined,
           purpose,
           reasonId:
             (purpose === "OTHER" || purpose === "DISPOSAL") && reasonId
@@ -2050,6 +2055,7 @@ function GoodsIssueFormDialog({
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
                   defaultType="customer"
+                  allowedTypes={["supplier", "customer", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
                   modalTitle="Chọn đối tượng"
@@ -2059,12 +2065,14 @@ function GoodsIssueFormDialog({
                     setCustomerCode(v);
                     setCustomerId("");
                     setCustomerName("");
+                    setCounterpartyKind("");
                     markDirty();
                   }}
                   onSelect={(c) => {
                     setCustomerId(c.id);
                     setCustomerCode(c.code ?? "");
                     setCustomerName(c.name);
+                    setCounterpartyKind(c.kind);
                     markDirty();
                   }}
                   disabled={isView}

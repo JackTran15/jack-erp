@@ -42,6 +42,10 @@ import {
   BatchPreferredShelfRowDto,
   PreferredShelfPairDto,
 } from './dto/batch-preferred-shelf.dto';
+import {
+  BatchTransferPreferredShelfRowDto,
+  TransferPreferredShelfPairDto,
+} from './dto/batch-transfer-preferred-shelf.dto';
 import { BatchAssignItemsDto } from './inventory-location-stock.controller';
 import { InventoryLocationService } from './inventory-location.service';
 
@@ -663,6 +667,47 @@ export class InventoryLocationStockService {
       storageId: pair.storageId,
       shelf: shelfByKey.get(keyOf(pair)) ?? null,
     }));
+  }
+
+  async getPreferredShelfTransferBatch(
+    pairs: TransferPreferredShelfPairDto[],
+    actor: ActorContext,
+  ): Promise<BatchTransferPreferredShelfRowDto[]> {
+    // Resolve the preferred shelf at both the source and destination storage
+    // for each distinct (itemId, sourceStorageId, destStorageId) once, then
+    // re-expand to the original request order.
+    const keyOf = (p: TransferPreferredShelfPairDto) =>
+      `${p.itemId}:${p.sourceStorageId}:${p.destStorageId}`;
+    const unique = new Map<string, TransferPreferredShelfPairDto>();
+    for (const pair of pairs) unique.set(keyOf(pair), pair);
+
+    const resolved = await Promise.all(
+      [...unique.values()].map(async (pair) => ({
+        key: keyOf(pair),
+        sourceShelf: await this.getPreferredShelf(
+          pair.itemId,
+          pair.sourceStorageId,
+          actor,
+        ),
+        destShelf: await this.getPreferredShelf(
+          pair.itemId,
+          pair.destStorageId,
+          actor,
+        ),
+      })),
+    );
+    const byKey = new Map(resolved.map((r) => [r.key, r]));
+
+    return pairs.map((pair) => {
+      const row = byKey.get(keyOf(pair));
+      return {
+        itemId: pair.itemId,
+        sourceStorageId: pair.sourceStorageId,
+        destStorageId: pair.destStorageId,
+        sourceShelf: row?.sourceShelf ?? null,
+        destShelf: row?.destShelf ?? null,
+      };
+    });
   }
 
   private async findAccessibleShelf(

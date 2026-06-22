@@ -118,6 +118,8 @@ interface GoodsReceipt {
   providerId?: string | null;
   providerName?: string;
   provider?: { id: string; code: string; name: string } | null;
+  counterpartyKind?: "supplier" | "customer" | "employee" | null;
+  counterpartyId?: string | null;
   deliveredBy?: string | null;
   reason?: string | null;
   description?: string | null;
@@ -1007,9 +1009,16 @@ function PurchaseOrderFormDialog({
       : { code: initial.providerId ?? "", name: "" };
   }, [initial, providers]);
 
-  const [providerId, setProviderId] = useState(initial?.providerId ?? "");
+  const [providerId, setProviderId] = useState(
+    initial?.counterpartyId ?? initial?.providerId ?? "",
+  );
   const [providerCode, setProviderCode] = useState(initialProvider.code);
   const [providerName, setProviderName] = useState(initialProvider.name);
+  // Đối tượng kind (supplier | customer | employee). Legacy rows with a
+  // provider but no kind are treated as suppliers.
+  const [counterpartyKind, setCounterpartyKind] = useState<
+    "supplier" | "customer" | "employee" | ""
+  >(initial?.counterpartyKind ?? (initial?.providerId ? "supplier" : ""));
   /**
    * Storage = warehouse ("Kho"). The DB still stores a `locationId` (bin) on
    * the receipt header for legacy reasons, but the UI lets users pick a
@@ -1494,7 +1503,8 @@ function PurchaseOrderFormDialog({
       const headerLocationId = resolvedLines[0]?.locationId ?? "";
       const payload = {
         purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
-        providerId: providerId || undefined,
+        counterpartyKind: counterpartyKind || undefined,
+        counterpartyId: providerId || undefined,
         deliveredBy: deliveryPerson || undefined,
         reason: reason || undefined,
         description: notes || undefined,
@@ -2049,6 +2059,7 @@ function PurchaseOrderFormDialog({
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
                   defaultType="supplier"
+                  allowedTypes={["supplier", "customer", "employee"]}
                   className="w-[180px]"
                   dropdownMinWidth={500}
                   modalTitle="Chọn đối tượng"
@@ -2058,12 +2069,14 @@ function PurchaseOrderFormDialog({
                     setProviderCode(v);
                     setProviderId("");
                     setProviderName("");
+                    setCounterpartyKind("");
                     markDirty();
                   }}
                   onSelect={(c) => {
                     setProviderId(c.id);
                     setProviderCode(c.code ?? "");
                     setProviderName(c.name);
+                    setCounterpartyKind(c.kind);
                     markDirty();
                   }}
                   disabled={isView}

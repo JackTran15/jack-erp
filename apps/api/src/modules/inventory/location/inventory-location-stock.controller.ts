@@ -41,6 +41,10 @@ import {
   BatchPreferredShelfRequestDto,
   BatchPreferredShelfResponseDto,
 } from './dto/batch-preferred-shelf.dto';
+import {
+  BatchTransferPreferredShelfRequestDto,
+  BatchTransferPreferredShelfResponseDto,
+} from './dto/batch-transfer-preferred-shelf.dto';
 import { InventoryLocationStockService } from './inventory-location-stock.service';
 
 class AddItemToLocationDto {
@@ -110,6 +114,26 @@ export class InventoryLocationStockController {
     @Actor() actor: ActorContext,
   ): Promise<BatchPreferredShelfResponseDto> {
     const data = await this.service.getPreferredShelfBatch(dto.pairs, actor);
+    return { data };
+  }
+
+  @Post('preferred-shelf/transfer-batch')
+  @HttpCode(200)
+  @RequirePermission('inventory.read')
+  @RequireBranchScope()
+  @ApiOperation({
+    summary:
+      'Resolve preferred shelves at both source and destination storage for many transfer lines in one request',
+  })
+  @ApiResponse({ status: 200, type: BatchTransferPreferredShelfResponseDto })
+  async batchTransferPreferredShelf(
+    @Body() dto: BatchTransferPreferredShelfRequestDto,
+    @Actor() actor: ActorContext,
+  ): Promise<BatchTransferPreferredShelfResponseDto> {
+    const data = await this.service.getPreferredShelfTransferBatch(
+      dto.pairs,
+      actor,
+    );
     return { data };
   }
 

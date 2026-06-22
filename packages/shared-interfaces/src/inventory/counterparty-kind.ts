@@ -5,4 +5,5 @@
 export enum DocCounterpartyKind {
   SUPPLIER = 'supplier',
   CUSTOMER = 'customer',
+  EMPLOYEE = 'employee',
 }

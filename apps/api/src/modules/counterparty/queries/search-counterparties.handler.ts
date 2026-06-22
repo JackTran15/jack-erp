@@ -153,8 +153,10 @@ export class SearchCounterpartiesHandler
       qb.leftJoin(
         EmployeeProfileEntity,
         'ep',
-        'ep.userId = u.id AND ep.organizationId = :orgId',
-        { orgId },
+        // users.organization_id is uuid but employee_profiles.organization_id
+        // (via BaseEntity) is varchar, so the join must cast. Raw snake_case:
+        // TypeORM does not translate alias.property before a ::cast.
+        'ep.user_id = u.id AND ep.organization_id::uuid = u.organization_id',
       )
         .where('u.organizationId = :orgId', { orgId })
         .andWhere('u.isActive = true');

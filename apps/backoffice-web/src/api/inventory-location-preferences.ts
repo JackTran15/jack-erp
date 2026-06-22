@@ -1,4 +1,5 @@
 import { erpApi, requireErpData } from "../lib/erp-api";
+import { apiClient } from "../lib/api-axios";
 
 export interface PreferredShelf {
   id: string;
@@ -26,4 +27,30 @@ export async function getPreferredShelfBatch(
     }),
   );
   return data;
+}
+
+export interface TransferPreferredShelfPair {
+  itemId: string;
+  sourceStorageId: string;
+  destStorageId: string;
+}
+
+export interface TransferPreferredShelfBatchRow {
+  itemId: string;
+  sourceStorageId: string;
+  destStorageId: string;
+  sourceShelf: PreferredShelf | null;
+  destShelf: PreferredShelf | null;
+}
+
+// Uses the raw axios client (not the typed erpApi) so this endpoint does not
+// require an OpenAPI regen of @erp/api-client. Mirror the body/response shape of
+// POST /inventory/locations/preferred-shelf/transfer-batch.
+export async function getTransferPreferredShelfBatch(
+  pairs: TransferPreferredShelfPair[],
+): Promise<TransferPreferredShelfBatchRow[]> {
+  const { data } = await apiClient.post<{
+    data: TransferPreferredShelfBatchRow[];
+  }>("/inventory/locations/preferred-shelf/transfer-batch", { pairs });
+  return data.data;
 }
