@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@erp/ui";
@@ -12,11 +12,26 @@ import { PageHeader } from "../layout/PageHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
+import {
+  navigateToCrudList,
+  parseCrudListLocationState,
+} from "./crudListNavigation";
 
 export function CrudEditPage() {
   const { entityKey, id } = useParams<{ entityKey: string; id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const listReturnRef = useRef(
+    parseCrudListLocationState(location.state)?.crudListReturn,
+  );
+
+  const navigateBackToList = () => {
+    if (listReturnRef.current) {
+      navigateToCrudList(navigate, entityKey!, listReturnRef.current);
+      return;
+    }
+    navigate(`/admin/${entityKey}`, { replace: true });
+  };
 
   const { data: config, isLoading: configLoading, error: configError } = useCrudConfig(entityKey!);
   const {
@@ -101,7 +116,7 @@ export function CrudEditPage() {
     return (
       <AdminPageShell>
         <p className="text-destructive">
-          Lỗi bản ghi: {recordError instanceof Error ? recordError.message : "Không tải được"}
+          Lỗi bản ghi: {recordError instanceof Error ? recordError.message : "Không xác định"}
         </p>
       </AdminPageShell>
     );
@@ -146,11 +161,8 @@ export function CrudEditPage() {
     try {
       await updateMutation.mutateAsync({ id, body: payload });
       toast.success(`Đã cập nhật ${config.displayName}.`);
-      navigate(`/admin/${entityKey}/${id}`, { replace: true });
-
-      // inventory-items has no standalone detail page — go back to the list.
-      if (entityKey === "inventory-items") {
-        navigate(`/admin/${entityKey}`, { replace: true });
+      if (entityKey === "inventory-items" || listReturnRef.current) {
+        navigateBackToList();
       } else {
         navigate(`/admin/${entityKey}/${id}`, { replace: true });
       }
@@ -201,6 +213,7 @@ export function CrudEditPage() {
               isSaving={updateMutation.isPending}
               mode="edit"
               initialRecord={record}
+              onCancel={navigateBackToList}
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

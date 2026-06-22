@@ -9,8 +9,13 @@ import {
 } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { OnDomainEvent } from '../../../events/decorators/on-event.decorator';
-import { StockTransferService } from '../../transfer/stock-transfer.service';
+import {
+  BranchScopedTransferInput,
+  StockTransferService,
+} from '../../transfer/stock-transfer.service';
+import { StockTransferEntity } from '../../transfer/stock-transfer.entity';
 import { TempWarehouseService } from '../temp-warehouse.service';
+import { TempWarehouseTransferMaterializerService } from '../temp-warehouse-transfer-materializer.service';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 
 /**
@@ -30,6 +35,7 @@ export class TempWarehouseTransferConsumer {
   constructor(
     private readonly stockTransferService: StockTransferService,
     private readonly tempWarehouseService: TempWarehouseService,
+    private readonly transferMaterializer: TempWarehouseTransferMaterializerService,
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.TEMP_WAREHOUSE_TRANSFER_REQUESTED)
@@ -63,6 +69,15 @@ export class TempWarehouseTransferConsumer {
     await this.handleFull(p, session, actor);
   }
 
+  private async createTempWarehouseTransfer(
+    dto: BranchScopedTransferInput,
+    actor: ActorContext,
+  ): Promise<StockTransferEntity> {
+    return this.stockTransferService.createAndPost(dto, actor, {
+      validateOnHand: false,
+    });
+  }
+
   private async handleFull(
     p: TempWarehouseTransferRequestedPayload,
     session: NonNullable<
@@ -93,21 +108,11 @@ export class TempWarehouseTransferConsumer {
     }
 
     try {
-      const transfer = await this.stockTransferService.create(
-        {
-          sourceLocationId: p.sourceLocationId,
-          destinationLocationId: p.destinationLocationId,
-          sourceBranchId: p.sourceBranchId,
-          destinationBranchId: p.destinationBranchId,
-          notes: `From temp warehouse session ${p.sessionId}`,
-          lines: p.lines.map((l) => ({
-            itemId: l.itemId,
-            quantity: Number(l.quantity),
-          })),
-        },
+      const dto = await this.transferMaterializer.buildBranchScopedTransfer(
+        p,
         actor,
       );
-      await this.stockTransferService.post(transfer.id, actor);
+      const transfer = await this.createTempWarehouseTransfer(dto, actor);
 
       await this.tempWarehouseService.markTransferCompleted(
         p.sessionId,
@@ -116,7 +121,7 @@ export class TempWarehouseTransferConsumer {
       );
 
       this.logger.log(
-        `Session ${p.sessionId} direction=${p.direction} → transfer ${transfer.id} POSTED`,
+        `Session ${p.sessionId} direction=${p.direction} → transfer ${transfer.id} (${transfer.status})`,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -148,7 +153,6 @@ export class TempWarehouseTransferConsumer {
       p.organizationId,
     );
 
-    // Defensive replay: if every input line is already TRANSFERRED with the same transferId, this is a re-delivery.
     const alreadyTransferred = existing.filter(
       (l) => l.status === TempWarehouseLineStatus.TRANSFERRED,
     );
@@ -168,21 +172,11 @@ export class TempWarehouseTransferConsumer {
       }
     }
 
-    const transfer = await this.stockTransferService.create(
-      {
-        sourceLocationId: p.sourceLocationId,
-        destinationLocationId: p.destinationLocationId,
-        sourceBranchId: p.sourceBranchId,
-        destinationBranchId: p.destinationBranchId,
-        notes: p.notes ?? `Partial from temp warehouse session ${p.sessionId}`,
-        lines: p.lines.map((l) => ({
-          itemId: l.itemId,
-          quantity: Number(l.quantity),
-        })),
-      },
+    const dto = await this.transferMaterializer.buildBranchScopedTransfer(
+      p,
       actor,
     );
-    await this.stockTransferService.post(transfer.id, actor);
+    const transfer = await this.createTempWarehouseTransfer(dto, actor);
 
     await this.tempWarehouseService.markLinesTransferred(
       p.sessionId,
@@ -192,7 +186,7 @@ export class TempWarehouseTransferConsumer {
     );
 
     this.logger.log(
-      `Partial transfer: session ${p.sessionId} direction=${p.direction} → transfer ${transfer.id} POSTED; ${lineIds.length} lines flipped to TRANSFERRED`,
+      `Partial transfer: session ${p.sessionId} direction=${p.direction} → transfer ${transfer.id} (${transfer.status}); ${lineIds.length} lines flipped to TRANSFERRED`,
     );
   }
 }

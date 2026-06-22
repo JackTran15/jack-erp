@@ -16,6 +16,13 @@ import {
 } from "@erp/shared-interfaces";
 import { catalogLocationName } from "./fast-stock-transfer-pickers";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isShelfUuid(value: string | undefined): value is string {
+  return Boolean(value && UUID_RE.test(value));
+}
+
 export function formatCarrierName(
   carrier: TempWarehousePublicUser | null | undefined,
 ): string {
@@ -25,8 +32,7 @@ export function formatCarrierName(
 }
 
 export function locationLabelForLine(line: TempWarehouseLine): string {
-  const loc = line.sourceLocation;
-  return loc?.name?.trim() || line.notes?.trim() || "";
+  return line.notes?.trim() ?? "";
 }
 
 export function lineSku(line: TempWarehouseLine): string {
@@ -151,6 +157,8 @@ export function mapDraftToAddBody(
   if (draft.carrier?.id) body.carrierUserId = draft.carrier.id;
   const notes = locationNotesFromDraft(draft);
   if (notes) body.notes = notes;
+  const shelfId = draft.location?.locationId;
+  if (isShelfUuid(shelfId)) body.sourceLocationId = shelfId;
   return body;
 }
 
@@ -161,6 +169,12 @@ export function mapDraftToPatchBody(
   if (draft.product?.itemId) body.itemId = draft.product.itemId;
   body.carrierUserId = draft.carrier?.id ?? null;
   body.notes = locationNotesFromDraft(draft) ?? null;
+  const shelfId = draft.location?.locationId;
+  body.sourceLocationId = isShelfUuid(shelfId)
+    ? shelfId
+    : draft.location
+      ? null
+      : undefined;
   return body;
 }
 

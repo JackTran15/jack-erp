@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { flattenCategoryTree, collectParentIds } from "./itemCategoryTree";
 import { useItemCategoryTree } from "./useItemCategoryTree";
+import { useCrudListReturnState } from "./useCrudListReturnState";
 
 /** Entity keys that open create/edit as a dialog instead of navigating to a new page. */
 const DIALOG_MODE_ENTITIES = new Set([
@@ -114,18 +115,6 @@ export function CrudListPage({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [sortBy, setSortBy] = useState<string | undefined>(initialSort?.sortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    initialSort?.sortOrder ?? "desc",
-  );
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [columnFilters, setColumnFilters] = useState<
-    Record<string, ColumnFilter>
-  >({});
-
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(
     new Set(),
   );
@@ -136,6 +125,37 @@ export function CrudListPage({
     string,
     unknown
   > | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
+  const resetListUiState = useCallback(() => {
+    setSelectedRecordIds(new Set());
+    setCreateDialogOpen(false);
+    setEditSnapshot(null);
+    setDuplicateSnapshot(null);
+    setCollapsedIds(new Set());
+  }, []);
+
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
+    search,
+    setSearch,
+    searchInput,
+    setSearchInput,
+    columnFilters,
+    setColumnFilters,
+    goToEdit,
+  } = useCrudListReturnState({
+    entityKey,
+    initialSort,
+    onEntityReset: resetListUiState,
+  });
 
   // Dialog-mode create/edit (for entities in DIALOG_MODE_ENTITIES)
   const [crudDialogOpen, setCrudDialogOpen] = useState(false);
@@ -155,7 +175,6 @@ export function CrudListPage({
   // Nhóm hàng hoá renders as a collapsible parent → child tree instead of the
   // flat paginated list. Ids in `collapsedIds` have their children hidden.
   const isCategoryTree = entityKey === "inventory-item-categories";
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const toggleCategoryCollapse = useCallback((id: string) => {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -244,21 +263,6 @@ export function CrudListPage({
   const createMutation = useCrudCreate(entityKey ?? "");
   const updateMutation = useCrudUpdate(entityKey ?? "");
   const deleteMutation = useCrudDelete(entityKey ?? "");
-
-  useEffect(() => {
-    setPage(1);
-    setPageSize(20);
-    setSortBy(initialSort?.sortBy);
-    setSortOrder(initialSort?.sortOrder ?? "desc");
-    setSearch("");
-    setSearchInput("");
-    setColumnFilters({});
-    setSelectedRecordIds(new Set());
-    setCreateDialogOpen(false);
-    setEditSnapshot(null);
-    setDuplicateSnapshot(null);
-    setCollapsedIds(new Set());
-  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!records) {
@@ -444,9 +448,7 @@ export function CrudListPage({
                   className="text-left font-medium text-primary hover:underline"
                   onClick={(event) => {
                     event.stopPropagation();
-                    navigate(
-                      `/admin/${entityKey}/${String(row[config?.idField ?? "id"])}/edit`,
-                    );
+                    goToEdit(String(row[config?.idField ?? "id"]));
                   }}
                 >
                   {content}
@@ -462,7 +464,7 @@ export function CrudListPage({
       config?.idField,
       entityKey,
       filterDefinitionByKey,
-      navigate,
+      goToEdit,
       v2,
       isCategoryTree,
       toggleCategoryCollapse,
@@ -727,7 +729,7 @@ export function CrudListPage({
             openEditDialog(id);
             return;
           }
-          void navigate(`/admin/${entityKey}/${id}/edit`);
+          void goToEdit(id);
         },
         handleDeleteSelected: () => void handleDeleteSelected(),
         refetchRecords,

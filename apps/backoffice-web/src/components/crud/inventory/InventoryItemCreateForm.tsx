@@ -88,6 +88,7 @@ export function InventoryItemCreateForm({
   isSaving = false,
   mode = "create",
   initialRecord,
+  onCancel,
 }: Props) {
   const navigate = useNavigate();
   const isEdit = mode === "edit";
@@ -1341,7 +1342,7 @@ export function InventoryItemCreateForm({
 
       <InventoryItemActionBar
         isSaving={isSaving}
-        onCancel={() => navigate(`/admin/${entityKey}`)}
+        onCancel={onCancel ?? (() => navigate(`/admin/${entityKey}`))}
       />
 
       <ItemCategoryCreateDialog

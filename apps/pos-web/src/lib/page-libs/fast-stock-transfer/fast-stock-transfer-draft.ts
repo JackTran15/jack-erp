@@ -3,9 +3,7 @@ import type { FastStockTransferToolbarDraft } from "@erp/pos/interfaces/fast-sto
 export function isFastStockTransferDraftCompleteForAdd(
   draft: FastStockTransferToolbarDraft,
 ): boolean {
-  if (!draft.product) return false;
-  if (draft.product.locations.length > 0 && !draft.location) return false;
-  return true;
+  return !!draft.product;
 }
 
 export function isFastStockTransferDraftCompleteForSave(
