@@ -5,6 +5,16 @@ export type ReportColumnAlign = "left" | "right" | "center";
 export type ReportColumnDataType = "date" | "number" | "text";
 export type ReportColumnPin = "left" | "right";
 
+// Kiểu ô filter của cột. Mặc định suy ra từ dataType (xem resolveReportColumnFilterKind);
+// "time"/"select"/"none" phải khai báo tường minh trong registry.
+export type ReportColumnFilterKind =
+  | "text"
+  | "number"
+  | "date"
+  | "time"
+  | "select"
+  | "none";
+
 // Render-config hiển thị cho từng cột (trước đây hardcode trong ReportPageTable).
 export interface ReportColumnTableConfig {
   width?: number;                   // mặc định DEFAULT_REPORT_COLUMN_WIDTH ở lib/table
@@ -12,6 +22,8 @@ export interface ReportColumnTableConfig {
   align?: ReportColumnAlign;        // mặc định suy ra từ dataType
   dataType?: ReportColumnDataType;  // mặc định "number"; lái toán tử filter, icon lịch, format số
   link?: boolean;                   // render giá trị thành link xanh
+  filterKind?: ReportColumnFilterKind;            // override kiểu ô filter (mặc định suy từ dataType)
+  filterOptions?: { value: string; label: string }[]; // options cho filterKind "select"
 }
 
 export interface ReportColumnConfig {

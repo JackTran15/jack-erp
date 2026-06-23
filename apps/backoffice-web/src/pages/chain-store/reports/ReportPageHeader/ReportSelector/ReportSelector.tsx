@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@erp/ui";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@erp/ui";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
 import { ReportFilterForm } from "./ReportFilterForm/ReportFilterForm";
 
@@ -15,12 +15,9 @@ export function ReportSelector() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="absolute left-0 h-[30px] rounded-[3px] bg-[#2B3164] px-3.5 text-[13px] text-white hover:bg-[#3A4178]"
-        >
+        <Button type="button" size="sm" className="absolute left-0">
           Chọn báo cáo
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto">
         <ReportFilterForm onSubmit={handleSubmit} onCancel={() => setOpen(false)} />

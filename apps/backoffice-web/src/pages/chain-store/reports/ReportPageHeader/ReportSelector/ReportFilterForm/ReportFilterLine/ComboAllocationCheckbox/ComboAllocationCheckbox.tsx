@@ -13,13 +13,13 @@ interface Props {
 
 export function ComboAllocationCheckbox({ value, onChange }: Props) {
   return (
-    <div className="flex items-start gap-2 text-[13px] text-[#333333]">
+    <div className="flex items-start gap-2 text-xs text-foreground">
       <label className="flex items-start gap-2">
         <input
           type="checkbox"
           checked={value}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-[#353B8C]"
+          className="mt-0.5 h-4 w-4 accent-primary"
         />
         Phân bổ doanh thu, khuyến mại, thuế của các hàng hóa trong combo
       </label>
@@ -29,7 +29,7 @@ export function ComboAllocationCheckbox({ value, onChange }: Props) {
             <button
               type="button"
               aria-label="Giải thích phân bổ combo"
-              className="mt-0.5 text-[#6B7280]"
+              className="mt-0.5 text-muted-foreground"
             >
               <HelpCircle className="h-4 w-4" />
             </button>

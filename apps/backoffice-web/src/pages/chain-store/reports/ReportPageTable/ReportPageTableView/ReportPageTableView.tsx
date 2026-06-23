@@ -30,10 +30,6 @@ import {
   isReportNumberColumn,
   pinPosition,
 } from "../../../../../lib/table";
-import {
-  DEFAULT_COLUMN_FILTER_MODE,
-  type ColumnFilterMode,
-} from "../../../../../components/table/pagination.dto";
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
 import type { ReportRow } from "../../_api/invoice-report.api";
@@ -259,7 +255,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
           className="border-separate border-spacing-0 text-sm"
           style={{ width: "max-content", minWidth: "100%" }}
         >
-          <thead className="bg-muted text-xs font-semibold">
+          <thead className="bg-muted text-sm font-semibold">
             {/* Tầng 1: group header */}
             <SortableContext items={topItems} strategy={horizontalListSortingStrategy}>
               <tr>
@@ -291,7 +287,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       >
                         {seg.col.label}
                         {getReportColumnCode(seg.col) && (
-                          <div className="font-normal text-muted-foreground">
+                          <div className="text-xs font-normal text-muted-foreground">
                             {getReportColumnCode(seg.col)}
                           </div>
                         )}
@@ -350,7 +346,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                         >
                           {col.label}
                           {getReportColumnCode(col) && (
-                            <div className="font-normal text-muted-foreground">
+                            <div className="text-xs font-normal text-muted-foreground">
                               {getReportColumnCode(col)}
                             </div>
                           )}
@@ -374,11 +370,9 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     style={pinPosition(column)}
                     pinned={Boolean(column.getIsPinned())}
                     value={filter?.value ?? ""}
-                    operator={
-                      (filter?.operator as ColumnFilterMode) || DEFAULT_COLUMN_FILTER_MODE
-                    }
-                    onOperatorChange={(mode) =>
-                      setColumnFilter(col.column, { operator: mode })
+                    operator={filter?.operator ?? ""}
+                    onOperatorChange={(op) =>
+                      setColumnFilter(col.column, { operator: op })
                     }
                     onValueChange={(v) => setColumnFilter(col.column, { value: v })}
                   />
@@ -395,6 +389,12 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 ...row.getRightVisibleCells(),
               ];
               const rowBg = rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20";
+              // Nền đục cho cột cố định (cùng màu với dòng): bg-muted/20 là nền trong suốt,
+              // khi cuộn ngang nội dung cột khác sẽ lộ chồng lên — dùng màu đặc để che.
+              const pinnedBg =
+                rowIndex % 2 === 0
+                  ? "hsl(var(--background))"
+                  : "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))";
               return (
                 <tr key={row.id} className={`${rowBg} hover:bg-blue-50/70`}>
                   {cells.map((cell) => {
@@ -406,11 +406,16 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     return (
                       <td
                         key={cell.id}
-                        style={{ width, minWidth: width, ...pinPosition(cell.column) }}
+                        style={{
+                          width,
+                          minWidth: width,
+                          ...pinPosition(cell.column),
+                          ...(pinned ? { backgroundColor: pinnedBg } : {}),
+                        }}
                         className={[
                           `${cellBorder} h-8 px-2 py-0 align-middle`,
                           getReportCellAlignClass(col),
-                          pinned ? `z-10 ${rowBg}` : "",
+                          pinned ? "z-10" : "",
                         ].join(" ")}
                       >
                         {col.tableConfig?.link ? (

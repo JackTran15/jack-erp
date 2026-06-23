@@ -26,12 +26,12 @@ export function ReportFilterForm({ onSubmit, onCancel }: Props) {
   const lines = getReportFormLines(reportType, branch);
 
   return (
-    <div className="flex w-[640px] max-w-[calc(100vw-2rem)] flex-col">
-      <div className="flex flex-col divide-y divide-[#F0F0F0]">
+    <div className="flex w-[450px] max-w-[calc(100vw-2rem)] flex-col">
+      <div className="flex flex-col divide-y divide-border">
         {/* Dòng chọn báo cáo: field đặc biệt, luôn hiển thị. */}
-        <div className="flex items-start gap-4 py-2">
-          <div className="w-[140px] shrink-0 pt-1.5 text-[13px] text-[#4A4A4A]">
-            Báo cáo<span className="text-[#E53935]"> *</span>
+        <div className="flex items-start gap-3 py-1.5">
+          <div className="w-[110px] shrink-0 pt-1.5 text-xs text-muted-foreground">
+            Báo cáo<span className="text-destructive"> *</span>
           </div>
           <div className="min-w-0 flex-1">
             <ReportTypeSelect
@@ -47,22 +47,13 @@ export function ReportFilterForm({ onSubmit, onCancel }: Props) {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-end gap-3">
-        <Button
-          type="button"
-          onClick={onSubmit}
-          className="bg-[#353B8C] hover:bg-[#2C3178]"
-        >
-          <Check className="h-4 w-4" />
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <Button type="button" size="sm" onClick={onSubmit}>
+          <Check className="mr-1 h-4 w-4" />
           Đồng ý
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onCancel}
-          className="text-[#353B8C]"
-        >
-          <X className="h-4 w-4" />
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          <X className="mr-1 h-4 w-4" />
           Hủy bỏ
         </Button>
       </div>

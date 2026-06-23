@@ -62,6 +62,7 @@ export function createReportStore(
         }),
 
       // Chốt filter hiện tại → appliedRequest (table sẽ fetch data theo snapshot này).
+      // reloadNonce tăng để ép refetch ngay cả khi filter không đổi (mỗi click = 1 lần gọi API).
       applyFilters: () =>
         set((s) => ({
           appliedRequest: {
@@ -69,6 +70,7 @@ export function createReportStore(
             filters: s.filters,
             columnFilters: s.columnFilters,
           },
+          reloadNonce: s.reloadNonce + 1,
         })),
 
       resetFilters: () =>

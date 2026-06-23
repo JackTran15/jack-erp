@@ -61,4 +61,19 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  /* Input date/time chưa có giá trị: ẩn placeholder định dạng mặc định (dd/mm/yyyy, --:--)
+     để ô trống; icon chọn lịch/giờ vẫn hiện. Khi focus thì hiện lại để nhập/đọc được. */
+  .date-input-blank-empty:not(:focus) {
+    color: transparent;
+  }
+  /* Input number: ẩn nút mũi tên tăng/giảm (spinner) để khỏi chiếm diện tích và dễ nhập số. */
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }

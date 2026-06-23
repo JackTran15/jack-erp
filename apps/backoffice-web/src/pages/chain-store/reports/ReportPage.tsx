@@ -71,7 +71,7 @@ export function ReportPage({ category, reportType }: Props) {
       >
         <ReportTableConfigSync />
         <ReportUrlSync />
-        <div className="flex h-full flex-col bg-white px-2">
+        <div className="flex h-full min-h-0 flex-col bg-background px-2">
           <ReportPageHeader />
           <ReportPageTable />
         </div>

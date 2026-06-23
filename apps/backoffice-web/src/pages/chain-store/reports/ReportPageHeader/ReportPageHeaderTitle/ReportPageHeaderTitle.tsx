@@ -12,11 +12,11 @@ export function ReportPageHeaderTitle() {
     branch === STORE_TYPE.CHAIN ? "Xem theo chuỗi cửa hàng" : "Xem theo chi nhánh";
 
   return (
-    <div className="mx-auto flex flex-col items-center gap-1 text-center text-[#2B3164]">
-      <h1 className="text-[20px] font-medium uppercase leading-tight">
+    <div className="mx-auto flex flex-col items-center gap-1 text-center text-primary">
+      <h1 className="text-lg font-semibold uppercase tracking-wide leading-tight">
         {title}
       </h1>
-      <p className="text-[13px] font-normal">{description}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

@@ -1,34 +1,33 @@
 import { useState } from "react";
-import { ChevronDown, Printer, Settings, UploadCloud } from "lucide-react";
+import { Button } from "@erp/ui";
+import { CloudUpload, Printer, Settings2 } from "lucide-react";
 import { ColumnConfigDialog } from "./ColumnConfigDialog/ColumnConfigDialog";
-
-const buttonClass =
-  "flex h-[30px] items-center gap-1.5 rounded-[3px] border border-[#D9D9DE] bg-white px-2.5 text-[13px] font-medium text-[#2B3164] hover:bg-[#F5F5F6]";
 
 export function ReportPageToolbar() {
   const [configOpen, setConfigOpen] = useState(false);
 
   return (
-    <div className="flex items-center gap-2">
-      <button type="button" className={buttonClass}>
-        <Printer className="h-4 w-4" />
+    <div className="flex items-center gap-2 flex-wrap">
+      <Button type="button" variant="outline" size="sm">
+        <Printer className="mr-1 h-4 w-4" />
         In
-        <ChevronDown className="h-3 w-3" />
-      </button>
+      </Button>
 
-      <button type="button" className={buttonClass}>
-        <UploadCloud className="h-4 w-4" />
+      <Button type="button" variant="outline" size="sm">
+        <CloudUpload className="mr-1 h-4 w-4" />
         Xuất khẩu
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
-        className="flex h-[30px] w-[30px] items-center justify-center rounded-[3px] border border-[#D9D9DE] bg-white text-[#6B6B75] hover:bg-[#F5F5F6]"
+        variant="outline"
+        size="icon"
+        className="h-9 w-9"
         aria-label="Thiết lập cột hiển thị"
         onClick={() => setConfigOpen(true)}
       >
-        <Settings className="h-[18px] w-[18px]" />
-      </button>
+        <Settings2 className="h-4 w-4" />
+      </Button>
 
       <ColumnConfigDialog open={configOpen} onClose={() => setConfigOpen(false)} />
     </div>

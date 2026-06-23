@@ -17,7 +17,7 @@ const columns: ReportColumnConfig[] = [
     label: "Giờ",
     order: 2,
     visible: true,
-    tableConfig: { width: 72, align: "left", dataType: "text" },
+    tableConfig: { width: 72, align: "left", dataType: "text", filterKind: "time" },
   },
   {
     column: ReportTableColumn.INVOICE_CODE,
