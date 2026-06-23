@@ -19,6 +19,7 @@ export function useCreateRole() {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["iam", "roles"] });
+      void qc.invalidateQueries({ queryKey: ["iam", "roles-search"] });
     },
   });
 }
@@ -41,6 +42,7 @@ export function useUpdateRole(roleId: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["iam", "roles"] });
+      void qc.invalidateQueries({ queryKey: ["iam", "roles-search"] });
       void qc.invalidateQueries({ queryKey: ["iam", "role", roleId] });
     },
   });
@@ -58,6 +60,7 @@ export function useSetRolePermissions(roleId: string) {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["iam", "roles"] });
+      void qc.invalidateQueries({ queryKey: ["iam", "roles-search"] });
       void qc.invalidateQueries({ queryKey: ["iam", "role", roleId] });
     },
   });
@@ -74,6 +77,7 @@ export function useDeleteRole() {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["iam", "roles"] });
+      void qc.invalidateQueries({ queryKey: ["iam", "roles-search"] });
     },
   });
 }

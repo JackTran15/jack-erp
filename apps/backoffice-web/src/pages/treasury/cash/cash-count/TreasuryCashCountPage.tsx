@@ -18,18 +18,24 @@ import { PaginationControls } from "../../../../components/table/PaginationContr
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { useDebouncedValue } from "../../../../lib/use-debounced-value";
 import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   loadCashCountParticipants,
   saveCashCountParticipants,
   useCashCount,
+  useCashCountSearch,
   useCashCountMutations,
-  useCashCountsList,
+  type CashCountSearchBody,
 } from "../../../../hooks/treasury/use-cash-counts";
+import {
+  columnToDateRangeFilter,
+  columnToStringFilter,
+  intersectDateRanges,
+} from "../../../../hooks/treasury/treasury-search-filters";
 import { CashCountDetailPanel } from "./CashCountDetailPanel";
 import { CashCountFormDialog } from "./CashCountFormDialog";
 import { CreateCashCountDialog } from "./CreateCashCountDialog";
@@ -40,6 +46,7 @@ import {
 } from "./cash-count.api-adapter";
 import {
   CASH_COUNT_FILTER_KEYS,
+  CASH_COUNT_STATUS_LABEL,
   type CashCountFilterKey,
 } from "./cash-count.constants";
 import {
@@ -47,10 +54,7 @@ import {
   CashCountStatusEnum,
   type CashCountRecord,
 } from "./cash-count.types";
-import {
-  filterCashCountByPeriod,
-  toComparableCashCountText,
-} from "./cash-count.utils";
+import { CashCountStatus } from "../../cash-vouchers.types";
 import { useCashCountTableColumns } from "./useCashCountTableColumns";
 
 function emptyColumnFilters(): Record<CashCountFilterKey, ColumnFilter> {
@@ -61,6 +65,35 @@ function emptyColumnFilters(): Record<CashCountFilterKey, ColumnFilter> {
     },
     {} as Record<CashCountFilterKey, ColumnFilter>,
   );
+}
+
+const CASH_COUNT_API_STATUS_BY_LABEL: Record<string, CashCountStatus> = {
+  [CASH_COUNT_STATUS_LABEL[CashCountStatusEnum.UNPROCESSED]]:
+    CashCountStatus.DRAFT,
+  [CASH_COUNT_STATUS_LABEL[CashCountStatusEnum.PROCESSED]]:
+    CashCountStatus.POSTED,
+};
+
+function resolveCashCountSearchBody(
+  filters: Record<CashCountFilterKey, ColumnFilter>,
+  period: { from?: string; to?: string },
+  pagination: { page: number; pageSize: number },
+  cashAccountId: string,
+): CashCountSearchBody {
+  const status = CASH_COUNT_API_STATUS_BY_LABEL[filters.statusLabel.value];
+  return {
+    page: pagination.page,
+    limit: pagination.pageSize,
+    cashAccountId: cashAccountId || undefined,
+    countedAt: intersectDateRanges(
+      period,
+      columnToDateRangeFilter(filters.countDate),
+      columnToDateRangeFilter(filters.inventoryUntilDate),
+    ),
+    documentNumber: columnToStringFilter(filters.documentNumber),
+    purpose: columnToStringFilter(filters.purpose),
+    status: status ? { value: status } : undefined,
+  };
 }
 
 export function TreasuryCashCountPage() {
@@ -83,25 +116,28 @@ export function TreasuryCashCountPage() {
   const [formRecord, setFormRecord] = useState<CashCountRecord | null>(null);
   const [createDraftDate, setCreateDraftDate] = useState<string | null>(null);
 
-  const listQuery = useMemo(
-    () => ({
-      cashAccountId: cashAccountId || undefined,
-      page: 1,
-      pageSize: 100,
-    }),
-    [cashAccountId],
+  const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
+  const searchBody = useMemo(
+    () =>
+      resolveCashCountSearchBody(
+        debouncedColumnFilters,
+        appliedPeriod,
+        pagination,
+        cashAccountId,
+      ),
+    [debouncedColumnFilters, appliedPeriod, pagination, cashAccountId],
   );
 
   const {
     data: listData,
     isLoading,
     refetch,
-  } = useCashCountsList(listQuery, Boolean(cashAccountId));
+  } = useCashCountSearch(searchBody, Boolean(cashAccountId));
 
-  const records = useMemo(() => {
-    const raw = (listData?.data ?? []).map(cashCountToRecord);
-    return filterCashCountByPeriod(raw, appliedPeriod.from, appliedPeriod.to);
-  }, [listData, appliedPeriod]);
+  const records = useMemo(
+    () => (listData?.data ?? []).map(cashCountToRecord),
+    [listData?.data],
+  );
 
   const { data: detailCount } = useCashCount(selectedId ?? undefined);
 
@@ -159,22 +195,7 @@ export function TreasuryCashCountPage() {
 
   const mutations = useCashCountMutations();
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((record) =>
-      CASH_COUNT_FILTER_KEYS.every((key) =>
-        applyColumnFilter(
-          toComparableCashCountText(record, key),
-          columnFilters[key],
-        ),
-      ),
-    );
-  }, [records, columnFilters]);
-
-  const total = filteredRecords.length;
-  const pagedRecords = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRecords.slice(start, start + pagination.pageSize);
-  }, [filteredRecords, pagination]);
+  const total = listData?.total ?? 0;
 
   const openForm = useCallback(
     (
@@ -216,22 +237,36 @@ export function TreasuryCashCountPage() {
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as CashCountFilterKey]: {
             ...prev[key as CashCountFilterKey],
             mode,
           },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as CashCountFilterKey]: {
             ...prev[key as CashCountFilterKey],
             value,
           },
-        })),
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as CashCountFilterKey]: {
+            ...prev[key as CashCountFilterKey],
+            [part]: value,
+          },
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
     }),
     [columnFilters],
   );
@@ -372,7 +407,7 @@ export function TreasuryCashCountPage() {
       >
         <BaseDataTable
           columns={columns}
-          rows={pagedRecords}
+          rows={records}
           loading={isLoading}
           emptyLabel="Không có phiếu kiểm kê trong kỳ đã chọn."
           getRowKey={(r) => r.id}

@@ -32,11 +32,10 @@ import { PaginationControls } from "../../../../components/table/PaginationContr
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
-  applyColumnFilter,
-  toComparableText,
   type ColumnFilter,
   type ColumnFilterMode,
 } from "../../../../components/table/pagination.dto";
+import { useDebouncedValue } from "../../../../lib/use-debounced-value";
 import { useCashAccounts } from "../../../../hooks/treasury/use-cash-accounts";
 import {
   useCashPayment,
@@ -48,7 +47,17 @@ import {
 } from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
 import { useCoaAccounts } from "../../../../hooks/treasury/use-coa-accounts";
-import { useMergedReceiptPayments } from "../../../../hooks/treasury/use-merged-receipt-payments";
+import {
+  columnToCompareFilter,
+  columnToDateRangeFilter,
+  columnToStringFilter,
+  intersectDateRanges,
+} from "../../../../hooks/treasury/treasury-search-filters";
+import {
+  useCashVoucherSearch,
+  type CashVoucherDocumentType,
+  type CashVoucherSearchBody,
+} from "../../../../hooks/treasury/use-cash-voucher-search";
 import {
   cashPaymentToVoucherDetail,
   cashReceiptToVoucherDetail,
@@ -80,6 +89,7 @@ import {
 import { MOCK_LEDGER_CASH_ROWS, findLedgerCashInvoiceByCode } from "../../ledger-cash/mock-ledger-cash";
 import { ReceiptCashDetailPanel } from "./ReceiptCashDetailPanel";
 import {
+  RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS,
   RECEIPT_CASH_FILTER_KEYS,
   type ReceiptCashFilterKey,
 } from "./receipt-cash.constants";
@@ -107,6 +117,39 @@ function dialogKindFromItem(
     : ReceiptCashVoucherDialogKindEnum.PAYMENT;
 }
 
+const DOCUMENT_TYPE_BY_LABEL: Record<string, CashVoucherDocumentType> =
+  Object.fromEntries(
+    RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS.map((option) => [
+      option.label,
+      option.value as CashVoucherDocumentType,
+    ]),
+  );
+
+function resolveCashVoucherSearchBody(
+  filters: Record<ReceiptCashFilterKey, ColumnFilter>,
+  period: { from?: string; to?: string },
+  pagination: { page: number; pageSize: number },
+  cashAccountId: string,
+): CashVoucherSearchBody {
+  const documentType = DOCUMENT_TYPE_BY_LABEL[
+    filters.documentTypeLabel.value
+  ];
+  return {
+    page: pagination.page,
+    limit: pagination.pageSize,
+    cashAccountId: cashAccountId || undefined,
+    voucherDate: intersectDateRanges(
+      period,
+      columnToDateRangeFilter(filters.documentDate),
+    ),
+    documentNumber: columnToStringFilter(filters.voucherNo),
+    documentType: documentType ? { value: documentType } : undefined,
+    totalAmount: columnToCompareFilter(filters.totalAmount),
+    counterparty: columnToStringFilter(filters.counterparty),
+    reason: columnToStringFilter(filters.reason),
+  };
+}
+
 export function TreasuryCashReceiptsPage() {
   const { data: cashAccounts } = useCashAccounts();
   const cashAccountId = cashAccounts?.[0]?.id ?? "";
@@ -132,25 +175,24 @@ export function TreasuryCashReceiptsPage() {
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
 
-  const listQuery = useMemo(
-    () => ({
-      cashAccountId: cashAccountId || undefined,
-      dateFrom: appliedPeriod.from,
-      dateTo: appliedPeriod.to,
-      page: 1,
-      pageSize: 100,
-    }),
-    [cashAccountId, appliedPeriod],
+  const debouncedColumnFilters = useDebouncedValue(columnFilters, 300);
+  const searchBody = useMemo(
+    () =>
+      resolveCashVoucherSearchBody(
+        debouncedColumnFilters,
+        appliedPeriod,
+        pagination,
+        cashAccountId,
+      ),
+    [debouncedColumnFilters, appliedPeriod, pagination, cashAccountId],
   );
 
-  const { merged, isLoading, refetch } = useMergedReceiptPayments(
-    listQuery,
-    listQuery,
-    { from: appliedPeriod.from, to: appliedPeriod.to },
+  const { data: listData, isLoading, refetch } = useCashVoucherSearch(
+    searchBody,
     Boolean(cashAccountId),
   );
 
-  const listRows = merged.data ?? [];
+  const listRows = listData?.data ?? [];
 
   const selectedItem = useMemo(
     () => listRows.find((r) => r.id === selectedId) ?? null,
@@ -180,48 +222,7 @@ export function TreasuryCashReceiptsPage() {
 
   const detailLines = selectedVoucher?.lines ?? [];
 
-  const filteredRows = useMemo(() => {
-    return listRows.filter((row) => {
-      const dateText = new Date(
-        `${row.voucherDate}T12:00:00`,
-      ).toLocaleDateString("vi-VN");
-      const typeLabel =
-        row.kind === ReceiptPaymentKind.RECEIPT
-          ? "Phiếu thu tiền mặt"
-          : row.isGoodsReceiptPayment
-            ? "Phiếu nhập hàng - Tiền mặt"
-            : "Phiếu chi tiền mặt";
-      return (
-        applyColumnFilter(
-          toComparableText(dateText),
-          columnFilters.documentDate,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.documentNumber),
-          columnFilters.voucherNo,
-        ) &&
-        applyColumnFilter(
-          toComparableText(typeLabel),
-          columnFilters.documentTypeLabel,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.totalAmount),
-          columnFilters.totalAmount,
-        ) &&
-        applyColumnFilter(
-          toComparableText(row.counterparty),
-          columnFilters.counterparty,
-        ) &&
-        applyColumnFilter(toComparableText(row.reason), columnFilters.reason)
-      );
-    });
-  }, [listRows, columnFilters]);
-
-  const total = filteredRows.length;
-  const pagedRows = useMemo(() => {
-    const start = (pagination.page - 1) * pagination.pageSize;
-    return filteredRows.slice(start, start + pagination.pageSize);
-  }, [filteredRows, pagination]);
+  const total = listData?.total ?? 0;
 
   const receiptMutations = useCashReceiptMutations();
   const paymentMutations = useCashPaymentMutations();
@@ -268,22 +269,36 @@ export function TreasuryCashReceiptsPage() {
   const columnFilterControl = useMemo(
     () => ({
       filters: columnFilters as unknown as Record<string, ColumnFilter>,
-      onModeChange: (key: string, mode: ColumnFilterMode) =>
+      onModeChange: (key: string, mode: ColumnFilterMode) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as ReceiptCashFilterKey]: {
             ...prev[key as ReceiptCashFilterKey],
             mode,
           },
-        })),
-      onValueChange: (key: string, value: string) =>
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
+      onValueChange: (key: string, value: string) => {
         setColumnFilters((prev) => ({
           ...prev,
           [key as ReceiptCashFilterKey]: {
             ...prev[key as ReceiptCashFilterKey],
             value,
           },
-        })),
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
+      onRangeChange: (key: string, part: "from" | "to", value: string) => {
+        setColumnFilters((prev) => ({
+          ...prev,
+          [key as ReceiptCashFilterKey]: {
+            ...prev[key as ReceiptCashFilterKey],
+            [part]: value,
+          },
+        }));
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      },
     }),
     [columnFilters],
   );
@@ -400,8 +415,8 @@ export function TreasuryCashReceiptsPage() {
   ];
 
   const listTotal = useMemo(
-    () => filteredRows.reduce((s, r) => s + r.totalAmount, 0),
-    [filteredRows],
+    () => listRows.reduce((sum, row) => sum + row.totalAmount, 0),
+    [listRows],
   );
 
   const openCreateReceipt = useCallback(() => {
@@ -578,7 +593,7 @@ export function TreasuryCashReceiptsPage() {
         }
         summary={
           <div className="flex items-center justify-end gap-6 px-2">
-            <span className="text-muted-foreground">Tổng tiền:</span>
+            <span className="text-muted-foreground">Tổng tiền trang:</span>
             <span className="text-base font-semibold">
               {formatMoneyInteger(listTotal)}
             </span>
@@ -601,7 +616,7 @@ export function TreasuryCashReceiptsPage() {
       >
         <BaseDataTable
           columns={columns}
-          rows={pagedRows}
+          rows={listRows}
           loading={isLoading}
           emptyLabel="Không có chứng từ thu chi tiền mặt trong kỳ đã chọn."
           getRowKey={(row) => `${row.kind}-${row.id}`}

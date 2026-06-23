@@ -43,6 +43,7 @@ export function useCashReceiptMutations() {
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["cash-receipts"] });
     void qc.invalidateQueries({ queryKey: ["cash-payments"] });
+    void qc.invalidateQueries({ queryKey: ["cash-vouchers"] });
     void qc.invalidateQueries({ queryKey: ["cash-receipts-payments-merged"] });
     void qc.invalidateQueries({ queryKey: ["cash-ledger"] });
     void qc.invalidateQueries({ queryKey: ["cash-accounts"] });

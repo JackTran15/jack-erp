@@ -23,6 +23,7 @@ export function useCashCountTableColumns(
         key: "countDate",
         label: "Ngày",
         width: 110,
+        filterKind: "date-range",
         render: (r) =>
           new Date(`${r.countDate}T12:00:00`).toLocaleDateString(
             "vi-VN",
@@ -45,6 +46,7 @@ export function useCashCountTableColumns(
         key: "inventoryUntilDate",
         label: "Kiểm kê đến ngày",
         width: 130,
+        filterKind: "date-range",
         render: (r) =>
           new Date(`${r.inventoryUntilDate}T12:00:00`).toLocaleDateString(
             "vi-VN",
