@@ -1,4 +1,4 @@
-import { AppModal, Button, Input } from "@erp/ui";
+import { AppModal, Button, Input, MoneyInput } from "@erp/ui";
 import { ChevronDown, ChevronRight, Search, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -678,22 +678,18 @@ function QtyPriceCells({
   return (
     <>
       <td className="px-2 py-1.5 text-right">
-        <Input
-          type="number"
-          min={0}
+        <MoneyInput
           value={getQty(id)}
-          onChange={(e) => setQty(id, Number(e.target.value) || 0)}
-          className="h-7 w-20 text-right"
+          onChange={(v) => setQty(id, v === "" ? 0 : v)}
+          className="h-7 w-20"
           aria-label={`Số lượng ${data.sku}`}
         />
       </td>
       <td className="px-2 py-1.5 text-right">
-        <Input
-          type="number"
-          min={0}
+        <MoneyInput
           value={getPrice(id, data)}
-          onChange={(e) => setPrice(id, Number(e.target.value) || 0)}
-          className="h-7 w-28 text-right"
+          onChange={(v) => setPrice(id, v === "" ? 0 : v)}
+          className="h-7 w-28"
           aria-label={`Đơn giá ${data.sku}`}
         />
       </td>

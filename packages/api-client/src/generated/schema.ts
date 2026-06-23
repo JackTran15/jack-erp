@@ -7535,6 +7535,9 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             transporterUserId?: string;
+            /** @enum {string|null} */
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
+            counterpartyId?: string | null;
             /** Format: date-time */
             transferredAt?: string;
             attachmentIds: string[];
@@ -7544,6 +7547,12 @@ export interface components {
                 id: string;
                 fullName: string;
             };
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById. Legacy transfers (no
+             *     counterparty) keep null and fall back to {@link transporter} on the FE.
+             */
+            counterparty?: Record<string, never> | null;
             /**
              * @description Transient (not a column): sum of line_value across the transfer's lines,
              *     inlined by the v2 search handler so the FE can render Tổng tiền + footer.
@@ -7662,6 +7671,10 @@ export interface components {
             notes?: string;
             /** Format: uuid */
             transporterUserId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             attachmentIds?: string[];
             transferredAt?: string;
             lines: components["schemas"]["StockTransferV2LineDto"][];
@@ -7920,6 +7933,7 @@ export interface components {
             supersededById?: string | null;
             transferId?: string | null;
             notes?: string | null;
+            sourceLocationId?: string | null;
             session?: components["schemas"]["TempWarehouseSessionEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -7952,6 +7966,11 @@ export interface components {
              */
             carrierUserId?: string;
             notes?: string;
+            /**
+             * Format: uuid
+             * @description Shelf/location on the source side of the movement
+             */
+            sourceLocationId?: string;
         };
         UpdateTempWarehouseLineDto: {
             /**
@@ -7962,6 +7981,8 @@ export interface components {
             /** Format: uuid */
             carrierUserId?: string | null;
             notes?: string | null;
+            /** Format: uuid */
+            sourceLocationId?: string | null;
         };
         CloseTempWarehouseSessionDto: {
             /** @enum {string} */
@@ -9047,6 +9068,12 @@ export interface components {
             /** Format: date-time */
             postedAt?: string;
             lines: components["schemas"]["GoodsIssueLineEntity"][];
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById so customer and employee
+             *     counterparties (no provider join) render their name instead of "—".
+             */
+            counterparty?: Record<string, never> | null;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;
@@ -9261,6 +9288,13 @@ export interface components {
             lines: components["schemas"]["GoodsReceiptLineEntity"][];
             provider?: components["schemas"]["ProviderEntity"];
             location?: components["schemas"]["LocationEntity"];
+            /**
+             * @description Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+             *     inlined by the v2 search handler / getById so the FE renders supplier,
+             *     customer and employee counterparties alike (provider_id is null for the
+             *     latter two).
+             */
+            counterparty?: Record<string, never> | null;
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
             organizationId: string;

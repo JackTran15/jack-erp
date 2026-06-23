@@ -336,3 +336,36 @@ After every session where the agent did something wrong:
 Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Under 300 is a good ceiling. Over 500 and you are fighting your own config.
 
 ---
+
+## AI tooling
+
+### code-review-graph (MCP)
+ALWAYS call code-review-graph MCP tools BEFORE Grep/Glob/Read when exploring the codebase.
+The graph is faster, cheaper, and gives structural context (callers, dependents, test coverage) that file scanning cannot.
+
+Workflow:
+- First call: `get_minimal_context(task="<description>")` — ~100 tokens, full picture
+- Exploring: `semantic_search_nodes_tool` or `query_graph_tool` instead of Grep
+- Impact: `get_impact_radius_tool` instead of tracing imports manually
+- Review: `detect_changes_tool` + `get_review_context_tool` instead of reading full files
+- Relationships: `query_graph_tool` with callers_of / callees_of / imports_of / tests_for
+- Fall back to Grep/Glob/Read only when the graph does not cover what you need
+
+Target: ≤5 tool calls per task, ≤800 total tokens of graph context.
+
+### rtk (CLI proxy)
+RTK is installed and hooked into Claude Code. Shell commands are automatically compressed.
+- `git status`, `git diff`, `git log` → compressed summaries
+- `pnpm test` → failures only, passing tests stripped
+- `pnpm lint` → errors only
+- Use `rtk read <file> -l aggressive` for signatures-only file reading
+- Use `rtk smart <file>` for 2-line heuristic summary
+
+### code-review sub-agent
+After implementing each ticket, spawn the code-review sub-agent:
+
+  claude -p "Review staged diff for ticket TKT-XXX-NN. Ticket path: tickets/tickets/TKT-XXX-NN-slug.md"
+
+The sub-agent returns a JSON verdict (PASS or BLOCKED).
+- PASS → commit and move to next ticket
+- BLOCKED → fix each blocker, re-stage, spawn sub-agent again

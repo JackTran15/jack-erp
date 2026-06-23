@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsEnum,
   IsISO8601,
   IsNumber,
   IsOptional,
@@ -7,8 +8,10 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DocCounterpartyKind } from '@erp/shared-interfaces';
 
 export class StockTransferV2LineDto {
   @IsUUID()
@@ -58,6 +61,14 @@ export class CreateStockTransferV2Dto {
   @IsOptional()
   @IsUUID()
   transporterUserId?: string;
+
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @ValidateIf((o) => o.counterpartyKind !== undefined)
+  @IsUUID()
+  counterpartyId?: string;
 
   @IsOptional()
   @IsArray()

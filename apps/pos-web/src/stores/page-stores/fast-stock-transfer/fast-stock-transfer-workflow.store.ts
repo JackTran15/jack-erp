@@ -3,7 +3,6 @@ import { create } from "zustand";
 import {
   EMPTY_FAST_STOCK_TRANSFER_FILTERS,
   EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT,
-  reconcileLocationOnProductChange,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/fast-stock-transfer-pickers";
 import type {
   FastStockTransferFilters,
@@ -106,10 +105,7 @@ export const usePosFastStockTransferWorkflowStore =
         toolbarDraft: {
           ...state.toolbarDraft,
           product,
-          location: reconcileLocationOnProductChange(
-            product,
-            state.toolbarDraft.location,
-          ),
+          location: null,
         },
       })),
 
@@ -140,10 +136,7 @@ export const usePosFastStockTransferWorkflowStore =
               editableDraft: {
                 ...state.editableDraft,
                 product,
-                location: reconcileLocationOnProductChange(
-                  product,
-                  state.editableDraft.location,
-                ),
+                location: null,
               },
             }
           : state,

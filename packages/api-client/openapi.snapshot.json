@@ -4794,6 +4794,38 @@
         ]
       }
     },
+    "/inventory/locations/preferred-shelf/transfer-batch": {
+      "post": {
+        "operationId": "InventoryLocationStockController_batchTransferPreferredShelf",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTransferPreferredShelfRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchTransferPreferredShelfResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve preferred shelves at both source and destination storage for many transfer lines in one request",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/inventory/locations/{locationId}/stock-items": {
       "get": {
         "operationId": "InventoryLocationStockController_listStockByLocation",
@@ -20469,6 +20501,100 @@
           "data"
         ]
       },
+      "TransferPreferredShelfPairDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destStorageId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "itemId",
+          "sourceStorageId",
+          "destStorageId"
+        ]
+      },
+      "BatchTransferPreferredShelfRequestDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferPreferredShelfPairDto"
+            }
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "BatchTransferPreferredShelfRowDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destStorageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceShelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          },
+          "destShelf": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreferredShelfResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "itemId",
+          "sourceStorageId",
+          "destStorageId",
+          "sourceShelf",
+          "destShelf"
+        ]
+      },
+      "BatchTransferPreferredShelfResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchTransferPreferredShelfRowDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "StockByLocationProviderDto": {
         "type": "object",
         "properties": {
@@ -23409,6 +23535,19 @@
           "transporterUserId": {
             "type": "string"
           },
+          "counterpartyKind": {
+            "nullable": true,
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ],
+            "type": "string"
+          },
+          "counterpartyId": {
+            "type": "string",
+            "nullable": true
+          },
           "transferredAt": {
             "format": "date-time",
             "type": "string"
@@ -23442,6 +23581,11 @@
               "id",
               "fullName"
             ]
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById. Legacy transfers (no\ncounterparty) keep null and fall back to {@link transporter} on the FE."
           },
           "totalAmount": {
             "type": "number",
@@ -23733,6 +23877,18 @@
             "type": "string"
           },
           "transporterUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
             "type": "string",
             "format": "uuid"
           },
@@ -24577,6 +24733,10 @@
             "type": "string",
             "nullable": true
           },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true
+          },
           "session": {
             "$ref": "#/components/schemas/TempWarehouseSessionEntity"
           },
@@ -24644,6 +24804,11 @@
           },
           "notes": {
             "type": "string"
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Shelf/location on the source side of the movement"
           }
         },
         "required": [
@@ -24667,6 +24832,11 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "sourceLocationId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           }
         }
       },
@@ -27990,7 +28160,8 @@
             "nullable": true,
             "enum": [
               "supplier",
-              "customer"
+              "customer",
+              "employee"
             ],
             "type": "string"
           },
@@ -28079,6 +28250,11 @@
             "items": {
               "$ref": "#/components/schemas/GoodsIssueLineEntity"
             }
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so customer and employee\ncounterparties (no provider join) render their name instead of \"—\"."
           },
           "id": {
             "type": "string"
@@ -28277,7 +28453,8 @@
             "type": "string",
             "enum": [
               "supplier",
-              "customer"
+              "customer",
+              "employee"
             ]
           },
           "counterpartyId": {
@@ -28479,6 +28656,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "counterpartyKind": {
+            "type": "string",
+            "description": "Đối tượng kind (supplier | customer | employee). When set, the service\n validates the counterparty and routes supplier→provider_id, customer /\n employee→counterparty cols (provider_id null).",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "deliveredBy": {
             "type": "string",
             "maxLength": 200
@@ -28592,7 +28782,8 @@
             "nullable": true,
             "enum": [
               "supplier",
-              "customer"
+              "customer",
+              "employee"
             ],
             "type": "string"
           },
@@ -28684,6 +28875,11 @@
           },
           "location": {
             "$ref": "#/components/schemas/LocationEntity"
+          },
+          "counterparty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Transient (not a column): the resolved \"Đối tượng\" { kind, id, code, name }\ninlined by the v2 search handler / getById so the FE renders supplier,\ncustomer and employee counterparties alike (provider_id is null for the\nlatter two)."
           },
           "id": {
             "type": "string"
@@ -28812,6 +29008,18 @@
             ]
           },
           "providerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "counterpartyKind": {
+            "type": "string",
+            "enum": [
+              "supplier",
+              "customer",
+              "employee"
+            ]
+          },
+          "counterpartyId": {
             "type": "string",
             "format": "uuid"
           },
@@ -28957,7 +29165,8 @@
             "type": "string",
             "enum": [
               "supplier",
-              "customer"
+              "customer",
+              "employee"
             ]
           },
           "counterpartyId": {

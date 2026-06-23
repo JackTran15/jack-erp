@@ -75,6 +75,7 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         .fn()
         .mockResolvedValue({ id: 'prod-1', code: 'P1', name: 'Prod', isActive: true }),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
+      exist: jest.fn().mockResolvedValue(true),
     };
     barcodeRepo = {
       create: jest.fn().mockImplementation((d) => ({ ...d })),
@@ -254,6 +255,15 @@ describe('InventoryItemCrudService.create (product with variants)', () => {
         quantity: 3,
         unitCost: 45000,
       }),
+    );
+  });
+
+  it('updates isPosVisible on all variants without colors/sizes or _productId', async () => {
+    await service.update('prod-1', { isPosVisible: false }, actor);
+
+    expect(itemRepo.update).toHaveBeenCalledWith(
+      { productId: 'prod-1', organizationId: 'org-1' },
+      { isPosVisible: false },
     );
   });
 

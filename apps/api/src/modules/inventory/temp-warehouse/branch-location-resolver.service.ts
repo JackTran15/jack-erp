@@ -6,7 +6,9 @@ import { ShowroomEntity } from '../location/showroom.entity';
 import { LocationEntity } from '../location/location.entity';
 
 export interface ResolvedBranchLocations {
+  warehouseStorageId: string;
   warehouseLocationId: string;
+  showroomStorageId: string;
   showroomLocationId: string;
 }
 
@@ -32,10 +34,25 @@ export class BranchLocationResolverService {
       });
     }
 
-    const warehouseLocation = await this.locationRepo.findOne({
-      where: { storageId: mainStorage.id, organizationId, isActive: true },
-      order: { createdAt: 'ASC' },
-    });
+    const warehouseLocation =
+      (await this.locationRepo.findOne({
+        where: {
+          storageId: mainStorage.id,
+          organizationId,
+          isActive: true,
+          isUnassigned: false,
+          isDefault: true,
+        },
+      })) ??
+      (await this.locationRepo.findOne({
+        where: {
+          storageId: mainStorage.id,
+          organizationId,
+          isActive: true,
+          isUnassigned: false,
+        },
+        order: { createdAt: 'ASC' },
+      }));
     if (!warehouseLocation) {
       throw new BadRequestException({
         code: 'TEMP_WAREHOUSE_MAIN_STORAGE_MISSING_LOCATION',
@@ -53,10 +70,25 @@ export class BranchLocationResolverService {
       });
     }
 
-    const showroomLocation = await this.locationRepo.findOne({
-      where: { storageId: mainShowroom.storageId, organizationId, isActive: true },
-      order: { createdAt: 'ASC' },
-    });
+    const showroomLocation =
+      (await this.locationRepo.findOne({
+        where: {
+          storageId: mainShowroom.storageId,
+          organizationId,
+          isActive: true,
+          isUnassigned: false,
+          isDefault: true,
+        },
+      })) ??
+      (await this.locationRepo.findOne({
+        where: {
+          storageId: mainShowroom.storageId,
+          organizationId,
+          isActive: true,
+          isUnassigned: false,
+        },
+        order: { createdAt: 'ASC' },
+      }));
     if (!showroomLocation) {
       throw new BadRequestException({
         code: 'TEMP_WAREHOUSE_MAIN_SHOWROOM_MISSING_LOCATION',
@@ -65,7 +97,9 @@ export class BranchLocationResolverService {
     }
 
     return {
+      warehouseStorageId: mainStorage.id,
       warehouseLocationId: warehouseLocation.id,
+      showroomStorageId: mainShowroom.storageId,
       showroomLocationId: showroomLocation.id,
     };
   }

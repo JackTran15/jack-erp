@@ -10,6 +10,7 @@ import { BranchEntity } from '../../branch/branch.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { LocationEntity } from '../location/location.entity';
 import { ProviderEntity } from '../location/provider.entity';
+import { CounterpartyDisplay } from '../location/services/counterparty-name.util';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
 /** Phiếu xuất hàng — goods issue from stock. Workflow: DRAFT → POSTED | CANCELLED */
@@ -110,4 +111,11 @@ export class GoodsIssueEntity extends BaseEntity {
     eager: true,
   })
   lines: GoodsIssueLineEntity[];
+
+  /**
+   * Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+   * inlined by the v2 search handler / getById so customer and employee
+   * counterparties (no provider join) render their name instead of "—".
+   */
+  counterparty?: CounterpartyDisplay | null;
 }

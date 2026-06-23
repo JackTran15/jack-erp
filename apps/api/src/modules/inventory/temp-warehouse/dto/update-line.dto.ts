@@ -16,4 +16,9 @@ export class UpdateTempWarehouseLineDto {
   @IsOptional()
   @IsString()
   notes?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  sourceLocationId?: string | null;
 }

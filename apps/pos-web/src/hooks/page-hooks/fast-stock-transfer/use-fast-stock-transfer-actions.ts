@@ -1,4 +1,5 @@
 import type { PosCatalogLine } from "@erp/pos/interfaces/catalog.interface";
+import type { FastStockTransferFilters, FastStockTransferToolbarDraft } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import {
   isFastStockTransferDraftCompleteForAdd,
   isFastStockTransferDraftCompleteForSave,
@@ -16,18 +17,31 @@ import {
   TempWarehouseDirection,
   TempWarehouseTransferProcessingStatus,
 } from "@erp/shared-interfaces";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { useInvalidatePosBranchCatalog } from "@erp/pos/hooks/react-query/use-query-catalog";
+import { CATALOG_KEYS } from "@erp/pos/constants/react-query-key.constant";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLookupPreferredShelf } from "@erp/pos/hooks/react-query/use-query-inventory";
 import { useInvalidateTempWarehouseCarriers } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { usePosFastStockTransferPickerStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-picker.store";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
 import { useTempWarehouseMutations } from "@erp/pos/hooks/react-query/use-query-temp-warehouse";
 
+function resolveStorageIdForShelf(
+  direction: TempWarehouseDirection,
+  filters: FastStockTransferFilters,
+): string | null {
+  const id =
+    direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
+      ? filters.sourceWarehouse
+      : filters.destinationWarehouse;
+  return id || null;
+}
+
 export function useFastStockTransferActions() {
   const branchId = usePosBranchStore((s) => s.branchId);
-  const invalidatePosBranchCatalog = useInvalidatePosBranchCatalog();
+  const queryClient = useQueryClient();
   const invalidateTempWarehouseCarriers = useInvalidateTempWarehouseCarriers();
   const data = useFastStockTransferData();
   const clearProductCache = usePosFastStockTransferPickerStore(
@@ -104,6 +118,77 @@ export function useFastStockTransferActions() {
   const setPollSessionId = usePosFastStockTransferWorkflowStore(
     (s) => s.setPollSessionId,
   );
+  const direction = usePosFastStockTransferWorkflowStore((s) => s.direction);
+  const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
+
+  const lookupPreferredShelf = useLookupPreferredShelf();
+  const pendingToolbarItemIdRef = useRef<string | null>(null);
+  const pendingEditItemIdRef = useRef<string | null>(null);
+
+  const applyPreferredShelf = useCallback(
+    (
+      product: PosCatalogLine,
+      pendingRef: { current: string | null },
+      setLocation: (
+        location: FastStockTransferToolbarDraft["location"],
+      ) => void,
+    ) => {
+      const storageId = resolveStorageIdForShelf(direction, filters);
+      if (!storageId) return;
+      pendingRef.current = product.itemId;
+      void lookupPreferredShelf([{ itemId: product.itemId, storageId }]).then(
+        (results) => {
+          if (pendingRef.current !== product.itemId) return;
+          const shelf = results[0]?.shelf;
+          if (shelf) {
+            setLocation({
+              locationId: shelf.id,
+              name: shelf.name || shelf.code,
+              quantity: 0,
+            });
+          } else {
+            setLocation(null);
+          }
+        },
+      );
+    },
+    [direction, filters, lookupPreferredShelf],
+  );
+
+  const createDraftProductHandler = useCallback(
+    (
+      setProduct: (product: PosCatalogLine | null) => void,
+      pendingRef: { current: string | null },
+      setLocation: (location: FastStockTransferToolbarDraft["location"]) => void,
+    ) =>
+      (product: PosCatalogLine | null) => {
+        setProduct(product);
+        if (!product) {
+          pendingRef.current = null;
+          return;
+        }
+        applyPreferredShelf(product, pendingRef, setLocation);
+      },
+    [applyPreferredShelf],
+  );
+
+  const handleToolbarDraftProduct = useCallback(
+    createDraftProductHandler(
+      setToolbarProduct,
+      pendingToolbarItemIdRef,
+      setToolbarLocation,
+    ),
+    [createDraftProductHandler, setToolbarProduct, setToolbarLocation],
+  );
+
+  const handleEditDraftProduct = useCallback(
+    createDraftProductHandler(
+      setEditDraftProduct,
+      pendingEditItemIdRef,
+      setEditDraftLocation,
+    ),
+    [createDraftProductHandler, setEditDraftProduct, setEditDraftLocation],
+  );
 
   const refetchLinesData = useCallback(async () => {
     await data.refetchLines();
@@ -114,7 +199,7 @@ export function useFastStockTransferActions() {
       data.refetchTempWarehouse(),
       branchId ? invalidateTempWarehouseCarriers(branchId) : Promise.resolve(),
       branchId
-        ? invalidatePosBranchCatalog(branchId, data.catalogDirection)
+        ? queryClient.invalidateQueries({ queryKey: CATALOG_KEYS.ALL })
         : Promise.resolve(),
       clearProductCache(),
       data.refetchStorages(),
@@ -124,8 +209,8 @@ export function useFastStockTransferActions() {
     branchId,
     clearProductCache,
     data,
-    invalidatePosBranchCatalog,
     invalidateTempWarehouseCarriers,
+    queryClient,
   ]);
 
   const handleResetData = useCallback(() => {
@@ -142,6 +227,10 @@ export function useFastStockTransferActions() {
       }
       if (data.isSessionClosed) {
         setPageError("Phiên kho tạm đã đóng. Không thể thêm dòng.");
+        return;
+      }
+      if (!data.toolbarDraft.carrier?.id) {
+        setPageError("Vui lòng chọn người vận chuyển.");
         return;
       }
       if (!isFastStockTransferDraftCompleteForAdd(data.toolbarDraft)) {
@@ -371,10 +460,10 @@ export function useFastStockTransferActions() {
     setDirection,
     setFilter,
     handleToolbarDraftCarrier: setToolbarCarrier,
-    handleToolbarDraftProduct: setToolbarProduct,
+    handleToolbarDraftProduct,
     handleToolbarDraftLocation: setToolbarLocation,
     handleEditDraftCarrier: setEditDraftCarrier,
-    handleEditDraftProduct: setEditDraftProduct,
+    handleEditDraftProduct,
     handleEditDraftLocation: setEditDraftLocation,
     handleAddRow,
     handleStartEdit,

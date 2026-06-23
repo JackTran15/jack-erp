@@ -23,7 +23,7 @@ import {
   locationLabelForLine,
 } from "@erp/pos/lib/page-libs/fast-stock-transfer/temp-warehouse-mappers";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFastStockTransferActions } from "./use-fast-stock-transfer-actions";
 import { useFastStockTransferCarriers } from "./use-fast-stock-transfer-carriers";
 import { useFastStockTransferData } from "./use-fast-stock-transfer-data";
@@ -73,10 +73,11 @@ interface SkuEditCellProps {
   value: PosCatalogLine | null;
   onSelect: (product: PosCatalogLine) => void;
   search: (query: string) => Promise<SearchSuggestion<PosCatalogLine>[]>;
+  onValueChange: (query: string) => void;
 }
 
 /** Inline SKU picker for the editing row — owns its own input string. */
-function SkuEditCell({ value, onSelect, search }: SkuEditCellProps) {
+function SkuEditCell({ value, onSelect, search, onValueChange }: SkuEditCellProps) {
   const [query, setQuery] = useState(value ? value.code : "");
   useEffect(() => {
     setQuery(value ? value.code : "");
@@ -84,7 +85,10 @@ function SkuEditCell({ value, onSelect, search }: SkuEditCellProps) {
   return (
     <PosSearchPopover
       value={query}
-      onValueChange={setQuery}
+      onValueChange={(q) => {
+        onValueChange(q);
+        setQuery(q);
+      }}
       search={search}
       onSelect={(p) => {
         onSelect(p);
@@ -108,7 +112,8 @@ export function useFastStockTransferTableColumns() {
   const data = useFastStockTransferData();
   const actions = useFastStockTransferActions();
   const { carrierSearchAdapter } = useFastStockTransferCarriers();
-  const { productSearchAdapter } = useFastStockTransferProductPicker();
+  const { productHybridAdapter, resetLookupGuard } =
+    useFastStockTransferProductPicker();
 
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
   const editingRowId = usePosFastStockTransferWorkflowStore(
@@ -117,6 +122,16 @@ export function useFastStockTransferTableColumns() {
   const editableDraft = usePosFastStockTransferWorkflowStore(
     (s) => s.editableDraft,
   );
+
+  const editProductHybridAdapter = useCallback(
+    (q: string) =>
+      productHybridAdapter(q, actions.handleEditDraftProduct),
+    [productHybridAdapter, actions.handleEditDraftProduct],
+  );
+
+  const handleSkuValueChange = useCallback(() => {
+    resetLookupGuard();
+  }, [resetLookupGuard]);
 
   return useMemo<ReadonlyArray<PosDataTableColumn<FastStockTransferTableRow>>>(
     () => [
@@ -155,7 +170,8 @@ export function useFastStockTransferTableColumns() {
             <SkuEditCell
               value={editableDraft.product}
               onSelect={actions.handleEditDraftProduct}
-              search={productSearchAdapter}
+              search={editProductHybridAdapter}
+              onValueChange={handleSkuValueChange}
             />
           ) : (
             lineSku(row)
@@ -262,6 +278,7 @@ export function useFastStockTransferTableColumns() {
       actions,
       carrierSearchAdapter,
       data,
+      editProductHybridAdapter,
       editableDraft,
       editingRowId,
       filters.location,
@@ -269,7 +286,7 @@ export function useFastStockTransferTableColumns() {
       filters.sku,
       filters.transporter,
       filters.unit,
-      productSearchAdapter,
+      handleSkuValueChange,
     ],
   );
 }

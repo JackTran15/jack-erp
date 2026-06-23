@@ -308,6 +308,7 @@ export class TempWarehouseService {
         quantity: '1.00',
         carrierUserId: dto.carrierUserId,
         notes: dto.notes,
+        sourceLocationId: dto.sourceLocationId,
         status: TempWarehouseLineStatus.ACTIVE,
         createdBy: actor.userId,
       });
@@ -331,7 +332,8 @@ export class TempWarehouseService {
     if (
       dto.itemId === undefined &&
       dto.carrierUserId === undefined &&
-      dto.notes === undefined
+      dto.notes === undefined &&
+      dto.sourceLocationId === undefined
     ) {
       throw new BadRequestException({
         code: 'TEMP_WAREHOUSE_UPDATE_LINE_EMPTY_BODY',
@@ -401,6 +403,10 @@ export class TempWarehouseService {
         carrierUserId:
           dto.carrierUserId !== undefined ? dto.carrierUserId : oldLine.carrierUserId,
         notes: dto.notes !== undefined ? dto.notes : oldLine.notes,
+        sourceLocationId:
+          dto.sourceLocationId !== undefined
+            ? dto.sourceLocationId
+            : oldLine.sourceLocationId,
         status: TempWarehouseLineStatus.ACTIVE,
         createdBy: actor.userId,
       });
@@ -978,6 +984,7 @@ export class TempWarehouseService {
         tempWarehouseLineId: l.id,
         itemId: l.itemId,
         quantity: Number(l.quantity),
+        sourceLocationId: l.sourceLocationId ?? undefined,
       })),
       actor: {
         userId: actor.userId,
@@ -1166,24 +1173,43 @@ export class TempWarehouseService {
           });
         }
 
-        const notTransferable = loaded.filter(
-          (l) => l.status !== TempWarehouseLineStatus.ACTIVE,
-        );
-        if (notTransferable.length > 0) {
-          throw new BadRequestException({
-            code: 'TEMP_WAREHOUSE_LINES_NOT_TRANSFERABLE',
-            message: `Lines are not ACTIVE and cannot be transferred`,
-            offendingLines: notTransferable.map((l) => ({
-              id: l.id,
-              status: l.status,
-            })),
-          });
+        // Resolve each requested line to its current ACTIVE version. Editing a
+        // line soft-deletes it and creates a successor (supersededById), possibly
+        // across several edits — so a selection captured before an edit carries a
+        // now-DELETED id. Follow the chain to the latest ACTIVE line; skip lines
+        // with no ACTIVE descendant (truly deleted / already transferred). This
+        // keeps "Xử lý chuyển kho" working when the selection includes edited rows.
+        const resolvedById = new Map<string, TempWarehouseLineEntity>();
+        const skippedLineIds: string[] = [];
+        for (const id of uniqueLineIds) {
+          const active = await this.resolveActiveLine(
+            manager,
+            loadedById.get(id)!,
+            sessionId,
+            actor.organizationId,
+          );
+          if (active) resolvedById.set(active.id, active);
+          else skippedLineIds.push(id);
         }
 
-        const w2sLines = loaded.filter(
+        const resolved = [...resolvedById.values()];
+        if (resolved.length === 0) {
+          throw new BadRequestException({
+            code: 'TEMP_WAREHOUSE_NO_TRANSFERABLE_LINES',
+            message: `No transferable (ACTIVE) lines in session ${sessionId} — all selected lines were deleted or already transferred`,
+            skippedLineIds,
+          });
+        }
+        if (skippedLineIds.length > 0) {
+          this.logger.warn(
+            `transferLines session=${sessionId}: skipped ${skippedLineIds.length} non-resolvable line(s): ${skippedLineIds.join(', ')}`,
+          );
+        }
+
+        const w2sLines = resolved.filter(
           (l) => l.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
         );
-        const s2wLines = loaded.filter(
+        const s2wLines = resolved.filter(
           (l) => l.direction === TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
         );
 
@@ -1293,6 +1319,36 @@ export class TempWarehouseService {
         transferId,
       },
     );
+  }
+
+  /**
+   * Follow a line's supersededById chain to its current ACTIVE version.
+   * Returns the ACTIVE line, or null when the chain dead-ends at a deleted /
+   * already-transferred line with no ACTIVE successor. A seen-set bounds the
+   * walk against cyclic data.
+   */
+  private async resolveActiveLine(
+    manager: ReturnType<DataSource['createEntityManager']>,
+    start: TempWarehouseLineEntity,
+    sessionId: string,
+    organizationId: string,
+  ): Promise<TempWarehouseLineEntity | null> {
+    let current = start;
+    const seen = new Set<string>();
+    while (current.status !== TempWarehouseLineStatus.ACTIVE) {
+      if (!current.supersededById || seen.has(current.id)) return null;
+      seen.add(current.id);
+      const next = await manager.findOne(TempWarehouseLineEntity, {
+        where: {
+          id: current.supersededById,
+          sessionId,
+          organizationId,
+        },
+      });
+      if (!next) return null;
+      current = next;
+    }
+    return current;
   }
 
   /** Consumer-side lookup for the partial-transfer defensive replay check. */

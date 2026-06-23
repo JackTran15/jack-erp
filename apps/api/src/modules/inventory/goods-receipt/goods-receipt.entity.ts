@@ -17,6 +17,7 @@ import { BaseEntity } from '../../../database/entities/base.entity';
 import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
 import { ProviderEntity } from '../location/provider.entity';
 import { LocationEntity } from '../location/location.entity';
+import { CounterpartyDisplay } from '../location/services/counterparty-name.util';
 
 export enum GoodsReceiptPaymentMethod {
   CASH = 'CASH',
@@ -137,4 +138,12 @@ export class GoodsReceiptEntity extends BaseEntity {
   @ManyToOne(() => LocationEntity, { eager: true })
   @JoinColumn({ name: 'location_id' })
   location?: LocationEntity;
+
+  /**
+   * Transient (not a column): the resolved "Đối tượng" { kind, id, code, name }
+   * inlined by the v2 search handler / getById so the FE renders supplier,
+   * customer and employee counterparties alike (provider_id is null for the
+   * latter two).
+   */
+  counterparty?: CounterpartyDisplay | null;
 }

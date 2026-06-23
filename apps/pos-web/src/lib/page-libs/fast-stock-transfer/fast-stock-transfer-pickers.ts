@@ -5,7 +5,6 @@ import type {
   FastStockTransferToolbarDraft,
 } from "@erp/pos/interfaces/fast-stock-transfer.interface";
 import {
-  TempWarehouseDirection,
   type TempWarehouseLine,
   type TempWarehousePublicUser,
 } from "@erp/shared-interfaces";
@@ -31,25 +30,6 @@ export function catalogLocationsForLine(
   return [];
 }
 
-export function reconcileLocationOnProductChange(
-  product: PosCatalogLine | null,
-  prevLocation: CatalogLocation | null,
-): CatalogLocation | null {
-  if (!product) return null;
-  const options = catalogLocationsForLine(product);
-  if (prevLocation) {
-    const matched = options.find(
-      (l) => l.locationId === prevLocation.locationId,
-    );
-    if (matched) return matched;
-  }
-  return (
-    options.find((l) => l.locationId === product.defaultLocationId) ??
-    options[0] ??
-    null
-  );
-}
-
 export const EMPTY_FAST_STOCK_TRANSFER_FILTERS: FastStockTransferFilters = {
   sourceWarehouse: "",
   destinationWarehouse: "",
@@ -68,12 +48,39 @@ export const EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT: FastStockTransferToolbarDr
     location: null,
   };
 
-function apiLocationIdForLine(line: TempWarehouseLine): string | null {
-  const loc =
-    line.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
-      ? line.sourceLocation
-      : line.destinationLocation;
-  return loc?.id ?? null;
+function locationFromLine(
+  line: TempWarehouseLine,
+  product: PosCatalogLine,
+): CatalogLocation | null {
+  const options = catalogLocationsForLine(product);
+  const sourceLocationId = line.sourceLocationId?.trim();
+
+  if (sourceLocationId) {
+    const matched = options.find((l) => l.locationId === sourceLocationId);
+    if (matched) return matched;
+
+    const apiLoc = line.sourceLocation;
+    const name =
+      apiLoc?.name?.trim() ||
+      apiLoc?.code?.trim() ||
+      locationLabelForLine(line) ||
+      sourceLocationId;
+    return {
+      locationId: sourceLocationId,
+      name,
+      quantity: 0,
+    };
+  }
+
+  const locationLabel = locationLabelForLine(line);
+  if (!locationLabel) return null;
+  return (
+    options.find((l) => catalogLocationName(l) === locationLabel) ?? {
+      locationId: locationLabel,
+      name: locationLabel,
+      quantity: 0,
+    }
+  );
 }
 
 export function lineToToolbarDraft(
@@ -90,16 +97,7 @@ export function lineToToolbarDraft(
 
   let location: CatalogLocation | null = null;
   if (product) {
-    const options = catalogLocationsForLine(product);
-    const apiLocId = apiLocationIdForLine(line);
-    const locationLabel = locationLabelForLine(line);
-    location =
-      (apiLocId ? options.find((l) => l.locationId === apiLocId) : undefined) ??
-      (locationLabel
-        ? options.find((l) => catalogLocationName(l) === locationLabel)
-        : undefined) ??
-      options[0] ??
-      null;
+    location = locationFromLine(line, product);
   }
 
   return { carrier, product, location };

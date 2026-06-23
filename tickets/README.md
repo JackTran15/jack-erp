@@ -1214,11 +1214,43 @@ flowchart LR
 | [TKT-TWF-02](./tickets/TKT-TWF-02-fe-transfer-shelf-client.md)                  | FE: client `getTransferPreferredShelfBatch`                       |
 | [TKT-TWF-03](./tickets/TKT-TWF-03-fe-choose-warehouses-dialog-fill.md)          | FE: dialog Chọn kho (xuất+nhập) + áp tất cả dòng + fill vị trí    |
 | [TKT-TWF-04](./tickets/TKT-TWF-04-fe-auto-add-line-on-select.md)                | FE: auto thêm dòng khi chọn item (grid Chuyển kho)               |
+| [TKT-TWF-05](./tickets/TKT-TWF-05-fe-clear-stale-location-on-warehouse-change.md) | FE (bug-fix): clear Vị trí xuất/nhập cũ khi đổi kho qua "Chọn kho" |
 
 ```mermaid
 flowchart LR
   W1["TWF-01 BE endpoint + OpenAPI"] --> W2["TWF-02 FE client"]
   W2 --> W3["TWF-03 Dialog + fill"]
   W3 --> W4["TWF-04 Auto-add line"]
+  W3 --> W5["TWF-05 Clear stale Vị trí (bug-fix)"]
+```
+
+### EPIC-22062026 Hiển thị "Đối tượng" (NCC/KH/NV) trên Nhập/Xuất/Chuyển kho
+
+- [EPIC-22062026 Hiển thị Đối tượng trên Nhập/Xuất/Chuyển kho](./epics/EPIC-22062026-counterparty-display-inventory-docs.md)
+- Sau redesign picker "Chọn đối tượng" (3 loại: NCC/KH/NV), đối tượng được **lưu đúng** (`counterparty_kind` + `counterparty_id`) nhưng **không hiển thị lại** khi không phải supplier — cột "Đối tượng" hiện `—` (Image #2: NK000011 chọn KH → `—`). Root cause: các search-v2 handler chỉ join `provider` + đọc `provider.name`; customer/employee có `provider_id` NULL nên không resolve được tên. Fix: util chung resolve tên cả 3 loại (`counterpartyNameSql` cho filter + `attachCounterparties` inline object `counterparty {kind,id,code,name}` theo batch), wire vào **Nhập kho + Xuất kho** (chỉ đổi resolve/display), và **mở rộng Chuyển kho** (migration thêm 2 cột, đổi cột "Đối tượng" từ transporter sang picker counterparty, fallback transporter cho phiếu legacy). Không sửa flow lưu (đã đúng).
+
+| Ticket                                                                       | Mô tả                                                                              |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TKT-CPD-01](./tickets/TKT-CPD-01-be-counterparty-resolver.md)               | BE: util `counterpartyNameSql` (filter) + `attachCounterparties` (inline batch)    |
+| [TKT-CPD-02](./tickets/TKT-CPD-02-be-goods-receipt-resolve.md)               | BE: Nhập kho — wire resolver vào search-v2 + detail                                |
+| [TKT-CPD-03](./tickets/TKT-CPD-03-be-goods-issue-resolve.md)                 | BE: Xuất kho — search-v2 (giữ fallback targetBranch) + detail                      |
+| [TKT-CPD-04](./tickets/TKT-CPD-04-be-transfer-counterparty.md)               | BE: Chuyển kho — migration + entity + DTO + service + search-v2 (fallback transporter) |
+| [TKT-CPD-05](./tickets/TKT-CPD-05-openapi-regen.md)                          | OpenAPI regen + commit snapshot (`counterparty` response + transfer DTO)           |
+| [TKT-CPD-06](./tickets/TKT-CPD-06-fe-receipt-issue-display.md)               | FE: Nhập/Xuất kho — cột Đối tượng + rehydrate picker (3 loại)                       |
+| [TKT-CPD-07](./tickets/TKT-CPD-07-fe-transfer-picker.md)                     | FE: Chuyển kho — thay transporter bằng `CounterpartyPickerField`                   |
+| [TKT-CPD-08](./tickets/TKT-CPD-08-tests-and-dod.md)                          | Util/handler spec (3 loại) + e2e + DoD gate                                        |
+
+```mermaid
+flowchart LR
+  P1["CPD-01 Resolver util"] --> P2["CPD-02 Nhập kho BE"]
+  P1 --> P3["CPD-03 Xuất kho BE"]
+  P1 --> P4["CPD-04 Chuyển kho BE + migration"]
+  P2 --> P5["CPD-05 openapi"]
+  P3 --> P5
+  P4 --> P5
+  P5 --> P6["CPD-06 FE Nhập/Xuất kho"]
+  P5 --> P7["CPD-07 FE Chuyển kho"]
+  P6 --> P8["CPD-08 Tests + DoD"]
+  P7 --> P8
 ```
 

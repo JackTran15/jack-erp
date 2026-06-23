@@ -45,6 +45,7 @@ import {
 import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
+import { attachCounterparties } from '../location/services/counterparty-name.util';
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -536,7 +537,9 @@ export class GoodsReceiptService {
   // ─── Read ─────────────────────────────────────────────────────────────────
 
   async getById(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    return this.findOrFail(id, actor.organizationId, actor.branchId);
+    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    await attachCounterparties(this.receiptRepo.manager, [receipt], actor.organizationId);
+    return receipt;
   }
 
   async list(query: GoodsReceiptQuery): Promise<PaginatedResponse<GoodsReceiptEntity>> {

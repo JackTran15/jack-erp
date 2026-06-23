@@ -261,14 +261,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       }
     }
 
-    // Product-level update: add any new variant combos. The edit form can also
-    // carry virtual colors/sizes for a real item ID; only the product fallback
-    // response includes _productId equal to the route id.
-    if (
-      (Array.isArray(normalized.colors) || Array.isArray(normalized.sizes)) &&
-      normalized._productId === id
-    ) {
-      return this.updateProductWithVariants(id, normalized, actor);
+    const productId = await this.resolveProductIdForUpdate(id, normalized, actor);
+    if (productId && this.hasProductLevelPatch(normalized)) {
+      return this.updateProductWithVariants(productId, normalized, actor);
     }
 
     // Only reconcile nested collections that were explicitly provided — a patch
@@ -695,6 +690,38 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
 
     return { productId: product.id, itemsCreated };
+  }
+
+  /** Route id may be a product UUID (list) or a variant item UUID (deep link). */
+  private async resolveProductIdForUpdate(
+    id: string,
+    payload: Record<string, any>,
+    actor: ActorContext,
+  ): Promise<string | null> {
+    if (typeof payload._productId === 'string') {
+      return payload._productId;
+    }
+
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+    const productExists = await productRepo.exist({
+      where: { id, organizationId: actor.organizationId },
+    });
+    if (productExists) return id;
+
+    const item = await this.repository.findOne({
+      where: { id, organizationId: actor.organizationId },
+      select: { id: true, productId: true },
+    });
+    return item?.productId ?? null;
+  }
+
+  private hasProductLevelPatch(payload: Record<string, any>): boolean {
+    return (
+      Array.isArray(payload.colors) ||
+      Array.isArray(payload.sizes) ||
+      Array.isArray(payload.variants) ||
+      Object.keys(pickProductVariantSharedItemFields(payload)).length > 0
+    );
   }
 
   private async updateProductWithVariants(

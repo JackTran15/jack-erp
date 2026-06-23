@@ -130,6 +130,7 @@ export function useCrudUpdate(entityKey: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
+      void qc.invalidateQueries({ queryKey: ["crud-v2", entityKey] });
     },
   });
 }
