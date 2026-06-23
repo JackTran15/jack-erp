@@ -10,8 +10,13 @@ import {
   Length,
   Max,
   Min,
+  IsNumber,
 } from 'class-validator';
 import { StockStateFilter } from '@erp/shared-interfaces';
+import {
+  STRING_FILTER_MODES,
+  type StringFilterMode,
+} from '../../ledger/balance-filter.constants';
 
 const STOCK_BY_LOCATION_SORTABLE = [
   'code',
@@ -19,7 +24,8 @@ const STOCK_BY_LOCATION_SORTABLE = [
   'quantity',
   'lastMovementAt',
 ] as const;
-export type StockByLocationSortField = (typeof STOCK_BY_LOCATION_SORTABLE)[number];
+export type StockByLocationSortField =
+  (typeof STOCK_BY_LOCATION_SORTABLE)[number];
 
 function parseBool(value: unknown): boolean | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -66,6 +72,56 @@ export class StockByLocationQueryDto {
   @Length(1, 100)
   search?: string;
 
+  @ApiPropertyOptional({ description: 'Partial match on item SKU' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  itemCode?: string;
+
+  @ApiPropertyOptional({ enum: STRING_FILTER_MODES, default: 'contains' })
+  @IsOptional()
+  @IsEnum(STRING_FILTER_MODES)
+  itemCodeMode?: StringFilterMode = 'contains';
+
+  @ApiPropertyOptional({ description: 'Partial match on item name' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  itemName?: string;
+
+  @ApiPropertyOptional({ enum: STRING_FILTER_MODES, default: 'contains' })
+  @IsOptional()
+  @IsEnum(STRING_FILTER_MODES)
+  itemNameMode?: StringFilterMode = 'contains';
+
+  @ApiPropertyOptional({ description: 'Partial match on unit' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  unit?: string;
+
+  @ApiPropertyOptional({ enum: STRING_FILTER_MODES, default: 'contains' })
+  @IsOptional()
+  @IsEnum(STRING_FILTER_MODES)
+  unitMode?: StringFilterMode = 'contains';
+
+  @ApiPropertyOptional({ description: 'Partial match on category name' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  categoryName?: string;
+
+  @ApiPropertyOptional({ enum: STRING_FILTER_MODES, default: 'contains' })
+  @IsOptional()
+  @IsEnum(STRING_FILTER_MODES)
+  categoryNameMode?: StringFilterMode = 'contains';
+
+  @ApiPropertyOptional({ description: 'Maximum on-hand quantity' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  quantityMax?: number;
+
   @ApiPropertyOptional({ description: 'Exact match on item_barcodes.code' })
   @IsOptional()
   @IsString()
@@ -94,7 +150,10 @@ export class StockByLocationQueryDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ enum: StockStateFilter, default: StockStateFilter.ALL })
+  @ApiPropertyOptional({
+    enum: StockStateFilter,
+    default: StockStateFilter.ALL,
+  })
   @IsOptional()
   @IsEnum(StockStateFilter)
   stockState?: StockStateFilter = StockStateFilter.ALL;

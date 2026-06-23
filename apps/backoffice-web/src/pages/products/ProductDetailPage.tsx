@@ -49,12 +49,12 @@ export function ProductDetailPage() {
   const handleDelete = async () => {
     if (!id) return;
     setDeleting(true);
+    setConfirmDelete(false);
     try {
       await productsApi.delete(id);
       navigate("/products");
     } catch (err: unknown) {
       setError(formatClientError(err));
-      setConfirmDelete(false);
     } finally {
       setDeleting(false);
     }

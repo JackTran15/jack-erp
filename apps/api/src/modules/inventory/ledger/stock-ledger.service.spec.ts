@@ -318,6 +318,7 @@ describe('StockLedgerService', () => {
 
       const result = await service.getBalances({
         organizationId: 'org-1',
+        branchId: 'branch-1',
         itemId: 'item-1',
         page: 1,
         pageSize: 20,
@@ -332,6 +333,10 @@ describe('StockLedgerService', () => {
       expect(mockQb.where).toHaveBeenCalledWith(
         'sb.organization_id = :organizationId',
         { organizationId: 'org-1' },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'storage.branch_id = :branchId',
+        { branchId: 'branch-1' },
       );
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'sb.item_id = :itemId',

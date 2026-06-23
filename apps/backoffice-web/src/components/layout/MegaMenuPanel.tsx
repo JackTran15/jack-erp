@@ -3,6 +3,9 @@ import { NavLink } from "react-router-dom";
 import { cn } from "@erp/ui";
 import { useLayout } from "./LayoutContext";
 import type { NavModule, NavSection, NavChild } from "./navConfig";
+import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
+
+type NavBadgeCounts = Partial<Record<NonNullable<NavChild["badgeKey"]>, number>>;
 
 export interface MegaMenuPanelProps {
   module: NavModule;
@@ -32,6 +35,10 @@ function splitFlyoutSections(
 export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
   function MegaMenuPanel({ module }, ref) {
     const { sidebarCollapsed } = useLayout();
+    const transferInCountQuery = useImportableTransferOrderCount();
+    const badgeCounts: NavBadgeCounts = {
+      "importable-transfer-orders": transferInCountQuery.data ?? 0,
+    };
     const columnSplit = splitFlyoutSections(module);
     const hasSplitColumns = columnSplit != null;
 
@@ -61,18 +68,30 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
               <>
                 <div className="flex min-w-0 flex-col gap-y-6">
                   {columnSplit.left.map((section) => (
-                    <SectionColumn key={section.id} section={section} />
+                    <SectionColumn
+                      key={section.id}
+                      section={section}
+                      badgeCounts={badgeCounts}
+                    />
                   ))}
                 </div>
                 <div className="flex min-w-0 flex-col gap-y-6">
                   {columnSplit.right.map((section) => (
-                    <SectionColumn key={section.id} section={section} />
+                    <SectionColumn
+                      key={section.id}
+                      section={section}
+                      badgeCounts={badgeCounts}
+                    />
                   ))}
                 </div>
               </>
             ) : (
               module.sections.map((section) => (
-                <SectionColumn key={section.id} section={section} />
+                <SectionColumn
+                  key={section.id}
+                  section={section}
+                  badgeCounts={badgeCounts}
+                />
               ))
             )}
           </div>
@@ -86,9 +105,10 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
 
 interface SectionColumnProps {
   section: NavSection;
+  badgeCounts: NavBadgeCounts;
 }
 
-function SectionColumn({ section }: SectionColumnProps) {
+function SectionColumn({ section, badgeCounts }: SectionColumnProps) {
   return (
     <div className="min-w-0">
       {section.label && (
@@ -99,7 +119,7 @@ function SectionColumn({ section }: SectionColumnProps) {
       <ul className="space-y-0.5">
         {section.children.map((child) => (
           <li key={child.to}>
-            <MegaMenuLink child={child} />
+            <MegaMenuLink child={child} badgeCounts={badgeCounts} />
           </li>
         ))}
       </ul>
@@ -111,9 +131,10 @@ function SectionColumn({ section }: SectionColumnProps) {
 
 interface MegaMenuLinkProps {
   child: NavChild;
+  badgeCounts: NavBadgeCounts;
 }
 
-function MegaMenuLink({ child }: MegaMenuLinkProps) {
+function MegaMenuLink({ child, badgeCounts }: MegaMenuLinkProps) {
   return (
     <NavLink
       to={child.to}
@@ -128,6 +149,23 @@ function MegaMenuLink({ child }: MegaMenuLinkProps) {
       }
     >
       <span className="whitespace-normal">{child.label}</span>
+      <NavItemBadge child={child} badgeCounts={badgeCounts} />
     </NavLink>
+  );
+}
+
+function NavItemBadge({
+  child,
+  badgeCounts,
+}: {
+  child: NavChild;
+  badgeCounts: NavBadgeCounts;
+}) {
+  const count = child.badgeKey ? (badgeCounts[child.badgeKey] ?? 0) : 0;
+  if (count <= 0) return null;
+  return (
+    <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+      {count}
+    </span>
   );
 }

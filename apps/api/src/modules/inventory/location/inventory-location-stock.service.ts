@@ -1,7 +1,6 @@
 import {
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,7 +13,9 @@ import {
   ILike,
   In,
   LessThan,
+  LessThanOrEqual,
   MoreThan,
+  Not,
   Repository,
 } from 'typeorm';
 import {
@@ -26,6 +27,7 @@ import {
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
+import type { StringFilterMode } from '../ledger/balance-filter.constants';
 import { ItemStorageLocationService } from '../product/item-storage-location.service';
 import {
   IntraWarehouseMoveLine,
@@ -51,8 +53,6 @@ import { InventoryLocationService } from './inventory-location.service';
 
 @Injectable()
 export class InventoryLocationStockService {
-  private readonly logger = new Logger(InventoryLocationStockService.name);
-
   constructor(
     @InjectRepository(StockBalanceEntity)
     private readonly stockBalanceRepo: Repository<StockBalanceEntity>,
@@ -114,30 +114,63 @@ export class InventoryLocationStockService {
     return { created, skipped };
   }
 
-  /** Move the requested unassigned quantity onto a real shelf. */
+  /** Move unassigned stock onto a real shelf, then record the preferred shelf. */
   async arrange(
     dto: ArrangeLocationDto,
     actor: ActorContext,
   ): Promise<{ moved: number; transferId: string | null }> {
-    // Resolve each line's "Chưa xếp" source + its current on-hand (the amount to move).
+    // Resolve each line's "Chưa xếp" source. When the UI does not send a
+    // quantity, move all currently unassigned stock; if none exists, still write
+    // the preferred shelf mapping below.
     const resolved: {
       line: ArrangeLocationDto['lines'][number];
       qty: number;
       unassignedId: string;
+      destination: LocationEntity;
     }[] = [];
     for (const line of dto.lines) {
+      const destination = await this.locationRepo.findOne({
+        where: {
+          id: line.destinationLocationId,
+          organizationId: actor.organizationId,
+          storageId: line.storageId,
+          isUnassigned: false,
+        },
+        relations: { storage: true },
+      });
+      if (!destination?.storage) {
+        throw new NotFoundException(
+          'Vị trí xếp hàng không tồn tại trong kho đã chọn',
+        );
+      }
+      if (actor.branchId && destination.storage.branchId !== actor.branchId) {
+        throw new ForbiddenException(
+          'Vị trí xếp hàng không thuộc chi nhánh đang chọn',
+        );
+      }
+
       const unassigned = await this.locationService.ensureUnassignedLocation(
         line.storageId,
         actor,
       );
+      const balance = await this.stockBalanceRepo.findOne({
+        where: {
+          organizationId: actor.organizationId,
+          itemId: line.itemId,
+          locationId: unassigned.id,
+        },
+      });
+      const unassignedQty = balance ? Number(balance.quantity) : 0;
       resolved.push({
         line,
-        qty: line.quantity,
+        qty: line.quantity ?? unassignedQty,
         unassignedId: unassigned.id,
+        destination,
       });
     }
 
     const moves: IntraWarehouseMoveLine[] = resolved
+      .filter((r) => r.qty > 0)
       .map((r) => ({
         itemId: r.line.itemId,
         quantity: r.qty,
@@ -154,21 +187,38 @@ export class InventoryLocationStockService {
       transferId = transfer.id;
     }
 
-    // Record the preferred shelf after the immutable transfer succeeds.
-    for (const r of resolved) {
-      try {
-        await this.pslService.setLocationByItem(
-          r.line.itemId,
-          r.line.destinationLocationId,
-          actor,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `Xếp vị trí: không ghi nhận được vị trí ưu tiên cho hàng ${r.line.itemId} ` +
-            `→ kệ ${r.line.destinationLocationId}: ` +
-            `${err instanceof Error ? err.message : String(err)}`,
-        );
+    // A zero-stock item still needs a balance row at the destination so it is
+    // visible in "Chi tiết vị trí hàng hóa". Never report success before these
+    // rows and the preferred-shelf mappings are persisted.
+    await this.dataSource.transaction(async (manager) => {
+      for (const r of resolved) {
+        const existing = await manager.findOne(StockBalanceEntity, {
+          where: {
+            organizationId: actor.organizationId,
+            itemId: r.line.itemId,
+            locationId: r.line.destinationLocationId,
+          },
+        });
+        if (!existing) {
+          await manager.insert(StockBalanceEntity, {
+            organizationId: actor.organizationId,
+            branchId: r.destination.storage!.branchId,
+            itemId: r.line.itemId,
+            locationId: r.line.destinationLocationId,
+            quantity: 0,
+            createdBy: actor.userId,
+          });
+        }
       }
+    });
+
+    for (const r of resolved) {
+      await this.pslService.setLocation(
+        r.line.itemId,
+        r.line.storageId,
+        r.line.destinationLocationId,
+        actor,
+      );
     }
 
     return { moved: dto.lines.length, transferId };
@@ -193,7 +243,7 @@ export class InventoryLocationStockService {
     if (!location || !location.storage) {
       throw new NotFoundException('Vị trí không tồn tại');
     }
-    const locationBranchId = location.branchId ?? location.storage.branchId;
+    const locationBranchId = location.storage.branchId;
     if (actor.branchId && locationBranchId !== actor.branchId) {
       throw new NotFoundException('Vị trí không tồn tại');
     }
@@ -208,7 +258,11 @@ export class InventoryLocationStockService {
     // Validate / auto-create item-storage-location binding (item-level).
     // pslService uses its own repos — runs outside the transaction boundary
     // which is acceptable here (the mapping is config, not a balance row).
-    await this.pslService.validateAndAssignByLocation(itemId, locationId, actor);
+    await this.pslService.validateAndAssignByLocation(
+      itemId,
+      locationId,
+      actor,
+    );
 
     // Upsert stock_balance row so the item appears in the location's stock list.
     const existing = await manager.findOne(StockBalanceEntity, {
@@ -235,15 +289,16 @@ export class InventoryLocationStockService {
   }
 
   /**
-   * Remove an item from a location. Only allowed when current balance is 0 to
-   * avoid orphan stock. (Caller may force-zero via stock adjustment first.)
+   * Remove an item from a real shelf without destroying stock. Positive stock
+   * is moved back to the storage's virtual "Chưa xếp" location first. Negative
+   * balances remain blocked because they require an inventory correction.
    */
   async removeItemFromLocation(
     locationId: string,
     itemId: string,
     actor: ActorContext,
   ): Promise<void> {
-    await this.resolveLocation(locationId, actor);
+    const location = await this.resolveLocation(locationId, actor);
 
     const balance = await this.stockBalanceRepo.findOne({
       where: {
@@ -253,12 +308,38 @@ export class InventoryLocationStockService {
       },
     });
     if (!balance) return;
-    if (Number(balance.quantity) !== 0) {
+    const quantity = Number(balance.quantity);
+    if (quantity < 0) {
       throw new ForbiddenException(
-        'Không thể bỏ hàng hóa khi tồn kho khác 0. Hãy điều chỉnh tồn về 0 trước.',
+        'Không thể bỏ hàng hóa đang có tồn kho âm. Hãy điều chỉnh tồn trước.',
       );
     }
+
+    if (quantity > 0) {
+      const unassigned = await this.locationService.ensureUnassignedLocation(
+        location.storage.id,
+        actor,
+      );
+      await this.stockTransferService.postIntraWarehouseMoves(
+        [
+          {
+            itemId,
+            quantity,
+            sourceLocationId: locationId,
+            destinationLocationId: unassigned.id,
+          },
+        ],
+        actor,
+      );
+    }
+
     await this.stockBalanceRepo.delete(balance.id);
+    await this.pslService.clearLocation(
+      itemId,
+      location.storage.id,
+      locationId,
+      actor,
+    );
   }
 
   async getStockByLocation(
@@ -386,6 +467,20 @@ export class InventoryLocationStockService {
     | FindOptionsWhere<StockBalanceEntity>[] {
     const itemWhere: FindOptionsWhere<ItemEntity> = {};
     if (query.categoryId) itemWhere.categoryId = query.categoryId;
+    if (query.itemCode) {
+      itemWhere.code = buildStringFilter(query.itemCode, query.itemCodeMode);
+    }
+    if (query.itemName) {
+      itemWhere.name = buildStringFilter(query.itemName, query.itemNameMode);
+    }
+    if (query.unit) {
+      itemWhere.unit = buildStringFilter(query.unit, query.unitMode);
+    }
+    if (query.categoryName) {
+      itemWhere.category = {
+        name: buildStringFilter(query.categoryName, query.categoryNameMode),
+      };
+    }
     if (typeof query.isPosVisible === 'boolean') {
       itemWhere.isPosVisible = query.isPosVisible;
     }
@@ -405,6 +500,9 @@ export class InventoryLocationStockService {
     };
     if (Object.keys(itemWhere).length > 0) {
       base.item = itemWhere;
+    }
+    if (query.quantityMax !== undefined) {
+      base.quantity = LessThanOrEqual(query.quantityMax);
     }
 
     switch (query.stockState) {
@@ -465,7 +563,7 @@ export class InventoryLocationStockService {
     }
 
     const storage = location.storage;
-    const locationBranchId = location.branchId ?? storage.branchId;
+    const locationBranchId = storage.branchId;
     if (actor.branchId && locationBranchId !== actor.branchId) {
       throw new ForbiddenException(
         `Vị trí ${locationId} không thuộc chi nhánh đang chọn`,
@@ -554,7 +652,9 @@ export class InventoryLocationStockService {
   ): StockByLocationItem {
     const item = sb.item;
     if (!item) {
-      throw new Error(`Item relation chưa được load cho stock_balance ${sb.id}`);
+      throw new Error(
+        `Item relation chưa được load cho stock_balance ${sb.id}`,
+      );
     }
 
     const quantity = Number(sb.quantity);
@@ -673,11 +773,7 @@ export class InventoryLocationStockService {
     const resolved = await Promise.all(
       [...unique.values()].map(async (pair) => ({
         key: keyOf(pair),
-        shelf: await this.getPreferredShelf(
-          pair.itemId,
-          pair.storageId,
-          actor,
-        ),
+        shelf: await this.getPreferredShelf(pair.itemId, pair.storageId, actor),
       })),
     );
     const shelfByKey = new Map(resolved.map((r) => [r.key, r.shelf]));
@@ -757,4 +853,21 @@ export class InventoryLocationStockService {
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+function buildStringFilter(value: string, mode: StringFilterMode = 'contains') {
+  const escaped = escapeLike(value.trim());
+  switch (mode) {
+    case 'equals':
+      return ILike(escaped);
+    case 'startsWith':
+      return ILike(`${escaped}%`);
+    case 'endsWith':
+      return ILike(`%${escaped}`);
+    case 'notContains':
+      return Not(ILike(`%${escaped}%`));
+    case 'contains':
+    default:
+      return ILike(`%${escaped}%`);
+  }
 }

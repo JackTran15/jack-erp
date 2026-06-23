@@ -33,6 +33,7 @@ import { InventoryStoragesPage } from "./pages/inventory/InventoryStoragesPage";
 import { ItemLocationDetailsPage } from "./pages/item-location-details/ItemLocationDetailsPage";
 import { StockTakesPage } from "./pages/stock-takes/StockTakesPage";
 import { TransferOrdersPage } from "./pages/transfer-orders/TransferOrdersPage";
+import { TransferInPage } from "./pages/transfer-in/TransferInPage";
 import { PurchaseOrdersPage } from "./pages/purchase-orders/PurchaseOrdersPage";
 import { GoodsIssuePage } from "./pages/goods-issue/GoodsIssuePage";
 import { StockTransferPage } from "./pages/stock-transfer/StockTransferPage";
@@ -125,6 +126,10 @@ export function App() {
                 <Route
                   path="/inventory/purchase-orders"
                   element={<PurchaseOrdersPage />}
+                />
+                <Route
+                  path="/inventory/transfer-in"
+                  element={<TransferInPage />}
                 />
                 <Route
                   path="/inventory/goods-issues"

@@ -739,30 +739,52 @@ export class InventoryLocationService {
     },
     actor: ActorContext,
   ): Promise<PaginatedResponse<LocationEntity>> {
-    const where: Record<string, unknown> = {
-      organizationId: actor.organizationId,
-    };
+    const branchId = actor.branchId ?? query.branchId;
+    const qb = this.locationRepo
+      .createQueryBuilder('location')
+      .leftJoinAndSelect('location.storage', 'storage')
+      .where('location.organizationId = :organizationId', {
+        organizationId: actor.organizationId,
+      });
     if (query.storageId) {
-      where.storageId = query.storageId;
+      qb.andWhere('location.storageId = :storageId', {
+        storageId: query.storageId,
+      });
     }
-    if (query.branchId) {
-      where.branchId = query.branchId;
+    if (branchId) {
+      qb.andWhere('storage.branchId = :branchId', { branchId });
     }
     // Hide the virtual "Chưa xếp" location from shelf pickers by default.
     if (!query.includeUnassigned) {
-      where.isUnassigned = false;
+      qb.andWhere('location.isUnassigned = false');
     }
 
-    const [data, total] = await this.locationRepo.findAndCount({
-      where,
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : query.sortOrder
-          ? { createdAt: query.sortOrder }
-          : { code: 'ASC', name: 'ASC' },
-    });
+    const sortColumns: Record<string, string> = {
+      code: 'location.code',
+      name: 'location.name',
+      createdAt: 'location.createdAt',
+      updatedAt: 'location.updatedAt',
+      isActive: 'location.isActive',
+    };
+    const sortColumn = query.sortBy ? sortColumns[query.sortBy] : undefined;
+    if (sortColumn) {
+      qb.orderBy(
+        sortColumn,
+        (query.sortOrder ?? 'asc').toUpperCase() as 'ASC' | 'DESC',
+      );
+    } else if (query.sortOrder) {
+      qb.orderBy(
+        'location.createdAt',
+        query.sortOrder.toUpperCase() as 'ASC' | 'DESC',
+      );
+    } else {
+      qb.orderBy('location.code', 'ASC').addOrderBy('location.name', 'ASC');
+    }
+
+    const [data, total] = await qb
+      .skip((query.page - 1) * query.pageSize)
+      .take(query.pageSize)
+      .getManyAndCount();
 
     // Mark which locations already hold items ("Đã xếp" vs "Chưa xếp"): a
     // location is "đã xếp" when it has at least one stock_balance row.

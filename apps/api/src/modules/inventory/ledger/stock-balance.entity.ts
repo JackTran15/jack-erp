@@ -1,6 +1,7 @@
 import { Entity, Column, Unique, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { ItemEntity } from '../location/item.entity';
+import { LocationEntity } from '../location/location.entity';
 
 /** Denormalized current stock quantity per item per location. Updated on every ledger posting. */
 @Entity('stock_balances')
@@ -17,6 +18,10 @@ export class StockBalanceEntity extends BaseEntity {
 
   @Column({ name: 'location_id', type: 'uuid', comment: 'The location holding the stock' })
   locationId: string;
+
+  @ManyToOne(() => LocationEntity, { nullable: true })
+  @JoinColumn({ name: 'location_id' })
+  location?: LocationEntity;
 
   @Column({ type: 'numeric', default: 0, comment: 'Current on-hand quantity; can be negative in rare adjustment scenarios' })
   quantity: number;

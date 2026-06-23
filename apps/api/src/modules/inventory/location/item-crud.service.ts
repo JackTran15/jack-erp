@@ -1474,11 +1474,11 @@ export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
   filterDefinitions: [
     {
       key: 'isActive',
-      label: 'Đang hoạt động',
+      label: 'Trạng thái',
       type: 'select',
       options: [
-        { label: 'Có', value: 'true' },
-        { label: 'Không', value: 'false' },
+        { label: 'Đang hoạt động', value: 'true' },
+        { label: 'Ngừng kinh doanh', value: 'false' },
       ],
     },
     {

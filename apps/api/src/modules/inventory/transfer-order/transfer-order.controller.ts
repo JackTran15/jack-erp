@@ -11,10 +11,11 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -23,17 +24,20 @@ import {
   IsUUID,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TransferOrderStatus } from '@erp/shared-interfaces';
-import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { RequireBranchScope, RequirePermission } from '../../auth/decorators';
-import { AuditInterceptor } from '../../crud/audit.interceptor';
-import { PermissionGuard } from '../../rbac/permission.guard';
-import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
-import { PaginationQueryDto } from '../../crud/dto';
-import { TransferOrderService } from './transfer-order.service';
+} from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { TransferOrderStatus } from "@erp/shared-interfaces";
+import {
+  Actor,
+  ActorContext,
+} from "../../../common/decorators/actor-context.decorator";
+import { RequireBranchScope, RequirePermission } from "../../auth/decorators";
+import { AuditInterceptor } from "../../crud/audit.interceptor";
+import { PermissionGuard } from "../../rbac/permission.guard";
+import { BranchScopeGuard } from "../../rbac/branch-scope.guard";
+import { PaginationQueryDto } from "../../crud/dto";
+import { TransferOrderService } from "./transfer-order.service";
 
 class TransferOrderLineDto {
   @IsUUID()
@@ -108,11 +112,11 @@ class ImportTransferOrderDto {
 }
 
 class ExportTransferOrderLineDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: "uuid" })
   @IsUUID()
   itemId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: "uuid" })
   @IsUUID()
   locationId: string;
 
@@ -151,7 +155,7 @@ class ExportTransferOrderDto {
   notes?: string;
 
   /** Đối tượng (counterparty provider) selected on the goods-issue form. */
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ format: "uuid" })
   @IsOptional()
   @IsUUID()
   providerId?: string;
@@ -170,18 +174,18 @@ class ExportTransferOrderDto {
   references?: string[];
 
   /** User-entered issue date+time (ISO). */
-  @ApiPropertyOptional({ format: 'date-time' })
+  @ApiPropertyOptional({ format: "date-time" })
   @IsOptional()
   @IsDateString()
   occurredAt?: string;
 }
 
 class CreateAndExportTransferOrderDto extends ExportTransferOrderDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: "uuid" })
   @IsUUID()
   locationId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ format: "uuid" })
   @IsUUID()
   targetBranchId: string;
 
@@ -201,6 +205,13 @@ class IssuableTransferOrderQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+}
+
+class ImportableTransferOrderQueryDto extends IssuableTransferOrderQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  includeCompleted?: boolean;
 }
 
 class CreateTransferOrderDto {
@@ -281,21 +292,21 @@ class TransferOrderQueryDto extends PaginationQueryDto {
   status?: TransferOrderStatus;
 }
 
-@Controller('inventory/transfer-orders')
+@Controller("inventory/transfer-orders")
 @UseInterceptors(AuditInterceptor)
 @UseGuards(PermissionGuard, BranchScopeGuard)
 export class TransferOrderController {
   constructor(private readonly service: TransferOrderService) {}
 
   @Post()
-  @RequirePermission('inventory.transfer.create')
+  @RequirePermission("inventory.transfer.create")
   @RequireBranchScope()
   create(@Body() dto: CreateTransferOrderDto, @Actor() actor: ActorContext) {
     return this.service.create(dto, actor);
   }
 
-  @Post('direct-export')
-  @RequirePermission('inventory.transfer.create')
+  @Post("direct-export")
+  @RequirePermission("inventory.transfer.create")
   @RequireBranchScope()
   createAndConfirmExport(
     @Body() dto: CreateAndExportTransferOrderDto,
@@ -305,7 +316,7 @@ export class TransferOrderController {
   }
 
   @Get()
-  @RequirePermission('inventory.transfer.read')
+  @RequirePermission("inventory.transfer.read")
   list(@Query() query: TransferOrderQueryDto, @Actor() actor: ActorContext) {
     return this.service.list({
       page: query.page ?? 1,
@@ -318,82 +329,92 @@ export class TransferOrderController {
     });
   }
 
-  @Get('issuable')
-  @RequirePermission('inventory.transfer.read')
+  @Get("issuable")
+  @RequirePermission("inventory.transfer.read")
   listIssuable(
     @Query() query: IssuableTransferOrderQueryDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.listIssuable(
-      { from: query.from, to: query.to },
-      actor,
-    );
+    return this.service.listIssuable({ from: query.from, to: query.to }, actor);
   }
 
-  @Get('importable')
-  @RequirePermission('inventory.transfer.read')
+  @Get("importable")
+  @RequirePermission("inventory.transfer.read")
   listImportable(
-    @Query() query: IssuableTransferOrderQueryDto,
+    @Query() query: ImportableTransferOrderQueryDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.listImportable(
-      { from: query.from, to: query.to },
+      {
+        from: query.from,
+        to: query.to,
+        includeCompleted: query.includeCompleted,
+      },
       actor,
     );
   }
 
-  @Get('by-code/:code')
-  @RequirePermission('inventory.transfer.read')
-  getByCode(@Param('code') code: string, @Actor() actor: ActorContext) {
+  @Get("by-code/:code")
+  @RequirePermission("inventory.transfer.read")
+  getByCode(@Param("code") code: string, @Actor() actor: ActorContext) {
     return this.service.getByCode(code, actor);
   }
 
-  @Get(':id')
-  @RequirePermission('inventory.transfer.read')
+  @Get(":id")
+  @RequirePermission("inventory.transfer.read")
   getById(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor);
   }
 
-  @Patch(':id')
-  @RequirePermission('inventory.transfer.create')
+  @Get(":id/export-goods-issue")
+  @RequirePermission("inventory.transfer.read")
+  getExportGoodsIssue(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.getExportGoodsIssue(id, actor);
+  }
+
+  @Patch(":id")
+  @RequirePermission("inventory.transfer.create")
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateTransferOrderDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.update(id, dto, actor);
   }
 
-  @Post(':id/export')
-  @RequirePermission('inventory.transfer.export')
+  @Post(":id/export")
+  @RequirePermission("inventory.transfer.export")
   @RequireBranchScope()
   confirmExport(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: ExportTransferOrderDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.confirmExport(id, actor, dto);
   }
 
-  @Post(':id/import')
-  @RequirePermission('inventory.transfer.import')
+  @Post(":id/import")
+  @RequirePermission("inventory.transfer.import")
   @RequireBranchScope()
   confirmImport(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: ImportTransferOrderDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.confirmImport(id, actor, dto);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @HttpCode(204)
-  @RequirePermission('inventory.transfer.cancel')
+  @RequirePermission("inventory.transfer.cancel")
   async cancel(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ): Promise<void> {
     await this.service.cancel(id, actor);

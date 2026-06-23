@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 import { Copy, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@erp/ui";
 import { LookupField } from "../../components/forms/LookupField";
 import { apiClient } from "../../lib/api-axios";
+import { getActiveBranch } from "../../lib/auth-storage";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 import { listStockBalances, type StockBalanceRow } from "../../api/stock-balances";
@@ -77,9 +78,38 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  selectedRows?: StockBalanceRow[];
 }
 
 const FETCH_PAGE_SIZE = 100;
+
+type RowValidationReason =
+  | "missingLocation"
+  | "sameLocation"
+  | "noStock"
+  | "invalidQuantity"
+  | "exceedsStock";
+
+function getRowValidationReason(
+  row: TransferRow,
+): RowValidationReason | null {
+  if (!row.sourceLocationId || !row.destLocationId) return "missingLocation";
+  if (row.sourceLocationId === row.destLocationId) return "sameLocation";
+  if (row.quantityOnHand <= 0) return "noStock";
+
+  const qty = Number(row.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return "invalidQuantity";
+  if (qty > row.quantityOnHand) return "exceedsStock";
+  return null;
+}
+
+const VALIDATION_LABELS: Record<RowValidationReason, string> = {
+  missingLocation: "chưa chọn đủ vị trí nguồn/đích",
+  sameLocation: "vị trí nguồn trùng vị trí đích",
+  noStock: "không có tồn kho tại vị trí nguồn",
+  invalidQuantity: "chưa nhập số lượng chuyển hợp lệ",
+  exceedsStock: "số lượng chuyển vượt quá tồn kho",
+};
 
 // Stable sentinel fed to useTrailingEmptyRow before a Kho is chosen: length 1
 // (so it isn't auto-seeded) and "empty" (so nothing is appended). Never rendered.
@@ -103,7 +133,12 @@ const NO_STORAGE_SENTINEL: TransferRow[] = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): ReactElement {
+export function TransferLocationDialog({
+  open,
+  onOpenChange,
+  onSaved,
+  selectedRows = [],
+}: Props): ReactElement {
   // Header — Kho (storage)
   const [storageId, setStorageId] = useState("");
   const [storageLabel, setStorageLabel] = useState("");
@@ -128,7 +163,9 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
 
   const searchStorages = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "20" });
+    const branchId = getActiveBranch();
     if (query.trim()) params.set("search", query.trim());
+    if (branchId) params.set("branchId", branchId);
     const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
       `/inventory/storages?${params}`,
     );
@@ -138,8 +175,10 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
   const searchLocationsInStorage = useCallback(
     (sid: string) => async (query: string) => {
       const params = new URLSearchParams({ page: "1", pageSize: "20" });
+      const branchId = getActiveBranch();
       if (query.trim()) params.set("search", query.trim());
       if (sid) params.set("storageId", sid);
+      if (branchId) params.set("branchId", branchId);
       const { data } = await apiClient.get<PaginatedResponse<InventoryLocation>>(
         `/inventory/locations?${params}`,
       );
@@ -147,6 +186,39 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
     },
     [],
   );
+
+  useEffect(() => {
+    if (!open || selectedRows.length === 0) return;
+    const first = selectedRows[0];
+    if (!first) return;
+    setStorageId(first.location.storageId);
+    setStorageLabel(first.location.storageName);
+    setSourceLocationId(first.location.id);
+    setSourceLocationLabel(`${first.location.code} · ${first.location.name}`);
+    setSourceLocationCode(first.location.code);
+    setDestLocationId("");
+    setDestLocationLabel("");
+    setRows(
+      selectedRows.map((r) => {
+        const quantityOnHand = Number(r.quantity);
+        return {
+          uid: crypto.randomUUID(),
+          itemId: r.itemId,
+          itemCode: r.item.code,
+          itemName: r.item.name,
+          unit: r.item.unit,
+          storageName: r.location.storageName,
+          sourceLocationId: r.location.id,
+          sourceLocationLabel: `${r.location.code} · ${r.location.name}`,
+          sourceLocationCode: r.location.code,
+          destLocationId: "",
+          destLocationLabel: "",
+          quantityOnHand,
+          qty: quantityOnHand > 0 ? String(quantityOnHand) : "",
+        };
+      }),
+    );
+  }, [open, selectedRows]);
 
   const searchItems = useCallback(async (query: string) => {
     const params = new URLSearchParams({ page: "1", pageSize: "12" });
@@ -395,39 +467,42 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
 
   const handleSave = useCallback(async () => {
     const lines: IntraWarehouseTransferLine[] = [];
-    let invalid = 0;
+    const invalidByReason = new Map<RowValidationReason, number>();
     for (const row of rows) {
       // Skip untouched trailing/blank rows entirely — they aren't "invalid".
       if (!row.itemId) {
         continue;
       }
-      if (!row.sourceLocationId || !row.destLocationId) {
-        invalid++;
-        continue;
-      }
-      if (row.sourceLocationId === row.destLocationId) {
-        invalid++;
-        continue;
-      }
-      const qty = Number(row.qty);
-      if (!Number.isFinite(qty) || qty <= 0 || qty > row.quantityOnHand) {
-        invalid++;
+      const invalidReason = getRowValidationReason(row);
+      if (invalidReason) {
+        invalidByReason.set(
+          invalidReason,
+          (invalidByReason.get(invalidReason) ?? 0) + 1,
+        );
         continue;
       }
       lines.push({
         itemId: row.itemId,
-        quantity: qty,
+        quantity: Number(row.qty),
         sourceLocationId: row.sourceLocationId,
         destinationLocationId: row.destLocationId,
       });
     }
 
+    const invalidSummary = [...invalidByReason]
+      .map(([reason, count]) => `${count} dòng ${VALIDATION_LABELS[reason]}`)
+      .join("; ");
+
     if (lines.length === 0) {
-      toast.error("Chưa có dòng nào hợp lệ để chuyển");
+      toast.error(
+        invalidSummary
+          ? `Không thể chuyển: ${invalidSummary}.`
+          : "Chưa có hàng hóa nào để chuyển.",
+      );
       return;
     }
-    if (invalid > 0) {
-      toast.warning(`${invalid} dòng chưa hợp lệ và sẽ bị bỏ qua.`);
+    if (invalidByReason.size > 0) {
+      toast.warning(`${invalidSummary}; các dòng này sẽ bị bỏ qua.`);
     }
 
     try {
@@ -478,17 +553,12 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
 
   const canFetch = Boolean(sourceLocationId);
 
-  const validRowCount = rows.filter((row) => {
-    const qty = Number(row.qty);
-    return (
-      row.itemId &&
-      row.sourceLocationId &&
-      row.destLocationId &&
-      row.sourceLocationId !== row.destLocationId &&
-      qty > 0 &&
-      qty <= row.quantityOnHand
-    );
-  }).length;
+  const validRowCount = rows.filter(
+    (row) => row.itemId && getRowValidationReason(row) === null,
+  ).length;
+  const zeroStockRowCount = rows.filter(
+    (row) => row.itemId && row.quantityOnHand <= 0,
+  ).length;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -581,6 +651,17 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
               }
               setDestLocationId(loc.id);
               setDestLocationLabel(`${loc.code} · ${loc.name}`);
+              setRows((prev) =>
+                prev.map((row) =>
+                  row.itemId && row.sourceLocationId !== loc.id
+                    ? {
+                        ...row,
+                        destLocationId: loc.id,
+                        destLocationLabel: `${loc.code} · ${loc.name}`,
+                      }
+                    : row,
+                ),
+              );
             }}
             search={searchLocationsInStorage(storageId)}
             itemKey={(loc) => loc.id}
@@ -770,9 +851,16 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
                         min={0}
                         step="any"
                         value={row.qty}
-                        disabled={!hasItem || !hasSource}
+                        disabled={
+                          !hasItem || !hasSource || row.quantityOnHand <= 0
+                        }
                         onChange={(e) => patchRow(row.uid, { qty: e.target.value })}
                         placeholder="0"
+                        title={
+                          row.quantityOnHand <= 0
+                            ? "Hàng hóa không có tồn kho tại vị trí nguồn"
+                            : undefined
+                        }
                         className={[
                           "w-full rounded border px-2 py-1 text-right text-sm tabular-nums",
                           "bg-background focus:outline-none focus:ring-1 focus:ring-ring",
@@ -844,6 +932,11 @@ export function TransferLocationDialog({ open, onOpenChange, onSaved }: Props): 
             {validRowCount > 0 && (
               <span className="ml-2 text-foreground">· Sẽ chuyển {validRowCount} dòng</span>
             )}
+            {zeroStockRowCount > 0 ? (
+              <span className="ml-2 text-destructive">
+                · {zeroStockRowCount} dòng tồn kho = 0
+              </span>
+            ) : null}
           </span>
         </div>
         <div className="flex gap-2">

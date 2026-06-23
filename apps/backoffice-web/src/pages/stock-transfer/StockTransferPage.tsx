@@ -265,11 +265,11 @@ export function StockTransferPage() {
 
   const handleDelete = async (t: Transfer) => {
     setActionLoading(t.id);
+    setConfirmDelete(null);
     try {
       // BE cancel() reverses the stock movements (returns stock) then marks the
       // posted doc CANCELLED, so it disappears from the list.
       await apiClient.post(`/inventory/stock/transfers/${t.id}/cancel`);
-      setConfirmDelete(null);
       if (selectedId === t.id) setSelectedId(null);
       await loadRecords();
     } catch (err) {

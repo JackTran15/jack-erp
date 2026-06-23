@@ -263,6 +263,19 @@ export function ItemLocationsPage() {
     () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
     [locations, selectedId],
   );
+  const selectedArrangeLocation = useMemo(
+    () =>
+      selected
+        ? {
+            id: selected.id,
+            code: selected.code,
+            name: selected.name,
+            storageId: selected.storageId,
+            storageName: storageNameById.get(selected.storageId) ?? "",
+          }
+        : null,
+    [selected, storageNameById],
+  );
 
   const filteredRows = useMemo(() => {
     const rows = locations?.data ?? [];
@@ -348,13 +361,13 @@ export function ItemLocationsPage() {
   const handleDeactivate = useCallback(
     async (loc: InventoryLocation) => {
       setSaving(true);
+      setConfirmDelete(null);
       try {
         await apiClient.patch(`/inventory/locations/${loc.id}`, {
           isActive: false,
         });
         toast.success("Đã ngừng hoạt động vị trí.");
         if (selectedId === loc.id) setSelectedId(null);
-        setConfirmDelete(null);
         await loadLocations();
       } catch (err) {
         toast.error(getUserFacingApiErrorMessage(err));
@@ -654,6 +667,7 @@ export function ItemLocationsPage() {
         open={arrangeOpen}
         onOpenChange={setArrangeOpen}
         onSaved={() => void loadLocations()}
+        initialLocation={selectedArrangeLocation}
       />
     </>
   );

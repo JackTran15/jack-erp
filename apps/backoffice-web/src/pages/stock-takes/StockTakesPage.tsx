@@ -299,10 +299,10 @@ export function StockTakesPage() {
 
   const handleCancel = async (st: StockTake) => {
     setActionLoading(st.id);
+    setConfirmCancel(null);
     try {
       await apiClient.delete(`/inventory/stock-takes/${st.id}`);
       toast.success("Đã huỷ phiếu kiểm kê.");
-      setConfirmCancel(null);
       if (selectedId === st.id) {
         setSelectedId(null);
         setSelectedDetail(null);

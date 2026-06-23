@@ -29,6 +29,15 @@ export async function getPreferredShelfBatch(
   return data;
 }
 
+/** Compatibility helper for single-row save fallbacks. */
+export async function getPreferredShelf(
+  itemId: string,
+  storageId: string,
+): Promise<PreferredShelf | null> {
+  const [result] = await getPreferredShelfBatch([{ itemId, storageId }]);
+  return result?.shelf ?? null;
+}
+
 export interface TransferPreferredShelfPair {
   itemId: string;
   sourceStorageId: string;

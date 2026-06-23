@@ -10,6 +10,7 @@ import type { FieldDefinition } from "@erp/shared-interfaces";
 import { toast } from "sonner";
 import {
   Button,
+  Badge,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -456,7 +457,12 @@ export function CrudListPage({
                   </button>
                 );
               }
-              const content = formatCell(row[field.key], field, col.format);
+              const content = formatCell(
+                row[field.key],
+                field,
+                col.format,
+                entityKey,
+              );
               if (!opensEdit) return content;
               return (
                 <button
@@ -713,15 +719,16 @@ export function CrudListPage({
 
   const confirmBulkDelete = async () => {
     if (selectedRows.length === 0) return;
+    const rowsToDelete = selectedRows;
+    setDeleteDialogOpen(false);
     try {
       await Promise.all(
-        selectedRows.map((record) =>
+        rowsToDelete.map((record) =>
           deleteMutation.mutateAsync(String(record[config.idField])),
         ),
       );
       setSelectedRecordIds(new Set());
-      setDeleteDialogOpen(false);
-      toast.success(`Đã xoá ${selectedRows.length} bản ghi.`);
+      toast.success(`Đã xoá ${rowsToDelete.length} bản ghi.`);
       void refetchRecords();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
@@ -956,8 +963,30 @@ function formatCell(
   value: unknown,
   field: FieldDefinition,
   format: ColumnFormatKind | undefined,
+  entityKey?: string,
 ): React.ReactNode {
   if (value === null || value === undefined) return "—";
+  if (entityKey === "inventory-items" && field.key === "isActive") {
+    const enabled = Boolean(value);
+    return (
+      <Badge
+        variant="outline"
+        className={
+          enabled
+            ? "gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+            : "gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
+        }
+      >
+        <span
+          aria-hidden="true"
+          className={`h-1.5 w-1.5 rounded-full ${
+            enabled ? "bg-emerald-500" : "bg-rose-500"
+          }`}
+        />
+        {enabled ? "Đang hoạt động" : "Ngừng kinh doanh"}
+      </Badge>
+    );
+  }
   if (field.type === "boolean") {
     return (
       <input

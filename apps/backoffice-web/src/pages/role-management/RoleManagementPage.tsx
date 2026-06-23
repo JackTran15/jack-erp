@@ -212,10 +212,10 @@ export function RoleManagementPage() {
 
   const handleDeleteRole = useCallback(async () => {
     if (!selectedRole || selectedRole.isSystem) return;
+    setConfirmDeleteRole(false);
     try {
       await deleteRole.mutateAsync(selectedRole.id);
       setSelectedRoleId(null);
-      setConfirmDeleteRole(false);
       toast.success("Đã xóa vai trò.");
     } catch (err) {
       toast.error(getIamErrorMessage(err, "Không xóa được vai trò."));

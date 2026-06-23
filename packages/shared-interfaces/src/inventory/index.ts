@@ -442,10 +442,26 @@ export interface ImportableTransferOrderListItem {
   /** "Điều chuyển từ" — resolved source branch name, inlined per row. */
   sourceBranchName: string;
   exportGoodsIssueId: string | null;
+  importGoodsReceiptId: string | null;
   /** "Số chứng từ" — the export goods-issue (XK) document number. */
   exportGoodsIssueDocumentNumber: string | null;
+  /** "Đối tượng" — counterparty selected on the export goods issue. */
+  counterpartyName: string | null;
   /** "Tổng thành tiền" — sum of the export goods-issue line totals. */
   totalAmount: number;
+  lines: Array<{
+    id: string;
+    itemId: string;
+    itemCode: string;
+    itemName: string;
+    unit: string;
+    storageName: string | null;
+    locationCode: string | null;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    notes: string | null;
+  }>;
   status: TransferOrderStatus;
 }
 
