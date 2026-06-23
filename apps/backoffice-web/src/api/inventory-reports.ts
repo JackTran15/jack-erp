@@ -178,6 +178,29 @@ export interface DocumentDetailRow {
   notes: string | null;
 }
 
+/**
+ * Row for "Hàng hóa xuất kho tạm" (temp-warehouse out goods).
+ * Mirrors backend `TempWarehouseIssueRow`. `saleQty`/`invoice` are always
+ * 0/"" — there is no temp-warehouse ↔ POS invoice link in the backend yet.
+ */
+export interface TempWarehouseIssueRow {
+  sku: string;
+  name: string;
+  unit: string;
+  location: string | null;
+  /** dd/MM/yyyy (Asia/Ho_Chi_Minh) */
+  date: string;
+  /** HH:mm:ss (Asia/Ho_Chi_Minh) */
+  time: string;
+  staff: string;
+  outQty: number;
+  returnQty: number;
+  saleQty: number;
+  remainingQty: number;
+  status: string;
+  invoice: string;
+}
+
 // === Response envelope ===
 
 export interface InventoryReportResponse<TRow> extends InventoryReportPagination {
@@ -247,6 +270,17 @@ export async function listStockDocumentDetails(
   return requireErpData(
     await erpApi.GET<InventoryReportResponse<DocumentDetailRow>>(
       "/reports/inventory/stock-document-details",
+      { params: { query: buildBaseQuery(filters) } },
+    ),
+  );
+}
+
+export async function listTemporaryWarehouseOutGoods(
+  filters: InventoryReportFilters,
+) {
+  return requireErpData(
+    await erpApi.GET<InventoryReportResponse<TempWarehouseIssueRow>>(
+      "/reports/inventory/temporary-warehouse-out-goods",
       { params: { query: buildBaseQuery(filters) } },
     ),
   );

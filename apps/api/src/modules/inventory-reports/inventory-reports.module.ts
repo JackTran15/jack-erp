@@ -5,6 +5,7 @@ import { StockPeriodService } from './services/stock-period.service';
 import { StockBalancePivotService } from './services/stock-balance-pivot.service';
 import { TransferReportService } from './services/transfer-report.service';
 import { DocumentDetailService } from './services/document-detail.service';
+import { TempWarehouseReportService } from './services/temp-warehouse-report.service';
 
 /**
  * Inventory reports module — Tasks 4, 5, 6.
@@ -23,6 +24,7 @@ import { DocumentDetailService } from './services/document-detail.service';
     StockBalancePivotService,
     TransferReportService,
     DocumentDetailService,
+    TempWarehouseReportService,
   ],
 })
 export class InventoryReportsModule {}

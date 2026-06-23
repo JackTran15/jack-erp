@@ -18,6 +18,7 @@ export enum ReportTableColumn {
   QUANTITY_SOLD = 'quantity_sold',
 
   // === Giá & Doanh thu ===
+  UNIT_PRICE = 'unit_price',
   PRICE_BEFORE_DISCOUNT = 'price_before_discount',
   PRICE_AFTER_DISCOUNT = 'price_after_discount',
   REVENUE_TOTAL = 'revenue_total',
@@ -161,6 +162,7 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.QUANTITY]: 'Số lượng',
   [ReportTableColumn.QUANTITY_SOLD]: 'Số lượng bán',
 
+  [ReportTableColumn.UNIT_PRICE]: 'Đơn giá',
   [ReportTableColumn.PRICE_BEFORE_DISCOUNT]: 'Giá trước giảm',
   [ReportTableColumn.PRICE_AFTER_DISCOUNT]: 'Giá sau giảm',
   [ReportTableColumn.REVENUE_TOTAL]: 'Tổng doanh thu',

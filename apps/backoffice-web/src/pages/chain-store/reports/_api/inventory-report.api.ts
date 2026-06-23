@@ -6,6 +6,7 @@ import {
   listStockSummaryByBranch,
   listTransferByBranch,
   listTransferSummary,
+  listTemporaryWarehouseOutGoods,
   type DocumentDetailRow,
   type InventoryReportFilters,
   type InventoryReportPreset,
@@ -15,7 +16,6 @@ import {
   type TransferSummaryRow,
 } from "../../../../api/inventory-reports";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
-import { TEMPORARY_ISSUES_MOCK_ROWS } from "../../../reports/storage/_shared/temporary-issues.mock";
 import type { ReportFilterValues } from "../../../../store/page-stores/report/report.interface";
 import type { ReportRow } from "./invoice-report.api";
 import type { ReportDataFetcher, ReportDataResult } from "./report-data-source";
@@ -32,6 +32,10 @@ function buildInventoryFilters(
   if (store && store.scope === "group" && store.storeIds.length > 0) {
     out.branchIds = store.storeIds;
   }
+
+  // Line "Cửa hàng" single-select (chuỗi cửa hàng) → lọc theo 1 chi nhánh.
+  const singleStore = filters[REPORT_FILTERS_LINE.STORE_SINGLE];
+  if (singleStore) out.branchIds = [singleStore];
 
   const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
   if (range?.fromDate || range?.toDate) {
@@ -377,7 +381,7 @@ export const fetchTransferByBranch: ReportDataFetcher = async (args) => {
   return { rows, totals: sumTotals(rows, TRANSFER_BY_BRANCH_NUMERIC), total: res.total ?? rows.length };
 };
 
-// ===== #8 Hàng hóa xuất kho tạm (mock — không có endpoint backend) =====
+// ===== #8 Hàng hóa xuất kho tạm =====
 
 const TEMPORARY_OUT_NUMERIC = [
   "outQty",
@@ -386,12 +390,16 @@ const TEMPORARY_OUT_NUMERIC = [
   "remainingQty",
 ] as const;
 
-export const fetchTemporaryWarehouseOutGoods: ReportDataFetcher = async () => {
-  // Dùng chung nguồn mock với store view để hai bên luôn đồng bộ.
-  const rows: ReportRow[] = TEMPORARY_ISSUES_MOCK_ROWS.map((r) => ({ ...r }));
+export const fetchTemporaryWarehouseOutGoods: ReportDataFetcher = async (
+  args,
+) => {
+  const res = await listTemporaryWarehouseOutGoods(
+    buildInventoryFilters(args.filters, args.page, args.limit),
+  );
+  const rows: ReportRow[] = (res.data ?? []).map((r) => ({ ...r }));
   return {
     rows,
     totals: sumTotals(rows, TEMPORARY_OUT_NUMERIC),
-    total: rows.length,
+    total: res.total ?? rows.length,
   };
 };

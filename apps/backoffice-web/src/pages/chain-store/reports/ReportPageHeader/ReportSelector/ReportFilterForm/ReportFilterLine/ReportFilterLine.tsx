@@ -12,14 +12,17 @@ import {
 import {
   warehouseOptions,
   productGroupOptions,
+  productTypeOptions,
   statisticByOptions,
   unitOptions,
   brandOptions,
   workShiftOptions,
   receivingStoreOptions,
 } from "../../_mock/report-inventory-filter.mock";
+import { ComboAllocationCheckbox } from "./ComboAllocationCheckbox/ComboAllocationCheckbox";
 import { SourceStoreField } from "./SourceStoreField/SourceStoreField";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
+import { StoreSelectField } from "./StoreSelectField/StoreSelectField";
 import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
 import { StatisticByBranchCheckbox } from "./StatisticByBranchCheckbox/StatisticByBranchCheckbox";
@@ -165,6 +168,17 @@ export function ReportFilterLine({ line }: Props) {
             }
           />
         );
+      case REPORT_FILTERS_LINE.PRODUCT_TYPE:
+        return (
+          <ReportSelectField
+            value={filters[REPORT_FILTERS_LINE.PRODUCT_TYPE] ?? "product"}
+            options={productTypeOptions}
+            placeholder="Hàng hóa"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_TYPE, v)
+            }
+          />
+        );
       case REPORT_FILTERS_LINE.STATISTIC_BY:
         return (
           <ReportSelectField
@@ -202,6 +216,27 @@ export function ReportFilterLine({ line }: Props) {
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.WORK_SHIFT, v)
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO:
+        return (
+          <ComboAllocationCheckbox
+            value={filters[REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO] ?? false}
+            onChange={(v) =>
+              actions.setFilterValue(
+                REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO,
+                v,
+              )
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.STORE_SINGLE:
+        return (
+          <StoreSelectField
+            value={filters[REPORT_FILTERS_LINE.STORE_SINGLE] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.STORE_SINGLE, v)
             }
           />
         );
