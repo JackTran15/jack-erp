@@ -22,6 +22,7 @@ import {
 import { ComboAllocationCheckbox } from "./ComboAllocationCheckbox/ComboAllocationCheckbox";
 import { SourceStoreField } from "./SourceStoreField/SourceStoreField";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
+import { StoreSelectField } from "./StoreSelectField/StoreSelectField";
 import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
 import { StatisticByBranchCheckbox } from "./StatisticByBranchCheckbox/StatisticByBranchCheckbox";
@@ -227,6 +228,15 @@ export function ReportFilterLine({ line }: Props) {
                 REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO,
                 v,
               )
+            }
+          />
+        );
+      case REPORT_FILTERS_LINE.STORE_SINGLE:
+        return (
+          <StoreSelectField
+            value={filters[REPORT_FILTERS_LINE.STORE_SINGLE] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.STORE_SINGLE, v)
             }
           />
         );

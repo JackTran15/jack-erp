@@ -1,14 +1,17 @@
-import { useMemo } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   StorageReportShell,
   resolveLabel,
+  buildApiFilters,
   type FilterField,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
 import {
-  TEMPORARY_ISSUES_MOCK_ROWS,
-  type TempIssueRow,
-} from "./_shared/temporary-issues.mock";
+  listTemporaryWarehouseOutGoods,
+  type InventoryReportFilters,
+  type TempWarehouseIssueRow,
+} from "../../../api/inventory-reports";
 
 const GROUP_OPTIONS = [
   { value: "__all__", label: "Tất cả nhóm" },
@@ -36,7 +39,7 @@ export function TemporaryIssuesReportPage() {
   ];
 
   const num = "text-right tabular-nums";
-  const columns: TableColumn<TempIssueRow>[] = [
+  const columns: TableColumn<TempWarehouseIssueRow>[] = [
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
     { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
     { key: "unit", label: "Đơn vị tính", width: 100, render: (r) => r.unit },
@@ -64,10 +67,21 @@ export function TemporaryIssuesReportPage() {
     },
   ];
 
-  const rows = useMemo(() => TEMPORARY_ISSUES_MOCK_ROWS, []);
+  const [apiFilters, setApiFilters] = useState<InventoryReportFilters>({
+    preset: "this_month",
+    page: 1,
+    pageSize: 200,
+  });
+
+  const query = useQuery({
+    queryKey: ["temp-warehouse-out-goods", apiFilters],
+    queryFn: () => listTemporaryWarehouseOutGoods(apiFilters),
+  });
+
+  const rows = query.data?.data ?? [];
 
   return (
-    <StorageReportShell<TempIssueRow>
+    <StorageReportShell<TempWarehouseIssueRow>
       title="Hàng hóa xuất kho tạm"
       storageKey="reports/storage/temporary-issues"
       filterFields={filterFields}
@@ -77,6 +91,12 @@ export function TemporaryIssuesReportPage() {
       ]}
       columns={columns}
       rows={rows}
+      loading={query.isFetching}
+      onApply={(values, period) =>
+        setApiFilters(
+          buildApiFilters(values, period, { categoryFieldKey: "group" }),
+        )
+      }
       emptyLabel="Không có dữ liệu xuất kho tạm."
       getRowKey={(r, i) => `${r.sku}-${r.date}-${r.time}-${i}`}
       columnSummary={(rs) => {

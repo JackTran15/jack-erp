@@ -1594,6 +1594,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/locations/preferred-shelf/transfer-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve preferred shelves at both source and destination storage for many transfer lines in one request */
+        post: operations["InventoryLocationStockController_batchTransferPreferredShelf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/locations/{locationId}/stock-items": {
         parameters: {
             query?: never;
@@ -5244,6 +5261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/inventory/temporary-warehouse-out-goods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hóa xuất kho tạm */
+        get: operations["InventoryReportsController_temporaryWarehouseOutGoods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/inventory/transfer-summary": {
         parameters: {
             query?: never;
@@ -6566,6 +6600,30 @@ export interface components {
         };
         BatchPreferredShelfResponseDto: {
             data: components["schemas"]["BatchPreferredShelfRowDto"][];
+        };
+        TransferPreferredShelfPairDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            sourceStorageId: string;
+            /** Format: uuid */
+            destStorageId: string;
+        };
+        BatchTransferPreferredShelfRequestDto: {
+            pairs: components["schemas"]["TransferPreferredShelfPairDto"][];
+        };
+        BatchTransferPreferredShelfRowDto: {
+            /** Format: uuid */
+            itemId: string;
+            /** Format: uuid */
+            sourceStorageId: string;
+            /** Format: uuid */
+            destStorageId: string;
+            sourceShelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+            destShelf: components["schemas"]["PreferredShelfResponseDto"] | null;
+        };
+        BatchTransferPreferredShelfResponseDto: {
+            data: components["schemas"]["BatchTransferPreferredShelfRowDto"][];
         };
         StockByLocationProviderDto: {
             /** Format: uuid */
@@ -8963,7 +9021,7 @@ export interface components {
             providerId?: string;
             provider?: components["schemas"]["ProviderEntity"];
             /** @enum {string|null} */
-            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
             counterpartyId?: string | null;
             reason: string;
             reasonId?: string;
@@ -9050,7 +9108,7 @@ export interface components {
             /** Format: uuid */
             locationId: string;
             /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer";
+            counterpartyKind?: "supplier" | "customer" | "employee";
             /** Format: uuid */
             counterpartyId?: string;
             /** @enum {string} */
@@ -9128,6 +9186,15 @@ export interface components {
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
+            /**
+             * @description Đối tượng kind (supplier | customer | employee). When set, the service
+             *      validates the counterparty and routes supplier→provider_id, customer /
+             *      employee→counterparty cols (provider_id null).
+             * @enum {string}
+             */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
@@ -9165,7 +9232,7 @@ export interface components {
             purpose: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             providerId?: string;
             /** @enum {string|null} */
-            counterpartyKind?: "supplier" | "customer" | null;
+            counterpartyKind?: "supplier" | "customer" | "employee" | null;
             counterpartyId?: string | null;
             deliveredBy?: string;
             reason?: string;
@@ -9233,6 +9300,10 @@ export interface components {
             purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** Format: uuid */
             providerId?: string;
+            /** @enum {string} */
+            counterpartyKind?: "supplier" | "customer" | "employee";
+            /** Format: uuid */
+            counterpartyId?: string;
             deliveredBy?: string;
             reason?: string;
             description?: string;
@@ -9273,7 +9344,7 @@ export interface components {
             /** @enum {string} */
             purpose?: "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
             /** @enum {string} */
-            counterpartyKind?: "supplier" | "customer";
+            counterpartyKind?: "supplier" | "customer" | "employee";
             /** Format: uuid */
             counterpartyId?: string;
             receivedAt: string;
@@ -12642,6 +12713,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchPreferredShelfResponseDto"];
+                };
+            };
+        };
+    };
+    InventoryLocationStockController_batchTransferPreferredShelf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTransferPreferredShelfRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchTransferPreferredShelfResponseDto"];
                 };
             };
         };
@@ -19114,6 +19208,40 @@ export interface operations {
         };
     };
     InventoryReportsController_stockByBranch: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_temporaryWarehouseOutGoods: {
         parameters: {
             query?: {
                 preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";

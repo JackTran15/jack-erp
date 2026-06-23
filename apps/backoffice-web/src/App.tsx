@@ -21,7 +21,6 @@ import { RegistrationDetailPage } from "./pages/onboarding/RegistrationDetailPag
 import { DashboardReportPage } from "./pages/reports/DashboardReportPage";
 import { ReportPage } from "./pages/chain-store/reports/ReportPage";
 import { REPORT_CATEGORY } from "./constants/reports/report-category.constant";
-import { PageKey } from "./constants/page-registry.constant";
 import { AgingReportPage } from "./pages/reports/AgingReportPage";
 import { CashReportPage } from "./pages/reports/CashReportPage";
 import { LedgerCashPage } from "./pages/treasury/ledger-cash/LedgerCashPage";
