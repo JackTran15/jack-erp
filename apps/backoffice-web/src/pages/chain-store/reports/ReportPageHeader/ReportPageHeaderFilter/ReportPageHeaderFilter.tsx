@@ -1,10 +1,10 @@
-import { PERIOD_PRESET_OPTIONS } from "@erp/ui";
+import { Button, PERIOD_PRESET_OPTIONS } from "@erp/ui";
 import { Filter } from "lucide-react";
 import { REPORT_FILTERS_LINE } from "../../../../../constants/reports/report-filters.constant";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
 
 const controlClass =
-  "h-[30px] rounded-[3px] border border-[#D9D9DE] bg-white px-2 text-[13px] text-[#212121] outline-none";
+  "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none";
 
 export function ReportPageHeaderFilter() {
   const applyFilters = useReportStore((s) => s.actions.applyFilters);
@@ -32,7 +32,7 @@ export function ReportPageHeaderFilter() {
         ))}
       </select>
 
-      <label className="text-[13px] text-[#5C5C66]">Từ ngày</label>
+      <label className="text-xs text-muted-foreground">Từ ngày</label>
       <input
         type="date"
         className={`${controlClass} w-[140px]`}
@@ -46,7 +46,7 @@ export function ReportPageHeaderFilter() {
         aria-label="Từ ngày"
       />
 
-      <label className="text-[13px] text-[#5C5C66]">Đến ngày</label>
+      <label className="text-xs text-muted-foreground">Đến ngày</label>
       <input
         type="date"
         className={`${controlClass} w-[140px]`}
@@ -60,14 +60,10 @@ export function ReportPageHeaderFilter() {
         aria-label="Đến ngày"
       />
 
-      <button
-        type="button"
-        onClick={() => applyFilters()}
-        className="flex h-[30px] items-center gap-1.5 rounded-[3px] border border-[#D9D9DE] bg-white px-3 text-[13px] font-medium text-[#2B3164] hover:bg-[#F5F5F6]"
-      >
-        <Filter className="h-3.5 w-3.5" />
+      <Button type="button" size="sm" onClick={() => applyFilters()}>
+        <Filter className="mr-1.5 h-4 w-4" />
         Lấy dữ liệu
-      </button>
+      </Button>
     </div>
   );
 }

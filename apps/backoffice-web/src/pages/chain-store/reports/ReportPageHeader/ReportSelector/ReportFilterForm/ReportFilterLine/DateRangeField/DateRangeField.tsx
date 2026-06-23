@@ -18,7 +18,7 @@ export function DateRangeField({ value, onChange }: Props) {
         onChange={(e) => onChange({ ...value, fromDate: e.target.value })}
         aria-label="Từ ngày"
       />
-      <span className="text-[13px] text-[#4A4A4A]">Đến ngày</span>
+      <span className="text-[13px] text-muted-foreground">Đến ngày</span>
       <input
         type="date"
         className={dateClass}

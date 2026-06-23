@@ -37,7 +37,7 @@ interface Props {
   onTogglePinned: (row: ColumnConfigRow) => void;
 }
 
-const headerCellClass = "border border-[#E0E0E0] px-3 py-2 text-[13px] font-bold text-[#1F2430]";
+const headerCellClass = "border border-border px-3 py-2 text-[13px] font-bold text-foreground";
 
 export function ColumnConfigTable({
   rows,
@@ -58,7 +58,7 @@ export function ColumnConfigTable({
         <col style={{ width: "8%" }} />
         <col style={{ width: "8%" }} />
       </colgroup>
-      <thead className="sticky top-0 z-10 bg-[#F5F5F5]">
+      <thead className="sticky top-0 z-10 bg-muted">
         <tr>
           <th className={`${headerCellClass} text-left`}>Tên cột dữ liệu</th>
           <th className={`${headerCellClass} text-left`}>Tên cột hiển thị</th>
@@ -89,7 +89,7 @@ export function ColumnConfigTable({
       <tbody>
         {rows.map((row) => {
           const key = row.kind === "group" ? `group:${row.label}` : `col:${row.id}`;
-          const rowBg = row.selected ? "bg-[#E4E7F4]" : "bg-white hover:bg-[#F5F6FA]";
+          const rowBg = row.selected ? "bg-primary/10" : "bg-background hover:bg-muted/30";
           const visible = row.kind === "group" ? row.visibility : row.visible ? "checked" : "unchecked";
           const pinned = row.kind === "group" ? row.pinned : row.pinned ? "checked" : "unchecked";
           return (
@@ -98,7 +98,7 @@ export function ColumnConfigTable({
               className={`cursor-pointer ${rowBg}`}
               onClick={() => onSelectRow(row)}
             >
-              <td className="border border-[#E0E0E0] px-3 py-2 text-[13px]">
+              <td className="border border-border px-3 py-2 text-[13px]">
                 <div
                   className="flex items-center gap-2"
                   style={{ paddingLeft: row.kind === "column" && row.indented ? 28 : 0 }}
@@ -107,7 +107,7 @@ export function ColumnConfigTable({
                     <button
                       type="button"
                       aria-label={row.expanded ? "Thu gọn" : "Mở rộng"}
-                      className="text-[#757575]"
+                      className="text-muted-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleExpand(row.label);
@@ -118,17 +118,17 @@ export function ColumnConfigTable({
                   ) : null}
                   <span
                     className={
-                      row.kind === "group" ? "font-bold text-[#1F2430]" : "text-[#3C4250]"
+                      row.kind === "group" ? "font-bold text-foreground" : "text-foreground/80"
                     }
                   >
                     {row.kind === "group" ? row.label : row.dataLabel}
                   </span>
                 </div>
               </td>
-              <td className="border border-[#E0E0E0] px-3 py-2 text-[13px] text-[#3C4250]">
+              <td className="border border-border px-3 py-2 text-[13px] text-foreground/80">
                 {row.kind === "column" ? row.displayLabel : ""}
               </td>
-              <td className="border border-[#E0E0E0] px-3 py-2">
+              <td className="border border-border px-3 py-2">
                 <div className="flex justify-center">
                   <ColumnConfigCheckbox
                     checked={visible === "checked"}
@@ -138,7 +138,7 @@ export function ColumnConfigTable({
                   />
                 </div>
               </td>
-              <td className="border border-[#E0E0E0] px-3 py-2">
+              <td className="border border-border px-3 py-2">
                 <div className="flex justify-center">
                   <ColumnConfigCheckbox
                     checked={pinned === "checked"}

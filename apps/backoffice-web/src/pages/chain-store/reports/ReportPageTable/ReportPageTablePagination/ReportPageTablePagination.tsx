@@ -1,3 +1,4 @@
+import { Button } from "@erp/ui";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,8 +13,7 @@ interface Props {
   total: number;
 }
 
-const iconButtonClass =
-  "flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-border bg-background text-muted-foreground disabled:opacity-45";
+const iconButtonClass = "h-8 w-8 shrink-0 rounded-sm p-0";
 
 export function ReportPageTablePagination({ total }: Props) {
   const pageIndex = useTableStore((s) => s.pagination.pageIndex);
@@ -28,61 +28,71 @@ export function ReportPageTablePagination({ total }: Props) {
   const to = Math.min(total, (pageIndex + 1) * pageSize);
 
   return (
-    <div className="flex h-8 items-center justify-between border-t border-border bg-background px-2 text-xs text-muted-foreground">
+    <div className="flex h-10 items-center justify-between border-t border-border bg-background px-2 text-xs text-muted-foreground">
       <div className="flex items-center gap-1">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           className={iconButtonClass}
           aria-label="Trang đầu"
           disabled={isFirst}
           onClick={() => setPageIndex(0)}
         >
-          <ChevronsLeft className="h-3 w-3" />
-        </button>
-        <button
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           className={iconButtonClass}
           aria-label="Trang trước"
           disabled={isFirst}
           onClick={() => setPageIndex(pageIndex - 1)}
         >
-          <ChevronLeft className="h-3 w-3" />
-        </button>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
         <span>Trang</span>
         <input
-          className="h-[22px] w-9 rounded-[2px] border border-border bg-background text-center text-foreground outline-none"
+          className="h-8 w-9 rounded-sm border border-input bg-background text-center text-foreground outline-none"
           value={currentPage}
           readOnly
         />
         <span>trên {pageCount}</span>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           className={iconButtonClass}
           aria-label="Trang sau"
           disabled={isLast}
           onClick={() => setPageIndex(pageIndex + 1)}
         >
-          <ChevronRight className="h-3 w-3" />
-        </button>
-        <button
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           className={iconButtonClass}
           aria-label="Trang cuối"
           disabled={isLast}
           onClick={() => setPageIndex(pageCount - 1)}
         >
-          <ChevronsRight className="h-3 w-3" />
-        </button>
-        <button
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+        <Button
           type="button"
-          className="flex h-[22px] w-[22px] items-center justify-center rounded-[2px] border border-border bg-background text-foreground"
+          variant="outline"
+          size="icon"
+          className={iconButtonClass}
           aria-label="Tải lại"
           onClick={() => setPageIndex(pageIndex)}
         >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </button>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
         <select
-          className="h-[22px] rounded-[2px] border border-border bg-background px-1 text-foreground outline-none"
+          className="h-8 rounded-sm border border-input bg-background px-1 text-foreground outline-none"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
         >

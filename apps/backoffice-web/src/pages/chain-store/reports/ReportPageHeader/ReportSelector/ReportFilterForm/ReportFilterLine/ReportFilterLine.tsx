@@ -260,9 +260,9 @@ export function ReportFilterLine({ line }: Props) {
 
   return (
     <div className="flex items-start gap-4 py-2">
-      <div className="w-[140px] shrink-0 pt-1.5 text-[13px] text-[#4A4A4A]">
+      <div className="w-[140px] shrink-0 pt-1.5 text-[13px] text-muted-foreground">
         {label}
-        {metadata?.isRequired ? <span className="text-[#E53935]"> *</span> : null}
+        {metadata?.isRequired ? <span className="text-destructive"> *</span> : null}
       </div>
       <div className="min-w-0 flex-1">{renderControl()}</div>
     </div>

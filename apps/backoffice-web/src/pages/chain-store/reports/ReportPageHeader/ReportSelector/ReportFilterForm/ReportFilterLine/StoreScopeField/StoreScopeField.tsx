@@ -15,14 +15,14 @@ const STORE_OPTIONS = reportStores.map((s) => ({
 export function StoreScopeField({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-6 text-[13px] text-[#333333]">
+      <div className="flex items-center gap-6 text-[13px] text-foreground">
         <label className="flex items-center gap-1.5">
           <input
             type="radio"
             name="store-scope"
             checked={value.scope === "all"}
             onChange={() => onChange({ scope: "all", storeIds: [] })}
-            className="accent-[#353B8C]"
+            className="accent-primary"
           />
           Tất cả
         </label>
@@ -32,7 +32,7 @@ export function StoreScopeField({ value, onChange }: Props) {
             name="store-scope"
             checked={value.scope === "group"}
             onChange={() => onChange({ ...value, scope: "group" })}
-            className="accent-[#353B8C]"
+            className="accent-primary"
           />
           Theo nhóm cửa hàng
         </label>

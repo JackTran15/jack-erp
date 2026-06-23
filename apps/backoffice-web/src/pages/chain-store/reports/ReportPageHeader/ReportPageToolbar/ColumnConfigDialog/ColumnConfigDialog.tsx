@@ -269,16 +269,16 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[90vh] max-w-[1100px] flex-col gap-0 p-0">
-        <DialogHeader className="border-b border-[#E0E0E0] bg-[#F2F2F2] px-6 py-4">
-          <DialogTitle className="text-[18px] font-bold text-[#1F2430]">Sửa mẫu</DialogTitle>
+        <DialogHeader className="border-b border-border bg-muted px-6 py-4">
+          <DialogTitle className="text-[18px] font-bold text-foreground">Sửa mẫu</DialogTitle>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-hidden px-4 py-3">
-          <div className="mb-3 text-[13px] font-medium tracking-wide text-[#3C4250]">
+          <div className="mb-3 text-[13px] font-medium tracking-wide text-muted-foreground">
             {REPORT_NAME}
           </div>
           <div className="flex items-start gap-4">
-            <div className="max-h-[60vh] min-h-0 flex-1 overflow-auto border border-[#E0E0E0]">
+            <div className="max-h-[60vh] min-h-0 flex-1 overflow-auto border border-border">
               <ColumnConfigTable
                 rows={rows}
                 headerVisibility={headerVisibility}
@@ -310,34 +310,26 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
           </div>
         </div>
 
-        <DialogFooter className="flex items-center border-t border-[#E0E0E0] px-6 py-3 sm:justify-between">
+        <DialogFooter className="flex items-center border-t border-border px-6 py-3 sm:justify-between">
           <button
             type="button"
-            className="flex items-center gap-1.5 text-[13px] font-medium text-[#2D3A8C]"
+            className="flex items-center gap-1.5 text-[13px] font-medium text-primary hover:underline"
           >
             <HelpCircle className="h-4 w-4" />
             Trợ giúp
           </button>
           <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={handleResetDefault}>
+            <Button type="button" variant="outline" size="sm" onClick={handleResetDefault}>
               Lấy mẫu ngầm định
             </Button>
-            <Button
-              type="button"
-              className="bg-[#2D3A8C] hover:bg-[#232E73]"
-              onClick={handleSave}
-            >
+            <Button type="button" size="sm" onClick={handleSave}>
               <Save className="mr-1.5 h-4 w-4" />
               Lưu
             </Button>
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-[13px] font-medium text-[#2D3A8C]"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" />
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              <X className="mr-1.5 h-4 w-4" />
               Hủy bỏ
-            </button>
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
