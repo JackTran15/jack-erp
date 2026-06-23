@@ -30,6 +30,7 @@ import type { ComponentType } from "react";
 import { hasPermission } from "../../lib/permissions";
 import { REPORT_CATEGORY_METADATA } from "../../constants/reports/report-category.constant";
 import { STORE_TYPE } from "../../constants/store.constant";
+import { INVENTORY_NAV_ITEMS } from "../document/inventoryNavigation";
 
 export interface NavChild {
   to: string;
@@ -134,20 +135,13 @@ export const navConfig: NavModule[] = [
     sections: [
       {
         id: "inventory-main",
-        children: [
-          { to: "/inventory/purchase-orders", label: "Nhập kho" },
-          {
-            to: "/inventory/transfer-in",
-            label: "Điều chuyển từ cửa hàng khác",
-            badgeKey: "importable-transfer-orders",
-          },
-          { to: "/inventory/goods-issues", label: "Xuất kho" },
-          { to: "/inventory/stock-transfers", label: "Chuyển kho" },
-          { to: "/inventory/transfer-orders", label: "Lệnh điều chuyển" },
-          { to: "/inventory/stock-takes", label: "Kiểm kê kho" },
-          { to: "/inventory/item-locations", label: "Vị trí hàng hóa" },
-          { to: "/inventory/item-location-details", label: "Chi tiết vị trí" },
-        ],
+        children: INVENTORY_NAV_ITEMS.map((item) => ({
+          to: item.href,
+          label: item.label,
+          ...(item.id === "transfer-in"
+            ? { badgeKey: "importable-transfer-orders" as const }
+            : {}),
+        })),
       },
     ],
   },

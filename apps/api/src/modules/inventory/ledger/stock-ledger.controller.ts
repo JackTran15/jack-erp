@@ -206,6 +206,7 @@ export class StockLedgerController {
 
   @Get('balances')
   @RequirePermission('inventory.read')
+  @RequireBranchScope()
   listBalances(
     @Query() query: BalanceQueryDto,
     @Actor() actor: ActorContext,
@@ -213,6 +214,8 @@ export class StockLedgerController {
     return this.service.getBalances({
       ...query,
       organizationId: actor.organizationId,
+      // Actor.branchId is resolved from the validated X-Branch-Id/JWT authentication context.
+      branchId: actor.branchId,
     });
   }
 

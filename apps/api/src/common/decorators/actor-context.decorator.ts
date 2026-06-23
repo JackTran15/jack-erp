@@ -15,20 +15,22 @@ export const Actor = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): ActorContext => {
     const request = ctx.switchToHttp().getRequest<Request>();
     const user = (request as any).user;
-    const fromJwt = user?.branchId as string | undefined;
     const allowed: string[] = Array.isArray(user?.branchIds)
       ? user.branchIds
       : [];
     const headerBranch = parseHeaderBranchId(request);
     const fromHeader =
       headerBranch && allowed.includes(headerBranch) ? headerBranch : undefined;
+    const fromJwt = user?.branchId as string | undefined;
     const fromJwtList = allowed[0] ?? undefined;
 
     return {
       userId: user?.userId ?? 'system',
       organizationId: user?.organizationId ?? 'default',
-      // Prefer active branch from JWT, then validated X-Branch-Id header, else first assigned branch
-      branchId: fromJwt ?? fromHeader ?? fromJwtList,
+      // X-Branch-Id is the explicit branch selected for this request. It is
+      // trusted only after checking the branch is assigned to the user. JWT is
+      // a fallback for clients that do not send the header.
+      branchId: fromHeader ?? fromJwt ?? fromJwtList,
       roles: user?.roles ?? [],
     };
   },

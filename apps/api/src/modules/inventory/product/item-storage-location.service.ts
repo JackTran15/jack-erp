@@ -174,4 +174,22 @@ export class ItemStorageLocationService {
     });
     return this.islRepo.save(mapping);
   }
+
+  /**
+   * Remove the preferred-shelf mapping only when it still points at the shelf
+   * being cleared. A mapping changed by another flow must not be deleted.
+   */
+  async clearLocation(
+    itemId: string,
+    storageId: string,
+    locationId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    await this.islRepo.delete({
+      itemId,
+      storageId,
+      locationId,
+      organizationId: actor.organizationId,
+    });
+  }
 }

@@ -75,6 +75,15 @@ function makeQuery(
   dto.sortBy = overrides.sortBy ?? 'name';
   dto.sortOrder = overrides.sortOrder ?? 'asc';
   dto.search = overrides.search;
+  dto.itemCode = overrides.itemCode;
+  dto.itemCodeMode = overrides.itemCodeMode ?? 'contains';
+  dto.itemName = overrides.itemName;
+  dto.itemNameMode = overrides.itemNameMode ?? 'contains';
+  dto.unit = overrides.unit;
+  dto.unitMode = overrides.unitMode ?? 'contains';
+  dto.categoryName = overrides.categoryName;
+  dto.categoryNameMode = overrides.categoryNameMode ?? 'contains';
+  dto.quantityMax = overrides.quantityMax;
   dto.barcode = overrides.barcode;
   dto.categoryId = overrides.categoryId;
   dto.providerId = overrides.providerId;
@@ -121,7 +130,7 @@ describe('InventoryLocationStockService', () => {
     }>;
   }): void {
     const locResult =
-      opts.location === null ? null : opts.location ?? locationEntity;
+      opts.location === null ? null : (opts.location ?? locationEntity);
     const rows = opts.rows ?? [];
     const total = opts.total ?? rows.length;
 
@@ -136,7 +145,9 @@ describe('InventoryLocationStockService', () => {
   beforeEach(async () => {
     stockBalanceRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     locationRepo = { findOne: jest.fn().mockResolvedValue(null) };
     thresholdRepo = { find: jest.fn().mockResolvedValue([]) };
@@ -145,8 +156,10 @@ describe('InventoryLocationStockService', () => {
     itemRepo = { findOne: jest.fn().mockResolvedValue(null) };
     pslService = {
       listByItem: jest.fn().mockResolvedValue([]),
+      setLocation: jest.fn().mockResolvedValue(undefined),
       setLocationByItem: jest.fn().mockResolvedValue(undefined),
       validateAndAssignByLocation: jest.fn().mockResolvedValue(undefined),
+      clearLocation: jest.fn().mockResolvedValue(undefined),
     };
     locationService = {
       ensureUnassignedLocation: jest.fn().mockResolvedValue({
@@ -216,6 +229,72 @@ describe('InventoryLocationStockService', () => {
     service = module.get(InventoryLocationStockService);
   });
 
+  describe('removeItemFromLocation', () => {
+    it('removes a zero-balance item and clears its preferred shelf', async () => {
+      setup({});
+      stockBalanceRepo.findOne.mockResolvedValue({
+        id: 'balance-1',
+        quantity: '0',
+      });
+
+      await service.removeItemFromLocation('loc-1', 'item-1', actor);
+
+      expect(
+        stockTransferService.postIntraWarehouseMoves,
+      ).not.toHaveBeenCalled();
+      expect(stockBalanceRepo.delete).toHaveBeenCalledWith('balance-1');
+      expect(pslService.clearLocation).toHaveBeenCalledWith(
+        'item-1',
+        'stor-1',
+        'loc-1',
+        actor,
+      );
+    });
+
+    it('moves positive stock to Chưa xếp before removing the shelf row', async () => {
+      setup({});
+      stockBalanceRepo.findOne.mockResolvedValue({
+        id: 'balance-1',
+        quantity: '8',
+      });
+
+      await service.removeItemFromLocation('loc-1', 'item-1', actor);
+
+      expect(locationService.ensureUnassignedLocation).toHaveBeenCalledWith(
+        'stor-1',
+        actor,
+      );
+      expect(stockTransferService.postIntraWarehouseMoves).toHaveBeenCalledWith(
+        [
+          {
+            itemId: 'item-1',
+            quantity: 8,
+            sourceLocationId: 'loc-1',
+            destinationLocationId: 'loc-unassigned',
+          },
+        ],
+        actor,
+      );
+      expect(stockBalanceRepo.delete).toHaveBeenCalledWith('balance-1');
+      expect(pslService.clearLocation).toHaveBeenCalled();
+    });
+
+    it('rejects negative stock without deleting anything', async () => {
+      setup({});
+      stockBalanceRepo.findOne.mockResolvedValue({
+        id: 'balance-1',
+        quantity: '-2',
+      });
+
+      await expect(
+        service.removeItemFromLocation('loc-1', 'item-1', actor),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(stockBalanceRepo.delete).not.toHaveBeenCalled();
+      expect(pslService.clearLocation).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resolveLocation', () => {
     it('throws NotFoundException when location not found in org', async () => {
       setup({ location: null });
@@ -228,7 +307,7 @@ describe('InventoryLocationStockService', () => {
       });
     });
 
-    it('throws ForbiddenException when location.branch ≠ actor.branch', async () => {
+    it('throws ForbiddenException when location storage belongs to another branch', async () => {
       setup({
         location: {
           ...locationEntity,
@@ -239,6 +318,28 @@ describe('InventoryLocationStockService', () => {
       await expect(
         service.getStockByLocation('loc-1', makeQuery(), actor),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('uses the parent storage branch when legacy location.branchId is stale', async () => {
+      setup({
+        location: {
+          ...locationEntity,
+          branchId: 'branch-STALE',
+          storage: { ...locationEntity.storage, branchId: 'branch-1' },
+        },
+        rows: [],
+      });
+
+      await expect(
+        service.getStockByLocation('loc-1', makeQuery(), actor),
+      ).resolves.toMatchObject({
+        meta: {
+          location: {
+            id: 'loc-1',
+            branch: { id: 'branch-1' },
+          },
+        },
+      });
     });
 
     it('returns meta.location populated from join', async () => {
@@ -456,6 +557,55 @@ describe('InventoryLocationStockService', () => {
       const w = whereArg();
       expect(w.organizationId).toBe('org-1');
       expect(w.locationId).toBe('loc-1');
+    });
+
+    it('maps per-column item filters and maximum quantity', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({
+          itemCode: 'SKU',
+          itemName: 'Giày',
+          unit: 'Đôi',
+          categoryName: 'Giày nữ',
+          quantityMax: 12,
+        }),
+        actor,
+      );
+      const w = whereArg();
+      expect(w.item.code).toBeInstanceOf(FindOperator);
+      expect(w.item.name).toBeInstanceOf(FindOperator);
+      expect(w.item.unit).toBeInstanceOf(FindOperator);
+      expect(w.item.category.name).toBeInstanceOf(FindOperator);
+      expect(w.quantity).toBeInstanceOf(FindOperator);
+      expect(w.quantity.type).toBe('lessThanOrEqual');
+      expect(w.quantity.value).toBe(12);
+    });
+
+    it('maps dynamic text filter modes', async () => {
+      setup({ rows: [] });
+      await service.getStockByLocation(
+        'loc-1',
+        makeQuery({
+          itemCode: 'SKU-001',
+          itemCodeMode: 'equals',
+          itemName: 'Giày',
+          itemNameMode: 'startsWith',
+          unit: 'đôi',
+          unitMode: 'endsWith',
+          categoryName: 'Dép',
+          categoryNameMode: 'notContains',
+        }),
+        actor,
+      );
+
+      const w = whereArg();
+      expect(w.item.code.type).toBe('ilike');
+      expect(w.item.code.value).toBe('SKU-001');
+      expect(w.item.name.value).toBe('Giày%');
+      expect(w.item.unit.value).toBe('%đôi');
+      expect(w.item.category.name.type).toBe('not');
+      expect(w.item.category.name.value).toBe('%Dép%');
     });
 
     it('main findAndCount only loads many-to-one relations (item.category)', async () => {
@@ -876,6 +1026,13 @@ describe('InventoryLocationStockService', () => {
 
   describe('arrange', () => {
     it('moves only the requested quantity from the unassigned location', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-dest',
+        storageId: 'storage-1',
+        isUnassigned: false,
+        storage: { id: 'storage-1', branchId: 'branch-1' },
+      });
+
       await service.arrange(
         {
           lines: [
@@ -901,6 +1058,94 @@ describe('InventoryLocationStockService', () => {
         ],
         actor,
       );
+      expect(managerInsert).toHaveBeenCalledWith(
+        StockBalanceEntity,
+        expect.objectContaining({
+          branchId: 'branch-1',
+          itemId: 'item-1',
+          locationId: 'loc-dest',
+          quantity: 0,
+        }),
+      );
+      expect(pslService.setLocation).toHaveBeenCalledWith(
+        'item-1',
+        'storage-1',
+        'loc-dest',
+        actor,
+      );
+    });
+
+    it('moves all unassigned stock when quantity is omitted', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-dest',
+        storageId: 'storage-1',
+        isUnassigned: false,
+        storage: { id: 'storage-1', branchId: 'branch-1' },
+      });
+      stockBalanceRepo.findOne.mockResolvedValue({
+        itemId: 'item-1',
+        locationId: 'loc-unassigned',
+        quantity: '7',
+      });
+      managerFindOne.mockResolvedValue({
+        itemId: 'item-1',
+        locationId: 'loc-dest',
+        quantity: '7',
+      });
+
+      await service.arrange(
+        {
+          lines: [
+            {
+              itemId: 'item-1',
+              storageId: 'storage-1',
+              destinationLocationId: 'loc-dest',
+            },
+          ],
+        },
+        actor,
+      );
+
+      expect(stockTransferService.postIntraWarehouseMoves).toHaveBeenCalledWith(
+        [
+          {
+            itemId: 'item-1',
+            quantity: 7,
+            sourceLocationId: 'loc-unassigned',
+            destinationLocationId: 'loc-dest',
+          },
+        ],
+        actor,
+      );
+      expect(managerInsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a destination whose storage belongs to another branch', async () => {
+      locationRepo.findOne.mockResolvedValue({
+        id: 'loc-dest',
+        storageId: 'storage-1',
+        isUnassigned: false,
+        storage: { id: 'storage-1', branchId: 'branch-2' },
+      });
+
+      await expect(
+        service.arrange(
+          {
+            lines: [
+              {
+                itemId: 'item-1',
+                storageId: 'storage-1',
+                destinationLocationId: 'loc-dest',
+              },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(
+        stockTransferService.postIntraWarehouseMoves,
+      ).not.toHaveBeenCalled();
     });
   });
 });

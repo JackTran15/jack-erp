@@ -348,7 +348,11 @@ export class StockLedgerService {
       });
 
     if (query.branchId) {
-      qb.andWhere('sb.branch_id = :branchId', { branchId: query.branchId });
+      // The physical storage is the authoritative branch owner. Historical
+      // stock_balances.branch_id values may be stale after imports/migrations.
+      qb.andWhere('storage.branch_id = :branchId', {
+        branchId: query.branchId,
+      });
     }
     if (query.itemId) {
       qb.andWhere('sb.item_id = :itemId', { itemId: query.itemId });
@@ -433,7 +437,7 @@ export class StockLedgerService {
     qb.select([
       'sb.id AS id',
       'sb.organization_id AS "organizationId"',
-      'sb.branch_id AS "branchId"',
+      'storage.branch_id AS "branchId"',
       'sb.item_id AS "itemId"',
       'sb.location_id AS "locationId"',
       'sb.quantity AS quantity',

@@ -51,6 +51,8 @@ interface Props {
   initialSelectedIds?: Set<string>;
   /** Show editable quantity + unit price columns and the "Nhập nhanh" action. */
   showQuantityPrice?: boolean;
+  /** Resolve collapsed full-product selections into rich item lines on confirm. */
+  resolveSelectedLines?: boolean;
   defaultUnitPriceSource?: UnitPriceSource;
   defaultQuantity?: number;
   onConfirm: (result: ProductSelectResult) => void;
@@ -107,6 +109,7 @@ export function ProductSelectDialog({
   categoryFilter = true,
   initialSelectedIds,
   showQuantityPrice = false,
+  resolveSelectedLines = false,
   defaultUnitPriceSource = "none",
   defaultQuantity = 1,
   onConfirm,
@@ -119,11 +122,13 @@ export function ProductSelectDialog({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   // product IDs whose all variants are selected (may not yet be loaded)
   const [autoSelectIds, setAutoSelectIds] = useState<Set<string>>(new Set());
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
-    () => initialSelectedIds ? new Set(initialSelectedIds) : new Set(),
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() =>
+    initialSelectedIds ? new Set(initialSelectedIds) : new Set(),
   );
   // Per-item quantity/price overrides + a "Nhập nhanh" bulk value applied to all
-  const [lineValues, setLineValues] = useState<Map<string, LineValue>>(new Map());
+  const [lineValues, setLineValues] = useState<Map<string, LineValue>>(
+    new Map(),
+  );
   const [bulkValue, setBulkValue] = useState<LineValue | null>(null);
   const [quickEntryOpen, setQuickEntryOpen] = useState(false);
   // Product id whose per-group "Nhập nhanh" dialog is open, or null.
@@ -140,7 +145,10 @@ export function ProductSelectDialog({
     { page: 1, pageSize: 100, sortBy: "name", sortOrder: "asc" },
     categoryFilter,
   );
-  const categories = (categoriesQuery.data?.data ?? []) as Record<string, unknown>[];
+  const categories = (categoriesQuery.data?.data ?? []) as Record<
+    string,
+    unknown
+  >[];
 
   const groupsQuery = useProductGroups({
     page,
@@ -154,13 +162,16 @@ export function ProductSelectDialog({
 
   // Cache orphan item data as rows render
   rows.forEach((row) => {
-    if (row.type === "orphan") itemDataById.current.set(row.id, orphanToSelected(row));
+    if (row.type === "orphan")
+      itemDataById.current.set(row.id, orphanToSelected(row));
   });
 
   const defaultUnitPrice = useCallback(
     (data: SelectedProduct): number => {
-      if (defaultUnitPriceSource === "purchasePrice") return data.purchasePrice ?? 0;
-      if (defaultUnitPriceSource === "sellingPrice") return data.sellingPrice ?? 0;
+      if (defaultUnitPriceSource === "purchasePrice")
+        return data.purchasePrice ?? 0;
+      if (defaultUnitPriceSource === "sellingPrice")
+        return data.sellingPrice ?? 0;
       return 0;
     },
     [defaultUnitPriceSource],
@@ -174,7 +185,9 @@ export function ProductSelectDialog({
 
   const getPrice = useCallback(
     (id: string, data: SelectedProduct): number =>
-      lineValues.get(id)?.unitPrice ?? bulkValue?.unitPrice ?? defaultUnitPrice(data),
+      lineValues.get(id)?.unitPrice ??
+      bulkValue?.unitPrice ??
+      defaultUnitPrice(data),
     [lineValues, bulkValue, defaultUnitPrice],
   );
 
@@ -276,12 +289,17 @@ export function ProductSelectDialog({
   // Derive product checkbox state from cache
   const getProductCheckState = useCallback(
     (row: ProductGroupRow): { checked: boolean; indeterminate: boolean } => {
-      if (autoSelectIds.has(row.id)) return { checked: true, indeterminate: false };
+      if (autoSelectIds.has(row.id))
+        return { checked: true, indeterminate: false };
       const cached = variantCache.current.get(row.id);
-      if (!cached || cached.length === 0) return { checked: false, indeterminate: false };
-      const selectedCount = cached.filter((v) => selectedItemIds.has(v.id)).length;
+      if (!cached || cached.length === 0)
+        return { checked: false, indeterminate: false };
+      const selectedCount = cached.filter((v) =>
+        selectedItemIds.has(v.id),
+      ).length;
       if (selectedCount === 0) return { checked: false, indeterminate: false };
-      if (selectedCount === cached.length) return { checked: true, indeterminate: false };
+      if (selectedCount === cached.length)
+        return { checked: true, indeterminate: false };
       return { checked: false, indeterminate: true };
     },
     [selectedItemIds, autoSelectIds],
@@ -359,7 +377,10 @@ export function ProductSelectDialog({
   const selectedProductCount = useMemo(() => {
     const productIds = new Set<string>(autoSelectIds);
     variantCache.current.forEach((variants, productId) => {
-      if (!autoSelectIds.has(productId) && variants.some((v) => selectedItemIds.has(v.id))) {
+      if (
+        !autoSelectIds.has(productId) &&
+        variants.some((v) => selectedItemIds.has(v.id))
+      ) {
         productIds.add(productId);
       }
     });
@@ -375,7 +396,11 @@ export function ProductSelectDialog({
   // Per-group "Nhập nhanh" — set quantity + price only for the SELECTED variants
   // of one product group (others untouched). Resolves an auto-selected (collapsed)
   // group's variants first so its items can be addressed by id.
-  async function applyGroupQuickEntry(productId: string, quantity: number, unitPrice: number) {
+  async function applyGroupQuickEntry(
+    productId: string,
+    quantity: number,
+    unitPrice: number,
+  ) {
     let variants = variantCache.current.get(productId) ?? [];
     if (autoSelectIds.has(productId) && variants.length === 0) {
       variants = await ensureAllVariants(productId);
@@ -392,12 +417,22 @@ export function ProductSelectDialog({
   }
 
   // Fetch all variant pages of a product (used to resolve auto-selected products on confirm)
-  async function ensureAllVariants(productId: string): Promise<ProductVariantRow[]> {
-    const first = await fetchProductVariants({ productId, page: 1, pageSize: VARIANT_PAGE_SIZE });
+  async function ensureAllVariants(
+    productId: string,
+  ): Promise<ProductVariantRow[]> {
+    const first = await fetchProductVariants({
+      productId,
+      page: 1,
+      pageSize: VARIANT_PAGE_SIZE,
+    });
     let all = [...first.data];
     let p = 2;
     while (all.length < first.total) {
-      const next = await fetchProductVariants({ productId, page: p, pageSize: VARIANT_PAGE_SIZE });
+      const next = await fetchProductVariants({
+        productId,
+        page: p,
+        pageSize: VARIANT_PAGE_SIZE,
+      });
       if (next.data.length === 0) break;
       all = all.concat(next.data);
       p += 1;
@@ -411,15 +446,19 @@ export function ProductSelectDialog({
     const fullySelectedProductIds = [...autoSelectIds];
     const cachedProductItemIds = new Set<string>();
     for (const productId of autoSelectIds) {
-      variantCache.current.get(productId)?.forEach((v) => cachedProductItemIds.add(v.id));
+      variantCache.current
+        .get(productId)
+        ?.forEach((v) => cachedProductItemIds.add(v.id));
     }
-    const standaloneItemIds = [...selectedItemIds].filter((id) => !cachedProductItemIds.has(id));
+    const standaloneItemIds = [...selectedItemIds].filter(
+      (id) => !cachedProductItemIds.has(id),
+    );
     const allSelectedItemIds = [...selectedItemIds];
 
     // Resolve every selected item to full line data. Only the line-picker mode needs
     // auto-selected (unexpanded) products expanded into their variants.
     const lineItemIds = new Set<string>(selectedItemIds);
-    if (showQuantityPrice && autoSelectIds.size > 0) {
+    if ((showQuantityPrice || resolveSelectedLines) && autoSelectIds.size > 0) {
       setResolving(true);
       try {
         for (const productId of autoSelectIds) {
@@ -435,191 +474,252 @@ export function ProductSelectDialog({
     for (const id of lineItemIds) {
       const data = itemDataById.current.get(id);
       if (!data) continue;
-      lines.push({ ...data, quantity: getQty(id), unitPrice: getPrice(id, data) });
+      lines.push({
+        ...data,
+        quantity: getQty(id),
+        unitPrice: getPrice(id, data),
+      });
     }
 
     onOpenChange(false);
-    onConfirm({ lines, fullySelectedProductIds, standaloneItemIds, allSelectedItemIds });
+    onConfirm({
+      lines,
+      fullySelectedProductIds,
+      standaloneItemIds,
+      allSelectedItemIds,
+    });
   }
 
   const colCount = showQuantityPrice ? 11 : 9;
 
   return (
     <>
-    <AppModal
-      open={open}
-      onOpenChange={onOpenChange}
-      preventOutsideClose
-      title={title}
-      description={null}
-      defaultWidth={showQuantityPrice ? 1100 : 960}
-      defaultHeight={660}
-      minWidth={640}
-      minHeight={420}
-      bodyClassName="overflow-hidden flex flex-col gap-3"
-      showFooter
-      footer={
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Đã chọn{" "}
-            <span className="font-semibold text-foreground">{selectedProductCount}</span>{" "}
-            mẫu mã (
-            <span className="font-semibold text-foreground">{totalSelectedCount}</span>{" "}
-            hàng hóa).
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={resolving}>
-              Hủy bỏ
-            </Button>
-            <Button
-              disabled={totalSelectedCount === 0 || resolving}
-              onClick={handleConfirm}
-            >
-              {resolving ? "Đang xử lý…" : `${confirmLabel} (${totalSelectedCount})`}
-            </Button>
+      <AppModal
+        open={open}
+        onOpenChange={onOpenChange}
+        preventOutsideClose
+        title={title}
+        description={null}
+        defaultWidth={showQuantityPrice ? 1100 : 960}
+        defaultHeight={660}
+        minWidth={640}
+        minHeight={420}
+        bodyClassName="overflow-hidden flex flex-col gap-3"
+        showFooter
+        footer={
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Đã chọn{" "}
+              <span className="font-semibold text-foreground">
+                {selectedProductCount}
+              </span>{" "}
+              mẫu mã (
+              <span className="font-semibold text-foreground">
+                {totalSelectedCount}
+              </span>{" "}
+              hàng hóa).
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={resolving}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                disabled={totalSelectedCount === 0 || resolving}
+                onClick={handleConfirm}
+              >
+                {resolving
+                  ? "Đang xử lý…"
+                  : `${confirmLabel} (${totalSelectedCount})`}
+              </Button>
+            </div>
           </div>
-        </div>
-      }
-    >
-      {/* Filters */}
-      <div className="flex shrink-0 items-center gap-2">
-        {categoryFilter && (
-          <select
-            className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm"
-            value={categoryId}
-            onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
-            aria-label="Lọc theo nhóm hàng hóa"
-          >
-            <option value="">— Tất cả nhóm —</option>
-            {categories.map((c) => (
-              <option key={String(c.id)} value={String(c.id)}>
-                {String(c.name)}
-              </option>
-            ))}
-          </select>
-        )}
-        <Input
-          type="search"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") commitSearch(); }}
-          placeholder="Nhập mã SKU, tên hàng hóa"
-          className="h-9 flex-1"
-        />
-        <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={commitSearch}>
-          <Search className="h-4 w-4" aria-hidden />
-          Tìm kiếm
-        </Button>
-        {showQuantityPrice && (
+        }
+      >
+        {/* Filters */}
+        <div className="flex shrink-0 items-center gap-2">
+          {categoryFilter && (
+            <select
+              className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm"
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                setPage(1);
+              }}
+              aria-label="Lọc theo nhóm hàng hóa"
+            >
+              <option value="">— Tất cả nhóm —</option>
+              {categories.map((c) => (
+                <option key={String(c.id)} value={String(c.id)}>
+                  {String(c.name)}
+                </option>
+              ))}
+            </select>
+          )}
+          <Input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitSearch();
+            }}
+            placeholder="Nhập mã SKU, tên hàng hóa"
+            className="h-9 flex-1"
+          />
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="h-9 shrink-0 gap-1.5"
-            disabled={totalSelectedCount === 0}
-            onClick={() => setQuickEntryOpen(true)}
+            onClick={commitSearch}
           >
-            <Zap className="h-4 w-4" aria-hidden />
-            Nhập nhanh
+            <Search className="h-4 w-4" aria-hidden />
+            Tìm kiếm
           </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground [&_th]:bg-muted">
-              <tr>
-                <th className="w-8 px-2 py-2" />
-                <th className="w-8 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    aria-label="Chọn tất cả trên trang"
-                    checked={allPageChecked}
-                    ref={(el) => { if (el) el.indeterminate = somePageChecked; }}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
-                </th>
-                <th className="px-3 py-2 text-left font-medium">Mã SKU</th>
-                <th className="px-3 py-2 text-left font-medium">Tên hàng hóa</th>
-                <th className="px-3 py-2 text-left font-medium">Nhóm hàng hóa</th>
-                <th className="px-3 py-2 text-left font-medium">Đơn vị tính</th>
-                <th className="px-3 py-2 text-left font-medium">Thương hiệu</th>
-                <th className="px-3 py-2 text-right font-medium">Giá mua TB</th>
-                <th className="px-3 py-2 text-right font-medium">Giá bán TB</th>
-                {showQuantityPrice && (
-                  <>
-                    <th className="px-3 py-2 text-right font-medium">Số lượng</th>
-                    <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {groupsQuery.isLoading ? (
-                <tr>
-                  <td colSpan={colCount} className="py-8 text-center text-sm text-muted-foreground">Đang tải…</td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={colCount} className="py-8 text-center text-sm text-muted-foreground">Không có hàng hóa phù hợp.</td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <ProductOrOrphanRow
-                    key={row.id}
-                    row={row}
-                    expanded={expandedIds.has(row.id)}
-                    autoSelect={autoSelectIds.has(row.id)}
-                    selectedItemIds={selectedItemIds}
-                    getProductCheckState={getProductCheckState}
-                    onToggleExpand={toggleExpand}
-                    onProductCheckChange={handleProductCheckChange}
-                    onToggleItem={toggleItem}
-                    onVariantsAutoLoaded={onVariantsAutoLoaded}
-                    variantCache={variantCache}
-                    itemDataById={itemDataById}
-                    showQuantityPrice={showQuantityPrice}
-                    getQty={getQty}
-                    getPrice={getPrice}
-                    setQty={setQty}
-                    setPrice={setPrice}
-                    onGroupQuickEntry={setQuickEntryGroup}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+          {showQuantityPrice && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 gap-1.5"
+              disabled={totalSelectedCount === 0}
+              onClick={() => setQuickEntryOpen(true)}
+            >
+              <Zap className="h-4 w-4" aria-hidden />
+              Nhập nhanh
+            </Button>
+          )}
         </div>
-        <PaginationControls
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-          pageSizeOptions={PAGE_SIZE_OPTIONS}
+
+        {/* Table */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
+          <div className="min-h-0 flex-1 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground [&_th]:bg-muted">
+                <tr>
+                  <th className="w-8 px-2 py-2" />
+                  <th className="w-8 px-2 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Chọn tất cả trên trang"
+                      checked={allPageChecked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageChecked;
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">Mã SKU</th>
+                  <th className="px-3 py-2 text-left font-medium">
+                    Tên hàng hóa
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">
+                    Nhóm hàng hóa
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">
+                    Đơn vị tính
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">
+                    Thương hiệu
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    Giá mua TB
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    Giá bán TB
+                  </th>
+                  {showQuantityPrice && (
+                    <>
+                      <th className="px-3 py-2 text-right font-medium">
+                        Số lượng
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        Đơn giá
+                      </th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {groupsQuery.isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={colCount}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      Đang tải…
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={colCount}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      Không có hàng hóa phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => (
+                    <ProductOrOrphanRow
+                      key={row.id}
+                      row={row}
+                      expanded={expandedIds.has(row.id)}
+                      autoSelect={autoSelectIds.has(row.id)}
+                      selectedItemIds={selectedItemIds}
+                      getProductCheckState={getProductCheckState}
+                      onToggleExpand={toggleExpand}
+                      onProductCheckChange={handleProductCheckChange}
+                      onToggleItem={toggleItem}
+                      onVariantsAutoLoaded={onVariantsAutoLoaded}
+                      variantCache={variantCache}
+                      itemDataById={itemDataById}
+                      showQuantityPrice={showQuantityPrice}
+                      getQty={getQty}
+                      getPrice={getPrice}
+                      setQty={setQty}
+                      setPrice={setPrice}
+                      onGroupQuickEntry={setQuickEntryGroup}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+          />
+        </div>
+      </AppModal>
+      {quickEntryOpen && (
+        <QuickEntryDialog
+          open
+          onOpenChange={setQuickEntryOpen}
+          onApply={applyQuickEntry}
         />
-      </div>
-    </AppModal>
-    {quickEntryOpen && (
-      <QuickEntryDialog
-        open
-        onOpenChange={setQuickEntryOpen}
-        onApply={applyQuickEntry}
-      />
-    )}
-    {quickEntryGroup && (
-      <QuickEntryDialog
-        open
-        title="Nhập nhanh cho hàng đã chọn trong nhóm"
-        onOpenChange={() => setQuickEntryGroup(null)}
-        onApply={(q, p) => {
-          void applyGroupQuickEntry(quickEntryGroup, q, p);
-          setQuickEntryGroup(null);
-        }}
-      />
-    )}
+      )}
+      {quickEntryGroup && (
+        <QuickEntryDialog
+          open
+          title="Nhập nhanh cho hàng đã chọn trong nhóm"
+          onOpenChange={() => setQuickEntryGroup(null)}
+          onApply={(q, p) => {
+            void applyGroupQuickEntry(quickEntryGroup, q, p);
+            setQuickEntryGroup(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -640,10 +740,16 @@ interface ProductOrOrphanRowProps extends RowSharedProps {
   row: ProductGroupRow;
   expanded: boolean;
   autoSelect: boolean;
-  getProductCheckState: (row: ProductGroupRow) => { checked: boolean; indeterminate: boolean };
+  getProductCheckState: (row: ProductGroupRow) => {
+    checked: boolean;
+    indeterminate: boolean;
+  };
   onToggleExpand: (id: string) => void;
   onProductCheckChange: (row: ProductGroupRow, checked: boolean) => void;
-  onVariantsAutoLoaded: (productId: string, variants: ProductVariantRow[]) => void;
+  onVariantsAutoLoaded: (
+    productId: string,
+    variants: ProductVariantRow[],
+  ) => void;
   /** Open the per-group "Nhập nhanh" dialog for this product id. */
   onGroupQuickEntry: (productId: string) => void;
   variantCache: { current: Map<string, ProductVariantRow[]> };
@@ -719,7 +825,9 @@ function ProductOrOrphanRow({
   if (row.type === "orphan") {
     return (
       <tr className="hover:bg-muted/40">
-        <td className="w-8 px-2 py-2 text-muted-foreground/40 text-center select-none">—</td>
+        <td className="w-8 px-2 py-2 text-muted-foreground/40 text-center select-none">
+          —
+        </td>
         <td className="w-8 px-2 py-2">
           <input
             type="checkbox"
@@ -730,11 +838,17 @@ function ProductOrOrphanRow({
         </td>
         <td className="px-3 py-2 font-mono text-xs">{row.code}</td>
         <td className="px-3 py-2">{row.name}</td>
-        <td className="px-3 py-2 text-muted-foreground">{row.categoryName ?? "—"}</td>
+        <td className="px-3 py-2 text-muted-foreground">
+          {row.categoryName ?? "—"}
+        </td>
         <td className="px-3 py-2 text-muted-foreground">{row.unit}</td>
         <td className="px-3 py-2 text-muted-foreground">{row.brand ?? "—"}</td>
-        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.purchasePrice)}</td>
-        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.sellingPrice)}</td>
+        <td className="px-3 py-2 text-right tabular-nums">
+          {formatMoney(row.purchasePrice)}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums">
+          {formatMoney(row.sellingPrice)}
+        </td>
         {showQuantityPrice && (
           <QtyPriceCells
             id={row.id}
@@ -762,7 +876,11 @@ function ProductOrOrphanRow({
             onClick={() => onToggleExpand(row.id)}
             aria-label={expanded ? "Thu gọn" : "Mở rộng"}
           >
-            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
           </button>
         </td>
         <td className="w-8 px-2 py-2">
@@ -770,7 +888,9 @@ function ProductOrOrphanRow({
             type="checkbox"
             aria-label={`Chọn tất cả ${row.name}`}
             checked={checked}
-            ref={(el) => { if (el) el.indeterminate = indeterminate; }}
+            ref={(el) => {
+              if (el) el.indeterminate = indeterminate;
+            }}
             onChange={(e) => onProductCheckChange(row, e.target.checked)}
           />
         </td>
@@ -783,11 +903,21 @@ function ProductOrOrphanRow({
             </span>
           )}
         </td>
-        <td className="px-3 py-2 text-muted-foreground font-normal">{row.categoryName ?? "—"}</td>
-        <td className="px-3 py-2 text-muted-foreground font-normal">{row.unit}</td>
-        <td className="px-3 py-2 text-muted-foreground font-normal">{row.brand ?? "—"}</td>
-        <td className="px-3 py-2 text-right tabular-nums font-normal">{formatMoney(row.purchasePrice)}</td>
-        <td className="px-3 py-2 text-right tabular-nums font-normal">{formatMoney(row.sellingPrice)}</td>
+        <td className="px-3 py-2 text-muted-foreground font-normal">
+          {row.categoryName ?? "—"}
+        </td>
+        <td className="px-3 py-2 text-muted-foreground font-normal">
+          {row.unit}
+        </td>
+        <td className="px-3 py-2 text-muted-foreground font-normal">
+          {row.brand ?? "—"}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums font-normal">
+          {formatMoney(row.purchasePrice)}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums font-normal">
+          {formatMoney(row.sellingPrice)}
+        </td>
         {showQuantityPrice && (
           <td colSpan={2} className="px-3 py-2 text-right">
             <button
@@ -827,7 +957,10 @@ function ProductOrOrphanRow({
 interface VariantRowsWithCacheProps extends RowSharedProps {
   productId: string;
   autoSelect: boolean;
-  onVariantsAutoLoaded: (productId: string, variants: ProductVariantRow[]) => void;
+  onVariantsAutoLoaded: (
+    productId: string,
+    variants: ProductVariantRow[],
+  ) => void;
   variantCache: { current: Map<string, ProductVariantRow[]> };
   itemDataById: { current: Map<string, SelectedProduct> };
 }
@@ -861,7 +994,9 @@ function VariantRowsWithCache({
     const existing = variantCache.current.get(productId) ?? [];
     const offset = (page - 1) * VARIANT_PAGE_SIZE;
     const merged = [...existing];
-    rows.forEach((v, i) => { merged[offset + i] = v; });
+    rows.forEach((v, i) => {
+      merged[offset + i] = v;
+    });
     variantCache.current.set(productId, merged.filter(Boolean));
     rows.forEach((v) => itemDataById.current.set(v.id, variantToSelected(v)));
   }
@@ -871,14 +1006,19 @@ function VariantRowsWithCache({
     if (autoSelect && rows.length > 0 && !query.isLoading) {
       onVariantsAutoLoaded(productId, rows);
     }
-  // Run once per productId when first page of data arrives
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Run once per productId when first page of data arrives
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSelect, query.isLoading, productId]);
 
   if (query.isLoading) {
     return (
       <tr>
-        <td colSpan={showQuantityPrice ? 11 : 9} className="py-2 pl-10 text-xs text-muted-foreground">Đang tải…</td>
+        <td
+          colSpan={showQuantityPrice ? 11 : 9}
+          className="py-2 pl-10 text-xs text-muted-foreground"
+        >
+          Đang tải…
+        </td>
       </tr>
     );
   }
@@ -896,18 +1036,32 @@ function VariantRowsWithCache({
               onChange={(e) => onToggleItem(v.id, e.target.checked)}
             />
           </td>
-          <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground pl-6">{v.code}</td>
+          <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground pl-6">
+            {v.code}
+          </td>
           <td className="px-3 py-1.5 text-sm">
             {v.name}
             {v.variantLabel ? (
-              <span className="ml-1.5 text-xs text-muted-foreground">({v.variantLabel})</span>
+              <span className="ml-1.5 text-xs text-muted-foreground">
+                ({v.variantLabel})
+              </span>
             ) : null}
           </td>
-          <td className="px-3 py-1.5 text-sm text-muted-foreground">{v.categoryName ?? "—"}</td>
-          <td className="px-3 py-1.5 text-sm text-muted-foreground">{v.unit}</td>
-          <td className="px-3 py-1.5 text-sm text-muted-foreground">{v.brand ?? "—"}</td>
-          <td className="px-3 py-1.5 text-right text-sm tabular-nums">{formatMoney(v.purchasePrice)}</td>
-          <td className="px-3 py-1.5 text-right text-sm tabular-nums">{formatMoney(v.sellingPrice)}</td>
+          <td className="px-3 py-1.5 text-sm text-muted-foreground">
+            {v.categoryName ?? "—"}
+          </td>
+          <td className="px-3 py-1.5 text-sm text-muted-foreground">
+            {v.unit}
+          </td>
+          <td className="px-3 py-1.5 text-sm text-muted-foreground">
+            {v.brand ?? "—"}
+          </td>
+          <td className="px-3 py-1.5 text-right text-sm tabular-nums">
+            {formatMoney(v.purchasePrice)}
+          </td>
+          <td className="px-3 py-1.5 text-right text-sm tabular-nums">
+            {formatMoney(v.sellingPrice)}
+          </td>
           {showQuantityPrice && (
             <QtyPriceCells
               id={v.id}

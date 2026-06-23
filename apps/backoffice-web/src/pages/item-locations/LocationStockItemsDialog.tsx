@@ -9,13 +9,12 @@ import type {
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { type TableColumn } from "../../components/table/BaseDataTable";
+import { ColumnFilterModeDropdown } from "../../components/table/ColumnFilterModeControl";
 import { PaginationControls } from "../../components/table/PaginationControls";
-import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
-import { LookupField } from "../../components/forms/LookupField";
-import {
-  QuickCreateItemDialog,
-  type QuickItem,
-} from "../../components/forms/QuickCreateDialogs";
+import type {
+  ColumnFilter,
+  ColumnFilterMode,
+} from "../../components/table/pagination.dto";
 
 interface Props {
   locationId: string;
@@ -23,27 +22,50 @@ interface Props {
   onClose: () => void;
 }
 
-interface PendingItem {
-  /** Local ID for keying; not sent to server. */
-  rowKey: string;
-  itemId: string;
-  code: string;
-  name: string;
-  unit: string;
-  categoryName: string | null;
-}
+type FilterKey =
+  | "itemCode"
+  | "itemName"
+  | "unit"
+  | "categoryName"
+  | "locationCode"
+  | "locationName"
+  | "quantityMax";
 
-interface ItemSearchResult {
-  id: string;
-  code: string;
-  name: string;
-  unit: string;
-  categoryName?: string | null;
-}
+const TEXT_FILTER_KEYS = [
+  "itemCode",
+  "itemName",
+  "unit",
+  "categoryName",
+] as const;
 
-interface PaginatedItems {
-  data: ItemSearchResult[];
-  total: number;
+const INITIAL_FILTERS: Record<FilterKey, ColumnFilter> = {
+  itemCode: { mode: "contains", value: "" },
+  itemName: { mode: "contains", value: "" },
+  unit: { mode: "contains", value: "" },
+  categoryName: { mode: "contains", value: "" },
+  locationCode: { mode: "contains", value: "" },
+  locationName: { mode: "contains", value: "" },
+  quantityMax: { mode: "contains", value: "" },
+};
+
+function matchesTextFilter(source: string, filter: ColumnFilter): boolean {
+  const actual = source.toLocaleLowerCase("vi-VN");
+  const expected = filter.value.trim().toLocaleLowerCase("vi-VN");
+  if (!expected) return true;
+
+  switch (filter.mode) {
+    case "equals":
+      return actual === expected;
+    case "startsWith":
+      return actual.startsWith(expected);
+    case "endsWith":
+      return actual.endsWith(expected);
+    case "notContains":
+      return !actual.includes(expected);
+    case "contains":
+    default:
+      return actual.includes(expected);
+  }
 }
 
 export function LocationStockItemsDialog({
@@ -52,21 +74,27 @@ export function LocationStockItemsDialog({
   onClose,
 }: Props) {
   const [data, setData] = useState<StockByLocationItem[]>([]);
-  const [meta, setMeta] = useState<StockByLocationResponse["meta"] | null>(null);
+  const [meta, setMeta] = useState<StockByLocationResponse["meta"] | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-
-  const [pending, setPending] = useState<PendingItem[]>([]);
-  const [pickerValue, setPickerValue] = useState("");
-  const [pickerNonce, setPickerNonce] = useState(0);
+  const [filters, setFilters] =
+    useState<Record<FilterKey, ColumnFilter>>(INITIAL_FILTERS);
+  const [committedFilters, setCommittedFilters] = useState(filters);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [saving, setSaving] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<StockByLocationItem | null>(null);
-  const [removing, setRemoving] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCommittedFilters(filters);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [filters]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,7 +103,18 @@ export function LocationStockItemsDialog({
         page: String(page),
         pageSize: String(pageSize),
       });
-      if (search.trim()) params.set("search", search.trim());
+      for (const key of TEXT_FILTER_KEYS) {
+        const filter = committedFilters[key];
+        const value = filter.value.trim();
+        if (value) {
+          params.set(key, value);
+          params.set(`${key}Mode`, filter.mode);
+        }
+      }
+      const quantityMax = committedFilters.quantityMax.value.trim();
+      if (quantityMax) {
+        params.set("quantityMax", quantityMax);
+      }
       const { data: res } = await apiClient.get<StockByLocationResponse>(
         `/inventory/locations/${locationId}/stock-items?${params}`,
       );
@@ -88,106 +127,74 @@ export function LocationStockItemsDialog({
     } finally {
       setLoading(false);
     }
-  }, [locationId, page, pageSize, search]);
+  }, [committedFilters, locationId, page, pageSize]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const searchItems = useCallback(async (query: string) => {
-    const params = new URLSearchParams({ page: "1", pageSize: "12" });
-    if (query.trim()) params.set("search", query.trim());
-    const { data: res } = await apiClient.get<PaginatedItems>(
-      `/inventory/items?${params}`,
+  const locationMatchesFilters = useMemo(() => {
+    if (!meta) return true;
+    return (
+      matchesTextFilter(meta.location.code, filters.locationCode) &&
+      matchesTextFilter(meta.location.name, filters.locationName)
     );
-    return res.data;
+  }, [filters.locationCode, filters.locationName, meta]);
+
+  const updateFilterValue = useCallback((key: FilterKey, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], value },
+    }));
   }, []);
 
-  const existingItemIds = useMemo(
-    () => new Set(data.map((d) => d.itemId)),
-    [data],
-  );
-  const pendingItemIds = useMemo(
-    () => new Set(pending.map((p) => p.itemId)),
-    [pending],
-  );
-
-  const addPending = useCallback(
-    (item: { id: string; code: string; name: string; unit: string; categoryName?: string | null }) => {
-      if (existingItemIds.has(item.id)) {
-        toast.error(`"${item.code}" đã có tại vị trí này.`);
-        return;
-      }
-      if (pendingItemIds.has(item.id)) {
-        toast.error(`"${item.code}" đã được thêm vào danh sách chờ.`);
-        return;
-      }
-      setPending((prev) => [
+  const updateFilterMode = useCallback(
+    (key: FilterKey, mode: ColumnFilterMode) => {
+      setFilters((prev) => ({
         ...prev,
-        {
-          rowKey: `pending-${item.id}-${Date.now()}`,
-          itemId: item.id,
-          code: item.code,
-          name: item.name,
-          unit: item.unit,
-          categoryName: item.categoryName ?? null,
-        },
-      ]);
-      // Reset the picker so user can add the next item.
-      setPickerValue("");
-      setPickerNonce((n) => n + 1);
+        [key]: { ...prev[key], mode },
+      }));
     },
-    [existingItemIds, pendingItemIds],
+    [],
   );
 
-  const removePending = useCallback((rowKey: string) => {
-    setPending((prev) => prev.filter((p) => p.rowKey !== rowKey));
+  const visibleData = useMemo(() => {
+    if (!locationMatchesFilters) return [];
+    return data.filter((row) => !pendingDeleteIds.has(row.itemId));
+  }, [data, locationMatchesFilters, pendingDeleteIds]);
+
+  const visibleTotal = locationMatchesFilters
+    ? Math.max(0, (meta?.total ?? 0) - pendingDeleteIds.size)
+    : 0;
+
+  const markForDelete = useCallback((itemId: string) => {
+    setPendingDeleteIds((prev) => {
+      const next = new Set(prev);
+      next.add(itemId);
+      return next;
+    });
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (pending.length === 0) return;
+    if (pendingDeleteIds.size === 0) return;
     setSaving(true);
     try {
-      // Sequential to surface first-failure with clearer error message.
-      for (const p of pending) {
-        await apiClient.post(`/inventory/locations/${locationId}/stock-items`, {
-          itemId: p.itemId,
-        });
-      }
-      toast.success(`Đã thêm ${pending.length} hàng hóa vào vị trí.`);
-      setPending([]);
+      await Promise.all(
+        [...pendingDeleteIds].map((itemId) =>
+          apiClient.delete(
+            `/inventory/locations/${locationId}/stock-items/${itemId}`,
+          ),
+        ),
+      );
+      toast.success(`Đã bỏ ${pendingDeleteIds.size} hàng hóa khỏi vị trí.`);
+      setPendingDeleteIds(new Set());
       await load();
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     } finally {
       setSaving(false);
     }
-  }, [pending, locationId, load]);
-
-  const handleRemoveExisting = useCallback(async () => {
-    if (!confirmRemove) return;
-    setRemoving(true);
-    try {
-      await apiClient.delete(
-        `/inventory/locations/${locationId}/stock-items/${confirmRemove.itemId}`,
-      );
-      toast.success(`Đã bỏ "${confirmRemove.code}" khỏi vị trí.`);
-      setConfirmRemove(null);
-      await load();
-    } catch (err) {
-      toast.error(getUserFacingApiErrorMessage(err));
-    } finally {
-      setRemoving(false);
-    }
-  }, [confirmRemove, locationId, load]);
-
-  const requestClose = () => {
-    if (pending.length > 0) {
-      setConfirmClose(true);
-      return;
-    }
-    onClose();
-  };
+  }, [load, locationId, pendingDeleteIds]);
 
   const columns: TableColumn<StockByLocationItem>[] = useMemo(
     () => [
@@ -248,7 +255,9 @@ export function LocationStockItemsDialog({
         className: "whitespace-nowrap text-right tabular-nums",
         headerClassName: "whitespace-nowrap text-right",
         render: (r) => (
-          <span className={r.belowMin ? "text-destructive font-medium" : undefined}>
+          <span
+            className={r.belowMin ? "text-destructive font-medium" : undefined}
+          >
             {Number(r.quantity).toLocaleString("vi-VN")}
           </span>
         ),
@@ -256,84 +265,57 @@ export function LocationStockItemsDialog({
       {
         key: "_actions",
         label: "",
-        width: 60,
+        width: 56,
         render: (r) => (
           <button
             type="button"
-            aria-label="Bỏ khỏi vị trí"
-            title={
-              Number(r.quantity) !== 0
-                ? "Chỉ bỏ được khi tồn = 0"
-                : "Bỏ khỏi vị trí"
-            }
-            className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 disabled:opacity-40 disabled:hover:bg-transparent"
-            disabled={Number(r.quantity) !== 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirmRemove(r);
-            }}
+            aria-label={`Bỏ ${r.code} khỏi vị trí`}
+            title="Đánh dấu bỏ khỏi vị trí"
+            className="inline-flex h-8 w-8 items-center justify-center rounded text-destructive hover:bg-destructive/10"
+            onClick={() => markForDelete(r.itemId)}
           >
             <Trash2 className="h-4 w-4" />
           </button>
         ),
       },
     ],
-    [meta?.location.code, meta?.location.name],
+    [markForDelete, meta?.location.code, meta?.location.name],
   );
 
   const title = meta?.location
     ? `${meta.location.storage.name} - ${meta.location.code}`
-    : fallbackTitle ?? "Danh sách hàng hóa";
+    : (fallbackTitle ?? "Danh sách hàng hóa");
 
   return (
     <AppModal
       open
       onOpenChange={(o) => {
-        if (!o) requestClose();
+        if (!o) onClose();
       }}
       title="Danh sách hàng hóa"
       defaultWidth={960}
       defaultHeight={660}
-      showFooter={false}
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            disabled={pendingDeleteIds.size === 0 || saving}
+            onClick={() => void handleSave()}
+          >
+            <Save className="mr-1.5 h-4 w-4" />
+            {saving ? "Đang lưu…" : "Lưu"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onClose}>
+            <X className="mr-1.5 h-4 w-4" />
+            Đóng
+          </Button>
+        </div>
+      }
     >
       <div className="flex h-full flex-col gap-3">
         <div className="py-1 text-center text-lg font-semibold uppercase text-foreground">
           {title}
         </div>
-
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSearch(searchInput);
-            setPage(1);
-          }}
-        >
-          <Input
-            type="search"
-            placeholder="Tìm mã hoặc tên hàng hóa…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="max-w-sm"
-          />
-          <Button type="submit" variant="outline" size="sm">
-            Tìm
-          </Button>
-          {search ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearch("");
-                setSearchInput("");
-                setPage(1);
-              }}
-            >
-              Xoá lọc
-            </Button>
-          ) : null}
-        </form>
 
         <div className="flex-1 overflow-auto">
           <table className="w-full min-w-[1400px] border-collapse text-sm">
@@ -349,6 +331,54 @@ export function LocationStockItemsDialog({
                   </th>
                 ))}
               </tr>
+              <tr>
+                {columns.map((c) => {
+                  if (c.key === "_actions") {
+                    return <th key={c.key} className="border-b border-r" />;
+                  }
+                  const keyByColumn: Record<string, keyof typeof filters> = {
+                    code: "itemCode",
+                    name: "itemName",
+                    unit: "unit",
+                    categoryName: "categoryName",
+                    locationCode: "locationCode",
+                    locationName: "locationName",
+                    quantity: "quantityMax",
+                  };
+                  const filterKey = keyByColumn[c.key];
+                  return (
+                    <th key={c.key} className="border-b border-r p-0">
+                      <div className="flex h-9 items-stretch">
+                        {c.key === "quantity" ? (
+                          <span className="flex w-9 shrink-0 items-center justify-center border-r text-xs font-normal">
+                            ≤
+                          </span>
+                        ) : (
+                          <ColumnFilterModeDropdown
+                            fieldLabel={c.label}
+                            value={filters[filterKey].mode}
+                            onChange={(mode) =>
+                              updateFilterMode(filterKey, mode)
+                            }
+                            triggerClassName="h-9 w-9 rounded-none border-0 border-r shadow-none"
+                          />
+                        )}
+                        <Input
+                          value={filters[filterKey].value}
+                          onChange={(e) =>
+                            updateFilterValue(filterKey, e.target.value)
+                          }
+                          inputMode={
+                            c.key === "quantity" ? "decimal" : undefined
+                          }
+                          className="h-9 rounded-none border-0 shadow-none focus-visible:ring-1"
+                          aria-label={`Lọc ${c.label}`}
+                        />
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
             </thead>
             <tbody>
               {loading ? (
@@ -362,7 +392,7 @@ export function LocationStockItemsDialog({
                 </tr>
               ) : null}
 
-              {!loading && data.length === 0 && pending.length === 0 ? (
+              {!loading && visibleData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length}
@@ -373,7 +403,7 @@ export function LocationStockItemsDialog({
                 </tr>
               ) : null}
 
-              {data.map((row) => (
+              {visibleData.map((row) => (
                 <tr key={row.itemId} className="border-b">
                   {columns.map((c) => (
                     <td
@@ -385,75 +415,23 @@ export function LocationStockItemsDialog({
                   ))}
                 </tr>
               ))}
-
-              {pending.map((row) => (
-                <tr key={row.rowKey} className="border-b bg-amber-50/60">
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.code}</td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">
-                    {row.name}
-                    <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-900">
-                      Mới
-                    </span>
-                  </td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.unit}</td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{row.categoryName ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{meta?.location.code ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap">{meta?.location.name ?? "—"}</td>
-                  <td className="border-r px-3 py-1.5 whitespace-nowrap text-right tabular-nums text-muted-foreground">
-                    0
-                  </td>
-                  <td className="border-r px-3 py-1.5">
-                    <button
-                      type="button"
-                      aria-label="Bỏ khỏi danh sách chờ"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10"
-                      onClick={() => removePending(row.rowKey)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {/* Picker row */}
-              <tr className="border-b">
-                <td className="px-2 py-1.5" colSpan={columns.length}>
-                  <LookupField
-                    key={pickerNonce}
-                    placeholder="Tìm mã hoặc tên hàng hóa để thêm…"
-                    value={pickerValue}
-                    onValueChange={setPickerValue}
-                    onSelect={(it) => addPending(it)}
-                    search={searchItems}
-                    itemKey={(it) => it.id}
-                    renderItem={(it) => it.name}
-                    renderMeta={(it) => `${it.code} · ${it.unit}`}
-                    columns={[
-                      { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
-                      { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
-                      { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
-                    ]}
-                    onCreateNew={() => setQuickCreateOpen(true)}
-                  />
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
 
-        <div className="flex items-center justify-between border-t pt-2 text-sm">
+        <div className="flex items-center justify-between border-t py-3 text-sm">
           <span className="text-muted-foreground">
-            Số dòng = {(meta?.total ?? 0) + pending.length}
-            {pending.length > 0 ? (
-              <span className="ml-2 text-amber-700">
-                · {pending.length} dòng chưa lưu
+            Số dòng = {visibleTotal}
+            {pendingDeleteIds.size > 0 ? (
+              <span className="ml-2 text-destructive">
+                · {pendingDeleteIds.size} dòng chờ xóa
               </span>
             ) : null}
           </span>
           <PaginationControls
             page={page}
             pageSize={pageSize}
-            total={meta?.total ?? 0}
+            total={visibleTotal}
             onPageChange={setPage}
             onPageSizeChange={(s) => {
               setPageSize(s);
@@ -462,64 +440,7 @@ export function LocationStockItemsDialog({
             onRefresh={() => void load()}
           />
         </div>
-
-        <div className="flex justify-end gap-2 border-t pt-3">
-          <Button
-            type="button"
-            disabled={saving || pending.length === 0}
-            onClick={() => void handleSave()}
-          >
-            <Save className="mr-1.5 h-4 w-4" />
-            {saving ? "Đang lưu…" : `Lưu${pending.length > 0 ? ` (${pending.length})` : ""}`}
-          </Button>
-          <Button type="button" variant="outline" onClick={requestClose}>
-            <X className="mr-1.5 h-4 w-4" />
-            Đóng
-          </Button>
-        </div>
       </div>
-
-      {confirmRemove && (
-        <ConfirmActionModal
-          title="Bỏ hàng hóa khỏi vị trí"
-          message={`Xác nhận bỏ "${confirmRemove.code} - ${confirmRemove.name}" khỏi vị trí này?`}
-          confirmLabel="Bỏ"
-          cancelLabel="Huỷ"
-          loading={removing}
-          onCancel={() => setConfirmRemove(null)}
-          onConfirm={handleRemoveExisting}
-        />
-      )}
-
-      {confirmClose && (
-        <ConfirmActionModal
-          title="Đóng mà không lưu?"
-          message={`${pending.length} dòng chưa lưu sẽ bị bỏ qua. Tiếp tục đóng?`}
-          confirmLabel="Đóng"
-          cancelLabel="Quay lại"
-          onCancel={() => setConfirmClose(false)}
-          onConfirm={() => {
-            setConfirmClose(false);
-            setPending([]);
-            onClose();
-          }}
-        />
-      )}
-
-      <QuickCreateItemDialog
-        open={quickCreateOpen}
-        onClose={() => setQuickCreateOpen(false)}
-        onCreated={(item: QuickItem) => {
-          setQuickCreateOpen(false);
-          addPending({
-            id: item.id,
-            code: item.code,
-            name: item.name,
-            unit: item.unit,
-            categoryName: null,
-          });
-        }}
-      />
     </AppModal>
   );
 }

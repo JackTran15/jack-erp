@@ -15,6 +15,7 @@ import {
   type StockBalanceRow,
 } from "../../api/stock-balances";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { getActiveBranch } from "../../lib/auth-storage";
 import {
   buildItemLocationColumns,
   buildLocationStockItemColumns,
@@ -62,6 +63,7 @@ export function ItemLocationDetailsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [arrangeOpen, setArrangeOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const activeBranchId = getActiveBranch();
 
   useEffect(() => {
     setPage(1);
@@ -78,7 +80,7 @@ export function ItemLocationDetailsPage() {
     undefined;
 
   const stockQuery = useQuery({
-    queryKey: ["stock-balances", queryParams],
+    queryKey: ["stock-balances", activeBranchId, queryParams],
     queryFn: () => listStockBalances(queryParams),
     enabled: !isLocationDetail,
   });
@@ -86,6 +88,7 @@ export function ItemLocationDetailsPage() {
   const locationQuery = useQuery({
     queryKey: [
       "location-stock-items",
+      activeBranchId,
       locationId,
       page,
       pageSize,

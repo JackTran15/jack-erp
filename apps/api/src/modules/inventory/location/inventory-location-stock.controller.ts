@@ -19,11 +19,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
-import {
-  ArrayMinSize,
-  IsUUID,
-  ValidateNested,
-} from 'class-validator';
+import { ArrayMinSize, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   Actor,
@@ -184,10 +180,7 @@ export class InventoryLocationStockController {
       'Xếp vị trí hàng hoá theo lô — tạo stock_balance = 0 + PSL cho nhiều cặp (item, location) trong 1 transaction.',
   })
   @ApiResponse({ status: 201, description: 'Kết quả: { created, skipped }' })
-  assignBatch(
-    @Body() dto: BatchAssignItemsDto,
-    @Actor() actor: ActorContext,
-  ) {
+  assignBatch(@Body() dto: BatchAssignItemsDto, @Actor() actor: ActorContext) {
     return this.service.assignBatch(dto, actor);
   }
 
@@ -211,7 +204,8 @@ export class InventoryLocationStockController {
   @RequirePermission('inventory.write')
   @RequireBranchScope()
   @ApiOperation({
-    summary: 'Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0)',
+    summary:
+      'Bỏ hàng hóa khỏi vị trí; tồn dương được chuyển về "Chưa xếp" cùng kho',
   })
   async removeItemFromLocation(
     @Param('locationId', ParseUUIDPipe) locationId: string,

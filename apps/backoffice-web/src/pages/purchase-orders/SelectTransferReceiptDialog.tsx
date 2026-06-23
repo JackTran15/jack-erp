@@ -31,6 +31,7 @@ export interface TransferReceiptDetailLine {
 export interface TransferReceiptDetail {
   id: string;
   documentNumber?: string;
+  exportGoodsIssueId?: string | null;
   sourceBranchId: string;
   destinationBranchId: string;
   notes?: string | null;
@@ -66,10 +67,16 @@ function today(): string {
   return ymd(new Date());
 }
 
-export function SelectTransferReceiptDialog({ open, onClose, onSelect }: Props) {
+export function SelectTransferReceiptDialog({
+  open,
+  onClose,
+  onSelect,
+}: Props) {
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
-  const [rows, setRows] = useState<ImportableTransferOrderListItem[] | null>(null);
+  const [rows, setRows] = useState<ImportableTransferOrderListItem[] | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -180,13 +187,19 @@ export function SelectTransferReceiptDialog({ open, onClose, onSelect }: Props) 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                  <td
+                    colSpan={4}
+                    className="p-6 text-center text-muted-foreground"
+                  >
                     Đang tải…
                   </td>
                 </tr>
               ) : !rows || rows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-10 text-center text-muted-foreground">
+                  <td
+                    colSpan={4}
+                    className="p-10 text-center text-muted-foreground"
+                  >
                     <Inbox className="mx-auto mb-2 h-10 w-10 opacity-40" />
                     <div className="font-medium">KHÔNG CÓ DỮ LIỆU</div>
                     <div className="text-xs">

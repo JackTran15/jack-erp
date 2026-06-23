@@ -42,6 +42,27 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
     qb.leftJoinAndSelect(`${alias}.item`, 'item');
     qb.leftJoinAndSelect('item.category', 'category');
     qb.leftJoinAndSelect('item.product', 'product');
+    qb.leftJoinAndSelect(`${alias}.location`, 'stockLocation');
+    qb.leftJoinAndSelect('stockLocation.storage', 'stockStorage');
+  }
+
+  /**
+   * A balance's branchId is denormalized historical data and can be stale.
+   * The physical location's parent storage is the authoritative branch owner.
+   */
+  protected override applyScoping(
+    qb: SelectQueryBuilder<StockBalanceEntity>,
+    alias: string,
+    actor: ActorContext,
+  ): void {
+    qb.andWhere(`${alias}.organizationId = :orgId`, {
+      orgId: actor.organizationId,
+    });
+    if (actor.branchId) {
+      qb.andWhere('stockStorage.branchId = :branchId', {
+        branchId: actor.branchId,
+      });
+    }
   }
 
   protected override applySearch(
@@ -101,9 +122,28 @@ export class InventoryStockBalanceCrudService extends BaseCrudService<
 
   private flattenForList(row: StockBalanceEntity): Record<string, unknown> {
     const item = row.item;
-    const { item: _drop, ...rest } = row;
+    const location = row.location;
+    const { item: _dropItem, location: _dropLocation, ...rest } = row;
     return {
       ...rest,
+      item: item
+        ? {
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            unit: item.unit,
+            categoryName: item.category?.name ?? null,
+          }
+        : null,
+      location: location
+        ? {
+            id: location.id,
+            code: location.code,
+            name: location.name,
+            storageId: location.storageId,
+            storageName: location.storage?.name ?? '',
+          }
+        : null,
       itemName: item?.name ?? '',
       itemCode: item?.code ?? '',
       itemVariants: formatItemVariantSummary(item),

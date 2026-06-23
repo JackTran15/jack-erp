@@ -5,8 +5,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import {
   Between,
   DataSource,
@@ -14,7 +14,7 @@ import {
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
-} from 'typeorm';
+} from "typeorm";
 import {
   DocumentType,
   ExportTransferOrderLine,
@@ -29,17 +29,17 @@ import {
   PaginatedResponse,
   PaginationQuery,
   TransferOrderStatus,
-} from '@erp/shared-interfaces';
-import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { BranchEntity } from '../../branch/branch.entity';
-import { GoodsIssueService } from '../goods-issue/goods-issue.service';
-import { GoodsReceiptService } from '../goods-receipt/goods-receipt.service';
-import { LocationEntity } from '../location/location.entity';
-import { StockBalanceEntity } from '../ledger/stock-balance.entity';
-import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
-import { TransferOrderEntity } from './transfer-order.entity';
-import { TransferOrderLineEntity } from './transfer-order-line.entity';
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
+import { BranchEntity } from "../../branch/branch.entity";
+import { GoodsIssueService } from "../goods-issue/goods-issue.service";
+import { GoodsReceiptService } from "../goods-receipt/goods-receipt.service";
+import { LocationEntity } from "../location/location.entity";
+import { StockBalanceEntity } from "../ledger/stock-balance.entity";
+import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
+import { TransferOrderEntity } from "./transfer-order.entity";
+import { TransferOrderLineEntity } from "./transfer-order-line.entity";
 
 export interface TransferOrderLineInput {
   itemId: string;
@@ -141,12 +141,12 @@ export class TransferOrderService {
     this.validateLines(dto.lines);
     if (!actor.branchId) {
       throw new BadRequestException(
-        'Cần chọn cửa hàng hiện tại để lập lệnh điều chuyển',
+        "Cần chọn cửa hàng hiện tại để lập lệnh điều chuyển",
       );
     }
     if (dto.destinationBranchId === actor.branchId) {
       throw new BadRequestException(
-        'Cửa hàng đích phải khác cửa hàng hiện tại',
+        "Cửa hàng đích phải khác cửa hàng hiện tại",
       );
     }
 
@@ -191,9 +191,7 @@ export class TransferOrderService {
     actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     if (!dto.targetBranchId) {
-      throw new BadRequestException(
-        'Cần chọn cửa hàng nhận hàng điều chuyển',
-      );
+      throw new BadRequestException("Cần chọn cửa hàng nhận hàng điều chuyển");
     }
 
     const sourceLocations = await Promise.all(
@@ -255,6 +253,34 @@ export class TransferOrderService {
   }
 
   /**
+   * Export goods-issue (XK) of a transfer, resolved org-scoped so the importing
+   * (destination) branch can view the source branch's issue document. The
+   * branch-scoped goods-issue GET would 404 here — the issue belongs to the
+   * source branch.
+   */
+  async getExportGoodsIssue(
+    id: string,
+    actor: ActorContext,
+  ): Promise<GoodsIssueEntity> {
+    const to = await this.findOrFail(id, actor.organizationId);
+    this.assertParticipantBranch(to, actor);
+    if (!to.exportGoodsIssueId) {
+      throw new NotFoundException(
+        `Lệnh điều chuyển ${id} chưa có phiếu xuất kho`,
+      );
+    }
+    const gi = await this.giRepo.findOne({
+      where: { id: to.exportGoodsIssueId, organizationId: actor.organizationId },
+    });
+    if (!gi) {
+      throw new NotFoundException(
+        `Không tìm thấy phiếu xuất kho của lệnh điều chuyển ${id}`,
+      );
+    }
+    return gi;
+  }
+
+  /**
    * Fill in each line's display bin (Vị trí) for the goods-issue form. The bin
    * is persisted on the line (source_location_id, resolved from stock at create
    * time); here we just resolve its human code. Legacy lines created before the
@@ -269,7 +295,9 @@ export class TransferOrderService {
 
     const locationIds = [
       ...new Set(
-        lines.map((l) => l.sourceLocationId).filter((id): id is string => Boolean(id)),
+        lines
+          .map((l) => l.sourceLocationId)
+          .filter((id): id is string => Boolean(id)),
       ),
     ];
     const locations = locationIds.length
@@ -291,8 +319,11 @@ export class TransferOrderService {
         : null;
       l.sourceLocationId = locId;
       l.sourceLocationCode = locId
-        ? (await this.locationRepo.findOne({ where: { id: locId, organizationId } }))
-            ?.code ?? null
+        ? ((
+            await this.locationRepo.findOne({
+              where: { id: locId, organizationId },
+            })
+          )?.code ?? null)
         : null;
     }
   }
@@ -307,15 +338,15 @@ export class TransferOrderService {
     organizationId: string,
   ): Promise<string | null> {
     const sb = await this.balanceRepo
-      .createQueryBuilder('sb')
-      .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
-      .where('sb.item_id = :itemId AND loc.storage_id = :storageId', {
+      .createQueryBuilder("sb")
+      .innerJoin("locations", "loc", "loc.id = sb.location_id")
+      .where("sb.item_id = :itemId AND loc.storage_id = :storageId", {
         itemId,
         storageId,
       })
-      .andWhere('sb.organization_id = :organizationId', { organizationId })
-      .andWhere('sb.quantity > 0')
-      .orderBy('sb.quantity', 'DESC')
+      .andWhere("sb.organization_id = :organizationId", { organizationId })
+      .andWhere("sb.quantity > 0")
+      .orderBy("sb.quantity", "DESC")
       .getOne();
     return sb?.locationId ?? null;
   }
@@ -343,9 +374,7 @@ export class TransferOrderService {
       where: { documentNumber, organizationId: actor.organizationId },
     });
     if (!to) {
-      throw new NotFoundException(
-        `Transfer order ${documentNumber} not found`,
-      );
+      throw new NotFoundException(`Transfer order ${documentNumber} not found`);
     }
     this.assertParticipantBranch(to, actor);
     return to;
@@ -372,7 +401,7 @@ export class TransferOrderService {
       where,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
     return { data, total, page, pageSize };
   }
@@ -397,7 +426,7 @@ export class TransferOrderService {
 
     const orders = await this.toRepo.find({
       where,
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     const destIds = [
@@ -412,13 +441,13 @@ export class TransferOrderService {
 
     return orders.map((o) => ({
       id: o.id,
-      documentNumber: o.documentNumber ?? '',
+      documentNumber: o.documentNumber ?? "",
       requestedDate:
         (o.requestedDate as string | undefined) ??
         (o.createdAt ? o.createdAt.toISOString() : null),
       notes: o.notes ?? null,
       destinationBranchId: o.destinationBranchId,
-      destinationBranchName: nameById.get(o.destinationBranchId) ?? '',
+      destinationBranchName: nameById.get(o.destinationBranchId) ?? "",
       status: o.status,
     }));
   }
@@ -430,20 +459,22 @@ export class TransferOrderService {
    * issue's (XK) document number + total amount.
    */
   async listImportable(
-    params: { from?: string; to?: string },
+    params: { from?: string; to?: string; includeCompleted?: boolean },
     actor: ActorContext,
   ): Promise<ImportableTransferOrderListItem[]> {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
       destinationBranchId: actor.branchId,
-      status: TransferOrderStatus.IN_PROGRESS,
+      status: params.includeCompleted
+        ? In([TransferOrderStatus.IN_PROGRESS, TransferOrderStatus.COMPLETED])
+        : TransferOrderStatus.IN_PROGRESS,
     };
     const createdAtRange = this.buildDateRange(params.from, params.to);
     if (createdAtRange) where.createdAt = createdAtRange;
 
     const orders = await this.toRepo.find({
       where,
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     const srcIds = [
@@ -474,10 +505,23 @@ export class TransferOrderService {
         gi.id,
         {
           documentNumber: gi.documentNumber ?? null,
+          counterpartyName: gi.counterparty?.name ?? gi.provider?.name ?? null,
           total: (gi.lines ?? []).reduce(
             (sum, l) => sum + Number(l.lineTotal ?? 0),
             0,
           ),
+          lines: (gi.lines ?? []).map((line) => ({
+            itemId: line.itemId,
+            itemCode: line.item?.code ?? "",
+            itemName: line.item?.name ?? "",
+            unit: line.item?.unit ?? "",
+            storageName: line.location?.storage?.name ?? null,
+            locationCode: line.location?.code ?? null,
+            quantity: Number(line.quantity ?? 0),
+            unitPrice: Number(line.unitPrice ?? 0),
+            lineTotal: Number(line.lineTotal ?? 0),
+            notes: line.notes ?? null,
+          })),
         },
       ]),
     );
@@ -486,16 +530,36 @@ export class TransferOrderService {
       const gi = o.exportGoodsIssueId ? giById.get(o.exportGoodsIssueId) : null;
       return {
         id: o.id,
-        documentNumber: o.documentNumber ?? '',
+        documentNumber: o.documentNumber ?? "",
         requestedDate:
           (o.requestedDate as string | undefined) ??
           (o.createdAt ? o.createdAt.toISOString() : null),
         notes: o.notes ?? null,
         sourceBranchId: o.sourceBranchId,
-        sourceBranchName: branchName.get(o.sourceBranchId) ?? '',
+        sourceBranchName: branchName.get(o.sourceBranchId) ?? "",
         exportGoodsIssueId: o.exportGoodsIssueId ?? null,
+        importGoodsReceiptId: o.importGoodsReceiptId ?? null,
         exportGoodsIssueDocumentNumber: gi?.documentNumber ?? null,
+        counterpartyName: gi?.counterpartyName ?? null,
         totalAmount: gi?.total ?? 0,
+        lines: (o.lines ?? []).map((line) => {
+          const issueLine = gi?.lines.find(
+            (candidate) => candidate.itemId === line.itemId,
+          );
+          return {
+            id: line.id,
+            itemId: line.itemId,
+            itemCode: issueLine?.itemCode ?? line.item?.code ?? "",
+            itemName: issueLine?.itemName ?? line.item?.name ?? "",
+            unit: issueLine?.unit ?? line.item?.unit ?? "",
+            storageName: issueLine?.storageName ?? null,
+            locationCode: issueLine?.locationCode ?? null,
+            quantity: issueLine?.quantity ?? Number(line.requestedQty ?? 0),
+            unitPrice: issueLine?.unitPrice ?? 0,
+            lineTotal: issueLine?.lineTotal ?? 0,
+            notes: issueLine?.notes ?? line.note ?? null,
+          };
+        }),
         status: o.status,
       };
     });
@@ -509,7 +573,11 @@ export class TransferOrderService {
     actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
-    this.assertSourceBranch(to, actor, 'Chỉ cửa hàng nguồn được sửa lệnh điều chuyển');
+    this.assertSourceBranch(
+      to,
+      actor,
+      "Chỉ cửa hàng nguồn được sửa lệnh điều chuyển",
+    );
 
     if (to.status === TransferOrderStatus.IN_PROGRESS) {
       const touchesLocked =
@@ -521,7 +589,7 @@ export class TransferOrderService {
         dto.lines !== undefined;
       if (touchesLocked) {
         throw new BadRequestException(
-          'Only description and attachments can be edited once the transfer is in progress',
+          "Only description and attachments can be edited once the transfer is in progress",
         );
       }
       if (dto.notes !== undefined) to.notes = dto.notes;
@@ -541,13 +609,11 @@ export class TransferOrderService {
       dto.sourceBranchId !== undefined &&
       dto.sourceBranchId !== actor.branchId
     ) {
-      throw new BadRequestException(
-        'Cửa hàng nguồn phải là cửa hàng hiện tại',
-      );
+      throw new BadRequestException("Cửa hàng nguồn phải là cửa hàng hiện tại");
     }
     if (dto.destinationBranchId === actor.branchId) {
       throw new BadRequestException(
-        'Cửa hàng đích phải khác cửa hàng hiện tại',
+        "Cửa hàng đích phải khác cửa hàng hiện tại",
       );
     }
 
@@ -564,7 +630,9 @@ export class TransferOrderService {
       if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
 
       if (dto.lines) {
-        await manager.delete(TransferOrderLineEntity, { transferOrderId: to.id });
+        await manager.delete(TransferOrderLineEntity, {
+          transferOrderId: to.id,
+        });
         to.lines = dto.lines.map((l) => this.makeLine(l, actor));
         await this.fillSourceLocations(
           to.lines,
@@ -587,11 +655,11 @@ export class TransferOrderService {
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
     if (to.status !== TransferOrderStatus.DRAFT) {
-      throw new ConflictException('Transfer order is not in DRAFT state');
+      throw new ConflictException("Transfer order is not in DRAFT state");
     }
     if (actor.branchId !== to.sourceBranchId) {
       throw new ForbiddenException(
-        'Export must be confirmed from the source branch',
+        "Export must be confirmed from the source branch",
       );
     }
 
@@ -655,7 +723,12 @@ export class TransferOrderService {
     to: TransferOrderEntity,
     actor: ActorContext,
   ): Promise<
-    { itemId: string; locationId: string; quantity: number; unitPrice: number }[]
+    {
+      itemId: string;
+      locationId: string;
+      quantity: number;
+      unitPrice: number;
+    }[]
   > {
     return Promise.all(
       to.lines.map(async (l) => ({
@@ -689,14 +762,16 @@ export class TransferOrderService {
     return inputLines.map((l) => {
       if (!allowed.has(l.itemId)) {
         throw new BadRequestException(
-          'Line item is not part of the transfer order',
+          "Line item is not part of the transfer order",
         );
       }
       if (Number(l.quantity) <= 0) {
-        throw new BadRequestException('Line quantity must be greater than 0');
+        throw new BadRequestException("Line quantity must be greater than 0");
       }
       if (!l.locationId) {
-        throw new BadRequestException('A source location is required for every line');
+        throw new BadRequestException(
+          "A source location is required for every line",
+        );
       }
       return {
         itemId: l.itemId,
@@ -729,21 +804,21 @@ export class TransferOrderService {
       const orderLine = byItem.get(l.itemId);
       if (!orderLine) {
         throw new BadRequestException(
-          'Line item is not part of the transfer order',
+          "Line item is not part of the transfer order",
         );
       }
       if (Number(l.quantity) <= 0) {
-        throw new BadRequestException('Line quantity must be greater than 0');
+        throw new BadRequestException("Line quantity must be greater than 0");
       }
       if (!l.locationId) {
         throw new BadRequestException(
-          'A destination location is required for every line',
+          "A destination location is required for every line",
         );
       }
       return {
         itemId: l.itemId,
         locationId: l.locationId,
-        uomCode: orderLine.item?.unit ?? 'CAI',
+        uomCode: orderLine.item?.unit ?? "CAI",
         quantity: Number(l.quantity),
         unitPrice: Number(l.unitPrice ?? orderLine.item?.purchasePrice ?? 0),
         note: l.note,
@@ -760,11 +835,11 @@ export class TransferOrderService {
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
     if (to.status !== TransferOrderStatus.IN_PROGRESS) {
-      throw new ConflictException('Transfer order is not IN_PROGRESS');
+      throw new ConflictException("Transfer order is not IN_PROGRESS");
     }
     if (actor.branchId !== to.destinationBranchId) {
       throw new ForbiddenException(
-        'Import must be confirmed from the destination branch',
+        "Import must be confirmed from the destination branch",
       );
     }
 
@@ -783,13 +858,16 @@ export class TransferOrderService {
     if (dto.lines?.length) {
       lines = this.buildImportLinesFromInput(dto.lines, to);
       const firstLoc = await this.locationRepo.findOne({
-        where: { id: lines[0].locationId, organizationId: actor.organizationId },
+        where: {
+          id: lines[0].locationId,
+          organizationId: actor.organizationId,
+        },
       });
       destStorageId = firstLoc?.storageId ?? destStorageId;
     } else {
       if (!destStorageId) {
         throw new BadRequestException(
-          'A destination warehouse is required to import',
+          "A destination warehouse is required to import",
         );
       }
       const destLocationId = await this.resolveLocation(
@@ -799,7 +877,7 @@ export class TransferOrderService {
       lines = to.lines.map((l) => ({
         itemId: l.itemId,
         locationId: destLocationId,
-        uomCode: l.item?.unit ?? 'CAI',
+        uomCode: l.item?.unit ?? "CAI",
         quantity: Number(l.requestedQty),
         unitPrice: Number(l.item?.purchasePrice ?? 0),
       }));
@@ -843,17 +921,24 @@ export class TransferOrderService {
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
     const to = await this.findOrFail(id, actor.organizationId);
-    this.assertSourceBranch(to, actor, 'Chỉ cửa hàng nguồn được hủy lệnh điều chuyển');
+    this.assertSourceBranch(
+      to,
+      actor,
+      "Chỉ cửa hàng nguồn được hủy lệnh điều chuyển",
+    );
     if (
       to.status === TransferOrderStatus.COMPLETED ||
       to.status === TransferOrderStatus.CANCELLED
     ) {
       throw new ConflictException(
-        'Cannot cancel a completed or already-cancelled transfer order',
+        "Cannot cancel a completed or already-cancelled transfer order",
       );
     }
 
-    if (to.status === TransferOrderStatus.IN_PROGRESS && to.exportGoodsIssueId) {
+    if (
+      to.status === TransferOrderStatus.IN_PROGRESS &&
+      to.exportGoodsIssueId
+    ) {
       // Reverse the export — GoodsIssue.cancel posts an ADJUSTMENT_INCREASE that
       // restores the source-branch stock.
       await this.goodsIssueService.cancel(to.exportGoodsIssueId, actor);
@@ -887,12 +972,14 @@ export class TransferOrderService {
   private validateLines(lines: TransferOrderLineInput[] | undefined): void {
     if (!lines || lines.length === 0) {
       throw new BadRequestException(
-        'Transfer order must have at least one line',
+        "Transfer order must have at least one line",
       );
     }
     for (const l of lines) {
       if (Number(l.requestedQty) <= 0) {
-        throw new BadRequestException('Requested quantity must be greater than 0');
+        throw new BadRequestException(
+          "Requested quantity must be greater than 0",
+        );
       }
     }
   }
@@ -904,7 +991,7 @@ export class TransferOrderService {
   ): Promise<string> {
     if (!storageId) {
       throw new BadRequestException(
-        'A source/destination warehouse is required for every line',
+        "A source/destination warehouse is required for every line",
       );
     }
     const location = await this.locationRepo.findOne({
@@ -926,7 +1013,8 @@ export class TransferOrderService {
       end = new Date(to);
       if (!Number.isNaN(end.getTime())) end.setUTCHours(23, 59, 59, 999);
     }
-    const validStart = start && !Number.isNaN(start.getTime()) ? start : undefined;
+    const validStart =
+      start && !Number.isNaN(start.getTime()) ? start : undefined;
     const validEnd = end && !Number.isNaN(end.getTime()) ? end : undefined;
     if (validStart && validEnd) return Between(validStart, validEnd);
     if (validStart) return MoreThanOrEqual(validStart);
