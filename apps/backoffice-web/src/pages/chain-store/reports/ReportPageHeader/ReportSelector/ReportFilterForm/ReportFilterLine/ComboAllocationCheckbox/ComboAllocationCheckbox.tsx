@@ -13,7 +13,7 @@ interface Props {
 
 export function ComboAllocationCheckbox({ value, onChange }: Props) {
   return (
-    <div className="flex items-start gap-2 text-[13px] text-foreground">
+    <div className="flex items-start gap-2 text-xs text-foreground">
       <label className="flex items-start gap-2">
         <input
           type="checkbox"

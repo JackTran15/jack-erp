@@ -6,11 +6,11 @@ interface Props {
 }
 
 const dateClass =
-  "h-9 w-[150px] rounded-[4px] border border-[#CCCCCC] bg-white px-2 text-[13px] text-[#333333] outline-none focus:border-[#3B6FE5]";
+  "h-9 min-w-0 flex-1 rounded-[4px] border border-[#CCCCCC] bg-white px-2 text-xs text-[#333333] outline-none focus:border-[#3B6FE5]";
 
 export function DateRangeField({ value, onChange }: Props) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <input
         type="date"
         className={dateClass}
@@ -18,7 +18,7 @@ export function DateRangeField({ value, onChange }: Props) {
         onChange={(e) => onChange({ ...value, fromDate: e.target.value })}
         aria-label="Từ ngày"
       />
-      <span className="text-[13px] text-muted-foreground">Đến ngày</span>
+      <span className="whitespace-nowrap text-xs text-muted-foreground">Đến ngày</span>
       <input
         type="date"
         className={dateClass}

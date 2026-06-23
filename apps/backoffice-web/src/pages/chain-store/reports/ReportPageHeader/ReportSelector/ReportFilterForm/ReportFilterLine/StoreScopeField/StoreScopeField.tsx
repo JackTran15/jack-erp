@@ -15,7 +15,7 @@ const STORE_OPTIONS = reportStores.map((s) => ({
 export function StoreScopeField({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-6 text-[13px] text-foreground">
+      <div className="flex items-center gap-6 text-xs text-foreground">
         <label className="flex items-center gap-1.5">
           <input
             type="radio"

@@ -5,7 +5,7 @@ interface Props {
 }
 
 const selectClass =
-  "h-9 w-full rounded-[4px] border border-[#CCCCCC] bg-white px-3 text-[13px] text-[#333333] outline-none focus:border-[#3B6FE5]";
+  "h-9 w-full rounded-[4px] border border-[#CCCCCC] bg-white px-3 text-xs text-[#333333] outline-none focus:border-[#3B6FE5]";
 
 export function ReportTypeSelect({ value, options, onChange }: Props) {
   return (

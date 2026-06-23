@@ -26,11 +26,11 @@ export function ReportFilterForm({ onSubmit, onCancel }: Props) {
   const lines = getReportFormLines(reportType, branch);
 
   return (
-    <div className="flex w-[640px] max-w-[calc(100vw-2rem)] flex-col">
+    <div className="flex w-[450px] max-w-[calc(100vw-2rem)] flex-col">
       <div className="flex flex-col divide-y divide-border">
         {/* Dòng chọn báo cáo: field đặc biệt, luôn hiển thị. */}
-        <div className="flex items-start gap-4 py-2">
-          <div className="w-[140px] shrink-0 pt-1.5 text-[13px] text-muted-foreground">
+        <div className="flex items-start gap-3 py-1.5">
+          <div className="w-[110px] shrink-0 pt-1.5 text-xs text-muted-foreground">
             Báo cáo<span className="text-destructive"> *</span>
           </div>
           <div className="min-w-0 flex-1">
@@ -47,7 +47,7 @@ export function ReportFilterForm({ onSubmit, onCancel }: Props) {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-end gap-3">
+      <div className="mt-3 flex items-center justify-end gap-2">
         <Button type="button" size="sm" onClick={onSubmit}>
           <Check className="mr-1 h-4 w-4" />
           Đồng ý

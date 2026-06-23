@@ -5,7 +5,7 @@ interface Props {
 
 export function StatisticByBranchCheckbox({ value, onChange }: Props) {
   return (
-    <label className="flex items-center gap-2 text-[13px] text-foreground">
+    <label className="flex items-center gap-2 text-xs text-foreground">
       <input
         type="checkbox"
         checked={value}
