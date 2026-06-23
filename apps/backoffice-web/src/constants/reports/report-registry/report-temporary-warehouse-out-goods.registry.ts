@@ -48,11 +48,16 @@ const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportTemporaryWarehouseOutGoods = tableConfig;
 export const chain_tableRegistryReportTemporaryWarehouseOutGoods = tableConfig;
 
-const filterLines = [
+const baseFilterLines = [
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
   REPORT_FILTERS_LINE.WORK_SHIFT,
 ];
-export const single_filterRegistryReportTemporaryWarehouseOutGoods = filterLines;
-export const chain_filterRegistryReportTemporaryWarehouseOutGoods = filterLines;
+export const single_filterRegistryReportTemporaryWarehouseOutGoods =
+  baseFilterLines;
+// Chuỗi cửa hàng có thêm line "Cửa hàng" (single-select) để chọn 1 cửa hàng.
+export const chain_filterRegistryReportTemporaryWarehouseOutGoods = [
+  REPORT_FILTERS_LINE.STORE_SINGLE,
+  ...baseFilterLines,
+];

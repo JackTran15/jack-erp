@@ -77,6 +77,16 @@ export class InventoryReportsController {
     return this.service.stockByBranch(actor, query);
   }
 
+  @Get('temporary-warehouse-out-goods')
+  @RequirePermission('inventory.reports.read')
+  @ApiOperation({ summary: 'Hàng hóa xuất kho tạm' })
+  temporaryWarehouseOutGoods(
+    @Actor() actor: ActorContext,
+    @Query() query: InventoryReportQueryDto,
+  ) {
+    return this.service.temporaryWarehouseOutGoods(actor, query);
+  }
+
   @Get('transfer-summary')
   @RequirePermission('inventory.reports.read')
   @ApiOperation({ summary: 'Tổng hợp nhập xuất điều chuyển' })

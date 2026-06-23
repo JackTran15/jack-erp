@@ -13,7 +13,7 @@ import {
   type PeriodValue,
 } from "@erp/ui";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, CloudDownload, Filter, Loader2, Search } from "lucide-react";
+import { ChevronDown, CloudDownload, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import {
@@ -58,8 +58,6 @@ import { StockDetailDrawer } from "./_components/StockDetailDrawer";
 
 interface AppliedFilters {
   search: string;
-  storageId: string;
-  categoryId: string;
   period: PeriodValue;
   advanced: StockSummaryAdvancedFilters;
   requestVersion: number;
@@ -141,12 +139,8 @@ export function InventoryManagementPage() {
   });
   const [draftPeriod, setDraftPeriod] = useState<PeriodValue>(initialPeriod);
   const [searchInput, setSearchInput] = useState("");
-  const [draftStorageId, setDraftStorageId] = useState("");
-  const [draftCategoryId, setDraftCategoryId] = useState("");
   const [applied, setApplied] = useState<AppliedFilters>({
     search: "",
-    storageId: "",
-    categoryId: "",
     period: initialPeriod,
     advanced: DEFAULT_ADVANCED_FILTERS,
     requestVersion: 0,
@@ -170,8 +164,8 @@ export function InventoryManagementPage() {
       page: pagination.page,
       pageSize: pagination.pageSize,
       search: applied.search.trim() || undefined,
-      storageId: applied.advanced.storageId || applied.storageId || undefined,
-      categoryId: applied.advanced.categoryId || applied.categoryId || undefined,
+      storageId: applied.advanced.storageId || undefined,
+      categoryId: applied.advanced.categoryId || undefined,
       brand: applied.advanced.brand || undefined,
       unit: applied.advanced.unit || undefined,
       isActive: toBoolParam(applied.advanced.isActive),
@@ -237,8 +231,6 @@ export function InventoryManagementPage() {
     setApplied((previous) => ({
       ...previous,
       search: searchInput,
-      storageId: draftStorageId,
-      categoryId: draftCategoryId,
       period: draftPeriod,
       requestVersion: previous.requestVersion + 1,
     }));
@@ -298,7 +290,7 @@ export function InventoryManagementPage() {
         label: "Tên hàng hóa",
         width: 220,
         render: (row) => (
-          <span className="text-primary hover:underline">
+          <span className="text-primary-blue hover:underline">
             {row.item.name}
             {!row.item.isActive ? (
               <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
@@ -406,100 +398,74 @@ export function InventoryManagementPage() {
       filters={
         <div className="flex flex-col gap-3">
           <form
-            className="flex flex-wrap items-center gap-2"
+            className="flex flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               applyFilters();
             }}
           >
-            <PeriodFilter
-              value={draftPeriod}
-              onChange={setDraftPeriod}
-              onApply={applyFilters}
-              hideApply
-            />
-            <select
-              className="h-9 min-w-[140px] rounded border border-input bg-background px-2 text-sm"
-              value={draftStorageId}
-              onChange={(event) => setDraftStorageId(event.target.value)}
-            >
-              <option value="">Tất cả kho</option>
-              {storageOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="h-9 min-w-[160px] rounded border border-input bg-background px-2 text-sm"
-              value={draftCategoryId}
-              onChange={(event) => setDraftCategoryId(event.target.value)}
-            >
-              <option value="">Tất cả nhóm hàng</option>
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setFilterDialogOpen(true)}
-            >
-              <Filter className="mr-1.5 h-3.5 w-3.5" />
-              Lọc thêm
-              {activeAdvancedCount > 0 ? (
-                <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground">
-                  {activeAdvancedCount}
-                </span>
-              ) : null}
-            </Button>
-            <Input
-              type="search"
-              placeholder="Nhập mã hàng hóa, tên hàng hóa..."
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              className="h-9 w-[260px]"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={dateInvalid || summaryQuery.isFetching}
-            >
-              <Search className="mr-1.5 h-3.5 w-3.5" />
-              Lấy dữ liệu
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={rows.length === 0 || exportingVariant !== null}
-                >
-                  {exportingVariant ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CloudDownload className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Xuất khẩu
-                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[310px]">
-                {STOCK_SUMMARY_EXPORT_OPTIONS.map((option) => (
-                  <DropdownMenuItem
-                    key={option.variant}
-                    disabled={exportingVariant !== null}
-                    onSelect={() => void handleExport(option.variant)}
+            <div className="flex flex-wrap items-center gap-2">
+              <PeriodFilter
+                value={draftPeriod}
+                onChange={setDraftPeriod}
+                onApply={applyFilters}
+                hideApply
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button type="button" onClick={() => setFilterDialogOpen(true)}>
+                Bộ lọc
+                {activeAdvancedCount > 0 ? (
+                  <span className="ml-1.5 rounded-full bg-primary-foreground px-1.5 text-[10px] font-semibold leading-4 text-primary">
+                    {activeAdvancedCount}
+                  </span>
+                ) : null}
+              </Button>
+              <Input
+                type="search"
+                placeholder="Nhập mã hàng hóa, tên hàng hóa..."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                className="h-10 flex-1"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={dateInvalid || summaryQuery.isFetching}
+              >
+                <Filter className="mr-1.5 h-4 w-4" />
+                Lấy dữ liệu
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={rows.length === 0 || exportingVariant !== null}
                   >
-                    {option.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    {exportingVariant ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CloudDownload className="mr-1.5 h-4 w-4" />
+                    )}
+                    Xuất khẩu
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[310px]">
+                  {STOCK_SUMMARY_EXPORT_OPTIONS.map((option) => (
+                    <DropdownMenuItem
+                      key={option.variant}
+                      disabled={exportingVariant !== null}
+                      onSelect={() => void handleExport(option.variant)}
+                    >
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </form>
 
           <div className="flex items-center gap-2 pb-1">
@@ -531,10 +497,7 @@ export function InventoryManagementPage() {
         rows={rows}
         loading={summaryQuery.isLoading}
         emptyLabel={
-          applied.search ||
-          applied.storageId ||
-          applied.categoryId ||
-          activeAdvancedCount > 0
+          applied.search || activeAdvancedCount > 0
             ? "Không có dữ liệu tồn kho phù hợp với bộ lọc."
             : "Chưa có dữ liệu tồn kho."
         }

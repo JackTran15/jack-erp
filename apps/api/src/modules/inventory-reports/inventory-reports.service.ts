@@ -28,6 +28,11 @@ import {
   DocumentDetailResult,
   DocumentDetailService,
 } from './services/document-detail.service';
+import {
+  TempWarehouseReportQuery,
+  TempWarehouseReportResult,
+  TempWarehouseReportService,
+} from './services/temp-warehouse-report.service';
 
 const CACHE_NAMESPACE = 'inventory-reports';
 const CACHE_TTL_SECONDS = 45;
@@ -45,6 +50,7 @@ export class InventoryReportsService {
     private readonly stockBalancePivotService: StockBalancePivotService,
     private readonly transferReportService: TransferReportService,
     private readonly documentDetailService: DocumentDetailService,
+    private readonly tempWarehouseReportService: TempWarehouseReportService,
     private readonly cacheService: CacheService,
   ) {}
 
@@ -283,6 +289,58 @@ export class InventoryReportsService {
       CACHE_NAMESPACE,
       cacheKey,
       () => this.documentDetailService.list(detailQuery),
+      CACHE_TTL_SECONDS,
+    );
+
+    return {
+      data: result.data,
+      total: result.total,
+      page,
+      pageSize,
+      period: {
+        startDate: period.startDate.toISOString(),
+        endDate: period.endDate.toISOString(),
+      },
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Báo cáo — Hàng hóa xuất kho tạm (temp-warehouse out goods)
+  // ──────────────────────────────────────────────────────────────────
+  async temporaryWarehouseOutGoods(
+    actor: ActorContext,
+    dto: InventoryReportQueryDto,
+  ) {
+    const period = resolvePeriod({
+      preset: dto.preset,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+    });
+    const page = dto.page ?? 1;
+    const pageSize = dto.pageSize ?? 20;
+
+    const reportQuery: TempWarehouseReportQuery = {
+      organizationId: actor.organizationId,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      branchIds: dto.branchIds,
+      categoryIds: dto.categoryIds,
+      search: dto.search,
+      page,
+      pageSize,
+    };
+
+    // Query shape matches DocumentDetailQuery, so the same cache-key builder applies.
+    const cacheKey = this.buildDocumentDetailCacheKey(
+      'temporary-warehouse-out-goods',
+      actor,
+      reportQuery,
+    );
+
+    const result = await this.cacheService.getOrSet<TempWarehouseReportResult>(
+      CACHE_NAMESPACE,
+      cacheKey,
+      () => this.tempWarehouseReportService.list(reportQuery),
       CACHE_TTL_SECONDS,
     );
 

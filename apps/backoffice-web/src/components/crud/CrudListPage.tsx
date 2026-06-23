@@ -176,6 +176,7 @@ export function CrudListPage({
   // Nhóm hàng hoá renders as a collapsible parent → child tree instead of the
   // flat paginated list. Ids in `collapsedIds` have their children hidden.
   const isCategoryTree = entityKey === "inventory-item-categories";
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const toggleCategoryCollapse = useCallback((id: string) => {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -264,6 +265,21 @@ export function CrudListPage({
   const createMutation = useCrudCreate(entityKey ?? "");
   const updateMutation = useCrudUpdate(entityKey ?? "");
   const deleteMutation = useCrudDelete(entityKey ?? "");
+
+  useEffect(() => {
+    setPage(1);
+    setPageSize(20);
+    setSortBy(initialSort?.sortBy);
+    setSortOrder(initialSort?.sortOrder ?? "desc");
+    setSearch("");
+    setSearchInput("");
+    setColumnFilters({});
+    setSelectedRecordIds(new Set());
+    setCreateDialogOpen(false);
+    setEditSnapshot(null);
+    setDuplicateSnapshot(null);
+    setCollapsedIds(new Set());
+  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!records) {

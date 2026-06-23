@@ -7,8 +7,8 @@ import {
   IsString,
   IsUUID,
   Min,
-  ValidateIf,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { DocCounterpartyKind } from '@erp/shared-interfaces';

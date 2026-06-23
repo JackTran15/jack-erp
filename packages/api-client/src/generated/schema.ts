@@ -5261,6 +5261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/inventory/temporary-warehouse-out-goods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hóa xuất kho tạm */
+        get: operations["InventoryReportsController_temporaryWarehouseOutGoods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/inventory/transfer-summary": {
         parameters: {
             query?: never;
@@ -19225,6 +19242,40 @@ export interface operations {
         };
     };
     InventoryReportsController_stockByBranch: {
+        parameters: {
+            query?: {
+                preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
+                /** @description ISO date (yyyy-MM-dd). Required when preset=custom. */
+                startDate?: string;
+                endDate?: string;
+                /** @description Branch IDs to filter; empty = all visible */
+                branchIds?: string[];
+                /** @description Item category IDs to filter */
+                categoryIds?: string[];
+                /** @description Location/warehouse IDs to filter */
+                locationIds?: string[];
+                /** @description Item-dimension grouping: item (per SKU), parent (per product), group (per category) */
+                itemGroupBy?: "item" | "parent" | "group";
+                /** @description Full-text search on item code/name */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InventoryReportsController_temporaryWarehouseOutGoods: {
         parameters: {
             query?: {
                 preset?: "today" | "this_week" | "last_week" | "this_month" | "last_month" | "this_quarter" | "this_year" | "custom";
