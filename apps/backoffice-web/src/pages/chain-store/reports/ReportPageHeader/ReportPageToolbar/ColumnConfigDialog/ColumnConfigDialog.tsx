@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@erp/ui";
+import { AppModal, Button } from "@erp/ui";
 import { HelpCircle, Save, X } from "lucide-react";
 import type { ReportColumnConfig } from "../../../../../../constants/reports/report.interface";
+import { getReportTypeLabel } from "../../../../../../constants/reports/report-type.constant";
+import { useReportStore } from "../../../../../../store/page-stores/report/report.context";
 import { useTableStore } from "../../../../../../store/common/table-store/table.context";
 import {
   ColumnConfigTable,
@@ -123,9 +118,9 @@ function reorder(
   return { ...draft, order: flattenUnits(next) };
 }
 
-const REPORT_NAME = "TỔNG HỢP BÁN HÀNG THEO NGÀY";
-
 export function ColumnConfigDialog({ open, onClose }: Props) {
+  const reportType = useReportStore((s) => s.reportType);
+  const reportName = getReportTypeLabel(reportType);
   const config = useTableStore((s) => s.config);
   const order = useTableStore((s) => s.columns.order);
   const visibility = useTableStore((s) => s.columns.visibility);
@@ -267,50 +262,16 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90vh] max-w-[1100px] flex-col gap-0 p-0">
-        <DialogHeader className="border-b border-border bg-muted px-6 py-4">
-          <DialogTitle className="text-[18px] font-bold text-foreground">Sửa mẫu</DialogTitle>
-        </DialogHeader>
-
-        <div className="min-h-0 flex-1 overflow-hidden px-4 py-3">
-          <div className="mb-3 text-[13px] font-medium tracking-wide text-muted-foreground">
-            {REPORT_NAME}
-          </div>
-          <div className="flex items-start gap-4">
-            <div className="max-h-[60vh] min-h-0 flex-1 overflow-auto border border-border">
-              <ColumnConfigTable
-                rows={rows}
-                headerVisibility={headerVisibility}
-                headerPinned={headerPinned}
-                onToggleHeaderVisibility={handleToggleHeaderVisibility}
-                onToggleHeaderPinned={handleToggleHeaderPinned}
-                onSelectRow={(row) =>
-                  setSelection(
-                    row.kind === "group"
-                      ? { kind: "group", label: row.label }
-                      : { kind: "column", id: row.id },
-                  )
-                }
-                onToggleExpand={(label) =>
-                  setExpanded((e) => ({ ...e, [label]: !(e[label] ?? true) }))
-                }
-                onToggleVisibility={handleToggleVisibility}
-                onTogglePinned={handleTogglePinned}
-              />
-            </div>
-            <div className="pt-2">
-              <ReorderButtonGroup
-                canUp={canUp}
-                canDown={canDown}
-                onUp={() => move("up")}
-                onDown={() => move("down")}
-              />
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="flex items-center border-t border-border px-6 py-3 sm:justify-between">
+    <AppModal
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title="Sửa mẫu"
+      defaultWidth={1040}
+      defaultHeight={640}
+      footer={
+        <div className="flex items-center sm:justify-between">
           <button
             type="button"
             className="flex items-center gap-1.5 text-[13px] font-medium text-primary hover:underline"
@@ -331,8 +292,41 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
               Hủy bỏ
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      }
+    >
+      <div className="mb-3 text-sm font-semibold uppercase">{reportName}</div>
+      <div className="flex items-center gap-4">
+        <div className="max-h-[60vh] min-h-0 flex-1 overflow-auto border border-border">
+          <ColumnConfigTable
+            rows={rows}
+            headerVisibility={headerVisibility}
+            headerPinned={headerPinned}
+            onToggleHeaderVisibility={handleToggleHeaderVisibility}
+            onToggleHeaderPinned={handleToggleHeaderPinned}
+            onSelectRow={(row) =>
+              setSelection(
+                row.kind === "group"
+                  ? { kind: "group", label: row.label }
+                  : { kind: "column", id: row.id },
+              )
+            }
+            onToggleExpand={(label) =>
+              setExpanded((e) => ({ ...e, [label]: !(e[label] ?? true) }))
+            }
+            onToggleVisibility={handleToggleVisibility}
+            onTogglePinned={handleTogglePinned}
+          />
+        </div>
+        <div>
+          <ReorderButtonGroup
+            canUp={canUp}
+            canDown={canDown}
+            onUp={() => move("up")}
+            onDown={() => move("down")}
+          />
+        </div>
+      </div>
+    </AppModal>
   );
 }

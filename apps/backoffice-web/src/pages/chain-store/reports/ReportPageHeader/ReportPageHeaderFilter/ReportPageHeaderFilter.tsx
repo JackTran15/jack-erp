@@ -16,7 +16,7 @@ export function ReportPageHeaderFilter() {
   const setFilterValue = useReportStore((s) => s.actions.setFilterValue);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <select
         className={`${controlClass} w-[120px]`}
         value={period}

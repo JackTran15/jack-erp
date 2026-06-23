@@ -37,7 +37,8 @@ interface Props {
   onTogglePinned: (row: ColumnConfigRow) => void;
 }
 
-const headerCellClass = "border border-border px-3 py-2 text-[13px] font-bold text-foreground";
+const headerCellClass =
+  "border border-border px-3 py-2 text-[13px] font-bold text-foreground whitespace-nowrap";
 
 export function ColumnConfigTable({
   rows,
@@ -53,10 +54,10 @@ export function ColumnConfigTable({
   return (
     <table className="w-full border-collapse">
       <colgroup>
-        <col style={{ width: "46%" }} />
-        <col style={{ width: "38%" }} />
-        <col style={{ width: "8%" }} />
-        <col style={{ width: "8%" }} />
+        <col style={{ width: "42%" }} />
+        <col style={{ width: "34%" }} />
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "14%" }} />
       </colgroup>
       <thead className="sticky top-0 z-10 bg-muted">
         <tr>

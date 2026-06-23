@@ -10,6 +10,7 @@ export function ReportPageTable() {
   const config = useTableStore((s) => s.config);
   const pagination = useTableStore((s) => s.pagination);
   const appliedRequest = useReportStore((s) => s.appliedRequest);
+  const reloadNonce = useReportStore((s) => s.reloadNonce);
   const branch = useReportStore((s) => s.branch);
 
   const columnIds = useMemo(
@@ -37,6 +38,7 @@ export function ReportPageTable() {
     queryKey: [
       "report-data",
       appliedRequest,
+      reloadNonce,
       branch,
       columnIds,
       pagination.pageIndex,

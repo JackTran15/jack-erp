@@ -99,7 +99,7 @@ const baseFilterLines = [
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
-  REPORT_FILTERS_LINE.WORK_SHIFT,
+  // REPORT_FILTERS_LINE.WORK_SHIFT,
 ];
 export const single_filterRegistryReportTemporaryWarehouseOutGoods =
   baseFilterLines;

@@ -59,6 +59,8 @@ export interface ReportInitialState {
   columnFilters: Record<string, ReportColumnFilter>;
   // null = chưa áp dụng → table chưa gọi API data.
   appliedRequest: AppliedReportRequest | null;
+  // Tăng mỗi lần bấm "Lấy dữ liệu" để ép refetch (queryKey đổi kể cả khi filter không đổi).
+  reloadNonce: number;
 }
 
 export interface ReportActions {

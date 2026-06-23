@@ -48,5 +48,6 @@ export function buildInitialReportState({
     filters,
     columnFilters: {},
     appliedRequest,
+    reloadNonce: 0,
   };
 }

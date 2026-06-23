@@ -7,7 +7,7 @@ export function ReportPageToolbar() {
   const [configOpen, setConfigOpen] = useState(false);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <Button type="button" variant="outline" size="sm">
         <Printer className="mr-1 h-4 w-4" />
         In
