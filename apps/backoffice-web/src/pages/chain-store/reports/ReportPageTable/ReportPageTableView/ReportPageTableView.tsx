@@ -389,6 +389,12 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 ...row.getRightVisibleCells(),
               ];
               const rowBg = rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20";
+              // Nền đục cho cột cố định (cùng màu với dòng): bg-muted/20 là nền trong suốt,
+              // khi cuộn ngang nội dung cột khác sẽ lộ chồng lên — dùng màu đặc để che.
+              const pinnedBg =
+                rowIndex % 2 === 0
+                  ? "hsl(var(--background))"
+                  : "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))";
               return (
                 <tr key={row.id} className={`${rowBg} hover:bg-blue-50/70`}>
                   {cells.map((cell) => {
@@ -400,11 +406,16 @@ export function ReportPageTableView({ rows, totals }: Props) {
                     return (
                       <td
                         key={cell.id}
-                        style={{ width, minWidth: width, ...pinPosition(cell.column) }}
+                        style={{
+                          width,
+                          minWidth: width,
+                          ...pinPosition(cell.column),
+                          ...(pinned ? { backgroundColor: pinnedBg } : {}),
+                        }}
                         className={[
                           `${cellBorder} h-8 px-2 py-0 align-middle`,
                           getReportCellAlignClass(col),
-                          pinned ? `z-10 ${rowBg}` : "",
+                          pinned ? "z-10" : "",
                         ].join(" ")}
                       >
                         {col.tableConfig?.link ? (
