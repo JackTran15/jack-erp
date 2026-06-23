@@ -5,6 +5,13 @@ import {
 } from "../report-table.constant";
 import { ReportColumnConfig, ReportTableConfig } from "../report.interface";
 
+// Options trạng thái hóa đơn — mock, BE chưa hỗ trợ chuỗi; chỉnh lại theo giá trị thật sau.
+const STATUS_FILTER_OPTIONS = [
+  { value: "completed", label: "Hoàn thành" },
+  { value: "processing", label: "Đang xử lý" },
+  { value: "cancelled", label: "Đã hủy" },
+];
+
 const columns: ReportColumnConfig[] = [
   {
     column: ReportTableColumn.DATE,
@@ -20,7 +27,7 @@ const columns: ReportColumnConfig[] = [
     label: "Giờ",
     order: 2,
     visible: true,
-    tableConfig: { width: 72, align: "left", dataType: "text" },
+    tableConfig: { width: 72, align: "left", dataType: "text", filterKind: "time" },
   },
   {
     column: ReportTableColumn.INVOICE_CODE,
@@ -36,7 +43,13 @@ const columns: ReportColumnConfig[] = [
     label: "Trạng thái",
     order: 4,
     visible: true,
-    tableConfig: { width: 110, align: "left", dataType: "text" },
+    tableConfig: {
+      width: 110,
+      align: "left",
+      dataType: "text",
+      filterKind: "select",
+      filterOptions: STATUS_FILTER_OPTIONS,
+    },
   },
   {
     group: ReportTableColumnGroup.REVENUE,

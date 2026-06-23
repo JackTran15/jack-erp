@@ -1,4 +1,4 @@
-import { MultiSelect } from "@erp/ui";
+import { MultiSelectChips } from "@erp/ui";
 import { reportStores } from "../../../_mock/report-stores.mock";
 import type { StoreScopeValue } from "../../../../../../../../store/page-stores/report/report.interface";
 
@@ -39,7 +39,7 @@ export function StoreScopeField({ value, onChange }: Props) {
       </div>
 
       {value.scope === "group" ? (
-        <MultiSelect
+        <MultiSelectChips
           options={STORE_OPTIONS}
           value={value.storeIds}
           onValueChange={(ids) => onChange({ scope: "group", storeIds: ids })}

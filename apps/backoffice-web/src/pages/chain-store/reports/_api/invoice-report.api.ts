@@ -125,7 +125,9 @@ export function buildSearchFilters(
   return payload;
 }
 
-// Column filter (chip header) → backend columnFilters. BE chỉ eq/range nên chỉ map `equals`.
+// Column filter (chip header) → backend columnFilters. BE chỉ hỗ trợ eq nên chỉ map toán tử
+// "bằng": text dùng "equals", còn date/time/number/select dùng "=" (compare-op). Các toán tử
+// so sánh khác (<, >, ≤, ≥) chưa gửi BE — giới hạn backend, xử lý sau.
 export function buildColumnFilters(
   columnFilters: Record<string, ReportColumnFilter>,
   numericCols: Set<string>,
@@ -133,7 +135,8 @@ export function buildColumnFilters(
   const out: ColumnFilter[] = [];
   for (const [col, filter] of Object.entries(columnFilters)) {
     const value = filter.value.trim();
-    if (!value || filter.operator !== "equals") continue;
+    const isEquals = filter.operator === "equals" || filter.operator === "=";
+    if (!value || !isEquals) continue;
     out.push({ col, eq: numericCols.has(col) ? Number(value) : value });
   }
   return out;

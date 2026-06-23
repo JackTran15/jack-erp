@@ -1,4 +1,7 @@
-import { ReportColumnConfig } from "../../constants/reports/report.interface";
+import {
+  ReportColumnConfig,
+  ReportColumnFilterKind,
+} from "../../constants/reports/report.interface";
 
 // Bề rộng mặc định khi cột không khai báo `width` trong registry.
 export const DEFAULT_REPORT_COLUMN_WIDTH = 112;
@@ -43,6 +46,19 @@ export function getReportColumnWidth(col: ReportColumnConfig): number {
 // dataType không khai báo ⇒ coi như cột số (đa số cột báo cáo là số tiền).
 export function isReportNumberColumn(col: ReportColumnConfig): boolean {
   return (col.tableConfig?.dataType ?? "number") === "number";
+}
+
+// Kiểu ô filter của cột: ưu tiên `filterKind` khai báo, else suy ra từ dataType
+// ("date"→date, "text"→text, "number"/không khai báo→number — khớp isReportNumberColumn).
+export function resolveReportColumnFilterKind(
+  col: ReportColumnConfig,
+): ReportColumnFilterKind {
+  const explicit = col.tableConfig?.filterKind;
+  if (explicit) return explicit;
+  const dataType = col.tableConfig?.dataType ?? "number";
+  if (dataType === "date") return "date";
+  if (dataType === "text") return "text";
+  return "number";
 }
 
 // Lề ô dữ liệu: ưu tiên `align`, mặc định suy ra từ dataType (số → phải, còn lại → trái).
