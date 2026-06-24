@@ -91,6 +91,32 @@ describe('InvoiceOrderListingReport.buildColumns', () => {
       group: { id: 'customerPayment', name: 'Khách hàng thanh toán' },
     });
   });
+
+  it('keeps every band contiguous — dynamic customerPayment columns sit before the platform band, not after it', async () => {
+    const report = makeReport({
+      accounts: [{ accountId: ACC, label: 'Tiền mặt', paymentMethod: 'cash', sortOrder: 0 }],
+    });
+    const headers = await report.buildColumns(actor);
+
+    // Each band must appear as a single uninterrupted run.
+    const bands = headers.map((h) => h.group?.id ?? null);
+    const seen = new Set<string | null>();
+    let prev: string | null | undefined;
+    for (const b of bands) {
+      if (b !== prev) {
+        expect(seen.has(b)).toBe(false); // a band already closed must never reopen
+        seen.add(b);
+        prev = b;
+      }
+    }
+
+    // The dynamic account column belongs to customerPayment, so it must land
+    // before the first platform column.
+    const dynIdx = headers.findIndex((h) => h.col === `payment.method.${ACC}`);
+    const firstPlatformIdx = headers.findIndex((h) => h.group?.id === 'platform');
+    expect(dynIdx).toBeGreaterThanOrEqual(0);
+    expect(firstPlatformIdx).toBeGreaterThan(dynIdx);
+  });
 });
 
 describe('InvoiceOrderListingReport.buildData', () => {
