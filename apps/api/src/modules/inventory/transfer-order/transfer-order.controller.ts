@@ -251,6 +251,10 @@ class CreateTransferOrderDto {
 
 class UpdateTransferOrderDto {
   @IsOptional()
+  @IsEnum(TransferOrderStatus)
+  status?: TransferOrderStatus;
+
+  @IsOptional()
   @IsString()
   sourceBranchId?: string;
 
