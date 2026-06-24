@@ -14,6 +14,7 @@ import {
   IsNull,
   LessThanOrEqual,
   MoreThanOrEqual,
+  Not,
   Repository,
 } from "typeorm";
 import {
@@ -474,6 +475,7 @@ export class TransferOrderService {
         TransferOrderStatus.IN_PROGRESS,
         TransferOrderStatus.COMPLETED,
       ]),
+      exportGoodsIssueId: Not(IsNull()),
       ...(params.includeCompleted ? {} : { importGoodsReceiptId: IsNull() }),
     };
     const createdAtRange = this.buildDateRange(params.from, params.to);
@@ -622,6 +624,9 @@ export class TransferOrderService {
       if (nextStatus === TransferOrderStatus.COMPLETED) {
         return this.completeOrderImmediately(to, actor);
       }
+      if (nextStatus === TransferOrderStatus.IN_PROGRESS) {
+        return this.startOrderImmediately(to, actor);
+      }
       to.status = nextStatus;
       await this.toRepo.save(to);
       return this.findOrFail(id, actor.organizationId);
@@ -700,7 +705,8 @@ export class TransferOrderService {
       if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
       if (
         dto.status !== undefined &&
-        dto.status !== TransferOrderStatus.COMPLETED
+        dto.status !== TransferOrderStatus.COMPLETED &&
+        dto.status !== TransferOrderStatus.IN_PROGRESS
       ) {
         to.status = dto.status;
       }
@@ -722,6 +728,9 @@ export class TransferOrderService {
     });
     if (dto.status === TransferOrderStatus.COMPLETED) {
       return this.completeOrderImmediately(saved, actor);
+    }
+    if (dto.status === TransferOrderStatus.IN_PROGRESS) {
+      return this.startOrderImmediately(saved, actor);
     }
     return this.findOrFail(saved.id, actor.organizationId);
   }
@@ -906,6 +915,72 @@ export class TransferOrderService {
         note: l.note,
       };
     });
+  }
+
+  /**
+   * MISA-style start from the transfer-order form. "Đang thực hiện" means the
+   * source store has created the transfer-out voucher, so the destination can
+   * later receive from an actual "Phiếu xuất kho điều chuyển" number.
+   */
+  private async startOrderImmediately(
+    to: TransferOrderEntity,
+    actor: ActorContext,
+  ): Promise<TransferOrderEntity> {
+    if (to.status !== TransferOrderStatus.DRAFT) {
+      if (
+        to.status === TransferOrderStatus.IN_PROGRESS &&
+        to.exportGoodsIssueId
+      ) {
+        return this.findOrFail(to.id, actor.organizationId);
+      }
+      throw new ConflictException("Transfer order is not in DRAFT state");
+    }
+
+    const sourceActor: ActorContext = {
+      ...actor,
+      branchId: to.sourceBranchId,
+    };
+    const lines = await this.deriveExportLines(to, sourceActor);
+    const goodsIssue = await this.goodsIssueService.createAndPost(
+      {
+        locationId: lines[0].locationId,
+        purpose: GoodsIssuePurpose.TRANSFER_OUT,
+        targetBranchId: to.destinationBranchId,
+        referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+        referenceId: to.id,
+        reason: `Transfer order ${to.documentNumber}`,
+        notes: to.notes,
+        lines,
+      },
+      sourceActor,
+    );
+
+    try {
+      await this.toRepo.update(
+        { id: to.id, organizationId: actor.organizationId },
+        {
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: goodsIssue.id,
+          exportedAt: new Date(),
+          exportedBy: actor.userId,
+        },
+      );
+    } catch (error) {
+      try {
+        await this.goodsIssueService.cancel(goodsIssue.id, sourceActor);
+      } catch (rollbackError) {
+        this.logger.error(
+          `Could not reverse goods issue ${goodsIssue.id} after transfer order ${to.id} start failed`,
+          rollbackError instanceof Error ? rollbackError.stack : undefined,
+        );
+      }
+      throw error;
+    }
+
+    this.logger.log(
+      `Transfer order ${to.id} started (goods issue ${goodsIssue.id})`,
+    );
+    return this.findOrFail(to.id, actor.organizationId);
   }
 
   // ─── Import (Store B): importable order → COMPLETED + GoodsReceipt ──────────

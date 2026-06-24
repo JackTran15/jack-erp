@@ -218,8 +218,7 @@ export function TransferInPage() {
       rows.filter((row) => {
         const values: Record<string, string> = {
           requestedDate: row.requestedDate?.slice(0, 10) ?? "",
-          exportDocument:
-            row.exportGoodsIssueDocumentNumber ?? row.documentNumber ?? "",
+          exportDocument: row.exportGoodsIssueDocumentNumber ?? "",
           counterparty: row.counterpartyName ?? "",
           totalAmount: moneyFmt.format(row.totalAmount),
           sourceBranch: row.sourceBranchName || row.sourceBranchId,
@@ -265,11 +264,8 @@ export function TransferInPage() {
         key: "exportDocument",
         label: "Số phiếu xuất",
         width: 150,
-        render: (row) => {
-          const displayNumber =
-            row.exportGoodsIssueDocumentNumber ?? row.documentNumber;
-          if (!displayNumber) return "—";
-          return row.exportGoodsIssueId && row.exportGoodsIssueDocumentNumber ? (
+        render: (row) =>
+          row.exportGoodsIssueDocumentNumber ? (
             <button
               type="button"
               className="font-medium text-primary-blue transition-colors hover:text-primary-blue-hover hover:underline"
@@ -281,11 +277,8 @@ export function TransferInPage() {
               {row.exportGoodsIssueDocumentNumber}
             </button>
           ) : (
-            <span className="font-medium text-primary-blue">
-              {displayNumber}
-            </span>
-          );
-        },
+            "—"
+          ),
       },
       {
         key: "counterparty",
