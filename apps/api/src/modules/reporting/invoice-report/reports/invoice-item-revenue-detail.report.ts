@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -17,7 +17,7 @@ import { ItemCategoryEntity } from '../../../inventory/location/item-category.en
 import { ItemProviderEntity } from '../../../inventory/location/item-provider.entity';
 import { LocationEntity } from '../../../inventory/location/location.entity';
 import { ProviderEntity } from '../../../inventory/location/provider.entity';
-import { InvoiceEntity, InvoiceStatus } from '../../../pos/entities/invoice.entity';
+import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
 import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -33,9 +33,15 @@ import {
   InvoiceItemRowInput,
   itemCellValue,
 } from '../invoice-item-revenue.aggregator';
+import { enrichHeader } from '../report-column.util';
+import {
+  applyBranchScope,
+  applyInvoiceStatusFilter,
+  CONSOLIDATED_PERMISSION,
+  resolveBranchIds,
+  statDateColumn,
+} from '../report-query.util';
 import { ReportDefinition } from '../report-definition';
-
-const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
 
 const fullName = (u?: { firstName?: string; lastName?: string }): string | null => {
   if (!u) return null;
@@ -79,13 +85,15 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
   async buildColumns(_actor: ActorContext): Promise<ReportColumnHeader[]> {
     // Flat catalog — no bands and no dynamic payment-method columns. `desc` is
     // null: values are direct line fields, not MISA formula derivations.
-    return INVOICE_ITEM_REVENUE_COLUMNS.map((c) => ({
-      col: c.key,
-      name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
-      desc: null,
-      type: c.type,
-      group: null,
-    }));
+    return INVOICE_ITEM_REVENUE_COLUMNS.map((c) =>
+      enrichHeader({
+        col: c.key,
+        name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
+        desc: null,
+        type: c.type,
+        group: null,
+      }),
+    );
   }
 
   async buildData(
@@ -110,23 +118,25 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
       );
     }
 
-    const branchId = await this.resolveBranchScope(
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      CONSOLIDATED_PERMISSION,
+    );
+    const branchIds = resolveBranchIds(
+      hasConsolidated,
+      dto.filters.store,
       dto.branchId ?? dto.filters.branchId,
       actor,
     );
 
     const qb = this.invoices
       .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('invoice.status != :cancelled', {
-        cancelled: InvoiceStatus.CANCELLED,
-      });
-    if (branchId) {
-      qb.andWhere('invoice.branchId = :branchId', { branchId });
-    }
+      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
+    applyBranchScope(qb, 'invoice', branchIds);
+    applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
-      .applyEnum('invoice.status', dto.filters.status?.value)
+      .applyDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value)
       .applyEnum('invoice.customerId', dto.filters.customerId)
       .applyEnum('invoice.staffId', dto.filters.cashierId)
@@ -134,11 +144,27 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceById = new Map(invoiceRows.map((i) => [i.id, i]));
 
-    const lines = invoiceRows.length
+    let lines = invoiceRows.length
       ? await this.lineItems.find({
           where: { invoiceId: In([...invoiceById.keys()]) },
         })
       : [];
+
+    // Filter lines by item category (Nhóm hàng hóa) when requested.
+    if (dto.filters.categoryId && lines.length) {
+      const itemIds = [
+        ...new Set(lines.map((l) => l.itemId).filter((id): id is string => !!id)),
+      ];
+      const items = itemIds.length
+        ? await this.catalogItems.find({
+            where: { id: In(itemIds), organizationId: actor.organizationId },
+          })
+        : [];
+      const categoryByItem = new Map(items.map((i) => [i.id, i.categoryId ?? null]));
+      lines = lines.filter(
+        (l) => categoryByItem.get(l.itemId) === dto.filters.categoryId,
+      );
+    }
 
     // Fetch only the auxiliary data the requested columns actually need.
     const needsCustomer = ['customer', 'customerCode', 'customerPhone', 'customerGroup'].some(
@@ -241,10 +267,10 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const offset = (page - 1) * limit;
     const pageRows = filtered.slice(offset, offset + limit);
 
-    const dataRaw = pageRows.map((r) => buildItemRow(dto.columns, r));
+    const rows2 = pageRows.map((r) => buildItemRow(dto.columns, r));
     const totals = filtered.length ? buildItemTotals(dto.columns, filtered) : null;
 
-    return { dataRaw, totals, total, page, limit };
+    return { rows: rows2, totals, total };
   }
 
   private async loadCustomers(
@@ -407,31 +433,5 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     const rows = await this.locations.find({ where: { id: In(ids), organizationId } });
     for (const loc of rows) map.set(loc.id, { code: loc.code, name: loc.name });
     return map;
-  }
-
-  /** Mirror of DailySalesSummaryReport.resolveBranchScope (gated on the consolidated permission). */
-  private async resolveBranchScope(
-    requestedBranchId: string | undefined,
-    actor: ActorContext,
-  ): Promise<string | null> {
-    const hasConsolidated = await this.rbac.hasPermission(
-      actor.userId,
-      actor.organizationId,
-      CONSOLIDATED_PERMISSION,
-    );
-    if (requestedBranchId) {
-      if (hasConsolidated) return requestedBranchId;
-      if (actor.branchId && actor.branchId === requestedBranchId) {
-        return requestedBranchId;
-      }
-      throw new ForbiddenException(`Access denied for branch: ${requestedBranchId}`);
-    }
-    if (hasConsolidated) return null;
-    if (!actor.branchId) {
-      throw new ForbiddenException(
-        'No branch scope available and consolidated access not granted',
-      );
-    }
-    return actor.branchId;
   }
 }

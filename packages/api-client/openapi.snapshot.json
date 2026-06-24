@@ -4900,6 +4900,123 @@
             }
           },
           {
+            "name": "itemCode",
+            "required": false,
+            "in": "query",
+            "description": "Partial match on item SKU",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCodeMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "contains",
+              "type": "string",
+              "enum": [
+                "contains",
+                "equals",
+                "startsWith",
+                "endsWith",
+                "notContains"
+              ]
+            }
+          },
+          {
+            "name": "itemName",
+            "required": false,
+            "in": "query",
+            "description": "Partial match on item name",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "contains",
+              "type": "string",
+              "enum": [
+                "contains",
+                "equals",
+                "startsWith",
+                "endsWith",
+                "notContains"
+              ]
+            }
+          },
+          {
+            "name": "unit",
+            "required": false,
+            "in": "query",
+            "description": "Partial match on unit",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "contains",
+              "type": "string",
+              "enum": [
+                "contains",
+                "equals",
+                "startsWith",
+                "endsWith",
+                "notContains"
+              ]
+            }
+          },
+          {
+            "name": "categoryName",
+            "required": false,
+            "in": "query",
+            "description": "Partial match on category name",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryNameMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "contains",
+              "type": "string",
+              "enum": [
+                "contains",
+                "equals",
+                "startsWith",
+                "endsWith",
+                "notContains"
+              ]
+            }
+          },
+          {
+            "name": "quantityMax",
+            "required": false,
+            "in": "query",
+            "description": "Maximum on-hand quantity",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
             "name": "barcode",
             "required": false,
             "in": "query",
@@ -5093,7 +5210,7 @@
             "description": ""
           }
         },
-        "summary": "Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0)",
+        "summary": "Bỏ hàng hóa khỏi vị trí; tồn dương được chuyển về \"Chưa xếp\" cùng kho",
         "tags": [
           "inventory"
         ]
@@ -13886,6 +14003,81 @@
         ]
       }
     },
+    "/reports/invoices/filter-options": {
+      "get": {
+        "operationId": "InvoiceReportController_getFilterOptions",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Which dropdown to load (store, cashier, invoiceStatus, …).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "store",
+                "cashier",
+                "salesperson",
+                "customer",
+                "productGroup",
+                "brand",
+                "unit",
+                "invoiceStatus",
+                "statDateType",
+                "productType",
+                "statBy"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Optional case-insensitive partial search (dynamic types only).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shared dropdown options for the report filters (store, cashier, status, …).",
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
     "/reports/invoices/search": {
       "post": {
         "operationId": "InvoiceReportController_search",
@@ -15382,6 +15574,36 @@
         ]
       }
     },
+    "/inventory/transfer-orders/{id}/export-goods-issue": {
+      "get": {
+        "operationId": "TransferOrderController_getExportGoodsIssue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsIssueEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "TransferOrder"
+        ]
+      }
+    },
     "/inventory/transfer-orders/{id}/export": {
       "post": {
         "operationId": "TransferOrderController_confirmExport",
@@ -16132,6 +16354,141 @@
           }
         },
         "summary": "Số lượng tồn theo cửa hàng (pivot)",
+        "tags": [
+          "inventory-reports"
+        ]
+      }
+    },
+    "/reports/inventory/temporary-warehouse-out-goods": {
+      "get": {
+        "operationId": "InventoryReportsController_temporaryWarehouseOutGoods",
+        "parameters": [
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "this_month",
+              "type": "string",
+              "enum": [
+                "today",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "this_year",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "ISO date (yyyy-MM-dd). Required when preset=custom.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Branch IDs to filter; empty = all visible",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Item category IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "locationIds",
+            "required": false,
+            "in": "query",
+            "description": "Location/warehouse IDs to filter",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "itemGroupBy",
+            "required": false,
+            "in": "query",
+            "description": "Item-dimension grouping: item (per SKU), parent (per product), group (per category)",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parent",
+                "group"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Full-text search on item code/name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Hàng hóa xuất kho tạm",
         "tags": [
           "inventory-reports"
         ]
@@ -20877,14 +21234,13 @@
           "quantity": {
             "type": "number",
             "minimum": 0.000001,
-            "description": "Số lượng cần xếp"
+            "description": "Số lượng cần xếp. Bỏ trống để lấy toàn bộ tồn ở vị trí \"Chưa xếp\"."
           }
         },
         "required": [
           "itemId",
           "storageId",
-          "destinationLocationId",
-          "quantity"
+          "destinationLocationId"
         ]
       },
       "ArrangeLocationDto": {
@@ -23042,6 +23398,9 @@
           },
           "locationId": {
             "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationEntity"
           },
           "quantity": {
             "type": "number"
@@ -27715,9 +28074,51 @@
           "type"
         ]
       },
+      "StoreScopeDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "\"all\" = every branch the actor may read; \"group\" = the listed storeIds.",
+            "enum": [
+              "all",
+              "group"
+            ]
+          },
+          "storeIds": {
+            "description": "Selected branch ids (used when scope = \"group\"; ignored for \"all\").",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "scope",
+          "storeIds"
+        ]
+      },
       "InvoiceReportFilterDto": {
         "type": "object",
         "properties": {
+          "statDateType": {
+            "type": "string",
+            "description": "Which date column the period filters on (default invoice_date).",
+            "enum": [
+              "invoice_date",
+              "created_date"
+            ]
+          },
+          "productType": {
+            "type": "string",
+            "description": "revenue-by-item only — product kind filter.",
+            "enum": [
+              "product",
+              "service",
+              "combo"
+            ]
+          },
           "issuedAt": {
             "description": "Report period — enforced present by the search handler.",
             "allOf": [
@@ -27726,8 +28127,28 @@
               }
             ]
           },
+          "store": {
+            "description": "Multi-store consolidation scope; absent ⇒ actor's own branch.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StoreScopeDto"
+              }
+            ]
+          },
+          "invoiceStatus": {
+            "description": "Multi-select invoice status; preferred over the single `status` below.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "status": {
-            "$ref": "#/components/schemas/EnumFilterDto"
+            "description": "Legacy single-status filter; kept for back-compat (use invoiceStatus).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
           },
           "type": {
             "$ref": "#/components/schemas/EnumFilterDto"
@@ -27751,23 +28172,31 @@
             "description": "Salesperson — matches invoice.salespersonId.",
             "format": "uuid"
           },
-          "groupBy": {
+          "statBy": {
             "type": "string",
             "description": "revenue-by-item only — row grain (default item).",
             "enum": [
               "item",
-              "group",
-              "brand"
+              "parent",
+              "group"
             ]
           },
           "categoryId": {
             "type": "string",
-            "description": "revenue-by-item only — filter by item category (Nhóm hàng hóa).",
+            "description": "revenue-by-item / per-line reports — filter by item category (Nhóm hàng hóa).",
             "format": "uuid"
           },
           "brand": {
             "type": "string",
             "description": "revenue-by-item only — filter by denormalized item brand (Thương hiệu)."
+          },
+          "statisticByBrand": {
+            "type": "boolean",
+            "description": "Add a brand-grain split (daily-summary / revenue-by-item)."
+          },
+          "allocateComboRevenue": {
+            "type": "boolean",
+            "description": "revenue-by-item only — split combo revenue across components."
           }
         }
       },
@@ -27796,6 +28225,22 @@
             "type": "string"
           },
           "to": {
+            "type": "string"
+          },
+          "contains": {
+            "type": "string",
+            "description": "Text operators (string columns)."
+          },
+          "equals": {
+            "type": "string"
+          },
+          "startsWith": {
+            "type": "string"
+          },
+          "endsWith": {
+            "type": "string"
+          },
+          "notContains": {
             "type": "string"
           }
         },

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -11,7 +11,8 @@ import { ActorContext } from '../../../../common/decorators/actor-context.decora
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { ItemEntity } from '../../../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
-import { InvoiceEntity, InvoiceStatus } from '../../../pos/entities/invoice.entity';
+import { ProductEntity } from '../../../inventory/product/product.entity';
+import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
 import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
 import { RbacService } from '../../../rbac/rbac.service';
 import { InvoiceReportSearchDto } from '../dto/invoice-report-search.dto';
@@ -20,6 +21,7 @@ import {
   aggregateByItem,
   buildItemGroupRow,
   buildItemGroupTotals,
+  ItemGrain,
   itemGroupCellValue,
   RevenueByItemRowInput,
 } from '../revenue-by-item.aggregator';
@@ -27,14 +29,33 @@ import {
   isKnownRevenueByItemColumn,
   REVENUE_BY_ITEM_COLUMNS,
 } from '../revenue-by-item.columns';
+import { enrichHeader } from '../report-column.util';
+import {
+  applyBranchScope,
+  applyInvoiceStatusFilter,
+  CONSOLIDATED_PERMISSION,
+  resolveBranchIds,
+} from '../report-query.util';
 import { ReportDefinition } from '../report-definition';
-
-const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
 
 interface ItemMeta {
   categoryId: string | null;
   category: string | null;
   brand: string | null;
+  parentId: string | null;
+  parentSku: string | null;
+  parentName: string | null;
+}
+
+/** Map the public statBy + statisticByBrand flags onto the internal row grain. */
+function resolveGrain(
+  statBy: ReportGroupBy | undefined,
+  statisticByBrand: boolean | undefined,
+): ItemGrain {
+  if (statisticByBrand) return 'brand';
+  if (statBy === ReportGroupBy.PARENT) return 'parent';
+  if (statBy === ReportGroupBy.GROUP) return 'group';
+  return 'item';
 }
 
 /** MISA-style "Doanh thu theo mặt hàng" — one aggregated row per item / category / brand. */
@@ -51,18 +72,22 @@ export class RevenueByItemReport implements ReportDefinition {
     private readonly catalogItems: Repository<ItemEntity>,
     @InjectRepository(ItemCategoryEntity)
     private readonly categories: Repository<ItemCategoryEntity>,
+    @InjectRepository(ProductEntity)
+    private readonly products: Repository<ProductEntity>,
     private readonly rbac: RbacService,
   ) {}
 
   async buildColumns(_actor: ActorContext): Promise<ReportColumnHeader[]> {
     // Flat catalog — no bands, no dynamic payment-method columns.
-    return REVENUE_BY_ITEM_COLUMNS.map((c) => ({
-      col: c.key,
-      name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
-      desc: null,
-      type: c.type,
-      group: null,
-    }));
+    return REVENUE_BY_ITEM_COLUMNS.map((c) =>
+      enrichHeader({
+        col: c.key,
+        name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
+        desc: null,
+        type: c.type,
+        group: null,
+      }),
+    );
   }
 
   async buildData(
@@ -87,23 +112,25 @@ export class RevenueByItemReport implements ReportDefinition {
       );
     }
 
-    const branchId = await this.resolveBranchScope(
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      CONSOLIDATED_PERMISSION,
+    );
+    const branchIds = resolveBranchIds(
+      hasConsolidated,
+      dto.filters.store,
       dto.branchId ?? dto.filters.branchId,
       actor,
     );
 
     const qb = this.invoices
       .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('invoice.status != :cancelled', {
-        cancelled: InvoiceStatus.CANCELLED,
-      });
-    if (branchId) {
-      qb.andWhere('invoice.branchId = :branchId', { branchId });
-    }
+      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
+    applyBranchScope(qb, 'invoice', branchIds);
+    applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
       .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
-      .applyEnum('invoice.status', dto.filters.status?.value)
       .applyEnum('invoice.type', dto.filters.type?.value);
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceIds = invoiceRows.map((i) => i.id);
@@ -120,6 +147,9 @@ export class RevenueByItemReport implements ReportDefinition {
         itemId: li.itemId ?? null,
         itemCode: li.itemCode,
         itemName: li.itemName,
+        parentId: meta?.parentId ?? null,
+        parentSku: meta?.parentSku ?? null,
+        parentName: meta?.parentName ?? null,
         categoryId: meta?.categoryId ?? null,
         itemCategory: meta?.category ?? null,
         brand: meta?.brand ?? null,
@@ -137,10 +167,13 @@ export class RevenueByItemReport implements ReportDefinition {
     if (dto.filters.brand) {
       rows = rows.filter((r) => r.brand === dto.filters.brand);
     }
+    // NOTE: `productType` (product/service/combo) and `allocateComboRevenue`
+    // have no backing field on the catalogue item, so they are accepted but
+    // currently have no effect. Revisit when item kind / combo composition exists.
 
     const groups = aggregateByItem(
       rows,
-      dto.filters.groupBy ?? ReportGroupBy.ITEM,
+      resolveGrain(dto.filters.statBy, dto.filters.statisticByBrand),
     );
 
     const filtered = dto.columnFilters?.length
@@ -155,13 +188,13 @@ export class RevenueByItemReport implements ReportDefinition {
     const offset = (page - 1) * limit;
     const pageRows = filtered.slice(offset, offset + limit);
 
-    const dataRaw = pageRows.map((g) => buildItemGroupRow(dto.columns, g));
+    const rows2 = pageRows.map((g) => buildItemGroupRow(dto.columns, g));
     const totals = filtered.length ? buildItemGroupTotals(dto.columns, filtered) : null;
 
-    return { dataRaw, totals, total, page, limit };
+    return { rows: rows2, totals, total };
   }
 
-  /** Category name + brand per itemId (inline-resolved relations). */
+  /** Category name + brand + parent product per itemId (inline-resolved relations). */
   private async loadItemMeta(
     lines: InvoiceItemEntity[],
     organizationId: string,
@@ -181,39 +214,26 @@ export class RevenueByItemReport implements ReportDefinition {
       ? await this.categories.find({ where: { id: In(categoryIds), organizationId } })
       : [];
     const nameByCategoryId = new Map(categories.map((c) => [c.id, c.name]));
+
+    const productIds = [
+      ...new Set(items.map((i) => i.productId).filter((id): id is string => !!id)),
+    ];
+    const products = productIds.length
+      ? await this.products.find({ where: { id: In(productIds), organizationId } })
+      : [];
+    const productById = new Map(products.map((p) => [p.id, p]));
+
     for (const i of items) {
+      const parent = i.productId ? productById.get(i.productId) : undefined;
       map.set(i.id, {
         categoryId: i.categoryId ?? null,
         category: i.categoryId ? nameByCategoryId.get(i.categoryId) ?? null : null,
         brand: i.brand ?? null,
+        parentId: i.productId ?? null,
+        parentSku: parent?.code ?? null,
+        parentName: parent?.name ?? null,
       });
     }
     return map;
-  }
-
-  /** Mirror of the other reports' branch scoping (gated on the consolidated permission). */
-  private async resolveBranchScope(
-    requestedBranchId: string | undefined,
-    actor: ActorContext,
-  ): Promise<string | null> {
-    const hasConsolidated = await this.rbac.hasPermission(
-      actor.userId,
-      actor.organizationId,
-      CONSOLIDATED_PERMISSION,
-    );
-    if (requestedBranchId) {
-      if (hasConsolidated) return requestedBranchId;
-      if (actor.branchId && actor.branchId === requestedBranchId) {
-        return requestedBranchId;
-      }
-      throw new ForbiddenException(`Access denied for branch: ${requestedBranchId}`);
-    }
-    if (hasConsolidated) return null;
-    if (!actor.branchId) {
-      throw new ForbiddenException(
-        'No branch scope available and consolidated access not granted',
-      );
-    }
-    return actor.branchId;
   }
 }

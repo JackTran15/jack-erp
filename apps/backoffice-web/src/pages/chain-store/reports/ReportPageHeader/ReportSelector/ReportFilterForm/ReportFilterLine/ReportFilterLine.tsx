@@ -1,21 +1,16 @@
 import {
+  PRODUCT_TYPE_OPTIONS,
+  ReportFilterOptionType,
+  STAT_BY_OPTIONS,
+  STAT_DATE_TYPE_OPTIONS,
+} from "@erp/shared-interfaces";
+import {
   REPORT_FILTERS_LINE,
   REPORT_FILTERS_LINE_METADATA,
 } from "../../../../../../../constants/reports/report-filters.constant";
 import { useReportStore } from "../../../../../../../store/page-stores/report/report.context";
 import {
-  statDateTypeOptions,
-  cashierOptions,
-  salespersonOptions,
-  customerOptions,
-} from "../../_mock/report-invoice-filter.mock";
-import {
   warehouseOptions,
-  productGroupOptions,
-  productTypeOptions,
-  statisticByOptions,
-  unitOptions,
-  brandOptions,
   workShiftOptions,
   receivingStoreOptions,
 } from "../../_mock/report-inventory-filter.mock";
@@ -27,6 +22,7 @@ import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
 import { StatisticByBranchCheckbox } from "./StatisticByBranchCheckbox/StatisticByBranchCheckbox";
 import { InvoiceStatusMultiSelect } from "./InvoiceStatusMultiSelect/InvoiceStatusMultiSelect";
+import { RemoteSelectField } from "./RemoteSelectField/RemoteSelectField";
 import { ReportSelectField } from "./ReportSelectField/ReportSelectField";
 
 interface Props {
@@ -71,7 +67,7 @@ export function ReportFilterLine({ line }: Props) {
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.STAT_DATE_TYPE] ?? ""}
-            options={statDateTypeOptions}
+            options={STAT_DATE_TYPE_OPTIONS}
             placeholder="— Chọn —"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.STAT_DATE_TYPE, v)
@@ -117,18 +113,18 @@ export function ReportFilterLine({ line }: Props) {
         );
       case REPORT_FILTERS_LINE.CASHIER:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.CASHIER}
             value={filters[REPORT_FILTERS_LINE.CASHIER] ?? ""}
-            options={cashierOptions}
             placeholder="Tất cả"
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.CASHIER, v)}
           />
         );
       case REPORT_FILTERS_LINE.SALESPERSON:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.SALESPERSON}
             value={filters[REPORT_FILTERS_LINE.SALESPERSON] ?? ""}
-            options={salespersonOptions}
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.SALESPERSON, v)
@@ -137,9 +133,9 @@ export function ReportFilterLine({ line }: Props) {
         );
       case REPORT_FILTERS_LINE.CUSTOMER:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.CUSTOMER}
             value={filters[REPORT_FILTERS_LINE.CUSTOMER] ?? ""}
-            options={customerOptions}
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.CUSTOMER, v)
@@ -159,9 +155,9 @@ export function ReportFilterLine({ line }: Props) {
         );
       case REPORT_FILTERS_LINE.PRODUCT_GROUP:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.PRODUCT_GROUP}
             value={filters[REPORT_FILTERS_LINE.PRODUCT_GROUP] ?? ""}
-            options={productGroupOptions}
             placeholder="Tất cả nhóm"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_GROUP, v)
@@ -172,7 +168,7 @@ export function ReportFilterLine({ line }: Props) {
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.PRODUCT_TYPE] ?? "product"}
-            options={productTypeOptions}
+            options={PRODUCT_TYPE_OPTIONS}
             placeholder="Hàng hóa"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_TYPE, v)
@@ -183,7 +179,7 @@ export function ReportFilterLine({ line }: Props) {
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.STATISTIC_BY] ?? "item"}
-            options={statisticByOptions}
+            options={STAT_BY_OPTIONS}
             placeholder="Hàng hóa"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.STATISTIC_BY, v)
@@ -192,18 +188,18 @@ export function ReportFilterLine({ line }: Props) {
         );
       case REPORT_FILTERS_LINE.UNIT:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.UNIT}
             value={filters[REPORT_FILTERS_LINE.UNIT] ?? ""}
-            options={unitOptions}
             placeholder="Tất cả ĐVT"
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.UNIT, v)}
           />
         );
       case REPORT_FILTERS_LINE.BRAND:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.BRAND}
             value={filters[REPORT_FILTERS_LINE.BRAND] ?? ""}
-            options={brandOptions}
             placeholder="Tất cả"
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.BRAND, v)}
           />

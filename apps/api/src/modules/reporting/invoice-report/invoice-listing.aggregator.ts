@@ -1,7 +1,7 @@
 import {
-  ReportCell,
   ReportCellValue,
   ReportColumnDataType,
+  ReportRow,
 } from '@erp/shared-interfaces';
 import { parseDynamicColumnKey } from './invoice-report.columns';
 import {
@@ -137,29 +137,28 @@ export function listingColumnType(col: string): ReportColumnDataType {
 export function buildInvoiceRow(
   columns: string[],
   r: InvoiceRowInput,
-): ReportCell[] {
-  return columns.map((col) => ({
-    col,
-    type: listingColumnType(col),
-    value: listingCellValue(col, r),
-  }));
+): ReportRow {
+  const row: ReportRow = {};
+  for (const col of columns) row[col] = listingCellValue(col, r);
+  return row;
 }
 
 /** Footer totals — only money columns (currency/number) are summed; others have no meaningful total. */
 export function buildListingTotals(
   columns: string[],
   rows: InvoiceRowInput[],
-): ReportCell[] {
-  return columns.map((col) => {
+): ReportRow {
+  const out: ReportRow = {};
+  for (const col of columns) {
     const type = listingColumnType(col);
     const summable =
       type === ReportColumnDataType.CURRENCY ||
       type === ReportColumnDataType.NUMBER;
-    const value = summable
+    out[col] = summable
       ? round2(
           rows.reduce((sum, r) => sum + Number(listingCellValue(col, r) ?? 0), 0),
         )
       : null;
-    return { col, type, value };
-  });
+  }
+  return out;
 }

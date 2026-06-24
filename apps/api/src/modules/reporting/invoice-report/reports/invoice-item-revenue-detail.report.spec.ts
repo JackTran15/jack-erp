@@ -156,9 +156,9 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
 
     expect(result).not.toHaveProperty('headers');
     expect(result.total).toBe(2);
-    expect(result.dataRaw).toHaveLength(2);
+    expect(result.rows).toHaveLength(2);
 
-    const row0 = Object.fromEntries(result.dataRaw[0].map((c) => [c.col, c.value]));
+    const row0 = result.rows[0];
     expect(row0).toMatchObject({
       date: '2026-06-03',
       time: '08:30',
@@ -187,7 +187,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       itemNote: 'line note',
     });
 
-    const row1 = Object.fromEntries(result.dataRaw[1].map((c) => [c.col, c.value]));
+    const row1 = result.rows[1];
     expect(row1).toMatchObject({
       sku: 'SKU002',
       itemCategory: null, // it2 has no category
@@ -198,7 +198,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
     });
 
     // totals: quantity + money columns summed; unit price + strings null
-    const totals = Object.fromEntries(result.totals!.map((c) => [c.col, c.value]));
+    const totals = result.totals!;
     expect(totals['quantity']).toBe(3);
     expect(totals['lineAmount']).toBe(2900000);
     expect(totals['lineRevenue']).toBe(2700000);
@@ -224,7 +224,7 @@ describe('InvoiceItemRevenueDetailReport.buildData', () => {
       actor,
     );
     expect(result.total).toBe(1);
-    expect(result.dataRaw[0][0]).toMatchObject({ col: 'sku', value: 'SKU001' });
-    expect(result.totals![2]).toMatchObject({ col: 'lineRevenue', value: 2200000 });
+    expect(result.rows[0].sku).toBe('SKU001');
+    expect(result.totals!['lineRevenue']).toBe(2200000);
   });
 });

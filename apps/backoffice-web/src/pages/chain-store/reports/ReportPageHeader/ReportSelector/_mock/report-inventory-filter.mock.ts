@@ -1,4 +1,4 @@
-import type { ReportFilterOption } from "./report-invoice-filter.mock";
+import type { ReportFilterOption } from "@erp/shared-interfaces";
 
 // Options filter báo cáo kho — mock (chain mode chưa có backend, xem CLAUDE.local.md).
 

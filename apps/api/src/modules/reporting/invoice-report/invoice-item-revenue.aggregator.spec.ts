@@ -1,4 +1,3 @@
-import { ReportColumnDataType } from '@erp/shared-interfaces';
 import {
   InvoiceItemRowInput,
   buildItemRow,
@@ -87,13 +86,10 @@ describe('itemCellValue', () => {
 });
 
 describe('buildItemRow', () => {
-  it('returns self-describing cells in the requested column order', () => {
-    const cells = buildItemRow(['date', 'sku', 'lineRevenue'], row());
-    expect(cells).toEqual([
-      { col: 'date', type: ReportColumnDataType.DATE, value: '2026-06-03' },
-      { col: 'sku', type: ReportColumnDataType.STRING, value: 'SKU001' },
-      { col: 'lineRevenue', type: ReportColumnDataType.CURRENCY, value: 2200000 },
-    ]);
+  it('returns a row keyed by column field in the requested order', () => {
+    const out = buildItemRow(['date', 'sku', 'lineRevenue'], row());
+    expect(Object.keys(out)).toEqual(['date', 'sku', 'lineRevenue']);
+    expect(out).toEqual({ date: '2026-06-03', sku: 'SKU001', lineRevenue: 2200000 });
   });
 });
 
@@ -104,10 +100,10 @@ describe('buildItemTotals', () => {
       ['sku', 'quantity', 'unitPrice', 'lineRevenue'],
       rows,
     );
-    expect(totals[0]).toMatchObject({ col: 'sku', value: null });
-    expect(totals[1]).toMatchObject({ col: 'quantity', value: 5 });
+    expect(totals['sku']).toBeNull();
+    expect(totals['quantity']).toBe(5);
     // per-unit price is not a meaningful total
-    expect(totals[2]).toMatchObject({ col: 'unitPrice', value: null });
-    expect(totals[3]).toMatchObject({ col: 'lineRevenue', value: 5200000 });
+    expect(totals['unitPrice']).toBeNull();
+    expect(totals['lineRevenue']).toBe(5200000);
   });
 });

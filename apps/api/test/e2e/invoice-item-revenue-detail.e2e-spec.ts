@@ -171,12 +171,12 @@ describe('Invoice item revenue detail report (E2E)', () => {
       .set(headers())
       .expect(200);
 
-    const byCol = new Map<string, any>(res.body.headers.map((h: any) => [h.col, h]));
+    const byCol = new Map<string, any>(res.body.columns.map((h: any) => [h.col, h]));
     expect(byCol.get('date')).toMatchObject({ name: 'Ngày', group: null });
     expect(byCol.get('sku')).toMatchObject({ name: 'Mã SKU', group: null });
     expect(byCol.get('lineRevenue')).toMatchObject({ name: 'Doanh thu', group: null });
     expect(byCol.get('supplier')).toMatchObject({ name: 'Nhà cung cấp' });
-    expect(res.body.headers.every((h: any) => h.group === null)).toBe(true);
+    expect(res.body.columns.every((h: any) => h.group === null)).toBe(true);
     expect([...byCol.keys()].some((k) => k.startsWith('payment.method.'))).toBe(false);
   });
 
@@ -198,9 +198,9 @@ describe('Invoice item revenue detail report (E2E)', () => {
 
     expect(res.body).not.toHaveProperty('headers');
     expect(res.body.total).toBe(2); // 2 lines on the paid invoice; cancelled invoice excluded
-    expect(res.body.dataRaw).toHaveLength(2);
+    expect(res.body.rows).toHaveLength(2);
 
-    const row0 = Object.fromEntries(res.body.dataRaw[0].map((c: any) => [c.col, c.value]));
+    const row0 = res.body.rows[0];
     expect(row0).toMatchObject({
       date: '2026-06-03',
       time: '08:30',
@@ -224,7 +224,7 @@ describe('Invoice item revenue detail report (E2E)', () => {
       itemNote: 'line note',
     });
 
-    const row1 = Object.fromEntries(res.body.dataRaw[1].map((c: any) => [c.col, c.value]));
+    const row1 = res.body.rows[1];
     expect(row1).toMatchObject({
       sku: 'SKU-IT2',
       itemCategory: null,
@@ -233,7 +233,7 @@ describe('Invoice item revenue detail report (E2E)', () => {
       itemNote: null,
     });
 
-    const totals = Object.fromEntries(res.body.totals.map((c: any) => [c.col, c.value]));
+    const totals = res.body.totals;
     expect(totals['quantity']).toBe(3);
     expect(totals['lineAmount']).toBe(2900000);
     expect(totals['lineRevenue']).toBe(2700000);
@@ -253,7 +253,7 @@ describe('Invoice item revenue detail report (E2E)', () => {
       })
       .expect(201);
     expect(res.body.total).toBe(1);
-    expect(res.body.dataRaw[0][0]).toMatchObject({ col: 'sku', value: 'SKU-IT1' });
+    expect(res.body.rows[0].sku).toBe('SKU-IT1');
   });
 
   it('400 when filters.issuedAt.from is missing', async () => {

@@ -1,8 +1,8 @@
 import {
   ColumnFilter,
-  ReportCell,
   ReportCellValue,
   ReportColumnDataType,
+  ReportRow,
 } from '@erp/shared-interfaces';
 import {
   getSummaryColumnDef,
@@ -144,27 +144,48 @@ export function columnType(col: string): ReportColumnDataType {
   return getSummaryColumnDef(col)?.type ?? ReportColumnDataType.STRING;
 }
 
-export function buildRow(columns: string[], agg: DayAggregate): ReportCell[] {
-  return columns.map((col) => ({ col, type: columnType(col), value: cellValue(col, agg) }));
+export function buildRow(columns: string[], agg: DayAggregate): ReportRow {
+  const row: ReportRow = {};
+  for (const col of columns) row[col] = cellValue(col, agg);
+  return row;
 }
 
-export function buildTotals(columns: string[], aggs: DayAggregate[]): ReportCell[] {
+export function buildTotals(columns: string[], aggs: DayAggregate[]): ReportRow {
   const combined = combineAggregates(aggs);
-  return columns.map((col) => ({
-    col,
-    type: columnType(col),
-    // The date column has no meaningful total.
-    value: col === 'date' ? null : cellValue(col, combined),
-  }));
+  const row: ReportRow = {};
+  // The date column has no meaningful total.
+  for (const col of columns) row[col] = col === 'date' ? null : cellValue(col, combined);
+  return row;
+}
+
+/** True when `f` carries any text operator (string-column filters). */
+function hasTextOperator(f: ColumnFilter): boolean {
+  return (
+    f.contains !== undefined ||
+    f.equals !== undefined ||
+    f.startsWith !== undefined ||
+    f.endsWith !== undefined ||
+    f.notContains !== undefined
+  );
 }
 
 /** Post-aggregate predicate for a per-column filter. All operators present in `f` must hold (AND). */
 export function matchColumnFilter(value: ReportCellValue, f: ColumnFilter): boolean {
-  if (typeof value === 'string') {
+  // String/text column (or a text operator targeting an empty cell).
+  if (typeof value === 'string' || hasTextOperator(f)) {
+    const s = String(value ?? '');
+    const lower = s.toLowerCase();
     // date / string column — yyyy-mm-dd sorts lexicographically
-    if (f.from !== undefined && value < f.from) return false;
-    if (f.to !== undefined && value > f.to) return false;
-    if (f.eq !== undefined && value !== String(f.eq)) return false;
+    if (f.from !== undefined && s < f.from) return false;
+    if (f.to !== undefined && s > f.to) return false;
+    if (f.eq !== undefined && s !== String(f.eq)) return false;
+    if (f.equals !== undefined && s !== f.equals) return false;
+    if (f.contains !== undefined && !lower.includes(f.contains.toLowerCase())) return false;
+    if (f.startsWith !== undefined && !s.startsWith(f.startsWith)) return false;
+    if (f.endsWith !== undefined && !s.endsWith(f.endsWith)) return false;
+    if (f.notContains !== undefined && lower.includes(f.notContains.toLowerCase())) {
+      return false;
+    }
     return true;
   }
   const n = typeof value === 'number' ? value : Number(value ?? 0);

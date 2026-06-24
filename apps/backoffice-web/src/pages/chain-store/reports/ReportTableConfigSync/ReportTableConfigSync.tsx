@@ -19,19 +19,19 @@ export function ReportTableConfigSync() {
 
   const backendKey = getReportBackendKey(reportType);
 
-  const { data: headers } = useQuery({
+  const { data: columnsResult } = useQuery({
     queryKey: ["report-columns", backendKey],
     queryFn: () => fetchReportColumns(backendKey as string),
     enabled: Boolean(backendKey),
   });
 
   useEffect(() => {
-    if (headers && headers.length > 0) {
-      setConfig(mapHeadersToTableConfig(headers));
+    if (columnsResult && columnsResult.columns.length > 0) {
+      setConfig(mapHeadersToTableConfig(columnsResult));
     } else {
       setConfig(getReportTableConfig(reportType, branch));
     }
-  }, [headers, reportType, branch, setConfig]);
+  }, [columnsResult, reportType, branch, setConfig]);
 
   return null;
 }

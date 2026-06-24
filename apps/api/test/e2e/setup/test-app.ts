@@ -136,6 +136,8 @@ export async function seedBaseData(
     'accounting.coa.create', 'accounting.coa.read',
     'accounting.expenses.create', 'accounting.expenses.read',
     'reporting.dashboard.branch.read', 'reporting.dashboard.consolidated.read',
+    'reporting.invoice.branch.read', 'reporting.invoice.consolidated.read',
+    'reporting.invoice-template.manage',
     'iam.user.read', 'iam.user.write', 'iam.user.delete',
     'iam.user.roles.write', 'iam.user.branches.write',
   ];

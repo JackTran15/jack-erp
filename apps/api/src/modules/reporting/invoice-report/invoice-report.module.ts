@@ -8,6 +8,7 @@ import { CustomerEntity } from '../../customer/customer.entity';
 import { CustomerGroupEntity } from '../../customer/customer-group.entity';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { ItemCategoryEntity } from '../../inventory/location/item-category.entity';
+import { ProductEntity } from '../../inventory/product/product.entity';
 import { ItemProviderEntity } from '../../inventory/location/item-provider.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { ProviderEntity } from '../../inventory/location/provider.entity';
@@ -26,6 +27,7 @@ import { ReportTypeEntity } from './report-type.entity';
 import { ReportTypeSyncService } from './report-type-sync.service';
 import { GetInvoiceReportColumnsHandler } from './queries/get-invoice-report-columns.handler';
 import { GetInvoiceReportTemplateHandler } from './queries/get-invoice-report-template.handler';
+import { GetReportFilterOptionsHandler } from './queries/get-report-filter-options.handler';
 import { ListInvoiceReportTemplatesHandler } from './queries/list-invoice-report-templates.handler';
 import { ListInvoiceReportTypesHandler } from './queries/list-invoice-report-types.handler';
 import { SearchInvoiceReportHandler } from './queries/search-invoice-report.handler';
@@ -54,6 +56,7 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
       UserEntity,
       ItemEntity,
       ItemCategoryEntity,
+      ProductEntity,
       LocationEntity,
       ItemProviderEntity,
       ProviderEntity,
@@ -85,6 +88,7 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
     ReportTypeSyncService,
     // Handlers (search/columns/types dispatch generically via ReportRegistry — no new handler per report type)
     GetInvoiceReportColumnsHandler,
+    GetReportFilterOptionsHandler,
     SearchInvoiceReportHandler,
     ListInvoiceReportTypesHandler,
     ListInvoiceReportTemplatesHandler,

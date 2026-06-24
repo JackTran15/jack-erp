@@ -1,7 +1,7 @@
 import {
-  ReportCell,
   ReportCellValue,
   ReportColumnDataType,
+  ReportRow,
 } from '@erp/shared-interfaces';
 import {
   getItemRevenueColumnDef,
@@ -145,28 +145,27 @@ export function itemColumnType(col: string): ReportColumnDataType {
 export function buildItemRow(
   columns: string[],
   r: InvoiceItemRowInput,
-): ReportCell[] {
-  return columns.map((col) => ({
-    col,
-    type: itemColumnType(col),
-    value: itemCellValue(col, r),
-  }));
+): ReportRow {
+  const row: ReportRow = {};
+  for (const col of columns) row[col] = itemCellValue(col, r);
+  return row;
 }
 
 /** Footer totals — money/quantity columns are summed; per-unit price and non-numeric columns have no meaningful total. */
 export function buildItemTotals(
   columns: string[],
   rows: InvoiceItemRowInput[],
-): ReportCell[] {
-  return columns.map((col) => {
+): ReportRow {
+  const out: ReportRow = {};
+  for (const col of columns) {
     const type = itemColumnType(col);
     const summable =
       !NON_SUMMABLE.has(col) &&
       (type === ReportColumnDataType.CURRENCY ||
         type === ReportColumnDataType.NUMBER);
-    const value = summable
+    out[col] = summable
       ? round2(rows.reduce((sum, r) => sum + Number(itemCellValue(col, r) ?? 0), 0))
       : null;
-    return { col, type, value };
-  });
+  }
+  return out;
 }
