@@ -220,9 +220,20 @@ export function PurchaseOrderFormDialog({
    */
   // On a fresh create, default the warehouse to the branch's main storage
   // (fallback: first available) so the first line's Kho is pre-filled.
+  const activeBranchId = getActiveBranchId();
+  const receivingStorages = useMemo(
+    () =>
+      activeBranchId
+        ? storages.filter((storage) => storage.branchId === activeBranchId)
+        : storages,
+    [activeBranchId, storages],
+  );
   const defaultStorage = useMemo(
-    () => storages.find((s) => s.isMainStorage) ?? storages[0] ?? null,
-    [storages],
+    () =>
+      receivingStorages.find((s) => s.isMainStorage) ??
+      receivingStorages[0] ??
+      null,
+    [receivingStorages],
   );
   const initialStorageId = initial
     ? (initial.location?.storageId ?? "")
@@ -303,6 +314,7 @@ export function PurchaseOrderFormDialog({
   const [dirty, setDirty] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
   const dirtyRef = useRef(false);
+  const autoSelectedTransferRef = useRef<string | null>(null);
   dirtyRef.current = dirty;
 
   // "Tham chiếu": when this receipt was auto-generated from a stock-take
@@ -558,6 +570,12 @@ export function PurchaseOrderFormDialog({
       setPickerOpen(true);
       return;
     }
+    // Wait for the active branch's receiving warehouse before prefilling. The
+    // effect can rerun when storage data arrives; guard the transfer id so a
+    // late props update never resets Kho/Vị trí already chosen by the user.
+    if (!defaultStorage) return;
+    if (autoSelectedTransferRef.current === autoSelectTransferOrder.id) return;
+    autoSelectedTransferRef.current = autoSelectTransferOrder.id;
     void (async () => {
       try {
         const { data } = await apiClient.get<TransferReceiptDetail>(
@@ -584,6 +602,7 @@ export function PurchaseOrderFormDialog({
           status: "IN_PROGRESS" as ImportableTransferOrderListItem["status"],
         });
       } catch (err) {
+        autoSelectedTransferRef.current = null;
         toast.error(getUserFacingApiErrorMessage(err));
         setPickerOpen(true);
       }
@@ -593,6 +612,7 @@ export function PurchaseOrderFormDialog({
     autoSelectTransferOrder,
     mode,
     prefillFromTransferOrder,
+    defaultStorage,
   ]);
 
   /** Unlink the transfer order — the form reverts to a plain goods receipt. */
@@ -675,8 +695,8 @@ export function PurchaseOrderFormDialog({
       // than hitting the API on every keystroke. The page-level fetch
       // already pulls up to 200 storages, which covers all real orgs.
       const filtered = q
-        ? storages.filter((s) => s.name.toLowerCase().includes(q))
-        : storages;
+        ? receivingStorages.filter((s) => s.name.toLowerCase().includes(q))
+        : receivingStorages;
       const effectivePageSize = pageSize ?? 8;
       const start = (page - 1) * effectivePageSize;
       const items = filtered.slice(start, start + effectivePageSize);
@@ -686,7 +706,7 @@ export function PurchaseOrderFormDialog({
         total: filtered.length,
       };
     },
-    [storages],
+    [receivingStorages],
   );
 
   const searchLocationsForStorage = useCallback(

@@ -33,7 +33,10 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { LookupField } from "../../components/forms/LookupField";
@@ -41,7 +44,10 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
-import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import {
+  InventoryPageTitle,
+  InventoryTabBar,
+} from "../../components/document/inventoryTabs";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -61,8 +67,8 @@ import type { DocumentLineImportJobRow } from "../inventory/_components/document
 type TOStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
 const STATUS_LABEL: Record<TOStatus, string> = {
-  DRAFT: "Nháp",
-  IN_PROGRESS: "Đang điều chuyển",
+  DRAFT: "Chưa thực hiện",
+  IN_PROGRESS: "Đang thực hiện",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
 };
@@ -129,10 +135,13 @@ const FILTER_KEYS = [
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
-  return FILTER_KEYS.reduce((acc, k) => {
-    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
-    return acc;
-  }, {} as Record<FilterKey, ColumnFilter>);
+  return FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<FilterKey, ColumnFilter>,
+  );
 }
 
 function getActiveBranchId(): string | null {
@@ -143,11 +152,13 @@ function getActiveBranchId(): string | null {
 }
 
 export function TransferOrdersPage() {
-  const [records, setRecords] = useState<PaginatedResponse<TransferOrder> | null>(null);
+  const [records, setRecords] =
+    useState<PaginatedResponse<TransferOrder> | null>(null);
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
     const range = resolvePeriodRange("this_week");
     return { preset: "this_week", ...range };
@@ -157,9 +168,13 @@ export function TransferOrdersPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
+  const [dialogMode, setDialogMode] = useState<
+    "create" | "edit" | "view" | null
+  >(null);
   const [editingOrder, setEditingOrder] = useState<TransferOrder | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<TransferOrder | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<TransferOrder | null>(
+    null,
+  );
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -174,7 +189,12 @@ export function TransferOrdersPage() {
       setRecords(data);
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setRecords({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+      });
     } finally {
       setLoading(false);
     }
@@ -249,7 +269,11 @@ export function TransferOrdersPage() {
     }
   };
 
-  const editable = selectedOrder?.status === "DRAFT";
+  const editable =
+    selectedOrder?.status === "DRAFT" ||
+    selectedOrder?.status === "IN_PROGRESS" ||
+    (selectedOrder?.status === "COMPLETED" &&
+      !selectedOrder.importGoodsReceiptId);
   const deletable =
     !!selectedOrder &&
     selectedOrder.status !== "COMPLETED" &&
@@ -293,7 +317,7 @@ export function TransferOrdersPage() {
       disabled: !selectedOrder || !editable,
       onClick: () => {
         if (!editable) {
-          toast.info("Chỉ sửa được phiếu ở trạng thái Nháp.");
+          toast.info("Phiếu đã hoàn thành hoặc đã hủy không thể sửa.");
           return;
         }
         if (!selectedOrder) return;
@@ -310,7 +334,12 @@ export function TransferOrdersPage() {
       onClick: () => selectedOrder && setConfirmDelete(selectedOrder),
     },
     { id: "sep1", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => void loadRecords(),
+    },
   ];
 
   const columns: TableColumn<TransferOrder>[] = [
@@ -421,9 +450,15 @@ export function TransferOrdersPage() {
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={records?.total ?? 0}
-            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageChange={(p) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
             onPageSizeChange={(nextPageSize) =>
-              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+              setPagination((prev) => ({
+                ...prev,
+                page: 1,
+                pageSize: nextPageSize,
+              }))
             }
           />
         }
@@ -449,7 +484,9 @@ export function TransferOrdersPage() {
                 type="checkbox"
                 aria-label="Chọn dòng"
                 checked={selectedId === row.id}
-                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
+                onChange={() =>
+                  setSelectedId(selectedId === row.id ? null : row.id)
+                }
                 onClick={(e) => e.stopPropagation()}
               />
             ),
@@ -481,7 +518,9 @@ export function TransferOrdersPage() {
           }}
           onRequestEdit={() => setDialogMode("edit")}
           onRequestDelete={
-            editingOrder && editingOrder.status !== "COMPLETED" && editingOrder.status !== "CANCELLED"
+            editingOrder &&
+            editingOrder.status !== "COMPLETED" &&
+            editingOrder.status !== "CANCELLED"
               ? () => setConfirmDelete(editingOrder)
               : undefined
           }
@@ -542,11 +581,21 @@ function DetailPanel({
         <table className="w-full border-collapse text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
-              <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Kho nguồn</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Mã SKU
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Tên hàng hóa
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Kho nguồn
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Đơn vị tính
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Số lượng
+              </th>
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
             </tr>
           </thead>
@@ -556,10 +605,12 @@ function DetailPanel({
               const name = line.item?.name ?? "—";
               const unit = line.item?.unit ?? "—";
               const srcId = line.sourceStorageId ?? order.sourceStorageId;
-              const srcName = srcId ? storageNameById.get(srcId) ?? "—" : "—";
+              const srcName = srcId ? (storageNameById.get(srcId) ?? "—") : "—";
               return (
                 <tr key={line.id} className="border-b">
-                  <td className="border-r px-2 py-1 font-mono text-xs">{code}</td>
+                  <td className="border-r px-2 py-1 font-mono text-xs">
+                    {code}
+                  </td>
                   <td className="border-r px-2 py-1">{name}</td>
                   <td className="border-r px-2 py-1">{srcName}</td>
                   <td className="border-r px-2 py-1">{unit}</td>
@@ -633,11 +684,19 @@ function TransferOrderFormDialog({
   onRequestDelete?: () => void;
 }) {
   const isView = mode === "view";
+  const isInProgress = initial?.status === "IN_PROGRESS";
+  const isIncompleteCompleted =
+    initial?.status === "COMPLETED" && !initial.importGoodsReceiptId;
+  const activeBranchId = getActiveBranchId();
+  const isSourceBranch = !initial || initial.sourceBranchId === activeBranchId;
+  const canEditDetails =
+    !isView && !isInProgress && !isIncompleteCompleted && isSourceBranch;
 
   // For Misa-style behavior: source branch defaults to the active branch
   // the user is currently scoped to, so they only need to pick destination.
   const fallbackSourceBranchId = getActiveBranchId() ?? "";
-  const initialSourceBranchId = initial?.sourceBranchId ?? fallbackSourceBranchId;
+  const initialSourceBranchId =
+    initial?.sourceBranchId ?? fallbackSourceBranchId;
   const initialSourceBranchName =
     branches.find((b) => b.id === initialSourceBranchId)?.name ?? "";
   const initialDestBranchId = initial?.destinationBranchId ?? "";
@@ -649,28 +708,35 @@ function TransferOrderFormDialog({
     storages.find((s) => s.branchId === initialSourceBranchId)?.id ??
     "";
   const [sourceBranchId, setSourceBranchId] = useState(initialSourceBranchId);
-  const [sourceBranchLabel, setSourceBranchLabel] = useState(initialSourceBranchName);
+  const [sourceBranchLabel, setSourceBranchLabel] = useState(
+    initialSourceBranchName,
+  );
   const [destBranchId, setDestBranchId] = useState(initialDestBranchId);
   const [destBranchLabel, setDestBranchLabel] = useState(initialDestBranchName);
-  const [sourceStorageId, setSourceStorageId] = useState(initialSourceStorageId);
+  const [sourceStorageId, setSourceStorageId] = useState(
+    initialSourceStorageId,
+  );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [docDate, setDocDate] = useState(
     initial?.requestedDate ?? new Date().toISOString().slice(0, 10),
   );
+  const [status, setStatus] = useState<TOStatus>(initial?.status ?? "DRAFT");
   const [lines, setLines] = useState<FormLine[]>(() => {
     if (!initial) return [emptyLine()];
 
     const initialLines = initial.lines.map((l) => ({
-          itemId: l.itemId,
-          itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
-          itemName: l.item?.name ?? "",
-          unit: l.item?.unit ?? "",
-          requestedQty: Number(l.requestedQty),
-          sourceStorageId: l.sourceStorageId ?? "",
-          note: l.note ?? "",
-        }));
+      itemId: l.itemId,
+      itemLabel: l.item?.code ?? l.itemId.slice(0, 8),
+      itemName: l.item?.name ?? "",
+      unit: l.item?.unit ?? "",
+      requestedQty: Number(l.requestedQty),
+      sourceStorageId: l.sourceStorageId ?? "",
+      note: l.note ?? "",
+    }));
 
-    return isView ? initialLines : normalizeFormLines(initialLines);
+    return isView || isInProgress
+      ? initialLines
+      : normalizeFormLines(initialLines);
   });
 
   const [saving, setSaving] = useState(false);
@@ -709,7 +775,9 @@ function TransferOrderFormDialog({
         ];
       });
       setLines(normalizeFormLines(mapped));
-      const firstStorageId = mapped.find((line) => line.sourceStorageId)?.sourceStorageId;
+      const firstStorageId = mapped.find(
+        (line) => line.sourceStorageId,
+      )?.sourceStorageId;
       if (firstStorageId && !sourceStorageId) {
         setSourceStorageId(firstStorageId);
       }
@@ -755,7 +823,11 @@ function TransferOrderFormDialog({
         `/branches?${params}`,
       );
       const fetched = data.page * data.pageSize;
-      return { items: data.data, hasMore: fetched < data.total, total: data.total };
+      return {
+        items: data.data,
+        hasMore: fetched < data.total,
+        total: data.total,
+      };
     },
     [],
   );
@@ -764,7 +836,9 @@ function TransferOrderFormDialog({
       const result = await searchBranches(query, page, pageSize);
       return {
         ...result,
-        items: result.items.filter((branch) => branch.id !== fallbackSourceBranchId),
+        items: result.items.filter(
+          (branch) => branch.id !== fallbackSourceBranchId,
+        ),
       };
     },
     [fallbackSourceBranchId, searchBranches],
@@ -792,9 +866,34 @@ function TransferOrderFormDialog({
   );
 
   const summaryLines = getPersistableFormLines(lines);
-  const totalQty = summaryLines.reduce((s, l) => s + Number(l.requestedQty || 0), 0);
+  const totalQty = summaryLines.reduce(
+    (s, l) => s + Number(l.requestedQty || 0),
+    0,
+  );
 
   const handleSave = useCallback(async (): Promise<boolean> => {
+    const isStatusOnlyEdit =
+      isInProgress || isIncompleteCompleted || !isSourceBranch;
+    if (isStatusOnlyEdit) {
+      setSaving(true);
+      try {
+        await apiClient.patch(`/inventory/transfer-orders/${initial!.id}`, {
+          status,
+          ...(isSourceBranch && !isIncompleteCompleted
+            ? { notes: notes || undefined }
+            : {}),
+        });
+        setDirty(false);
+        toast.success("Đã cập nhật lệnh điều chuyển.");
+        await onSaved();
+        return true;
+      } catch (err) {
+        toast.error(getUserFacingApiErrorMessage(err));
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    }
     if (!sourceBranchId) {
       toast.error("Vui lòng chọn chi nhánh nguồn.");
       return false;
@@ -819,6 +918,7 @@ function TransferOrderFormDialog({
     setSaving(true);
     try {
       const payload = {
+        ...(mode === "edit" ? { status } : {}),
         sourceBranchId,
         destinationBranchId: destBranchId,
         sourceStorageId: sourceStorageId || undefined,
@@ -832,7 +932,10 @@ function TransferOrderFormDialog({
         })),
       };
       if (mode === "edit" && initial?.id) {
-        await apiClient.patch(`/inventory/transfer-orders/${initial.id}`, payload);
+        await apiClient.patch(
+          `/inventory/transfer-orders/${initial.id}`,
+          payload,
+        );
         toast.success("Đã cập nhật phiếu điều chuyển.");
       } else {
         await apiClient.post("/inventory/transfer-orders", payload);
@@ -851,6 +954,10 @@ function TransferOrderFormDialog({
     sourceBranchId,
     destBranchId,
     sourceStorageId,
+    status,
+    isInProgress,
+    isIncompleteCompleted,
+    isSourceBranch,
     docDate,
     notes,
     lines,
@@ -890,8 +997,20 @@ function TransferOrderFormDialog({
   };
 
   const dialogToolbar: ToolbarItem[] = [
-    { id: "prev", label: "Trước", icon: ChevronLeft, disabled: true, onClick: () => {} },
-    { id: "next", label: "Sau", icon: ChevronRight, disabled: true, onClick: () => {} },
+    {
+      id: "prev",
+      label: "Trước",
+      icon: ChevronLeft,
+      disabled: true,
+      onClick: () => {},
+    },
+    {
+      id: "next",
+      label: "Sau",
+      icon: ChevronRight,
+      disabled: true,
+      onClick: () => {},
+    },
     { id: "sep1", type: "separator" },
     {
       id: "create-new",
@@ -904,7 +1023,11 @@ function TransferOrderFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView || initial?.status !== "DRAFT",
+      disabled:
+        !isView ||
+        (initial?.status !== "DRAFT" &&
+          initial?.status !== "IN_PROGRESS" &&
+          !isIncompleteCompleted),
       onClick: onRequestEdit,
     },
     {
@@ -933,8 +1056,20 @@ function TransferOrderFormDialog({
       onClick: () => {},
     },
     { id: "sep2", type: "separator" },
-    { id: "print", label: "In", icon: Printer, disabled: true, onClick: () => {} },
-    { id: "export", label: "Xuất khẩu", icon: CloudUpload, disabled: true, onClick: () => {} },
+    {
+      id: "print",
+      label: "In",
+      icon: Printer,
+      disabled: true,
+      onClick: () => {},
+    },
+    {
+      id: "export",
+      label: "Xuất khẩu",
+      icon: CloudUpload,
+      disabled: true,
+      onClick: () => {},
+    },
     { id: "help", label: "Trợ giúp", icon: HelpCircle, onClick: () => {} },
     { id: "close", label: "Đóng", icon: X, onClick: requestClose },
   ];
@@ -1006,11 +1141,21 @@ function TransferOrderFormDialog({
           renderItem={(item) => item.name}
           renderMeta={(item) => `${item.code} · ${item.unit}`}
           columns={[
-            { key: "code", label: "Mã", className: "w-[120px] font-mono", render: (it) => it.code },
+            {
+              key: "code",
+              label: "Mã",
+              className: "w-[120px] font-mono",
+              render: (it) => it.code,
+            },
             { key: "name", label: "Tên hàng hóa", render: (it) => it.name },
-            { key: "unit", label: "ĐVT", className: "w-[80px]", render: (it) => it.unit },
+            {
+              key: "unit",
+              label: "ĐVT",
+              className: "w-[80px]",
+              render: (it) => it.unit,
+            },
           ]}
-          disabled={isView}
+          disabled={!canEditDetails}
           className="h-full"
         />
       ),
@@ -1030,11 +1175,13 @@ function TransferOrderFormDialog({
         <select
           className="h-full w-full bg-transparent px-2 text-sm outline-none disabled:opacity-60"
           value={row.sourceStorageId || sourceStorageId}
-          disabled={isView}
+          disabled={!canEditDetails}
           onChange={(e) => {
             const v = e.target.value;
             setLines((prev) =>
-              prev.map((l, i) => (i === idx ? { ...l, sourceStorageId: v } : l)),
+              prev.map((l, i) =>
+                i === idx ? { ...l, sourceStorageId: v } : l,
+              ),
             );
             markDirty();
           }}
@@ -1071,8 +1218,6 @@ function TransferOrderFormDialog({
     },
   ];
 
-  const statusLabel = initial?.status ? STATUS_LABEL[initial.status] : "Chưa thực hiện";
-
   return (
     <>
       <DocumentFormDialog
@@ -1089,12 +1234,10 @@ function TransferOrderFormDialog({
         generalInfo={
           <>
             <div className="grid grid-cols-[120px_minmax(0,1fr)_70px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
-              <label className="text-sm text-muted-foreground">Điều chuyển từ</label>
-              <Input
-                value={sourceBranchLabel}
-                readOnly
-                disabled
-              />
+              <label className="text-sm text-muted-foreground">
+                Điều chuyển từ
+              </label>
+              <Input value={sourceBranchLabel} readOnly disabled />
               <label className="text-sm text-muted-foreground">Đến</label>
               <LookupField
                 enableSearchModal
@@ -1117,10 +1260,18 @@ function TransferOrderFormDialog({
                 renderItem={(b) => b.name}
                 renderMeta={(b) => b.address ?? ""}
                 columns={[
-                  { key: "name", label: "Tên chi nhánh", render: (b) => b.name },
-                  { key: "address", label: "Địa chỉ", render: (b) => b.address ?? "—" },
+                  {
+                    key: "name",
+                    label: "Tên chi nhánh",
+                    render: (b) => b.name,
+                  },
+                  {
+                    key: "address",
+                    label: "Địa chỉ",
+                    render: (b) => b.address ?? "—",
+                  },
                 ]}
-                disabled={isView}
+                disabled={!canEditDetails}
               />
             </div>
             <FieldRow label="Lý do">
@@ -1130,7 +1281,7 @@ function TransferOrderFormDialog({
                   setNotes(e.target.value);
                   markDirty();
                 }}
-                disabled={isView}
+                disabled={isView || !isSourceBranch}
               />
             </FieldRow>
             <FieldRow label="Tham chiếu">
@@ -1164,11 +1315,23 @@ function TransferOrderFormDialog({
                   setDocDate(e.target.value);
                   markDirty();
                 }}
-                disabled={isView}
+                disabled={!canEditDetails}
               />
             </FieldRow>
             <FieldRow label="Trạng thái">
-              <Input value={statusLabel} readOnly disabled />
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                value={status}
+                disabled={isView || mode === "create"}
+                onChange={(event) => {
+                  setStatus(event.target.value as TOStatus);
+                  markDirty();
+                }}
+              >
+                <option value="DRAFT">Chưa thực hiện</option>
+                <option value="IN_PROGRESS">Đang thực hiện</option>
+                <option value="COMPLETED">Hoàn thành</option>
+              </select>
             </FieldRow>
           </>
         }
@@ -1181,7 +1344,7 @@ function TransferOrderFormDialog({
             <button
               type="button"
               className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
-              disabled={isView || !sourceStorageId}
+              disabled={!canEditDetails || !sourceStorageId}
               onClick={() => {
                 if (!sourceStorageId) return;
                 setLines((prev) =>
@@ -1200,7 +1363,7 @@ function TransferOrderFormDialog({
             <button
               type="button"
               className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
-              disabled={isView || saving}
+              disabled={!canEditDetails || saving}
               onClick={() => setImportOpen(true)}
             >
               Nhập khẩu
@@ -1211,12 +1374,18 @@ function TransferOrderFormDialog({
           <LineItemGrid
             columns={lineColumns}
             rows={lines}
-            onChangeCell={(idx, key, value) => {
-              setLines((prev) =>
-                prev.map((l, i) => (i === idx ? { ...l, [key]: value } : l)),
-              );
-              markDirty();
-            }}
+            onChangeCell={
+              canEditDetails
+                ? (idx, key, value) => {
+                    setLines((prev) =>
+                      prev.map((l, i) =>
+                        i === idx ? { ...l, [key]: value } : l,
+                      ),
+                    );
+                    markDirty();
+                  }
+                : undefined
+            }
             onAddRow={() => {
               setLines((prev) => normalizeFormLines([...prev, emptyLine()]));
               markDirty();
@@ -1227,8 +1396,8 @@ function TransferOrderFormDialog({
               );
               markDirty();
             }}
-            showAddRow={!isView}
-            showRowActions={!isView}
+            showAddRow={canEditDetails}
+            showRowActions={canEditDetails}
           />
         }
         footerSummary={
@@ -1285,7 +1454,13 @@ function TransferOrderFormDialog({
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-[120px_1fr] items-center gap-3">
       <label className="text-sm text-muted-foreground">{label}</label>

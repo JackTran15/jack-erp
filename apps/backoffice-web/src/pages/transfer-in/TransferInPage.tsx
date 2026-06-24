@@ -42,14 +42,17 @@ import type { GoodsIssue } from "../../components/document/goods-issue-shared";
 const moneyFmt = new Intl.NumberFormat("vi-VN");
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
-type TransferInStatus =
-  | TransferOrderStatus.IN_PROGRESS
-  | TransferOrderStatus.COMPLETED;
+function isReceivableTransfer(row: ImportableTransferOrderListItem): boolean {
+  return (
+    !row.importGoodsReceiptId &&
+    (row.status === TransferOrderStatus.IN_PROGRESS ||
+      row.status === TransferOrderStatus.COMPLETED)
+  );
+}
 
-const STATUS_LABELS: Record<TransferInStatus, string> = {
-  [TransferOrderStatus.IN_PROGRESS]: "Chưa nhập kho",
-  [TransferOrderStatus.COMPLETED]: "Đã nhập kho",
-};
+function receiveStatusLabel(row: ImportableTransferOrderListItem): string {
+  return row.importGoodsReceiptId ? "Đã nhập kho" : "Chưa nhập kho";
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -93,7 +96,17 @@ export function TransferInPage() {
   });
   // Data the in-place goods-receipt dialog needs (mirrors PurchaseOrdersPage).
   const [providers, setProviders] = useState<InventoryProvider[]>([]);
+  // Keep the organization-wide list for viewing the source XK document, but
+  // only expose active-branch warehouses to the destination receipt form.
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
+  const receivingStorages = useMemo(() => {
+    const activeBranchId =
+      localStorage.getItem("active_branch_id") ??
+      localStorage.getItem("branch_id");
+    return activeBranchId
+      ? storages.filter((storage) => storage.branchId === activeBranchId)
+      : [];
+  }, [storages]);
   // Open the Nhập kho form in-place for this transfer (no navigation away).
   const [receiveTarget, setReceiveTarget] =
     useState<ImportableTransferOrderListItem | null>(null);
@@ -211,7 +224,7 @@ export function TransferInPage() {
           sourceBranch: row.sourceBranchName || row.sourceBranchId,
           notes: row.notes ?? "",
           documentType: "Phiếu xuất kho điều chuyển",
-          status: row.status,
+          status: receiveStatusLabel(row),
         };
         return Object.entries(filters).every(([key, filter]) =>
           matchesText(
@@ -307,12 +320,15 @@ export function TransferInPage() {
         filterPlaceholder: "Tất cả",
         filterOptions: [
           {
-            value: TransferOrderStatus.IN_PROGRESS,
-            label: STATUS_LABELS[TransferOrderStatus.IN_PROGRESS],
+            value: "Chưa nhập kho",
+            label: "Chưa nhập kho",
+          },
+          {
+            value: "Đã nhập kho",
+            label: "Đã nhập kho",
           },
         ],
-        render: (row) =>
-          STATUS_LABELS[row.status as TransferInStatus] ?? row.status,
+        render: (row) => receiveStatusLabel(row),
       },
     ],
     [openExportView],
@@ -392,9 +408,7 @@ export function TransferInPage() {
         id: "receive",
         label: "Nhập kho",
         icon: PackagePlus,
-        disabled:
-          !selectedRow ||
-          selectedRow.status !== TransferOrderStatus.IN_PROGRESS,
+        disabled: !selectedRow || !isReceivableTransfer(selectedRow),
         onClick: () => selectedRow && openReceiptFor(selectedRow),
       },
       {
@@ -517,7 +531,9 @@ export function TransferInPage() {
         emptyLabel="Không có phiếu điều chuyển phù hợp."
         getRowKey={(row) => row.id}
         onRowClick={selectOnlyRow}
-        onRowDoubleClick={(row) => openReceiptFor(row)}
+        onRowDoubleClick={(row) => {
+          if (isReceivableTransfer(row)) openReceiptFor(row);
+        }}
         leadingColumn={{
           width: 40,
           header: (
@@ -567,6 +583,7 @@ export function TransferInPage() {
             type="button"
             size="sm"
             className="h-7 px-2 py-0"
+            disabled={!isReceivableTransfer(row)}
             onClick={() => openReceiptFor(row)}
           >
             Nhập kho
@@ -600,7 +617,7 @@ export function TransferInPage() {
           mode="create"
           initial={null}
           providers={providers}
-          storages={storages}
+          storages={receivingStorages}
           actionLoading={false}
           onClose={() => setReceiveTarget(null)}
           onSaved={async () => {

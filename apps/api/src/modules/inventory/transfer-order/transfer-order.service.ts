@@ -11,8 +11,10 @@ import {
   Between,
   DataSource,
   In,
+  IsNull,
   LessThanOrEqual,
   MoreThanOrEqual,
+  Not,
   Repository,
 } from "typeorm";
 import {
@@ -38,6 +40,7 @@ import { GoodsReceiptService } from "../goods-receipt/goods-receipt.service";
 import { LocationEntity } from "../location/location.entity";
 import { StockBalanceEntity } from "../ledger/stock-balance.entity";
 import { GoodsIssueEntity } from "../goods-issue/goods-issue.entity";
+import { StorageEntity } from "../location/storage.entity";
 import { TransferOrderEntity } from "./transfer-order.entity";
 import { TransferOrderLineEntity } from "./transfer-order-line.entity";
 
@@ -95,6 +98,7 @@ export interface CreateAndConfirmTransferExportDto {
 }
 
 export interface UpdateTransferOrderDto {
+  status?: TransferOrderStatus;
   sourceBranchId?: string;
   destinationBranchId?: string;
   sourceStorageId?: string;
@@ -126,6 +130,8 @@ export class TransferOrderService {
     private readonly giRepo: Repository<GoodsIssueEntity>,
     @InjectRepository(BranchEntity)
     private readonly branchRepo: Repository<BranchEntity>,
+    @InjectRepository(StorageEntity)
+    private readonly storageRepo: Repository<StorageEntity>,
     private readonly dataSource: DataSource,
     private readonly documentNumberingService: DocumentNumberingService,
     private readonly goodsIssueService: GoodsIssueService,
@@ -270,7 +276,10 @@ export class TransferOrderService {
       );
     }
     const gi = await this.giRepo.findOne({
-      where: { id: to.exportGoodsIssueId, organizationId: actor.organizationId },
+      where: {
+        id: to.exportGoodsIssueId,
+        organizationId: actor.organizationId,
+      },
     });
     if (!gi) {
       throw new NotFoundException(
@@ -388,10 +397,7 @@ export class TransferOrderService {
     };
     if (query.status) baseWhere.status = query.status;
     const where = query.branchId
-      ? [
-          { ...baseWhere, sourceBranchId: query.branchId },
-          { ...baseWhere, destinationBranchId: query.branchId },
-        ]
+      ? { ...baseWhere, sourceBranchId: query.branchId }
       : baseWhere;
 
     const page = Math.max(1, Number(query.page ?? 1));
@@ -453,10 +459,10 @@ export class TransferOrderService {
   }
 
   /**
-   * IN_PROGRESS transfer orders the actor's active branch (as destination) can
-   * import — feeds the "Chọn chứng từ xuất kho điều chuyển" picker on the
-   * goods-receipt form. Inlines the source branch name and the export goods
-   * issue's (XK) document number + total amount.
+   * Transfer orders the actor's active branch (as destination) can import.
+   * MISA allows the source form to mark a transfer order "Hoàn thành" before
+   * the destination creates its stock receipt, so both PROGRESS and
+   * COMPLETED-without-import-reference are importable here.
    */
   async listImportable(
     params: { from?: string; to?: string; includeCompleted?: boolean },
@@ -465,9 +471,12 @@ export class TransferOrderService {
     const where: Record<string, unknown> = {
       organizationId: actor.organizationId,
       destinationBranchId: actor.branchId,
-      status: params.includeCompleted
-        ? In([TransferOrderStatus.IN_PROGRESS, TransferOrderStatus.COMPLETED])
-        : TransferOrderStatus.IN_PROGRESS,
+      status: In([
+        TransferOrderStatus.IN_PROGRESS,
+        TransferOrderStatus.COMPLETED,
+      ]),
+      exportGoodsIssueId: Not(IsNull()),
+      ...(params.includeCompleted ? {} : { importGoodsReceiptId: IsNull() }),
     };
     const createdAtRange = this.buildDateRange(params.from, params.to);
     if (createdAtRange) where.createdAt = createdAtRange;
@@ -541,11 +550,21 @@ export class TransferOrderService {
         importGoodsReceiptId: o.importGoodsReceiptId ?? null,
         exportGoodsIssueDocumentNumber: gi?.documentNumber ?? null,
         counterpartyName: gi?.counterpartyName ?? null,
-        totalAmount: gi?.total ?? 0,
+        totalAmount:
+          gi?.total ??
+          (o.lines ?? []).reduce(
+            (sum, line) =>
+              sum +
+              Number(line.requestedQty ?? 0) *
+                Number(line.item?.purchasePrice ?? 0),
+            0,
+          ),
         lines: (o.lines ?? []).map((line) => {
           const issueLine = gi?.lines.find(
             (candidate) => candidate.itemId === line.itemId,
           );
+          const fallbackQuantity = Number(line.requestedQty ?? 0);
+          const fallbackUnitPrice = Number(line.item?.purchasePrice ?? 0);
           return {
             id: line.id,
             itemId: line.itemId,
@@ -554,9 +573,10 @@ export class TransferOrderService {
             unit: issueLine?.unit ?? line.item?.unit ?? "",
             storageName: issueLine?.storageName ?? null,
             locationCode: issueLine?.locationCode ?? null,
-            quantity: issueLine?.quantity ?? Number(line.requestedQty ?? 0),
-            unitPrice: issueLine?.unitPrice ?? 0,
-            lineTotal: issueLine?.lineTotal ?? 0,
+            quantity: issueLine?.quantity ?? fallbackQuantity,
+            unitPrice: issueLine?.unitPrice ?? fallbackUnitPrice,
+            lineTotal:
+              issueLine?.lineTotal ?? fallbackQuantity * fallbackUnitPrice,
             notes: issueLine?.notes ?? line.note ?? null,
           };
         }),
@@ -565,7 +585,7 @@ export class TransferOrderService {
     });
   }
 
-  // ─── Update (DRAFT: full; IN_PROGRESS: notes + attachments only) ─────────────
+  // ─── Update (DRAFT: full + start; IN_PROGRESS: notes + attachments only) ─────
 
   async update(
     id: string,
@@ -573,11 +593,44 @@ export class TransferOrderService {
     actor: ActorContext,
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
-    this.assertSourceBranch(
-      to,
-      actor,
-      "Chỉ cửa hàng nguồn được sửa lệnh điều chuyển",
-    );
+    this.assertParticipantBranch(to, actor);
+    const isSourceBranch = actor.branchId === to.sourceBranchId;
+    const isStatusOnlyCompletion =
+      dto.status === TransferOrderStatus.COMPLETED &&
+      Object.entries(dto).every(
+        ([key, value]) => key === "status" || value === undefined,
+      );
+
+    if (to.status === TransferOrderStatus.COMPLETED && isStatusOnlyCompletion) {
+      return this.completeOrderImmediately(to, actor);
+    }
+
+    if (!isSourceBranch) {
+      const nextStatus = dto.status;
+      const statusOnly =
+        (nextStatus === TransferOrderStatus.IN_PROGRESS ||
+          nextStatus === TransferOrderStatus.COMPLETED) &&
+        Object.entries(dto).every(
+          ([key, value]) => key === "status" || value === undefined,
+        );
+      const canDestinationChangeStatus =
+        to.status === TransferOrderStatus.DRAFT ||
+        to.status === TransferOrderStatus.IN_PROGRESS;
+      if (!canDestinationChangeStatus || !statusOnly) {
+        throw new ForbiddenException(
+          "Cửa hàng đích chỉ được cập nhật trạng thái lệnh điều chuyển",
+        );
+      }
+      if (nextStatus === TransferOrderStatus.COMPLETED) {
+        return this.completeOrderImmediately(to, actor);
+      }
+      if (nextStatus === TransferOrderStatus.IN_PROGRESS) {
+        return this.startOrderImmediately(to, actor);
+      }
+      to.status = nextStatus;
+      await this.toRepo.save(to);
+      return this.findOrFail(id, actor.organizationId);
+    }
 
     if (to.status === TransferOrderStatus.IN_PROGRESS) {
       const touchesLocked =
@@ -592,8 +645,22 @@ export class TransferOrderService {
           "Only description and attachments can be edited once the transfer is in progress",
         );
       }
+      if (
+        dto.status !== undefined &&
+        dto.status !== TransferOrderStatus.IN_PROGRESS &&
+        dto.status !== TransferOrderStatus.COMPLETED
+      ) {
+        throw new BadRequestException(
+          "Trạng thái lệnh điều chuyển không hợp lệ",
+        );
+      }
       if (dto.notes !== undefined) to.notes = dto.notes;
       if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
+      if (dto.status === TransferOrderStatus.COMPLETED) {
+        await this.toRepo.save(to);
+        return this.completeOrderImmediately(to, actor);
+      }
+      if (dto.status !== undefined) to.status = dto.status;
       await this.toRepo.save(to);
       return this.findOrFail(id, actor.organizationId);
     }
@@ -606,6 +673,14 @@ export class TransferOrderService {
 
     if (dto.lines) this.validateLines(dto.lines);
     if (
+      dto.status !== undefined &&
+      dto.status !== TransferOrderStatus.DRAFT &&
+      dto.status !== TransferOrderStatus.IN_PROGRESS &&
+      dto.status !== TransferOrderStatus.COMPLETED
+    ) {
+      throw new BadRequestException("Trạng thái lệnh điều chuyển không hợp lệ");
+    }
+    if (
       dto.sourceBranchId !== undefined &&
       dto.sourceBranchId !== actor.branchId
     ) {
@@ -617,7 +692,7 @@ export class TransferOrderService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       if (dto.sourceBranchId !== undefined) to.sourceBranchId = actor.branchId!;
       if (dto.destinationBranchId !== undefined)
         to.destinationBranchId = dto.destinationBranchId;
@@ -628,6 +703,13 @@ export class TransferOrderService {
       if (dto.requestedDate !== undefined) to.requestedDate = dto.requestedDate;
       if (dto.notes !== undefined) to.notes = dto.notes;
       if (dto.attachmentIds !== undefined) to.attachmentIds = dto.attachmentIds;
+      if (
+        dto.status !== undefined &&
+        dto.status !== TransferOrderStatus.COMPLETED &&
+        dto.status !== TransferOrderStatus.IN_PROGRESS
+      ) {
+        to.status = dto.status;
+      }
 
       if (dto.lines) {
         await manager.delete(TransferOrderLineEntity, {
@@ -642,8 +724,15 @@ export class TransferOrderService {
       }
 
       await manager.save(to);
-      return this.findOrFail(to.id, actor.organizationId);
+      return to;
     });
+    if (dto.status === TransferOrderStatus.COMPLETED) {
+      return this.completeOrderImmediately(saved, actor);
+    }
+    if (dto.status === TransferOrderStatus.IN_PROGRESS) {
+      return this.startOrderImmediately(saved, actor);
+    }
+    return this.findOrFail(saved.id, actor.organizationId);
   }
 
   // ─── Export (Store A): DRAFT → IN_PROGRESS, spawn GoodsIssue ─────────────────
@@ -733,10 +822,12 @@ export class TransferOrderService {
     return Promise.all(
       to.lines.map(async (l) => ({
         itemId: l.itemId,
-        locationId: await this.resolveLocation(
-          l.sourceStorageId ?? to.sourceStorageId,
-          actor.organizationId,
-        ),
+        locationId:
+          l.sourceLocationId ??
+          (await this.resolveLocation(
+            l.sourceStorageId ?? to.sourceStorageId,
+            actor.organizationId,
+          )),
         quantity: Number(l.requestedQty),
         unitPrice: Number(l.item?.purchasePrice ?? 0),
       })),
@@ -826,7 +917,73 @@ export class TransferOrderService {
     });
   }
 
-  // ─── Import (Store B): IN_PROGRESS → COMPLETED, spawn GoodsReceipt ───────────
+  /**
+   * MISA-style start from the transfer-order form. "Đang thực hiện" means the
+   * source store has created the transfer-out voucher, so the destination can
+   * later receive from an actual "Phiếu xuất kho điều chuyển" number.
+   */
+  private async startOrderImmediately(
+    to: TransferOrderEntity,
+    actor: ActorContext,
+  ): Promise<TransferOrderEntity> {
+    if (to.status !== TransferOrderStatus.DRAFT) {
+      if (
+        to.status === TransferOrderStatus.IN_PROGRESS &&
+        to.exportGoodsIssueId
+      ) {
+        return this.findOrFail(to.id, actor.organizationId);
+      }
+      throw new ConflictException("Transfer order is not in DRAFT state");
+    }
+
+    const sourceActor: ActorContext = {
+      ...actor,
+      branchId: to.sourceBranchId,
+    };
+    const lines = await this.deriveExportLines(to, sourceActor);
+    const goodsIssue = await this.goodsIssueService.createAndPost(
+      {
+        locationId: lines[0].locationId,
+        purpose: GoodsIssuePurpose.TRANSFER_OUT,
+        targetBranchId: to.destinationBranchId,
+        referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+        referenceId: to.id,
+        reason: `Transfer order ${to.documentNumber}`,
+        notes: to.notes,
+        lines,
+      },
+      sourceActor,
+    );
+
+    try {
+      await this.toRepo.update(
+        { id: to.id, organizationId: actor.organizationId },
+        {
+          status: TransferOrderStatus.IN_PROGRESS,
+          exportGoodsIssueId: goodsIssue.id,
+          exportedAt: new Date(),
+          exportedBy: actor.userId,
+        },
+      );
+    } catch (error) {
+      try {
+        await this.goodsIssueService.cancel(goodsIssue.id, sourceActor);
+      } catch (rollbackError) {
+        this.logger.error(
+          `Could not reverse goods issue ${goodsIssue.id} after transfer order ${to.id} start failed`,
+          rollbackError instanceof Error ? rollbackError.stack : undefined,
+        );
+      }
+      throw error;
+    }
+
+    this.logger.log(
+      `Transfer order ${to.id} started (goods issue ${goodsIssue.id})`,
+    );
+    return this.findOrFail(to.id, actor.organizationId);
+  }
+
+  // ─── Import (Store B): importable order → COMPLETED + GoodsReceipt ──────────
 
   async confirmImport(
     id: string,
@@ -834,8 +991,12 @@ export class TransferOrderService {
     dto: ConfirmImportDto = {},
   ): Promise<TransferOrderEntity> {
     const to = await this.findOrFail(id, actor.organizationId);
-    if (to.status !== TransferOrderStatus.IN_PROGRESS) {
-      throw new ConflictException("Transfer order is not IN_PROGRESS");
+    if (
+      (to.status !== TransferOrderStatus.IN_PROGRESS &&
+        to.status !== TransferOrderStatus.COMPLETED) ||
+      to.importGoodsReceiptId
+    ) {
+      throw new ConflictException("Transfer order is not importable");
     }
     if (actor.branchId !== to.destinationBranchId) {
       throw new ForbiddenException(
@@ -857,13 +1018,11 @@ export class TransferOrderService {
     }[];
     if (dto.lines?.length) {
       lines = this.buildImportLinesFromInput(dto.lines, to);
-      const firstLoc = await this.locationRepo.findOne({
-        where: {
-          id: lines[0].locationId,
-          organizationId: actor.organizationId,
-        },
-      });
-      destStorageId = firstLoc?.storageId ?? destStorageId;
+      destStorageId = await this.validateDestinationLocations(
+        lines.map((line) => line.locationId),
+        actor,
+        dto.destinationStorageId,
+      );
     } else {
       if (!destStorageId) {
         throw new BadRequestException(
@@ -874,6 +1033,11 @@ export class TransferOrderService {
         destStorageId,
         actor.organizationId,
       );
+      await this.validateDestinationLocations(
+        [destLocationId],
+        actor,
+        destStorageId,
+      );
       lines = to.lines.map((l) => ({
         itemId: l.itemId,
         locationId: destLocationId,
@@ -883,30 +1047,83 @@ export class TransferOrderService {
       }));
     }
 
-    const goodsReceipt = await this.goodsReceiptService.createAndPost(
-      {
-        purpose: GoodsReceiptPurpose.TRANSFER_IN,
-        referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
-        referenceId: to.id,
-        sourceBranchId: to.sourceBranchId,
-        receivedAt: dto.occurredAt ?? new Date().toISOString(),
-        locationId: lines[0].locationId,
-        // Carry the goods-receipt form's header fields onto the spawned receipt
-        // so the import leg round-trips Đối tượng / Người giao / Tham chiếu.
-        providerId: dto.providerId,
-        deliveredBy: dto.deliverer,
-        references: dto.references,
-        lines,
-      },
-      actor,
-    );
+    // A transfer order may be moved to IN_PROGRESS directly from its edit form
+    // so it appears in "Điều chuyển từ cửa hàng khác" and in pending-stock
+    // reports before any ledger movement. When that path is used, materialize
+    // the missing source issue immediately before the destination receipt so a
+    // completed transfer always changes both outgoing and incoming stock.
+    let generatedExportGoodsIssueId: string | undefined;
+    const sourceActor: ActorContext = {
+      ...actor,
+      branchId: to.sourceBranchId,
+    };
+    if (!to.exportGoodsIssueId) {
+      const exportLines = await this.deriveExportLines(to, sourceActor);
+      const goodsIssue = await this.goodsIssueService.createAndPost(
+        {
+          locationId: exportLines[0].locationId,
+          purpose: GoodsIssuePurpose.TRANSFER_OUT,
+          targetBranchId: to.destinationBranchId,
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: to.id,
+          reason: `Transfer order ${to.documentNumber}`,
+          lines: exportLines,
+        },
+        sourceActor,
+      );
+      generatedExportGoodsIssueId = goodsIssue.id;
+    }
+
+    let goodsReceipt: { id: string };
+    try {
+      goodsReceipt = await this.goodsReceiptService.createAndPost(
+        {
+          purpose: GoodsReceiptPurpose.TRANSFER_IN,
+          referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
+          referenceId: to.id,
+          sourceBranchId: to.sourceBranchId,
+          receivedAt: dto.occurredAt ?? new Date().toISOString(),
+          locationId: lines[0].locationId,
+          // Carry the goods-receipt form's header fields onto the spawned receipt
+          // so the import leg round-trips Đối tượng / Người giao / Tham chiếu.
+          providerId: dto.providerId,
+          deliveredBy: dto.deliverer,
+          references: dto.references,
+          lines,
+        },
+        actor,
+      );
+    } catch (error) {
+      if (generatedExportGoodsIssueId) {
+        try {
+          await this.goodsIssueService.cancel(
+            generatedExportGoodsIssueId,
+            sourceActor,
+          );
+        } catch (rollbackError) {
+          this.logger.error(
+            `Could not reverse auto-generated goods issue ${generatedExportGoodsIssueId} after transfer import ${to.id} failed`,
+            rollbackError instanceof Error ? rollbackError.stack : undefined,
+          );
+        }
+      }
+      throw error;
+    }
 
     await this.toRepo.update(
       { id: to.id, organizationId: actor.organizationId },
       {
         status: TransferOrderStatus.COMPLETED,
+        exportGoodsIssueId:
+          generatedExportGoodsIssueId ?? to.exportGoodsIssueId,
         importGoodsReceiptId: goodsReceipt.id,
         destinationStorageId: destStorageId ?? to.destinationStorageId,
+        ...(generatedExportGoodsIssueId
+          ? {
+              exportedAt: new Date(),
+              exportedBy: actor.userId,
+            }
+          : {}),
         completedAt: new Date(),
         completedBy: actor.userId,
       },
@@ -915,6 +1132,165 @@ export class TransferOrderService {
       `Transfer order ${to.id} completed (goods receipt ${goodsReceipt.id})`,
     );
     return this.findOrFail(to.id, actor.organizationId);
+  }
+
+  /**
+   * MISA-style direct completion from the transfer-order form. Completing a
+   * transfer is a material stock action, not just a status flag: it must post
+   * the source goods issue and the destination goods receipt so Tổng hợp tồn kho
+   * shows SL xuất / SL nhập immediately.
+   */
+  private async completeOrderImmediately(
+    to: TransferOrderEntity,
+    actor: ActorContext,
+  ): Promise<TransferOrderEntity> {
+    if (to.importGoodsReceiptId) {
+      if (to.status !== TransferOrderStatus.COMPLETED) {
+        await this.toRepo.update(
+          { id: to.id, organizationId: actor.organizationId },
+          { status: TransferOrderStatus.COMPLETED },
+        );
+      }
+      return this.findOrFail(to.id, actor.organizationId);
+    }
+
+    if (!to.lines?.length) {
+      throw new BadRequestException(
+        "Lệnh điều chuyển phải có ít nhất một dòng hàng hóa",
+      );
+    }
+
+    const sourceActor: ActorContext = {
+      ...actor,
+      branchId: to.sourceBranchId,
+    };
+    const destinationActor: ActorContext = {
+      ...actor,
+      branchId: to.destinationBranchId,
+    };
+
+    const destinationStorageId =
+      to.destinationStorageId ??
+      (await this.resolveDefaultDestinationStorageId(to, actor.organizationId));
+    const destinationLocationId = await this.resolveLocation(
+      destinationStorageId,
+      actor.organizationId,
+    );
+    await this.validateDestinationLocations(
+      [destinationLocationId],
+      destinationActor,
+      destinationStorageId,
+    );
+
+    let generatedExportGoodsIssueId: string | undefined;
+    if (!to.exportGoodsIssueId) {
+      const exportLines = await this.deriveExportLines(to, sourceActor);
+      const goodsIssue = await this.goodsIssueService.createAndPost(
+        {
+          locationId: exportLines[0].locationId,
+          purpose: GoodsIssuePurpose.TRANSFER_OUT,
+          targetBranchId: to.destinationBranchId,
+          referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+          referenceId: to.id,
+          reason: `Transfer order ${to.documentNumber}`,
+          notes: to.notes,
+          lines: exportLines,
+        },
+        sourceActor,
+      );
+      generatedExportGoodsIssueId = goodsIssue.id;
+    }
+
+    let goodsReceipt: { id: string };
+    try {
+      goodsReceipt = await this.goodsReceiptService.createAndPost(
+        {
+          purpose: GoodsReceiptPurpose.TRANSFER_IN,
+          referenceType: GoodsReceiptReferenceType.STOCK_TRANSFER,
+          referenceId: to.id,
+          sourceBranchId: to.sourceBranchId,
+          receivedAt: new Date().toISOString(),
+          locationId: destinationLocationId,
+          references: to.documentNumber ? [to.documentNumber] : undefined,
+          lines: to.lines.map((line) => ({
+            itemId: line.itemId,
+            locationId: destinationLocationId,
+            uomCode: line.item?.unit ?? "CAI",
+            quantity: Number(line.requestedQty),
+            unitPrice: Number(line.item?.purchasePrice ?? 0),
+            note: line.note,
+          })),
+        },
+        destinationActor,
+      );
+    } catch (error) {
+      if (generatedExportGoodsIssueId) {
+        try {
+          await this.goodsIssueService.cancel(
+            generatedExportGoodsIssueId,
+            sourceActor,
+          );
+        } catch (rollbackError) {
+          this.logger.error(
+            `Could not reverse auto-generated goods issue ${generatedExportGoodsIssueId} after direct transfer completion ${to.id} failed`,
+            rollbackError instanceof Error ? rollbackError.stack : undefined,
+          );
+        }
+      }
+      throw error;
+    }
+
+    await this.toRepo.update(
+      { id: to.id, organizationId: actor.organizationId },
+      {
+        status: TransferOrderStatus.COMPLETED,
+        exportGoodsIssueId:
+          generatedExportGoodsIssueId ?? to.exportGoodsIssueId,
+        importGoodsReceiptId: goodsReceipt.id,
+        destinationStorageId,
+        ...(generatedExportGoodsIssueId
+          ? {
+              exportedAt: new Date(),
+              exportedBy: actor.userId,
+            }
+          : {}),
+        completedAt: new Date(),
+        completedBy: actor.userId,
+      },
+    );
+
+    this.logger.log(
+      `Transfer order ${to.id} directly completed (goods receipt ${goodsReceipt.id})`,
+    );
+    return this.findOrFail(to.id, actor.organizationId);
+  }
+
+  private async resolveDefaultDestinationStorageId(
+    to: TransferOrderEntity,
+    organizationId: string,
+  ): Promise<string> {
+    const where = {
+      organizationId,
+      branchId: to.destinationBranchId,
+    };
+    const storage =
+      (await this.storageRepo.findOne({
+        where: { ...where, isDefaultReceiving: true },
+      })) ??
+      (await this.storageRepo.findOne({
+        where: { ...where, isMainStorage: true },
+      })) ??
+      (await this.storageRepo.findOne({
+        where,
+        order: { createdAt: "ASC" },
+      }));
+
+    if (!storage) {
+      throw new BadRequestException(
+        "Cần thiết lập kho nhận cho cửa hàng đích trước khi hoàn thành lệnh điều chuyển",
+      );
+    }
+    return storage.id;
   }
 
   // ─── Cancel (DRAFT: free; IN_PROGRESS: reverse export) ──────────────────────
@@ -1003,6 +1379,43 @@ export class TransferOrderService {
       );
     }
     return location.id;
+  }
+
+  private async validateDestinationLocations(
+    locationIds: string[],
+    actor: ActorContext,
+    requestedStorageId?: string,
+  ): Promise<string> {
+    const uniqueIds = [...new Set(locationIds)];
+    const locations = await this.locationRepo.find({
+      where: {
+        id: In(uniqueIds),
+        organizationId: actor.organizationId,
+      },
+      relations: { storage: true },
+    });
+    const byId = new Map(locations.map((location) => [location.id, location]));
+
+    for (const locationId of locationIds) {
+      const location = byId.get(locationId);
+      if (!location || location.isActive === false) {
+        throw new BadRequestException(
+          `Vị trí nhận ${locationId} không tồn tại hoặc đã ngừng sử dụng`,
+        );
+      }
+      if (location.storage?.branchId !== actor.branchId) {
+        throw new BadRequestException(
+          "Mọi vị trí nhận phải thuộc chi nhánh hiện tại",
+        );
+      }
+      if (requestedStorageId && location.storageId !== requestedStorageId) {
+        throw new BadRequestException(
+          "Vị trí nhận không thuộc kho nhận đã chọn",
+        );
+      }
+    }
+
+    return byId.get(locationIds[0])!.storageId;
   }
 
   /** Build a createdAt range operator from day-granularity from/to strings. */

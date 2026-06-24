@@ -27,10 +27,8 @@ export const Actor = createParamDecorator(
     return {
       userId: user?.userId ?? 'system',
       organizationId: user?.organizationId ?? 'default',
-      // X-Branch-Id is the explicit branch selected for this request. It is
-      // trusted only after checking the branch is assigned to the user. JWT is
-      // a fallback for clients that do not send the header.
-      branchId: fromHeader ?? fromJwt ?? fromJwtList,
+      // always: jwt > header > jwtList
+      branchId: fromJwt ?? fromHeader ?? fromJwtList,
       roles: user?.roles ?? [],
     };
   },
