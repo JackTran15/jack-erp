@@ -106,7 +106,15 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       );
     }
 
-    return [...fixed, ...dynamic];
+    // The dynamic payment-account columns belong to the `customerPayment` band.
+    // Splice them in right after the last fixed `customerPayment` column so the
+    // band stays one contiguous block; appending at the end would drop them
+    // after the `platform` band and break the FE header colSpan grouping.
+    const insertAt = fixed.reduce(
+      (last, h, i) => (h.group?.id === 'customerPayment' ? i + 1 : last),
+      fixed.length,
+    );
+    return [...fixed.slice(0, insertAt), ...dynamic, ...fixed.slice(insertAt)];
   }
 
   async buildData(
