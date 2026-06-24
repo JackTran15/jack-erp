@@ -107,6 +107,7 @@ export interface InventoryStorage {
   name: string;
   branchId: string;
   isMainStorage?: boolean;
+  isDefaultReceiving?: boolean;
 }
 
 /** Active branch id used as X-Branch-Id (set by api-axios from localStorage). */

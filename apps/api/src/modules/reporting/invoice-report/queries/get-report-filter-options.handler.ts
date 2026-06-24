@@ -131,7 +131,7 @@ export class GetReportFilterOptionsHandler
   ): Promise<IDropdownOption[]> {
     const qb = this.employees
       .createQueryBuilder('e')
-      .innerJoin(UserEntity, 'u', 'u.id = e.userId AND u.organizationId = e.organizationId')
+      .innerJoin(UserEntity, 'u', 'u.id = e.userId AND e.organization_id::uuid = u.organizationId')
       .where('e.organizationId = :org', { org })
       .select('e.id', 'id')
       .addSelect('e.code', 'code')

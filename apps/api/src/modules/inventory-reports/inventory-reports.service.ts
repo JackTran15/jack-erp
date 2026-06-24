@@ -332,7 +332,7 @@ export class InventoryReportsService {
 
     // Query shape matches DocumentDetailQuery, so the same cache-key builder applies.
     const cacheKey = this.buildDocumentDetailCacheKey(
-      'temporary-warehouse-out-goods',
+      'temporary-warehouse-out-goods2',
       actor,
       reportQuery,
     );

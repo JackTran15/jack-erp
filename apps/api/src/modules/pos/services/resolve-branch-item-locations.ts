@@ -25,11 +25,18 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
  * this fallback. If the showroom has no default location (or the branch has no
  * main storage), the item is omitted and the caller's checkout guard fails the
  * line closed rather than deducting from elsewhere.
+ *
+ * With `showroomOnly`, warehouse (non-main) shelf rows are ignored entirely, so
+ * a POS sale never resolves a warehouse location: an item shelved only in a
+ * warehouse falls through to the showroom's default location (or is omitted when
+ * none exists). Used by the POS sale path so sales always deduct from the
+ * showroom; other callers (e.g. exchange OUT lines) keep the default behavior.
  */
 export async function resolveBranchItemLocations(
   manager: EntityManager,
   itemIds: string[],
   actor: ActorContext,
+  options: { showroomOnly?: boolean } = {},
 ): Promise<Map<string, string>> {
   if (itemIds.length === 0 || !actor.branchId) return new Map();
 
@@ -39,10 +46,13 @@ export async function resolveBranchItemLocations(
   });
   if (storages.length === 0) return new Map();
 
+
+  console.log("s",storages,)
+
   const mainStorageIds = new Set(
     storages.filter((s) => s.isMainStorage).map((s) => s.id),
   );
-  const storageIds = storages.map((s) => s.id);
+  const storageIds = Array.from(mainStorageIds);
 
   const rows = await manager.findBy(ItemStorageLocationEntity, {
     itemId: In(itemIds),
@@ -50,8 +60,14 @@ export async function resolveBranchItemLocations(
     organizationId: actor.organizationId,
   });
 
+  // For POS sales, drop warehouse rows so only showroom shelves can win; the
+  // showroom-default fallback below then covers warehouse-only items.
+  const candidateRows = options.showroomOnly
+    ? rows.filter((row) => mainStorageIds.has(row.storageId))
+    : rows;
+
   const result = new Map<string, string>();
-  for (const row of rows) {
+  for (const row of candidateRows) {
     // First in-branch row wins, but a main-storage row always overrides a
     // non-main one so the showroom shelf is the deterministic default.
     if (!result.has(row.itemId) || mainStorageIds.has(row.storageId)) {
