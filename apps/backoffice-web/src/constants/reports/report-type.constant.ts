@@ -3,7 +3,7 @@ import { REPORT_FILTERS_LINE } from "./report-filters.constant";
 import { chain_filterRegistryReportDailySaleSummary, chain_tableRegistryReportDailySaleSummary, single_filterRegistryReportDailySaleSummary, single_tableRegistryReportDailySaleSummary } from "./report-registry/report-daily-sale-summary.registry";
 import { chain_filterRegistryReportInvoiceAndOrderList, chain_tableRegistryReportInvoiceAndOrderList, single_filterRegistryReportInvoiceAndOrderList, single_tableRegistryReportInvoiceAndOrderList } from "./report-registry/report-invoice-and-order-list.registry";
 import { chain_filterRegistryReportRevenueDetailByInvoiceAndProduct, chain_tableRegistryReportRevenueDetailByInvoiceAndProduct, single_filterRegistryReportRevenueDetailByInvoiceAndProduct, single_tableRegistryReportRevenueDetailByInvoiceAndProduct } from "./report-registry/report-revenue-detail-by-invoice-and-product.registry";
-import { chain_filterRegistryReportRevenueByProduct, single_filterRegistryReportRevenueByProduct } from "./report-registry/report-revenue-by-product.registry";
+import { chain_filterRegistryReportRevenueByProduct, chain_tableRegistryReportRevenueByProduct, single_filterRegistryReportRevenueByProduct, single_tableRegistryReportRevenueByProduct } from "./report-registry/report-revenue-by-product.registry";
 import { chain_filterRegistryReportInventoryInOutStockSummary, chain_tableRegistryReportInventoryInOutStockSummary, single_filterRegistryReportInventoryInOutStockSummary, single_tableRegistryReportInventoryInOutStockSummary } from "./report-registry/report-inventory-in-out-stock-summary.registry";
 import { chain_filterRegistryReportWarehouseVoucherDetailList, chain_tableRegistryReportWarehouseVoucherDetailList, single_filterRegistryReportWarehouseVoucherDetailList, single_tableRegistryReportWarehouseVoucherDetailList } from "./report-registry/report-warehouse-voucher-detail-list.registry";
 import { chain_filterRegistryReportInventoryInOutStockQuantityDetail, chain_tableRegistryReportInventoryInOutStockQuantityDetail, single_filterRegistryReportInventoryInOutStockQuantityDetail, single_tableRegistryReportInventoryInOutStockQuantityDetail } from "./report-registry/report-inventory-in-out-stock-quantity-detail.registry";
@@ -80,6 +80,10 @@ export const REPORT_TYPE_SALES_METADATA = {
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportRevenueByProduct,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportRevenueByProduct,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportRevenueByProduct,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportRevenueByProduct,
     },
   },
 

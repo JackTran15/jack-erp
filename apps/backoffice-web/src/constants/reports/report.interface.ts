@@ -67,3 +67,9 @@ export interface ReportCategoryMetadata {
   url: string;
   configs: Partial<Record<STORE_TYPE, ReportBranchConfig>>;
 }
+
+export interface IDropdownOption {
+  value: any;
+  label: string;
+  metadata?: Record<string, any>;
+}
