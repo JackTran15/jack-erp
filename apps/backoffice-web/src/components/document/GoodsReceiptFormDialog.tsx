@@ -230,11 +230,14 @@ export function PurchaseOrderFormDialog({
   );
   const defaultStorage = useMemo(
     () =>
-      receivingStorages.find((s) => s.isMainStorage) ??
+      receivingStorages.find((s) => 
+        storages.find((s) => s.isDefaultReceiving) ??
+        s.isMainStorage) ??
       receivingStorages[0] ??
       null,
     [receivingStorages],
   );
+
   const initialStorageId = initial
     ? (initial.location?.storageId ?? "")
     : (defaultStorage?.id ?? "");

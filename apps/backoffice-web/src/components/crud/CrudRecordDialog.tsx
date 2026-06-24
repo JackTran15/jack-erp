@@ -177,6 +177,7 @@ export function CrudRecordDialog({
   onClose,
   onSuccess,
 }: Props) {
+  console.log("CrudRecordDialog", { entityKey, recordId, open });
   const isEdit = recordId !== null;
   const isSupplier = entityKey === "inventory-providers";
   const isStorage = entityKey === "inventory-storages";
@@ -211,6 +212,7 @@ export function CrudRecordDialog({
   // (one-per-branch invariant), not the generic PATCH — track it separately.
   const [storageDefaultReceiving, setStorageDefaultReceiving] = useState(false);
   const wasStorageDefault = isStorage && Boolean(record?.isDefaultReceiving);
+  console.log("wasStorageDefault", wasStorageDefault, record);
 
   useEffect(() => {
     if (!config) return;

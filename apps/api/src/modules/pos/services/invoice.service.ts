@@ -407,7 +407,10 @@ export class InvoiceService {
     actor: ActorContext,
   ): Promise<Map<string, string>> {
     const itemIds = [...new Set(catalogItems.map((c) => c.id))];
-    return resolveBranchItemLocations(manager, itemIds, actor);
+    // POS sales always deduct from the showroom, never a warehouse storage.
+    return resolveBranchItemLocations(manager, itemIds, actor, {
+      showroomOnly: true,
+    });
   }
 
   async findDrafts(

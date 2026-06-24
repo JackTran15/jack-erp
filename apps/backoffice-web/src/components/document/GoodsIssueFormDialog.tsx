@@ -257,11 +257,16 @@ export function GoodsIssueFormDialog({
   // Storage derived from the saved location's parent. Cached storages let us
   // resolve a name immediately on open; the picker will reset both if user
   // changes warehouse later. For a new (create) phiếu, default to the active
-  // branch's main storage (list is main-first; fall back to the first kho).
+  // branch's default receiving storage; fall back to the main storage, then the
+  // first kho.
   const defaultStorage = useMemo(
-    () => storages.find((s) => s.isMainStorage) ?? storages[0],
+    () =>
+      storages.find((s) => s.isDefaultReceiving) ??
+      storages.find((s) => s.isMainStorage) ??
+      storages[0],
     [storages],
   );
+
   const initialStorageId =
     initial?.location?.storageId ?? (initial ? "" : defaultStorage?.id ?? "");
   const initialStorageName = initialStorageId

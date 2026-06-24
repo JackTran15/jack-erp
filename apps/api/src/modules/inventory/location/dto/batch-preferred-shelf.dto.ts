@@ -23,7 +23,7 @@ export class BatchPreferredShelfRequestDto {
   @ApiProperty({ type: [PreferredShelfPairDto] })
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(200)
+  @ArrayMaxSize(10000)
   @ValidateNested({ each: true })
   @Type(() => PreferredShelfPairDto)
   pairs!: PreferredShelfPairDto[];

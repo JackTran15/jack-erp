@@ -193,4 +193,66 @@ describe('resolveBranchItemLocations', () => {
     expect(findBy).toHaveBeenCalledTimes(1);
     expect(findBy).toHaveBeenCalledWith(StorageEntity, expect.objectContaining({ branchId: BRANCH_B }));
   });
+
+  describe('showroomOnly (POS sale path)', () => {
+    it('ignores a warehouse-only shelf and falls back to the showroom default location', async () => {
+      const storages: FakeStorage[] = [
+        { id: STORAGE_B_MAIN, branchId: BRANCH_B, organizationId: ORG, isMainStorage: true },
+        { id: STORAGE_B_BACK, branchId: BRANCH_B, organizationId: ORG, isMainStorage: false },
+      ];
+      const locations: FakeLocation[] = [
+        { id: LOC_B_DEFAULT, storageId: STORAGE_B_MAIN, organizationId: ORG, isDefault: true },
+      ];
+      // Item shelved only in the warehouse (non-main) storage.
+      const isl: FakeIsl[] = [
+        { itemId: ITEM, storageId: STORAGE_B_BACK, locationId: LOC_B_BACK, organizationId: ORG },
+      ];
+      const map = await resolveBranchItemLocations(
+        makeManager(storages, isl, locations).manager,
+        [ITEM],
+        actor(BRANCH_B),
+        { showroomOnly: true },
+      );
+      expect(map.get(ITEM)).toBe(LOC_B_DEFAULT);
+      expect(map.get(ITEM)).not.toBe(LOC_B_BACK);
+    });
+
+    it('still uses an explicit showroom (main-storage) shelf when one exists', async () => {
+      const storages: FakeStorage[] = [
+        { id: STORAGE_B_MAIN, branchId: BRANCH_B, organizationId: ORG, isMainStorage: true },
+        { id: STORAGE_B_BACK, branchId: BRANCH_B, organizationId: ORG, isMainStorage: false },
+      ];
+      const locations: FakeLocation[] = [
+        { id: LOC_B_DEFAULT, storageId: STORAGE_B_MAIN, organizationId: ORG, isDefault: true },
+      ];
+      const isl: FakeIsl[] = [
+        { itemId: ITEM, storageId: STORAGE_B_BACK, locationId: LOC_B_BACK, organizationId: ORG },
+        { itemId: ITEM, storageId: STORAGE_B_MAIN, locationId: LOC_B_MAIN, organizationId: ORG },
+      ];
+      const map = await resolveBranchItemLocations(
+        makeManager(storages, isl, locations).manager,
+        [ITEM],
+        actor(BRANCH_B),
+        { showroomOnly: true },
+      );
+      expect(map.get(ITEM)).toBe(LOC_B_MAIN);
+    });
+
+    it('omits a warehouse-only item when the showroom has no default location (fails closed)', async () => {
+      const storages: FakeStorage[] = [
+        { id: STORAGE_B_MAIN, branchId: BRANCH_B, organizationId: ORG, isMainStorage: true },
+        { id: STORAGE_B_BACK, branchId: BRANCH_B, organizationId: ORG, isMainStorage: false },
+      ];
+      const isl: FakeIsl[] = [
+        { itemId: ITEM, storageId: STORAGE_B_BACK, locationId: LOC_B_BACK, organizationId: ORG },
+      ];
+      const map = await resolveBranchItemLocations(
+        makeManager(storages, isl).manager,
+        [ITEM],
+        actor(BRANCH_B),
+        { showroomOnly: true },
+      );
+      expect(map.has(ITEM)).toBe(false);
+    });
+  });
 });

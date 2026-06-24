@@ -103,6 +103,7 @@ export interface InventoryStorage {
   name: string;
   branchId: string;
   isMainStorage?: boolean;
+  isDefaultReceiving?: boolean;
 }
 
 /** Active branch — same source the axios client uses for the X-Branch-Id header. */
