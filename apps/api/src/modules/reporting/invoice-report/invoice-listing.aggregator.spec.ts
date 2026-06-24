@@ -1,4 +1,3 @@
-import { ReportColumnDataType } from '@erp/shared-interfaces';
 import {
   InvoiceRowInput,
   buildInvoiceRow,
@@ -83,13 +82,14 @@ describe('listingCellValue', () => {
 });
 
 describe('buildInvoiceRow', () => {
-  it('returns self-describing cells in the requested column order', () => {
-    const cells = buildInvoiceRow(['date', 'invoiceCode', 'revenue.total'], row());
-    expect(cells).toEqual([
-      { col: 'date', type: ReportColumnDataType.DATE, value: '2026-06-03' },
-      { col: 'invoiceCode', type: ReportColumnDataType.STRING, value: 'HD000001' },
-      { col: 'revenue.total', type: ReportColumnDataType.CURRENCY, value: 18000000 },
-    ]);
+  it('returns a row keyed by column field in the requested order', () => {
+    const out = buildInvoiceRow(['date', 'invoiceCode', 'revenue.total'], row());
+    expect(Object.keys(out)).toEqual(['date', 'invoiceCode', 'revenue.total']);
+    expect(out).toEqual({
+      date: '2026-06-03',
+      invoiceCode: 'HD000001',
+      'revenue.total': 18000000,
+    });
   });
 });
 
@@ -97,10 +97,10 @@ describe('buildListingTotals', () => {
   it('sums money columns and nulls out non-money columns', () => {
     const rows = [row(), row({ id: 'i2', subtotal: 5000000, discountAmount: 0 })];
     const totals = buildListingTotals(['date', 'invoiceCode', 'revenue.goods', 'revenue.promoRate'], rows);
-    expect(totals[0]).toMatchObject({ col: 'date', value: null });
-    expect(totals[1]).toMatchObject({ col: 'invoiceCode', value: null });
-    expect(totals[2]).toMatchObject({ col: 'revenue.goods', value: 25000000 });
+    expect(totals['date']).toBeNull();
+    expect(totals['invoiceCode']).toBeNull();
+    expect(totals['revenue.goods']).toBe(25000000);
     // percent is not summed
-    expect(totals[3]).toMatchObject({ col: 'revenue.promoRate', value: null });
+    expect(totals['revenue.promoRate']).toBeNull();
   });
 });

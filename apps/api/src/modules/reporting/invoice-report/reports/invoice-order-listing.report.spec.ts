@@ -166,9 +166,9 @@ describe('InvoiceOrderListingReport.buildData', () => {
 
     expect(result).not.toHaveProperty('headers');
     expect(result.total).toBe(2);
-    expect(result.dataRaw).toHaveLength(2);
+    expect(result.rows).toHaveLength(2);
 
-    const row0 = Object.fromEntries(result.dataRaw[0].map((c) => [c.col, c.value]));
+    const row0 = result.rows[0];
     expect(row0).toMatchObject({
       date: '2026-06-03',
       time: '08:30',
@@ -185,7 +185,7 @@ describe('InvoiceOrderListingReport.buildData', () => {
     });
 
     // totals: money columns summed, strings/dates null
-    const totals = Object.fromEntries(result.totals!.map((c) => [c.col, c.value]));
+    const totals = result.totals!;
     expect(totals['revenue.total']).toBe(23000000);
     expect(totals['payment.cash']).toBe(18000000);
     expect(totals['date']).toBeNull();
@@ -208,7 +208,7 @@ describe('InvoiceOrderListingReport.buildData', () => {
       actor,
     );
     expect(result.total).toBe(1);
-    expect(result.dataRaw[0][0]).toMatchObject({ col: 'invoiceCode', value: 'HD000002' });
-    expect(result.totals![1]).toMatchObject({ col: 'revenue.goods', value: 5000000 });
+    expect(result.rows[0].invoiceCode).toBe('HD000002');
+    expect(result.totals!['revenue.goods']).toBe(5000000);
   });
 });

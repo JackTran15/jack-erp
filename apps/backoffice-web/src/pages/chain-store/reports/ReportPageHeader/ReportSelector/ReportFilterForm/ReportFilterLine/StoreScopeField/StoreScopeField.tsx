@@ -1,5 +1,6 @@
+import { ReportFilterOptionType } from "@erp/shared-interfaces";
 import { MultiSelectChips } from "@erp/ui";
-import { reportStores } from "../../../_mock/report-stores.mock";
+import { useReportFilterOptions } from "../../../../../_api/report-filter-options.api";
 import type { StoreScopeValue } from "../../../../../../../../store/page-stores/report/report.interface";
 
 interface Props {
@@ -7,12 +8,14 @@ interface Props {
   onChange: (value: StoreScopeValue) => void;
 }
 
-const STORE_OPTIONS = reportStores.map((s) => ({
-  value: s.id,
-  label: `${s.code} - ${s.name}`,
-}));
-
 export function StoreScopeField({ value, onChange }: Props) {
+  const { data: stores = [] } = useReportFilterOptions(
+    ReportFilterOptionType.STORE,
+  );
+  const STORE_OPTIONS = stores.map((s) => ({
+    value: String(s.value),
+    label: s.label,
+  }));
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-6 text-xs text-foreground">

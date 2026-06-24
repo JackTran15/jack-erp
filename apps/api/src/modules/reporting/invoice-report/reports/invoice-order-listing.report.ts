@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -17,7 +17,6 @@ import { CustomerEntity } from '../../../customer/customer.entity';
 import {
   InvoiceEntity,
   InvoicePaymentMethod,
-  InvoiceStatus,
 } from '../../../pos/entities/invoice.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
 import { InvoicePromotionEntity, InvoicePromotionType } from '../../../promotion/invoice-promotion.entity';
@@ -41,9 +40,15 @@ import {
   InvoiceRowInput,
   listingCellValue,
 } from '../invoice-listing.aggregator';
+import { enrichHeader } from '../report-column.util';
+import {
+  applyBranchScope,
+  applyInvoiceStatusFilter,
+  CONSOLIDATED_PERMISSION,
+  resolveBranchIds,
+  statDateColumn,
+} from '../report-query.util';
 import { ReportDefinition } from '../report-definition';
-
-const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
 
 const band = (id: ListingBandId | null): ReportColumnGroup | null =>
   id ? { id, name: INVOICE_REPORT_BAND_LABELS_VI[id] ?? id } : null;
@@ -74,13 +79,15 @@ export class InvoiceOrderListingReport implements ReportDefinition {
   async buildColumns(actor: ActorContext): Promise<ReportColumnHeader[]> {
     // desc (formula sub-labels) intentionally null in v1 — the reused keys carry
     // daily-sales formulas in INVOICE_REPORT_COLUMN_DESCS that don't apply here.
-    const fixed: ReportColumnHeader[] = INVOICE_LISTING_COLUMNS.map((c) => ({
-      col: c.key,
-      name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
-      desc: null,
-      type: c.type,
-      group: band(c.group),
-    }));
+    const fixed: ReportColumnHeader[] = INVOICE_LISTING_COLUMNS.map((c) =>
+      enrichHeader({
+        col: c.key,
+        name: INVOICE_REPORT_COLUMN_LABELS_VI[c.key] ?? c.key,
+        desc: null,
+        type: c.type,
+        group: band(c.group),
+      }),
+    );
 
     const accounts = await this.activeAccounts(actor);
     const seen = new Set<string>();
@@ -88,13 +95,15 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     for (const a of accounts) {
       if (seen.has(a.accountId)) continue;
       seen.add(a.accountId);
-      dynamic.push({
-        col: dynamicColumnKey(a.accountId),
-        name: a.label ?? a.paymentMethod,
-        desc: null,
-        type: ReportColumnDataType.CURRENCY,
-        group: band('customerPayment'),
-      });
+      dynamic.push(
+        enrichHeader({
+          col: dynamicColumnKey(a.accountId),
+          name: a.label ?? a.paymentMethod,
+          desc: null,
+          type: ReportColumnDataType.CURRENCY,
+          group: band('customerPayment'),
+        }),
+      );
     }
 
     return [...fixed, ...dynamic];
@@ -129,23 +138,25 @@ export class InvoiceOrderListingReport implements ReportDefinition {
       );
     }
 
-    const branchId = await this.resolveBranchScope(
+    const hasConsolidated = await this.rbac.hasPermission(
+      actor.userId,
+      actor.organizationId,
+      CONSOLIDATED_PERMISSION,
+    );
+    const branchIds = resolveBranchIds(
+      hasConsolidated,
+      dto.filters.store,
       dto.branchId ?? dto.filters.branchId,
       actor,
     );
 
     const qb = this.invoices
       .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('invoice.status != :cancelled', {
-        cancelled: InvoiceStatus.CANCELLED,
-      });
-    if (branchId) {
-      qb.andWhere('invoice.branchId = :branchId', { branchId });
-    }
+      .where('invoice.organizationId = :orgId', { orgId: actor.organizationId });
+    applyBranchScope(qb, 'invoice', branchIds);
+    applyInvoiceStatusFilter(qb, 'invoice', dto.filters);
     new FilterBuilder(qb)
-      .applyDateRange('invoice.issuedAt', dto.filters.issuedAt)
-      .applyEnum('invoice.status', dto.filters.status?.value)
+      .applyDateRange(statDateColumn('invoice', dto.filters), dto.filters.issuedAt)
       .applyEnum('invoice.type', dto.filters.type?.value);
     const invoiceRows = (await qb.getMany()).filter((i) => i.issuedAt);
     const invoiceIds = invoiceRows.map((i) => i.id);
@@ -227,12 +238,12 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     const offset = (page - 1) * limit;
     const pageRows = filtered.slice(offset, offset + limit);
 
-    const dataRaw = pageRows.map((r) => buildInvoiceRow(dto.columns, r));
+    const rows2 = pageRows.map((r) => buildInvoiceRow(dto.columns, r));
     const totals = filtered.length
       ? buildListingTotals(dto.columns, filtered)
       : null;
 
-    return { dataRaw, totals, total, page, limit };
+    return { rows: rows2, totals, total };
   }
 
   private activeAccounts(actor: ActorContext): Promise<PaymentAccountEntity[]> {
@@ -356,33 +367,5 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     });
     for (const e of rows) map.set(e.id, e.code);
     return map;
-  }
-
-  /** Mirror of DailySalesSummaryReport.resolveBranchScope (gated on the consolidated permission). */
-  private async resolveBranchScope(
-    requestedBranchId: string | undefined,
-    actor: ActorContext,
-  ): Promise<string | null> {
-    const hasConsolidated = await this.rbac.hasPermission(
-      actor.userId,
-      actor.organizationId,
-      CONSOLIDATED_PERMISSION,
-    );
-    if (requestedBranchId) {
-      if (hasConsolidated) return requestedBranchId;
-      if (actor.branchId && actor.branchId === requestedBranchId) {
-        return requestedBranchId;
-      }
-      throw new ForbiddenException(
-        `Access denied for branch: ${requestedBranchId}`,
-      );
-    }
-    if (hasConsolidated) return null;
-    if (!actor.branchId) {
-      throw new ForbiddenException(
-        'No branch scope available and consolidated access not granted',
-      );
-    }
-    return actor.branchId;
   }
 }

@@ -142,13 +142,13 @@ describe('DailySalesSummaryReport.buildData', () => {
 
     expect(result).not.toHaveProperty('headers');
     expect(result.total).toBe(2);
-    expect(result.dataRaw).toHaveLength(2);
-    const row0 = result.dataRaw[0];
-    expect(row0[0]).toMatchObject({ col: 'date', value: '2026-06-03' });
-    expect(row0[1]).toMatchObject({ col: 'revenue.goods', value: 20000000 });
-    expect(row0[2]).toMatchObject({ col: 'revenue.total', value: 20000000 });
-    expect(row0[3]).toMatchObject({ col: `payment.method.${ACC}`, value: 15600000 });
-    expect(result.totals![1]).toMatchObject({ col: 'revenue.goods', value: 25000000 });
+    expect(result.rows).toHaveLength(2);
+    const row0 = result.rows[0];
+    expect(row0.date).toBe('2026-06-03');
+    expect(row0['revenue.goods']).toBe(20000000);
+    expect(row0['revenue.total']).toBe(20000000);
+    expect(row0[`payment.method.${ACC}`]).toBe(15600000);
+    expect(result.totals!['revenue.goods']).toBe(25000000);
   });
 
   it('applies per-column filter post-aggregate and recomputes totals', async () => {
@@ -167,7 +167,7 @@ describe('DailySalesSummaryReport.buildData', () => {
       actor,
     );
     expect(result.total).toBe(1);
-    expect(result.dataRaw[0][0]).toMatchObject({ col: 'date', value: '2026-06-04' });
-    expect(result.totals![1]).toMatchObject({ col: 'revenue.goods', value: 5000000 });
+    expect(result.rows[0].date).toBe('2026-06-04');
+    expect(result.totals!['revenue.goods']).toBe(5000000);
   });
 });

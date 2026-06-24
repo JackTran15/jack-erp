@@ -9,8 +9,6 @@ import {
   buildColumnFilters,
   buildSearchFilters,
   fetchReportData,
-  mapDataRows,
-  mapTotals,
   type ReportRow,
 } from "./invoice-report.api";
 import {
@@ -56,8 +54,8 @@ const invoiceDataFetcher: ReportDataFetcher = async (args) => {
     limit: args.limit,
   });
   return {
-    rows: mapDataRows(res.dataRaw),
-    totals: mapTotals(res.totals ?? null),
+    rows: res.rows,
+    totals: res.totals ?? {},
     total: res.total ?? 0,
   };
 };

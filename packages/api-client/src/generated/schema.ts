@@ -1673,7 +1673,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Bỏ hàng hóa khỏi vị trí (chỉ cho phép khi tồn = 0) */
+        /** Bỏ hàng hóa khỏi vị trí; tồn dương được chuyển về "Chưa xếp" cùng kho */
         delete: operations["InventoryLocationStockController_removeItemFromLocation"];
         options?: never;
         head?: never;
@@ -4676,6 +4676,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/invoices/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shared dropdown options for the report filters (store, cashier, status, …). */
+        get: operations["InvoiceReportController_getFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/invoices/search": {
         parameters: {
             query?: never;
@@ -5142,6 +5159,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["TransferOrderController_update"];
+        trace?: never;
+    };
+    "/inventory/transfer-orders/{id}/export-goods-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TransferOrderController_getExportGoodsIssue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/inventory/transfer-orders/{id}/export": {
@@ -6711,8 +6744,8 @@ export interface components {
              * @description Vị trí kệ đích để xếp hàng lên
              */
             destinationLocationId: string;
-            /** @description Số lượng cần xếp */
-            quantity: number;
+            /** @description Số lượng cần xếp. Bỏ trống để lấy toàn bộ tồn ở vị trí "Chưa xếp". */
+            quantity?: number;
         };
         ArrangeLocationDto: {
             lines: components["schemas"]["ArrangeLocationLineDto"][];
@@ -7373,6 +7406,7 @@ export interface components {
             itemId: string;
             item?: components["schemas"]["ItemEntity"];
             locationId: string;
+            location?: components["schemas"]["LocationEntity"];
             quantity: number;
             /** Format: date-time */
             lastMovementAt?: string;
@@ -8893,9 +8927,33 @@ export interface components {
             startDate?: string;
             endDate?: string;
         };
+        StoreScopeDto: {
+            /**
+             * @description "all" = every branch the actor may read; "group" = the listed storeIds.
+             * @enum {string}
+             */
+            scope: "all" | "group";
+            /** @description Selected branch ids (used when scope = "group"; ignored for "all"). */
+            storeIds: string[];
+        };
         InvoiceReportFilterDto: {
+            /**
+             * @description Which date column the period filters on (default invoice_date).
+             * @enum {string}
+             */
+            statDateType?: "invoice_date" | "created_date";
+            /**
+             * @description revenue-by-item only — product kind filter.
+             * @enum {string}
+             */
+            productType?: "product" | "service" | "combo";
             /** @description Report period — enforced present by the search handler. */
             issuedAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Multi-store consolidation scope; absent ⇒ actor's own branch. */
+            store?: components["schemas"]["StoreScopeDto"];
+            /** @description Multi-select invoice status; preferred over the single `status` below. */
+            invoiceStatus?: string[];
+            /** @description Legacy single-status filter; kept for back-compat (use invoiceStatus). */
             status?: components["schemas"]["EnumFilterDto"];
             type?: components["schemas"]["EnumFilterDto"];
             /** Format: uuid */
@@ -8919,14 +8977,18 @@ export interface components {
              * @description revenue-by-item only — row grain (default item).
              * @enum {string}
              */
-            groupBy?: "item" | "group" | "brand";
+            statBy?: "item" | "parent" | "group";
             /**
              * Format: uuid
-             * @description revenue-by-item only — filter by item category (Nhóm hàng hóa).
+             * @description revenue-by-item / per-line reports — filter by item category (Nhóm hàng hóa).
              */
             categoryId?: string;
             /** @description revenue-by-item only — filter by denormalized item brand (Thương hiệu). */
             brand?: string;
+            /** @description Add a brand-grain split (daily-summary / revenue-by-item). */
+            statisticByBrand?: boolean;
+            /** @description revenue-by-item only — split combo revenue across components. */
+            allocateComboRevenue?: boolean;
         };
         ColumnFilterDto: {
             col: string;
@@ -8937,6 +8999,12 @@ export interface components {
             gte?: number;
             from?: string;
             to?: string;
+            /** @description Text operators (string columns). */
+            contains?: string;
+            equals?: string;
+            startsWith?: string;
+            endsWith?: string;
+            notContains?: string;
         };
         InvoiceReportSearchDto: {
             /** @description Which backend report definition to run. */
@@ -12784,6 +12852,20 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 /** @description Partial match on item code & name */
                 search?: string;
+                /** @description Partial match on item SKU */
+                itemCode?: string;
+                itemCodeMode?: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
+                /** @description Partial match on item name */
+                itemName?: string;
+                itemNameMode?: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
+                /** @description Partial match on unit */
+                unit?: string;
+                unitMode?: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
+                /** @description Partial match on category name */
+                categoryName?: string;
+                categoryNameMode?: "contains" | "equals" | "startsWith" | "endsWith" | "notContains";
+                /** @description Maximum on-hand quantity */
+                quantityMax?: number;
                 /** @description Exact match on item_barcodes.code */
                 barcode?: string;
                 categoryId?: string;
@@ -18107,6 +18189,32 @@ export interface operations {
             };
         };
     };
+    InvoiceReportController_getFilterOptions: {
+        parameters: {
+            query: {
+                /** @description Which dropdown to load (store, cashier, invoiceStatus, …). */
+                type: "store" | "cashier" | "salesperson" | "customer" | "productGroup" | "brand" | "unit" | "invoiceStatus" | "statDateType" | "productType" | "statBy";
+                /** @description Optional case-insensitive partial search (dynamic types only). */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     InvoiceReportController_search: {
         parameters: {
             query?: never;
@@ -19051,6 +19159,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransferOrderEntity"];
+                };
+            };
+        };
+    };
+    TransferOrderController_getExportGoodsIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsIssueEntity"];
                 };
             };
         };

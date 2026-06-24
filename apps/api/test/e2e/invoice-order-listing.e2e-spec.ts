@@ -128,8 +128,13 @@ describe('Invoice order listing report (E2E)', () => {
       .set(headers())
       .expect(200);
 
-    const byCol = new Map<string, any>(res.body.headers.map((h: any) => [h.col, h]));
+    expect(res.body.summaryLabel).toBe('Tổng');
+    const byCol = new Map<string, any>(res.body.columns.map((h: any) => [h.col, h]));
     expect(byCol.get('date')).toMatchObject({ name: 'Ngày', group: null });
+    // status column carries select filterOptions; invoiceCode is a link
+    expect(byCol.get('status')).toMatchObject({ filterKind: 'select' });
+    expect(byCol.get('status').filterOptions.length).toBeGreaterThan(0);
+    expect(byCol.get('invoiceCode')).toMatchObject({ link: true });
     expect(byCol.get('platform.fee')).toMatchObject({
       name: 'Phí trả sàn',
       group: { id: 'platform', name: 'Doanh thu sàn TMĐT' },
@@ -152,10 +157,9 @@ describe('Invoice order listing report (E2E)', () => {
 
     expect(res.body).not.toHaveProperty('headers');
     expect(res.body.total).toBe(2); // cancelled excluded
-    expect(res.body.dataRaw).toHaveLength(2);
+    expect(res.body.rows).toHaveLength(2);
 
-    const row0 = Object.fromEntries(res.body.dataRaw[0].map((c: any) => [c.col, c.value]));
-    expect(row0).toMatchObject({
+    expect(res.body.rows[0]).toMatchObject({
       date: '2026-06-03',
       time: '08:30',
       invoiceCode: 'HD000001',
@@ -168,7 +172,7 @@ describe('Invoice order listing report (E2E)', () => {
       cashier: 'NV000001',
     });
 
-    const totals = Object.fromEntries(res.body.totals.map((c: any) => [c.col, c.value]));
+    const totals = res.body.totals;
     expect(totals['revenue.total']).toBe(23000000);
     expect(totals['payment.cash']).toBe(23000000);
     expect(totals['platform.fee']).toBe(0);
@@ -187,7 +191,39 @@ describe('Invoice order listing report (E2E)', () => {
       })
       .expect(201);
     expect(res.body.total).toBe(1);
-    expect(res.body.dataRaw[0][0]).toMatchObject({ col: 'invoiceCode', value: 'HD000002' });
+    expect(res.body.rows[0].invoiceCode).toBe('HD000002');
+  });
+
+  it('text column operator (contains) filters by invoice code', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/reports/invoices/search')
+      .set(headers())
+      .send({
+        reportType: REPORT,
+        columns: ['invoiceCode'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+        columnFilters: [{ col: 'invoiceCode', contains: 'HD000002' }],
+      })
+      .expect(201);
+    expect(res.body.total).toBe(1);
+    expect(res.body.rows[0].invoiceCode).toBe('HD000002');
+  });
+
+  it('multi-status filter includes cancelled when explicitly selected', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/reports/invoices/search')
+      .set(headers())
+      .send({
+        reportType: REPORT,
+        columns: ['invoiceCode', 'status'],
+        filters: {
+          issuedAt: { from: '2026-06-01', to: '2026-06-30' },
+          invoiceStatus: ['cancelled'],
+        },
+      })
+      .expect(201);
+    expect(res.body.total).toBe(1);
+    expect(res.body.rows[0].status).toBe('cancelled');
   });
 
   it('400 when filters.issuedAt.from is missing', async () => {

@@ -5,9 +5,9 @@ import {
   type InvoiceReportFilterPayload,
   type InvoiceReportResult,
   type InvoiceReportSearchPayload,
-  type ReportCell,
   type ReportCellValue,
   type ReportColumnHeader,
+  type ReportGroupBy,
 } from "@erp/shared-interfaces";
 import { erpApi, requireErpData } from "../../../../lib/erp-api";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
@@ -21,20 +21,19 @@ import type {
   ReportFilterValues,
 } from "../../../../store/page-stores/report/report.interface";
 
-// Một dòng data từ API: object keyed theo col (cell tự mô tả col/type/value).
+// Một dòng data từ API: object keyed theo field của cột.
 export type ReportRow = Record<string, ReportCellValue>;
 
 // ===== API calls =====
 
 export async function fetchReportColumns(
   reportType: string,
-): Promise<ReportColumnHeader[]> {
-  const res = requireErpData(
+): Promise<InvoiceReportColumnsResult> {
+  return requireErpData(
     await erpApi.GET<InvoiceReportColumnsResult>("/reports/invoices/columns", {
       params: { query: { reportType } },
     }),
   );
-  return res.headers;
 }
 
 export async function fetchReportData(
@@ -63,13 +62,14 @@ function feDataType(type: ReportColumnDataType): FeColumnDataType {
   }
 }
 
-// headers (API) → ReportTableConfig (giữ band/group, type, công thức desc).
+// columns API → ReportTableConfig. Backend giờ là nguồn sự thật cho filterKind/filterOptions/
+// align/pinned/link; FE chỉ map thẳng, không tự suy ra nữa.
 export function mapHeadersToTableConfig(
-  headers: ReportColumnHeader[],
+  result: InvoiceReportColumnsResult,
 ): ReportTableConfig {
   return {
-    summaryLabel: "Tổng",
-    columns: headers.map((h, index) => ({
+    summaryLabel: result.summaryLabel ?? "Tổng",
+    columns: result.columns.map((h: ReportColumnHeader, index) => ({
       column: h.col,
       order: index + 1,
       label: h.name ?? h.col,
@@ -80,24 +80,14 @@ export function mapHeadersToTableConfig(
       tableConfig: {
         dataType: feDataType(h.type),
         width: DEFAULT_REPORT_COLUMN_WIDTH,
-        link: h.col === "invoiceCode",
+        align: h.align,
+        pinned: h.pinned ?? undefined,
+        link: h.link ?? false,
+        filterKind: h.filterKind,
+        filterOptions: h.filterOptions,
       },
     })),
   };
-}
-
-function cellsToRow(cells: ReportCell[]): ReportRow {
-  const row: ReportRow = {};
-  for (const cell of cells) row[cell.col] = cell.value;
-  return row;
-}
-
-export function mapDataRows(dataRaw: ReportCell[][]): ReportRow[] {
-  return dataRaw.map(cellsToRow);
-}
-
-export function mapTotals(totals: ReportCell[] | null): ReportRow {
-  return totals ? cellsToRow(totals) : {};
 }
 
 // ===== Mappers: store filter → backend payload =====
@@ -106,10 +96,21 @@ export function buildSearchFilters(
   filters: Partial<ReportFilterValues>,
 ): InvoiceReportFilterPayload {
   const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
-  const status = filters[REPORT_FILTERS_LINE.INVOICE_STATUS];
+  const store = filters[REPORT_FILTERS_LINE.STORE];
+  const invoiceStatus = filters[REPORT_FILTERS_LINE.INVOICE_STATUS];
+  const statDateType = filters[REPORT_FILTERS_LINE.STAT_DATE_TYPE];
   const cashier = filters[REPORT_FILTERS_LINE.CASHIER];
   const salesperson = filters[REPORT_FILTERS_LINE.SALESPERSON];
   const customer = filters[REPORT_FILTERS_LINE.CUSTOMER];
+  const categoryId = filters[REPORT_FILTERS_LINE.PRODUCT_GROUP];
+  const statBy = filters[REPORT_FILTERS_LINE.STATISTIC_BY];
+  const brand = filters[REPORT_FILTERS_LINE.BRAND];
+  const productType = filters[REPORT_FILTERS_LINE.PRODUCT_TYPE];
+  const statisticByBrand = filters[REPORT_FILTERS_LINE.CHECKBOX_STATISTIC_BY_BRAND];
+  const allocateComboRevenue =
+    filters[REPORT_FILTERS_LINE.CHECKBOX_ALLOCATE_COMBO];
+
+  const notAll = (v: string | undefined): v is string => !!v && v !== "all";
 
   const payload: InvoiceReportFilterPayload = {
     issuedAt: {
@@ -117,17 +118,46 @@ export function buildSearchFilters(
       to: range?.toDate || undefined,
     },
   };
-  // status BE là single → lấy phần tử đầu (FE đang multi-select).
-  if (status && status.length > 0) payload.status = { value: status[0] };
-  if (cashier && cashier !== "all") payload.cashierId = cashier;
-  if (salesperson && salesperson !== "all") payload.salespersonId = salesperson;
-  if (customer && customer !== "all") payload.customerId = customer;
+  if (store?.scope) {
+    payload.store = { scope: store.scope, storeIds: store.storeIds ?? [] };
+  }
+  if (invoiceStatus && invoiceStatus.length > 0) {
+    payload.invoiceStatus = invoiceStatus;
+  }
+  if (statDateType) {
+    payload.statDateType = statDateType as InvoiceReportFilterPayload["statDateType"];
+  }
+  if (notAll(cashier)) payload.cashierId = cashier;
+  if (notAll(salesperson)) payload.salespersonId = salesperson;
+  if (notAll(customer)) payload.customerId = customer;
+  if (notAll(categoryId)) payload.categoryId = categoryId;
+  if (statBy) payload.statBy = statBy as ReportGroupBy;
+  if (notAll(brand)) payload.brand = brand;
+  if (productType) {
+    payload.productType = productType as InvoiceReportFilterPayload["productType"];
+  }
+  if (statisticByBrand) payload.statisticByBrand = true;
+  if (allocateComboRevenue) payload.allocateComboRevenue = true;
   return payload;
 }
 
-// Column filter (chip header) → backend columnFilters. BE chỉ hỗ trợ eq nên chỉ map toán tử
-// "bằng": text dùng "equals", còn date/time/number/select dùng "=" (compare-op). Các toán tử
-// so sánh khác (<, >, ≤, ≥) chưa gửi BE — giới hạn backend, xử lý sau.
+const TEXT_OPERATORS = new Set([
+  "contains",
+  "equals",
+  "startsWith",
+  "endsWith",
+  "notContains",
+]);
+const COMPARE_FIELD: Record<string, "eq" | "lt" | "lte" | "gt" | "gte"> = {
+  "=": "eq",
+  "<": "lt",
+  "<=": "lte",
+  ">": "gt",
+  ">=": "gte",
+};
+
+// Column filter (chip header) → backend columnFilters. Text cột dùng contains/equals/startsWith/…;
+// cột số dùng eq/lt/lte/gt/gte; cột ngày dùng eq + from/to (≤ → to, ≥ → from).
 export function buildColumnFilters(
   columnFilters: Record<string, ReportColumnFilter>,
   numericCols: Set<string>,
@@ -135,9 +165,20 @@ export function buildColumnFilters(
   const out: ColumnFilter[] = [];
   for (const [col, filter] of Object.entries(columnFilters)) {
     const value = filter.value.trim();
-    const isEquals = filter.operator === "equals" || filter.operator === "=";
-    if (!value || !isEquals) continue;
-    out.push({ col, eq: numericCols.has(col) ? Number(value) : value });
+    if (!value) continue;
+    const op = filter.operator;
+    if (TEXT_OPERATORS.has(op)) {
+      out.push({ col, [op]: value } as ColumnFilter);
+    } else if (numericCols.has(col)) {
+      const field = COMPARE_FIELD[op] ?? "eq";
+      out.push({ col, [field]: Number(value) } as ColumnFilter);
+    } else if (op === "=") {
+      out.push({ col, eq: value });
+    } else if (op === "<" || op === "<=") {
+      out.push({ col, to: value });
+    } else if (op === ">" || op === ">=") {
+      out.push({ col, from: value });
+    }
   }
   return out;
 }

@@ -32,6 +32,7 @@ function makeReport(opts: {
   lines?: any[];
   items?: any[];
   categories?: any[];
+  products?: any[];
   hasConsolidated?: boolean;
 }) {
   const qb: any = {
@@ -45,6 +46,7 @@ function makeReport(opts: {
     repo(opts.lines) as any,
     repo(opts.items) as any,
     repo(opts.categories) as any,
+    repo(opts.products) as any,
     { hasPermission: jest.fn(async () => opts.hasConsolidated ?? false) } as any,
   );
 }
@@ -91,13 +93,13 @@ describe('RevenueByItemReport.buildData', () => {
     });
     const res = await report.buildData(baseDto() as any, actor);
     expect(res.total).toBe(1);
-    const byCol = Object.fromEntries(res.dataRaw[0].map((c) => [c.col, c.value]));
+    const byCol = res.rows[0];
     expect(byCol).toMatchObject({ sku: 'SKU001', quantity: 5, 'revenue.total': 4900 });
-    const totals = Object.fromEntries((res.totals ?? []).map((c) => [c.col, c.value]));
+    const totals = res.totals ?? {};
     expect(totals['quantity']).toBe(5);
   });
 
-  it('groups by category when groupBy=group', async () => {
+  it('groups by category when statBy=group', async () => {
     const report = makeReport({
       invoices: [inv()],
       lines: [line()],
@@ -107,12 +109,12 @@ describe('RevenueByItemReport.buildData', () => {
     const res = await report.buildData(
       baseDto({
         columns: ['itemName', 'revenue.total'],
-        filters: { issuedAt: { from: '2026-06-01' }, groupBy: ReportGroupBy.GROUP },
+        filters: { issuedAt: { from: '2026-06-01' }, statBy: ReportGroupBy.GROUP },
       }) as any,
       actor,
     );
     expect(res.total).toBe(1);
-    expect(res.dataRaw[0][0]).toMatchObject({ col: 'itemName', value: 'Shoes' });
+    expect(res.rows[0].itemName).toBe('Shoes');
   });
 
   it('filters by brand pre-aggregate', async () => {

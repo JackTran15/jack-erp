@@ -1254,3 +1254,35 @@ flowchart LR
   P7 --> P8
 ```
 
+### EPIC-24062026 Chain-Store Report API (invoice-report)
+
+- [EPIC-24062026 Chain-Store Report API](./epics/EPIC-24062026-chain-store-report-api.md)
+- Đưa backend `invoice-report` bám đúng hợp đồng 3-API mà FE đã dựng cho chế độ **Chuỗi cửa hàng**, cho 4 báo cáo bán hàng (`daily-sales-summary`, `invoice-order-listing`, `invoice-item-revenue-detail`, `revenue-by-item`). Hiện trạng: (1) `GET /columns` đã có nhưng thiếu `filterKind`/`filterOptions`/`summaryLabel`; (2) `POST /search` trả mảng cell thay vì rows keyed, filter mỏng (thiếu store-scope đa chi nhánh, multi-status, statDateType, productType, statBy, statisticByBrand, allocateComboRevenue) + thiếu toán tử text; (3) **chưa có** endpoint options dropdown (FE đang mock toàn bộ). Không có migration — chỉ contract types + query logic + 1 endpoint read. Báo cáo Kho B.5–B.12 ngoài scope (đã có API riêng).
+
+| Ticket                                                              | Mô tả                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [TKT-CSR-01](./tickets/TKT-CSR-01-shared-contract-reshape.md)      | Shared-interfaces: keyed rows + enriched column header + filter payload + enums |
+| [TKT-CSR-02](./tickets/TKT-CSR-02-dtos-filter-options.md)          | DTOs: filter mở rộng (store scope…) + text column ops + options query           |
+| [TKT-CSR-03](./tickets/TKT-CSR-03-filter-options-endpoint.md)      | `GET /filter-options` dùng chung (dynamic + enum), org-scoped, search/paging    |
+| [TKT-CSR-04](./tickets/TKT-CSR-04-columns-table-config.md)         | `GET /columns` → `{summaryLabel, columns}` + filterKind/filterOptions/align/link |
+| [TKT-CSR-05](./tickets/TKT-CSR-05-search-consolidation-filters.md) | `/search`: consolidation đa chi nhánh + statDateType/multi-status/statBy/…       |
+| [TKT-CSR-06](./tickets/TKT-CSR-06-keyed-rows-text-operators.md)    | `/search`: response rows keyed theo field + toán tử text (contains/…)            |
+| [TKT-CSR-07](./tickets/TKT-CSR-07-openapi-regen.md)                | openapi:generate + commit api-client snapshot                                   |
+| [TKT-CSR-08](./tickets/TKT-CSR-08-fe-integration.md)               | FE: options thật + gửi đủ filter + mapper rows keyed; xóa mock                   |
+| [TKT-CSR-09](./tickets/TKT-CSR-09-tests-e2e.md)                    | Unit + e2e (consolidation, statDateType, keyed rows, text ops) + DoD gate        |
+
+```mermaid
+flowchart LR
+  R1["CSR-01 Shared contract"] --> R2["CSR-02 DTOs"]
+  R1 --> R4["CSR-04 Columns config"]
+  R2 --> R3["CSR-03 Options endpoint"]
+  R2 --> R5["CSR-05 Search consolidation+filters"]
+  R1 --> R6["CSR-06 Keyed rows + text ops"]
+  R5 --> R6
+  R3 --> R7["CSR-07 openapi regen"]
+  R4 --> R7
+  R6 --> R7
+  R7 --> R8["CSR-08 FE integration"]
+  R8 --> R9["CSR-09 Tests + E2E"]
+```
+

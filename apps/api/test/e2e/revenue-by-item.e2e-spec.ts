@@ -129,14 +129,9 @@ describe('Revenue by item report (E2E)', () => {
   const search = (body: Record<string, unknown>) =>
     request(app.getHttpServer()).post('/reports/invoices/search').set(headers()).send(body);
 
-  /** dataRaw → { [keyCol value]: { col: value } } for easy lookup. */
-  const indexBy = (dataRaw: any[][], keyCol: string) =>
-    Object.fromEntries(
-      dataRaw.map((row) => {
-        const m = Object.fromEntries(row.map((c: any) => [c.col, c.value]));
-        return [m[keyCol], m];
-      }),
-    );
+  /** keyed rows → { [keyCol value]: row } for easy lookup. */
+  const indexBy = (rows: Record<string, any>[], keyCol: string) =>
+    Object.fromEntries(rows.map((m) => [m[keyCol], m]));
 
   it('lists the report type in /types with its VI label', async () => {
     const res = await request(app.getHttpServer())
@@ -153,11 +148,12 @@ describe('Revenue by item report (E2E)', () => {
       .get(`/reports/invoices/columns?reportType=${REPORT}`)
       .set(headers())
       .expect(200);
-    const cols = res.body.headers.map((h: { col: string }) => h.col);
+    expect(res.body.summaryLabel).toBe('Tổng');
+    const cols = res.body.columns.map((h: { col: string }) => h.col);
     expect(cols).toEqual(
       expect.arrayContaining(['sku', 'itemName', 'brand', 'quantity', 'revenue.total']),
     );
-    expect(res.body.headers.every((h: any) => h.group === null)).toBe(true);
+    expect(res.body.columns.every((h: any) => h.group === null)).toBe(true);
   });
 
   it('aggregates one row per item (cancelled excluded, two lines summed)', async () => {
@@ -168,7 +164,7 @@ describe('Revenue by item report (E2E)', () => {
     }).expect(201);
 
     expect(res.body.total).toBe(3);
-    const bySku = indexBy(res.body.dataRaw, 'sku');
+    const bySku = indexBy(res.body.rows, 'sku');
     expect(bySku['SKU1']).toMatchObject({
       itemName: 'Giày A',
       itemCategory: 'Nhóm Giày',
@@ -182,34 +178,34 @@ describe('Revenue by item report (E2E)', () => {
     expect(bySku['SKU2']).toMatchObject({ quantity: 1, 'revenue.total': 50000 });
     expect(bySku['SKU3']).toMatchObject({ quantity: 4, 'revenue.total': 120000 });
 
-    const totals = Object.fromEntries(res.body.totals.map((c: any) => [c.col, c.value]));
+    const totals = res.body.totals;
     expect(totals['quantity']).toBe(8);
     expect(totals['revenue.total']).toBe(450000);
     expect(totals['revenue.promoRate']).toBeNull();
   });
 
-  it('pivots to category with groupBy=group', async () => {
+  it('pivots to category with statBy=group', async () => {
     const res = await search({
       reportType: REPORT,
       columns: ['itemName', 'quantity', 'revenue.total'],
-      filters: { issuedAt: { from: '2026-06-01' }, groupBy: 'group' },
+      filters: { issuedAt: { from: '2026-06-01' }, statBy: 'group' },
     }).expect(201);
 
     expect(res.body.total).toBe(2);
-    const byName = indexBy(res.body.dataRaw, 'itemName');
+    const byName = indexBy(res.body.rows, 'itemName');
     expect(byName['Nhóm Giày']).toMatchObject({ quantity: 4, 'revenue.total': 330000 });
     expect(byName['Nhóm Dép']).toMatchObject({ quantity: 4, 'revenue.total': 120000 });
   });
 
-  it('pivots to brand with groupBy=brand', async () => {
+  it('pivots to brand with statisticByBrand', async () => {
     const res = await search({
       reportType: REPORT,
       columns: ['itemName', 'quantity', 'revenue.total'],
-      filters: { issuedAt: { from: '2026-06-01' }, groupBy: 'brand' },
+      filters: { issuedAt: { from: '2026-06-01' }, statisticByBrand: true },
     }).expect(201);
 
     expect(res.body.total).toBe(2);
-    const byName = indexBy(res.body.dataRaw, 'itemName');
+    const byName = indexBy(res.body.rows, 'itemName');
     expect(byName['Nike']).toMatchObject({ quantity: 7, 'revenue.total': 400000 });
     expect(byName['Adidas']).toMatchObject({ quantity: 1, 'revenue.total': 50000 });
   });
@@ -221,7 +217,7 @@ describe('Revenue by item report (E2E)', () => {
       filters: { issuedAt: { from: '2026-06-01' }, categoryId: CAT1 },
     }).expect(201);
     expect(res.body.total).toBe(2);
-    expect(Object.keys(indexBy(res.body.dataRaw, 'sku')).sort()).toEqual(['SKU1', 'SKU2']);
+    expect(Object.keys(indexBy(res.body.rows, 'sku')).sort()).toEqual(['SKU1', 'SKU2']);
   });
 
   it('filters by brand', async () => {
@@ -230,7 +226,7 @@ describe('Revenue by item report (E2E)', () => {
       columns: ['sku', 'quantity'],
       filters: { issuedAt: { from: '2026-06-01' }, brand: 'Nike' },
     }).expect(201);
-    expect(Object.keys(indexBy(res.body.dataRaw, 'sku')).sort()).toEqual(['SKU1', 'SKU3']);
+    expect(Object.keys(indexBy(res.body.rows, 'sku')).sort()).toEqual(['SKU1', 'SKU3']);
   });
 
   it('applies a per-column filter post-aggregate', async () => {
@@ -241,7 +237,7 @@ describe('Revenue by item report (E2E)', () => {
       columnFilters: [{ col: 'quantity', gte: 4 }],
     }).expect(201);
     expect(res.body.total).toBe(1);
-    expect(res.body.dataRaw[0][0]).toMatchObject({ col: 'sku', value: 'SKU3' });
+    expect(res.body.rows[0].sku).toBe('SKU3');
   });
 
   it('400 when filters.issuedAt.from is missing', async () => {

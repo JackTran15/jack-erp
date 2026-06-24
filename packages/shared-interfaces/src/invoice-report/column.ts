@@ -1,3 +1,5 @@
+import { ReportFilterOption } from './options';
+
 /** Data type of a report column — drives FE vi-VN formatting, alignment and filter widget. */
 export enum ReportColumnDataType {
   STRING = 'string',
@@ -16,6 +18,15 @@ export interface ReportColumnGroup {
   name: string;
 }
 
+/** Filter widget the FE renders for a column's per-column filter row. */
+export type ReportColumnFilterKind =
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'time'
+  | 'select'
+  | 'none';
+
 /** One column descriptor returned by the catalog (GET columns) API. */
 export interface ReportColumnHeader {
   /** Stable key, e.g. "date" | "revenue.total" | "payment.method.<coaAccountId>". */
@@ -27,11 +38,25 @@ export interface ReportColumnHeader {
   type: ReportColumnDataType;
   /** Band; null for ungrouped leading columns (date, actualRevenue). */
   group: ReportColumnGroup | null;
+  /** Filter widget kind for this column's filter row. */
+  filterKind: ReportColumnFilterKind;
+  /** Options for a `select` filter column (e.g. status); omitted otherwise. */
+  filterOptions?: ReportFilterOption[];
+  /** Horizontal alignment; number-family columns are right-aligned. */
+  align?: 'left' | 'right' | 'center';
+  /** Sticky/pinned side; null/absent = not pinned. */
+  pinned?: 'left' | 'right' | null;
+  /** Whether the cell renders as a link (e.g. invoice code). */
+  link?: boolean;
+  /** Suggested column width in px. */
+  width?: number;
 }
 
-/** Response of the columns API — only the full catalog, no data. */
+/** Response of the columns API — full catalog + the footer summary label. */
 export interface InvoiceReportColumnsResult {
-  headers: ReportColumnHeader[];
+  /** Footer first-cell label for the totals row, e.g. "Tổng". */
+  summaryLabel: string;
+  columns: ReportColumnHeader[];
 }
 
 /**

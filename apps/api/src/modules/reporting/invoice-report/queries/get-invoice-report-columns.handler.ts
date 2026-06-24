@@ -18,6 +18,6 @@ export class GetInvoiceReportColumnsHandler
     if (!def) {
       throw new BadRequestException(`Unknown report type: ${reportType}`);
     }
-    return { headers: await def.buildColumns(actor) };
+    return { summaryLabel: 'Tổng', columns: await def.buildColumns(actor) };
   }
 }

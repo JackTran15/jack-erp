@@ -1,13 +1,19 @@
 import {
-  ReportCell,
   ReportCellValue,
   ReportColumnDataType,
-  ReportGroupBy,
+  ReportRow,
 } from '@erp/shared-interfaces';
 import {
   getRevenueByItemColumnDef,
   RevenueByItemDimension,
 } from './revenue-by-item.columns';
+
+/**
+ * Internal row grain. Public `statBy` is item|parent|group; `statisticByBrand`
+ * adds the 'brand' grain. 'parent' groups by the item's parent product
+ * (item.productId); items without a parent product fall back to item grain.
+ */
+export type ItemGrain = 'item' | 'parent' | 'group' | 'brand';
 
 /**
  * One invoice LINE ITEM with its item metadata resolved INLINE (category/brand
@@ -18,6 +24,10 @@ export interface RevenueByItemRowInput {
   itemId: string | null;
   itemCode: string;
   itemName: string;
+  /** Parent product (mẫu mã) — for statBy=parent; null when the item has no parent. */
+  parentId: string | null;
+  parentSku: string | null;
+  parentName: string | null;
   categoryId: string | null;
   itemCategory: string | null;
   brand: string | null;
@@ -53,10 +63,19 @@ interface Dimension {
   unit: string | null;
 }
 
+const EMPTY_DIMENSION: Dimension = {
+  key: null,
+  sku: null,
+  name: '',
+  itemCategory: null,
+  brand: null,
+  unit: null,
+};
+
 /** Resolve the grouping key + dimension display fields for a row at a given grain. */
-function dimensionOf(r: RevenueByItemRowInput, groupBy: ReportGroupBy): Dimension {
-  switch (groupBy) {
-    case ReportGroupBy.GROUP:
+function dimensionOf(r: RevenueByItemRowInput, grain: ItemGrain): Dimension {
+  switch (grain) {
+    case 'group':
       return r.categoryId
         ? {
             key: r.categoryId,
@@ -66,8 +85,8 @@ function dimensionOf(r: RevenueByItemRowInput, groupBy: ReportGroupBy): Dimensio
             brand: null,
             unit: null,
           }
-        : { key: null, sku: null, name: '', itemCategory: null, brand: null, unit: null };
-    case ReportGroupBy.BRAND:
+        : EMPTY_DIMENSION;
+    case 'brand':
       return r.brand
         ? {
             key: r.brand,
@@ -77,8 +96,27 @@ function dimensionOf(r: RevenueByItemRowInput, groupBy: ReportGroupBy): Dimensio
             brand: r.brand,
             unit: null,
           }
-        : { key: null, sku: null, name: '', itemCategory: null, brand: null, unit: null };
-    case ReportGroupBy.ITEM:
+        : EMPTY_DIMENSION;
+    case 'parent':
+      // Group by parent product (mẫu mã); items without a parent fall back to item grain.
+      return r.parentId
+        ? {
+            key: r.parentId,
+            sku: r.parentSku,
+            name: r.parentName ?? r.parentSku ?? r.itemName,
+            itemCategory: r.itemCategory,
+            brand: r.brand,
+            unit: r.unit,
+          }
+        : {
+            key: r.itemId ?? r.itemCode,
+            sku: r.itemCode,
+            name: r.itemName,
+            itemCategory: r.itemCategory,
+            brand: r.brand,
+            unit: r.unit,
+          };
+    case 'item':
     default:
       return {
         key: r.itemId ?? r.itemCode,
@@ -98,11 +136,11 @@ function dimensionOf(r: RevenueByItemRowInput, groupBy: ReportGroupBy): Dimensio
  */
 export function aggregateByItem(
   rows: RevenueByItemRowInput[],
-  groupBy: ReportGroupBy,
+  grain: ItemGrain,
 ): ItemGroupAggregate[] {
   const byKey = new Map<string, ItemGroupAggregate>();
   for (const r of rows) {
-    const d = dimensionOf(r, groupBy);
+    const d = dimensionOf(r, grain);
     if (d.key === null) continue;
     let agg = byKey.get(d.key);
     if (!agg) {
@@ -181,12 +219,10 @@ export function itemGroupColumnType(col: string): ReportColumnDataType {
 export function buildItemGroupRow(
   columns: string[],
   agg: ItemGroupAggregate,
-): ReportCell[] {
-  return columns.map((col) => ({
-    col,
-    type: itemGroupColumnType(col),
-    value: itemGroupCellValue(col, agg),
-  }));
+): ReportRow {
+  const row: ReportRow = {};
+  for (const col of columns) row[col] = itemGroupCellValue(col, agg);
+  return row;
 }
 
 /**
@@ -196,17 +232,18 @@ export function buildItemGroupRow(
 export function buildItemGroupTotals(
   columns: string[],
   groups: ItemGroupAggregate[],
-): ReportCell[] {
-  return columns.map((col) => {
+): ReportRow {
+  const out: ReportRow = {};
+  for (const col of columns) {
     const type = itemGroupColumnType(col);
     const summable =
       type === ReportColumnDataType.CURRENCY ||
       type === ReportColumnDataType.NUMBER;
-    const value = summable
+    out[col] = summable
       ? round2(
           groups.reduce((sum, g) => sum + Number(itemGroupCellValue(col, g) ?? 0), 0),
         )
       : null;
-    return { col, type, value };
-  });
+  }
+  return out;
 }

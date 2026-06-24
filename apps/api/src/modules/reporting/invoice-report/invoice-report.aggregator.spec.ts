@@ -1,4 +1,3 @@
-import { ReportColumnDataType } from '@erp/shared-interfaces';
 import {
   aggregateByDay,
   buildRow,
@@ -69,18 +68,15 @@ describe('cellValue', () => {
 describe('buildRow / buildTotals', () => {
   const b = aggregateByDay(invoices, payments, promotions);
 
-  it('buildRow emits self-describing cells', () => {
+  it('buildRow emits a row keyed by column field', () => {
     const row = buildRow(['date', 'revenue.goods'], b.get('2026-06-04')!);
-    expect(row).toEqual([
-      { col: 'date', type: ReportColumnDataType.DATE, value: '2026-06-04' },
-      { col: 'revenue.goods', type: ReportColumnDataType.CURRENCY, value: 5000000 },
-    ]);
+    expect(row).toEqual({ date: '2026-06-04', 'revenue.goods': 5000000 });
   });
 
   it('buildTotals: date is null, numeric cols summed across days', () => {
     const totals = buildTotals(['date', 'revenue.goods'], [...b.values()]);
-    expect(totals[0]).toEqual({ col: 'date', type: ReportColumnDataType.DATE, value: null });
-    expect(totals[1].value).toBe(25000000);
+    expect(totals.date).toBeNull();
+    expect(totals['revenue.goods']).toBe(25000000);
   });
 });
 
@@ -95,5 +91,18 @@ describe('matchColumnFilter', () => {
   it('date range', () => {
     expect(matchColumnFilter('2026-06-03', { col: 'date', from: '2026-06-01', to: '2026-06-30' })).toBe(true);
     expect(matchColumnFilter('2026-07-03', { col: 'date', to: '2026-06-30' })).toBe(false);
+  });
+  it('text operators (case-insensitive contains / startsWith / endsWith / notContains)', () => {
+    expect(matchColumnFilter('HD000123', { col: 'c', contains: 'hd' })).toBe(true);
+    expect(matchColumnFilter('HD000123', { col: 'c', contains: 'xyz' })).toBe(false);
+    expect(matchColumnFilter('HD000123', { col: 'c', startsWith: 'HD' })).toBe(true);
+    expect(matchColumnFilter('HD000123', { col: 'c', endsWith: '123' })).toBe(true);
+    expect(matchColumnFilter('HD000123', { col: 'c', notContains: 'ZZ' })).toBe(true);
+    expect(matchColumnFilter('HD000123', { col: 'c', notContains: '000' })).toBe(false);
+    expect(matchColumnFilter('Giày', { col: 'c', equals: 'Giày' })).toBe(true);
+  });
+  it('text operator on an empty/null cell', () => {
+    expect(matchColumnFilter(null, { col: 'c', contains: 'x' })).toBe(false);
+    expect(matchColumnFilter(null, { col: 'c', notContains: 'x' })).toBe(true);
   });
 });
