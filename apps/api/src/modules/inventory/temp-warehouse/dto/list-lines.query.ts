@@ -55,6 +55,16 @@ export class ListTempWarehouseLinesQueryDto {
   @IsEnum(TempWarehouseDirection)
   direction?: TempWarehouseDirection;
 
+  @ApiPropertyOptional({
+    description:
+      'When true, also return TRANSFERRED-by-sale lines (those carrying an invoiceId) alongside the ACTIVE working set, each with invoiceId/invoiceNumber. Default (omitted) returns the ACTIVE working set only. Ignores the status filter.',
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeTransferred?: boolean = false;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)

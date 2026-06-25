@@ -18,6 +18,7 @@ import {
 import { ProductModule } from "../product/product.module";
 import { ItemCostSnapshotModule } from "../location/item-cost-snapshot.module";
 import { StockDeductionPublisher } from "../publishers/stock-deduction.publisher";
+import { TempWarehouseFulfillPublisher } from "../publishers/temp-warehouse-fulfill.publisher";
 import { StockDeductionConsumer } from "../consumers/stock-deduction.consumer";
 import { StockReturnConsumer } from "../consumers/stock-return.consumer";
 import { StockReturnInConsumer } from "../consumers/stock-return-in.consumer";
@@ -55,11 +56,16 @@ import { StockSummaryExportService } from "./stock-summary-export.service";
       useExisting: InventoryStockBalanceCrudService,
     },
     StockDeductionPublisher,
+    TempWarehouseFulfillPublisher,
     StockDeductionConsumer,
     StockReturnConsumer,
     StockReturnInConsumer,
   ],
-  exports: [StockLedgerService, StockDeductionPublisher],
+  exports: [
+    StockLedgerService,
+    StockDeductionPublisher,
+    TempWarehouseFulfillPublisher,
+  ],
 })
 export class StockLedgerModule implements OnModuleInit {
   constructor(private readonly entityRegistry: EntityRegistryService) {}

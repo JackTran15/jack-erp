@@ -71,6 +71,24 @@ export class TempWarehouseLineEntity extends BaseEntity {
   })
   sourceLocationId?: string | null;
 
+  @Column({
+    name: 'invoice_id',
+    type: 'uuid',
+    nullable: true,
+    comment:
+      'POS invoice that consumed this line via checkout fulfillment; null for manually staged/transferred lines.',
+  })
+  invoiceId?: string | null;
+
+  @Column({
+    name: 'invoice_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+    comment: 'Human-readable code of the consuming invoice (denormalized).',
+  })
+  invoiceNumber?: string | null;
+
   @ManyToOne(() => TempWarehouseSessionEntity, (s) => s.lines)
   @JoinColumn({ name: 'session_id' })
   session?: TempWarehouseSessionEntity;

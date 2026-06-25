@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppModal, Button, FormField, Input, MoneyInput } from "@erp/ui";
 import type { UserDetail } from "@erp/shared-interfaces";
 import { toast } from "sonner";
@@ -264,6 +264,17 @@ export function QuickCreateLocationDialog({
   const [name, setName] = useState("");
   const [storageId, setStorageId] = useState(storages[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
+
+  // `storages` loads asynchronously, so the initial useState above captures an
+  // empty list. Keep `storageId` pointing at a valid storage once the list
+  // arrives (or when the current selection is no longer in the list), otherwise
+  // the <select> visually shows the first option while state stays "".
+  useEffect(() => {
+    if (storages.length === 0) return;
+    setStorageId((prev) =>
+      prev && storages.some((s) => s.id === prev) ? prev : storages[0].id,
+    );
+  }, [storages]);
 
   const reset = () => {
     setCode("");

@@ -9476,6 +9476,16 @@
             }
           },
           {
+            "name": "includeTransferred",
+            "required": false,
+            "in": "query",
+            "description": "When true, also return TRANSFERRED-by-sale lines (those carrying an invoiceId) alongside the ACTIVE working set, each with invoiceId/invoiceNumber. Default (omitted) returns the ACTIVE working set only. Ignores the status filter.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -20806,7 +20816,7 @@
         "properties": {
           "pairs": {
             "minItems": 1,
-            "maxItems": 200,
+            "maxItems": 10000,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PreferredShelfPairDto"
@@ -23920,6 +23930,14 @@
           "notes": {
             "type": "string"
           },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "nullable": true
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -25093,6 +25111,14 @@
             "nullable": true
           },
           "sourceLocationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceNumber": {
             "type": "string",
             "nullable": true
           },

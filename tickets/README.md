@@ -1286,3 +1286,36 @@ flowchart LR
   R8 --> R9["CSR-09 Tests + E2E"]
 ```
 
+### EPIC-25062026 Checkout ↔ Kho tạm (auto-chuyển kho khi bán + lọc dòng đã chuyển)
+
+- [EPIC-25062026 Checkout ↔ Kho tạm](./epics/EPIC-25062026-checkout-temp-warehouse-fulfillment.md)
+- Khi **checkout**, mỗi item đang nằm trong **kho tạm** (dòng `warehouse_to_showroom` ACTIVE) được tự **chuyển kho lưu trữ → showroom** đúng `min(saleQty, tempQty)`, gắn `invoiceId`, rồi trừ tồn showroom như cũ (SALE_ISSUE). Async, tái dùng pipeline sự kiện (eventId tất định = `invoiceId`); tách dòng FIFO (phần dư còn ACTIVE); liên kết hóa đơn có cấu trúc (cột `invoice_id` trên `temp_warehouse_lines` + `stock_transfers`). Trang **Chuyển kho tạm** (pos-web): tích "Hiển thị dòng cần kiểm tra" → ẩn dòng đã sale; bỏ tích → hiện lại (cột "Chuyển kho"). Tái dùng materializer + `StockTransferService.createAndPost`; 1 migration nhỏ.
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-CTW-01](./tickets/TKT-CTW-01-schema-invoice-link.md)               | Migration + cột `invoice_id`/`invoice_number` (temp_warehouse_lines + stock_transfers) |
+| [TKT-CTW-02](./tickets/TKT-CTW-02-shared-contract.md)                   | Shared-interfaces: event fulfill + field hóa đơn + filter status dòng           |
+| [TKT-CTW-03](./tickets/TKT-CTW-03-checkout-publisher.md)                | Checkout publish `TEMP_WAREHOUSE_INVOICE_FULFILL_REQUESTED` (eventId=invoiceId) |
+| [TKT-CTW-04](./tickets/TKT-CTW-04-fulfillment-service-consumer.md)      | Fulfillment service + consumer: khớp + tách FIFO + transfer + mark TRANSFERRED  |
+| [TKT-CTW-05](./tickets/TKT-CTW-05-lines-query-transferred.md)           | Lines query trả dòng TRANSFERRED-by-sale + field hóa đơn                        |
+| [TKT-CTW-06](./tickets/TKT-CTW-06-openapi-regen.md)                     | openapi:generate + commit api-client snapshot                                  |
+| [TKT-CTW-07](./tickets/TKT-CTW-07-fe-checkbox-transferred.md)           | FE pos-web: ngữ nghĩa checkbox + render dòng TRANSFERRED                        |
+| [TKT-CTW-08](./tickets/TKT-CTW-08-report-saleqty-invoice.md)            | (tùy chọn) Report kho tạm: điền saleQty/invoice                                 |
+| [TKT-CTW-09](./tickets/TKT-CTW-09-tests-e2e.md)                         | E2E + test plan + DoD gate                                                      |
+
+```mermaid
+flowchart LR
+  C1["CTW-01 Migration + cột"] --> C2["CTW-02 Shared contract"]
+  C2 --> C3["CTW-03 Checkout publisher"]
+  C2 --> C4["CTW-04 Fulfill svc+consumer"]
+  C3 --> C4
+  C2 --> C5["CTW-05 Lines query TRANSFERRED"]
+  C5 --> C6["CTW-06 openapi regen"]
+  C4 --> C7["CTW-07 FE checkbox + render"]
+  C6 --> C7
+  C4 --> C8["CTW-08 Report (tùy chọn)"]
+  C4 --> C9["CTW-09 Tests + E2E"]
+  C5 --> C9
+  C7 --> C9
+```
+

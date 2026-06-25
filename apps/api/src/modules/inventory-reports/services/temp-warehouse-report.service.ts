@@ -19,10 +19,9 @@ import { DataSource } from 'typeorm';
  *   - remainingQty : tồn hiện tại (`stock_balances`) tại showroom location.
  *   - staff        : carrier (`users.first_name + last_name`).
  *
- * Giới hạn đã biết (không có nguồn dữ liệu trong hệ thống hiện tại):
- *   - saleQty / invoice: KHÔNG có liên kết temp-warehouse ↔ hóa đơn POS, nên
- *     luôn trả 0 / '' (giống file Excel mẫu). Cần bổ sung quan hệ ở backend
- *     nếu muốn số bán hàng chính xác.
+ * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
+ * (TRANSFERRED-by-sale, mang `invoice_id`/`invoice_number`). Dòng xuất chưa bán
+ * giữ saleQty=0 / invoice=''.
  *
  * Lọc: `status NOT IN ('DELETED','AUTO_BALANCED')` (loại dòng cân bằng tự động
  * vì không có carrier / không phải sự kiện xuất-trả thực; giữ ACTIVE/TRANSFERRED)
@@ -41,11 +40,11 @@ export interface TempWarehouseIssueRow {
   staff: string;
   outQty: number;
   returnQty: number;
-  /** Luôn 0 — không có nguồn liên kết hóa đơn POS. */
+  /** 1 when the issue was consumed by a sale (line carries an invoiceId), else 0. */
   saleQty: number;
   remainingQty: number;
   status: string;
-  /** Luôn '' — không có nguồn liên kết hóa đơn POS. */
+  /** Consuming invoice number for sale-consumed issues, else ''. */
   invoice: string;
 }
 
@@ -118,6 +117,8 @@ export class TempWarehouseReportService {
           l.carrier_user_id,
           l.created_at,
           l.direction,
+          l.invoice_id,
+          l.invoice_number,
           s.showroom_location_id
         FROM temp_warehouse_lines l
         JOIN temp_warehouse_sessions s ON s.id = l.session_id
@@ -151,7 +152,10 @@ export class TempWarehouseReportService {
           COALESCE(e.showroom_location_id, r.showroom_location_id) AS showroom_location_id,
           COALESCE(e.created_at, r.created_at) AS event_at,
           (e.id IS NOT NULL)::int AS out_qty,
-          (r.id IS NOT NULL)::int AS return_qty
+          (r.id IS NOT NULL)::int AS return_qty,
+          -- Only an issue (warehouse_to_showroom) carries the consuming invoice.
+          e.invoice_id AS invoice_id,
+          e.invoice_number AS invoice_number
         FROM exp e
         FULL OUTER JOIN ret r
           ON e.item_id = r.item_id
@@ -192,14 +196,14 @@ export class TempWarehouseReportService {
         TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS staff,
         p.out_qty AS out_qty,
         p.return_qty AS return_qty,
-        0 AS sale_qty,
+        (p.invoice_id IS NOT NULL)::int AS sale_qty,
         COALESCE(sb.quantity, 0) AS remaining_qty,
         CASE
           WHEN p.return_qty = p.out_qty THEN ''
           WHEN p.return_qty = 1 THEN 'Trả hàng trưng bày'
           ELSE 'Xuất không bán'
         END AS status,
-        '' AS invoice
+        COALESCE(p.invoice_number, '') AS invoice
       FROM paired p
       JOIN items i ON i.id = p.item_id AND i.organization_id = $1
       LEFT JOIN users u ON u.id = p.carrier_user_id

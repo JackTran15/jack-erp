@@ -8,6 +8,8 @@ export interface ListLinesParams {
   sessionId?: string;
   direction?: TempWarehouseDirection;
   status?: "ACTIVE" | "DELETED" | "AUTO_BALANCED" | "ALL";
+  /** When true, also return TRANSFERRED-by-sale lines (those carrying an invoiceId). */
+  includeTransferred?: boolean;
   pagination?: PaginationQuery;
 }
 

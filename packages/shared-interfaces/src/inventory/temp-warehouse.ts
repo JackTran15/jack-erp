@@ -64,6 +64,10 @@ export interface TempWarehouseLine {
   supersededById: string | null;
   notes: string | null;
   sourceLocationId: string | null;
+  /** POS invoice that consumed this line via checkout fulfillment (TRANSFERRED-by-sale); null otherwise. */
+  invoiceId?: string | null;
+  /** Human-readable code of the consuming invoice (denormalized). */
+  invoiceNumber?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string;

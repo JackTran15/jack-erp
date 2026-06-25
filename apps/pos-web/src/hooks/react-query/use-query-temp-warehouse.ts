@@ -32,14 +32,22 @@ export function useTempWarehouseLines(
   branchId: string | null,
   direction: TempWarehouseDirection,
   enabled = true,
+  includeTransferred = false,
 ): UseQueryResult<ListLinesRawResult, Error> {
   return useQuery({
-    queryKey: TEMP_WAREHOUSE_KEYS.LINES(branchId ?? "", direction),
+    queryKey: TEMP_WAREHOUSE_KEYS.LINES(
+      branchId ?? "",
+      direction,
+      includeTransferred,
+    ),
     queryFn: () =>
       tempWarehouseService.listLinesRaw({
         branchId: branchId as string,
         direction,
-        status: "ACTIVE",
+        // When surfacing TRANSFERRED-by-sale rows the backend ignores status;
+        // otherwise keep the ACTIVE working set.
+        status: includeTransferred ? undefined : "ACTIVE",
+        includeTransferred,
         pagination: { page: 1, pageSize: 500 },
       }),
     enabled: Boolean(branchId) && enabled,

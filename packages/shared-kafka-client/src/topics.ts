@@ -21,6 +21,7 @@ export const ERP_TOPICS = {
   CASH_VOUCHER_CREATED: 'erp.cash.voucher.created',
   CUSTOMER_MERGED: 'erp.customer.merged',
   TEMP_WAREHOUSE_TRANSFER_REQUESTED: 'erp.temp-warehouse.transfer-requested',
+  TEMP_WAREHOUSE_INVOICE_FULFILL: 'erp.temp-warehouse.invoice-fulfill',
   RETURN_POSTED: 'erp.return.posted',
   STOCK_RETURN_IN: 'erp.stock.return.in',
   LOYALTY_POINTS_REVERSE: 'erp.loyalty.points.reverse',

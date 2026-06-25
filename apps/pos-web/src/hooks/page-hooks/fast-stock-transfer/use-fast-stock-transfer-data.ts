@@ -65,15 +65,20 @@ export function useFastStockTransferData(): FastStockTransferData {
   const sessionId = session?.id ?? null;
   const isSessionClosed = session?.status === TempWarehouseSessionStatus.CLOSED;
 
+  // Unticking "Hiển thị dòng cần kiểm tra" surfaces the sale-consumed
+  // (TRANSFERRED-by-sale) rows alongside the ACTIVE working set.
+  const includeTransferred = !filters.showRowsNeedingReview;
   const outboundQuery = useTempWarehouseLines(
     branchId,
     TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
     !isSessionClosed,
+    includeTransferred,
   );
   const returnQuery = useTempWarehouseLines(
     branchId,
     TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
     !isSessionClosed,
+    includeTransferred,
   );
   const nettedQuery = useTempWarehouseNettedLines(branchId, sessionId);
 
