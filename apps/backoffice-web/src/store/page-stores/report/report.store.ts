@@ -14,6 +14,7 @@ export function createReportStore(
 ): ReportStoreApi {
   return createStore<ReportState>((set) => ({
     ...initialState,
+    detailInvoiceCode: null,
 
     actions: {
       // Đổi report type → columns tự fetch theo type. Chain: tự áp dụng ngay
@@ -81,7 +82,9 @@ export function createReportStore(
           appliedRequest: null,
         }),
 
-      reset: () => set({ ...initialState }),
+      setDetailInvoiceCode: (code) => set({ detailInvoiceCode: code }),
+
+      reset: () => set({ ...initialState, detailInvoiceCode: null }),
     },
   }));
 }

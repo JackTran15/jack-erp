@@ -1,6 +1,7 @@
 import {
   ReportColumnDataType,
   type ColumnFilter,
+  type InvoiceDetailView,
   type InvoiceReportColumnsResult,
   type InvoiceReportFilterPayload,
   type InvoiceReportResult,
@@ -42,6 +43,17 @@ export async function fetchReportData(
   return requireErpData(
     await erpApi.POST<InvoiceReportResult>("/reports/invoices/search", {
       body: payload as unknown as Record<string, unknown>,
+    }),
+  );
+}
+
+// Chi tiết một hóa đơn (line items + thanh toán) cho dialog drill-down, tra theo mã hóa đơn.
+export async function fetchInvoiceDetail(
+  code: string,
+): Promise<InvoiceDetailView> {
+  return requireErpData(
+    await erpApi.GET<InvoiceDetailView>("/reports/invoices/detail", {
+      params: { query: { code } },
     }),
   );
 }

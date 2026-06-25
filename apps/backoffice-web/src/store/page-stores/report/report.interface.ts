@@ -74,8 +74,12 @@ export interface ReportActions {
   applyFilters: () => void;
   resetFilters: () => void;
   reset: () => void;
+  // Mã hóa đơn đang xem chi tiết (mở dialog); null = đóng.
+  setDetailInvoiceCode: (code: string | null) => void;
 }
 
 export interface ReportState extends ReportInitialState {
+  // UI state cho dialog chi tiết hóa đơn (không thuộc initial metadata).
+  detailInvoiceCode: string | null;
   actions: ReportActions;
 }
