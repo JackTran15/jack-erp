@@ -25,10 +25,13 @@ import {
   TempWarehouseTransferKind,
   TempWarehouseTransferProcessingStatus,
   TempWarehouseTransferRequestedPayload,
+  TempWarehouseInvoiceFulfillRequestedPayload,
 } from '@erp/shared-interfaces';
 import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../../events/event-publisher.service';
+import { StockTransferService } from '../transfer/stock-transfer.service';
+import { TempWarehouseTransferMaterializerService } from './temp-warehouse-transfer-materializer.service';
 import { TempWarehouseSessionEntity } from './temp-warehouse-session.entity';
 import { TempWarehouseLineEntity } from './temp-warehouse-line.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
@@ -110,6 +113,17 @@ const PG_UNIQUE_VIOLATION = '23505';
 // Any fixed v4 UUID works — must not change once events have been published in production.
 const TEMP_WAREHOUSE_EVENT_NAMESPACE = '7b2f3c84-1d6e-4a9c-9b25-3f8a4e1c0d77';
 
+// Business description (Vietnamese, user-facing) stamped on the stock transfer
+// posted when a checkout consumes temp-warehouse stock. Data, not a log/error.
+const fulfillTransferDescription = (invoiceNumber: string): string =>
+  `Chuyển kho bán hàng hóa từ phiếu xuất đi tại kho tạm theo hóa đơn số ${invoiceNumber}`;
+
+/** One ACTIVE warehouse_to_showroom line consumed (in full or in part) by a sale. */
+interface ConsumedPortion {
+  line: TempWarehouseLineEntity;
+  take: number;
+}
+
 @Injectable()
 export class TempWarehouseService {
   private readonly logger = new Logger(TempWarehouseService.name);
@@ -132,6 +146,8 @@ export class TempWarehouseService {
     private readonly dataSource: DataSource,
     private readonly locationResolver: BranchLocationResolverService,
     private readonly eventPublisher: EventPublisher,
+    private readonly stockTransferService: StockTransferService,
+    private readonly transferMaterializer: TempWarehouseTransferMaterializerService,
   ) {}
 
   // ─── Session reads ──────────────────────────────────────────────────
@@ -517,23 +533,36 @@ export class TempWarehouseService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    // Hard-exclude TRANSFERRED from every raw-mode listing, including status=ALL.
     const qb = this.lineRepo
       .createQueryBuilder('l')
       .where('l.session_id = :sessionId', { sessionId })
       .andWhere('l.organization_id = :orgId', {
         orgId: actor.organizationId,
-      })
-      .andWhere('l.status != :transferred', {
-        transferred: TempWarehouseLineStatus.TRANSFERRED,
       });
 
-    if (statusFilter) {
-      qb.andWhere('l.status = :status', { status: statusFilter });
-    } else if (!query.status) {
-      qb.andWhere('l.status = :active', {
-        active: TempWarehouseLineStatus.ACTIVE,
+    if (query.includeTransferred) {
+      // ACTIVE working set + TRANSFERRED-by-sale rows (those tied to an invoice).
+      // Manual transfers (TRANSFERRED without an invoiceId) stay excluded so the
+      // Chuyển kho tạm screen is not polluted. The status filter is ignored here.
+      qb.andWhere(
+        '(l.status = :active OR (l.status = :transferred AND l.invoice_id IS NOT NULL))',
+        {
+          active: TempWarehouseLineStatus.ACTIVE,
+          transferred: TempWarehouseLineStatus.TRANSFERRED,
+        },
+      );
+    } else {
+      // Hard-exclude TRANSFERRED from every raw-mode listing, including status=ALL.
+      qb.andWhere('l.status != :transferred', {
+        transferred: TempWarehouseLineStatus.TRANSFERRED,
       });
+      if (statusFilter) {
+        qb.andWhere('l.status = :status', { status: statusFilter });
+      } else if (!query.status) {
+        qb.andWhere('l.status = :active', {
+          active: TempWarehouseLineStatus.ACTIVE,
+        });
+      }
     }
     if (query.direction) {
       qb.andWhere('l.direction = :direction', { direction: query.direction });
@@ -1112,6 +1141,172 @@ export class TempWarehouseService {
     return this.sessionRepo.findOne({
       where: { id: sessionId, organizationId },
     });
+  }
+
+  // ─── Checkout fulfillment ───────────────────────────────────────────
+
+  /**
+   * Consume temp-warehouse stock for a posted invoice. For each sold item, match
+   * ACTIVE warehouse_to_showroom lines FIFO (createdAt ASC), consume
+   * min(saleQty, Σ staged qty), and post a single warehouse -> showroom transfer
+   * (one line per item) tied to the invoice. The consumed portion of each line
+   * flips to TRANSFERRED (with invoiceId/invoiceNumber/transferId); a partially
+   * consumed line keeps its remainder as a fresh ACTIVE line (supersededById
+   * chain), mirroring the edit/split pattern.
+   *
+   * No-ops when the branch has no ACTIVE session or no staged line matches.
+   * Idempotent: processed_events dedupes on eventId=invoiceId, and a defensive
+   * guard skips when any line already carries this invoiceId.
+   */
+  async fulfillInvoiceFromTempWarehouse(
+    p: TempWarehouseInvoiceFulfillRequestedPayload,
+    actor: ActorContext,
+  ): Promise<void> {
+    const session = await this.getActiveSession(p.branchId, actor);
+    if (!session) return;
+
+    // Defensive idempotency: this invoice already consumed staged stock.
+    const alreadyFulfilled = await this.lineRepo.findOne({
+      where: { invoiceId: p.invoiceId, organizationId: p.organizationId },
+      select: { id: true },
+    });
+    if (alreadyFulfilled) {
+      this.logger.log(
+        `fulfillInvoice ${p.invoiceId} replay-detected → lines already carry this invoice, skipping`,
+      );
+      return;
+    }
+
+    // Build the consume plan (reads only). One transfer line per item; multiple
+    // FIFO temp lines for the same item aggregate into that item's quantity.
+    const plan: ConsumedPortion[] = [];
+    const consumedByItem = new Map<
+      string,
+      { quantity: number; sourceLocationId?: string | null }
+    >();
+    for (const reqLine of p.lines) {
+      const activeLines = await this.lineRepo.find({
+        where: {
+          sessionId: session.id,
+          organizationId: p.organizationId,
+          itemId: reqLine.itemId,
+          direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+          status: TempWarehouseLineStatus.ACTIVE,
+        },
+        order: { createdAt: 'ASC' },
+      });
+
+      let need = reqLine.quantity;
+      for (const line of activeLines) {
+        if (need <= 0) break;
+        const take = Math.min(need, Number(line.quantity));
+        if (take <= 0) continue;
+        plan.push({ line, take });
+        const agg = consumedByItem.get(reqLine.itemId);
+        if (agg) {
+          agg.quantity += take;
+        } else {
+          consumedByItem.set(reqLine.itemId, {
+            quantity: take,
+            sourceLocationId: line.sourceLocationId,
+          });
+        }
+        need -= take;
+      }
+    }
+
+    if (plan.length === 0) return;
+
+    // Reuse the materializer (source shelf + showroom shelf resolution) by feeding
+    // it a warehouse_to_showroom transfer request built from the consumed totals.
+    const description = fulfillTransferDescription(p.invoiceNumber);
+    const transferPayload: TempWarehouseTransferRequestedPayload = {
+      sessionId: session.id,
+      organizationId: p.organizationId,
+      branchId: p.branchId,
+      direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+      sourceLocationId: session.warehouseLocationId,
+      destinationLocationId: session.showroomLocationId,
+      sourceBranchId: p.branchId,
+      destinationBranchId: p.branchId,
+      lines: [...consumedByItem.entries()].map(([itemId, agg]) => ({
+        tempWarehouseLineId: itemId,
+        itemId,
+        quantity: agg.quantity,
+        sourceLocationId: agg.sourceLocationId ?? undefined,
+      })),
+      actor: {
+        userId: actor.userId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        roles: actor.roles,
+      },
+      requestedAt: new Date().toISOString(),
+      kind: TempWarehouseTransferKind.PARTIAL,
+      notes: description,
+    };
+
+    const input = await this.transferMaterializer.buildBranchScopedTransfer(
+      transferPayload,
+      actor,
+    );
+    input.notes = description;
+    input.invoiceId = p.invoiceId;
+    input.invoiceNumber = p.invoiceNumber;
+
+    const transfer = await this.stockTransferService.createAndPost(
+      input,
+      actor,
+      { validateOnHand: false },
+    );
+
+    // Split + mark consumed lines TRANSFERRED in one transaction. The transfer is
+    // already POSTED; re-check each line is still ACTIVE before mutating it.
+    await this.dataSource.transaction(async (manager) => {
+      for (const { line, take } of plan) {
+        const fresh = await manager.findOne(TempWarehouseLineEntity, {
+          where: {
+            id: line.id,
+            organizationId: p.organizationId,
+            status: TempWarehouseLineStatus.ACTIVE,
+          },
+        });
+        if (!fresh) continue;
+
+        const lineQty = Number(fresh.quantity);
+        const patch: Partial<TempWarehouseLineEntity> = {
+          status: TempWarehouseLineStatus.TRANSFERRED,
+          quantity: take.toFixed(2),
+          transferId: transfer.id,
+          invoiceId: p.invoiceId,
+          invoiceNumber: p.invoiceNumber,
+        };
+
+        if (take < lineQty) {
+          const remainder = manager.create(TempWarehouseLineEntity, {
+            organizationId: fresh.organizationId,
+            branchId: fresh.branchId,
+            sessionId: fresh.sessionId,
+            itemId: fresh.itemId,
+            direction: fresh.direction,
+            quantity: (lineQty - take).toFixed(2),
+            carrierUserId: fresh.carrierUserId,
+            notes: fresh.notes,
+            sourceLocationId: fresh.sourceLocationId,
+            status: TempWarehouseLineStatus.ACTIVE,
+            createdBy: actor.userId,
+          });
+          const savedRemainder = await manager.save(remainder);
+          patch.supersededById = savedRemainder.id;
+        }
+
+        await manager.update(TempWarehouseLineEntity, fresh.id, patch);
+      }
+    });
+
+    this.logger.log(
+      `Invoice ${p.invoiceId} fulfilled from temp warehouse: transfer ${transfer.id}, ${plan.length} line(s) consumed`,
+    );
   }
 
   // ─── Partial transfer ──────────────────────────────────────────────

@@ -18,6 +18,7 @@ import { DocumentNumberingService } from '../../document-numbering/document-numb
 import { EventPublisher } from '../../events/event-publisher.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-warehouse-fulfill.publisher';
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
@@ -70,6 +71,7 @@ export class CheckoutInvoiceService {
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly promotionApplyService: PromotionApplyService,
     private readonly stockDeductionPublisher: StockDeductionPublisher,
+    private readonly tempWarehouseFulfillPublisher: TempWarehouseFulfillPublisher,
     private readonly loyaltyPointsPublisher: LoyaltyPointsPublisher,
     private readonly journalSalePublisher: JournalSalePublisher,
     private readonly cashFromPaymentPublisher: CashFromPaymentPublisher,
@@ -251,7 +253,7 @@ export class CheckoutInvoiceService {
         return { invoice: saved, payments: savedPayments };
       });
 
-    // Publish 3 downstream events — consumers process async with DLQ + dead_letter_events
+    // Publish downstream events — consumers process async with DLQ + dead_letter_events
     await this.stockDeductionPublisher.publish(
       updatedInvoice.id,
       items.map((item) => ({
@@ -262,6 +264,33 @@ export class CheckoutInvoiceService {
       updatedInvoice.branchId!,
       actor,
     );
+
+    // Auto-transfer any sold item that is staged in the temp warehouse
+    // (warehouse -> showroom) against this invoice. The consumer no-ops when the
+    // branch has no ACTIVE session or no staged line, so this is always published.
+    const fulfillByItem = new Map<string, number>();
+    for (const item of items) {
+      fulfillByItem.set(
+        item.itemId,
+        (fulfillByItem.get(item.itemId) ?? 0) + Number(item.quantity),
+      );
+    }
+    await this.tempWarehouseFulfillPublisher.publish({
+      organizationId: actor.organizationId,
+      branchId: updatedInvoice.branchId!,
+      invoiceId: updatedInvoice.id,
+      invoiceNumber: realCode,
+      actor: {
+        userId: actor.userId,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        roles: actor.roles,
+      },
+      lines: [...fulfillByItem.entries()].map(([itemId, quantity]) => ({
+        itemId,
+        quantity,
+      })),
+    });
 
     await this.loyaltyPointsPublisher.publish(
       {

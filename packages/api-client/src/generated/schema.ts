@@ -7576,6 +7576,8 @@ export interface components {
             transferredAt?: string;
             attachmentIds: string[];
             notes?: string;
+            invoiceId?: string | null;
+            invoiceNumber?: string | null;
             lines: components["schemas"]["StockTransferLineEntity"][];
             transporter?: {
                 id: string;
@@ -7968,6 +7970,8 @@ export interface components {
             transferId?: string | null;
             notes?: string | null;
             sourceLocationId?: string | null;
+            invoiceId?: string | null;
+            invoiceNumber?: string | null;
             session?: components["schemas"]["TempWarehouseSessionEntity"];
             id: string;
             /** @description Tenant isolation key — every row belongs to exactly one organization. */
@@ -15429,6 +15433,8 @@ export interface operations {
                 /** @description Filter by line status; use ALL to return every status. TRANSFERRED lines are always excluded — query stock_transfers via temp_warehouse_lines.transfer_id for that audit trail. */
                 status?: "ACTIVE" | "DELETED" | "AUTO_BALANCED" | "ALL";
                 direction?: "warehouse_to_showroom" | "showroom_to_warehouse";
+                /** @description When true, also return TRANSFERRED-by-sale lines (those carrying an invoiceId) alongside the ACTIVE working set, each with invoiceId/invoiceNumber. Default (omitted) returns the ACTIVE working set only. Ignores the status filter. */
+                includeTransferred?: boolean;
                 page?: number;
                 pageSize?: number;
                 /** @description Hide items whose totalW2s equals totalS2w. Requires hideOffsetting=true; otherwise 400. */

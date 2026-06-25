@@ -166,6 +166,28 @@ export interface TempWarehouseTransferRequestedPayload {
   notes?: string;
 }
 
+/**
+ * Published by checkout for every posted (non-draft) invoice. The temp-warehouse
+ * fulfillment consumer matches each line against ACTIVE warehouse_to_showroom
+ * temp-warehouse lines (FIFO), splits/consumes them, and posts a warehouse ->
+ * showroom transfer tied to the invoice. eventId is the invoiceId (deterministic)
+ * so replays are no-ops; the consumer no-ops when there is no ACTIVE session or
+ * no staged line for the item.
+ */
+export interface TempWarehouseInvoiceFulfillRequestedPayload {
+  organizationId: string;
+  branchId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  actor: {
+    userId: string;
+    organizationId: string;
+    branchId?: string;
+    roles: string[];
+  };
+  lines: { itemId: string; quantity: number }[];
+}
+
 export interface Provider {
   id: string;
   organizationId: string;

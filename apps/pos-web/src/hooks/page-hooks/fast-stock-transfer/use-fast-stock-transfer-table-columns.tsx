@@ -16,6 +16,7 @@ import { formatOnHand } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import type { FastStockTransferTableRow } from "@erp/pos/types/fast-stock-transfer.type";
 import {
   formatCarrierName,
+  isLineSaleTransferred,
   lineProductName,
   lineQuantityDisplay,
   lineSku,
@@ -235,13 +236,25 @@ export function useFastStockTransferTableColumns() {
         title: "Chuyển kho",
         headerClassName: "text-center",
         cellClassName: "text-center",
-        render: (row) => (
-          <PosCheckbox
-            checked={row.isTransferSelected}
-            disabled={data.isLineBalanced(row.id)}
-            onChange={(value) => actions.handleToggleTransfer(row.id, value)}
-          />
-        ),
+        render: (row) =>
+          isLineSaleTransferred(row) ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="inline-flex items-center rounded bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
+                Đã chuyển
+              </span>
+              {row.invoiceNumber ? (
+                <span className="text-[10px] text-[#6B7280]">
+                  {row.invoiceNumber}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <PosCheckbox
+              checked={row.isTransferSelected}
+              disabled={data.isLineBalanced(row.id)}
+              onChange={(value) => actions.handleToggleTransfer(row.id, value)}
+            />
+          ),
       },
       {
         key: "actions",
@@ -250,6 +263,8 @@ export function useFastStockTransferTableColumns() {
         headerClassName: "w-[110px]",
         cellClassName: "w-[110px]",
         render: (row) => {
+          // Sale-consumed rows are read-only (no edit/delete).
+          if (isLineSaleTransferred(row)) return null;
           if (data.isLineBalanced(row.id)) return null;
           if (editingRowId === row.id && editableDraft) {
             return (

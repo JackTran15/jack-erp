@@ -13,6 +13,7 @@ import { TempWarehouseService } from './temp-warehouse.service';
 import { TempWarehouseController } from './temp-warehouse.controller';
 import { BranchLocationResolverService } from './branch-location-resolver.service';
 import { TempWarehouseTransferConsumer } from './consumers/temp-warehouse-transfer.consumer';
+import { TempWarehouseFulfillConsumer } from './consumers/temp-warehouse-fulfill.consumer';
 import { TempWarehouseTransferMaterializerService } from './temp-warehouse-transfer-materializer.service';
 import { StockTransferModule } from '../transfer/stock-transfer.module';
 import { InventoryLocationModule } from '../location/inventory-location.module';
@@ -41,6 +42,7 @@ import { EventsModule } from '../../events/events.module';
     BranchLocationResolverService,
     TempWarehouseTransferMaterializerService,
     TempWarehouseTransferConsumer,
+    TempWarehouseFulfillConsumer,
   ],
   exports: [TempWarehouseService],
 })

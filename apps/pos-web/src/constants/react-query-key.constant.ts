@@ -116,8 +116,12 @@ export const POS_BRANCH_CATALOG_KEYS = {
 export const TEMP_WAREHOUSE_KEYS = {
   ALL: ["temp-wh"] as const,
   ACTIVE: (branchId: string) => ["temp-wh", "active", branchId] as const,
-  LINES: (branchId: string, direction: TempWarehouseDirection) =>
-    ["temp-wh", "lines", branchId, direction] as const,
+  LINES: (
+    branchId: string,
+    direction: TempWarehouseDirection,
+    includeTransferred = false,
+  ) =>
+    ["temp-wh", "lines", branchId, direction, includeTransferred] as const,
   LINES_NETTED: (sessionId: string) =>
     ["temp-wh", "lines-netted", sessionId] as const,
   SESSION: (sessionId: string) => ["temp-wh", "session", sessionId] as const,

@@ -55,6 +55,10 @@ export interface CreateTransferDto {
   attachmentIds?: string[];
   /** ISO timestamp the transfer takes place; defaults to posting time when omitted. */
   transferredAt?: string;
+  /** POS invoice that triggered this transfer (checkout fulfillment); null for manual transfers. */
+  invoiceId?: string;
+  /** Human-readable code of the triggering invoice (denormalized). */
+  invoiceNumber?: string;
   lines: {
     itemId: string;
     quantity: number;
@@ -81,6 +85,10 @@ export interface BranchScopedTransferInput {
   counterpartyId?: string;
   attachmentIds?: string[];
   transferredAt?: string;
+  /** POS invoice that triggered this transfer (checkout fulfillment); null for manual transfers. */
+  invoiceId?: string;
+  /** Human-readable code of the triggering invoice (denormalized). */
+  invoiceNumber?: string;
   lines: {
     itemId: string;
     quantity: number;
@@ -180,6 +188,8 @@ export class StockTransferService {
       counterpartyId: dto.counterpartyId ?? null,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt ? new Date(dto.transferredAt) : undefined,
+      invoiceId: dto.invoiceId ?? null,
+      invoiceNumber: dto.invoiceNumber ?? null,
       createdBy: actor.userId,
       lines: dto.lines.map((l) => {
         const line = new StockTransferLineEntity();
@@ -380,6 +390,8 @@ export class StockTransferService {
       counterpartyId: counterparty.counterpartyId ?? undefined,
       attachmentIds: dto.attachmentIds ?? [],
       transferredAt: dto.transferredAt,
+      invoiceId: dto.invoiceId,
+      invoiceNumber: dto.invoiceNumber,
       notes: dto.notes,
       lines,
     };

@@ -69,6 +69,24 @@ export class StockTransferEntity extends BaseEntity {
   @Column({ nullable: true, comment: 'Free-text notes about the transfer' })
   notes?: string;
 
+  @Column({
+    name: 'invoice_id',
+    type: 'uuid',
+    nullable: true,
+    comment:
+      'POS invoice that triggered this transfer via checkout fulfillment; null for manual transfers.',
+  })
+  invoiceId?: string | null;
+
+  @Column({
+    name: 'invoice_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+    comment: 'Human-readable code of the triggering invoice (denormalized).',
+  })
+  invoiceNumber?: string | null;
+
   @OneToMany(() => StockTransferLineEntity, (line) => line.transfer, {
     cascade: ['insert'],
     eager: true,

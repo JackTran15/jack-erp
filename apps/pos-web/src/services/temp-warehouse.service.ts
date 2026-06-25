@@ -89,6 +89,7 @@ export const tempWarehouseService = {
     if (params.sessionId) q.set("sessionId", params.sessionId);
     if (params.direction) q.set("direction", params.direction);
     if (params.status) q.set("status", params.status);
+    if (params.includeTransferred) q.set("includeTransferred", "true");
     if (params.pagination) appendPaginationQuery(q, params.pagination);
     return call(() =>
       http.get<

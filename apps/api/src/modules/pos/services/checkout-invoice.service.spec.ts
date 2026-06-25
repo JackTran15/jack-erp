@@ -12,6 +12,7 @@ import { EventPublisher } from '../../events/event-publisher.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { StockDeductionPublisher } from '../../inventory/publishers/stock-deduction.publisher';
+import { TempWarehouseFulfillPublisher } from '../../inventory/publishers/temp-warehouse-fulfill.publisher';
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { JournalSalePublisher } from '../../accounting/publishers/journal-sale.publisher';
 import { CashFromPaymentPublisher } from '../../accounting/publishers/cash-from-payment.publisher';
@@ -101,6 +102,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
   let wsEmitter: { emitToBranch: jest.Mock };
   let promotionApplyService: { commitPromotions: jest.Mock };
   let stockDeductionPublisher: { publish: jest.Mock };
+  let tempWarehouseFulfillPublisher: { publish: jest.Mock };
   let loyaltyPointsPublisher: { publish: jest.Mock };
   let journalSalePublisher: { publish: jest.Mock };
   let cashFromPaymentPublisher: { publish: jest.Mock };
@@ -135,6 +137,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
     wsEmitter                = { emitToBranch: jest.fn() };
     promotionApplyService    = { commitPromotions: jest.fn().mockResolvedValue(undefined) };
     stockDeductionPublisher  = { publish: jest.fn().mockResolvedValue(undefined) };
+    tempWarehouseFulfillPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     loyaltyPointsPublisher   = { publish: jest.fn().mockResolvedValue(true) };
     journalSalePublisher     = { publish: jest.fn().mockResolvedValue(undefined) };
     cashFromPaymentPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
@@ -171,6 +174,7 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         { provide: WebSocketEmitterService,               useValue: wsEmitter },
         { provide: PromotionApplyService,                 useValue: promotionApplyService },
         { provide: StockDeductionPublisher,               useValue: stockDeductionPublisher },
+        { provide: TempWarehouseFulfillPublisher,         useValue: tempWarehouseFulfillPublisher },
         { provide: LoyaltyPointsPublisher,                useValue: loyaltyPointsPublisher },
         { provide: JournalSalePublisher,                  useValue: journalSalePublisher },
         { provide: CashFromPaymentPublisher,              useValue: cashFromPaymentPublisher },
@@ -450,6 +454,34 @@ describe('CheckoutInvoiceService (event-driven)', () => {
         /without an assigned location/,
       );
       expect(stockDeductionPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes one temp-warehouse fulfill event with item-aggregated lines + the invoice code', async () => {
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ id: 'row-1', itemId: 'item-1', quantity: 2 }),
+        invoiceItemStub({ id: 'row-2', itemId: 'item-1', quantity: 3 }),
+        invoiceItemStub({ id: 'row-3', itemId: 'item-2', quantity: 1 }),
+      ]);
+
+      await service.checkout('inv-1', cashPaymentDto(), actor);
+
+      expect(tempWarehouseFulfillPublisher.publish).toHaveBeenCalledTimes(1);
+      expect(tempWarehouseFulfillPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org-1',
+          branchId: 'branch-1',
+          invoiceId: 'inv-1',
+          invoiceNumber: 'INV-2605-00001',
+          lines: expect.arrayContaining([
+            { itemId: 'item-1', quantity: 5 },
+            { itemId: 'item-2', quantity: 1 },
+          ]),
+        }),
+      );
+      // exactly the two aggregated items, no per-row duplication.
+      expect(
+        tempWarehouseFulfillPublisher.publish.mock.calls[0][0].lines,
+      ).toHaveLength(2);
     });
 
     it('publishes loyalty points award event when customer present', async () => {

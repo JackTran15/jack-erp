@@ -59,6 +59,17 @@ export function attachTransferSelection(
   return { ...line, isTransferSelected };
 }
 
+/**
+ * A line consumed by a checkout (transferred out to the showroom against an
+ * invoice). Surfaced read-only when "Hiển thị dòng cần kiểm tra" is unticked.
+ */
+export function isLineSaleTransferred(line: TempWarehouseLine): boolean {
+  return (
+    line.status === TempWarehouseLineStatus.TRANSFERRED &&
+    Boolean(line.invoiceId)
+  );
+}
+
 function matchesText(value: string, query: string): boolean {
   if (!query.trim()) return true;
   return value.toLowerCase().includes(query.trim().toLowerCase());
@@ -76,8 +87,10 @@ export function lineMatchesTableFilters(
   if (!matchesText(lineProductName(line), filters.productName)) return false;
   if (!matchesText(locationLabelForLine(line), filters.location)) return false;
   if (!matchesText(lineUnit(line), filters.unit)) return false;
-  if (filters.showRowsNeedingReview && balancedLineIds.has(line.id)) {
-    return false;
+  if (filters.showRowsNeedingReview) {
+    // Ticked = only rows needing review: hide sale-consumed and balanced rows.
+    if (isLineSaleTransferred(line)) return false;
+    if (balancedLineIds.has(line.id)) return false;
   }
   return true;
 }
