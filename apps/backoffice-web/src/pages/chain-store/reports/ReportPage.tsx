@@ -9,6 +9,7 @@ import { TableStoreProvider } from "../../../store/common/table-store/table.cont
 import { buildInitialTableState } from "../../../store/common/table-store/table.factory";
 import { ReportStoreProvider } from "../../../store/page-stores/report/report.context";
 import { buildInitialReportState } from "../../../store/page-stores/report/report.factory";
+import { InvoiceDetailDialog } from "./InvoiceDetailDialog/InvoiceDetailDialog";
 import { ReportPageHeader } from "./ReportPageHeader/ReportPageHeader";
 import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
@@ -75,6 +76,7 @@ export function ReportPage({ category, reportType }: Props) {
           <ReportPageHeader />
           <ReportPageTable />
         </div>
+        <InvoiceDetailDialog />
       </TableStoreProvider>
     </ReportStoreProvider>
   );

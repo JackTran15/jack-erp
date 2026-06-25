@@ -73,6 +73,9 @@ export function ReportPageTableView({ rows, totals }: Props) {
   // Column filter gom chung ở report store (đồng bộ với filter header/popover).
   const columnFilters = useReportStore((s) => s.columnFilters);
   const setColumnFilter = useReportStore((s) => s.actions.setColumnFilter);
+  const setDetailInvoiceCode = useReportStore(
+    (s) => s.actions.setDetailInvoiceCode,
+  );
 
   // Tra cứu cấu hình cột theo id để render metadata (label, group, mã, align, link).
   const configById = useMemo(() => {
@@ -419,7 +422,16 @@ export function ReportPageTableView({ rows, totals }: Props) {
                         ].join(" ")}
                       >
                         {col.tableConfig?.link ? (
-                          <a className="text-blue-600 hover:underline cursor-pointer">{raw ?? ""}</a>
+                          col.column === "invoiceCode" && raw ? (
+                            <a
+                              className="cursor-pointer text-blue-600 hover:underline"
+                              onClick={() => setDetailInvoiceCode(String(raw))}
+                            >
+                              {raw}
+                            </a>
+                          ) : (
+                            raw ?? ""
+                          )
                         ) : isReportNumberColumn(col) ? (
                           formatReportNumber(raw)
                         ) : (

@@ -25,6 +25,7 @@ import { InvoiceReportController } from './invoice-report.controller';
 import { InvoiceReportTemplateEntity } from './invoice-report-template.entity';
 import { ReportTypeEntity } from './report-type.entity';
 import { ReportTypeSyncService } from './report-type-sync.service';
+import { GetInvoiceDetailHandler } from './queries/get-invoice-detail.handler';
 import { GetInvoiceReportColumnsHandler } from './queries/get-invoice-report-columns.handler';
 import { GetInvoiceReportTemplateHandler } from './queries/get-invoice-report-template.handler';
 import { GetReportFilterOptionsHandler } from './queries/get-report-filter-options.handler';
@@ -90,6 +91,7 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
     GetInvoiceReportColumnsHandler,
     GetReportFilterOptionsHandler,
     SearchInvoiceReportHandler,
+    GetInvoiceDetailHandler,
     ListInvoiceReportTypesHandler,
     ListInvoiceReportTemplatesHandler,
     GetInvoiceReportTemplateHandler,

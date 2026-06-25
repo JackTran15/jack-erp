@@ -24,6 +24,7 @@ import { CreateInvoiceReportTemplateDto } from './dto/create-invoice-report-temp
 import { InvoiceReportSearchDto } from './dto/invoice-report-search.dto';
 import { ReportFilterOptionsQueryDto } from './dto/report-filter-options-query.dto';
 import { UpdateInvoiceReportTemplateDto } from './dto/update-invoice-report-template.dto';
+import { GetInvoiceDetailQuery } from './queries/get-invoice-detail.query';
 import { GetInvoiceReportColumnsQuery } from './queries/get-invoice-report-columns.query';
 import { GetInvoiceReportTemplateQuery } from './queries/get-invoice-report-template.query';
 import { GetReportFilterOptionsQuery } from './queries/get-report-filter-options.query';
@@ -74,6 +75,16 @@ export class InvoiceReportController {
   @RequirePermission(BRANCH_READ)
   search(@Body() dto: InvoiceReportSearchDto, @Actor() actor: ActorContext) {
     return this.queryBus.execute(new SearchInvoiceReportQuery(dto, actor));
+  }
+
+  /** Full invoice detail (line items + payments) for the drill-down dialog, by invoice code. */
+  @Get('detail')
+  @RequirePermission(BRANCH_READ)
+  getInvoiceDetail(
+    @Query('code') code: string,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.queryBus.execute(new GetInvoiceDetailQuery(code, actor));
   }
 
   @Get('templates')
