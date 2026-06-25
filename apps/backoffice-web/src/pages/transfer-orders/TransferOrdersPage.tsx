@@ -44,6 +44,7 @@ import {
   ProductSelectDialog,
   type ProductSelectResult,
 } from "../../components/shared/product-select/ProductSelectDialog";
+import { ChooseWarehouseDialog } from "../../components/document/ChooseWarehouseDialog";
 import {
   InventoryPageTitle,
   InventoryTabBar,
@@ -245,6 +246,7 @@ export function TransferOrdersPage() {
     for (const s of storages) map.set(s.id, s.name);
     return map;
   }, [storages]);
+
 
   const selectedOrder = useMemo(
     () => records?.data.find((o) => o.id === selectedId) ?? null,
@@ -639,6 +641,7 @@ interface FormLine {
   // Per-line source warehouse; empty falls back to the header source storage.
   // The destination warehouse is chosen later, at import time.
   sourceStorageId: string;
+  sourceStorageLabel: string;
   note: string;
 }
 
@@ -649,6 +652,7 @@ const emptyLine = (): FormLine => ({
   unit: "",
   requestedQty: 1,
   sourceStorageId: "",
+  sourceStorageLabel: "",
   note: "",
 });
 
@@ -707,6 +711,11 @@ function TransferOrderFormDialog({
     initial?.sourceStorageId ??
     storages.find((s) => s.branchId === initialSourceBranchId)?.id ??
     "";
+  const storageNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of storages) map.set(s.id, s.name);
+    return map;
+  }, [storages]);
   const [sourceBranchId, setSourceBranchId] = useState(initialSourceBranchId);
   const [sourceBranchLabel, setSourceBranchLabel] = useState(
     initialSourceBranchName,
@@ -730,7 +739,9 @@ function TransferOrderFormDialog({
       itemName: l.item?.name ?? "",
       unit: l.item?.unit ?? "",
       requestedQty: Number(l.requestedQty),
-      sourceStorageId: l.sourceStorageId ?? "",
+      sourceStorageId: l.sourceStorageId ?? initialSourceStorageId,
+      sourceStorageLabel:
+        storageNameById.get(l.sourceStorageId ?? initialSourceStorageId) ?? "",
       note: l.note ?? "",
     }));
 
@@ -745,6 +756,7 @@ function TransferOrderFormDialog({
   const [importOpen, setImportOpen] = useState(false);
   // Multi-select product picker (adds N lines).
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [chooseStorageOpen, setChooseStorageOpen] = useState(false);
   const [pendingAfterUnsaved, setPendingAfterUnsaved] = useState<
     "close" | "create"
   >("close");
@@ -770,6 +782,7 @@ function TransferOrderFormDialog({
             unit: normalized.unit,
             requestedQty: normalized.quantity,
             sourceStorageId: importedStorageId,
+            sourceStorageLabel: storageNameById.get(importedStorageId) ?? "",
             note: normalized.note,
           },
         ];
@@ -783,7 +796,7 @@ function TransferOrderFormDialog({
       }
       setDirty(true);
     },
-    [sourceStorageId],
+    [sourceStorageId, storageNameById],
   );
 
   // When user picks a new source branch and we don't yet have a storage
@@ -863,6 +876,17 @@ function TransferOrderFormDialog({
       };
     },
     [],
+  );
+
+  const searchSourceStorages = useCallback(
+    async (query: string) => {
+      const term = query.trim().toLowerCase();
+      const items = sourceStorageOptions.filter((s) =>
+        term ? s.name.toLowerCase().includes(term) : true,
+      );
+      return { items, hasMore: false, total: items.length };
+    },
+    [sourceStorageOptions],
   );
 
   const summaryLines = getPersistableFormLines(lines);
@@ -1168,31 +1192,57 @@ function TransferOrderFormDialog({
       getValue: (row) => row.itemName,
     },
     {
-      key: "sourceStorageId",
+      key: "sourceStorageLabel",
       label: "Kho",
       width: 220,
       renderEditor: (row, idx) => (
-        <select
-          className="h-full w-full bg-transparent px-2 text-sm outline-none disabled:opacity-60"
-          value={row.sourceStorageId || sourceStorageId}
-          disabled={!canEditDetails}
-          onChange={(e) => {
-            const v = e.target.value;
+        <LookupField
+          portalToBody
+          placeholder="Chọn kho"
+          value={
+            row.sourceStorageLabel ||
+            storageNameById.get(row.sourceStorageId || sourceStorageId) ||
+            ""
+          }
+          onValueChange={(val) => {
             setLines((prev) =>
               prev.map((l, i) =>
-                i === idx ? { ...l, sourceStorageId: v } : l,
+                i === idx
+                  ? {
+                      ...l,
+                      sourceStorageId: "",
+                      sourceStorageLabel: val,
+                    }
+                  : l,
               ),
             );
             markDirty();
           }}
-        >
-          <option value="">— Chọn kho —</option>
-          {sourceStorageOptions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+          onSelect={(storage) => {
+            setLines((prev) =>
+              prev.map((l, i) =>
+                i === idx
+                  ? {
+                      ...l,
+                      sourceStorageId: storage.id,
+                      sourceStorageLabel: storage.name,
+                    }
+                  : l,
+              ),
+            );
+            markDirty();
+          }}
+          search={searchSourceStorages}
+          enableSearchModal
+          searchModalTitle="Chọn kho"
+          searchModalPlaceholder="Nhập tên kho"
+          itemKey={(s) => s.id}
+          renderItem={(s) => s.name}
+          renderMeta={() => ""}
+          columns={[{ key: "name", label: "Tên kho", render: (s) => s.name }]}
+          disabled={!canEditDetails}
+          className="h-full"
+        />
       ),
     },
     {
@@ -1344,19 +1394,8 @@ function TransferOrderFormDialog({
             <button
               type="button"
               className="flex items-center gap-1.5 text-primary-blue transition-colors hover:text-primary-blue-hover disabled:opacity-50"
-              disabled={!canEditDetails || !sourceStorageId}
-              onClick={() => {
-                if (!sourceStorageId) return;
-                setLines((prev) =>
-                  normalizeFormLines(
-                    prev.map((line) => ({
-                      ...line,
-                      sourceStorageId: line.sourceStorageId || sourceStorageId,
-                    })),
-                  ),
-                );
-                markDirty();
-              }}
+              disabled={!canEditDetails || sourceStorageOptions.length === 0}
+              onClick={() => setChooseStorageOpen(true)}
             >
               Chọn kho
             </button>
@@ -1448,6 +1487,28 @@ function TransferOrderFormDialog({
           open
           onOpenChange={setProductPickerOpen}
           onConfirm={addLinesFromPicker}
+        />
+      )}
+
+      {chooseStorageOpen && (
+        <ChooseWarehouseDialog
+          storages={sourceStorageOptions}
+          defaultStorageId={sourceStorageId || sourceStorageOptions[0]?.id}
+          fieldLabel="Kho nguồn"
+          onClose={() => setChooseStorageOpen(false)}
+          onConfirm={(storage) => {
+            setSourceStorageId(storage.id);
+            setLines((prev) =>
+              normalizeFormLines(
+                prev.map((line) => ({
+                  ...line,
+                  sourceStorageId: storage.id,
+                  sourceStorageLabel: storage.name,
+                })),
+              ),
+            );
+            markDirty();
+          }}
         />
       )}
     </>

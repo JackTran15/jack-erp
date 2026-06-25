@@ -2,6 +2,11 @@ import type { TableColumn } from "../../components/table/BaseDataTable";
 import type { StockBalanceRow } from "../../api/stock-balances";
 import type { StockByLocationItem } from "@erp/shared-interfaces";
 
+function displayLocationName(row: StockBalanceRow): string {
+  if (row.location.code === "__UNASSIGNED__") return "Chưa xếp";
+  return row.location.name || "—";
+}
+
 export function buildItemLocationColumns(
   rowIndexMap: Map<string, number>,
 ): TableColumn<StockBalanceRow>[] {
@@ -20,7 +25,7 @@ export function buildItemLocationColumns(
       label: "Tên vị trí",
       width: 150,
       filterKind: "symbol",
-      render: (r) => r.location.name,
+      render: displayLocationName,
     },
     {
       key: "itemCode",

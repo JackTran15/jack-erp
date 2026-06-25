@@ -457,6 +457,7 @@ export interface ImportableTransferOrderListItem {
     unit: string;
     storageName: string | null;
     locationCode: string | null;
+    locationName: string | null;
     quantity: number;
     unitPrice: number;
     lineTotal: number;

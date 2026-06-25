@@ -53,7 +53,7 @@ export function ChooseTransferWarehousesDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="max-w-[520px]">
+      <DialogContent overlayClassName="z-[70]" className="z-[80] max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Chọn kho</DialogTitle>
         </DialogHeader>

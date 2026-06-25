@@ -60,6 +60,14 @@ function formatDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
 }
 
+function displayLocationLabel(row: {
+  locationCode?: string | null;
+  locationName?: string | null;
+}): string {
+  if (row.locationCode === "__UNASSIGNED__") return "Chưa xếp";
+  return row.locationName || row.locationCode || "—";
+}
+
 function matchesText(
   value: string,
   filterValue: string,
@@ -360,7 +368,7 @@ export function TransferInPage() {
         key: "locationCode",
         label: "Vị trí",
         width: 140,
-        render: (row) => row.locationCode || "—",
+        render: (row) => displayLocationLabel(row),
       },
       {
         key: "unit",
