@@ -54,7 +54,7 @@ export function ChooseWarehouseDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="max-w-[480px]">
+      <DialogContent overlayClassName="z-[70]" className="z-[80] max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Chọn kho</DialogTitle>
         </DialogHeader>

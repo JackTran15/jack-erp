@@ -109,7 +109,6 @@ export function ProductSelectDialog({
   categoryFilter = true,
   initialSelectedIds,
   showQuantityPrice = false,
-  resolveSelectedLines = false,
   defaultUnitPriceSource = "none",
   defaultQuantity = 1,
   onConfirm,
@@ -455,10 +454,10 @@ export function ProductSelectDialog({
     );
     const allSelectedItemIds = [...selectedItemIds];
 
-    // Resolve every selected item to full line data. Only the line-picker mode needs
-    // auto-selected (unexpanded) products expanded into their variants.
+    // Resolve every selected item to full line data. A checked collapsed product
+    // represents all of its variants, even when the caller only needs item ids.
     const lineItemIds = new Set<string>(selectedItemIds);
-    if ((showQuantityPrice || resolveSelectedLines) && autoSelectIds.size > 0) {
+    if (autoSelectIds.size > 0) {
       setResolving(true);
       try {
         for (const productId of autoSelectIds) {

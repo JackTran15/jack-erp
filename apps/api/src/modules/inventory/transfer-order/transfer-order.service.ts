@@ -526,6 +526,7 @@ export class TransferOrderService {
             unit: line.item?.unit ?? "",
             storageName: line.location?.storage?.name ?? null,
             locationCode: line.location?.code ?? null,
+            locationName: line.location?.name ?? null,
             quantity: Number(line.quantity ?? 0),
             unitPrice: Number(line.unitPrice ?? 0),
             lineTotal: Number(line.lineTotal ?? 0),
@@ -573,6 +574,7 @@ export class TransferOrderService {
             unit: issueLine?.unit ?? line.item?.unit ?? "",
             storageName: issueLine?.storageName ?? null,
             locationCode: issueLine?.locationCode ?? null,
+            locationName: issueLine?.locationName ?? null,
             quantity: issueLine?.quantity ?? fallbackQuantity,
             unitPrice: issueLine?.unitPrice ?? fallbackUnitPrice,
             lineTotal:
