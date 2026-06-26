@@ -43,6 +43,7 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
 /** Staff — orders, temp warehouse, invoices, shifts, transfer requests. */
 export const STAFF_PERMISSION_KEYS: string[] = [
   'customer.read',
+  'customer.write',
   'product.read',
   'inventory.read',
   'inventory.item.read',
