@@ -14,11 +14,11 @@
 | TC-05 Ca làm việc POS | — | 🚫 Skip — POS chưa có UI mở/đóng ca |
 | TC-06 Quỹ tiền | [`report-06.md`](report-06.md) | 🟡 Một phần — 4/8 pass, 2 bug (auto-post + reverse UI) |
 | TC-07 Điều chuyển chi nhánh | [`report-07.md`](report-07.md) | 🟢 Xong — 5/5 pass, 1 bug minor |
-| TC-08 Xuất kho thủ công | — | ⏳ Chưa test |
-| TC-09 Kiểm kê kho | — | ⏳ Chưa test |
-| TC-10 Đổi trả hàng | — | ⏳ Chưa test |
-| TC-11 Báo cáo | — | ⏳ Chưa test |
-| TC-12 Phân quyền | — | ⏳ Chưa test |
+| TC-08 Xuất kho thủ công | [`report-08.md`](report-08.md) | 🟢 Xong — 3/3 pass, 1 UX nhỏ |
+| TC-09 Kiểm kê kho | [`report-09.md`](report-09.md) | 🟡 Một phần — 6/7 pass, 1 bug minor |
+| TC-10 Đổi trả hàng | [`report-10.md`](report-10.md) | 🔴 4/6 pass, 2 NG — 1 bug major (type sai), 1 bug minor |
+| TC-11 Báo cáo | [`report-11.md`](report-11.md) | 🔧 Tạm dừng — 1/3 pass, 2 NG; chờ fix bug group-by (13 TC chưa test) |
+| TC-12 Phân quyền | [`report-12.md`](report-12.md) | 🔴 5/8 pass, 3 NG — 3 bug major (FE guard, branch ERP, mgr scope) |
 
 ---
 
