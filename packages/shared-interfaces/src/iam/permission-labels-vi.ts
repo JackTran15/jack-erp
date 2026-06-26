@@ -104,6 +104,36 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'accounting.receivables.update': 'Cập nhật công nợ phải thu',
   'accounting.receivables.write-off': 'Xóa nợ khó đòi',
 
+  // Phiếu thu tiền mặt
+  'accounting.cash_receipt.create': 'Tạo phiếu thu tiền mặt',
+  'accounting.cash_receipt.read': 'Xem phiếu thu tiền mặt',
+  'accounting.cash_receipt.update': 'Cập nhật phiếu thu tiền mặt',
+  'accounting.cash_receipt.delete': 'Xóa phiếu thu tiền mặt',
+  'accounting.cash_receipt.post': 'Ghi sổ phiếu thu tiền mặt',
+  'accounting.cash_receipt.reverse': 'Đảo phiếu thu tiền mặt',
+
+  // Phiếu chi tiền mặt
+  'accounting.cash_payment.create': 'Tạo phiếu chi tiền mặt',
+  'accounting.cash_payment.read': 'Xem phiếu chi tiền mặt',
+  'accounting.cash_payment.update': 'Cập nhật phiếu chi tiền mặt',
+  'accounting.cash_payment.delete': 'Xóa phiếu chi tiền mặt',
+  'accounting.cash_payment.post': 'Ghi sổ phiếu chi tiền mặt',
+  'accounting.cash_payment.reverse': 'Đảo phiếu chi tiền mặt',
+
+  // Kiểm kê tiền mặt
+  'accounting.cash_count.create': 'Tạo phiếu kiểm kê tiền mặt',
+  'accounting.cash_count.read': 'Xem phiếu kiểm kê tiền mặt',
+  'accounting.cash_count.update': 'Cập nhật phiếu kiểm kê tiền mặt',
+  'accounting.cash_count.post': 'Ghi sổ kiểm kê tiền mặt',
+
+  // Sổ chi tiết & danh mục phiếu thu/chi
+  'accounting.cash_ledger.read': 'Xem sổ chi tiết tiền mặt',
+  'accounting.cash_voucher_partner.read': 'Xem đối tượng phiếu thu/chi',
+  'accounting.cash_voucher_category.create': 'Tạo loại phiếu thu/chi',
+  'accounting.cash_voucher_category.read': 'Xem loại phiếu thu/chi',
+  'accounting.cash_voucher_category.update': 'Cập nhật loại phiếu thu/chi',
+  'accounting.cash_voucher_category.delete': 'Xóa loại phiếu thu/chi',
+
   // Báo cáo
   'reporting.dashboard.branch.read': 'Xem báo cáo theo chi nhánh',
   'reporting.dashboard.consolidated.read': 'Xem báo cáo tổng hợp',

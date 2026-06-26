@@ -60,5 +60,7 @@ export const STAFF_PERMISSION_KEYS: string[] = [
   'pos.invoice.read',
   'pos.invoice.write',
   'pos.return.create',
+  'pos.exchange.create',
   'pos.session.manage',
+  'accounting.cash.read',
 ];
