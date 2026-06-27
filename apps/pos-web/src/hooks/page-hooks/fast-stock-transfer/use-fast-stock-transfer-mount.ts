@@ -51,14 +51,26 @@ export function useFastStockTransferMount() {
 
       if (sourceValid && destValid) return prev;
 
+      const nextSource = sourceValid
+        ? prev.sourceWarehouse
+        : defaults.sourceWarehouse;
+      const nextDest = destValid
+        ? prev.destinationWarehouse
+        : defaults.destinationWarehouse;
+
+      // Nothing actually changes (e.g. defaults match the already-set values
+      // that just aren't validatable yet) — return prev to avoid a re-render loop.
+      if (
+        nextSource === prev.sourceWarehouse &&
+        nextDest === prev.destinationWarehouse
+      ) {
+        return prev;
+      }
+
       return {
         ...prev,
-        sourceWarehouse: sourceValid
-          ? prev.sourceWarehouse
-          : defaults.sourceWarehouse,
-        destinationWarehouse: destValid
-          ? prev.destinationWarehouse
-          : defaults.destinationWarehouse,
+        sourceWarehouse: nextSource,
+        destinationWarehouse: nextDest,
       };
     });
   }, [

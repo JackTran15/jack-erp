@@ -174,8 +174,13 @@ export class InvoiceService {
 
         const itemEntities = items.map((item, index) => {
           const catalog = priceMap.get(item.itemId);
+          // POS sales must deduct from the showroom. Don't let an FE-supplied
+          // warehouse shelf win over the showroom resolution: when the line is
+          // also auto-transferred out of that warehouse (temp-warehouse fulfill),
+          // letting it win double-debits the warehouse. Fall back to the FE
+          // location only when the item has no showroom shelf.
           const resolvedLocationId =
-            item.locationId ?? itemLocationMap.get(item.itemId);
+            itemLocationMap.get(item.itemId) ?? item.locationId;
           const d = lineDiscounts[index];
           return manager.create(InvoiceItemEntity, {
             organizationId: actor.organizationId,
@@ -331,8 +336,11 @@ export class InvoiceService {
 
           const itemEntities = dto.items.map((item, index) => {
             const catalog = priceMap.get(item.itemId);
+            // POS sales must deduct from the showroom — see createInvoice. The
+            // showroom resolution wins; the FE location is only a fallback when
+            // the item has no showroom shelf.
             const resolvedLocationId =
-              item.locationId ?? itemLocationMap.get(item.itemId);
+              itemLocationMap.get(item.itemId) ?? item.locationId;
             const d = lineDiscounts[index];
             return manager.create(InvoiceItemEntity, {
               organizationId: actor.organizationId,

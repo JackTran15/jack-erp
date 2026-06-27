@@ -9,6 +9,13 @@ import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
+import { resolveBranchItemLocations } from './resolve-branch-item-locations';
+
+jest.mock('./resolve-branch-item-locations');
+const mockResolveBranchItemLocations =
+  resolveBranchItemLocations as jest.MockedFunction<
+    typeof resolveBranchItemLocations
+  >;
 
 const actor = {
   userId: 'user-1',
@@ -115,6 +122,9 @@ describe('InvoiceService', () => {
     }).compile();
 
     service = module.get(InvoiceService);
+
+    mockResolveBranchItemLocations.mockReset();
+    mockResolveBranchItemLocations.mockResolvedValue(new Map());
   });
 
   // ===========================================================================
@@ -204,6 +214,72 @@ describe('InvoiceService', () => {
       expect(mockManager.save).toHaveBeenCalledTimes(1);
       const createCall = mockManager.create.mock.calls[0];
       expect(createCall[1].subtotal).toBe(0);
+    });
+  });
+
+  // ===========================================================================
+  // sale deduction location — showroom resolution wins over FE-supplied shelf
+  // ===========================================================================
+  describe('sale deduction location', () => {
+    const lineLocationId = (calls: any[][]): string | undefined =>
+      calls.find((c) => c[0] === InvoiceItemEntity)?.[1].locationId;
+
+    it('create: deducts from the resolved showroom location, ignoring an FE-supplied warehouse shelf', async () => {
+      mockResolveBranchItemLocations.mockResolvedValue(
+        new Map([['item-1', 'showroom-loc']]),
+      );
+      const savedInvoice = invoiceStub();
+      mockManager.save.mockResolvedValue(savedInvoice);
+      invoiceRepo.findOne.mockResolvedValue(savedInvoice);
+      itemRepo.find.mockResolvedValue([]);
+
+      const dto: CreateInvoiceDto = {
+        sessionId: 'session-1',
+        items: [
+          { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 1, unitPrice: 50, locationId: 'warehouse-shelf' },
+        ],
+      };
+
+      await service.create(dto, actor);
+
+      expect(lineLocationId(mockManager.create.mock.calls)).toBe('showroom-loc');
+    });
+
+    it('create: falls back to the FE-supplied location when the item has no showroom shelf', async () => {
+      mockResolveBranchItemLocations.mockResolvedValue(new Map());
+      const savedInvoice = invoiceStub();
+      mockManager.save.mockResolvedValue(savedInvoice);
+      invoiceRepo.findOne.mockResolvedValue(savedInvoice);
+      itemRepo.find.mockResolvedValue([]);
+
+      const dto: CreateInvoiceDto = {
+        sessionId: 'session-1',
+        items: [
+          { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 1, unitPrice: 50, locationId: 'warehouse-shelf' },
+        ],
+      };
+
+      await service.create(dto, actor);
+
+      expect(lineLocationId(mockManager.create.mock.calls)).toBe('warehouse-shelf');
+    });
+
+    it('update: deducts from the resolved showroom location, ignoring an FE-supplied warehouse shelf', async () => {
+      mockResolveBranchItemLocations.mockResolvedValue(
+        new Map([['item-1', 'showroom-loc']]),
+      );
+      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
+      itemRepo.find.mockResolvedValue([]);
+
+      const dto: UpdateInvoiceDto = {
+        items: [
+          { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 1, unitPrice: 50, locationId: 'warehouse-shelf' },
+        ],
+      };
+
+      await service.update('inv-1', dto, actor);
+
+      expect(lineLocationId(mockManager.create.mock.calls)).toBe('showroom-loc');
     });
   });
 

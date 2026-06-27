@@ -16,3 +16,4 @@ test_logs/
 # **.md
 # Added by code-review-graph
 .code-review-graph/
+graphify-out
