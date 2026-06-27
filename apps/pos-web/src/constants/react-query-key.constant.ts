@@ -115,7 +115,8 @@ export const POS_BRANCH_CATALOG_KEYS = {
 
 export const TEMP_WAREHOUSE_KEYS = {
   ALL: ["temp-wh"] as const,
-  ACTIVE: (branchId: string) => ["temp-wh", "active", branchId] as const,
+  ACTIVE: (branchId: string, direction: TempWarehouseDirection) =>
+    ["temp-wh", "active", branchId, direction] as const,
   LINES: (
     branchId: string,
     direction: TempWarehouseDirection,

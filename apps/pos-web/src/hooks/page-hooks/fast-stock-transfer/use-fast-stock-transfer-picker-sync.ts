@@ -32,7 +32,7 @@ export function useFastStockTransferPickerSync(): void {
     (s) => s.setToolbarProduct,
   );
 
-  const { data: session } = useTempWarehouseActiveSession(branchId);
+  const { data: session } = useTempWarehouseActiveSession(branchId, direction);
   const isSessionClosed = session?.status === TempWarehouseSessionStatus.CLOSED;
 
   const outboundQuery = useTempWarehouseLines(

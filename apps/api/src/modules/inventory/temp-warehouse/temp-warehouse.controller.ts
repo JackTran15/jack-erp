@@ -9,10 +9,12 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
+  ParseEnumPipe,
   UseGuards,
   UseInterceptors,
   NotFoundException,
 } from '@nestjs/common';
+import { TempWarehouseDirection } from '@erp/shared-interfaces';
 import { ApiTags, ApiHeader, ApiOperation } from '@nestjs/swagger';
 import { Actor, ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission, RequireBranchScope } from '../../auth/decorators';
@@ -23,7 +25,7 @@ import { TempWarehouseService } from './temp-warehouse.service';
 import { AddTempWarehouseLineDto } from './dto/add-line.dto';
 import { UpdateTempWarehouseLineDto } from './dto/update-line.dto';
 import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
-import { CloseTempWarehouseSessionDto } from './dto/close-session.dto';
+import { CloseBranchSessionsDto } from './dto/close-session.dto';
 import { ListCarriersQueryDto } from './dto/list-carriers.query';
 import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
 
@@ -41,17 +43,26 @@ export class TempWarehouseController {
   constructor(private readonly service: TempWarehouseService) {}
 
   @Get('sessions/active')
-  @ApiOperation({ summary: 'Get the ACTIVE session for a branch (404 if none)' })
+  @ApiOperation({
+    summary:
+      'Get the ACTIVE session for a branch and direction (w2s/s2w) — 404 if none',
+  })
   @RequirePermission('inventory.temp-warehouse.read')
   async getActiveSession(
     @Query('branchId', ParseUUIDPipe) branchId: string,
+    @Query('direction', new ParseEnumPipe(TempWarehouseDirection))
+    direction: TempWarehouseDirection,
     @Actor() actor: ActorContext,
   ) {
-    const session = await this.service.getActiveSession(branchId, actor);
+    const session = await this.service.getActiveSession(
+      branchId,
+      direction,
+      actor,
+    );
     if (!session) {
       throw new NotFoundException({
         code: 'TEMP_WAREHOUSE_NO_ACTIVE_SESSION',
-        message: `Branch ${branchId} has no ACTIVE temp warehouse session`,
+        message: `Branch ${branchId} has no ACTIVE ${direction} temp warehouse session`,
       });
     }
     return session;
@@ -110,18 +121,17 @@ export class TempWarehouseController {
     return this.service.listLines(query, actor);
   }
 
-  @Post('sessions/:id/close')
+  @Post('sessions/close')
   @ApiOperation({
     summary:
-      'Close a session with one of three modes: NET_OFFSET (auto-balance), CREATE_TRANSFERS (publish events to create stock transfers), or NONE',
+      'Close both direction sessions (w2s + s2w) of a branch. NET_OFFSET (auto-balance) requires both sessions sharing locations; otherwise CREATE_TRANSFERS publishes one single transfer per session, or NONE.',
   })
   @RequirePermission('inventory.temp-warehouse.close')
-  closeSession(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: CloseTempWarehouseSessionDto,
+  closeBranchSessions(
+    @Body() dto: CloseBranchSessionsDto,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.closeSession(id, dto, actor);
+    return this.service.closeBranchSessions(dto, actor);
   }
 
   @Post('sessions/:id/transfer-lines')

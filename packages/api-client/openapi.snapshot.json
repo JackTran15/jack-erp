@@ -9308,6 +9308,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "direction",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9322,7 +9330,7 @@
             }
           }
         },
-        "summary": "Get the ACTIVE session for a branch (404 if none)",
+        "summary": "Get the ACTIVE session for a branch and direction (w2s/s2w) — 404 if none",
         "tags": [
           "Inventory · Temp Warehouse"
         ]
@@ -9620,23 +9628,15 @@
         ]
       }
     },
-    "/inventory/temp-warehouse/sessions/{id}/close": {
+    "/inventory/temp-warehouse/sessions/close": {
       "post": {
-        "operationId": "TempWarehouseController_closeSession",
+        "operationId": "TempWarehouseController_closeBranchSessions",
         "parameters": [
           {
             "name": "X-Idempotency-Key",
             "in": "header",
             "description": "Idempotency key — same key + same body within 24h replays the original response without creating duplicates",
             "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
             "schema": {
               "type": "string"
             }
@@ -9647,7 +9647,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CloseTempWarehouseSessionDto"
+                "$ref": "#/components/schemas/CloseBranchSessionsDto"
               }
             }
           }
@@ -9664,7 +9664,7 @@
             }
           }
         },
-        "summary": "Close a session with one of three modes: NET_OFFSET (auto-balance), CREATE_TRANSFERS (publish events to create stock transfers), or NONE",
+        "summary": "Close both direction sessions (w2s + s2w) of a branch. NET_OFFSET (auto-balance) requires both sessions sharing locations; otherwise CREATE_TRANSFERS publishes one single transfer per session, or NONE.",
         "tags": [
           "Inventory · Temp Warehouse"
         ]
@@ -24961,6 +24961,14 @@
               "CLOSED"
             ]
           },
+          "direction": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "warehouse_to_showroom",
+              "showroom_to_warehouse"
+            ]
+          },
           "closeMode": {
             "type": "string",
             "nullable": true,
@@ -25180,7 +25188,17 @@
               "showroom_to_warehouse"
             ],
             "type": "string",
-            "description": "Omit to auto-resolve direction from the items current stock balance at the branchs main warehouse vs main showroom location"
+            "description": "Direction of this session/line: warehouse_to_showroom (w2s) or showroom_to_warehouse (s2w). Selects/opens the per-direction session."
+          },
+          "warehouseStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Warehouse-side storage for this session; resolved to its default location. Falls back to branch main storage when omitted. Only honored when opening the session."
+          },
+          "showroomStorageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Showroom-side storage for this session; resolved to its default location. Falls back to branch main showroom when omitted. Only honored when opening the session."
           },
           "carrierUserId": {
             "type": "string",
@@ -25198,7 +25216,8 @@
         },
         "required": [
           "branchId",
-          "itemId"
+          "itemId",
+          "direction"
         ]
       },
       "UpdateTempWarehouseLineDto": {
@@ -25225,9 +25244,14 @@
           }
         }
       },
-      "CloseTempWarehouseSessionDto": {
+      "CloseBranchSessionsDto": {
         "type": "object",
         "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Branch whose ACTIVE direction sessions are closed"
+          },
           "mode": {
             "enum": [
               "NET_OFFSET",
@@ -25238,6 +25262,7 @@
           }
         },
         "required": [
+          "branchId",
           "mode"
         ]
       },

@@ -169,12 +169,14 @@ describe('Temp-warehouse checkout fulfillment (e2e)', () => {
       }),
     );
 
-    // One ACTIVE temp-warehouse session for the branch (max one is allowed).
+    // One ACTIVE w2s temp-warehouse session for the branch (checkout fulfillment
+    // consumes warehouse_to_showroom staged stock, so it targets the w2s session).
     const session = await ds.getRepository(TempWarehouseSessionEntity).save(
       ds.getRepository(TempWarehouseSessionEntity).create({
         organizationId: seed.organizationId,
         branchId: seed.branchId,
         status: TempWarehouseSessionStatus.ACTIVE,
+        direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
         warehouseLocationId: whLocationId,
         showroomLocationId: srLocationId,
         openedBy: seed.userId,

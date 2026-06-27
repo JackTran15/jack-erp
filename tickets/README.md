@@ -1319,3 +1319,57 @@ flowchart LR
   C7 --> C9
 ```
 
+### EPIC-25062026 Kho tạm theo hướng phiên (session-level direction w2s/s2w + combined close)
+
+- [EPIC-25062026 Kho tạm theo hướng phiên](./epics/EPIC-25062026-temp-warehouse-session-direction.md)
+- Tách **direction** từ cấp dòng lên **cấp phiên** kho tạm: 1 chi nhánh mở **tối đa 2 phiên ACTIVE** đồng thời — `w2s` (Xuất đi) + `s2w` (Trả lại), mỗi phiên chọn `warehouse_location`/`showroom_location` **riêng** (client cung cấp, fallback resolver). `GET sessions/active` thêm `direction` (bắt buộc); `addLine` đổi `direction` thành bắt buộc + location tùy chọn. **Đóng gộp theo chi nhánh** (`POST sessions/close { branchId, mode }`, thay `sessions/:id/close`): chỉ "đối cộng trừ" (`NET_OFFSET`) khi **cả 2 phiên cùng tồn tại + cùng cặp location**; khác location hoặc 1 phiên → **không đối cộng trừ, chuyển thẳng single** (`CREATE_TRANSFERS` từng phiên). 1 migration nhỏ (cột `direction` + đổi unique index sang `(branch, direction)`); consumer/materializer cho phiên single-direction hoàn tất sau 1 transfer. Tái dùng `BranchLocationResolverService`, `buildEventPayload`/`buildAutoBalancedLines`, enum sẵn có.
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-TWD-01](./tickets/TKT-TWD-01-schema-session-direction.md)          | Migration + entity: cột `direction` + unique `(branch, direction)`              |
+| [TKT-TWD-02](./tickets/TKT-TWD-02-shared-contract.md)                   | Shared-interfaces: session direction + addLine body + combined close body       |
+| [TKT-TWD-03](./tickets/TKT-TWD-03-open-active-by-direction.md)          | DTO + service: mở phiên theo hướng (location client) + active/list theo direction |
+| [TKT-TWD-04](./tickets/TKT-TWD-04-combined-close.md)                    | Combined close + net-offset eligibility (service + controller)                  |
+| [TKT-TWD-05](./tickets/TKT-TWD-05-transfer-completion.md)               | Consumer/materializer: phiên single-direction hoàn tất sau 1 transfer           |
+| [TKT-TWD-06](./tickets/TKT-TWD-06-openapi-regen.md)                     | openapi:generate + commit api-client snapshot                                   |
+| [TKT-TWD-07](./tickets/TKT-TWD-07-fe-data-layer.md)                     | FE pos-web data layer (service + hooks + query keys)                            |
+| [TKT-TWD-08](./tickets/TKT-TWD-08-fe-ui.md)                             | FE pos-web UI: wiring 2 phiên + gate NET_OFFSET + picker location               |
+| [TKT-TWD-09](./tickets/TKT-TWD-09-tests-e2e.md)                         | Tests + E2E + DoD gate                                                          |
+| [TKT-TWD-10](./tickets/TKT-TWD-10-session-locations-from-storages.md)   | addLine: session locations từ kho đã chọn (storage→location) + chặn trùng        |
+| [TKT-TWD-11](./tickets/TKT-TWD-11-openapi-regen-storages.md)            | openapi:generate (addLine storage ids) + snapshot                                |
+| [TKT-TWD-12](./tickets/TKT-TWD-12-fe-send-storage-ids.md)               | FE: truyền kho đã chọn (storage ids) xuống addLine                               |
+
+```mermaid
+flowchart LR
+  D1["TWD-01 Migration + entity"] --> D2["TWD-02 Shared contract"]
+  D2 --> D3["TWD-03 Open/active by direction"]
+  D2 --> D4["TWD-04 Combined close"]
+  D3 --> D4
+  D4 --> D5["TWD-05 Transfer completion"]
+  D3 --> D6["TWD-06 openapi regen"]
+  D4 --> D6
+  D6 --> D7["TWD-07 FE data layer"]
+  D7 --> D8["TWD-08 FE UI"]
+  D4 --> D9["TWD-09 Tests + E2E"]
+  D5 --> D9
+  D8 --> D9
+  D3 --> D10["TWD-10 Session locations from storages"]
+  D10 --> D11["TWD-11 openapi regen"]
+  D11 --> D12["TWD-12 FE send storage ids"]
+```
+
+### EPIC-27062026 POS bán hàng — SALE_ISSUE phải trừ tại showroom (sửa double-trừ kho lưu trữ)
+
+- [EPIC-27062026 SALE_ISSUE trừ tại showroom](./epics/EPIC-27062026-pos-sale-deduct-showroom.md)
+- Khi item đang ở **kho tạm** được bán, auto-chuyển kho `kho lưu trữ → showroom` đã trừ kho lưu trữ (`TRANSFER_OUT`); nhưng `SALE_ISSUE` lại trừ **chính kho lưu trữ** thay vì showroom → kho lưu trữ bị **trừ kép** (40→38) và showroom dư (+1). Nguyên nhân: dòng hóa đơn lấy `item.locationId ?? showroomResolved`, để shelf kho lưu trữ do FE gửi (`A001`) thắng. Sửa: **đảo precedence** trong `invoice.service.ts` (create `:178` + update draft `:335`) → showroom thắng, `item.locationId` chỉ fallback khi item không có shelf showroom. Đúng ý định `"POS sales always deduct from the showroom"`. Fix-forward, không migration, không đổi contract/FE.
+
+| Ticket                                                                  | Mô tả                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [TKT-SDS-01](./tickets/TKT-SDS-01-sale-deduct-showroom-location.md)     | BE: đảo precedence resolve location dòng hóa đơn bán (showroom thắng) + unit spec |
+| [TKT-SDS-02](./tickets/TKT-SDS-02-e2e-ledger-balance.md)                | E2E: SALE_ISSUE tại showroom + net tồn đúng sau auto-chuyển kho tạm             |
+
+```mermaid
+flowchart LR
+  S1["SDS-01 BE fix precedence + spec"] --> S2["SDS-02 E2E ledger balance"]
+```
+

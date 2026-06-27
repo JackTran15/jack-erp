@@ -11,14 +11,29 @@ export class AddTempWarehouseLineDto {
   @IsUUID()
   itemId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     enum: TempWarehouseDirection,
     description:
-      'Omit to auto-resolve direction from the items current stock balance at the branchs main warehouse vs main showroom location',
+      'Direction of this session/line: warehouse_to_showroom (w2s) or showroom_to_warehouse (s2w). Selects/opens the per-direction session.',
+  })
+  @IsEnum(TempWarehouseDirection)
+  direction: TempWarehouseDirection;
+
+  @ApiPropertyOptional({
+    description:
+      'Warehouse-side storage for this session; resolved to its default location. Falls back to branch main storage when omitted. Only honored when opening the session.',
   })
   @IsOptional()
-  @IsEnum(TempWarehouseDirection)
-  direction?: TempWarehouseDirection;
+  @IsUUID()
+  warehouseStorageId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Showroom-side storage for this session; resolved to its default location. Falls back to branch main showroom when omitted. Only honored when opening the session.',
+  })
+  @IsOptional()
+  @IsUUID()
+  showroomStorageId?: string;
 
   @ApiPropertyOptional({ description: 'Carrier user id (FK users)' })
   @IsOptional()

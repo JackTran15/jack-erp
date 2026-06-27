@@ -246,6 +246,22 @@ export function useFastStockTransferActions() {
         body.carrierUserId = data.toolbarDraft.carrier.id;
       }
 
+      // Pin the session's storages from the "Kho xuất"/"Kho nhập" pickers so the
+      // BE opens it with distinct warehouse vs showroom locations. The warehouse
+      // side is a storage id; the showroom side is a showroom id → its storageId.
+      const showroomStorageOf = (id: string) =>
+        data.showrooms.find((s) => s.id === id)?.storageId;
+      const isW2s =
+        data.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
+      const warehouseStorageId = isW2s
+        ? data.filters.sourceWarehouse
+        : data.filters.destinationWarehouse;
+      const showroomStorageId = isW2s
+        ? showroomStorageOf(data.filters.destinationWarehouse)
+        : showroomStorageOf(data.filters.sourceWarehouse);
+      if (warehouseStorageId) body.warehouseStorageId = warehouseStorageId;
+      if (showroomStorageId) body.showroomStorageId = showroomStorageId;
+
       addLineMutation.mutate(body, {
         onSuccess: () => {
           resetToolbarAfterAdd(null);
@@ -349,34 +365,37 @@ export function useFastStockTransferActions() {
 
   const runCloseSession = useCallback(
     async (closeMode: TempWarehouseCloseMode) => {
-      if (!data.sessionId) {
-        setPageError("Chưa có phiên kho tạm.");
+      if (!data.branchId) {
+        setPageError("Chưa có chi nhánh.");
         return;
       }
       try {
         const result = await closeSessionMutation.mutateAsync({
-          sessionId: data.sessionId,
+          branchId: data.branchId,
           mode: closeMode,
         });
         clearTransferSelection();
         resetDialogs();
         await refetchAll();
 
-        if (
-          closeMode === TempWarehouseCloseMode.CREATE_TRANSFERS &&
-          result.session.transferProcessingStatus ===
-            TempWarehouseTransferProcessingStatus.PENDING
-        ) {
-          setPollSessionId(data.sessionId);
-        } else if (
-          closeMode === TempWarehouseCloseMode.CREATE_TRANSFERS &&
-          result.session.transferProcessingStatus ===
-            TempWarehouseTransferProcessingStatus.FAILED
-        ) {
-          setPageError(
-            result.session.transferFailureReason ??
-              "Tạo phiếu chuyển kho thất bại.",
+        if (closeMode === TempWarehouseCloseMode.CREATE_TRANSFERS) {
+          const pending = result.sessions.find(
+            (s) =>
+              s.transferProcessingStatus ===
+              TempWarehouseTransferProcessingStatus.PENDING,
           );
+          const failed = result.sessions.find(
+            (s) =>
+              s.transferProcessingStatus ===
+              TempWarehouseTransferProcessingStatus.FAILED,
+          );
+          if (pending) {
+            setPollSessionId(pending.id);
+          } else if (failed) {
+            setPageError(
+              failed.transferFailureReason ?? "Tạo phiếu chuyển kho thất bại.",
+            );
+          }
         }
       } catch (err) {
         setPageError(getErrorMessage(err));

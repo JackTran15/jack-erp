@@ -8,6 +8,7 @@ import {
 import {
   TempWarehouseSessionStatus,
   TempWarehouseCloseMode,
+  TempWarehouseDirection,
   TempWarehouseTransferProcessingStatus,
 } from '@erp/shared-interfaces';
 import { BaseEntity } from '../../../database/entities/base.entity';
@@ -15,7 +16,7 @@ import { TempWarehouseLineEntity } from './temp-warehouse-line.entity';
 
 /**
  * Header row aggregating stock movements between main warehouse and main showroom of a branch within one shift.
- * Each branch may have at most one ACTIVE session — enforced by a partial unique index in DB.
+ * Each branch may have at most one ACTIVE session per direction — enforced by a partial unique index in DB.
  */
 @Entity('temp_warehouse_sessions')
 @Index(['organizationId', 'status'])
@@ -27,6 +28,15 @@ export class TempWarehouseSessionEntity extends BaseEntity {
     comment: 'ACTIVE | CLOSED',
   })
   status: TempWarehouseSessionStatus;
+
+  @Column({
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+    comment:
+      'warehouse_to_showroom (w2s) | showroom_to_warehouse (s2w) — direction of this session',
+  })
+  direction?: TempWarehouseDirection | null;
 
   @Column({
     name: 'close_mode',

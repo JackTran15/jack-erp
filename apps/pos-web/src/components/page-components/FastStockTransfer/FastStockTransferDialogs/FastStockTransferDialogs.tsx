@@ -15,7 +15,8 @@ export function FastStockTransferDialogs() {
     (s) => s.isDiscrepancyDialogOpen,
   );
 
-  const { selectedDialogRows, discrepancyItems } = useFastStockTransferData();
+  const { selectedDialogRows, discrepancyItems, netOffsetEligible } =
+    useFastStockTransferData();
   const {
     handleCloseProcessDialog,
     handleConfirmProcess,
@@ -34,6 +35,7 @@ export function FastStockTransferDialogs() {
       <FastStockTransferDiscrepancyDialog
         open={isDiscrepancyDialogOpen}
         items={discrepancyItems}
+        netOffsetEligible={netOffsetEligible}
         onClose={handleCloseDiscrepancyDialog}
         onConfirm={handleConfirmDiscrepancyDialog}
       />

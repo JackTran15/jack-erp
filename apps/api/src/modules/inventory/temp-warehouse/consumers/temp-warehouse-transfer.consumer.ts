@@ -23,7 +23,7 @@ import { ActorContext } from '../../../../common/decorators/actor-context.decora
  * (create → approve → post). Idempotency, retry, and DLQ are handled by EventConsumerManager.
  *
  * Two flavors share this topic:
- *   - kind=FULL (or undefined): emitted by closeSession(CREATE_TRANSFERS). Session must be CLOSED;
+ *   - kind=FULL (or undefined): emitted by closeBranchSessions(CREATE_TRANSFERS). Session must be CLOSED;
  *     consumer updates session.transferW2sId / transferS2wId and the processing status.
  *   - kind=PARTIAL: emitted by transferLines. Session must be ACTIVE; consumer flips the listed
  *     lines to TRANSFERRED and records the transferId per line. Session-level fields are untouched.
