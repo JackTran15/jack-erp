@@ -1,12 +1,13 @@
 import type {
   AddLineResult,
   AddTempWarehouseLineBody,
-  CloseSessionResult,
+  CloseBranchSessionsResult,
   CloseTempWarehouseSessionBody,
   ListLinesNettedResult,
   ListLinesRawResult,
   PaginatedResponse,
   TempWarehouseCloseMode,
+  TempWarehouseDirection,
   TempWarehouseLine,
   TempWarehousePublicUser,
   TempWarehouseSession,
@@ -57,11 +58,14 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
 export const tempWarehouseService = {
   getActiveSession: async (
     branchId: string,
+    direction: TempWarehouseDirection,
   ): Promise<TempWarehouseSession | null> => {
     try {
       return await call(() =>
         http.get<TempWarehouseSession>(
-          `${BASE}/sessions/active?branchId=${encodeURIComponent(branchId)}`,
+          `${BASE}/sessions/active?branchId=${encodeURIComponent(
+            branchId,
+          )}&direction=${direction}`,
         ),
       );
     } catch (err) {
@@ -132,16 +136,13 @@ export const tempWarehouseService = {
       ),
     ),
 
-  closeSession: (
-    sessionId: string,
+  closeBranchSessions: (
+    branchId: string,
     mode: TempWarehouseCloseMode,
-  ): Promise<CloseSessionResult> => {
-    const body: CloseTempWarehouseSessionBody = { mode };
+  ): Promise<CloseBranchSessionsResult> => {
+    const body: CloseTempWarehouseSessionBody = { branchId, mode };
     return call(() =>
-      http.post<CloseSessionResult>(
-        `${BASE}/sessions/${encodeURIComponent(sessionId)}/close`,
-        body,
-      ),
+      http.post<CloseBranchSessionsResult>(`${BASE}/sessions/close`, body),
     );
   },
 

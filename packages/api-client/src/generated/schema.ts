@@ -2946,7 +2946,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the ACTIVE session for a branch (404 if none) */
+        /** Get the ACTIVE session for a branch and direction (w2s/s2w) — 404 if none */
         get: operations["TempWarehouseController_getActiveSession"];
         put?: never;
         post?: never;
@@ -3009,7 +3009,7 @@ export interface paths {
         patch: operations["TempWarehouseController_updateLine"];
         trace?: never;
     };
-    "/inventory/temp-warehouse/sessions/{id}/close": {
+    "/inventory/temp-warehouse/sessions/close": {
         parameters: {
             query?: never;
             header?: never;
@@ -3018,8 +3018,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Close a session with one of three modes: NET_OFFSET (auto-balance), CREATE_TRANSFERS (publish events to create stock transfers), or NONE */
-        post: operations["TempWarehouseController_closeSession"];
+        /** Close both direction sessions (w2s + s2w) of a branch. NET_OFFSET (auto-balance) requires both sessions sharing locations; otherwise CREATE_TRANSFERS publishes one single transfer per session, or NONE. */
+        post: operations["TempWarehouseController_closeBranchSessions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7927,6 +7927,8 @@ export interface components {
             /** @enum {string} */
             status: "ACTIVE" | "CLOSED";
             /** @enum {string|null} */
+            direction?: "warehouse_to_showroom" | "showroom_to_warehouse" | null;
+            /** @enum {string|null} */
             closeMode?: "NET_OFFSET" | "CREATE_TRANSFERS" | "NONE" | null;
             warehouseLocationId: string;
             showroomLocationId: string;
@@ -7994,10 +7996,20 @@ export interface components {
             /** Format: uuid */
             itemId: string;
             /**
-             * @description Omit to auto-resolve direction from the items current stock balance at the branchs main warehouse vs main showroom location
+             * @description Direction of this session/line: warehouse_to_showroom (w2s) or showroom_to_warehouse (s2w). Selects/opens the per-direction session.
              * @enum {string}
              */
-            direction?: "warehouse_to_showroom" | "showroom_to_warehouse";
+            direction: "warehouse_to_showroom" | "showroom_to_warehouse";
+            /**
+             * Format: uuid
+             * @description Warehouse-side storage for this session; resolved to its default location. Falls back to branch main storage when omitted. Only honored when opening the session.
+             */
+            warehouseStorageId?: string;
+            /**
+             * Format: uuid
+             * @description Showroom-side storage for this session; resolved to its default location. Falls back to branch main showroom when omitted. Only honored when opening the session.
+             */
+            showroomStorageId?: string;
             /**
              * Format: uuid
              * @description Carrier user id (FK users)
@@ -8022,7 +8034,12 @@ export interface components {
             /** Format: uuid */
             sourceLocationId?: string | null;
         };
-        CloseTempWarehouseSessionDto: {
+        CloseBranchSessionsDto: {
+            /**
+             * Format: uuid
+             * @description Branch whose ACTIVE direction sessions are closed
+             */
+            branchId: string;
             /** @enum {string} */
             mode: "NET_OFFSET" | "CREATE_TRANSFERS" | "NONE";
         };
@@ -15379,6 +15396,7 @@ export interface operations {
         parameters: {
             query: {
                 branchId: string;
+                direction: string;
             };
             header?: {
                 /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
@@ -15537,21 +15555,19 @@ export interface operations {
             };
         };
     };
-    TempWarehouseController_closeSession: {
+    TempWarehouseController_closeBranchSessions: {
         parameters: {
             query?: never;
             header?: {
                 /** @description Idempotency key — same key + same body within 24h replays the original response without creating duplicates */
                 "X-Idempotency-Key"?: string;
             };
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CloseTempWarehouseSessionDto"];
+                "application/json": components["schemas"]["CloseBranchSessionsDto"];
             };
         };
         responses: {

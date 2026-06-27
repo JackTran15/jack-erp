@@ -34,16 +34,16 @@ import { StockTransferService } from '../transfer/stock-transfer.service';
 import { TempWarehouseTransferMaterializerService } from './temp-warehouse-transfer-materializer.service';
 import { TempWarehouseSessionEntity } from './temp-warehouse-session.entity';
 import { TempWarehouseLineEntity } from './temp-warehouse-line.entity';
-import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { ItemEntity } from '../location/item.entity';
 import { LocationEntity } from '../location/location.entity';
 import { UserEntity } from '../../auth/user.entity';
 import { UserBranchAssignmentEntity } from '../../branch/user-branch-assignment.entity';
 import { BranchLocationResolverService } from './branch-location-resolver.service';
+import { StorageDefaultLocationResolverService } from '../location/storage-default-location-resolver.service';
 import { AddTempWarehouseLineDto } from './dto/add-line.dto';
 import { UpdateTempWarehouseLineDto } from './dto/update-line.dto';
 import { ListTempWarehouseLinesQueryDto } from './dto/list-lines.query';
-import { CloseTempWarehouseSessionDto } from './dto/close-session.dto';
+import { CloseBranchSessionsDto } from './dto/close-session.dto';
 import { ListCarriersQueryDto } from './dto/list-carriers.query';
 import { TransferTempWarehouseLinesDto } from './dto/transfer-lines.dto';
 
@@ -101,8 +101,9 @@ export interface UpdateLineResult {
   newLine: TempWarehouseLineEntity;
 }
 
-export interface CloseSessionResult {
-  session: TempWarehouseSessionEntity;
+export interface CloseBranchSessionsResult {
+  sessions: TempWarehouseSessionEntity[];
+  netOffsetEligible: boolean;
   autoBalancedLines?: TempWarehouseLineEntity[];
   publishedEvents?: { direction: TempWarehouseDirection; eventId: string }[];
 }
@@ -133,8 +134,6 @@ export class TempWarehouseService {
     private readonly sessionRepo: Repository<TempWarehouseSessionEntity>,
     @InjectRepository(TempWarehouseLineEntity)
     private readonly lineRepo: Repository<TempWarehouseLineEntity>,
-    @InjectRepository(StockBalanceEntity)
-    private readonly stockBalanceRepo: Repository<StockBalanceEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     @InjectRepository(UserBranchAssignmentEntity)
@@ -145,6 +144,7 @@ export class TempWarehouseService {
     private readonly locationRepo: Repository<LocationEntity>,
     private readonly dataSource: DataSource,
     private readonly locationResolver: BranchLocationResolverService,
+    private readonly storageDefaultLocationResolver: StorageDefaultLocationResolverService,
     private readonly eventPublisher: EventPublisher,
     private readonly stockTransferService: StockTransferService,
     private readonly transferMaterializer: TempWarehouseTransferMaterializerService,
@@ -154,6 +154,7 @@ export class TempWarehouseService {
 
   async getActiveSession(
     branchId: string,
+    direction: TempWarehouseDirection,
     actor: ActorContext,
   ): Promise<TempWarehouseSessionEntity | null> {
     return this.sessionRepo.findOne({
@@ -161,6 +162,7 @@ export class TempWarehouseService {
         branchId,
         organizationId: actor.organizationId,
         status: TempWarehouseSessionStatus.ACTIVE,
+        direction,
       },
     });
   }
@@ -268,17 +270,51 @@ export class TempWarehouseService {
           branchId: dto.branchId,
           organizationId: actor.organizationId,
           status: TempWarehouseSessionStatus.ACTIVE,
+          direction: dto.direction,
         },
       });
 
       if (!session) {
-        const { warehouseLocationId, showroomLocationId } =
-          await this.locationResolver.resolve(dto.branchId, actor.organizationId);
+        // Client may pin the session's warehouse/showroom storages explicitly
+        // (each resolved to its default location); otherwise fall back to the
+        // branch's main storage / main showroom locations.
+        let warehouseLocationId: string;
+        let showroomLocationId: string;
+        if (dto.warehouseStorageId && dto.showroomStorageId) {
+          warehouseLocationId =
+            await this.storageDefaultLocationResolver.resolveStorageTransferLocation(
+              dto.warehouseStorageId,
+              actor.organizationId,
+            );
+          showroomLocationId =
+            await this.storageDefaultLocationResolver.resolveStorageTransferLocation(
+              dto.showroomStorageId,
+              actor.organizationId,
+            );
+        } else {
+          const resolved = await this.locationResolver.resolve(
+            dto.branchId,
+            actor.organizationId,
+          );
+          warehouseLocationId = resolved.warehouseLocationId;
+          showroomLocationId = resolved.showroomLocationId;
+        }
+
+        // Guarantee distinct sides — a single-location branch (or same storage)
+        // would otherwise open a session whose two locations are identical.
+        if (warehouseLocationId === showroomLocationId) {
+          throw new BadRequestException({
+            code: 'TEMP_WAREHOUSE_SESSION_SAME_LOCATION',
+            message:
+              'Warehouse and showroom resolve to the same location; pick distinct storages or configure distinct default locations',
+          });
+        }
 
         const newSession = manager.create(TempWarehouseSessionEntity, {
           organizationId: actor.organizationId,
           branchId: dto.branchId,
           status: TempWarehouseSessionStatus.ACTIVE,
+          direction: dto.direction,
           warehouseLocationId,
           showroomLocationId,
           openedBy: actor.userId,
@@ -291,12 +327,13 @@ export class TempWarehouseService {
           session = await manager.save(newSession);
         } catch (err) {
           if (this.isUniqueViolation(err)) {
-            // Race: a concurrent request opened the session first.
+            // Race: a concurrent request opened the session (branch, direction) first.
             session = await manager.findOne(TempWarehouseSessionEntity, {
               where: {
                 branchId: dto.branchId,
                 organizationId: actor.organizationId,
                 status: TempWarehouseSessionStatus.ACTIVE,
+                direction: dto.direction,
               },
             });
             if (!session) throw err;
@@ -306,21 +343,12 @@ export class TempWarehouseService {
         }
       }
 
-      const resolvedDirection =
-        dto.direction ??
-        (await this.resolveDirectionFromStock(
-          dto.itemId,
-          session!.warehouseLocationId,
-          session!.showroomLocationId,
-          actor.organizationId,
-        ));
-
       const line = manager.create(TempWarehouseLineEntity, {
         organizationId: actor.organizationId,
         branchId: dto.branchId,
         sessionId: session!.id,
         itemId: dto.itemId,
-        direction: resolvedDirection,
+        direction: dto.direction,
         quantity: '1.00',
         carrierUserId: dto.carrierUserId,
         notes: dto.notes,
@@ -331,7 +359,7 @@ export class TempWarehouseService {
       const savedLine = await manager.save(line);
 
       this.logger.log(
-        `Added line ${savedLine.id} to session ${session!.id} (direction=${resolvedDirection})`,
+        `Added line ${savedLine.id} to session ${session!.id} (direction=${dto.direction})`,
       );
 
       return { session: session!, line: savedLine };
@@ -503,26 +531,30 @@ export class TempWarehouseService {
       });
     }
 
-    const sessionId = await this.resolveSessionId(query, actor);
-    if (!sessionId) {
-      return query.hideOffsetting
-        ? { sessionId: null, items: [] }
-        : {
-            sessionId: null,
-            data: [],
-            total: 0,
-            page: query.page ?? 1,
-            pageSize: query.pageSize ?? 50,
-          };
-    }
-
+    // Netted (aggregated) view — may span both ACTIVE direction sessions of a branch.
     if (query.hideOffsetting) {
+      const sessionIds = await this.resolveNettedSessionIds(query, actor);
+      if (sessionIds.length === 0) {
+        return { sessionId: null, items: [] };
+      }
       const items = await this.computeNettedView(
-        sessionId,
+        sessionIds,
         actor.organizationId,
         !!query.hideBalanced,
       );
-      return { sessionId, items };
+      return { sessionId: sessionIds[0], items };
+    }
+
+    // Raw view — resolved to a single (branch, direction) session.
+    const sessionId = await this.resolveSessionId(query, actor);
+    if (!sessionId) {
+      return {
+        sessionId: null,
+        data: [],
+        total: 0,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 50,
+      };
     }
 
     const statusFilter =
@@ -597,7 +629,18 @@ export class TempWarehouseService {
       return s?.id ?? null;
     }
     if (query.branchId) {
-      const s = await this.getActiveSession(query.branchId, actor);
+      if (!query.direction) {
+        throw new BadRequestException({
+          code: 'TEMP_WAREHOUSE_LIST_MISSING_DIRECTION',
+          message:
+            'direction is required when listing raw lines by branchId (a branch holds one session per direction)',
+        });
+      }
+      const s = await this.getActiveSession(
+        query.branchId,
+        query.direction,
+        actor,
+      );
       return s?.id ?? null;
     }
     throw new BadRequestException({
@@ -606,14 +649,43 @@ export class TempWarehouseService {
     });
   }
 
+  // Netted view can aggregate across both ACTIVE direction sessions of a branch
+  // (or a single one when direction is given / sessionId is pinned).
+  private async resolveNettedSessionIds(
+    query: ListTempWarehouseLinesQueryDto,
+    actor: ActorContext,
+  ): Promise<string[]> {
+    if (query.sessionId) {
+      const s = await this.sessionRepo.findOne({
+        where: { id: query.sessionId, organizationId: actor.organizationId },
+      });
+      return s ? [s.id] : [];
+    }
+    if (query.branchId) {
+      const sessions = await this.sessionRepo.find({
+        where: {
+          branchId: query.branchId,
+          organizationId: actor.organizationId,
+          status: TempWarehouseSessionStatus.ACTIVE,
+          ...(query.direction ? { direction: query.direction } : {}),
+        },
+      });
+      return sessions.map((s) => s.id);
+    }
+    throw new BadRequestException({
+      code: 'TEMP_WAREHOUSE_LIST_MISSING_SCOPE',
+      message: 'Either branchId or sessionId must be provided',
+    });
+  }
+
   private async computeNettedView(
-    sessionId: string,
+    sessionIds: string[],
     organizationId: string,
     hideBalanced: boolean,
   ): Promise<NettedLineView[]> {
     const lines = await this.lineRepo.find({
       where: {
-        sessionId,
+        sessionId: In(sessionIds),
         organizationId,
         status: In([
           TempWarehouseLineStatus.ACTIVE,
@@ -726,42 +798,6 @@ export class TempWarehouseService {
     });
   }
 
-  private async resolveDirectionFromStock(
-    itemId: string,
-    warehouseLocationId: string,
-    showroomLocationId: string,
-    organizationId: string,
-  ): Promise<TempWarehouseDirection> {
-    const balances = await this.stockBalanceRepo.find({
-      where: [
-        { itemId, locationId: warehouseLocationId, organizationId },
-        { itemId, locationId: showroomLocationId, organizationId },
-      ],
-    });
-    const wQty = Number(
-      balances.find((b) => b.locationId === warehouseLocationId)?.quantity ?? 0,
-    );
-    const sQty = Number(
-      balances.find((b) => b.locationId === showroomLocationId)?.quantity ?? 0,
-    );
-    if (wQty > 0 && sQty <= 0) {
-      return TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
-    }
-    if (sQty > 0 && wQty <= 0) {
-      return TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE;
-    }
-    if (wQty <= 0 && sQty <= 0) {
-      throw new BadRequestException({
-        code: 'TEMP_WAREHOUSE_ITEM_NO_STOCK',
-        message: `Item ${itemId} has no stock at either main warehouse or main showroom for this branch`,
-      });
-    }
-    throw new BadRequestException({
-      code: 'TEMP_WAREHOUSE_DIRECTION_AMBIGUOUS',
-      message: `Item ${itemId} has stock at both main warehouse and main showroom; explicit direction is required`,
-    });
-  }
-
   private collectCarrierIds(lines: TempWarehouseLineEntity[]): string[] {
     const set = new Set<string>();
     for (const l of lines) {
@@ -832,117 +868,163 @@ export class TempWarehouseService {
 
   // ─── Close session ──────────────────────────────────────────────────
 
-  async closeSession(
-    sessionId: string,
-    dto: CloseTempWarehouseSessionDto,
+  /**
+   * Close both direction sessions of a branch at once. NET_OFFSET (đối cộng trừ)
+   * only applies when BOTH a w2s and an s2w session are ACTIVE and share the same
+   * warehouse + showroom locations; otherwise it is rejected and the caller must
+   * pick CREATE_TRANSFERS (single transfer per session) or NONE.
+   */
+  async closeBranchSessions(
+    dto: CloseBranchSessionsDto,
     actor: ActorContext,
-  ): Promise<CloseSessionResult> {
+  ): Promise<CloseBranchSessionsResult> {
     type PublishItem = {
       direction: TempWarehouseDirection;
       payload: TempWarehouseTransferRequestedPayload;
     };
     const publishPlan: PublishItem[] = [];
-    let alreadyClosedReplay: CloseSessionResult | null = null;
+    let replay: CloseBranchSessionsResult | null = null;
 
     const txResult = await this.dataSource.transaction(async (manager) => {
-      const session = await manager.findOne(TempWarehouseSessionEntity, {
-        where: { id: sessionId, organizationId: actor.organizationId },
+      const sessions = await manager.find(TempWarehouseSessionEntity, {
+        where: {
+          branchId: dto.branchId,
+          organizationId: actor.organizationId,
+        },
+        order: { openedAt: 'ASC' },
       });
-      if (!session) {
-        throw new NotFoundException({
-          code: 'TEMP_WAREHOUSE_SESSION_NOT_FOUND',
-          message: `Session ${sessionId} not found`,
-        });
-      }
 
-      // Defensive idempotency: session already CLOSED — return current state if same mode, 409 otherwise.
-      if (session.status === TempWarehouseSessionStatus.CLOSED) {
-        if (session.closeMode === dto.mode) {
-          this.logger.log(
-            `closeSession ${sessionId} replay-detected (mode=${dto.mode}) → returning current state`,
-          );
-          alreadyClosedReplay = { session };
-          return null;
+      const active = sessions.filter(
+        (s) => s.status === TempWarehouseSessionStatus.ACTIVE,
+      );
+      const w2s =
+        active.find(
+          (s) => s.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        ) ?? null;
+      const s2w =
+        active.find(
+          (s) => s.direction === TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+        ) ?? null;
+
+      const eligible =
+        !!w2s &&
+        !!s2w &&
+        w2s.warehouseLocationId === s2w.warehouseLocationId &&
+        w2s.showroomLocationId === s2w.showroomLocationId;
+
+      // Nothing ACTIVE to close — distinguish idempotent replay from not-found.
+      if (!w2s && !s2w) {
+        const closed = sessions
+          .filter((s) => s.status === TempWarehouseSessionStatus.CLOSED && s.closedAt)
+          .sort((a, b) => b.closedAt!.getTime() - a.closedAt!.getTime());
+        if (closed.length === 0) {
+          throw new NotFoundException({
+            code: 'TEMP_WAREHOUSE_NO_ACTIVE_SESSION',
+            message: `Branch ${dto.branchId} has no ACTIVE temp warehouse session to close`,
+          });
         }
-        throw new ConflictException({
-          code: 'TEMP_WAREHOUSE_SESSION_ALREADY_CLOSED_DIFFERENT_MODE',
-          message: `Session already CLOSED with mode=${session.closeMode}; cannot re-close with mode=${dto.mode}`,
+        // Latest closed session per direction is the just-closed set we replay.
+        const latestByDir = new Map<string, TempWarehouseSessionEntity>();
+        for (const s of closed) {
+          const key = s.direction ?? 'legacy';
+          if (!latestByDir.has(key)) latestByDir.set(key, s);
+        }
+        const latest = [...latestByDir.values()];
+        const conflicting = latest.find((s) => s.closeMode !== dto.mode);
+        if (conflicting) {
+          throw new ConflictException({
+            code: 'TEMP_WAREHOUSE_SESSION_ALREADY_CLOSED_DIFFERENT_MODE',
+            message: `Branch ${dto.branchId} sessions already CLOSED with a different mode; cannot re-close with mode=${dto.mode}`,
+          });
+        }
+        this.logger.log(
+          `closeBranchSessions ${dto.branchId} replay-detected (mode=${dto.mode}) → returning current state`,
+        );
+        replay = { sessions: latest, netOffsetEligible: false };
+        return null;
+      }
+
+      if (dto.mode === TempWarehouseCloseMode.NET_OFFSET && !eligible) {
+        throw new BadRequestException({
+          code: 'TEMP_WAREHOUSE_NET_OFFSET_NOT_ELIGIBLE',
+          message:
+            'NET_OFFSET requires two ACTIVE sessions (w2s + s2w) sharing the same warehouse and showroom locations',
         });
       }
 
-      const activeLines = await manager.find(TempWarehouseLineEntity, {
-        where: { sessionId, status: TempWarehouseLineStatus.ACTIVE },
-        order: { createdAt: 'ASC' },
-      });
+      const presentSessions = [w2s, s2w].filter(
+        (s): s is TempWarehouseSessionEntity => !!s,
+      );
+      const linesBySession = new Map<string, TempWarehouseLineEntity[]>();
+      for (const s of presentSessions) {
+        linesBySession.set(
+          s.id,
+          await manager.find(TempWarehouseLineEntity, {
+            where: { sessionId: s.id, status: TempWarehouseLineStatus.ACTIVE },
+            order: { createdAt: 'ASC' },
+          }),
+        );
+      }
 
-      const patch: Partial<TempWarehouseSessionEntity> = {
+      const basePatch: Partial<TempWarehouseSessionEntity> = {
         status: TempWarehouseSessionStatus.CLOSED,
         closeMode: dto.mode,
         closedBy: actor.userId,
         closedAt: new Date(),
-        transferProcessingStatus: TempWarehouseTransferProcessingStatus.NONE,
       };
       let autoBalancedLines: TempWarehouseLineEntity[] | undefined;
 
       if (dto.mode === TempWarehouseCloseMode.NET_OFFSET) {
+        const combinedLines = presentSessions.flatMap(
+          (s) => linesBySession.get(s.id) ?? [],
+        );
         autoBalancedLines = await this.buildAutoBalancedLines(
           manager,
-          session,
-          activeLines,
+          { w2s: w2s!, s2w: s2w! },
+          combinedLines,
           actor,
         );
+        for (const s of presentSessions) {
+          await manager.update(TempWarehouseSessionEntity, s.id, {
+            ...basePatch,
+            transferProcessingStatus: TempWarehouseTransferProcessingStatus.NONE,
+          });
+        }
       } else if (dto.mode === TempWarehouseCloseMode.CREATE_TRANSFERS) {
-        const w2sLines = activeLines.filter(
-          (l) => l.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
-        );
-        const s2wLines = activeLines.filter(
-          (l) => l.direction === TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
-        );
-
-        if (w2sLines.length === 0 && s2wLines.length === 0) {
-          // No lines to publish — treat as NONE.
-          patch.transferProcessingStatus =
-            TempWarehouseTransferProcessingStatus.NONE;
-        } else {
-          patch.transferProcessingStatus =
-            TempWarehouseTransferProcessingStatus.PENDING;
-          if (w2sLines.length > 0) {
+        for (const s of presentSessions) {
+          const lines = linesBySession.get(s.id) ?? [];
+          await manager.update(TempWarehouseSessionEntity, s.id, {
+            ...basePatch,
+            transferProcessingStatus:
+              lines.length > 0
+                ? TempWarehouseTransferProcessingStatus.PENDING
+                : TempWarehouseTransferProcessingStatus.NONE,
+          });
+          if (lines.length > 0) {
             publishPlan.push({
-              direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
-              payload: this.buildEventPayload(
-                session,
-                TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
-                w2sLines,
-                actor,
-              ),
-            });
-          }
-          if (s2wLines.length > 0) {
-            publishPlan.push({
-              direction: TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
-              payload: this.buildEventPayload(
-                session,
-                TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
-                s2wLines,
-                actor,
-              ),
+              direction: s.direction!,
+              payload: this.buildEventPayload(s, s.direction!, lines, actor),
             });
           }
         }
+      } else {
+        // NONE
+        for (const s of presentSessions) {
+          await manager.update(TempWarehouseSessionEntity, s.id, {
+            ...basePatch,
+            transferProcessingStatus: TempWarehouseTransferProcessingStatus.NONE,
+          });
+        }
       }
 
-      await manager.update(TempWarehouseSessionEntity, sessionId, patch);
-      const refreshed = (await manager.findOne(TempWarehouseSessionEntity, {
-        where: { id: sessionId },
-      }))!;
+      const refreshed = await manager.find(TempWarehouseSessionEntity, {
+        where: { id: In(presentSessions.map((s) => s.id)) },
+      });
 
-      return {
-        session: refreshed,
-        autoBalancedLines,
-      };
+      return { sessions: refreshed, netOffsetEligible: eligible, autoBalancedLines };
     });
 
-    if (alreadyClosedReplay) return alreadyClosedReplay;
+    if (replay) return replay;
 
     // Publish events AFTER commit.
     const publishedEvents: { direction: TempWarehouseDirection; eventId: string }[] = [];
@@ -980,7 +1062,8 @@ export class TempWarehouseService {
     }
 
     return {
-      session: txResult!.session,
+      sessions: txResult!.sessions,
+      netOffsetEligible: txResult!.netOffsetEligible,
       autoBalancedLines: txResult!.autoBalancedLines,
       publishedEvents,
     };
@@ -1029,13 +1112,20 @@ export class TempWarehouseService {
 
   private async buildAutoBalancedLines(
     manager: ReturnType<DataSource['createEntityManager']>,
-    session: TempWarehouseSessionEntity,
+    sessions: {
+      w2s: TempWarehouseSessionEntity;
+      s2w: TempWarehouseSessionEntity;
+    },
     activeLines: TempWarehouseLineEntity[],
     actor: ActorContext,
   ): Promise<TempWarehouseLineEntity[]> {
-    // Defensive idempotency: if AUTO_BALANCED lines already exist, return them and skip insert.
+    // Defensive idempotency: if AUTO_BALANCED lines already exist on either
+    // session, return them and skip insert.
     const existing = await manager.find(TempWarehouseLineEntity, {
-      where: { sessionId: session.id, status: TempWarehouseLineStatus.AUTO_BALANCED },
+      where: {
+        sessionId: In([sessions.w2s.id, sessions.s2w.id]),
+        status: TempWarehouseLineStatus.AUTO_BALANCED,
+      },
     });
     if (existing.length > 0) {
       return existing;
@@ -1057,15 +1147,22 @@ export class TempWarehouseService {
     for (const [itemId, { w2s, s2w }] of byItem.entries()) {
       const diff = w2s - s2w;
       if (diff === 0) continue;
+      // The compensating line carries the opposite direction of the net surplus
+      // and is attached to the session that owns that direction.
+      const compensateDirection =
+        diff > 0
+          ? TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE
+          : TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
+      const owner =
+        compensateDirection === TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE
+          ? sessions.s2w
+          : sessions.w2s;
       const compensate = manager.create(TempWarehouseLineEntity, {
-        organizationId: session.organizationId,
-        branchId: session.branchId,
-        sessionId: session.id,
+        organizationId: owner.organizationId,
+        branchId: owner.branchId,
+        sessionId: owner.id,
         itemId,
-        direction:
-          diff > 0
-            ? TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE
-            : TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        direction: compensateDirection,
         quantity: Math.abs(diff).toFixed(2),
         status: TempWarehouseLineStatus.AUTO_BALANCED,
         notes: 'Auto-balanced on close (NET_OFFSET)',
@@ -1084,7 +1181,9 @@ export class TempWarehouseService {
     return false;
   }
 
-  // Mark in-flight pending → completed when both directions done (called by consumer).
+  // Record a direction's transfer id and mark the session COMPLETED once every
+  // direction that actually has lines has a transfer id. A single-direction session
+  // therefore completes after its one transfer. Called by the consumer.
   async markTransferCompleted(
     sessionId: string,
     direction: TempWarehouseDirection,
@@ -1162,7 +1261,13 @@ export class TempWarehouseService {
     p: TempWarehouseInvoiceFulfillRequestedPayload,
     actor: ActorContext,
   ): Promise<void> {
-    const session = await this.getActiveSession(p.branchId, actor);
+    // Checkout fulfillment only consumes warehouse_to_showroom staged stock,
+    // so it targets the branch's w2s session.
+    const session = await this.getActiveSession(
+      p.branchId,
+      TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+      actor,
+    );
     if (!session) return;
 
     // Defensive idempotency: this invoice already consumed staged stock.

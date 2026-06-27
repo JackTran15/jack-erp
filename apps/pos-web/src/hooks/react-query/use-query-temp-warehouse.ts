@@ -9,7 +9,7 @@ import {
 import {
   AddLineResult,
   AddTempWarehouseLineBody,
-  CloseSessionResult,
+  CloseBranchSessionsResult,
   ListLinesNettedResult,
   ListLinesRawResult,
   PaginatedResponse,
@@ -92,10 +92,12 @@ export function useTempWarehouseSessionDetail(
 
 export function useTempWarehouseActiveSession(
   branchId: string | null,
+  direction: TempWarehouseDirection,
 ): UseQueryResult<TempWarehouseSession | null, Error> {
   return useQuery({
-    queryKey: TEMP_WAREHOUSE_KEYS.ACTIVE(branchId ?? ""),
-    queryFn: () => tempWarehouseService.getActiveSession(branchId as string),
+    queryKey: TEMP_WAREHOUSE_KEYS.ACTIVE(branchId ?? "", direction),
+    queryFn: () =>
+      tempWarehouseService.getActiveSession(branchId as string, direction),
     enabled: Boolean(branchId),
     staleTime: 10_000,
   });
@@ -190,7 +192,7 @@ interface UpdateLineVars {
 }
 
 interface CloseSessionVars {
-  sessionId: string;
+  branchId: string;
   mode: TempWarehouseCloseMode;
 }
 
@@ -211,7 +213,7 @@ export interface UseTempWarehouseMutationsResult {
     UpdateLineVars
   >;
   closeSessionMutation: UseMutationResult<
-    CloseSessionResult,
+    CloseBranchSessionsResult,
     Error,
     CloseSessionVars
   >;
@@ -257,12 +259,12 @@ export function useTempWarehouseMutations(
   });
 
   const closeSessionMutation = useMutation<
-    CloseSessionResult,
+    CloseBranchSessionsResult,
     Error,
     CloseSessionVars
   >({
-    mutationFn: ({ sessionId, mode }) =>
-      tempWarehouseService.closeSession(sessionId, mode),
+    mutationFn: ({ branchId: closeBranchId, mode }) =>
+      tempWarehouseService.closeBranchSessions(closeBranchId, mode),
   });
 
   const transferLinesMutation = useMutation<

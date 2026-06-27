@@ -82,6 +82,8 @@ export interface TempWarehouseSession {
   organizationId: string;
   branchId: string;
   status: TempWarehouseSessionStatus;
+  /** Direction of this session (w2s = warehouse_to_showroom, s2w = showroom_to_warehouse); null for legacy combined sessions. */
+  direction: TempWarehouseDirection | null;
   closeMode: TempWarehouseCloseMode | null;
   warehouseLocationId: string;
   showroomLocationId: string;
@@ -115,7 +117,12 @@ export interface TempWarehouseNettedItem {
 export interface AddTempWarehouseLineBody {
   branchId: string;
   itemId: string;
-  direction?: TempWarehouseDirection;
+  /** Required — selects/opens the per-direction session and is the line's direction. */
+  direction: TempWarehouseDirection;
+  /** Warehouse-side storage for this session; resolved to its default location. Falls back to branch main storage when omitted. Only used when opening the session. */
+  warehouseStorageId?: string;
+  /** Showroom-side storage for this session; resolved to its default location. Falls back to branch main showroom when omitted. Only used when opening the session. */
+  showroomStorageId?: string;
   carrierUserId?: string;
   notes?: string;
   sourceLocationId?: string;
@@ -129,6 +136,7 @@ export interface UpdateTempWarehouseLineBody {
 }
 
 export interface CloseTempWarehouseSessionBody {
+  branchId: string;
   mode: TempWarehouseCloseMode;
 }
 
@@ -142,9 +150,14 @@ export interface UpdateLineResult {
   newLine: TempWarehouseLine;
 }
 
-export interface CloseSessionResult {
-  session: TempWarehouseSession;
+export interface CloseBranchSessionsResult {
+  /** The 0..2 sessions that were closed (w2s and/or s2w). */
+  sessions: TempWarehouseSession[];
+  /** True when both direction sessions existed and shared warehouse + showroom locations (NET_OFFSET allowed). */
+  netOffsetEligible: boolean;
+  /** Compensating lines created on close — only when mode = NET_OFFSET. */
   autoBalancedLines?: TempWarehouseLine[];
+  /** Transfer-requested events published — only when mode = CREATE_TRANSFERS. */
   publishedEvents?: { direction: TempWarehouseDirection; eventId: string }[];
 }
 

@@ -31,18 +31,30 @@ export class TempWarehouseTransferMaterializerService {
     );
     const isW2s =
       payload.direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
-    const sourceStorageId = isW2s
-      ? branchLocs.warehouseStorageId
-      : branchLocs.showroomStorageId;
-    const destinationStorageId = isW2s
-      ? branchLocs.showroomStorageId
-      : branchLocs.warehouseStorageId;
-    const sourceFallbackLocationId = isW2s
-      ? branchLocs.warehouseLocationId
-      : branchLocs.showroomLocationId;
-    const destinationFallbackLocationId = isW2s
-      ? branchLocs.showroomLocationId
-      : branchLocs.warehouseLocationId;
+
+    // Prefer the session-pinned locations carried on the payload (each session may
+    // choose its own warehouse/showroom). Fall back to the branch main storage /
+    // main showroom when the payload omits them or they cannot be resolved.
+    const sourceSide = await this.resolveSessionSide(
+      payload.sourceLocationId,
+      payload.organizationId,
+    );
+    const destinationSide = await this.resolveSessionSide(
+      payload.destinationLocationId,
+      payload.organizationId,
+    );
+    const sourceStorageId =
+      sourceSide?.storageId ??
+      (isW2s ? branchLocs.warehouseStorageId : branchLocs.showroomStorageId);
+    const destinationStorageId =
+      destinationSide?.storageId ??
+      (isW2s ? branchLocs.showroomStorageId : branchLocs.warehouseStorageId);
+    const sourceFallbackLocationId =
+      sourceSide?.locationId ??
+      (isW2s ? branchLocs.warehouseLocationId : branchLocs.showroomLocationId);
+    const destinationFallbackLocationId =
+      destinationSide?.locationId ??
+      (isW2s ? branchLocs.showroomLocationId : branchLocs.warehouseLocationId);
 
     const lines: BranchScopedTransferInput['lines'] = [];
     for (const [idx, pl] of payload.lines.entries()) {
@@ -91,6 +103,23 @@ export class TempWarehouseTransferMaterializerService {
           : `From temp warehouse session ${payload.sessionId}`),
       lines,
     };
+  }
+
+  /**
+   * Resolve a session-pinned location id to its { storageId, locationId }, so a
+   * session that chose a non-default warehouse/showroom transfers from/to its own
+   * storage. Returns null when the id is missing or does not resolve.
+   */
+  private async resolveSessionSide(
+    locationId: string | undefined,
+    organizationId: string,
+  ): Promise<{ storageId: string; locationId: string } | null> {
+    if (!locationId || !isUuid(locationId)) return null;
+    const loc = await this.locationRepo.findOne({
+      where: { id: locationId, organizationId },
+      select: { id: true, storageId: true },
+    });
+    return loc ? { storageId: loc.storageId, locationId: loc.id } : null;
   }
 
   /**

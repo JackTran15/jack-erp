@@ -48,6 +48,8 @@ export interface FastStockTransferData {
   branchId: string | null;
   sessionId: string | null;
   isSessionClosed: boolean;
+  /** True when both direction sessions are active and share locations (NET_OFFSET allowed). */
+  netOffsetEligible: boolean;
   direction: TempWarehouseDirection;
   filters: FastStockTransferFilters;
   toolbarDraft: FastStockTransferToolbarDraft;

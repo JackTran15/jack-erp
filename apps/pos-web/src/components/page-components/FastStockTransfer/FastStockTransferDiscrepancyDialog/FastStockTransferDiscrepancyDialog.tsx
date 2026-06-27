@@ -12,11 +12,13 @@ import {
   TempWarehouseCloseMode,
   type TempWarehouseNettedItem,
 } from "@erp/shared-interfaces";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface FastStockTransferDiscrepancyDialogProps {
   open: boolean;
   items: ReadonlyArray<TempWarehouseNettedItem>;
+  /** When false, the NET_OFFSET (đối cộng trừ) option is hidden — only one session or mismatched locations. */
+  netOffsetEligible: boolean;
   onClose: () => void;
   onConfirm: (closeMode: TempWarehouseCloseMode) => void;
 }
@@ -42,12 +44,32 @@ const CLOSE_MODE_OPTIONS: ReadonlyArray<{
 export function FastStockTransferDiscrepancyDialog({
   open,
   items,
+  netOffsetEligible,
   onClose,
   onConfirm,
 }: FastStockTransferDiscrepancyDialogProps) {
+  const options = useMemo(
+    () =>
+      CLOSE_MODE_OPTIONS.filter(
+        (opt) =>
+          opt.value !== TempWarehouseCloseMode.NET_OFFSET || netOffsetEligible,
+      ),
+    [netOffsetEligible],
+  );
+
   const [closeMode, setCloseMode] = useState<TempWarehouseCloseMode>(
     TempWarehouseCloseMode.NET_OFFSET,
   );
+
+  // Keep the selection valid when NET_OFFSET is unavailable.
+  useEffect(() => {
+    if (
+      !netOffsetEligible &&
+      closeMode === TempWarehouseCloseMode.NET_OFFSET
+    ) {
+      setCloseMode(TempWarehouseCloseMode.CREATE_TRANSFERS);
+    }
+  }, [netOffsetEligible, closeMode]);
 
   const columns = useMemo<
     ReadonlyArray<PosDataTableColumn<TempWarehouseNettedItem>>
@@ -98,7 +120,7 @@ export function FastStockTransferDiscrepancyDialog({
               aria-label="Xử lý chênh lệch"
               className="flex h-7 items-center gap-6"
             >
-              {CLOSE_MODE_OPTIONS.map((opt) => (
+              {options.map((opt) => (
                 <PosRadio
                   key={opt.value}
                   name="discrepancy-close-mode"

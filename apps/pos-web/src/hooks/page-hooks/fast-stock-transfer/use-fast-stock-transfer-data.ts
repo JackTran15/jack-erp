@@ -60,10 +60,35 @@ export function useFastStockTransferData(): FastStockTransferData {
     [hiddenLineIds],
   );
 
-  const { data: session, isLoading: sessionLoading } =
-    useTempWarehouseActiveSession(branchId);
+  // A branch holds up to two ACTIVE sessions — one per direction.
+  const { data: w2sSession, isLoading: w2sLoading } =
+    useTempWarehouseActiveSession(
+      branchId,
+      TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+    );
+  const { data: s2wSession, isLoading: s2wLoading } =
+    useTempWarehouseActiveSession(
+      branchId,
+      TempWarehouseDirection.SHOWROOM_TO_WAREHOUSE,
+    );
+  const sessionLoading = w2sLoading || s2wLoading;
+  // Session for the direction currently being viewed.
+  const session =
+    direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM
+      ? w2sSession
+      : s2wSession;
   const sessionId = session?.id ?? null;
+  const hasActiveSession = Boolean(w2sSession || s2wSession);
   const isSessionClosed = session?.status === TempWarehouseSessionStatus.CLOSED;
+
+  // NET_OFFSET (đối cộng trừ) is only valid when BOTH direction sessions exist
+  // and share the same warehouse + showroom locations.
+  const netOffsetEligible = Boolean(
+    w2sSession &&
+      s2wSession &&
+      w2sSession.warehouseLocationId === s2wSession.warehouseLocationId &&
+      w2sSession.showroomLocationId === s2wSession.showroomLocationId,
+  );
 
   // Unticking "Hiển thị dòng cần kiểm tra" surfaces the sale-consumed
   // (TRANSFERRED-by-sale) rows alongside the ACTIVE working set.
@@ -80,7 +105,8 @@ export function useFastStockTransferData(): FastStockTransferData {
     !isSessionClosed,
     includeTransferred,
   );
-  const nettedQuery = useTempWarehouseNettedLines(branchId, sessionId);
+  // Net across BOTH direction sessions (branch-scoped), not a single session.
+  const nettedQuery = useTempWarehouseNettedLines(branchId, null);
 
   const {
     refetchTempWarehouse: refetchTempWarehouseQuery,
@@ -112,8 +138,14 @@ export function useFastStockTransferData(): FastStockTransferData {
     refetch: refetchShowroomsQuery,
   } = useBranchShowrooms(branchId);
 
-  const storages = storagesData ?? [];
-  const showrooms = showroomsData ?? [];
+  // Exclude the auto-generated showroom-backing storage (isMainStorage); the
+  // transfer pickers, the ">= 2 storages" gating, and the default selection
+  // only consider real storage warehouses.
+  const storages = useMemo(
+    () => (storagesData ?? []).filter((s) => !s.isMainStorage),
+    [storagesData],
+  );
+  const showrooms = useMemo(() => showroomsData ?? [], [showroomsData]);
   const locationsLoading = storagesLoading || showroomsLoading;
 
   const visibleLinesFromQueries = useMemo(() => {
@@ -252,11 +284,9 @@ export function useFastStockTransferData(): FastStockTransferData {
     !isSessionClosed &&
     Boolean(sessionId);
 
+  // Closing is branch-wide: enabled when at least one direction session is active.
   const canCloseTransfer =
-    Boolean(sessionId) &&
-    !editingRowId &&
-    !isSessionClosed &&
-    totalActiveLineCount > 0;
+    hasActiveSession && !editingRowId && totalActiveLineCount > 0;
 
   const isLinesRefetching =
     outboundQuery.isFetching ||
@@ -285,6 +315,7 @@ export function useFastStockTransferData(): FastStockTransferData {
     branchId,
     sessionId,
     isSessionClosed,
+    netOffsetEligible,
     direction,
     filters,
     toolbarDraft,
