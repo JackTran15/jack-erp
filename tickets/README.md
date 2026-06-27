@@ -1365,11 +1365,11 @@ flowchart LR
 
 | Ticket                                                                  | Mô tả                                                                          |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [TKT-SDS-01](./tickets/TKT-SDS-01-sale-deduct-showroom-location.md)     | BE: đảo precedence resolve location dòng hóa đơn bán (showroom thắng) + unit spec |
-| [TKT-SDS-02](./tickets/TKT-SDS-02-e2e-ledger-balance.md)                | E2E: SALE_ISSUE tại showroom + net tồn đúng sau auto-chuyển kho tạm             |
+| [TKT-SDS-01](./tickets/TKT-SDS-01-sale-deduct-showroom-location.md)     | BE: đảo precedence resolve location dòng hóa đơn bán (showroom thắng) + unit spec — **DONE** |
+| [TKT-SDS-02](./tickets/TKT-SDS-02-e2e-ledger-balance.md)                | E2E ledger — **DROPPED** (unit coverage SDS-01 đủ; fulfillment e2e không sinh SALE_ISSUE) |
 
 ```mermaid
 flowchart LR
-  S1["SDS-01 BE fix precedence + spec"] --> S2["SDS-02 E2E ledger balance"]
+  S1["SDS-01 BE fix precedence + spec (DONE)"] -.dropped.-> S2["SDS-02 E2E (DROPPED)"]
 ```
 

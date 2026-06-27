@@ -4,10 +4,11 @@ import { useFastStockTransferActions } from "@erp/pos/hooks/page-hooks/fast-stoc
 import { useFastStockTransferData } from "@erp/pos/hooks/page-hooks/fast-stock-transfer/use-fast-stock-transfer-data";
 import type { InventoryLocationPickerOption } from "@erp/pos/interfaces/inventory-location.interface";
 import { usePosFastStockTransferWorkflowStore } from "@erp/pos/stores/page-stores/fast-stock-transfer/fast-stock-transfer-workflow.store";
+import { TempWarehouseDirection } from "@erp/shared-interfaces";
 
 export function WarehouseFilterRow() {
   const filters = usePosFastStockTransferWorkflowStore((s) => s.filters);
-  const { sourceWarehouseOptions, destinationWarehouseOptions } =
+  const { sourceWarehouseOptions, destinationWarehouseOptions, storages, direction } =
     useFastStockTransferData();
   const { setFilter } = useFastStockTransferActions();
 
@@ -17,6 +18,14 @@ export function WarehouseFilterRow() {
   const selectedDestination = destinationWarehouseOptions.find(
     (o) => o.id === filters.destinationWarehouse,
   );
+
+  // The showroom side is always fixed; only the storage side is selectable,
+  // and only when the branch has more than one storage to choose from.
+  const isOutbound =
+    direction === TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM;
+  const canPickStorage = storages.length >= 2;
+  const sourceDisabled = isOutbound ? !canPickStorage : true;
+  const destinationDisabled = isOutbound ? true : !canPickStorage;
 
   return (
     <div className="flex flex-wrap gap-4">
@@ -31,7 +40,7 @@ export function WarehouseFilterRow() {
         itemKey={(o) => o.id}
         renderItem={(o) => o.name}
         placeholder="Chọn kho xuất"
-        disabled
+        disabled={sourceDisabled}
       />
       <PosSelect<InventoryLocationPickerOption>
         label="Kho nhập"
@@ -46,7 +55,7 @@ export function WarehouseFilterRow() {
         itemKey={(o) => o.id}
         renderItem={(o) => o.name}
         placeholder="Chọn kho nhập"
-        disabled
+        disabled={destinationDisabled}
       />
       <div className="flex w-1/4 items-center pr-3">
         <PosCheckbox

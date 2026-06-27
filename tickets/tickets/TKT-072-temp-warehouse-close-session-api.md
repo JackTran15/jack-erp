@@ -109,7 +109,7 @@ async close(sessionId: string, dto: CloseSessionDto, actor: ActorContext) {
       where: { id: sessionId, organizationId: actor.organizationId },
     });
     if (!session) throw new NotFoundException();
-    if (session.status === TempWarehouseSessionStatus.CLOSED) {
+    if (session.status === **TempWarehouseSessionStatus**.CLOSED) {
       throw new BadRequestException('Session already closed');
     }
 
