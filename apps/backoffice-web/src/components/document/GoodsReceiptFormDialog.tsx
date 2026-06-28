@@ -1284,6 +1284,7 @@ export function PurchaseOrderFormDialog({
       type: "number",
       align: "right",
       filterSymbol: "≤",
+      footer: totalQty.toLocaleString("vi-VN"),
     },
     {
       key: "unitPrice",
@@ -1318,6 +1319,7 @@ export function PurchaseOrderFormDialog({
       filterSymbol: "≤",
       getValue: (r) =>
         formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
+      footer: formatMoneyInteger(totalAmount),
     },
     { key: "notes", label: "Ghi chú", width: 200, minWidth: 200 },
   ];

@@ -54,7 +54,11 @@ export function UnsavedChangesDialog({
           </DialogDescription>
         </div>
         <div className="flex justify-end gap-2 pt-1">
-          <Button onClick={handle("save")} disabled={saveDisabled}>
+          <Button
+            className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+            onClick={handle("save")}
+            disabled={saveDisabled}
+          >
             <Save className="mr-1.5 h-4 w-4" />
             {saveLabel}
           </Button>

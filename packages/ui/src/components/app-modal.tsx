@@ -15,6 +15,36 @@ const DEFAULT_MIN_W = 320;
 const DEFAULT_MIN_H = 220;
 const VIEW_MARGIN = 16;
 const TITLE_H = 40;
+const MODAL_STACK_BASE_Z = 40;
+const MODAL_STACK_STEP_Z = 20;
+
+let nextModalId = 0;
+const openModalIds: number[] = [];
+const modalStackSubscribers = new Set<() => void>();
+
+function notifyModalStackSubscribers() {
+  modalStackSubscribers.forEach((subscriber) => subscriber());
+}
+
+function pushModalId(id: number) {
+  if (openModalIds.includes(id)) return;
+  openModalIds.push(id);
+  notifyModalStackSubscribers();
+}
+
+function removeModalId(id: number) {
+  const index = openModalIds.indexOf(id);
+  if (index < 0) return;
+  openModalIds.splice(index, 1);
+  notifyModalStackSubscribers();
+}
+
+function subscribeModalStack(subscriber: () => void) {
+  modalStackSubscribers.add(subscriber);
+  return () => {
+    modalStackSubscribers.delete(subscriber);
+  };
+}
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 type Bounds = { x: number; y: number; w: number; h: number };
@@ -85,6 +115,8 @@ export interface AppModalProps {
   className?: string;
   /** Class cho vùng nội dung (mặc định `overflow-auto`). Dùng `overflow-hidden` khi scroll nội bộ. */
   bodyClassName?: string;
+  /** @default true — body stretches between header and footer. Set false for compact dialogs. */
+  bodyStretch?: boolean;
   defaultWidth?: number;
   defaultHeight?: number;
   minWidth?: number;
@@ -108,6 +140,7 @@ function AppModal({
   footer,
   className,
   bodyClassName,
+  bodyStretch = true,
   defaultWidth = 520,
   defaultHeight = 440,
   minWidth = DEFAULT_MIN_W,
@@ -118,6 +151,13 @@ function AppModal({
     computeCentered(defaultWidth, defaultHeight, minWidth, minHeight),
   );
   const [maximized, setMaximized] = React.useState(false);
+  const [, forceStackRender] = React.useReducer((value: number) => value + 1, 0);
+  const modalIdRef = React.useRef<number | null>(null);
+  if (modalIdRef.current === null) {
+    nextModalId += 1;
+    modalIdRef.current = nextModalId;
+  }
+  const modalId = modalIdRef.current;
 
   // Refs read inside the high-frequency pointermove handler. Updated on each
   // render so the handler always sees fresh values without re-attaching.
@@ -142,6 +182,20 @@ function AppModal({
     setMaximized(false);
     preMaxRef.current = null;
   }, [open, defaultWidth, defaultHeight, minWidth, minHeight]);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeModalStack(forceStackRender);
+    return unsubscribe;
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) {
+      removeModalId(modalId);
+      return;
+    }
+    pushModalId(modalId);
+    return () => removeModalId(modalId);
+  }, [modalId, open]);
 
   // Stable hot-path handlers — created once per mount, read fresh state via refs.
   // This avoids re-attaching window listeners and lets us use passive: true.
@@ -324,6 +378,9 @@ function AppModal({
         maxWidth: "none",
         maxHeight: "none",
       };
+  const stackIndex = Math.max(0, openModalIds.indexOf(modalId));
+  const overlayZIndex = MODAL_STACK_BASE_Z + stackIndex * MODAL_STACK_STEP_Z;
+  const contentZIndex = overlayZIndex + 10;
 
   const handleBar = (edge: ResizeEdge, hClass: string) => (
     <div
@@ -339,7 +396,8 @@ function AppModal({
       ? createPortal(
           <div
             aria-hidden
-            className="pointer-events-none fixed inset-0 z-40 bg-black/25"
+            className="fixed inset-0 bg-black/25"
+            style={{ zIndex: overlayZIndex }}
           />,
           document.body,
         )
@@ -353,7 +411,8 @@ function AppModal({
         showCloseButton={false}
         freePosition
         className={cn("gap-0 p-0 [contain:layout_paint]", className)}
-        style={frameStyle}
+        overlayClassName="hidden"
+        style={{ ...frameStyle, zIndex: contentZIndex }}
         onPointerDownOutside={(event) => {
           if (preventOutsideClose) { event.preventDefault(); return; }
           const target = event.target as Element | null;
@@ -429,13 +488,25 @@ function AppModal({
             </Button>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-4 pt-3">
+          <div
+            className={cn(
+              "flex min-h-0 flex-col gap-2 overflow-hidden px-4",
+              bodyStretch ? "pt-3" : "py-4",
+              bodyStretch ? "flex-1" : "shrink-0",
+            )}
+          >
             {description ? (
               <DialogDescription asChild>
                 <div className="shrink-0 text-sm text-muted-foreground">{description}</div>
               </DialogDescription>
             ) : null}
-            <div className={cn("min-h-0 flex-1 overflow-auto", bodyClassName)}>
+            <div
+              className={cn(
+                "min-h-0 overflow-auto",
+                bodyStretch ? "flex-1" : "shrink-0",
+                bodyClassName,
+              )}
+            >
               {children}
             </div>
           </div>
@@ -449,7 +520,12 @@ function AppModal({
                   {cancelLabel}
                 </Button>
                 {onSave ? (
-                  <Button type="button" disabled={saveDisabled} onClick={() => void onSave()}>
+                  <Button
+                    type="button"
+                    className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+                    disabled={saveDisabled}
+                    onClick={() => void onSave()}
+                  >
                     {saveLabel}
                   </Button>
                 ) : null}

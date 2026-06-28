@@ -1183,6 +1183,7 @@ export function GoodsIssueFormDialog({
       type: "number",
       align: "right",
       filterSymbol: "≤",
+      footer: totalQty.toLocaleString("vi-VN"),
     },
     {
       key: "unitPrice",
@@ -1205,6 +1206,17 @@ export function GoodsIssueFormDialog({
           }}
         />
       ),
+    },
+    {
+      key: "lineTotal",
+      label: "Thành tiền",
+      width: 150,
+      type: "readonly",
+      align: "right",
+      filterSymbol: "≤",
+      getValue: (r) =>
+        r.itemId ? formatMoneyInteger(Number(r.quantity) * Number(r.unitPrice)) : "",
+      footer: formatMoneyInteger(totalAmount),
     },
   ];
 
@@ -1240,7 +1252,7 @@ export function GoodsIssueFormDialog({
             </select>
 
             {reasonBucket ? (
-              <div className="min-w-[320px] flex-1">
+              <div className="min-w-[220px] flex-1">
                 <LookupField
                   enableSearchModal
                   searchModalTitle="Chọn lý do xuất kho"

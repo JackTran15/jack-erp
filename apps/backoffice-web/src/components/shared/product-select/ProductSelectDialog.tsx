@@ -489,7 +489,7 @@ export function ProductSelectDialog({
     });
   }
 
-  const colCount = showQuantityPrice ? 11 : 9;
+  const colCount = showQuantityPrice ? 10 : 8;
 
   return (
     <>
@@ -530,9 +530,7 @@ export function ProductSelectDialog({
                 disabled={totalSelectedCount === 0 || resolving}
                 onClick={handleConfirm}
               >
-                {resolving
-                  ? "Đang xử lý…"
-                  : `${confirmLabel} (${totalSelectedCount})`}
+                {resolving ? "Đang xử lý…" : confirmLabel}
               </Button>
             </div>
           </div>
@@ -620,9 +618,6 @@ export function ProductSelectDialog({
                   </th>
                   <th className="px-3 py-2 text-left font-medium">
                     Đơn vị tính
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium">
-                    Thương hiệu
                   </th>
                   <th className="px-3 py-2 text-right font-medium">
                     Giá mua TB
@@ -841,7 +836,6 @@ function ProductOrOrphanRow({
           {row.categoryName ?? "—"}
         </td>
         <td className="px-3 py-2 text-muted-foreground">{row.unit}</td>
-        <td className="px-3 py-2 text-muted-foreground">{row.brand ?? "—"}</td>
         <td className="px-3 py-2 text-right tabular-nums">
           {formatMoney(row.purchasePrice)}
         </td>
@@ -898,7 +892,7 @@ function ProductOrOrphanRow({
           {row.name}
           {row.itemCount > 0 && (
             <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-              {row.itemCount}
+              {row.itemCount.toLocaleString("vi-VN")} hàng hóa
             </span>
           )}
         </td>
@@ -907,9 +901,6 @@ function ProductOrOrphanRow({
         </td>
         <td className="px-3 py-2 text-muted-foreground font-normal">
           {row.unit}
-        </td>
-        <td className="px-3 py-2 text-muted-foreground font-normal">
-          {row.brand ?? "—"}
         </td>
         <td className="px-3 py-2 text-right tabular-nums font-normal">
           {formatMoney(row.purchasePrice)}
@@ -1013,7 +1004,7 @@ function VariantRowsWithCache({
     return (
       <tr>
         <td
-          colSpan={showQuantityPrice ? 11 : 9}
+          colSpan={showQuantityPrice ? 10 : 8}
           className="py-2 pl-10 text-xs text-muted-foreground"
         >
           Đang tải…
@@ -1052,9 +1043,6 @@ function VariantRowsWithCache({
           <td className="px-3 py-1.5 text-sm text-muted-foreground">
             {v.unit}
           </td>
-          <td className="px-3 py-1.5 text-sm text-muted-foreground">
-            {v.brand ?? "—"}
-          </td>
           <td className="px-3 py-1.5 text-right text-sm tabular-nums">
             {formatMoney(v.purchasePrice)}
           </td>
@@ -1077,7 +1065,7 @@ function VariantRowsWithCache({
 
       {total > VARIANT_PAGE_SIZE && (
         <tr>
-          <td colSpan={showQuantityPrice ? 11 : 9} className="px-10 py-1">
+          <td colSpan={showQuantityPrice ? 10 : 8} className="px-10 py-1">
             <PaginationControls
               page={page}
               pageSize={VARIANT_PAGE_SIZE}

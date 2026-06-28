@@ -70,6 +70,14 @@ const DIALOG_MODE_ENTITIES = new Set([
   "branches",
   "inventory-storages",
 ]);
+
+function areStringSetsEqual(left: Set<string>, right: Set<string>): boolean {
+  if (left.size !== right.size) return false;
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+  return true;
+}
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
 import { TableActionHeader } from "../layout/TableActionHeader";
@@ -321,7 +329,10 @@ export function CrudListPage({
     );
     setSelectedRecordIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
-      return next.size === prev.size ? prev : next;
+      if (next.size === 0 && filteredRecords.length > 0) {
+        next.add(String(filteredRecords[0][config?.idField ?? "id"]));
+      }
+      return areStringSetsEqual(next, prev) ? prev : next;
     });
   }, [filteredRecords, config?.idField]);
 

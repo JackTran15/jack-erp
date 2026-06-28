@@ -95,6 +95,9 @@ export function CreateStockTakeDialog({ onClose, onPicked }: Props) {
       }}
       title="Kiểm kê kho"
       className="max-w-[520px]"
+      defaultHeight={320}
+      minHeight={300}
+      bodyStretch={false}
       showFooter={false}
     >
       <div className="flex flex-col gap-4 p-1">

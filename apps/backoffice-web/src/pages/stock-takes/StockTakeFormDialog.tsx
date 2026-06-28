@@ -1481,7 +1481,7 @@ export function StockTakeFormDialog({
         title={title}
         toolbarItems={toolbarItems}
         defaultWidth={1220}
-        defaultHeight={800}
+        defaultHeight={700}
         headerContent={
           <div className="grid min-h-[220px] grid-cols-[minmax(0,1fr)_340px] gap-x-8">
             <section className="min-w-0">

@@ -53,6 +53,7 @@ export function RoleEditModal({
           {!readOnly && (
             <Button
               type="button"
+              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
               onClick={handleSave}
               disabled={!draft.name.trim() || saving}
             >

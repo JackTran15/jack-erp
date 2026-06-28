@@ -29,6 +29,7 @@ export function CreateCashCountDialog({ onClose, onPicked }: Props) {
       title="Kiểm kê tiền mặt"
       className="max-w-[520px]"
       defaultHeight={180}
+      bodyStretch={false}
       showFooter
       footer={
         <div className="flex items-center justify-end gap-2">

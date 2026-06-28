@@ -393,7 +393,7 @@ export function LineItemGrid<R>({
                     position: "sticky",
                     bottom: 0,
                     zIndex: 10,
-                    ...(col.width ? { width: col.width } : {}),
+                    ...sizeStyle(col),
                   }}
                 >
                   {col.footer ?? null}

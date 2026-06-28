@@ -943,6 +943,7 @@ export function TransferLocationDialog({
           <Button
             variant="default"
             size="sm"
+            className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
             disabled={submitting || rows.length === 0}
             onClick={() => void handleSave()}
           >

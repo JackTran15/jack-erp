@@ -20,17 +20,20 @@ function pickSingleUuid(value: unknown): string | undefined {
 
 /**
  * Map the shell's `PeriodValue` into the backend's preset / startDate / endDate.
- * The UI exposes a "yesterday" preset that the backend does not — surface it as
- * a custom range.
+ * The UI exposes some MISA-style presets that the backend report API does not
+ * accept directly — surface them as custom ranges.
  */
 export function mapPeriodToApi(
   period: PeriodValue | undefined,
 ): Pick<InventoryReportFilters, "preset" | "startDate" | "endDate"> {
   if (!period) return { preset: "this_month" };
-  if (period.preset === "yesterday") {
-    return { preset: "custom", startDate: period.from, endDate: period.to };
-  }
-  if (period.preset === "custom") {
+  if (
+    period.preset === "yesterday" ||
+    period.preset === "last_quarter" ||
+    period.preset === "last_six_months" ||
+    period.preset === "last_year" ||
+    period.preset === "custom"
+  ) {
     return { preset: "custom", startDate: period.from, endDate: period.to };
   }
   return { preset: period.preset };
@@ -115,4 +118,3 @@ export function pickSourceBranchId(
   if (Array.isArray(raw) && raw.length > 0) return pickSingleUuid(raw[0]);
   return undefined;
 }
-

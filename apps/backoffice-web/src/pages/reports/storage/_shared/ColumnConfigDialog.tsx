@@ -196,6 +196,7 @@ export function ColumnConfigDialog({
             type="button"
             variant="default"
             size="sm"
+            className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
             onClick={() => {
               onSave(draft);
               onOpenChange(false);

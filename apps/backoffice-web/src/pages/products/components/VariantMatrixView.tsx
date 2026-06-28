@@ -153,6 +153,7 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
           saveLabel="Xác nhận"
           cancelLabel="Huỷ"
           className="max-w-[420px]"
+          bodyStretch={false}
         >
           <p className="text-sm leading-relaxed text-muted-foreground">
             Xác nhận sinh {expectedCount} biến thể? Các biến thể đã tồn tại sẽ

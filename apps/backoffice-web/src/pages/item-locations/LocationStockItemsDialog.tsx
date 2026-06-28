@@ -299,6 +299,7 @@ export function LocationStockItemsDialog({
         <div className="flex justify-end gap-3">
           <Button
             type="button"
+            className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
             disabled={pendingDeleteIds.size === 0 || saving}
             onClick={() => void handleSave()}
           >
