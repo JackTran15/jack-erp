@@ -376,7 +376,7 @@ export function PurchaseOrdersPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
+      disabled: !selectedOrder,
       onClick: () => {
         if (!selectedOrder) return;
         setEditingOrder(selectedOrder);
@@ -418,6 +418,7 @@ export function PurchaseOrdersPage() {
     () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
     [records],
   );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const columns: TableColumn<PurchaseOrder>[] = [
     {
@@ -470,7 +471,7 @@ export function PurchaseOrdersPage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      footer: formatMoneyInteger(totalSum),
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(orderTotal(row)),
     },
     {

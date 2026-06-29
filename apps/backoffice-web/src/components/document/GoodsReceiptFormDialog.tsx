@@ -978,7 +978,7 @@ export function PurchaseOrderFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView || initial?.status !== "DRAFT",
+      disabled: !isView || !initial,
       onClick: onEdit,
     },
     {

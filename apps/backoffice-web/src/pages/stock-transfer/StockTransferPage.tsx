@@ -329,6 +329,7 @@ export function StockTransferPage() {
     () => (records?.data ?? []).reduce((s, r) => s + transferTotal(r), 0),
     [records],
   );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const toolbarItems: ToolbarItem[] = [
     {
@@ -435,7 +436,7 @@ export function StockTransferPage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      footer: formatMoneyInteger(totalSum),
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(transferTotal(row)),
     },
     {

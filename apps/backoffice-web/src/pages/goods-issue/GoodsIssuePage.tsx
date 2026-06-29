@@ -321,7 +321,7 @@ export function GoodsIssuePage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: true,
+      disabled: !selectedIssue,
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);
@@ -362,6 +362,7 @@ export function GoodsIssuePage() {
     () => (records?.data ?? []).reduce((s, r) => s + issueTotal(r), 0),
     [records],
   );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const columns: TableColumn<GoodsIssue>[] = [
     {
@@ -419,7 +420,7 @@ export function GoodsIssuePage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
-      footer: formatMoneyInteger(totalSum),
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(issueTotal(row)),
     },
     {

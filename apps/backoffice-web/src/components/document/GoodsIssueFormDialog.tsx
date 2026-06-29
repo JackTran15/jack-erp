@@ -829,7 +829,7 @@ export function GoodsIssueFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: true,
+      disabled: !isView || !initial,
       onClick: onEdit,
     },
     {
