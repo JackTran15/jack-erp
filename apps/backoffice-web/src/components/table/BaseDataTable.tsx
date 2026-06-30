@@ -657,7 +657,7 @@ export function BaseDataTable<T>({
                     <td
                       key={`${column.key}-footer`}
                       className={cn(
-                        "h-8 border-t border-border bg-muted px-2 py-0 text-xs font-semibold",
+                        "h-8 border-t border-border bg-muted px-2 py-0 text-sm font-semibold",
                         column.className,
                         column.frozen && FROZEN_BG,
                       )}

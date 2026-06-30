@@ -979,22 +979,15 @@ function formatCell(
   if (entityKey === "inventory-items" && field.key === "isActive") {
     const enabled = Boolean(value);
     return (
-      <Badge
-        variant="outline"
+      <span
         className={
           enabled
-            ? "gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-            : "gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
+            ? "inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-950/50 dark:text-green-300"
+            : "inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
         }
       >
-        <span
-          aria-hidden="true"
-          className={`h-1.5 w-1.5 rounded-full ${
-            enabled ? "bg-emerald-500" : "bg-rose-500"
-          }`}
-        />
         {enabled ? "Đang hoạt động" : "Ngừng kinh doanh"}
-      </Badge>
+      </span>
     );
   }
   if (field.type === "boolean") {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  Badge,
   DocumentListShell,
   formatMoneyInteger,
   PageToolbar,
@@ -101,6 +102,28 @@ const STATUS_LABELS: Record<GoodsIssueStatus, string> = {
 
 function issueTotal(o: GoodsIssue): number {
   return o.lines.reduce((s, l) => s + lineSubtotal(l), 0);
+}
+
+function renderStatusBadge(status: GoodsIssueStatus) {
+  const className =
+    status === "POSTED"
+      ? "gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+      : status === "CANCELLED"
+        ? "gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
+        : "gap-1.5 border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300";
+  const dotClassName =
+    status === "POSTED"
+      ? "bg-emerald-500"
+      : status === "CANCELLED"
+        ? "bg-rose-500"
+        : "bg-slate-400";
+
+  return (
+    <Badge variant="outline" className={className}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />
+      {STATUS_LABELS[status]}
+    </Badge>
+  );
 }
 
 export function GoodsIssuePage() {
@@ -321,7 +344,7 @@ export function GoodsIssuePage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedIssue,
+      disabled: !selectedIssue || selectedIssue.status !== "DRAFT",
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);
@@ -449,19 +472,7 @@ export function GoodsIssuePage() {
       key: "status",
       label: "Trạng thái",
       width: 130,
-      render: (row) => (
-        <span
-          className={
-            row.status === "POSTED"
-              ? "text-green-600"
-              : row.status === "CANCELLED"
-                ? "text-muted-foreground"
-                : "text-foreground"
-          }
-        >
-          {STATUS_LABELS[row.status]}
-        </span>
-      ),
+      render: (row) => renderStatusBadge(row.status),
     },
   ];
 
