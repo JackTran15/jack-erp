@@ -2,6 +2,7 @@ import type {
   InvoicePaymentMethod,
   InvoiceStatus,
   InvoiceType,
+  ItemDirection,
 } from "@erp/pos/types/invoice.type";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
 
@@ -13,6 +14,8 @@ export interface InvoiceItemRow {
   itemName: string;
   unit: string;
   quantity: number;
+  /** OUT = mua/bán, IN = trả lại. Phân biệt dòng trả trong đơn đổi/trả. */
+  direction?: ItemDirection;
   unitPrice: number;
   lineDiscount: number;
   /** KM thủ công per-line (null = legacy chỉ có `lineDiscount` amount). */
@@ -49,6 +52,8 @@ export interface InvoiceRow {
   depositAmount: number;
   amountDue: number;
   totalPaid: number;
+  /** Net = newSubtotal - returnSubtotal; âm = hoàn tiền khách (RETURN/EXCHANGE). 0 cho SALE. */
+  netAmount: number;
   note?: string;
   issuedAt?: string;
   createdAt: string;

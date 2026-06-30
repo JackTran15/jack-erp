@@ -16,6 +16,12 @@ export type InvoiceStatus =
 export type InvoiceType = "SALE" | "RETURN" | "EXCHANGE";
 
 /**
+ * Chiều của dòng hàng — mirror `ItemDirection` ở backend (`invoice-item.entity.ts`).
+ * OUT = hàng bán / mua mới, IN = hàng trả lại (RETURN / phần trả của EXCHANGE).
+ */
+export type ItemDirection = "OUT" | "IN";
+
+/**
  * Chế độ tạo đơn trả — `quick` không cần hóa đơn gốc, `regular` tham chiếu hóa
  * đơn bán gốc. Mirror `ReturnInvoiceMode` (`create-return-invoice.dto.ts`).
  */

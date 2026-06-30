@@ -17,6 +17,7 @@ import {
   UpdatePosSettingsDto,
 } from './dto';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
+import { DefaultAccountSeederService } from '../accounting/seeders/default-account.seeder';
 import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
 import { MembershipCardTypeSeederService } from '../customer/services/membership-card-type.seeder';
 
@@ -28,6 +29,7 @@ export class OrganizationService {
     @InjectRepository(OrganizationEntity)
     private readonly orgRepo: Repository<OrganizationEntity>,
     private readonly coaSeederService: CoaSeederService,
+    private readonly defaultAccountSeederService: DefaultAccountSeederService,
     private readonly cashVoucherCategorySeederService: CashVoucherCategorySeederService,
     private readonly membershipCardTypeSeederService: MembershipCardTypeSeederService,
   ) {}
@@ -56,9 +58,14 @@ export class OrganizationService {
 
     try {
       await this.coaSeederService.seedForOrganization(saved.id, actor.userId);
+      // Default-account roles depend on the COA accounts above existing.
+      await this.defaultAccountSeederService.seedForOrganization(
+        saved.id,
+        actor.userId,
+      );
     } catch (err) {
       this.logger.error(
-        `Failed to seed COA for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
+        `Failed to seed accounting defaults for new organization ${saved.id}: ${err instanceof Error ? err.message : err}`,
       );
     }
 

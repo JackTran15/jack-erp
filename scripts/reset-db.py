@@ -92,7 +92,7 @@ def main():
         print("\nSkipping seed (--no-seed).")
     else:
         print("\n=== Seeding ===")
-        run(["pnpm", "--filter", "@erp/api", "seed:inventory"], cwd=REPO_ROOT)
+        run(["pnpm", "--filter", "@erp/api", "seed:org"], cwd=REPO_ROOT)
 
     print("\nDone.")
 

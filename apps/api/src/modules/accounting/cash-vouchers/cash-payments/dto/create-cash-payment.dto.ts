@@ -57,9 +57,14 @@ export class CreateCashPaymentDto {
   @IsUUID()
   cashAccountId: string;
 
-  /** Contra GL account for the whole voucher (per-header, e.g. 331/811). */
+  /**
+   * Optional contra GL account override. Normally the contra account is resolved
+   * server-side from {@link purpose}; this is only honoured for cases where the
+   * cashier explicitly picks the offsetting account (e.g. a transfer destination).
+   */
+  @IsOptional()
   @IsUUID()
-  contraAccountId: string;
+  contraAccountId?: string;
 
   /** Denormalized total — must equal sum(lines.amount). */
   @IsNumber({ maxDecimalPlaces: 2 })

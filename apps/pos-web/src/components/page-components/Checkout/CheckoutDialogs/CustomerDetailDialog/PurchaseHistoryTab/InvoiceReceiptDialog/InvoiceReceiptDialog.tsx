@@ -6,6 +6,7 @@ import { useInvoiceDetailQuery } from "@erp/pos/hooks/react-query/use-query-invo
 import { formatDiscountLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
+import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 import { InvoiceStatusBadge } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerDetailDialog/PurchaseHistoryTab/InvoiceReceiptDialog/InvoiceStatusBadge/InvoiceStatusBadge";
 import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { InvoiceType } from "@erp/pos/types/invoice.type";
@@ -33,7 +34,7 @@ interface SummaryLine {
 
 function buildPaymentLines(invoice: InvoiceRow): SummaryLine[] {
   const lines: SummaryLine[] = [
-    { label: "Tổng thanh toán", value: invoice.amountDue, bold: true },
+    { label: "Tổng thanh toán", value: getInvoiceSignedTotal(invoice), bold: true },
   ];
   if (invoice.discountAmount > 0) {
     lines.push({ label: "Giảm giá", value: invoice.discountAmount });
@@ -138,10 +139,19 @@ export function InvoiceReceiptDialog({
                     </td>
                   </tr>
                 ) : (
-                  items.map((it) => (
+                  items.map((it) => {
+                    const isReturn = it.direction === "IN";
+                    return (
                     <tr key={it.id} className="align-top">
                       <td className="px-3 py-2.5">
-                        <div className="font-semibold">{it.itemName}</div>
+                        <div className="flex items-center gap-2 font-semibold">
+                          <span>{it.itemName}</span>
+                          {isReturn ? (
+                            <span className="rounded bg-[#FEE2E2] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#E5403A]">
+                              Trả lại
+                            </span>
+                          ) : null}
+                        </div>
                         {it.itemCode ? (
                           <div className="text-[12px] text-[#9CA3AF]">
                             {it.itemCode}
@@ -171,11 +181,20 @@ export function InvoiceReceiptDialog({
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         {formatVnd(it.unitPrice)}
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">
-                        {formatVnd(it.lineTotal)}
+                      <td
+                        className={`px-3 py-2.5 text-right tabular-nums${
+                          isReturn ? " text-[#E5403A]" : ""
+                        }`}
+                      >
+                        {formatVnd(
+                          isReturn
+                            ? -Math.abs(Number(it.lineTotal))
+                            : it.lineTotal,
+                        )}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

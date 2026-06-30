@@ -71,6 +71,10 @@ const IDS = {
   paymentAccountCash:       'E0000000-0000-4000-8000-000000000003',
   paymentAccountBank:       'E0000000-0000-4000-8000-000000000004',
   paymentAccountCard:       'E0000000-0000-4000-8000-000000000005',
+  // Voucher contra-account defaults (resolved server-side from the voucher purpose).
+  defaultAccountOtherIncome: 'E0000000-0000-4000-8000-000000000006',
+  defaultAccountPayable:     'E0000000-0000-4000-8000-000000000007',
+  defaultAccountExpense:     'E0000000-0000-4000-8000-000000000008',
   // POS / Customer
   cashAccountRegister: 'C0000000-0000-4000-8000-000000000001',
   customerWalkIn:    'D0000000-0000-4000-8000-000000000001',
@@ -551,8 +555,11 @@ async function seedInventoryData() {
       INSERT INTO accounting_default_account
         (id, organization_id, branch_id, account_role, account_id, created_by, created_at, updated_at)
       VALUES
-        ($1, $5, NULL, 'REVENUE',    $3, $6, NOW(), NOW()),
-        ($2, $5, NULL, 'RECEIVABLE', $4, $6, NOW(), NOW())
+        ($1, $5, NULL, 'REVENUE',      $3,  $6, NOW(), NOW()),
+        ($2, $5, NULL, 'RECEIVABLE',   $4,  $6, NOW(), NOW()),
+        ($7, $5, NULL, 'OTHER_INCOME', $8,  $6, NOW(), NOW()),
+        ($9, $5, NULL, 'PAYABLE',      $10, $6, NOW(), NOW()),
+        ($11,$5, NULL, 'EXPENSE',      $12, $6, NOW(), NOW())
       ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -562,6 +569,12 @@ async function seedInventoryData() {
         IDS.accountReceivable,
         IDS.organization,
         IDS.user,
+        IDS.defaultAccountOtherIncome,
+        IDS.accountOtherIncome,
+        IDS.defaultAccountPayable,
+        IDS.accountPayable,
+        IDS.defaultAccountExpense,
+        IDS.accountOtherExpense,
       ],
     );
 

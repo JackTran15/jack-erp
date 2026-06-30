@@ -9,7 +9,10 @@ import {
   InvoiceStatus,
   InvoiceType,
 } from '../entities/invoice.entity';
-import { InvoiceItemEntity } from '../entities/invoice-item.entity';
+import {
+  InvoiceItemEntity,
+  ItemDirection,
+} from '../entities/invoice-item.entity';
 import { SearchReturnableInvoicesV2Query } from './search-returnable-invoices-v2.query';
 
 @QueryHandler(SearchReturnableInvoicesV2Query)
@@ -44,7 +47,19 @@ export class SearchReturnableInvoicesV2Handler
       .where('inv.organizationId = :orgId', { orgId: actor.organizationId })
       .andWhere('inv.type = :type', { type: InvoiceType.SALE })
       .andWhere('inv.status = :status', { status: InvoiceStatus.PAID })
-      .andWhere('inv.isDraft = false');
+      .andWhere('inv.isDraft = false')
+      // Hide fully-returned invoices: keep only those with at least one sold
+      // (OUT) line that still has un-returned quantity. Partially-returned
+      // invoices stay listed because they still have items left to return.
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM invoice_items ii
+          WHERE ii.invoice_id = inv.id
+            AND ii.direction = :outDir
+            AND ii.quantity > ii.returned_quantity
+        )`,
+        { outDir: ItemDirection.OUT },
+      );
 
     if (actor.branchId) {
       qb.andWhere('inv.branchId = :branchId', { branchId: actor.branchId });

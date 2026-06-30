@@ -1,4 +1,6 @@
 import {
+  AppModal,
+  Button,
   DocumentListShell,
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +20,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Trash2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -47,7 +50,6 @@ import {
   useCashReceiptMutations,
 } from "../../../../hooks/treasury/use-cash-receipts";
 import { useCategoryNameMap } from "../../../../hooks/treasury/use-cash-voucher-categories";
-import { useCoaAccounts } from "../../../../hooks/treasury/use-coa-accounts";
 import { useMergedReceiptPayments } from "../../../../hooks/treasury/use-merged-receipt-payments";
 import {
   cashPaymentToVoucherDetail,
@@ -126,9 +128,11 @@ export function TreasuryCashReceiptsPage() {
     useState<LedgerCashInvoiceDetail | null>(null);
   const [confirmDeleteItem, setConfirmDeleteItem] =
     useState<ReceiptPaymentListItem | null>(null);
+  const [reverseItem, setReverseItem] =
+    useState<ReceiptPaymentListItem | null>(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reverseLoading, setReverseLoading] = useState(false);
 
-  const { data: coaAccounts } = useCoaAccounts();
-  const contraAccountId = coaAccounts?.[0]?.id ?? "";
   const categoryInMap = useCategoryNameMap(CashVoucherCategoryDirection.IN);
   const categoryOutMap = useCategoryNameMap(CashVoucherCategoryDirection.OUT);
 
@@ -332,13 +336,12 @@ export function TreasuryCashReceiptsPage() {
         ? "Không nhân bản phiếu nhập hàng"
         : undefined,
       onClick: async () => {
-        if (!selectedVoucher || !cashAccountId || !contraAccountId) return;
+        if (!selectedVoucher || !cashAccountId) return;
         try {
           if (selectedItem?.kind === ReceiptPaymentKind.RECEIPT) {
             const body = ledgerDetailToCreateReceiptBody(
               { ...selectedVoucher, voucherNo: "" },
               cashAccountId,
-              contraAccountId,
             );
             const created = await receiptMutations.create.mutateAsync(body);
             setSelectedId(created.id);
@@ -346,7 +349,6 @@ export function TreasuryCashReceiptsPage() {
             const body = ledgerDetailToCreatePaymentBody(
               { ...selectedVoucher, voucherNo: "" },
               cashAccountId,
-              contraAccountId,
             );
             const created = await paymentMutations.create.mutateAsync(body);
             setSelectedId(created.id);
@@ -377,6 +379,23 @@ export function TreasuryCashReceiptsPage() {
           ? "Chỉ sửa phiếu nháp"
           : undefined,
       onClick: handlePageEdit,
+    },
+    {
+      id: "reverse",
+      label: "Đảo",
+      icon: RotateCcw,
+      disabled:
+        !selectedItem || selectedItem.status !== CashVoucherStatus.POSTED,
+      tooltip:
+        selectedItem && selectedItem.status !== CashVoucherStatus.POSTED
+          ? "Chỉ đảo phiếu đã ghi sổ"
+          : undefined,
+      onClick: () => {
+        if (selectedItem) {
+          setReverseReason("");
+          setReverseItem(selectedItem);
+        }
+      },
     },
     { id: "sep1", type: "separator" },
     {
@@ -422,8 +441,8 @@ export function TreasuryCashReceiptsPage() {
 
   const handleSaveVoucher = useCallback(
     async (detail: LedgerCashVoucherDetail) => {
-      if (!voucherDialog || !cashAccountId || !contraAccountId) {
-        toast.error("Chưa có két tiền hoặc tài khoản đối ứng.");
+      if (!voucherDialog || !cashAccountId) {
+        toast.error("Chưa chọn két tiền.");
         return;
       }
       try {
@@ -444,11 +463,7 @@ export function TreasuryCashReceiptsPage() {
               await receiptMutations.debtCollection.mutateAsync(body);
             setSelectedId(result.receiptId);
           } else {
-            const body = ledgerDetailToCreateReceiptBody(
-              detail,
-              cashAccountId,
-              contraAccountId,
-            );
+            const body = ledgerDetailToCreateReceiptBody(detail, cashAccountId);
             if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
               const created = await receiptMutations.create.mutateAsync(body);
               setSelectedId(created.id);
@@ -476,11 +491,7 @@ export function TreasuryCashReceiptsPage() {
               await paymentMutations.supplierDebtPayment.mutateAsync(body);
             setSelectedId(result.paymentId);
           } else {
-            const body = ledgerDetailToCreatePaymentBody(
-              detail,
-              cashAccountId,
-              contraAccountId,
-            );
+            const body = ledgerDetailToCreatePaymentBody(detail, cashAccountId);
             if (voucherDialog.mode === TreasuryVoucherDialogModeEnum.CREATE) {
               const created = await paymentMutations.create.mutateAsync(body);
               setSelectedId(created.id);
@@ -494,7 +505,7 @@ export function TreasuryCashReceiptsPage() {
           }
         }
         closeVoucherDialogs();
-        toast.success("Đã lưu chứng từ.");
+        toast.success("Đã ghi sổ chứng từ.");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Lưu thất bại.");
       }
@@ -502,13 +513,36 @@ export function TreasuryCashReceiptsPage() {
     [
       voucherDialog,
       cashAccountId,
-      contraAccountId,
       selectedId,
       receiptMutations,
       paymentMutations,
       closeVoucherDialogs,
     ],
   );
+
+  const handleConfirmReverse = useCallback(async () => {
+    if (!reverseItem) return;
+    const reason = reverseReason.trim();
+    if (!reason) {
+      toast.error("Nhập lý do đảo chứng từ.");
+      return;
+    }
+    setReverseLoading(true);
+    try {
+      if (reverseItem.kind === ReceiptPaymentKind.RECEIPT) {
+        await receiptMutations.reverse.mutateAsync({ id: reverseItem.id, reason });
+      } else {
+        await paymentMutations.reverse.mutateAsync({ id: reverseItem.id, reason });
+      }
+      setReverseItem(null);
+      setReverseReason("");
+      toast.success("Đã đảo chứng từ.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Đảo chứng từ thất bại.");
+    } finally {
+      setReverseLoading(false);
+    }
+  }, [reverseItem, reverseReason, receiptMutations, paymentMutations]);
 
   const dialogInitial =
     voucherDialog?.mode === TreasuryVoucherDialogModeEnum.CREATE
@@ -704,6 +738,60 @@ export function TreasuryCashReceiptsPage() {
             }
           }}
         />
+      ) : null}
+
+      {reverseItem ? (
+        <AppModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setReverseItem(null);
+              setReverseReason("");
+            }
+          }}
+          title="Đảo chứng từ"
+          bodyStretch={false}
+          defaultWidth={460}
+          defaultHeight={260}
+          minWidth={380}
+          minHeight={240}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setReverseItem(null);
+                  setReverseReason("");
+                }}
+              >
+                Quay lại
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={reverseLoading || !reverseReason.trim()}
+                onClick={handleConfirmReverse}
+              >
+                {reverseLoading ? "Đang xử lý…" : "Đảo chứng từ"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground leading-relaxed">
+              {`Đảo chứng từ ${reverseItem.documentNumber || reverseItem.id} sẽ tạo một bút toán bù trừ trong sổ. Hành động không thể hoàn tác.`}
+            </p>
+            <label className="text-sm font-medium">Lý do đảo</label>
+            <textarea
+              className="min-h-[72px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={reverseReason}
+              maxLength={500}
+              placeholder="Nhập lý do đảo chứng từ…"
+              onChange={(e) => setReverseReason(e.target.value)}
+            />
+          </div>
+        </AppModal>
       ) : null}
     </>
   );

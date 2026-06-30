@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { AccountEntity } from '../coa/account.entity';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { AccountingDefaultAccountEntity } from './accounting-default-account.entity';
 import { AccountingDefaultAccountRole, PaymentAccountMethod } from './enums';
@@ -20,7 +21,41 @@ export class AccountResolverService {
     private readonly paymentAccountRepo: Repository<PaymentAccountEntity>,
     @InjectRepository(AccountingDefaultAccountEntity)
     private readonly defaultAccountRepo: Repository<AccountingDefaultAccountEntity>,
+    @InjectRepository(AccountEntity)
+    private readonly accountRepo: Repository<AccountEntity>,
   ) {}
+
+  /**
+   * Resolve the contra (offsetting) COA account for a cash voucher.
+   *
+   * When `overrideAccountId` is given (e.g. a payment transfer's destination
+   * account chosen by the cashier), it is validated to be an active account in the
+   * actor's org and returned. Otherwise the account is resolved from `role` via
+   * {@link resolveDefaultAccount} (branch override → org default). Callers map the
+   * voucher purpose to a role; this method never trusts a client-supplied role.
+   */
+  async resolveContraAccount(
+    role: AccountingDefaultAccountRole,
+    actor: ActorContext,
+    overrideAccountId?: string,
+  ): Promise<string> {
+    if (overrideAccountId) {
+      const account = await this.accountRepo.findOne({
+        where: {
+          id: overrideAccountId,
+          organizationId: actor.organizationId,
+          isActive: true,
+        },
+      });
+      if (!account) {
+        throw new BadRequestException(
+          `Contra account ${overrideAccountId} not found or inactive for organization ${actor.organizationId}`,
+        );
+      }
+      return account.id;
+    }
+    return this.resolveDefaultAccount(role, actor);
+  }
 
   /**
    * Resolve the default COA account for a role. A branch override

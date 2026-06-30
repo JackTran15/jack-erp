@@ -6,9 +6,21 @@ import {
   LEDGER_CASH_VI_DATE,
   TABLE_NUM_CLASS,
 } from "../../ledger-cash/ledger-cash.constants";
-import { receiptPaymentDocumentTypeLabel } from "../../cash-vouchers.labels";
-import type { ReceiptPaymentListItem } from "../../cash-vouchers.types";
+import {
+  CASH_VOUCHER_STATUS_LABEL,
+  receiptPaymentDocumentTypeLabel,
+} from "../../cash-vouchers.labels";
+import {
+  CashVoucherStatus,
+  type ReceiptPaymentListItem,
+} from "../../cash-vouchers.types";
 import { RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS } from "./receipt-cash.constants";
+
+const STATUS_BADGE_CLASS: Record<CashVoucherStatus, string> = {
+  [CashVoucherStatus.DRAFT]: "bg-gray-100 text-gray-700",
+  [CashVoucherStatus.POSTED]: "bg-green-100 text-green-700",
+  [CashVoucherStatus.REVERSED]: "bg-amber-100 text-amber-700",
+};
 
 export function useReceiptCashTableColumns(
   onOpenVoucher: (row: ReceiptPaymentListItem) => void,
@@ -48,6 +60,18 @@ export function useReceiptCashTableColumns(
         })),
         render: (r) =>
           receiptPaymentDocumentTypeLabel(r.kind, r.referenceType),
+      },
+      {
+        key: "status",
+        label: "Trạng thái",
+        width: 120,
+        render: (r) => (
+          <span
+            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[r.status]}`}
+          >
+            {CASH_VOUCHER_STATUS_LABEL[r.status]}
+          </span>
+        ),
       },
       {
         key: "totalAmount",

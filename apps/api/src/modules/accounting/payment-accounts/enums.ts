@@ -16,10 +16,16 @@ export enum PaymentAccountMethod {
 }
 
 /**
- * Role of a default COA account resolved server-side. Both values ship up front so
- * later phases never need `ALTER TYPE ... ADD VALUE` (not transaction-revertible).
+ * Role of a default COA account resolved server-side. REVENUE/RECEIVABLE back sale
+ * posting; OTHER_INCOME/PAYABLE/EXPENSE back the contra account of manually-created
+ * cash receipt/payment vouchers (resolved from the voucher purpose). New values are
+ * added to the Postgres enum via migration (`ALTER TYPE ... ADD VALUE`, not
+ * transaction-revertible — the migration's down() is a no-op).
  */
 export enum AccountingDefaultAccountRole {
   REVENUE = 'REVENUE',
   RECEIVABLE = 'RECEIVABLE',
+  OTHER_INCOME = 'OTHER_INCOME',
+  PAYABLE = 'PAYABLE',
+  EXPENSE = 'EXPENSE',
 }

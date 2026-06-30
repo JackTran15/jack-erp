@@ -267,7 +267,8 @@ export interface CreateCashReceiptBody {
   reason?: string;
   staffId?: string;
   cashAccountId: string;
-  contraAccountId: string;
+  /** Optional contra override; normally resolved server-side from the purpose. */
+  contraAccountId?: string;
   totalAmount: number;
   attachmentIds?: string[];
   lines: Array<{
@@ -319,7 +320,8 @@ export interface CreateCashPaymentBody {
   reason?: string;
   staffId?: string;
   cashAccountId: string;
-  contraAccountId: string;
+  /** Optional contra override; normally resolved server-side from the purpose. */
+  contraAccountId?: string;
   totalAmount: number;
   attachmentIds?: string[];
   lines: Array<{

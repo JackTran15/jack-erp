@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { AccountResolverService } from './account-resolver.service';
+import { AccountEntity } from '../coa/account.entity';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { AccountingDefaultAccountEntity } from './accounting-default-account.entity';
 import { AccountingDefaultAccountRole, PaymentAccountMethod } from './enums';
@@ -17,16 +18,19 @@ describe('AccountResolverService', () => {
   let service: AccountResolverService;
   let paymentAccountRepo: { find: jest.Mock; findOne: jest.Mock };
   let defaultAccountRepo: { find: jest.Mock };
+  let accountRepo: { findOne: jest.Mock };
 
   beforeEach(async () => {
     paymentAccountRepo = { find: jest.fn(), findOne: jest.fn() };
     defaultAccountRepo = { find: jest.fn() };
+    accountRepo = { findOne: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AccountResolverService,
         { provide: getRepositoryToken(PaymentAccountEntity), useValue: paymentAccountRepo },
         { provide: getRepositoryToken(AccountingDefaultAccountEntity), useValue: defaultAccountRepo },
+        { provide: getRepositoryToken(AccountEntity), useValue: accountRepo },
       ],
     }).compile();
 
@@ -55,6 +59,53 @@ describe('AccountResolverService', () => {
       defaultAccountRepo.find.mockResolvedValue([]);
       await expect(
         service.resolveDefaultAccount(AccountingDefaultAccountRole.RECEIVABLE, actor),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resolveContraAccount', () => {
+    it('delegates to the role default when no override is given', async () => {
+      defaultAccountRepo.find.mockResolvedValue([
+        { branchId: null, accountId: 'other-income-coa' },
+      ]);
+      await expect(
+        service.resolveContraAccount(
+          AccountingDefaultAccountRole.OTHER_INCOME,
+          actor,
+        ),
+      ).resolves.toBe('other-income-coa');
+      expect(accountRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('returns the override account when it is active and in org', async () => {
+      accountRepo.findOne.mockResolvedValue({ id: 'transfer-coa' });
+      await expect(
+        service.resolveContraAccount(
+          AccountingDefaultAccountRole.PAYABLE,
+          actor,
+          'transfer-coa',
+        ),
+      ).resolves.toBe('transfer-coa');
+      expect(accountRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'transfer-coa',
+            organizationId: 'org-1',
+            isActive: true,
+          }),
+        }),
+      );
+      expect(defaultAccountRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('throws when the override account is missing or inactive', async () => {
+      accountRepo.findOne.mockResolvedValue(null);
+      await expect(
+        service.resolveContraAccount(
+          AccountingDefaultAccountRole.EXPENSE,
+          actor,
+          'bad-coa',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
