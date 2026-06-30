@@ -1,4 +1,5 @@
-import { AppModal } from "@erp/ui";
+import { AppModal, Button } from "@erp/ui";
+import { Trash2 } from "lucide-react";
 
 interface ConfirmActionModalProps {
   title: string;
@@ -19,6 +20,8 @@ export function ConfirmActionModal({
   onConfirm,
   onCancel,
 }: ConfirmActionModalProps) {
+  const isDeleteAction = /xoá|xóa/i.test(confirmLabel);
+
   return (
     <AppModal
       open={true}
@@ -26,11 +29,28 @@ export function ConfirmActionModal({
         if (!open) onCancel();
       }}
       title={title}
-      onSave={onConfirm}
-      onCancel={onCancel}
-      saveLabel={loading ? "Đang xử lý…" : confirmLabel}
-      cancelLabel={cancelLabel}
-      saveDisabled={loading}
+      bodyStretch={false}
+      defaultWidth={420}
+      defaultHeight={190}
+      minWidth={360}
+      minHeight={170}
+      bodyClassName="overflow-visible"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={isDeleteAction ? "destructive" : "default"}
+            disabled={loading}
+            onClick={onConfirm}
+          >
+            {isDeleteAction ? <Trash2 className="mr-2 h-4 w-4" /> : null}
+            {loading ? "Đang xử lý…" : confirmLabel}
+          </Button>
+        </div>
+      }
     >
       <p className="text-muted-foreground leading-relaxed">{message}</p>
     </AppModal>

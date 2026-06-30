@@ -164,6 +164,7 @@ export function GoodsIssueFormDialog({
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
+  const canEdit = isView && initial?.status === "DRAFT";
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
   // stale response from overwriting a row the user has since changed.
@@ -829,7 +830,7 @@ export function GoodsIssueFormDialog({
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !isView || !initial,
+      disabled: !canEdit,
       onClick: onEdit,
     },
     {

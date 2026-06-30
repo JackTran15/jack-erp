@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Button,
   DocumentListShell,
   formatMoneyInteger,
   PageToolbar,
@@ -10,7 +9,7 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -110,6 +109,22 @@ function purchasePurposeLabel(purpose: PurchaseOrder["purpose"]): string {
   if (purpose === "TRANSFER_IN") return "Phiếu nhập kho điều chuyển";
   if (purpose === "STOCK_TAKE") return "Phiếu nhập kho kiểm kê";
   return "Phiếu nhập kho khác";
+}
+
+function renderStatusBadge(status: PurchaseOrderStatus) {
+  const isCancelled = status === "CANCELLED" || status === "REVERSED";
+  const className =
+    status === "POSTED"
+      ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"
+      : isCancelled
+        ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+        : "bg-muted text-muted-foreground";
+
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${className}`}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 export function PurchaseOrdersPage() {
@@ -376,7 +391,7 @@ export function PurchaseOrdersPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder,
+      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
       onClick: () => {
         if (!selectedOrder) return;
         setEditingOrder(selectedOrder);
@@ -497,6 +512,12 @@ export function PurchaseOrdersPage() {
         { value: "STOCK_TAKE", label: "Phiếu nhập kho kiểm kê" },
       ],
       render: (row) => purchasePurposeLabel(row.purpose),
+    },
+    {
+      key: "status",
+      label: "Trạng thái",
+      width: 130,
+      render: (row) => renderStatusBadge(row.status),
     },
   ];
 
