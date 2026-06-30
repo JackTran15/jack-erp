@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import type { SwitchBranchResponse } from "@erp/shared-interfaces";
 import { useMyBranches } from "../../hooks/iam/useBranches";
 import { erpApi, requireErpData } from "../../lib/erp-api";
-import { persistSwitchBranchResponse } from "../../lib/auth-storage";
+import { getActiveBranch, persistSwitchBranchResponse } from "../../lib/auth-storage";
 import { CHAIN_OPTION_VALUE } from "../../store/common/branch/branch.constant";
 import {
   useBranchStore,
@@ -28,9 +28,15 @@ export function BranchSelector() {
   const selectChain = useBranchStore((s) => s.selectChain);
   const [switching, setSwitching] = useState(false);
 
+  // Reconcile the store against the authoritative branch (localStorage
+  // active_branch_id — the same source api-axios sends as X-Branch-Id). This
+  // covers a fresh tab / post-login state where the store was initialized
+  // before the session existed, so the selector never drifts from the data.
   useEffect(() => {
-    if (isChain || !branchId || branchName) return;
-    const branch = branches?.find((b) => b.id === branchId);
+    if (isChain) return;
+    const active = getActiveBranch();
+    if (!active || (active === branchId && branchName)) return;
+    const branch = branches?.find((b) => b.id === active);
     if (branch) selectBranch(branch.id, branch.name);
   }, [isChain, branchId, branchName, branches, selectBranch]);
 

@@ -324,7 +324,7 @@ export const navConfig: NavModule[] = [
             to: "/admin/inventory-item-prices",
             label: "Bảng giá",
           },
-          { to: "/admin/inventory-storages", label: "Kho hàng" },
+          { to: "/admin/inventory-storages", label: "Kho hàng", views: [STORE_TYPE.SINGLE] },
           { to: "/admin/inventory-stock-balances", label: "Tồn kho" , views: [STORE_TYPE.SINGLE] },
         ],
       },

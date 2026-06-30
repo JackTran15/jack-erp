@@ -21,6 +21,7 @@ import {
   hasRefreshToken,
 } from "../lib/auth-storage";
 import { erpApi, requireErpData } from "../lib/erp-api";
+import { useBranchStore } from "../store/common/branch/branch.store";
 
 interface AuthState {
   isReady: boolean;
@@ -77,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (data) => {
       persistSession(data);
+      // A fresh login starts in single-branch mode on its actual branch. Reset
+      // the branch store so a prior session's chain mode (persisted in
+      // localStorage and not cleared on logout) can't leak into this one — the
+      // BranchSelector then re-syncs branchId from the persisted session.
+      useBranchStore.getState().clear();
       queryClient.setQueryData(["auth", "bootstrap"], true);
     },
   });
