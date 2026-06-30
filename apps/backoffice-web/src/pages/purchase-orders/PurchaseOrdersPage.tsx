@@ -10,7 +10,7 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Copy, Eye, Pencil, Plus, RefreshCw, Tags, Trash2, X } from "lucide-react";
+import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -24,6 +24,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -105,6 +106,12 @@ function orderTotal(o: PurchaseOrder): number {
   return o.lines.reduce((s, l) => s + lineSubtotal(l), 0);
 }
 
+function purchasePurposeLabel(purpose: PurchaseOrder["purpose"]): string {
+  if (purpose === "TRANSFER_IN") return "Phiếu nhập kho điều chuyển";
+  if (purpose === "STOCK_TAKE") return "Phiếu nhập kho kiểm kê";
+  return "Phiếu nhập kho khác";
+}
+
 export function PurchaseOrdersPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -123,7 +130,6 @@ export function PurchaseOrdersPage() {
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<
     "create" | "edit" | "view" | null
   >(null);
@@ -143,9 +149,17 @@ export function PurchaseOrdersPage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
+      const searchFilters: Record<FilterKey, ColumnFilter> = {
+        ...columnFilters,
+        date: {
+          ...columnFilters.date,
+          from: period.from,
+          to: period.to,
+        },
+      };
       const body = buildV2Body(
         GR_SEARCH,
-        columnFilters as unknown as Record<string, ColumnFilter>,
+        searchFilters as unknown as Record<string, ColumnFilter>,
         pagination.page,
         pagination.pageSize,
       );
@@ -172,7 +186,7 @@ export function PurchaseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, columnFilters]);
+  }, [pagination, columnFilters, period]);
 
   const loadProviders = useCallback(async () => {
     try {
@@ -276,10 +290,15 @@ export function PurchaseOrdersPage() {
     return map;
   }, [providers, records]);
 
-  const selectedOrder = useMemo(
-    () => records?.data.find((o) => o.id === selectedId) ?? null,
-    [records, selectedId],
-  );
+  const getOrderId = useCallback((order: PurchaseOrder) => order.id, []);
+  const {
+    selectedId,
+    setSelectedId,
+    activeRecord: selectedOrder,
+  } = useDocumentListSelection({
+    rows: records?.data ?? [],
+    getRowId: getOrderId,
+  });
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -357,7 +376,7 @@ export function PurchaseOrdersPage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: !selectedOrder || selectedOrder.status !== "DRAFT",
+      disabled: !selectedOrder,
       onClick: () => {
         if (!selectedOrder) return;
         setEditingOrder(selectedOrder);
@@ -387,13 +406,19 @@ export function PurchaseOrdersPage() {
     {
       id: "barcode",
       label: "In tem mã",
-      icon: Tags,
+      icon: Barcode,
       disabled: !selectedOrder,
       onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
     },
   ];
 
   // ─── Master table columns ─────────────────────────────────────────────────────
+
+  const totalSum = useMemo(
+    () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
+    [records],
+  );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const columns: TableColumn<PurchaseOrder>[] = [
     {
@@ -446,6 +471,7 @@ export function PurchaseOrdersPage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(orderTotal(row)),
     },
     {
@@ -464,16 +490,13 @@ export function PurchaseOrdersPage() {
       label: "Loại chứng từ",
       width: 200,
       filterKind: "select",
+      filterPlaceholder: "Tất cả",
       filterOptions: [
         { value: "OTHER", label: "Phiếu nhập kho khác" },
-        { value: "TRANSFER_IN", label: "Điều chuyển từ cửa hàng khác" },
+        { value: "TRANSFER_IN", label: "Phiếu nhập kho điều chuyển" },
+        { value: "STOCK_TAKE", label: "Phiếu nhập kho kiểm kê" },
       ],
-      render: (row) =>
-        row.purpose === "TRANSFER_IN"
-          ? "Điều chuyển từ cửa hàng khác"
-          : row.purpose === "STOCK_TAKE"
-            ? "Phiếu nhập kho kiểm kê"
-            : "Phiếu nhập kho khác",
+      render: (row) => purchasePurposeLabel(row.purpose),
     },
   ];
 
@@ -512,11 +535,6 @@ export function PurchaseOrdersPage() {
     [columnFilters, resetPage],
   );
 
-  const totalSum = useMemo(
-    () => (records?.data ?? []).reduce((s, r) => s + orderTotal(r), 0),
-    [records],
-  );
-
   /** Preview the next document number based on max numeric suffix in current list.
    *  Format: NK + 6-digit zero-padded. Empty list → NK000001. */
   const nextDocumentNumber = useMemo(() => {
@@ -552,14 +570,6 @@ export function PurchaseOrdersPage() {
             onChange={setPeriod}
             onApply={() => void loadRecords()}
           />
-        }
-        summary={
-          <div className="flex items-center justify-end gap-6 px-2">
-            <span className="text-muted-foreground">Tổng tiền:</span>
-            <span className="text-base font-semibold">
-              {formatMoneyInteger(totalSum)}
-            </span>
-          </div>
         }
         pagination={
           <PaginationControls
@@ -715,7 +725,10 @@ function DetailPanel({
                 Đơn vị tính
               </th>
               <th className="border-r px-2 py-1.5 text-right font-medium">
-                Số lượng
+                SL theo chứng từ
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                SL thực tế
               </th>
               <th className="border-r px-2 py-1.5 text-right font-medium">
                 Đơn giá
@@ -755,6 +768,9 @@ function DetailPanel({
                     {Number(line.quantity)}
                   </td>
                   <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {Number(line.quantity)}
+                  </td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
                     {formatMoneyInteger(Number(line.unitPrice))}
                   </td>
                   <td className="border-r px-2 py-1 text-right tabular-nums">
@@ -770,4 +786,3 @@ function DetailPanel({
     </div>
   );
 }
-

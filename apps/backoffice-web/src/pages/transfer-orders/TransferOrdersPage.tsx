@@ -49,6 +49,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -168,7 +169,6 @@ export function TransferOrdersPage() {
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<
     "create" | "edit" | "view" | null
   >(null);
@@ -248,10 +248,15 @@ export function TransferOrdersPage() {
   }, [storages]);
 
 
-  const selectedOrder = useMemo(
-    () => records?.data.find((o) => o.id === selectedId) ?? null,
-    [records, selectedId],
-  );
+  const getOrderId = useCallback((order: TransferOrder) => order.id, []);
+  const {
+    selectedId,
+    setSelectedId,
+    activeRecord: selectedOrder,
+  } = useDocumentListSelection({
+    rows: records?.data ?? [],
+    getRowId: getOrderId,
+  });
 
   const reloadAfterMutation = useCallback(async () => {
     await loadRecords();

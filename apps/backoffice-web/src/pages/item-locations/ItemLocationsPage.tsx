@@ -752,6 +752,7 @@ function ItemLocationFormDialog({
           <div className="flex items-center gap-2">
             <Button
               type="button"
+              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
               disabled={saving}
               onClick={() => submit("save")}
             >

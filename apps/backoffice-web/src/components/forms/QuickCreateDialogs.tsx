@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppModal, Button, FormField, Input, MoneyInput } from "@erp/ui";
 import type { UserDetail } from "@erp/shared-interfaces";
+import { Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -215,24 +216,51 @@ export function QuickCreateIssueReasonDialog({
         if (!o) onClose();
       }}
       title={ISSUE_REASON_LABELS[purpose]}
-      onSave={() => void handleSave()}
-      onCancel={onClose}
-      saveLabel={saving ? "Đang lưu…" : "Lưu"}
-      cancelLabel="Hủy bỏ"
-      saveDisabled={saving}
-      defaultWidth={480}
-      defaultHeight={240}
-      minHeight={200}
+      footer={
+        <div className="flex min-h-[72px] w-full items-center justify-end gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              className="gap-2"
+              disabled={saving}
+              onClick={() => void handleSave()}
+            >
+              <Save className="h-4 w-4" />
+              {saving ? "Đang lưu…" : "Lưu"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="gap-2 font-semibold text-primary-blue hover:bg-primary-blue/10 hover:text-primary-blue-hover"
+              onClick={onClose}
+            >
+              <X className="h-5 w-5" />
+              Hủy bỏ
+            </Button>
+          </div>
+        </div>
+      }
+      defaultWidth={760}
+      defaultHeight={280}
+      minWidth={680}
+      minHeight={260}
+      bodyStretch={false}
+      bodyClassName="overflow-visible px-1"
     >
-      <div className="flex flex-col gap-3">
-        <FormField label="Lý do *">
+      <div className="grid grid-cols-[140px_minmax(0,1fr)] items-center gap-4 pb-4 pt-2">
+        <label htmlFor="quick-issue-reason-name" className="text-base font-normal">
+          Lý do <span className="text-destructive">*</span>
+        </label>
+        <div className="min-w-0 px-0.5">
           <Input
+            id="quick-issue-reason-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
             placeholder="VD: Hàng hỏng do bảo quản chưa tốt"
+            className="h-11"
           />
-        </FormField>
+        </div>
       </div>
     </AppModal>
   );

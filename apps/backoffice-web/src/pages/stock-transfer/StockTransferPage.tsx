@@ -43,6 +43,7 @@ import { CounterpartyPickerField } from "../../components/forms/CounterpartyPick
 import { ChooseTransferWarehousesDialog } from "../../components/document/ChooseTransferWarehousesDialog";
 import { getTransferPreferredShelfBatch } from "../../api/inventory-location-preferences";
 import { InventoryPageTitle, InventoryTabBar } from "../../components/document/inventoryTabs";
+import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   buildV2Body,
   type V2SearchConfig,
@@ -194,7 +195,6 @@ export function StockTransferPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editing, setEditing] = useState<Transfer | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Transfer | null>(null);
@@ -258,10 +258,15 @@ export function StockTransferPage() {
     void loadStorages();
   }, [loadStorages]);
 
-  const selected = useMemo(
-    () => records?.data.find((r) => r.id === selectedId) ?? null,
-    [records, selectedId],
-  );
+  const getTransferId = useCallback((transfer: Transfer) => transfer.id, []);
+  const {
+    selectedId,
+    setSelectedId,
+    activeRecord: selected,
+  } = useDocumentListSelection({
+    rows: records?.data ?? [],
+    getRowId: getTransferId,
+  });
 
   const handleDelete = async (t: Transfer) => {
     setActionLoading(t.id);
@@ -324,6 +329,7 @@ export function StockTransferPage() {
     () => (records?.data ?? []).reduce((s, r) => s + transferTotal(r), 0),
     [records],
   );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const toolbarItems: ToolbarItem[] = [
     {
@@ -430,6 +436,7 @@ export function StockTransferPage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(transferTotal(row)),
     },
     {
@@ -457,14 +464,6 @@ export function StockTransferPage() {
             onChange={setPeriod}
             onApply={() => void loadRecords()}
           />
-        }
-        summary={
-          <div className="flex items-center justify-end gap-6 px-2">
-            <span className="text-muted-foreground">Tổng tiền:</span>
-            <span className="text-base font-semibold">
-              {formatMoneyInteger(totalSum)}
-            </span>
-          </div>
         }
         pagination={
           <PaginationControls
@@ -1373,6 +1372,7 @@ function TransferFormDialog({
       type: "number",
       align: "right",
       filterSymbol: "≤",
+      footer: totalQty.toLocaleString("vi-VN"),
       renderEditor: (row, idx) => (
         <MoneyInput
           className="h-full border-0"
@@ -1421,6 +1421,7 @@ function TransferFormDialog({
       type: "readonly",
       align: "right",
       getValue: (r) => (r.itemId ? formatMoneyInteger(lineAmount(r)) : ""),
+      footer: formatMoneyInteger(totalAmount),
     },
     { key: "notes", label: "Ghi chú", width: 200 },
   ];

@@ -35,6 +35,7 @@ export function QuickEntryDialog({
       defaultHeight={240}
       minWidth={360}
       minHeight={200}
+      bodyStretch={false}
       bodyClassName="flex flex-col gap-3"
       showFooter
       footer={

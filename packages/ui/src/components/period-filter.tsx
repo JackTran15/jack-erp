@@ -12,7 +12,10 @@ export type PeriodPreset =
   | "this_month"
   | "last_month"
   | "this_quarter"
+  | "last_quarter"
+  | "last_six_months"
   | "this_year"
+  | "last_year"
   | "custom";
 
 export const PERIOD_PRESET_OPTIONS: { value: PeriodPreset; label: string }[] = [
@@ -23,7 +26,10 @@ export const PERIOD_PRESET_OPTIONS: { value: PeriodPreset; label: string }[] = [
   { value: "this_month", label: "Tháng này" },
   { value: "last_month", label: "Tháng trước" },
   { value: "this_quarter", label: "Quý này" },
+  { value: "last_quarter", label: "Quý trước" },
+  { value: "last_six_months", label: "6 tháng trước" },
   { value: "this_year", label: "Năm nay" },
+  { value: "last_year", label: "Năm trước" },
   { value: "custom", label: "Khác" },
 ];
 
@@ -94,9 +100,25 @@ export function resolvePeriodRange(preset: PeriodPreset, now: Date = new Date())
     const to = new Date(today.getFullYear(), q * 3 + 3, 0);
     return { from: toIsoDate(from), to: toIsoDate(to) };
   }
+  if (preset === "last_quarter") {
+    const q = Math.floor(today.getMonth() / 3) - 1;
+    const from = new Date(today.getFullYear(), q * 3, 1);
+    const to = new Date(today.getFullYear(), q * 3 + 3, 0);
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
+  if (preset === "last_six_months") {
+    const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const to = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
   if (preset === "this_year") {
     const from = new Date(today.getFullYear(), 0, 1);
     const to = new Date(today.getFullYear(), 11, 31);
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
+  if (preset === "last_year") {
+    const from = new Date(today.getFullYear() - 1, 0, 1);
+    const to = new Date(today.getFullYear() - 1, 11, 31);
     return { from: toIsoDate(from), to: toIsoDate(to) };
   }
   // custom: caller-controlled, return today as a sensible default

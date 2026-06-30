@@ -357,7 +357,12 @@ export function CrudFormDialog({
             Trợ giúp
           </button>
           <div className="flex items-center gap-2">
-            <Button type="button" disabled={submitting} onClick={handleSave}>
+            <Button
+              type="button"
+              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              disabled={submitting}
+              onClick={handleSave}
+            >
               <Save className="mr-1.5 h-4 w-4" />
               {saveLabel}
             </Button>

@@ -335,6 +335,7 @@ export function CrudRecordDialog({
             <div className="flex gap-2">
               <Button
                 type="button"
+                className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
                 onClick={() => void save(false)}
                 disabled={isSaving}
               >
@@ -370,7 +371,12 @@ export function CrudRecordDialog({
     <div className="flex w-full items-center justify-between gap-2">
       <HelpButton />
       <div className="flex gap-2">
-        <Button type="button" onClick={() => void save(false)} disabled={isSaving}>
+        <Button
+          type="button"
+          className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+          onClick={() => void save(false)}
+          disabled={isSaving}
+        >
           {isSaving ? "Đang lưu…" : "Lưu"}
         </Button>
         {!isEdit && (

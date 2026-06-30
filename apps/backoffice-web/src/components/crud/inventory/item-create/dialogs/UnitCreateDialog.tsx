@@ -3,6 +3,10 @@ import { AppModal, FormField, Input, Textarea } from "@erp/ui";
 import { toast } from "sonner";
 import { useCreateItemUnit } from "../hooks";
 import { getUserFacingApiErrorMessage } from "../../../../../lib/user-facing-api-error";
+import {
+  DIALOG_FORM_FIELD_PROPS,
+  DIALOG_FORM_STACK_CLASS,
+} from "../../../../forms/dialog-form-layout";
 
 export interface UnitPick {
   id: string;
@@ -56,14 +60,21 @@ export function UnitCreateDialog({ open, onOpenChange, initialName, onCreated }:
       open={open}
       onOpenChange={onOpenChange}
       title="Thêm mới đơn vị tính"
-      defaultWidth={560}
+      defaultWidth={620}
       defaultHeight={360}
+      minWidth={560}
+      bodyStretch={false}
       saveLabel={createUnit.isPending ? "Đang lưu…" : "Lưu"}
       saveDisabled={createUnit.isPending || !name.trim()}
       onSave={save}
     >
-      <div className="grid gap-3">
-        <FormField label="Đơn vị tính" htmlFor="unit-create-name" required>
+      <div className={DIALOG_FORM_STACK_CLASS}>
+        <FormField
+          label="Đơn vị tính"
+          htmlFor="unit-create-name"
+          required
+          {...DIALOG_FORM_FIELD_PROPS}
+        >
           <Input
             id="unit-create-name"
             autoFocus
@@ -72,7 +83,11 @@ export function UnitCreateDialog({ open, onOpenChange, initialName, onCreated }:
             placeholder="VD: Cái, Hộp, Thùng…"
           />
         </FormField>
-        <FormField label="Diễn giải" htmlFor="unit-create-desc">
+        <FormField
+          label="Diễn giải"
+          htmlFor="unit-create-desc"
+          {...DIALOG_FORM_FIELD_PROPS}
+        >
           <Textarea
             id="unit-create-desc"
             rows={3}

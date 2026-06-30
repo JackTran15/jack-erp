@@ -283,7 +283,12 @@ export function ColumnConfigDialog({ open, onClose }: Props) {
             <Button type="button" variant="outline" size="sm" onClick={handleResetDefault}>
               Lấy mẫu ngầm định
             </Button>
-            <Button type="button" size="sm" onClick={handleSave}>
+            <Button
+              type="button"
+              size="sm"
+              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              onClick={handleSave}
+            >
               <Save className="mr-1.5 h-4 w-4" />
               Lưu
             </Button>

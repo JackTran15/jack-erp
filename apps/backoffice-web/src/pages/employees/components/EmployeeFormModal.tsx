@@ -213,7 +213,12 @@ export function EmployeeFormModal({
         <div className="flex w-full items-center justify-between gap-2">
           <HelpButton />
           <div className="flex items-center gap-2">
-            <Button type="button" onClick={handleSave} disabled={!formReady}>
+            <Button
+              type="button"
+              className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+              onClick={handleSave}
+              disabled={!formReady}
+            >
               <Save className="mr-1 h-4 w-4" />
               Lưu
             </Button>

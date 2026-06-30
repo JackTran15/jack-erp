@@ -3,6 +3,10 @@ import { AppModal, FormField, Input } from "@erp/ui";
 import { toast } from "sonner";
 import { useCreateProvider } from "../hooks";
 import { getUserFacingApiErrorMessage } from "../../../../../lib/user-facing-api-error";
+import {
+  DIALOG_FORM_FIELD_PROPS,
+  DIALOG_FORM_STACK_CLASS,
+} from "../../../../forms/dialog-form-layout";
 
 export interface ProviderPick {
   id: string;
@@ -61,17 +65,29 @@ export function ProviderCreateDialog({ open, onOpenChange, onCreated }: Props) {
       open={open}
       onOpenChange={onOpenChange}
       title="Thêm nhà cung cấp mới"
-      defaultWidth={560}
+      defaultWidth={620}
       defaultHeight={340}
+      minWidth={560}
+      bodyStretch={false}
       saveLabel={createProvider.isPending ? "Đang lưu…" : "Lưu"}
       saveDisabled={createProvider.isPending || !code.trim() || !name.trim()}
       onSave={save}
     >
-      <div className="grid gap-3">
-        <FormField label="Mã nhà cung cấp" htmlFor="prov-code" required>
+      <div className={DIALOG_FORM_STACK_CLASS}>
+        <FormField
+          label="Mã nhà cung cấp"
+          htmlFor="prov-code"
+          required
+          {...DIALOG_FORM_FIELD_PROPS}
+        >
           <Input id="prov-code" autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
         </FormField>
-        <FormField label="Tên nhà cung cấp" htmlFor="prov-name" required>
+        <FormField
+          label="Tên nhà cung cấp"
+          htmlFor="prov-name"
+          required
+          {...DIALOG_FORM_FIELD_PROPS}
+        >
           <Input id="prov-name" value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
       </div>

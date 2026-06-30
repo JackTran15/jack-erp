@@ -259,6 +259,19 @@ export function TransferInPage() {
     if (page > lastPage) setPage(lastPage);
   }, [filteredRows.length, page, pageSize]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (pageRows.length === 0) {
+      if (selectedId !== null) setSelectedId(null);
+      if (selectedIds.size > 0) setSelectedIds(new Set());
+      return;
+    }
+    if (selectedId && pageRows.some((row) => row.id === selectedId)) return;
+    const firstId = pageRows[0].id;
+    setSelectedId(firstId);
+    setSelectedIds(new Set([firstId]));
+  }, [loading, pageRows, selectedId, selectedIds.size]);
+
   const columns = useMemo<TableColumn<ImportableTransferOrderListItem>[]>(
     () => [
       {

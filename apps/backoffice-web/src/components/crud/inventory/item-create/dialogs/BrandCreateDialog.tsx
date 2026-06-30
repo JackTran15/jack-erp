@@ -3,6 +3,7 @@ import { AppModal, FormField, Input } from "@erp/ui";
 import { toast } from "sonner";
 import { useCreateBrand } from "../hooks";
 import { getUserFacingApiErrorMessage } from "../../../../../lib/user-facing-api-error";
+import { DIALOG_FORM_FIELD_PROPS } from "../../../../forms/dialog-form-layout";
 
 export interface BrandPick {
   id: string;
@@ -52,13 +53,20 @@ export function BrandCreateDialog({ open, onOpenChange, initialName, onCreated }
       open={open}
       onOpenChange={onOpenChange}
       title="Thêm mới Thương hiệu"
-      defaultWidth={520}
+      defaultWidth={620}
       defaultHeight={240}
+      minWidth={560}
+      bodyStretch={false}
       saveLabel={createBrand.isPending ? "Đang lưu…" : "Lưu"}
       saveDisabled={createBrand.isPending || !name.trim()}
       onSave={save}
     >
-      <FormField label="Tên thương hiệu" htmlFor="brand-create-name" required>
+      <FormField
+        label="Tên thương hiệu"
+        htmlFor="brand-create-name"
+        required
+        {...DIALOG_FORM_FIELD_PROPS}
+      >
         <Input
           id="brand-create-name"
           autoFocus

@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import {
+  Barcode,
   CloudDownload,
   CloudUpload,
   Copy,
@@ -7,7 +8,6 @@ import {
   PackageX,
   Pencil,
   Plus,
-  Printer,
   RefreshCw,
   SquareMinus,
   SquarePlus,
@@ -43,7 +43,7 @@ export type ToolbarRegistryEntry = {
   variant?: "danger";
 };
 
-export const TOOLBAR_REGISTRY = {
+export const TOOLBAR_REGISTRY: Record<ToolbarActionId, ToolbarRegistryEntry> = {
   [TOOLBAR_ACTION.create]: {
     id: TOOLBAR_ACTION.create,
     label: "Thêm mới",
@@ -93,7 +93,7 @@ export const TOOLBAR_REGISTRY = {
   [TOOLBAR_ACTION.printLabel]: {
     id: TOOLBAR_ACTION.printLabel,
     label: "In tem mã",
-    icon: Printer,
+    icon: Barcode,
   },
   [TOOLBAR_ACTION.utilities]: {
     id: TOOLBAR_ACTION.utilities,
@@ -110,4 +110,4 @@ export const TOOLBAR_REGISTRY = {
     label: "Xem lịch sử giao dịch",
     icon: History,
   },
-} as const satisfies Record<ToolbarActionId, ToolbarRegistryEntry>;
+};

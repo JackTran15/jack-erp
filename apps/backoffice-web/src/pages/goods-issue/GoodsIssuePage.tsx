@@ -9,7 +9,7 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Copy, Eye, Pencil, Plus, RefreshCw, Tags, Trash2 } from "lucide-react";
+import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -23,6 +23,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -118,7 +119,6 @@ export function GoodsIssuePage() {
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
   const [editingIssue, setEditingIssue] = useState<GoodsIssue | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<GoodsIssue | null>(null);
@@ -127,9 +127,17 @@ export function GoodsIssuePage() {
   const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
+      const searchFilters: Record<FilterKey, ColumnFilter> = {
+        ...columnFilters,
+        date: {
+          ...columnFilters.date,
+          from: period.from,
+          to: period.to,
+        },
+      };
       const body = buildV2Body(
         GI_SEARCH,
-        columnFilters as unknown as Record<string, ColumnFilter>,
+        searchFilters as unknown as Record<string, ColumnFilter>,
         pagination.page,
         pagination.pageSize,
       );
@@ -151,7 +159,7 @@ export function GoodsIssuePage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, columnFilters]);
+  }, [pagination, columnFilters, period]);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -229,10 +237,15 @@ export function GoodsIssuePage() {
     return map;
   }, [storages]);
 
-  const selectedIssue = useMemo(
-    () => records?.data.find((o) => o.id === selectedId) ?? null,
-    [records, selectedId],
-  );
+  const getIssueId = useCallback((issue: GoodsIssue) => issue.id, []);
+  const {
+    selectedId,
+    setSelectedId,
+    activeRecord: selectedIssue,
+  } = useDocumentListSelection({
+    rows: records?.data ?? [],
+    getRowId: getIssueId,
+  });
 
   // ─── Row actions ──────────────────────────────────────────────────────────────
 
@@ -308,7 +321,7 @@ export function GoodsIssuePage() {
       id: "edit",
       label: "Sửa",
       icon: Pencil,
-      disabled: true,
+      disabled: !selectedIssue,
       onClick: () => {
         if (!selectedIssue) return;
         setEditingIssue(selectedIssue);
@@ -337,13 +350,19 @@ export function GoodsIssuePage() {
     {
       id: "barcode",
       label: "In tem mã",
-      icon: Tags,
+      icon: Barcode,
       disabled: !selectedIssue,
       onClick: () => toast.info("Tính năng in tem mã sẽ được bổ sung."),
     },
   ];
 
   // ─── Master table columns ─────────────────────────────────────────────────────
+
+  const totalSum = useMemo(
+    () => (records?.data ?? []).reduce((s, r) => s + issueTotal(r), 0),
+    [records],
+  );
+  const showTotalFooter = !loading && (records?.data.length ?? 0) > 0;
 
   const columns: TableColumn<GoodsIssue>[] = [
     {
@@ -401,6 +420,7 @@ export function GoodsIssuePage() {
       filterKind: "number-range",
       headerClassName: "text-right",
       className: "text-right tabular-nums",
+      footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(issueTotal(row)),
     },
     {
@@ -419,6 +439,7 @@ export function GoodsIssuePage() {
       label: "Loại chứng từ",
       width: 200,
       filterKind: "select",
+      filterPlaceholder: "Tất cả",
       filterOptions: (Object.keys(PURPOSE_LABELS) as GoodsIssuePurposeUI[]).map(
         (value) => ({ value, label: PURPOSE_LABELS[value] }),
       ),
@@ -478,11 +499,6 @@ export function GoodsIssuePage() {
     [columnFilters, resetPage],
   );
 
-  const totalSum = useMemo(
-    () => (records?.data ?? []).reduce((s, r) => s + issueTotal(r), 0),
-    [records],
-  );
-
   const nextDocumentNumber = useMemo(() => {
     const rows = records?.data ?? [];
     let max = 0;
@@ -516,12 +532,6 @@ export function GoodsIssuePage() {
             onChange={setPeriod}
             onApply={() => void loadRecords()}
           />
-        }
-        summary={
-          <div className="flex items-center justify-end gap-6 px-2">
-            <span className="text-muted-foreground">Tổng tiền:</span>
-            <span className="text-base font-semibold">{formatMoneyInteger(totalSum)}</span>
-          </div>
         }
         pagination={
           <PaginationControls
@@ -683,4 +693,3 @@ function DetailPanel({
 }
 
 // ─── Form dialog (create / edit / view) ──────────────────────────────────────
-

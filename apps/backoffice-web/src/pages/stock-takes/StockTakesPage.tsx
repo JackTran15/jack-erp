@@ -34,6 +34,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -72,7 +73,6 @@ export function StockTakesPage() {
     return { preset: "this_month", ...range };
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<StockTake | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -159,10 +159,16 @@ export function StockTakesPage() {
     return m;
   }, [storages]);
 
-  const selected = useMemo(
-    () => records?.data.find((r) => r.id === selectedId) ?? null,
-    [records, selectedId],
-  );
+  const getStockTakeId = useCallback((stockTake: StockTake) => stockTake.id, []);
+  const {
+    selectedId,
+    setSelectedId,
+    activeRecord: selected,
+  } = useDocumentListSelection({
+    rows: records?.data ?? [],
+    getRowId: getStockTakeId,
+    onAutoSelect: (stockTake) => setSelectedIds([stockTake.id]),
+  });
   const selectedRows = useMemo(
     () =>
       (records?.data ?? []).filter((record) => selectedIds.includes(record.id)),
@@ -212,23 +218,31 @@ export function StockTakesPage() {
   const detailRequestId = useRef(0);
 
   /** Fetch a full stock-take so the bottom panel always has lines and members. */
-  const selectStockTake = useCallback(async (id: string) => {
-    setSelectedId(id);
-    const requestId = ++detailRequestId.current;
-    try {
-      const { data } = await apiClient.get<StockTake>(
-        `/inventory/stock-takes/${id}`,
-      );
-      if (requestId !== detailRequestId.current) return null;
-      setSelectedDetail(data);
-      return data;
-    } catch (err) {
-      if (requestId === detailRequestId.current) {
-        toast.error(getUserFacingApiErrorMessage(err));
+  const selectStockTake = useCallback(
+    async (id: string) => {
+      setSelectedId(id);
+      const requestId = ++detailRequestId.current;
+      try {
+        const { data } = await apiClient.get<StockTake>(
+          `/inventory/stock-takes/${id}`,
+        );
+        if (requestId !== detailRequestId.current) return null;
+        setSelectedDetail(data);
+        return data;
+      } catch (err) {
+        if (requestId === detailRequestId.current) {
+          toast.error(getUserFacingApiErrorMessage(err));
+        }
+        return null;
       }
-      return null;
-    }
-  }, []);
+    },
+    [setSelectedId],
+  );
+
+  useEffect(() => {
+    if (!selected || selectedDetail?.id === selected.id) return;
+    void selectStockTake(selected.id);
+  }, [selectStockTake, selected, selectedDetail?.id]);
 
   /** Fetch a single stock-take (with full lines) when opening for view/edit. */
   const openForEdit = useCallback(async (id: string) => {
