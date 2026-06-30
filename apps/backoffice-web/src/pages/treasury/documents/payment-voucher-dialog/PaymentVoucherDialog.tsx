@@ -604,7 +604,14 @@ export function PaymentVoucherDialog({
                         }
                       }}
                     >
-                      {PAYMENT_OTHER_SUB_OPTIONS.map((o) => (
+                      {/* Transfer sub-options (cash→bank, branch transfer) are
+                          hidden: with auto-post they would book to the
+                          purpose-default account. Proper transfer booking
+                          (resolve the destination account, DR asset / CR cash)
+                          is follow-up work. */}
+                      {PAYMENT_OTHER_SUB_OPTIONS.filter(
+                        (o) => !isTransferSubOption(o.value),
+                      ).map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>

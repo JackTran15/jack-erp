@@ -9,6 +9,8 @@ import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { DebtCollectionSagaService } from '../debt-collection/debt-collection-saga.service';
 import {
   CashReceiptPurpose,
@@ -59,6 +61,7 @@ describe('CashReceiptsService', () => {
   let cashService: { recordMovement: jest.Mock };
   let docNumbering: { generate: jest.Mock };
   let partnerResolver: { resolve: jest.Mock };
+  let accountResolver: { resolveContraAccount: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
 
   const setup = async (manager: any) => {
@@ -69,6 +72,9 @@ describe('CashReceiptsService', () => {
     };
     docNumbering = { generate: jest.fn().mockResolvedValue('PT-26-00001') };
     partnerResolver = { resolve: jest.fn().mockResolvedValue(null) };
+    accountResolver = {
+      resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
+    };
     dataSource = {
       transaction: jest.fn((cb) => cb(manager)),
       manager,
@@ -83,6 +89,7 @@ describe('CashReceiptsService', () => {
         { provide: CashService, useValue: cashService },
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: PartnerResolverService, useValue: partnerResolver },
+        { provide: AccountResolverService, useValue: accountResolver },
         {
           provide: DebtCollectionSagaService,
           useValue: { compensate: jest.fn().mockResolvedValue(undefined) },
@@ -92,6 +99,77 @@ describe('CashReceiptsService', () => {
 
     service = module.get(CashReceiptsService);
   };
+
+  describe('create', () => {
+    it('auto-posts: resolves contra by purpose and records a DEPOSIT movement', async () => {
+      const manager = buildManager({
+        findOneResult: {
+          id: 'r-new',
+          status: CashVoucherStatus.POSTED,
+          documentNumber: 'PT-26-00001',
+        },
+      });
+      await setup(manager);
+
+      const result = await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashReceiptPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          lines: [{ description: 'Thu khác', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // OTHER receipt purpose → OTHER_INCOME contra account, resolved server-side.
+      expect(accountResolver.resolveContraAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.OTHER_INCOME,
+        actor,
+        undefined,
+      );
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cashAccountId: 'cash-1',
+          type: CashMovementType.DEPOSIT,
+          amount: 100,
+          contraAccountId: 'contra-resolved',
+        }),
+        actor,
+        manager,
+      );
+      const createdVoucher = manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[1]?.status === CashVoucherStatus.POSTED &&
+          c[1]?.cashMovementId === 'mv-1',
+      );
+      expect(createdVoucher).toBeDefined();
+      expect(createdVoucher[1].referenceType).toBe(
+        CashReceiptReferenceType.MANUAL,
+      );
+      expect(createdVoucher[1].contraAccountId).toBe('contra-resolved');
+      expect(createdVoucher[1].journalEntryId).toBe('je-1');
+      expect(result.status).toBe(CashVoucherStatus.POSTED);
+    });
+
+    it('rejects when total_amount does not match the line sum', async () => {
+      const manager = buildManager({});
+      await setup(manager);
+
+      await expect(
+        service.create(
+          {
+            voucherDate: '2026-06-30',
+            cashAccountId: 'cash-1',
+            totalAmount: 100,
+            lines: [{ description: 'x', amount: 80 }],
+          } as any,
+          actor,
+        ),
+      ).rejects.toThrow(/must equal sum/);
+      expect(cashService.recordMovement).not.toHaveBeenCalled();
+    });
+  });
 
   describe('post', () => {
     it('records a DEPOSIT movement and marks the receipt POSTED', async () => {

@@ -152,6 +152,9 @@ export function useReturnGoods(): UseReturnGoodsResult {
 
   const toggleItem = useCallback<UseReturnGoodsResult["toggleItem"]>(
     (id) => {
+      // Không cho chọn dòng đã trả hết (allowedQty <= 0).
+      const target = items.find((i) => i.id === id);
+      if (target && target.allowedQty <= 0) return;
       setSelectedIds((prev) => {
         const next = new Set(prev);
         if (next.has(id)) {
@@ -175,10 +178,12 @@ export function useReturnGoods(): UseReturnGoodsResult {
   const toggleAllItems = useCallback<UseReturnGoodsResult["toggleAllItems"]>(
     (next) => {
       if (next) {
-        setSelectedIds(new Set(items.map((i) => i.id)));
+        // "Chọn tất cả" chỉ chọn dòng còn trả được, bỏ qua dòng đã trả hết.
+        const returnable = items.filter((i) => i.allowedQty > 0);
+        setSelectedIds(new Set(returnable.map((i) => i.id)));
         setQtyById((prev) => {
           const updated = { ...prev };
-          for (const item of items) {
+          for (const item of returnable) {
             if (!updated[item.id] || updated[item.id] === 0) {
               updated[item.id] = clampReturnQty(1, item.allowedQty);
             }

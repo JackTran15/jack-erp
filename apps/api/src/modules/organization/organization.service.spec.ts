@@ -7,6 +7,7 @@ import {
 } from './organization.entity';
 import { OrganizationService } from './organization.service';
 import { CoaSeederService } from '../accounting/seeders/coa-seeder.service';
+import { DefaultAccountSeederService } from '../accounting/seeders/default-account.seeder';
 import { CashVoucherCategorySeederService } from '../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.seeder';
 import { MembershipCardTypeSeederService } from '../customer/services/membership-card-type.seeder';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
@@ -38,6 +39,7 @@ describe('OrganizationService', () => {
     update: jest.Mock;
   };
   let coaSeederService: { seedForOrganization: jest.Mock };
+  let defaultAccountSeederService: { seedForOrganization: jest.Mock };
   let cashVoucherCategorySeederService: { seedForOrganization: jest.Mock };
   let membershipCardTypeSeederService: { seedForOrganization: jest.Mock };
 
@@ -50,6 +52,9 @@ describe('OrganizationService', () => {
       update: jest.fn(),
     };
     coaSeederService = { seedForOrganization: jest.fn().mockResolvedValue(15) };
+    defaultAccountSeederService = {
+      seedForOrganization: jest.fn().mockResolvedValue(5),
+    };
     cashVoucherCategorySeederService = {
       seedForOrganization: jest.fn().mockResolvedValue(7),
     };
@@ -62,6 +67,10 @@ describe('OrganizationService', () => {
         OrganizationService,
         { provide: getRepositoryToken(OrganizationEntity), useValue: orgRepo },
         { provide: CoaSeederService, useValue: coaSeederService },
+        {
+          provide: DefaultAccountSeederService,
+          useValue: defaultAccountSeederService,
+        },
         {
           provide: CashVoucherCategorySeederService,
           useValue: cashVoucherCategorySeederService,
@@ -96,6 +105,9 @@ describe('OrganizationService', () => {
         result.id,
         'user-1',
       );
+      expect(
+        defaultAccountSeederService.seedForOrganization,
+      ).toHaveBeenCalledWith(result.id, 'user-1');
     });
 
     it('does not fail organization create when COA seed throws', async () => {

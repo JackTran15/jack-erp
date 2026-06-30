@@ -43,7 +43,12 @@ export function ReturnItemsDialog({
   onConfirm,
   onClose,
 }: ReturnItemsDialogProps) {
-  const allChecked = items.length > 0 && items.every((i) => selectedIds.has(i.id));
+  // Only lines that still have un-returned quantity are selectable; fully
+  // returned lines (allowedQty <= 0) are shown disabled with an "Đã đổi trả" tag.
+  const selectableItems = items.filter((i) => i.allowedQty > 0);
+  const allChecked =
+    selectableItems.length > 0 &&
+    selectableItems.every((i) => selectedIds.has(i.id));
   const anyChecked = items.some((i) => selectedIds.has(i.id));
 
   const columns = useMemo<ReadonlyArray<PosDataTableColumn<ReturnableItem>>>(
@@ -64,6 +69,7 @@ export function ReturnItemsDialog({
             checked={selectedIds.has(row.id)}
             onChange={() => onToggleItem(row.id)}
             ariaLabel={row.name}
+            disabled={row.allowedQty <= 0}
           />
         ),
       },
@@ -72,8 +78,13 @@ export function ReturnItemsDialog({
         title: "Tên hàng hóa",
         render: (row) => (
           <div className="flex flex-col">
-            <span className="text-[13px] font-medium text-[#1F2937]">
+            <span className="flex items-center gap-2 text-[13px] font-medium text-[#1F2937]">
               {row.code}
+              {row.allowedQty <= 0 ? (
+                <span className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[11px] font-medium leading-none text-[#6B7280]">
+                  Đã đổi trả
+                </span>
+              ) : null}
             </span>
             <span className="text-[13px] text-gray-500">{row.name}</span>
           </div>
@@ -101,25 +112,28 @@ export function ReturnItemsDialog({
         align: "right",
         headerClassName: "w-[120px]",
         cellClassName: "w-[120px]",
-        render: (row) => (
-          <PosNumberInput
-            value={qtyById[row.id] ?? 0}
-            onChange={(next) =>
-              onChangeQty(row.id, clampReturnQty(next, row.allowedQty))
-            }
-            min={0}
-            max={row.allowedQty}
-            ariaLabel={`Số lượng trả ${row.name}`}
-            variant="underline"
-            inputMode="numeric"
-            displayValue={String(qtyById[row.id] ?? 0)}
-            parser={(raw) => {
-              const digits = raw.replace(/\D/g, "");
-              return digits === "" ? 0 : Number(digits);
-            }}
-            formatter={(value) => String(value)}
-          />
-        ),
+        render: (row) =>
+          row.allowedQty <= 0 ? (
+            <span className="text-[13px] text-gray-400">—</span>
+          ) : (
+            <PosNumberInput
+              value={qtyById[row.id] ?? 0}
+              onChange={(next) =>
+                onChangeQty(row.id, clampReturnQty(next, row.allowedQty))
+              }
+              min={0}
+              max={row.allowedQty}
+              ariaLabel={`Số lượng trả ${row.name}`}
+              variant="underline"
+              inputMode="numeric"
+              displayValue={String(qtyById[row.id] ?? 0)}
+              parser={(raw) => {
+                const digits = raw.replace(/\D/g, "");
+                return digits === "" ? 0 : Number(digits);
+              }}
+              formatter={(value) => String(value)}
+            />
+          ),
       },
     ],
     [allChecked, onToggleAll, onToggleItem, onChangeQty, qtyById, selectedIds],
@@ -148,7 +162,10 @@ export function ReturnItemsDialog({
               : "Hóa đơn này không còn hàng hóa nào để trả."
           }
           rowClassName={(row) =>
-            cn(selectedIds.has(row.id) && "bg-[#EEF2FF]")
+            cn(
+              row.allowedQty <= 0 && "opacity-60",
+              selectedIds.has(row.id) && "bg-[#EEF2FF]",
+            )
           }
         />
       </PosDialog.Body>

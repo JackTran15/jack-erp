@@ -9,11 +9,13 @@ import {
   SeedResult,
 } from './setup/test-app';
 import { CoaSeederService } from '../../src/modules/accounting/seeders/coa-seeder.service';
+import { DefaultAccountSeederService } from '../../src/modules/accounting/seeders/default-account.seeder';
 import { RbacService } from '../../src/modules/rbac/rbac.service';
 
 /**
- * Phase 1 manual cash voucher flows (no auto-create): receipt, payment, ledger,
- * cash count variance + multi-tenant isolation. Backend-only (HTTP).
+ * Phase 1 manual cash voucher flows: receipt, payment, ledger, cash count
+ * variance + multi-tenant isolation. Manual create now posts to the ledger
+ * immediately (no DRAFT stage). Backend-only (HTTP).
  */
 describe('Cash Vouchers Phase 1 (E2E)', () => {
   let app: INestApplication;
@@ -52,6 +54,11 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
 
     // Chart of accounts (incl. TK 711/811 for variance vouchers).
     await app.get(CoaSeederService).seedForOrganization(seed.organizationId, seed.userId);
+    // Default contra accounts per role, so manual vouchers can resolve their
+    // contra account from the voucher purpose (e.g. OTHER → 711).
+    await app
+      .get(DefaultAccountSeederService)
+      .seedForOrganization(seed.organizationId, seed.userId);
 
     // Grant the cash-voucher permissions to the seeded admin role.
     const roleRows = await ds.query(
@@ -112,7 +119,8 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
   describe('Cash receipt manual flow', () => {
     let receiptId: string;
 
-    it('creates a DRAFT receipt', async () => {
+    it('creates an auto-posted receipt → balance increases + DEPOSIT movement + document number', async () => {
+      const before = await getBalance();
       const res = await request(app.getHttpServer())
         .post('/cash-receipts')
         .set(headers())
@@ -124,22 +132,13 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
           lines: [{ description: 'Thu bán hàng', amount: 1000000 }],
         })
         .expect(201);
-      expect(res.body.status).toBe('DRAFT');
-      expect(res.body.lines).toHaveLength(1);
-      receiptId = res.body.id;
-    });
-
-    it('posts the receipt → balance increases + DEPOSIT movement + document number', async () => {
-      const before = await getBalance();
-      const res = await request(app.getHttpServer())
-        .post(`/cash-receipts/${receiptId}/post`)
-        .set(headers())
-        .expect(201);
       expect(res.body.status).toBe('POSTED');
       expect(res.body.documentNumber).toMatch(/^PT/);
       expect(res.body.cashMovementId).toBeTruthy();
       expect(res.body.journalEntryId).toBeTruthy();
+      expect(res.body.lines).toHaveLength(1);
       expect(await getBalance()).toBe(before + 1000000);
+      receiptId = res.body.id;
     });
 
     it('rejects editing a POSTED receipt', async () => {
@@ -176,12 +175,43 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
       expect(Number(res.body.reversal.totalAmount)).toBe(1000000);
       expect(await getBalance()).toBe(before - 1000000);
     });
+
+    it('resolves the contra account from the purpose and posts a balanced journal entry', async () => {
+      const cashGlId = await accountByCode('1111');
+      const otherIncomeId = await accountByCode('711');
+      const res = await request(app.getHttpServer())
+        .post('/cash-receipts')
+        .set(headers())
+        // No contraAccountId — purpose OTHER must resolve to 711 server-side.
+        .send({
+          voucherDate: '2026-05-21',
+          purpose: 'OTHER',
+          cashAccountId,
+          totalAmount: 250000,
+          lines: [{ description: 'Thu khác', amount: 250000 }],
+        })
+        .expect(201);
+      expect(res.body.status).toBe('POSTED');
+      expect(res.body.journalEntryId).toBeTruthy();
+
+      const lines = await ds.query(
+        `SELECT account_id, debit_amount, credit_amount
+           FROM journal_lines WHERE journal_entry_id = $1`,
+        [res.body.journalEntryId],
+      );
+      const debit = lines.find((l: any) => Number(l.debit_amount) > 0);
+      const credit = lines.find((l: any) => Number(l.credit_amount) > 0);
+      expect(debit.account_id).toBe(cashGlId);
+      expect(Number(debit.debit_amount)).toBe(250000);
+      expect(credit.account_id).toBe(otherIncomeId);
+      expect(Number(credit.credit_amount)).toBe(250000);
+    });
   });
 
   describe('Cash payment manual flow', () => {
     beforeAll(async () => {
-      // Top up the register so payments can be posted.
-      const r = await request(app.getHttpServer())
+      // Top up the register (auto-posted) so payments can be posted.
+      await request(app.getHttpServer())
         .post('/cash-receipts')
         .set(headers())
         .send({
@@ -192,15 +222,11 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
           lines: [{ description: 'Nạp quỹ', amount: 2000000 }],
         })
         .expect(201);
-      await request(app.getHttpServer())
-        .post(`/cash-receipts/${r.body.id}/post`)
-        .set(headers())
-        .expect(201);
     });
 
-    it('creates and posts a payment → balance decreases + WITHDRAWAL', async () => {
+    it('creates an auto-posted payment → balance decreases + WITHDRAWAL', async () => {
       const before = await getBalance();
-      const create = await request(app.getHttpServer())
+      const posted = await request(app.getHttpServer())
         .post('/cash-payments')
         .set(headers())
         .send({
@@ -211,17 +237,15 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
           lines: [{ description: 'Chi văn phòng phẩm', amount: 500000 }],
         })
         .expect(201);
-      const posted = await request(app.getHttpServer())
-        .post(`/cash-payments/${create.body.id}/post`)
-        .set(headers())
-        .expect(201);
       expect(posted.body.status).toBe('POSTED');
       expect(posted.body.documentNumber).toMatch(/^PC/);
+      expect(posted.body.journalEntryId).toBeTruthy();
       expect(await getBalance()).toBe(before - 500000);
     });
 
-    it('rejects posting a payment with insufficient balance (400)', async () => {
-      const create = await request(app.getHttpServer())
+    it('rejects creating a payment with insufficient balance (400)', async () => {
+      const before = await getBalance();
+      await request(app.getHttpServer())
         .post('/cash-payments')
         .set(headers())
         .send({
@@ -231,11 +255,6 @@ describe('Cash Vouchers Phase 1 (E2E)', () => {
           totalAmount: 999999999,
           lines: [{ description: 'Chi quá tay', amount: 999999999 }],
         })
-        .expect(201);
-      const before = await getBalance();
-      await request(app.getHttpServer())
-        .post(`/cash-payments/${create.body.id}/post`)
-        .set(headers())
         .expect(400);
       expect(await getBalance()).toBe(before); // balance unchanged
     });

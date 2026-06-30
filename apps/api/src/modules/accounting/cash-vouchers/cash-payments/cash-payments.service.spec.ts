@@ -9,6 +9,8 @@ import { CashService } from '../../cash/cash.service';
 import { CashMovementType } from '../../cash/cash-movement.entity';
 import { DocumentNumberingService } from '../../../document-numbering/document-numbering.service';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { SupplierDebtPaymentSagaService } from '../supplier-debt-payment/supplier-debt-payment-saga.service';
 import {
   CashPaymentPurpose,
@@ -58,6 +60,7 @@ describe('CashPaymentsService', () => {
   let cashService: { recordMovement: jest.Mock };
   let docNumbering: { generate: jest.Mock };
   let partnerResolver: { resolve: jest.Mock };
+  let accountResolver: { resolveContraAccount: jest.Mock };
   let dataSource: { transaction: jest.Mock; manager: any };
 
   const setup = async (manager: any) => {
@@ -68,6 +71,9 @@ describe('CashPaymentsService', () => {
     };
     docNumbering = { generate: jest.fn().mockResolvedValue('PC-26-00001') };
     partnerResolver = { resolve: jest.fn().mockResolvedValue(null) };
+    accountResolver = {
+      resolveContraAccount: jest.fn().mockResolvedValue('contra-resolved'),
+    };
     dataSource = { transaction: jest.fn((cb) => cb(manager)), manager };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -79,6 +85,7 @@ describe('CashPaymentsService', () => {
         { provide: CashService, useValue: cashService },
         { provide: DocumentNumberingService, useValue: docNumbering },
         { provide: PartnerResolverService, useValue: partnerResolver },
+        { provide: AccountResolverService, useValue: accountResolver },
         {
           provide: SupplierDebtPaymentSagaService,
           useValue: { compensate: jest.fn().mockResolvedValue(undefined) },
@@ -88,6 +95,107 @@ describe('CashPaymentsService', () => {
 
     service = module.get(CashPaymentsService);
   };
+
+  describe('create', () => {
+    it('auto-posts: resolves contra by purpose and records a WITHDRAWAL', async () => {
+      const manager = buildManager({
+        findOneResult: {
+          id: 'p-new',
+          status: CashVoucherStatus.POSTED,
+          documentNumber: 'PC-26-00001',
+        },
+      });
+      await setup(manager);
+
+      const result = await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashPaymentPurpose.SUPPLIER_PAYMENT,
+          cashAccountId: 'cash-1',
+          totalAmount: 100,
+          lines: [{ description: 'Trả NCC', amount: 100 }],
+        } as any,
+        actor,
+      );
+
+      // SUPPLIER_PAYMENT purpose → PAYABLE contra account, resolved server-side.
+      expect(accountResolver.resolveContraAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.PAYABLE,
+        actor,
+        undefined,
+      );
+      expect(cashService.recordMovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cashAccountId: 'cash-1',
+          type: CashMovementType.WITHDRAWAL,
+          amount: 100,
+          contraAccountId: 'contra-resolved',
+        }),
+        actor,
+        manager,
+      );
+      const createdVoucher = manager.create.mock.calls.find(
+        (c: any[]) =>
+          c[1]?.status === CashVoucherStatus.POSTED &&
+          c[1]?.cashMovementId === 'mv-1',
+      );
+      expect(createdVoucher).toBeDefined();
+      expect(createdVoucher[1].referenceType).toBe(
+        CashPaymentReferenceType.MANUAL,
+      );
+      expect(createdVoucher[1].contraAccountId).toBe('contra-resolved');
+      expect(result.status).toBe(CashVoucherStatus.POSTED);
+    });
+
+    it('honours an explicit contra override (e.g. transfer destination)', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'p-new', status: CashVoucherStatus.POSTED },
+      });
+      await setup(manager);
+      accountResolver.resolveContraAccount.mockResolvedValue('transfer-coa');
+
+      await service.create(
+        {
+          voucherDate: '2026-06-30',
+          purpose: CashPaymentPurpose.OTHER,
+          cashAccountId: 'cash-1',
+          contraAccountId: 'transfer-coa',
+          totalAmount: 50,
+          lines: [{ description: 'Chuyển quỹ', amount: 50 }],
+        } as any,
+        actor,
+      );
+
+      expect(accountResolver.resolveContraAccount).toHaveBeenCalledWith(
+        AccountingDefaultAccountRole.EXPENSE,
+        actor,
+        'transfer-coa',
+      );
+    });
+
+    it('propagates insufficient-balance (400) from recordMovement', async () => {
+      const manager = buildManager({
+        findOneResult: { id: 'cash-1' },
+      });
+      await setup(manager);
+      cashService.recordMovement.mockRejectedValue(
+        new BadRequestException('Insufficient cash balance'),
+      );
+
+      await expect(
+        service.create(
+          {
+            voucherDate: '2026-06-30',
+            purpose: CashPaymentPurpose.OTHER,
+            cashAccountId: 'cash-1',
+            totalAmount: 100,
+            lines: [{ description: 'x', amount: 100 }],
+          } as any,
+          actor,
+        ),
+      ).rejects.toThrow(/Insufficient cash balance/);
+    });
+  });
 
   describe('post', () => {
     it('records a WITHDRAWAL movement and marks the payment POSTED', async () => {
