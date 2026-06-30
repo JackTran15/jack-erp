@@ -117,6 +117,15 @@ export async function listLocationStockItems(
   return data;
 }
 
+export async function removeItemFromLocation(
+  locationId: string,
+  itemId: string,
+): Promise<void> {
+  await apiClient.delete(
+    `/inventory/locations/${locationId}/stock-items/${itemId}`,
+  );
+}
+
 export interface AssignBatchRow {
   itemId: string;
   locationId: string;

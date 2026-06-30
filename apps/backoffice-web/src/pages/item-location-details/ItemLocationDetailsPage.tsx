@@ -12,6 +12,7 @@ import { InventoryPageTitle, InventoryTabBar } from "../../components/document/i
 import {
   listLocationStockItems,
   listStockBalances,
+  removeItemFromLocation,
   type StockBalanceRow,
 } from "../../api/stock-balances";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -63,6 +64,7 @@ export function ItemLocationDetailsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [arrangeOpen, setArrangeOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [stopWatchingSubmitting, setStopWatchingSubmitting] = useState(false);
   const activeBranchId = getActiveBranch();
 
   useEffect(() => {
@@ -296,16 +298,45 @@ export function ItemLocationDetailsPage() {
     [qc, isLocationDetail],
   );
 
+  const stopWatchingSelected = useCallback(async () => {
+    const rowsToRemove = selectedTransferRows.map((row) => ({
+      itemId: row.itemId,
+      locationId: row.locationId,
+    }));
+
+    if (rowsToRemove.length === 0) {
+      toast.error("Chọn hàng hóa cần ngừng theo dõi.");
+      return;
+    }
+
+    setStopWatchingSubmitting(true);
+    try {
+      await Promise.all(
+        rowsToRemove.map((row) =>
+          removeItemFromLocation(row.locationId, row.itemId),
+        ),
+      );
+      toast.success(`Đã ngừng theo dõi ${rowsToRemove.length} dòng.`);
+      setSelectedIds(new Set());
+      await reload();
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+    } finally {
+      setStopWatchingSubmitting(false);
+    }
+  }, [reload, selectedTransferRows]);
+
   const toolbarItems = useMemo(
     () =>
       buildItemLocationToolbarItems({
-        isFetching,
+        isFetching: isFetching || stopWatchingSubmitting,
         hasSelection,
         onReload: reload,
+        onStopWatching: stopWatchingSelected,
         onOpenArrange: () => setArrangeOpen(true),
         onOpenTransfer: () => setTransferOpen(true),
       }),
-    [isFetching, hasSelection, reload],
+    [isFetching, hasSelection, reload, stopWatchingSelected, stopWatchingSubmitting],
   );
 
   return (
