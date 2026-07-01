@@ -4,20 +4,24 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
-import { DocumentType, PaginationQuery, PaginatedResponse } from '@erp/shared-interfaces';
-import { ActorContext } from '../../common/decorators/actor-context.decorator';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, IsNull, Repository } from "typeorm";
+import {
+  DocumentType,
+  PaginationQuery,
+  PaginatedResponse,
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../common/decorators/actor-context.decorator";
 import {
   DocumentNumberRuleEntity,
   ResetPolicy,
-} from './document-number-rule.entity';
-import { DocumentNumberCounterEntity } from './document-number-counter.entity';
+} from "./document-number-rule.entity";
+import { DocumentNumberCounterEntity } from "./document-number-counter.entity";
 import {
   CreateDocumentNumberRuleDto,
   UpdateDocumentNumberRuleDto,
-} from './dto';
+} from "./dto";
 
 /**
  * Default numbering config per document type, used to auto-create a rule when
@@ -31,35 +35,35 @@ const DEFAULT_DOC_NUMBER_CONFIG: Record<
   { prefix: string; continuous: boolean }
 > = {
   // Legacy accounting / POS types — date-based, monthly reset, 5-digit
-  [DocumentType.INVOICE]: { prefix: 'INV', continuous: false },
-  [DocumentType.SALE]: { prefix: 'SAL', continuous: false },
-  [DocumentType.RETURN]: { prefix: 'RTN', continuous: false },
-  [DocumentType.ADJUSTMENT]: { prefix: 'ADJ', continuous: false },
-  [DocumentType.JOURNAL]: { prefix: 'JNL', continuous: false },
-  [DocumentType.PAYABLE]: { prefix: 'PAY', continuous: false },
-  [DocumentType.RECEIVABLE]: { prefix: 'REC', continuous: false },
+  [DocumentType.INVOICE]: { prefix: "INV", continuous: false },
+  [DocumentType.SALE]: { prefix: "SAL", continuous: false },
+  [DocumentType.RETURN]: { prefix: "RTN", continuous: false },
+  [DocumentType.ADJUSTMENT]: { prefix: "ADJ", continuous: false },
+  [DocumentType.JOURNAL]: { prefix: "JNL", continuous: false },
+  [DocumentType.PAYABLE]: { prefix: "PAY", continuous: false },
+  [DocumentType.RECEIVABLE]: { prefix: "REC", continuous: false },
   // Standard code types — continuous, 6-digit, never reset
-  [DocumentType.QUOTATION]: { prefix: 'PBH', continuous: true },
-  [DocumentType.PURCHASE_ORDER]: { prefix: 'PDH', continuous: true },
-  [DocumentType.GOODS_RECEIPT]: { prefix: 'NK', continuous: true },
-  [DocumentType.GOODS_ISSUE]: { prefix: 'XK', continuous: true },
-  [DocumentType.TRANSFER]: { prefix: 'CK', continuous: true },
-  [DocumentType.TRANSFER_ORDER]: { prefix: 'LDC', continuous: true },
-  [DocumentType.STOCK_COUNT]: { prefix: 'KK', continuous: true },
-  [DocumentType.CASH_RECEIPT]: { prefix: 'PT', continuous: true },
-  [DocumentType.CASH_PAYMENT]: { prefix: 'PC', continuous: true },
-  [DocumentType.CASH_COUNT]: { prefix: 'KKQ', continuous: true },
-  [DocumentType.BANK_RECEIPT]: { prefix: 'NTTK', continuous: true },
-  [DocumentType.BANK_PAYMENT]: { prefix: 'UNC', continuous: true },
-  [DocumentType.EXPENSE]: { prefix: 'CP', continuous: true },
-  [DocumentType.RECONCILIATION]: { prefix: 'DS', continuous: true },
-  [DocumentType.DEBT_OFFSET]: { prefix: 'BTCN', continuous: true },
-  [DocumentType.CUSTOMER]: { prefix: 'KH', continuous: true },
-  [DocumentType.EMPLOYEE]: { prefix: 'NV', continuous: true },
-  [DocumentType.SUPPLIER]: { prefix: 'NCC', continuous: true },
-  [DocumentType.DELIVERY_PARTNER]: { prefix: 'DTGH', continuous: true },
-  [DocumentType.STOCK_TAKE]: { prefix: 'KK', continuous: true },
-  [DocumentType.WAREHOUSE]: { prefix: 'WH', continuous: true },
+  [DocumentType.QUOTATION]: { prefix: "PBH", continuous: true },
+  [DocumentType.PURCHASE_ORDER]: { prefix: "PDH", continuous: true },
+  [DocumentType.GOODS_RECEIPT]: { prefix: "NK", continuous: true },
+  [DocumentType.GOODS_ISSUE]: { prefix: "XK", continuous: true },
+  [DocumentType.TRANSFER]: { prefix: "CK", continuous: true },
+  [DocumentType.TRANSFER_ORDER]: { prefix: "LDC", continuous: true },
+  [DocumentType.STOCK_COUNT]: { prefix: "KK", continuous: true },
+  [DocumentType.CASH_RECEIPT]: { prefix: "PT", continuous: true },
+  [DocumentType.CASH_PAYMENT]: { prefix: "PC", continuous: true },
+  [DocumentType.CASH_COUNT]: { prefix: "KKQ", continuous: true },
+  [DocumentType.BANK_RECEIPT]: { prefix: "NTTK", continuous: true },
+  [DocumentType.BANK_PAYMENT]: { prefix: "UNC", continuous: true },
+  [DocumentType.EXPENSE]: { prefix: "CP", continuous: true },
+  [DocumentType.RECONCILIATION]: { prefix: "DS", continuous: true },
+  [DocumentType.DEBT_OFFSET]: { prefix: "BTCN", continuous: true },
+  [DocumentType.CUSTOMER]: { prefix: "KH", continuous: true },
+  [DocumentType.EMPLOYEE]: { prefix: "NV", continuous: true },
+  [DocumentType.SUPPLIER]: { prefix: "NCC", continuous: true },
+  [DocumentType.DELIVERY_PARTNER]: { prefix: "DTGH", continuous: true },
+  [DocumentType.STOCK_TAKE]: { prefix: "KK", continuous: true },
+  [DocumentType.WAREHOUSE]: { prefix: "WH", continuous: true },
 };
 
 @Injectable()
@@ -173,8 +177,8 @@ export class DocumentNumberingService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
       order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { createdAt: 'DESC' },
+        ? { [query.sortBy]: query.sortOrder ?? "asc" }
+        : { createdAt: "DESC" },
     });
 
     return { data, total, page: query.page, pageSize: query.pageSize };
@@ -204,6 +208,37 @@ export class DocumentNumberingService {
     const now = new Date();
     const resetKey = this.computeResetKey(rule.resetPolicy, now);
     const nextValue = await this.atomicIncrement(rule, resetKey, actor);
+
+    return this.formatDocumentNumber(rule, now, nextValue);
+  }
+
+  async preview(
+    documentType: DocumentType,
+    branchId: string | undefined,
+    actor: ActorContext,
+  ): Promise<string> {
+    let rule = await this.resolveActiveRule(
+      documentType,
+      branchId,
+      actor.organizationId,
+    );
+
+    if (!rule) {
+      rule = await this.ensureDefaultActiveRule(documentType, actor);
+    }
+
+    if (!rule) {
+      throw new NotFoundException(
+        `No active document numbering rule found for ${documentType}. Please configure one before proceeding.`,
+      );
+    }
+
+    const now = new Date();
+    const resetKey = this.computeResetKey(rule.resetPolicy, now);
+    const counter = await this.counterRepo.findOne({
+      where: { ruleId: rule.id, resetKey },
+    });
+    const nextValue = Number(counter?.currentValue ?? 0) + 1;
 
     return this.formatDocumentNumber(rule, now, nextValue);
   }
@@ -248,7 +283,7 @@ export class DocumentNumberingService {
       prefix: this.getDefaultPrefix(documentType),
       suffix: undefined,
       includeDate: !useContinuous,
-      dateFormat: 'YYYYMM',
+      dateFormat: "YYYYMM",
       sequenceLength: useContinuous ? 6 : 5,
       resetPolicy: useContinuous ? ResetPolicy.NEVER : ResetPolicy.MONTHLY,
       isActive: true,
@@ -279,8 +314,8 @@ export class DocumentNumberingService {
 
   private computeResetKey(policy: ResetPolicy, now: Date): string {
     const year = now.getFullYear().toString();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, "0");
+    const day = now.getDate().toString().padStart(2, "0");
 
     switch (policy) {
       case ResetPolicy.DAILY:
@@ -290,7 +325,7 @@ export class DocumentNumberingService {
       case ResetPolicy.YEARLY:
         return year;
       case ResetPolicy.NEVER:
-        return 'NEVER';
+        return "NEVER";
     }
   }
 
@@ -304,12 +339,12 @@ export class DocumentNumberingService {
     resetKey: string,
     actor: ActorContext,
   ): Promise<number> {
-    return this.dataSource.transaction('SERIALIZABLE', async (manager) => {
+    return this.dataSource.transaction("SERIALIZABLE", async (manager) => {
       const counterRepo = manager.getRepository(DocumentNumberCounterEntity);
 
       let counter = await counterRepo.findOne({
         where: { ruleId: rule.id, resetKey },
-        lock: { mode: 'pessimistic_write' },
+        lock: { mode: "pessimistic_write" },
       });
 
       if (!counter) {
@@ -335,7 +370,7 @@ export class DocumentNumberingService {
     now: Date,
     sequence: number,
   ): string {
-    const seq = sequence.toString().padStart(rule.sequenceLength, '0');
+    const seq = sequence.toString().padStart(rule.sequenceLength, "0");
     // Continuous rules (no date, no suffix) render as "<prefix><seq>" so users
     // see "NK000001" instead of "NK-000001". Rules with a date or suffix keep
     // the legacy hyphen-separated layout — readability wins when there are
@@ -352,13 +387,13 @@ export class DocumentNumberingService {
     if (rule.suffix) {
       parts.push(rule.suffix);
     }
-    return parts.join('-');
+    return parts.join("-");
   }
 
   private formatDate(format: string, date: Date): string {
     const year = date.getFullYear().toString();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
 
     const replacements: Record<string, string> = {
       YYYYMMDD: `${year}${month}${day}`,

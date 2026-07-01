@@ -27,9 +27,12 @@ export interface AttributeDefinition {
 export interface Variant {
   id: string;
   code: string;
+  name?: string;
   variantLabel: string;
   productId: string;
   productName?: string;
+  barcode?: string;
+  unit?: string;
   attributes?: Record<string, string>;
 }
 
@@ -55,7 +58,8 @@ export const productsApi = {
 
   getById: (id: string) => apiClient.get<Product>(`/products/${id}`),
 
-  create: (data: Partial<Product>) => apiClient.post<Product>("/products", data),
+  create: (data: Partial<Product>) =>
+    apiClient.post<Product>("/products", data),
 
   update: (id: string, data: Partial<Product>) =>
     apiClient.patch<Product>(`/products/${id}`, data),
@@ -66,15 +70,29 @@ export const productsApi = {
     apiClient.get<AttributeDefinition[]>(`/products/${productId}/attributes`),
 
   createAttribute: (productId: string, data: Partial<AttributeDefinition>) =>
-    apiClient.post<AttributeDefinition>(`/products/${productId}/attributes`, data),
+    apiClient.post<AttributeDefinition>(
+      `/products/${productId}/attributes`,
+      data,
+    ),
 
-  updateAttribute: (productId: string, id: string, data: Partial<AttributeDefinition>) =>
-    apiClient.patch<AttributeDefinition>(`/products/${productId}/attributes/${id}`, data),
+  updateAttribute: (
+    productId: string,
+    id: string,
+    data: Partial<AttributeDefinition>,
+  ) =>
+    apiClient.patch<AttributeDefinition>(
+      `/products/${productId}/attributes/${id}`,
+      data,
+    ),
 
   deleteAttribute: (productId: string, id: string) =>
     apiClient.delete(`/products/${productId}/attributes/${id}`),
 
-  createOption: (productId: string, attrId: string, data: Partial<AttributeOption>) =>
+  createOption: (
+    productId: string,
+    attrId: string,
+    data: Partial<AttributeOption>,
+  ) =>
     apiClient.post<AttributeOption>(
       `/products/${productId}/attributes/${attrId}/options`,
       data,
@@ -92,12 +110,17 @@ export const productsApi = {
     ),
 
   deleteOption: (productId: string, attrId: string, optId: string) =>
-    apiClient.delete(`/products/${productId}/attributes/${attrId}/options/${optId}`),
+    apiClient.delete(
+      `/products/${productId}/attributes/${attrId}/options/${optId}`,
+    ),
 
   generateVariants: (productId: string, force?: boolean) =>
-    apiClient.post<{ created: number }>(`/products/${productId}/generate-variants`, {
-      force,
-    }),
+    apiClient.post<{ created: number }>(
+      `/products/${productId}/generate-variants`,
+      {
+        force,
+      },
+    ),
 
   listItems: (productId: string, params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<Variant>>("/inventory/items", {
@@ -105,7 +128,10 @@ export const productsApi = {
     }),
 
   listStockBalances: (productId: string, params?: Record<string, unknown>) =>
-    apiClient.get<PaginatedResponse<StockBalance>>("/inventory/stock/balances", {
-      params: { ...params, productId },
-    }),
+    apiClient.get<PaginatedResponse<StockBalance>>(
+      "/inventory/stock/balances",
+      {
+        params: { ...params, productId },
+      },
+    ),
 };

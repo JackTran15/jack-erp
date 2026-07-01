@@ -26,7 +26,9 @@ import { MegaMenuPanel } from "./MegaMenuPanel";
 import { useCurrentView } from "../../store/common/branch/branch.store";
 import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
 
-type NavBadgeCounts = Partial<Record<NonNullable<NavChild["badgeKey"]>, number>>;
+type NavBadgeCounts = Partial<
+  Record<NonNullable<NavChild["badgeKey"]>, number>
+>;
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
@@ -47,7 +49,9 @@ export function AppSidebar() {
 
   // Start with all menu groups collapsed and no flyout shown.
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
-  const [openFlyoutModuleId, setOpenFlyoutModuleId] = useState<string | null>(null);
+  const [openFlyoutModuleId, setOpenFlyoutModuleId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setOpenFlyoutModuleId(null);
@@ -133,7 +137,11 @@ export function AppSidebar() {
 
       {/* Mega-menu panel — fixed overlay to the right of the sidebar */}
       {openFlyoutModule && (
-        <MegaMenuPanel ref={megaMenuPanelRef} module={openFlyoutModule} />
+        <MegaMenuPanel
+          ref={megaMenuPanelRef}
+          module={openFlyoutModule}
+          onNavigate={() => setOpenFlyoutModuleId(null)}
+        />
       )}
     </TooltipProvider>
   );
@@ -216,7 +224,9 @@ function ModuleRow({
         module={module}
         isActive={collapsedActive}
         onFlyoutOpen={
-          isFlyoutEnabled(module) ? () => onCollapsedFlyoutOpen(module.id) : undefined
+          isFlyoutEnabled(module)
+            ? () => onCollapsedFlyoutOpen(module.id)
+            : undefined
         }
         badgeCounts={badgeCounts}
       />

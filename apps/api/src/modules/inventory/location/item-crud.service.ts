@@ -3,8 +3,8 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import {
   Brackets,
   DataSource,
@@ -12,44 +12,47 @@ import {
   QueryFailedError,
   Repository,
   SelectQueryBuilder,
-} from 'typeorm';
-import { ProductEntity } from '../product/product.entity';
-import { ProductAttributeDefinitionEntity } from '../product/product-attribute-definition.entity';
-import { ProductAttributeOptionEntity } from '../product/product-attribute-option.entity';
-import { ItemAttributeValueEntity } from '../product/item-attribute-value.entity';
+} from "typeorm";
+import { ProductEntity } from "../product/product.entity";
+import { ProductAttributeDefinitionEntity } from "../product/product-attribute-definition.entity";
+import { ProductAttributeOptionEntity } from "../product/product-attribute-option.entity";
+import { ItemAttributeValueEntity } from "../product/item-attribute-value.entity";
 import {
   CrudEntityConfig,
   DeletionPolicy,
   ScopingPolicy,
   StockMovementType,
-} from '@erp/shared-interfaces';
-import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { BaseCrudService } from '../../crud/base-crud.service';
-import { PaginationQueryDto } from '../../crud/dto/pagination-query.dto';
-import type { PaginatedResponse } from '@erp/shared-interfaces';
-import { StockLedgerService } from '../ledger/stock-ledger.service';
-import { ItemEntity } from './item.entity';
-import { ItemCategoryEntity } from './item-category.entity';
-import { BrandEntity } from './brand.entity';
-import { ItemProviderEntity } from './item-provider.entity';
-import { ItemStockThresholdEntity } from './item-stock-threshold.entity';
-import { ItemUnitEntity } from './item-unit.entity';
-import { LocationEntity } from './location.entity';
+} from "@erp/shared-interfaces";
+import { ActorContext } from "../../../common/decorators/actor-context.decorator";
+import { BaseCrudService } from "../../crud/base-crud.service";
+import { PaginationQueryDto } from "../../crud/dto/pagination-query.dto";
+import type { PaginatedResponse } from "@erp/shared-interfaces";
+import { StockLedgerService } from "../ledger/stock-ledger.service";
+import { ItemEntity } from "./item.entity";
+import { ItemCategoryEntity } from "./item-category.entity";
+import { BrandEntity } from "./brand.entity";
+import { ItemProviderEntity } from "./item-provider.entity";
+import { ItemStockThresholdEntity } from "./item-stock-threshold.entity";
+import { ItemUnitEntity } from "./item-unit.entity";
+import { ItemBarcodeEntity } from "./item-barcode.entity";
+import { LocationEntity } from "./location.entity";
 import {
+  CreateItemBarcodeInput,
   CreateItemProviderInput,
   CreateItemThresholdInput,
   CreateItemUnitInput,
-} from './dto/create-item.dto';
+} from "./dto/create-item.dto";
 import type {
   ProductGroupRow,
   ProductGroupsQueryDto,
   ProductItemsQueryDto,
   ProductVariantRow,
-} from './dto/product-group-query.dto';
+} from "./dto/product-group-query.dto";
 
-export const INVENTORY_ITEM_SERVICE_TOKEN = 'InventoryItemCrudService';
+export const INVENTORY_ITEM_SERVICE_TOKEN = "InventoryItemCrudService";
 
 interface NestedPayload {
+  barcodes?: CreateItemBarcodeInput[];
   providers?: CreateItemProviderInput[];
   units?: CreateItemUnitInput[];
   threshold?: CreateItemThresholdInput;
@@ -72,7 +75,8 @@ export class InventoryItemCrudService extends BaseCrudService<
   Record<string, any>,
   Record<string, any>
 > {
-  protected readonly entityConfig: CrudEntityConfig = INVENTORY_ITEM_ENTITY_CONFIG;
+  protected readonly entityConfig: CrudEntityConfig =
+    INVENTORY_ITEM_ENTITY_CONFIG;
 
   constructor(
     @InjectRepository(ItemEntity)
@@ -96,15 +100,15 @@ export class InventoryItemCrudService extends BaseCrudService<
   }
 
   protected override getByIdRelations(): string[] {
-    return ['category', 'product'];
+    return ["category", "product"];
   }
 
   protected override configureListQuery(
     qb: SelectQueryBuilder<ItemEntity>,
     alias: string,
   ): void {
-    qb.leftJoinAndSelect(`${alias}.category`, 'category');
-    qb.leftJoinAndSelect(`${alias}.product`, 'product');
+    qb.leftJoinAndSelect(`${alias}.category`, "category");
+    qb.leftJoinAndSelect(`${alias}.product`, "product");
   }
 
   protected override applySearch(
@@ -118,8 +122,8 @@ export class InventoryItemCrudService extends BaseCrudService<
         sub
           .where(`${alias}.code ILIKE :search`, { search: `%${search}%` })
           .orWhere(`${alias}.name ILIKE :search`, { search: `%${search}%` })
-          .orWhere('category.name ILIKE :search', { search: `%${search}%` })
-          .orWhere('product.name ILIKE :search', { search: `%${search}%` });
+          .orWhere("category.name ILIKE :search", { search: `%${search}%` })
+          .orWhere("product.name ILIKE :search", { search: `%${search}%` });
       }),
     );
   }
@@ -131,10 +135,10 @@ export class InventoryItemCrudService extends BaseCrudService<
       const { category: _c, product: _p, ...rest } = row;
       return {
         ...rest,
-        categoryName: category?.name ?? '',
-        productCode: product?.code ?? '',
-        productName: product?.name ?? '',
-        variantLabel: row.variantLabel ?? '',
+        categoryName: category?.name ?? "",
+        productCode: product?.code ?? "",
+        productName: product?.name ?? "",
+        variantLabel: row.variantLabel ?? "",
       };
     });
   }
@@ -161,7 +165,13 @@ export class InventoryItemCrudService extends BaseCrudService<
     // Try as a real item ID first
     const item = await this.repository.findOne({
       where: { id, organizationId: actor.organizationId },
-      relations: ['category', 'product', 'units', 'providers', 'providers.provider'],
+      relations: [
+        "category",
+        "product",
+        "units",
+        "providers",
+        "providers.provider",
+      ],
     });
     if (item) {
       const transformed = (this.transformListResults([item]) as any[])[0];
@@ -223,6 +233,7 @@ export class InventoryItemCrudService extends BaseCrudService<
         nested.providers,
         nested.providerId,
       );
+      await this.saveBarcodes(manager, savedItem.id, actor, nested.barcodes);
       await this.saveUnits(manager, savedItem.id, actor, nested.units);
       await this.saveThreshold(manager, savedItem.id, actor, nested.threshold);
 
@@ -252,9 +263,12 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     // Resolve / clear brand FK and keep the denormalized name in sync. Do this
     // before the product-variant branch as those payloads also carry brandId.
-    if ('brandId' in normalized) {
+    if ("brandId" in normalized) {
       if (normalized.brandId) {
-        normalized.brand = await this.resolveBrandName(normalized.brandId, actor);
+        normalized.brand = await this.resolveBrandName(
+          normalized.brandId,
+          actor,
+        );
       } else {
         normalized.brandId = null;
         normalized.brand = null;
@@ -271,17 +285,23 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     // Only reconcile nested collections that were explicitly provided — a patch
     // that omits them must leave the existing rows untouched.
-    const hasProviders = 'providers' in normalized;
-    const hasUnits = 'units' in normalized;
+    const hasProviders = "providers" in normalized;
+    const hasUnits = "units" in normalized;
+    const hasBarcodes = "barcodes" in normalized;
     const providers = Array.isArray(normalized.providers)
       ? normalized.providers
       : undefined;
-    const units = Array.isArray(normalized.units) ? normalized.units : undefined;
+    const units = Array.isArray(normalized.units)
+      ? normalized.units
+      : undefined;
+    const barcodes = Array.isArray(normalized.barcodes)
+      ? normalized.barcodes
+      : undefined;
 
     const { colors: _c, sizes: _s, ...rest } = normalized;
     const saved = (await super.update(id, rest as any, actor)) as ItemEntity;
 
-    if (hasProviders || hasUnits) {
+    if (hasProviders || hasUnits || hasBarcodes) {
       await this.dataSource.transaction(async (manager) => {
         if (hasProviders) {
           await manager.delete(ItemProviderEntity, {
@@ -289,6 +309,13 @@ export class InventoryItemCrudService extends BaseCrudService<
             organizationId: actor.organizationId,
           });
           await this.saveProviders(manager, id, actor, providers);
+        }
+        if (hasBarcodes) {
+          await manager.delete(ItemBarcodeEntity, {
+            itemId: id,
+            organizationId: actor.organizationId,
+          });
+          await this.saveBarcodes(manager, id, actor, barcodes);
         }
         if (hasUnits) {
           await manager.delete(ItemUnitEntity, {
@@ -338,6 +365,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     } = payload;
     return {
       nested: {
+        barcodes,
         providers,
         units,
         threshold,
@@ -361,7 +389,10 @@ export class InventoryItemCrudService extends BaseCrudService<
   ): Promise<void> {
     const rows: CreateItemProviderInput[] = [];
     if (providers?.length) rows.push(...providers);
-    if (legacyProviderId && !rows.some((r) => r.providerId === legacyProviderId)) {
+    if (
+      legacyProviderId &&
+      !rows.some((r) => r.providerId === legacyProviderId)
+    ) {
       rows.push({ providerId: legacyProviderId, isPrimary: true });
     }
     if (rows.length === 0) return;
@@ -369,7 +400,7 @@ export class InventoryItemCrudService extends BaseCrudService<
     // Ensure exactly one primary
     let primaryAssigned = false;
     const normalized = rows.map((r) => {
-      const shouldBePrimary = !primaryAssigned && (r.isPrimary === true);
+      const shouldBePrimary = !primaryAssigned && r.isPrimary === true;
       if (shouldBePrimary) primaryAssigned = true;
       return { ...r, isPrimary: shouldBePrimary };
     });
@@ -388,6 +419,65 @@ export class InventoryItemCrudService extends BaseCrudService<
       }),
     );
     await manager.save(ItemProviderEntity, entities);
+  }
+
+  private async saveBarcodes(
+    manager: EntityManager,
+    itemId: string,
+    actor: ActorContext,
+    barcodes?: CreateItemBarcodeInput[],
+  ): Promise<void> {
+    if (!barcodes?.length) return;
+    const seen = new Set<string>();
+    const rows: Array<{ code: string; notes?: string }> = [];
+    for (const barcode of barcodes) {
+      const code = cleanString(barcode.code);
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      rows.push({ code, notes: cleanString(barcode.notes) });
+    }
+    if (rows.length === 0) return;
+
+    const entities = rows.map((b) =>
+      manager.create(ItemBarcodeEntity, {
+        itemId,
+        code: b.code,
+        notes: b.notes,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+      }),
+    );
+    await manager.save(ItemBarcodeEntity, entities);
+  }
+
+  private async replaceBarcodesForItem(
+    itemId: string,
+    actor: ActorContext,
+    barcodes?: CreateItemBarcodeInput[],
+  ): Promise<void> {
+    const repo = this.dataSource.getRepository(ItemBarcodeEntity);
+    await repo.delete({ itemId, organizationId: actor.organizationId });
+    if (!barcodes?.length) return;
+    const seen = new Set<string>();
+    const rows: Array<{ code: string; notes?: string }> = [];
+    for (const barcode of barcodes) {
+      const code = cleanString(barcode.code);
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      rows.push({ code, notes: cleanString(barcode.notes) });
+    }
+    const entities = rows.map((b) =>
+      repo.create({
+        itemId,
+        code: b.code,
+        notes: b.notes,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+      }),
+    );
+    if (entities.length > 0) await repo.save(entities);
   }
 
   private async saveUnits(
@@ -463,14 +553,14 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<string | undefined> {
     const qb = this.locationRepo
-      .createQueryBuilder('loc')
-      .innerJoin('storages', 's', 's.id = loc.storage_id')
-      .where('s.organization_id = :orgId', { orgId: actor.organizationId })
-      .andWhere('loc.is_active = true')
-      .orderBy('loc.created_at', 'ASC')
+      .createQueryBuilder("loc")
+      .innerJoin("storages", "s", "s.id = loc.storage_id")
+      .where("s.organization_id = :orgId", { orgId: actor.organizationId })
+      .andWhere("loc.is_active = true")
+      .orderBy("loc.created_at", "ASC")
       .limit(1);
     if (actor.branchId) {
-      qb.andWhere('s.branch_id = :branchId', { branchId: actor.branchId });
+      qb.andWhere("s.branch_id = :branchId", { branchId: actor.branchId });
     }
     const row = await qb.getOne();
     return row?.id;
@@ -490,7 +580,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       locationId ?? (await this.resolveDefaultLocationId(actor));
     if (!resolvedLocationId) {
       throw new BadRequestException(
-        'Không tìm thấy vị trí kho mặc định để ghi tồn kho đầu kỳ. Vui lòng cấu hình tối thiểu một vị trí.',
+        "Không tìm thấy vị trí kho mặc định để ghi tồn kho đầu kỳ. Vui lòng cấu hình tối thiểu một vị trí.",
       );
     }
 
@@ -498,11 +588,11 @@ export class InventoryItemCrudService extends BaseCrudService<
     await this.stockLedger.recordMovement({
       itemId: item.id,
       locationId: resolvedLocationId,
-      branchId: actor.branchId ?? '',
+      branchId: actor.branchId ?? "",
       organizationId: actor.organizationId,
       movementType: StockMovementType.ADJUSTMENT_INCREASE,
       quantity: qty,
-      referenceType: 'INITIAL_STOCK',
+      referenceType: "INITIAL_STOCK",
       referenceId: item.id,
       notes: `Tồn kho đầu kỳ — đơn giá nhập ${cost}`,
       actorContext: actor,
@@ -532,9 +622,9 @@ export class InventoryItemCrudService extends BaseCrudService<
         ? ((err as QueryFailedError & { code?: string }).code ??
           (err as { driverError?: { code?: string } }).driverError?.code)
         : undefined;
-    if (code === '23505') {
+    if (code === "23505") {
       throw new ConflictException(
-        'A record with the same unique code already exists in this organization',
+        "A record with the same unique code already exists in this organization",
       );
     }
     throw err;
@@ -550,7 +640,9 @@ export class InventoryItemCrudService extends BaseCrudService<
       where: { id: brandId, organizationId: actor.organizationId },
     });
     if (!brand) {
-      throw new BadRequestException(`Brand ${brandId} not found in organization`);
+      throw new BadRequestException(
+        `Brand ${brandId} not found in organization`,
+      );
     }
     return brand.name;
   }
@@ -569,7 +661,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       categoryId,
       purchasePrice = 0,
       sellingPrice = 0,
-      unit = 'Đôi',
+      unit = "Đôi",
       isPosVisible = true,
       isActive = true,
       colors = [],
@@ -580,7 +672,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       initialLocationId,
     } = payload;
 
-    if (!productName) throw new BadRequestException('Tên hàng hóa là bắt buộc');
+    if (!productName) throw new BadRequestException("Tên hàng hóa là bắt buộc");
     if (categoryId) {
       await this.ensureCategoryBelongsToOrg(categoryId, actor);
     }
@@ -598,12 +690,14 @@ export class InventoryItemCrudService extends BaseCrudService<
       )
       .catch((err) => this.toConflictIfDuplicate(err));
 
-    const colorDef = (colors as string[]).length > 0
-      ? await this.resolveOrCreateAttrDef(product.id, 'Color', actor)
-      : null;
-    const sizeDef = (sizes as string[]).length > 0
-      ? await this.resolveOrCreateAttrDef(product.id, 'Size', actor)
-      : null;
+    const colorDef =
+      (colors as string[]).length > 0
+        ? await this.resolveOrCreateAttrDef(product.id, "Color", actor)
+        : null;
+    const sizeDef =
+      (sizes as string[]).length > 0
+        ? await this.resolveOrCreateAttrDef(product.id, "Size", actor)
+        : null;
 
     const colorOptions: Array<{ id: string; label: string }> = colorDef
       ? await Promise.all(
@@ -631,10 +725,10 @@ export class InventoryItemCrudService extends BaseCrudService<
       string,
       any
     >[]) {
-      variantByKey.set(`${v?.color ?? ''}__${v?.size ?? ''}`, v);
+      variantByKey.set(`${v?.color ?? ""}__${v?.size ?? ""}`, v);
     }
     const str = (val: unknown): string | undefined =>
-      typeof val === 'string' && val.trim() ? val.trim() : undefined;
+      typeof val === "string" && val.trim() ? val.trim() : undefined;
     const sharedItemFields = pickProductVariantSharedItemFields(payload);
 
     let itemsCreated = 0;
@@ -642,9 +736,9 @@ export class InventoryItemCrudService extends BaseCrudService<
     for (const combo of combos) {
       const variantLabel = [combo.size?.label, combo.color?.label]
         .filter(Boolean)
-        .join(' · ');
+        .join(" · ");
       const v = variantByKey.get(
-        `${combo.color?.label ?? ''}__${combo.size?.label ?? ''}`,
+        `${combo.color?.label ?? ""}__${combo.size?.label ?? ""}`,
       );
       const code =
         str(v?.sku) ?? this.buildVariantCode(productCode || productName, combo);
@@ -675,6 +769,12 @@ export class InventoryItemCrudService extends BaseCrudService<
         )
         .catch((err) => this.toConflictIfDuplicate(err));
 
+      if (str(v?.barcode)) {
+        await this.replaceBarcodesForItem(item.id, actor, [
+          { code: str(v?.barcode)! },
+        ]);
+      }
+
       if (combo.color && colorDef) {
         await this.upsertAttrValue(item.id, colorDef, combo.color.id, actor);
       }
@@ -694,7 +794,6 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     return { productId: product.id, itemsCreated };
   }
-
 
   private hasProductLevelPatch(payload: Record<string, any>): boolean {
     return (
@@ -738,12 +837,14 @@ export class InventoryItemCrudService extends BaseCrudService<
     }
     await this.updateExistingVariantRowsFromPayload(payload.variants, actor);
 
-    const colorDef = (colors as string[]).length > 0
-      ? await this.resolveOrCreateAttrDef(productId, 'Color', actor)
-      : null;
-    const sizeDef = (sizes as string[]).length > 0
-      ? await this.resolveOrCreateAttrDef(productId, 'Size', actor)
-      : null;
+    const colorDef =
+      (colors as string[]).length > 0
+        ? await this.resolveOrCreateAttrDef(productId, "Color", actor)
+        : null;
+    const sizeDef =
+      (sizes as string[]).length > 0
+        ? await this.resolveOrCreateAttrDef(productId, "Size", actor)
+        : null;
 
     const colorOptions: Array<{ id: string; label: string }> = colorDef
       ? await Promise.all(
@@ -771,14 +872,14 @@ export class InventoryItemCrudService extends BaseCrudService<
 
       const variantLabel = [combo.size?.label, combo.color?.label]
         .filter(Boolean)
-        .join(' · ');
+        .join(" · ");
       const code = this.buildVariantCode(product.code || product.name, combo);
 
       const item = await this.repository.save(
         this.repository.create({
           code,
           name: variantLabel ? `${product.name} ${variantLabel}` : product.name,
-          unit: payload.unit || 'Đôi',
+          unit: payload.unit || "Đôi",
           ...sharedPatch,
           isActive:
             payload.isActive !== undefined
@@ -814,7 +915,7 @@ export class InventoryItemCrudService extends BaseCrudService<
   ): Promise<void> {
     if (!Array.isArray(variants) || variants.length === 0) return;
     for (const raw of variants as Record<string, any>[]) {
-      const itemId = typeof raw?.itemId === 'string' ? raw.itemId : undefined;
+      const itemId = typeof raw?.itemId === "string" ? raw.itemId : undefined;
       if (!itemId) continue;
 
       const itemPatch: Record<string, any> = {};
@@ -823,6 +924,7 @@ export class InventoryItemCrudService extends BaseCrudService<
       const sku = cleanString(raw.sku);
       const purchasePrice = finiteNumber(raw.purchasePrice);
       const sellingPrice = finiteNumber(raw.sellPrice);
+      const barcode = cleanString(raw.barcode);
 
       if (name) itemPatch.name = name;
       if (unit) itemPatch.unit = unit;
@@ -837,6 +939,13 @@ export class InventoryItemCrudService extends BaseCrudService<
         );
       }
 
+      if ("barcode" in raw) {
+        await this.replaceBarcodesForItem(
+          itemId,
+          actor,
+          barcode ? [{ code: barcode }] : [],
+        );
+      }
     }
   }
 
@@ -871,7 +980,10 @@ export class InventoryItemCrudService extends BaseCrudService<
   private buildCombos(
     colors: Array<{ id: string; label: string }>,
     sizes: Array<{ id: string; label: string }>,
-  ): Array<{ color?: { id: string; label: string }; size?: { id: string; label: string } }> {
+  ): Array<{
+    color?: { id: string; label: string };
+    size?: { id: string; label: string };
+  }> {
     if (colors.length === 0 && sizes.length === 0) return [{}];
     if (colors.length === 0) return sizes.map((s) => ({ size: s }));
     if (sizes.length === 0) return colors.map((c) => ({ color: c }));
@@ -882,14 +994,15 @@ export class InventoryItemCrudService extends BaseCrudService<
     base: string,
     combo: { color?: { label: string }; size?: { label: string } },
   ): string {
-    const prefix = base
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .slice(0, 6)
-      .toUpperCase() || 'ITEM';
+    const prefix =
+      base
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .slice(0, 6)
+        .toUpperCase() || "ITEM";
     const parts = [combo.size?.label, combo.color?.label].filter(Boolean);
-    return parts.length > 0 ? `${prefix}-${parts.join('-')}` : prefix;
+    return parts.length > 0 ? `${prefix}-${parts.join("-")}` : prefix;
   }
 
   private async variantExists(
@@ -897,21 +1010,23 @@ export class InventoryItemCrudService extends BaseCrudService<
     combo: { color?: { id: string }; size?: { id: string } },
     actor: ActorContext,
   ): Promise<boolean> {
-    const optionIds = [combo.color?.id, combo.size?.id].filter(Boolean) as string[];
+    const optionIds = [combo.color?.id, combo.size?.id].filter(
+      Boolean,
+    ) as string[];
     if (optionIds.length === 0) return false;
 
     const count = await this.repository
-      .createQueryBuilder('i')
+      .createQueryBuilder("i")
       .innerJoin(
-        'item_attribute_values',
-        'av',
-        'av.item_id = i.id AND av.option_id IN (:...optionIds)',
+        "item_attribute_values",
+        "av",
+        "av.item_id = i.id AND av.option_id IN (:...optionIds)",
         { optionIds },
       )
-      .where('i.productId = :productId', { productId })
-      .andWhere('i.organizationId = :orgId', { orgId: actor.organizationId })
-      .groupBy('i.id')
-      .having('COUNT(DISTINCT av.option_id) = :cnt', { cnt: optionIds.length })
+      .where("i.productId = :productId", { productId })
+      .andWhere("i.organizationId = :orgId", { orgId: actor.organizationId })
+      .groupBy("i.id")
+      .having("COUNT(DISTINCT av.option_id) = :cnt", { cnt: optionIds.length })
       .getCount();
 
     return count > 0;
@@ -919,23 +1034,30 @@ export class InventoryItemCrudService extends BaseCrudService<
 
   // ─── Attribute helpers (Color / Size) ────────────────────────────────
 
-  private async loadProductAttributes(productId: string): Promise<ItemAttrSnapshot> {
+  private async loadProductAttributes(
+    productId: string,
+  ): Promise<ItemAttrSnapshot> {
     const rows = await this.attrValRepo
-      .createQueryBuilder('av')
-      .innerJoin(ItemEntity, 'i', 'i.id = av.itemId AND i.productId = :productId', { productId })
-      .innerJoin('av.attributeDefinition', 'def')
-      .innerJoin('av.option', 'opt')
+      .createQueryBuilder("av")
+      .innerJoin(
+        ItemEntity,
+        "i",
+        "i.id = av.itemId AND i.productId = :productId",
+        { productId },
+      )
+      .innerJoin("av.attributeDefinition", "def")
+      .innerJoin("av.option", "opt")
       .andWhere("LOWER(def.name) IN ('color', 'size')")
-      .select(['def.name AS def_name', 'opt.valueLabel AS opt_value_label'])
+      .select(["def.name AS def_name", "opt.valueLabel AS opt_value_label"])
       .distinct(true)
       .getRawMany<{ def_name: string; opt_value_label: string }>();
 
     return rows.reduce(
       (acc, r) => {
         const lower = r.def_name?.toLowerCase();
-        if (lower === 'color' && !acc.colors.includes(r.opt_value_label)) {
+        if (lower === "color" && !acc.colors.includes(r.opt_value_label)) {
           acc.colors.push(r.opt_value_label);
-        } else if (lower === 'size' && !acc.sizes.includes(r.opt_value_label)) {
+        } else if (lower === "size" && !acc.sizes.includes(r.opt_value_label)) {
           acc.sizes.push(r.opt_value_label);
         }
         return acc;
@@ -946,19 +1068,19 @@ export class InventoryItemCrudService extends BaseCrudService<
 
   private async loadItemAttributes(itemId: string): Promise<ItemAttrSnapshot> {
     const rows = await this.attrValRepo
-      .createQueryBuilder('av')
-      .innerJoin('av.attributeDefinition', 'def')
-      .innerJoin('av.option', 'opt')
-      .where('av.itemId = :itemId', { itemId })
+      .createQueryBuilder("av")
+      .innerJoin("av.attributeDefinition", "def")
+      .innerJoin("av.option", "opt")
+      .where("av.itemId = :itemId", { itemId })
       .andWhere("LOWER(def.name) IN ('color', 'size')")
-      .select(['def.name AS def_name', 'opt.valueLabel AS opt_value_label'])
+      .select(["def.name AS def_name", "opt.valueLabel AS opt_value_label"])
       .getRawMany<{ def_name: string; opt_value_label: string }>();
 
     return rows.reduce(
       (acc, r) => {
         const lower = r.def_name?.toLowerCase();
-        if (lower === 'color') acc.colors = [r.opt_value_label ?? ''];
-        else if (lower === 'size') acc.sizes = [r.opt_value_label ?? ''];
+        if (lower === "color") acc.colors = [r.opt_value_label ?? ""];
+        else if (lower === "size") acc.sizes = [r.opt_value_label ?? ""];
         return acc;
       },
       { colors: [] as string[], sizes: [] as string[] } as ItemAttrSnapshot,
@@ -971,10 +1093,10 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<string> {
     const existing = await this.attrDefRepo
-      .createQueryBuilder('d')
-      .where('d.productId = :productId', { productId })
-      .andWhere('d.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('LOWER(d.name) = LOWER(:name)', { name })
+      .createQueryBuilder("d")
+      .where("d.productId = :productId", { productId })
+      .andWhere("d.organizationId = :orgId", { orgId: actor.organizationId })
+      .andWhere("LOWER(d.name) = LOWER(:name)", { name })
       .getOne();
     if (existing) return existing.id;
 
@@ -996,10 +1118,10 @@ export class InventoryItemCrudService extends BaseCrudService<
     actor: ActorContext,
   ): Promise<string> {
     const existing = await this.attrOptRepo
-      .createQueryBuilder('o')
-      .where('o.attributeDefinitionId = :defId', { defId })
-      .andWhere('o.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('LOWER(o.value_label) = LOWER(:valueLabel)', { valueLabel })
+      .createQueryBuilder("o")
+      .where("o.attributeDefinitionId = :defId", { defId })
+      .andWhere("o.organizationId = :orgId", { orgId: actor.organizationId })
+      .andWhere("LOWER(o.value_label) = LOWER(:valueLabel)", { valueLabel })
       .getOne();
     if (existing) return existing.id;
 
@@ -1137,7 +1259,11 @@ export class InventoryItemCrudService extends BaseCrudService<
     const baseParams = [orgId, searchParam, catParam];
     const [countResult, data] = await Promise.all([
       this.dataSource.query<{ total: number }[]>(countSql, baseParams),
-      this.dataSource.query<ProductGroupRow[]>(dataSql, [...baseParams, pageSize, offset]),
+      this.dataSource.query<ProductGroupRow[]>(dataSql, [
+        ...baseParams,
+        pageSize,
+        offset,
+      ]),
     ]);
 
     return { data, total: countResult[0]?.total ?? 0 };
@@ -1150,12 +1276,12 @@ export class InventoryItemCrudService extends BaseCrudService<
     productId: string,
   ): Promise<Record<string, unknown> | null> {
     const item = await this.repository
-      .createQueryBuilder('i')
-      .leftJoinAndSelect('i.category', 'category')
-      .leftJoinAndSelect('i.product', 'product')
-      .where('i.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('i.productId = :productId', { productId })
-      .orderBy('i.code', 'ASC')
+      .createQueryBuilder("i")
+      .leftJoinAndSelect("i.category", "category")
+      .leftJoinAndSelect("i.product", "product")
+      .where("i.organizationId = :orgId", { orgId: actor.organizationId })
+      .andWhere("i.productId = :productId", { productId })
+      .orderBy("i.code", "ASC")
       .getOne();
 
     if (!item) return null;
@@ -1167,15 +1293,18 @@ export class InventoryItemCrudService extends BaseCrudService<
 
     const attrs = await this.loadProductAttributes(productId);
     const variants = await this.loadProductVariants(actor, productId);
-    const opening = await this.loadProductInitialStockSnapshot(actor, productId);
+    const opening = await this.loadProductInitialStockSnapshot(
+      actor,
+      productId,
+    );
 
     return {
       ...rest,
       ...attrs,
       ...opening,
       variants,
-      categoryName: category?.name ?? '',
-      productName: product?.name ?? '',
+      categoryName: category?.name ?? "",
+      productName: product?.name ?? "",
       // Override code/name with the PRODUCT values so the form shows product-level fields
       code: product?.code ?? rest.code,
       name: product?.name ?? rest.name,
@@ -1274,7 +1403,10 @@ export class InventoryItemCrudService extends BaseCrudService<
       GROUP BY p.id, p.code, p.name, ic.id, ic.name
       LIMIT 1
     `;
-    const rows = await this.dataSource.query<ProductGroupRow[]>(sql, [actor.organizationId, productId]);
+    const rows = await this.dataSource.query<ProductGroupRow[]>(sql, [
+      actor.organizationId,
+      productId,
+    ]);
     return rows[0] ?? null;
   }
 
@@ -1287,11 +1419,11 @@ export class InventoryItemCrudService extends BaseCrudService<
     const offset = (page - 1) * pageSize;
 
     const qb = this.repository
-      .createQueryBuilder('i')
-      .leftJoinAndSelect('i.category', 'category')
-      .where('i.organizationId = :orgId', { orgId: actor.organizationId })
-      .andWhere('i.productId = :productId', { productId })
-      .orderBy('i.code', 'ASC')
+      .createQueryBuilder("i")
+      .leftJoinAndSelect("i.category", "category")
+      .where("i.organizationId = :orgId", { orgId: actor.organizationId })
+      .andWhere("i.productId = :productId", { productId })
+      .orderBy("i.code", "ASC")
       .skip(offset)
       .take(pageSize);
 
@@ -1341,28 +1473,28 @@ function pickProductVariantSharedItemFields(
   payload: Record<string, any>,
 ): Record<string, any> {
   const keys = [
-    'unit',
-    'categoryId',
-    'brand',
-    'brandId',
-    'itemType',
-    'purchasePrice',
-    'sellingPrice',
-    'isPosVisible',
-    'isActive',
-    'weightGram',
-    'lengthCm',
-    'widthCm',
-    'heightCm',
-    'manufactureYear',
-    'composition',
-    'packageWeightGram',
-    'packageLengthCm',
-    'packageWidthCm',
-    'packageHeightCm',
-    'oddSize',
-    'isGoldSilver',
-    'manageBarcodePerUnit',
+    "unit",
+    "categoryId",
+    "brand",
+    "brandId",
+    "itemType",
+    "purchasePrice",
+    "sellingPrice",
+    "isPosVisible",
+    "isActive",
+    "weightGram",
+    "lengthCm",
+    "widthCm",
+    "heightCm",
+    "manufactureYear",
+    "composition",
+    "packageWeightGram",
+    "packageLengthCm",
+    "packageWidthCm",
+    "packageHeightCm",
+    "oddSize",
+    "isGoldSilver",
+    "manageBarcodePerUnit",
   ];
   const picked: Record<string, any> = {};
   for (const key of keys) {
@@ -1374,20 +1506,20 @@ function pickProductVariantSharedItemFields(
 }
 
 function cleanString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function finiteNumber(value: unknown): number | undefined {
-  if (value === null || value === undefined || value === '') return undefined;
+  if (value === null || value === undefined || value === "") return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 }
 
 function parseInitialStockUnitPrice(notes: unknown): number | undefined {
-  if (typeof notes !== 'string') return undefined;
+  if (typeof notes !== "string") return undefined;
   const match = notes.match(/đơn giá nhập\s+([0-9.,]+)/i);
   if (!match) return undefined;
-  const normalized = match[1].replace(/\./g, '').replace(',', '.');
+  const normalized = match[1].replace(/\./g, "").replace(",", ".");
   return finiteNumber(normalized);
 }
 
@@ -1402,81 +1534,186 @@ function parseInitialStockUnitPrice(notes: unknown): number | undefined {
 function normalizePayload<T extends Record<string, any>>(payload: T): T {
   const next: Record<string, any> = { ...payload };
   for (const [key, value] of Object.entries(next)) {
-    if (value === '') next[key] = undefined;
+    if (value === "") next[key] = undefined;
   }
   return next as T;
 }
 
 export const INVENTORY_ITEM_ENTITY_CONFIG: CrudEntityConfig = {
-  entityKey: 'inventory-items',
-  displayName: 'Hàng hoá',
-  apiResource: 'inventory/items',
-  idField: 'id',
+  entityKey: "inventory-items",
+  displayName: "Hàng hoá",
+  apiResource: "inventory/items",
+  idField: "id",
   fields: [
     // ── List-visible fields (shown in table, order matches the UI) ────────
-    { key: 'code', label: 'SKU mẫu mã', type: 'string' },
-    { key: 'barcode', label: 'Mã vạch', type: 'string', readOnly: true, hideInList: true },
-    { key: 'name', label: 'Tên mẫu mã', type: 'string', required: true },
-    { key: 'unit', label: 'Đơn vị tính', type: 'string', required: true },
-    { key: 'brand', label: 'Thương hiệu', type: 'string' },
-    { key: 'purchasePrice', label: 'Giá mua TB', type: 'number', numberFormat: 'money' },
-    { key: 'sellingPrice', label: 'Giá bán TB', type: 'number', numberFormat: 'money' },
-    { key: 'isPosVisible', label: 'Hiển thị MH bán hàng', type: 'boolean' },
-    { key: 'isActive', label: 'Trạng thái', type: 'boolean' },
+    { key: "code", label: "SKU mẫu mã", type: "string" },
+    {
+      key: "barcode",
+      label: "Mã vạch",
+      type: "string",
+      readOnly: true,
+      hideInList: true,
+    },
+    { key: "name", label: "Tên mẫu mã", type: "string", required: true },
+    { key: "unit", label: "Đơn vị tính", type: "string", required: true },
+    { key: "brand", label: "Thương hiệu", type: "string" },
+    {
+      key: "purchasePrice",
+      label: "Giá mua TB",
+      type: "number",
+      numberFormat: "money",
+    },
+    {
+      key: "sellingPrice",
+      label: "Giá bán TB",
+      type: "number",
+      numberFormat: "money",
+    },
+    { key: "isPosVisible", label: "Hiển thị MH bán hàng", type: "boolean" },
+    { key: "isActive", label: "Trạng thái", type: "boolean" },
     // ── Display fields removed from the table (kept for form/back-compat) ──
-    { key: 'categoryName', label: 'Nhóm hàng hóa', type: 'string', readOnly: true, hideInList: true },
-    { key: 'itemType', label: 'Loại hàng hóa', type: 'string', hideInList: true },
+    {
+      key: "categoryName",
+      label: "Nhóm hàng hóa",
+      type: "string",
+      readOnly: true,
+      hideInList: true,
+    },
+    {
+      key: "itemType",
+      label: "Loại hàng hóa",
+      type: "string",
+      hideInList: true,
+    },
     // ── Form-only fields (hidden from list table) ─────────────────────────
-    { key: 'categoryId', label: 'ID Danh mục', type: 'string', hideInList: true },
-    { key: 'description', label: 'Mô tả', type: 'string', hideInList: true },
-    { key: 'productId', label: 'ID Sản phẩm', type: 'string', hideInList: true },
-    { key: 'productCode', label: 'Mã SKU mẫu mã', type: 'string', readOnly: true, hideInList: true },
-    { key: 'productName', label: 'Tên mẫu mã', type: 'string', readOnly: true, hideInList: true },
-    { key: 'colors', label: 'Màu sắc', type: 'tags', hideInList: true },
-    { key: 'sizes', label: 'Size', type: 'tags', hideInList: true },
-    { key: 'variantLabel', label: 'Biến thể', type: 'string', readOnly: true, hideInList: true },
-    { key: 'providerId', label: 'Nhà cung cấp', type: 'string', hideInList: true },
-    { key: 'weightGram', label: 'Trọng lượng (g)', type: 'number', hideInList: true },
-    { key: 'lengthCm', label: 'Dài (cm)', type: 'number', hideInList: true },
-    { key: 'widthCm', label: 'Rộng (cm)', type: 'number', hideInList: true },
-    { key: 'heightCm', label: 'Cao (cm)', type: 'number', hideInList: true },
-    { key: 'packageWeightGram', label: 'Trọng lượng gói hàng (g)', type: 'number', hideInList: true },
-    { key: 'packageLengthCm', label: 'Dài đóng gói (cm)', type: 'number', hideInList: true },
-    { key: 'packageWidthCm', label: 'Rộng đóng gói (cm)', type: 'number', hideInList: true },
-    { key: 'packageHeightCm', label: 'Cao đóng gói (cm)', type: 'number', hideInList: true },
-    { key: 'manufactureYear', label: 'Năm sản xuất', type: 'number', hideInList: true },
-    { key: 'composition', label: 'Thành phần', type: 'string', hideInList: true },
-    { key: 'oddSize', label: 'Đầy size', type: 'string', hideInList: true },
-    { key: 'isGoldSilver', label: 'Mặt hàng vàng bạc', type: 'boolean', hideInList: true },
-    { key: 'manageBarcodePerUnit', label: 'Mã vạch theo đơn vị', type: 'boolean', hideInList: true },
-    { key: 'createdAt', label: 'Ngày tạo', type: 'date', hideInList: true },
+    {
+      key: "categoryId",
+      label: "ID Danh mục",
+      type: "string",
+      hideInList: true,
+    },
+    { key: "description", label: "Mô tả", type: "string", hideInList: true },
+    {
+      key: "productId",
+      label: "ID Sản phẩm",
+      type: "string",
+      hideInList: true,
+    },
+    {
+      key: "productCode",
+      label: "Mã SKU mẫu mã",
+      type: "string",
+      readOnly: true,
+      hideInList: true,
+    },
+    {
+      key: "productName",
+      label: "Tên mẫu mã",
+      type: "string",
+      readOnly: true,
+      hideInList: true,
+    },
+    { key: "colors", label: "Màu sắc", type: "tags", hideInList: true },
+    { key: "sizes", label: "Size", type: "tags", hideInList: true },
+    {
+      key: "variantLabel",
+      label: "Biến thể",
+      type: "string",
+      readOnly: true,
+      hideInList: true,
+    },
+    {
+      key: "providerId",
+      label: "Nhà cung cấp",
+      type: "string",
+      hideInList: true,
+    },
+    {
+      key: "weightGram",
+      label: "Trọng lượng (g)",
+      type: "number",
+      hideInList: true,
+    },
+    { key: "lengthCm", label: "Dài (cm)", type: "number", hideInList: true },
+    { key: "widthCm", label: "Rộng (cm)", type: "number", hideInList: true },
+    { key: "heightCm", label: "Cao (cm)", type: "number", hideInList: true },
+    {
+      key: "packageWeightGram",
+      label: "Trọng lượng gói hàng (g)",
+      type: "number",
+      hideInList: true,
+    },
+    {
+      key: "packageLengthCm",
+      label: "Dài đóng gói (cm)",
+      type: "number",
+      hideInList: true,
+    },
+    {
+      key: "packageWidthCm",
+      label: "Rộng đóng gói (cm)",
+      type: "number",
+      hideInList: true,
+    },
+    {
+      key: "packageHeightCm",
+      label: "Cao đóng gói (cm)",
+      type: "number",
+      hideInList: true,
+    },
+    {
+      key: "manufactureYear",
+      label: "Năm sản xuất",
+      type: "number",
+      hideInList: true,
+    },
+    {
+      key: "composition",
+      label: "Thành phần",
+      type: "string",
+      hideInList: true,
+    },
+    { key: "oddSize", label: "Đầy size", type: "string", hideInList: true },
+    {
+      key: "isGoldSilver",
+      label: "Mặt hàng vàng bạc",
+      type: "boolean",
+      hideInList: true,
+    },
+    {
+      key: "manageBarcodePerUnit",
+      label: "Mã vạch theo đơn vị",
+      type: "boolean",
+      hideInList: true,
+    },
+    { key: "createdAt", label: "Ngày tạo", type: "date", hideInList: true },
   ],
-  searchableFields: ['code', 'name', 'categoryName', 'productName'],
+  searchableFields: ["code", "name", "categoryName", "productName"],
   filterDefinitions: [
     {
-      key: 'isActive',
-      label: 'Trạng thái',
-      type: 'select',
+      key: "isActive",
+      label: "Trạng thái",
+      type: "select",
       options: [
-        { label: 'Đang hoạt động', value: 'true' },
-        { label: 'Ngừng kinh doanh', value: 'false' },
+        { label: "Đang hoạt động", value: "true" },
+        { label: "Ngừng kinh doanh", value: "false" },
       ],
     },
     {
-      key: 'isPosVisible',
-      label: 'Hiển thị POS',
-      type: 'select',
+      key: "isPosVisible",
+      label: "Hiển thị POS",
+      type: "select",
       options: [
-        { label: 'Có', value: 'true' },
-        { label: 'Không', value: 'false' },
+        { label: "Có", value: "true" },
+        { label: "Không", value: "false" },
       ],
     },
   ],
   permissions: {
-    create: 'inventory.write',
-    read: 'inventory.read',
-    update: 'inventory.write',
-    delete: 'inventory.write',
+    create: "inventory.write",
+    read: "inventory.read",
+    update: "inventory.write",
+    delete: "inventory.write",
   },
   scopingPolicy: ScopingPolicy.ORGANIZATION,
   deletionPolicy: DeletionPolicy.HARD,

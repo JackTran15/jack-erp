@@ -7,21 +7,24 @@ import {
   Body,
   Query,
   ParseUUIDPipe,
-} from '@nestjs/common';
-import { DocumentType, PaginationQuery } from '@erp/shared-interfaces';
-import { Actor, ActorContext } from '../../common/decorators/actor-context.decorator';
-import { DocumentNumberingService } from './document-numbering.service';
+} from "@nestjs/common";
+import { DocumentType, PaginationQuery } from "@erp/shared-interfaces";
+import {
+  Actor,
+  ActorContext,
+} from "../../common/decorators/actor-context.decorator";
+import { DocumentNumberingService } from "./document-numbering.service";
 import {
   CreateDocumentNumberRuleDto,
   UpdateDocumentNumberRuleDto,
   GenerateDocumentNumberDto,
-} from './dto';
+} from "./dto";
 
 @Controller()
 export class DocumentNumberingController {
   constructor(private readonly service: DocumentNumberingService) {}
 
-  @Post('document-number-rules')
+  @Post("document-number-rules")
   createRule(
     @Body() dto: CreateDocumentNumberRuleDto,
     @Actor() actor: ActorContext,
@@ -29,9 +32,10 @@ export class DocumentNumberingController {
     return this.service.createRule(dto, actor);
   }
 
-  @Get('document-number-rules')
+  @Get("document-number-rules")
   listRules(
-    @Query() query: PaginationQuery & { documentType?: DocumentType; branchId?: string },
+    @Query()
+    query: PaginationQuery & { documentType?: DocumentType; branchId?: string },
     @Actor() actor: ActorContext,
   ) {
     return this.service.listRules(
@@ -47,36 +51,44 @@ export class DocumentNumberingController {
     );
   }
 
-  @Patch('document-number-rules/:id')
+  @Patch("document-number-rules/:id")
   updateRule(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateDocumentNumberRuleDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.updateRule(id, dto, actor);
   }
 
-  @Post('document-number-rules/:id/activate')
+  @Post("document-number-rules/:id/activate")
   activateRule(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
     return this.service.activateRule(id, actor);
   }
 
-  @Post('document-number-rules/:id/deactivate')
+  @Post("document-number-rules/:id/deactivate")
   deactivateRule(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Actor() actor: ActorContext,
   ) {
     return this.service.deactivateRule(id, actor);
   }
 
-  @Post('document-numbers/generate')
+  @Post("document-numbers/generate")
   generate(
     @Body() dto: GenerateDocumentNumberDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.generate(dto.documentType, dto.branchId, actor);
+  }
+
+  @Post("document-numbers/preview")
+  preview(
+    @Body() dto: GenerateDocumentNumberDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.preview(dto.documentType, dto.branchId, actor);
   }
 }

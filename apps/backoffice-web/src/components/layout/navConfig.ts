@@ -146,6 +146,20 @@ export const navConfig: NavModule[] = [
     ],
   },
   {
+    id: "purchases",
+    label: "Mua hàng",
+    icon: ShoppingCart,
+    defaultPath: "/purchases/imports",
+    flyout: { enabled: true },
+    views: [STORE_TYPE.SINGLE],
+    sections: [
+      {
+        id: "purchases-main",
+        children: [{ to: "/purchases/imports", label: "Nhập hàng" }],
+      },
+    ],
+  },
+  {
     id: "customers",
     label: "Khách hàng",
     icon: Users,

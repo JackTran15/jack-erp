@@ -9,18 +9,17 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-  ValidateIf,
   ArrayMinSize,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
 import {
   DocCounterpartyKind,
   GoodsReceiptPurpose,
   GoodsReceiptReferenceType,
-} from '@erp/shared-interfaces';
-import { GoodsReceiptPaymentMethod } from '../goods-receipt.entity';
+} from "@erp/shared-interfaces";
+import { GoodsReceiptPaymentMethod } from "../goods-receipt.entity";
 
-export type CashMethod = 'CASH' | 'BANK' | 'EWALLET';
+export type CashMethod = "CASH" | "BANK" | "EWALLET";
 
 export class GoodsReceiptLineDto {
   @IsUUID()
@@ -52,7 +51,7 @@ export class GoodsReceiptLineDto {
 }
 
 export class CashSettlementDto {
-  @IsEnum(['CASH', 'BANK', 'EWALLET'])
+  @IsEnum(["CASH", "BANK", "EWALLET"])
   method: CashMethod;
 
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -124,7 +123,7 @@ export class CreateGoodsReceiptDto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   attachmentIds?: string[];
 
   /** FE-supplied reference codes shown as Tham chiếu. */
@@ -144,8 +143,8 @@ export class CreateGoodsReceiptDto {
   @IsEnum(GoodsReceiptPaymentMethod)
   paymentMethod?: GoodsReceiptPaymentMethod;
 
-  /** Cash account to pay from — required when paymentMethod=CASH. */
-  @ValidateIf((o) => o.paymentMethod === GoodsReceiptPaymentMethod.CASH)
+  /** Cash account to pay from; defaults to the branch cash fund when omitted. */
+  @IsOptional()
   @IsUUID()
   cashAccountId?: string;
 

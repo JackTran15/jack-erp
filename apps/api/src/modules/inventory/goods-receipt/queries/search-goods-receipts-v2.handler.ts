@@ -1,13 +1,13 @@
-import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { FilterBuilder } from '../../../../common/filters/filter.builder';
-import { GoodsReceiptEntity } from '../goods-receipt.entity';
+import { IQueryHandler, QueryHandler } from "@nestjs/cqrs";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { FilterBuilder } from "../../../../common/filters/filter.builder";
+import { GoodsReceiptEntity } from "../goods-receipt.entity";
 import {
   attachCounterparties,
   counterpartyNameSql,
-} from '../../location/services/counterparty-name.util';
-import { SearchGoodsReceiptsV2Query } from './search-goods-receipts-v2.query';
+} from "../../location/services/counterparty-name.util";
+import { SearchGoodsReceiptsV2Query } from "./search-goods-receipts-v2.query";
 
 /**
  * Correlated line total — mirrors the client-side Tổng tiền calc
@@ -19,9 +19,7 @@ const TOTAL_AMOUNT_SUBQUERY = `(SELECT COALESCE(SUM(l.quantity * l.unit_price), 
    FROM goods_receipt_lines l WHERE l.goods_receipt_id = gr.id)`;
 
 @QueryHandler(SearchGoodsReceiptsV2Query)
-export class SearchGoodsReceiptsV2Handler
-  implements IQueryHandler<SearchGoodsReceiptsV2Query>
-{
+export class SearchGoodsReceiptsV2Handler implements IQueryHandler<SearchGoodsReceiptsV2Query> {
   constructor(
     @InjectRepository(GoodsReceiptEntity)
     private readonly repo: Repository<GoodsReceiptEntity>,
@@ -36,28 +34,39 @@ export class SearchGoodsReceiptsV2Handler
     // location, lines + line item/location); the detail panel and view dialog
     // rely on `lines`.
     const qb = this.repo
-      .createQueryBuilder('gr')
-      .leftJoinAndSelect('gr.provider', 'provider')
-      .leftJoinAndSelect('gr.location', 'location')
-      .leftJoinAndSelect('gr.lines', 'lines')
-      .leftJoinAndSelect('lines.item', 'lineItem')
-      .leftJoinAndSelect('lines.location', 'lineLocation')
-      .where('gr.organizationId = :orgId', { orgId: actor.organizationId });
+      .createQueryBuilder("gr")
+      .leftJoinAndSelect("gr.provider", "provider")
+      .leftJoinAndSelect("gr.location", "location")
+      .leftJoinAndSelect("gr.lines", "lines")
+      .leftJoinAndSelect("lines.item", "lineItem")
+      .leftJoinAndSelect("lines.location", "lineLocation")
+      .where("gr.organizationId = :orgId", { orgId: actor.organizationId });
 
     if (actor.branchId) {
-      qb.andWhere('gr.branchId = :branchId', { branchId: actor.branchId });
+      qb.andWhere("gr.branchId = :branchId", { branchId: actor.branchId });
     }
 
     new FilterBuilder(qb)
-      .applyString('gr.documentNumber', dto.documentNumber)
-      .applyString(counterpartyNameSql('gr'), dto.party)
-      .applyString('gr.description', dto.description)
-      .applyString('gr.reason', dto.reason)
-      .applyEnum('gr.purpose', dto.purpose?.value)
-      .applyDateRange('gr.receivedAt', dto.date)
+      .applyString("gr.documentNumber", dto.documentNumber)
+      .applyString(counterpartyNameSql("gr"), dto.party)
+      .applyString("gr.description", dto.description)
+      .applyString("gr.reason", dto.reason)
+      .applyEnum("gr.purpose", dto.purpose?.value)
+      .applyDateRange("gr.receivedAt", dto.date)
       .applyCompare(TOTAL_AMOUNT_SUBQUERY, dto.totalAmount);
 
-    qb.orderBy('gr.receivedAt', 'DESC')
+    if (dto.purposes?.length) {
+      qb.andWhere("gr.purpose IN (:...purposes)", {
+        purposes: dto.purposes,
+      });
+    }
+    if (dto.excludePurposes?.length) {
+      qb.andWhere("gr.purpose NOT IN (:...excludePurposes)", {
+        excludePurposes: dto.excludePurposes,
+      });
+    }
+
+    qb.orderBy("gr.receivedAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
 

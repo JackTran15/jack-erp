@@ -128,6 +128,10 @@ export function App() {
                   element={<PurchaseOrdersPage />}
                 />
                 <Route
+                  path="/purchases/imports"
+                  element={<PurchaseOrdersPage mode="purchase" />}
+                />
+                <Route
                   path="/inventory/transfer-in"
                   element={<TransferInPage />}
                 />

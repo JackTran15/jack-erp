@@ -329,8 +329,10 @@ export function InventoryItemCreateForm({
         if (existing) {
           next.push({
             ...existing,
+            name: existing.name || variantName,
             unit: baseUnit,
             sku,
+            barcode: existing.barcode ?? "",
           });
         } else {
           // Edit mode: seed the row from the saved variant prices and SKU.
@@ -343,15 +345,22 @@ export function InventoryItemCreateForm({
             saved && typeof saved.name === "string" && saved.name
               ? String(saved.name)
               : variantName;
+          const savedBarcode =
+            saved && typeof saved.barcode === "string" && saved.barcode
+              ? String(saved.barcode)
+              : "";
           next.push({
             id: `variant-${key}`,
             itemId:
-              saved && typeof saved.id === "string" ? String(saved.id) : undefined,
+              saved && typeof saved.id === "string"
+                ? String(saved.id)
+                : undefined,
             color,
             size,
             name: savedName,
             unit: baseUnit,
             sku: savedSku,
+            barcode: savedBarcode,
             purchasePrice:
               saved && saved.purchasePrice != null
                 ? String(saved.purchasePrice)
@@ -391,6 +400,7 @@ export function InventoryItemCreateForm({
               size: r.size || undefined,
               unit: r.unit,
               sku: r.sku,
+              barcode: r.barcode.trim() || undefined,
               purchasePrice: toNumberOrUndef(r.purchasePrice) ?? 0,
               sellPrice: toNumberOrUndef(r.sellPrice) ?? 0,
               initialStock: toNumberOrUndef(r.initialStock) ?? 0,
@@ -399,6 +409,17 @@ export function InventoryItemCreateForm({
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantRows]);
+
+  useEffect(() => {
+    setValues((prev) => ({
+      ...prev,
+      barcodes:
+        String(prev.barcode ?? "").trim().length > 0
+          ? [{ code: String(prev.barcode).trim() }]
+          : undefined,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.barcode]);
 
   const removeVariant = (row: ProductVariantRow) => {
     removedVariantKeys.current.add(variantComboKey(row.color, row.size));
@@ -736,6 +757,8 @@ export function InventoryItemCreateForm({
               setValues((prev) => ({ ...prev, code: text }));
             })}
 
+            {renderDynamicField("barcode", variantRows.length > 0)}
+
             {/* Giá mua TB / Giá bán TB: chỉ hiện khi tạo mới. Ẩn ở màn xem chi
                 tiết/sửa — với hàng có biến thể giá thực nằm ở từng biến thể,
                 khớp với cách MISA hiển thị chi tiết mặt hàng. */}
@@ -796,7 +819,8 @@ export function InventoryItemCreateForm({
               />
               {variantRows.length > 0 ? (
                 <p className="mt-1 text-xs italic text-muted-foreground">
-                  (Hàng hóa có phiên bản: nhập tồn kho ban đầu tại từng phiên bản.)
+                  (Hàng hóa có phiên bản: nhập tồn kho ban đầu tại từng phiên
+                  bản.)
                 </p>
               ) : isEdit ? (
                 <p className="mt-1 text-xs italic text-muted-foreground">

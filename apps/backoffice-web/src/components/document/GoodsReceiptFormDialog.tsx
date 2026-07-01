@@ -35,7 +35,10 @@ import {
   SelectTransferReceiptDialog,
   type TransferReceiptDetail,
 } from "../../pages/purchase-orders/SelectTransferReceiptDialog";
-import type { ImportableTransferOrderListItem } from "@erp/shared-interfaces";
+import {
+  DocumentType,
+  type ImportableTransferOrderListItem,
+} from "@erp/shared-interfaces";
 import { LookupField } from "../../components/forms/LookupField";
 import { CounterpartyPickerField } from "../../components/forms/CounterpartyPickerField";
 import {
@@ -119,6 +122,7 @@ export function PurchaseOrderFormDialog({
   onRequestDelete,
   autoOpenTransferPicker = false,
   autoSelectTransferOrder,
+  documentKind = "warehouse-receipt",
 }: {
   mode: "create" | "edit" | "view";
   initial: PurchaseOrder | null;
@@ -139,10 +143,12 @@ export function PurchaseOrderFormDialog({
     exportGoodsIssueId?: string | null;
     exportGoodsIssueDocumentNumber?: string | null;
   } | null;
+  documentKind?: "warehouse-receipt" | "purchase-import";
 }) {
   const navigate = useNavigate();
   const isView = mode === "view";
   const canEdit = isView && initial?.status === "DRAFT";
+  const isPurchaseImport = documentKind === "purchase-import";
   // Resolve preferred shelves for many lines in a single request, then apply
   // each result back to its row. The (idx, itemId, storageId) guard prevents a
   // stale response from overwriting a row the user has since changed.
@@ -231,9 +237,8 @@ export function PurchaseOrderFormDialog({
   );
   const defaultStorage = useMemo(
     () =>
-      receivingStorages.find((s) => 
-        storages.find((s) => s.isDefaultReceiving) ??
-        s.isMainStorage) ??
+      receivingStorages.find((s) => s.isDefaultReceiving) ??
+      receivingStorages.find((s) => s.isMainStorage) ??
       receivingStorages[0] ??
       null,
     [receivingStorages],
@@ -249,9 +254,56 @@ export function PurchaseOrderFormDialog({
     : (defaultStorage?.name ?? "");
   const [storageId, setStorageId] = useState(initialStorageId);
   const [storageQuery, setStorageQuery] = useState(initialStorageLabel);
-  const [purpose, setPurpose] = useState<"OTHER" | "TRANSFER">(
-    initial?.purpose === "TRANSFER_IN" ? "TRANSFER" : "OTHER",
+  const [purpose, setPurpose] = useState<"PURCHASE" | "OTHER" | "TRANSFER">(
+    isPurchaseImport
+      ? "PURCHASE"
+      : initial?.purpose === "TRANSFER_IN"
+        ? "TRANSFER"
+        : initial?.purpose === "PURCHASE"
+          ? "PURCHASE"
+          : "OTHER",
   );
+  const [settlementMode, setSettlementMode] = useState<"CREDIT" | "CASH">(
+    initial?.paymentMethod === "CASH" ? "CASH" : "CREDIT",
+  );
+  const [cashPaymentChannel, setCashPaymentChannel] = useState<"CASH" | "BANK">(
+    "CASH",
+  );
+  const [purchaseTab, setPurchaseTab] = useState<"receipt" | "payment">(
+    "receipt",
+  );
+  const [paymentDocumentNumber, setPaymentDocumentNumber] = useState("");
+  useEffect(() => {
+    if (settlementMode !== "CASH" && purchaseTab === "payment") {
+      setPurchaseTab("receipt");
+    }
+  }, [purchaseTab, settlementMode]);
+  useEffect(() => {
+    if (
+      !isPurchaseImport ||
+      settlementMode !== "CASH" ||
+      mode !== "create" ||
+      paymentDocumentNumber
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void apiClient
+      .post<string>("/document-numbers/preview", {
+        documentType: DocumentType.CASH_PAYMENT,
+      })
+      .then(({ data: nextNumber }) => {
+        if (!cancelled) setPaymentDocumentNumber(nextNumber);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Không sinh được số phiếu chi. Vui lòng thử lại.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPurchaseImport, mode, paymentDocumentNumber, settlementMode]);
   const [sourceBranchId, setSourceBranchId] = useState(
     initial?.sourceBranchId ?? "",
   );
@@ -801,8 +853,13 @@ export function PurchaseOrderFormDialog({
   );
 
   const handleSave = useCallback(async (): Promise<boolean> => {
-    if (purpose === "OTHER" && !providerId) {
-      toast.error("Vui lòng chọn đối tượng (NCC).");
+    const receiptPurpose = isPurchaseImport ? "PURCHASE" : purpose;
+    if (receiptPurpose === "PURCHASE" && !providerId) {
+      toast.error("Vui lòng chọn nhà cung cấp cho phiếu nhập hàng mua.");
+      return false;
+    }
+    if (receiptPurpose === "PURCHASE" && counterpartyKind !== "supplier") {
+      toast.error("Phiếu nhập hàng mua chỉ được chọn nhà cung cấp.");
       return false;
     }
     const persistableLines = getPersistableFormLines(lines);
@@ -865,14 +922,23 @@ export function PurchaseOrderFormDialog({
       // per row (with fallback applied above).
       const headerLocationId = resolvedLines[0]?.locationId ?? "";
       const payload = {
-        purpose: purpose === "TRANSFER" ? "TRANSFER_IN" : "OTHER",
+        purpose:
+          receiptPurpose === "TRANSFER"
+            ? "TRANSFER_IN"
+            : receiptPurpose === "PURCHASE"
+              ? "PURCHASE"
+              : "OTHER",
         counterpartyKind: counterpartyKind || undefined,
         counterpartyId: providerId || undefined,
+        paymentMethod:
+          receiptPurpose === "PURCHASE" ? settlementMode : undefined,
         deliveredBy: deliveryPerson || undefined,
         reason: reason || undefined,
         description: notes || undefined,
         sourceBranchId:
-          purpose === "TRANSFER" ? sourceBranchId || undefined : undefined,
+          receiptPurpose === "TRANSFER"
+            ? sourceBranchId || undefined
+            : undefined,
         receivedAt: receivedAtIso,
         locationId: headerLocationId,
         lines: resolvedLines.map((l) => ({
@@ -914,8 +980,12 @@ export function PurchaseOrderFormDialog({
       setDirty(false);
       toast.success(
         mode === "edit"
-          ? "Đã cập nhật phiếu nhập kho."
-          : "Đã nhập kho thành công.",
+          ? isPurchaseImport
+            ? "Đã cập nhật phiếu nhập hàng."
+            : "Đã cập nhật phiếu nhập kho."
+          : isPurchaseImport
+            ? "Đã nhập hàng thành công."
+            : "Đã nhập kho thành công.",
       );
       await onSaved();
       return true;
@@ -927,6 +997,8 @@ export function PurchaseOrderFormDialog({
     }
   }, [
     purpose,
+    isPurchaseImport,
+    settlementMode,
     providerId,
     lines,
     docDate,
@@ -937,6 +1009,7 @@ export function PurchaseOrderFormDialog({
     sourceBranchId,
     sourceTransferOrderId,
     references,
+    counterpartyKind,
     initial,
     mode,
     onSaved,
@@ -1322,6 +1395,61 @@ export function PurchaseOrderFormDialog({
         formatMoneyInteger(Number(r.orderedQuantity) * Number(r.unitPrice)),
       footer: formatMoneyInteger(totalAmount),
     },
+    ...(isPurchaseImport
+      ? ([
+          {
+            key: "discountPercent",
+            label: "% CK",
+            width: 90,
+            minWidth: 90,
+            type: "readonly",
+            align: "right",
+            getValue: () => "0",
+          },
+          {
+            key: "discountAmount",
+            label: "Tiền CK",
+            width: 120,
+            minWidth: 120,
+            type: "readonly",
+            align: "right",
+            getValue: () => "0",
+            footer: "0",
+          },
+          {
+            key: "taxRate",
+            label: "Thuế suất",
+            width: 110,
+            minWidth: 110,
+            type: "readonly",
+            align: "right",
+            getValue: () => "",
+          },
+          {
+            key: "taxAmount",
+            label: "Tiền thuế",
+            width: 120,
+            minWidth: 120,
+            type: "readonly",
+            align: "right",
+            getValue: () => "0",
+            footer: "0",
+          },
+          {
+            key: "payableAmount",
+            label: "Tiền thanh toán",
+            width: 150,
+            minWidth: 150,
+            type: "readonly",
+            align: "right",
+            getValue: (r: FormLine) =>
+              formatMoneyInteger(
+                Number(r.orderedQuantity) * Number(r.unitPrice),
+              ),
+            footer: formatMoneyInteger(totalAmount),
+          },
+        ] satisfies LineColumn<FormLine>[])
+      : []),
     { key: "notes", label: "Ghi chú", width: 200, minWidth: 200 },
   ];
 
@@ -1333,100 +1461,187 @@ export function PurchaseOrderFormDialog({
           if (!o) requestClose();
         }}
         title={
-          mode === "create"
-            ? "Thêm mới phiếu nhập kho"
-            : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`
+          isPurchaseImport
+            ? mode === "create"
+              ? "Thêm mới Phiếu nhập hàng"
+              : `Phiếu nhập hàng ${initial?.documentNumber ?? ""}`
+            : mode === "create"
+              ? "Thêm mới phiếu nhập kho"
+              : `Phiếu nhập kho ${initial?.documentNumber ?? ""}`
         }
         toolbarItems={dialogToolbar}
         purpose={
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-            <span className="text-muted-foreground">Mục đích nhập kho</span>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={purpose === "OTHER"}
-                onChange={() => {
-                  setPurpose("OTHER");
-                  setSourceBranchId("");
-                  setSourceBranchLabel("");
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-              Khác
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                checked={purpose === "TRANSFER"}
-                onChange={() => {
-                  setPurpose("TRANSFER");
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-              Điều chuyển từ cửa hàng khác
-            </label>
-            {purpose === "TRANSFER" ? (
-              <>
-                <div className="w-[260px]">
-                  <LookupField
-                    enableSearchModal
-                    searchModalTitle="Chọn cửa hàng nguồn"
-                    searchModalPlaceholder="Nhập tên cửa hàng"
-                    placeholder="Chọn cửa hàng nguồn"
-                    value={sourceBranchLabel}
-                    onValueChange={(v) => {
-                      setSourceBranchLabel(v);
-                      setSourceBranchId("");
-                    }}
-                    onSelect={(b) => {
-                      setSourceBranchId(b.id);
-                      setSourceBranchLabel(b.name);
-                      setNotes(
-                        `Nhập kho hàng hóa điều chuyển từ cửa hàng ${b.name}`,
-                      );
-                      markDirty();
-                    }}
-                    search={searchBranches}
-                    itemKey={(b) => b.id}
-                    renderItem={(b) => b.name}
-                    renderMeta={(b) => b.address ?? ""}
-                    columns={[
-                      {
-                        key: "name",
-                        label: "Tên cửa hàng",
-                        render: (b) => b.name,
-                      },
-                      {
-                        key: "address",
-                        label: "Địa chỉ",
-                        render: (b) => b.address ?? "—",
-                      },
-                    ]}
-                    disabled={isView}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPickerOpen(true)}
+          isPurchaseImport ? (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  checked={settlementMode === "CREDIT"}
+                  onChange={() => {
+                    setSettlementMode("CREDIT");
+                    setPurchaseTab("receipt");
+                    markDirty();
+                  }}
                   disabled={isView}
-                >
-                  Chọn chứng từ điều chuyển
-                </Button>
-              </>
-            ) : null}
-          </div>
+                />
+                Ghi nợ nhà cung cấp
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  checked={settlementMode === "CASH"}
+                  onChange={() => {
+                    setSettlementMode("CASH");
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+                Thanh toán ngay
+              </label>
+              <select
+                className="h-9 w-52 rounded-md border border-input bg-background px-3 text-sm"
+                value={cashPaymentChannel}
+                onChange={(e) => {
+                  setCashPaymentChannel(e.target.value as "CASH" | "BANK");
+                  markDirty();
+                }}
+                disabled={isView || settlementMode !== "CASH"}
+              >
+                <option value="CASH">Tiền mặt</option>
+                <option value="BANK" disabled>
+                  Tiền gửi
+                </option>
+              </select>
+              <Button type="button" variant="outline" size="sm" disabled>
+                Chọn phiếu đặt hàng
+              </Button>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" disabled={isView} />
+                Nhận kèm hóa đơn
+              </label>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <span className="text-muted-foreground">Mục đích nhập kho</span>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  checked={purpose === "OTHER"}
+                  onChange={() => {
+                    setPurpose("OTHER");
+                    setSourceBranchId("");
+                    setSourceBranchLabel("");
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+                Khác
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  checked={purpose === "TRANSFER"}
+                  onChange={() => {
+                    setPurpose("TRANSFER");
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+                Điều chuyển từ cửa hàng khác
+              </label>
+              {purpose === "TRANSFER" ? (
+                <>
+                  <div className="w-[260px]">
+                    <LookupField
+                      enableSearchModal
+                      searchModalTitle="Chọn cửa hàng nguồn"
+                      searchModalPlaceholder="Nhập tên cửa hàng"
+                      placeholder="Chọn cửa hàng nguồn"
+                      value={sourceBranchLabel}
+                      onValueChange={(v) => {
+                        setSourceBranchLabel(v);
+                        setSourceBranchId("");
+                      }}
+                      onSelect={(b) => {
+                        setSourceBranchId(b.id);
+                        setSourceBranchLabel(b.name);
+                        setNotes(
+                          `Nhập kho hàng hóa điều chuyển từ cửa hàng ${b.name}`,
+                        );
+                        markDirty();
+                      }}
+                      search={searchBranches}
+                      itemKey={(b) => b.id}
+                      renderItem={(b) => b.name}
+                      renderMeta={(b) => b.address ?? ""}
+                      columns={[
+                        {
+                          key: "name",
+                          label: "Tên cửa hàng",
+                          render: (b) => b.name,
+                        },
+                        {
+                          key: "address",
+                          label: "Địa chỉ",
+                          render: (b) => b.address ?? "—",
+                        },
+                      ]}
+                      disabled={isView}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={isView}
+                  >
+                    Chọn chứng từ điều chuyển
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          )
         }
         generalInfo={
           <>
-            <FieldRow label="Đối tượng">
+            {isPurchaseImport ? (
+              <div className="mb-3 flex border-b bg-muted/40">
+                <button
+                  type="button"
+                  className={`border-b-2 px-4 py-2 text-sm font-medium ${
+                    purchaseTab === "receipt"
+                      ? "border-primary-blue text-primary-blue"
+                      : "border-transparent text-muted-foreground"
+                  }`}
+                  onClick={() => setPurchaseTab("receipt")}
+                >
+                  Phiếu nhập
+                </button>
+                {settlementMode === "CASH" ? (
+                  <button
+                    type="button"
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${
+                      purchaseTab === "payment"
+                        ? "border-primary-blue text-primary-blue"
+                        : "border-transparent text-muted-foreground"
+                    }`}
+                    onClick={() => setPurchaseTab("payment")}
+                  >
+                    Phiếu chi
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            <FieldRow label={isPurchaseImport ? "Nhà cung cấp" : "Đối tượng"}>
               <div className="flex items-stretch gap-2">
                 <CounterpartyPickerField
                   defaultType="supplier"
-                  allowedTypes={["supplier", "customer", "employee"]}
+                  allowedTypes={
+                    isPurchaseImport || purpose === "PURCHASE"
+                      ? ["supplier"]
+                      : ["supplier", "customer", "employee"]
+                  }
                   className="w-[180px]"
                   dropdownMinWidth={500}
                   modalTitle="Chọn đối tượng"
@@ -1460,7 +1675,13 @@ export function PurchaseOrderFormDialog({
                 />
               </div>
             </FieldRow>
-            <FieldRow label="Người giao">
+            <FieldRow
+              label={
+                isPurchaseImport && purchaseTab === "payment"
+                  ? "Người nhận"
+                  : "Người giao"
+              }
+            >
               <Input
                 value={deliveryPerson}
                 onChange={(e) => {
@@ -1470,7 +1691,16 @@ export function PurchaseOrderFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            {purpose === "TRANSFER" ? null : (
+            {isPurchaseImport && purchaseTab === "payment" ? (
+              <>
+                <FieldRow label="Địa chỉ">
+                  <Input disabled={isView} />
+                </FieldRow>
+                <FieldRow label="Lý do chi">
+                  <Input value="Thanh toán tiền nhập hàng hóa" readOnly />
+                </FieldRow>
+              </>
+            ) : purpose === "TRANSFER" || isPurchaseImport ? null : (
               <FieldRow label="Lý do">
                 <Input
                   value={reason}
@@ -1482,16 +1712,23 @@ export function PurchaseOrderFormDialog({
                 />
               </FieldRow>
             )}
-            <FieldRow label="Diễn giải">
-              <Input
-                value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value);
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-            </FieldRow>
+            {isPurchaseImport && purchaseTab === "payment" ? null : (
+              <FieldRow label="Diễn giải">
+                <Input
+                  value={notes}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+              </FieldRow>
+            )}
+            {isPurchaseImport && purchaseTab === "receipt" ? (
+              <FieldRow label="NV mua hàng">
+                <Input disabled />
+              </FieldRow>
+            ) : null}
             <FieldRow label="Tham chiếu">
               {(() => {
                 // FE-supplied reference list (e.g. the source XK number), plus
@@ -1568,9 +1805,19 @@ export function PurchaseOrderFormDialog({
         }
         documentInfo={
           <>
-            <FieldRow label="Số phiếu nhập">
+            <FieldRow
+              label={
+                isPurchaseImport && purchaseTab === "payment"
+                  ? "Số phiếu chi"
+                  : "Số phiếu nhập"
+              }
+            >
               <Input
-                value={initial?.documentNumber ?? previewDocumentNumber ?? ""}
+                value={
+                  isPurchaseImport && purchaseTab === "payment"
+                    ? paymentDocumentNumber
+                    : (initial?.documentNumber ?? previewDocumentNumber ?? "")
+                }
                 readOnly
                 title={
                   initial?.documentNumber
@@ -1579,7 +1826,13 @@ export function PurchaseOrderFormDialog({
                 }
               />
             </FieldRow>
-            <FieldRow label="Ngày nhập">
+            <FieldRow
+              label={
+                isPurchaseImport && purchaseTab === "payment"
+                  ? "Ngày chi"
+                  : "Ngày nhập"
+              }
+            >
               <Input
                 type="date"
                 value={docDate}
@@ -1590,17 +1843,19 @@ export function PurchaseOrderFormDialog({
                 disabled={isView}
               />
             </FieldRow>
-            <FieldRow label="Giờ nhập">
-              <Input
-                type="time"
-                value={docTime}
-                onChange={(e) => {
-                  setDocTime(e.target.value);
-                  markDirty();
-                }}
-                disabled={isView}
-              />
-            </FieldRow>
+            {isPurchaseImport && purchaseTab === "payment" ? null : (
+              <FieldRow label="Giờ nhập">
+                <Input
+                  type="time"
+                  value={docTime}
+                  onChange={(e) => {
+                    setDocTime(e.target.value);
+                    markDirty();
+                  }}
+                  disabled={isView}
+                />
+              </FieldRow>
+            )}
           </>
         }
         detailActions={
@@ -1658,20 +1913,46 @@ export function PurchaseOrderFormDialog({
           />
         }
         footerSummary={
-          <div className="flex items-center justify-between">
-            <span>Số dòng = {lines.length}</span>
-            <div className="flex gap-8">
+          isPurchaseImport ? (
+            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
               <span>
-                Số lượng: <strong className="ml-1">{totalQty}</strong>
+                Tổng số lượng <strong className="ml-1">{totalQty}</strong>
               </span>
               <span>
-                Thành tiền:{" "}
+                Tổng thành tiền{" "}
+                <strong className="ml-1">
+                  {formatMoneyInteger(totalAmount)}
+                </strong>
+              </span>
+              <span>
+                Tiền CK <strong className="ml-1">0</strong>
+              </span>
+              <span>
+                Tiền thuế <strong className="ml-1">0</strong>
+              </span>
+              <span>
+                Tổng tiền thanh toán{" "}
                 <strong className="ml-1">
                   {formatMoneyInteger(totalAmount)}
                 </strong>
               </span>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span>Số dòng = {lines.length}</span>
+              <div className="flex gap-8">
+                <span>
+                  Số lượng: <strong className="ml-1">{totalQty}</strong>
+                </span>
+                <span>
+                  Thành tiền:{" "}
+                  <strong className="ml-1">
+                    {formatMoneyInteger(totalAmount)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          )
         }
       />
 
@@ -1689,6 +1970,7 @@ export function PurchaseOrderFormDialog({
           setProviderId(p.id);
           setProviderCode(p.code);
           setProviderName(p.name);
+          setCounterpartyKind("supplier");
           markDirty();
         }}
       />

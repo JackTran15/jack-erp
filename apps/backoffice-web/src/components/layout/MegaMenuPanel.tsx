@@ -1,14 +1,17 @@
 import { forwardRef } from "react";
-import { NavLink } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@erp/ui";
 import { useLayout } from "./LayoutContext";
 import type { NavModule, NavSection, NavChild } from "./navConfig";
 import { useImportableTransferOrderCount } from "../../hooks/useImportableTransferOrderCount";
 
-type NavBadgeCounts = Partial<Record<NonNullable<NavChild["badgeKey"]>, number>>;
+type NavBadgeCounts = Partial<
+  Record<NonNullable<NavChild["badgeKey"]>, number>
+>;
 
 export interface MegaMenuPanelProps {
   module: NavModule;
+  onNavigate?: () => void;
 }
 
 /** Chia section theo `flyout.splitLeft` / `flyout.splitRight` khi cả hai đều có. */
@@ -33,7 +36,7 @@ function splitFlyoutSections(
  * so that it always attaches flush to the sidebar edge.
  */
 export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
-  function MegaMenuPanel({ module }, ref) {
+  function MegaMenuPanel({ module, onNavigate }, ref) {
     const { sidebarCollapsed } = useLayout();
     const transferInCountQuery = useImportableTransferOrderCount();
     const badgeCounts: NavBadgeCounts = {
@@ -72,6 +75,7 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
                       key={section.id}
                       section={section}
                       badgeCounts={badgeCounts}
+                      onNavigate={onNavigate}
                     />
                   ))}
                 </div>
@@ -81,6 +85,7 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
                       key={section.id}
                       section={section}
                       badgeCounts={badgeCounts}
+                      onNavigate={onNavigate}
                     />
                   ))}
                 </div>
@@ -91,6 +96,7 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
                   key={section.id}
                   section={section}
                   badgeCounts={badgeCounts}
+                  onNavigate={onNavigate}
                 />
               ))
             )}
@@ -106,9 +112,14 @@ export const MegaMenuPanel = forwardRef<HTMLDivElement, MegaMenuPanelProps>(
 interface SectionColumnProps {
   section: NavSection;
   badgeCounts: NavBadgeCounts;
+  onNavigate?: () => void;
 }
 
-function SectionColumn({ section, badgeCounts }: SectionColumnProps) {
+function SectionColumn({
+  section,
+  badgeCounts,
+  onNavigate,
+}: SectionColumnProps) {
   return (
     <div className="min-w-0">
       {section.label && (
@@ -119,7 +130,11 @@ function SectionColumn({ section, badgeCounts }: SectionColumnProps) {
       <ul className="space-y-0.5">
         {section.children.map((child) => (
           <li key={child.to}>
-            <MegaMenuLink child={child} badgeCounts={badgeCounts} />
+            <MegaMenuLink
+              child={child}
+              badgeCounts={badgeCounts}
+              onNavigate={onNavigate}
+            />
           </li>
         ))}
       </ul>
@@ -132,25 +147,36 @@ function SectionColumn({ section, badgeCounts }: SectionColumnProps) {
 interface MegaMenuLinkProps {
   child: NavChild;
   badgeCounts: NavBadgeCounts;
+  onNavigate?: () => void;
 }
 
-function MegaMenuLink({ child, badgeCounts }: MegaMenuLinkProps) {
+function MegaMenuLink({ child, badgeCounts, onNavigate }: MegaMenuLinkProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const active =
+    location.pathname === child.to ||
+    (!child.end && location.pathname.startsWith(`${child.to}/`));
+
   return (
-    <NavLink
-      to={child.to}
-      end={child.end}
-      className={({ isActive }) =>
-        cn(
-          "flex items-center gap-2.5 rounded px-2.5 py-1.5 text-sm transition-colors",
-          isActive
-            ? "bg-blue-600 text-white font-medium"
-            : "text-gray-300 hover:bg-gray-800 hover:text-white",
-        )
-      }
+    <button
+      type="button"
+      onClick={() => {
+        onNavigate?.();
+        navigate(child.to, {
+          replace: active,
+          state: active ? { refreshAt: Date.now() } : undefined,
+        });
+      }}
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left text-sm transition-colors",
+        active
+          ? "bg-blue-600 text-white font-medium"
+          : "text-gray-300 hover:bg-gray-800 hover:text-white",
+      )}
     >
       <span className="whitespace-normal">{child.label}</span>
       <NavItemBadge child={child} badgeCounts={badgeCounts} />
-    </NavLink>
+    </button>
   );
 }
 

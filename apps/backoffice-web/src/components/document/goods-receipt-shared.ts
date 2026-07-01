@@ -2,7 +2,8 @@
 // Extracted from PurchaseOrdersPage so TransferInPage can reuse the dialog in-place.
 
 export type GoodsReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED" | "REVERSED";
-export type GoodsReceiptPurpose = "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
+export type GoodsReceiptPurpose =
+  "PURCHASE" | "OTHER" | "TRANSFER_IN" | "STOCK_TAKE";
 
 export interface GoodsReceiptLine {
   id: string;
@@ -41,6 +42,7 @@ export interface GoodsReceipt {
     code: string | null;
     name: string;
   } | null;
+  paymentMethod?: "CASH" | "CREDIT" | null;
   deliveredBy?: string | null;
   reason?: string | null;
   description?: string | null;

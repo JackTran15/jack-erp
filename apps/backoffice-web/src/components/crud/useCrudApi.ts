@@ -63,7 +63,11 @@ export function useCrudRecords(
   });
 }
 
-export function useCrudRecord(entityKey: string, id: string | undefined, enabled: boolean) {
+export function useCrudRecord(
+  entityKey: string,
+  id: string | undefined,
+  enabled: boolean,
+) {
   return useQuery({
     queryKey: ["crud", entityKey, "record", id],
     queryFn: async () =>
@@ -107,6 +111,9 @@ export function useCrudCreate(entityKey: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
+      if (entityKey === "inventory-item-categories") {
+        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      }
     },
   });
 }
@@ -131,6 +138,9 @@ export function useCrudUpdate(entityKey: string) {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
       void qc.invalidateQueries({ queryKey: ["crud-v2", entityKey] });
+      if (entityKey === "inventory-item-categories") {
+        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      }
     },
   });
 }
@@ -147,6 +157,9 @@ export function useCrudDelete(entityKey: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
+      if (entityKey === "inventory-item-categories") {
+        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      }
     },
   });
 }
