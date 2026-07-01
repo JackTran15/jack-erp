@@ -8,7 +8,6 @@ export const STRING_FILTER_KEYS = [
   "itemName",
   "categoryName",
   "unit",
-  "storageName",
 ] as const;
 
 export type StringFilterKey = (typeof STRING_FILTER_KEYS)[number];
@@ -26,6 +25,8 @@ export function buildQuery(
     extra[key] = value;
     extra[`${key as StringFilterKey}Mode`] = f.mode;
   }
+  const storageId = filters.storageId?.value?.trim();
+  if (storageId) extra.storageId = storageId;
   const q = filters.quantity;
   if (q?.value?.trim()) {
     const n = Number(q.value.trim());

@@ -1,4 +1,7 @@
-import type { TableColumn } from "../../components/table/BaseDataTable";
+import type {
+  ColumnFilterSelectOption,
+  TableColumn,
+} from "../../components/table/BaseDataTable";
 import type { StockBalanceRow } from "../../api/stock-balances";
 import type { StockByLocationItem } from "@erp/shared-interfaces";
 
@@ -9,6 +12,7 @@ function displayLocationName(row: StockBalanceRow): string {
 
 export function buildItemLocationColumns(
   rowIndexMap: Map<string, number>,
+  storageOptions: ColumnFilterSelectOption[],
 ): TableColumn<StockBalanceRow>[] {
   return [
     {
@@ -66,10 +70,11 @@ export function buildItemLocationColumns(
       render: (r) => r.item.unit,
     },
     {
-      key: "storageName",
+      key: "storageId",
       label: "Kho",
       width: 180,
-      filterKind: "symbol",
+      filterKind: "select",
+      filterOptions: storageOptions,
       render: (r) => r.location.storageName,
     },
   ];

@@ -12,10 +12,12 @@ import { InventoryPageTitle, InventoryTabBar } from "../../components/document/i
 import {
   listLocationStockItems,
   listStockBalances,
+  type PaginatedResponse,
   type StockBalanceRow,
 } from "../../api/stock-balances";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { getActiveBranch } from "../../lib/auth-storage";
+import { apiClient } from "../../lib/api-axios";
 import {
   buildItemLocationColumns,
   buildLocationStockItemColumns,
@@ -23,6 +25,11 @@ import {
 import { buildQuery } from "./ItemLocationDetailsQuery";
 import { ArrangeLocationDialog } from "./ArrangeLocationDialog";
 import { TransferLocationDialog } from "./TransferLocationDialog";
+
+interface InventoryStorage {
+  id: string;
+  name: string;
+}
 
 const naturalCollator = new Intl.Collator("vi-VN", {
   numeric: true,
@@ -82,6 +89,19 @@ export function ItemLocationDetailsPage() {
   const stockQuery = useQuery({
     queryKey: ["stock-balances", activeBranchId, queryParams],
     queryFn: () => listStockBalances(queryParams),
+    enabled: !isLocationDetail,
+  });
+
+  const storagesQuery = useQuery({
+    queryKey: ["inventory-storages", activeBranchId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", pageSize: "200" });
+      if (activeBranchId) params.set("branchId", activeBranchId);
+      const { data } = await apiClient.get<PaginatedResponse<InventoryStorage>>(
+        `/inventory/storages?${params}`,
+      );
+      return data.data;
+    },
     enabled: !isLocationDetail,
   });
 
@@ -235,9 +255,14 @@ export function ItemLocationDetailsPage() {
     [locationRows, page, pageSize],
   );
 
+  const storageFilterOptions = useMemo(
+    () => (storagesQuery.data ?? []).map((s) => ({ value: s.id, label: s.name })),
+    [storagesQuery.data],
+  );
+
   const stockColumns = useMemo(
-    () => buildItemLocationColumns(stockRowIndexMap),
-    [stockRowIndexMap],
+    () => buildItemLocationColumns(stockRowIndexMap, storageFilterOptions),
+    [stockRowIndexMap, storageFilterOptions],
   );
   const locationColumns = useMemo(
     () => buildLocationStockItemColumns(locationRowIndexMap),

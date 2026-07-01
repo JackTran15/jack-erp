@@ -170,6 +170,9 @@ export function ItemLocationsPage() {
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">(
     "",
   );
+  const [arrangeFilter, setArrangeFilter] = useState<
+    "" | "arranged" | "unarranged"
+  >("");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<
@@ -259,6 +262,11 @@ export function ItemLocationsPage() {
     return m;
   }, [storages]);
 
+  const storageFilterOptions = useMemo(
+    () => storages.map((s) => ({ value: s.id, label: s.name })),
+    [storages],
+  );
+
   const selected = useMemo(
     () => (locations?.data ?? []).find((l) => l.id === selectedId) ?? null,
     [locations, selectedId],
@@ -282,6 +290,8 @@ export function ItemLocationsPage() {
     const filtered = rows.filter((row) => {
       if (statusFilter === "active" && !row.isActive) return false;
       if (statusFilter === "inactive" && row.isActive) return false;
+      if (arrangeFilter === "arranged" && !row.hasItems) return false;
+      if (arrangeFilter === "unarranged" && row.hasItems) return false;
       for (const key of FILTER_KEYS) {
         const filter = columnFilters[key];
         if (!filter.value.trim()) continue;
@@ -302,7 +312,7 @@ export function ItemLocationsPage() {
       return true;
     });
     return sortLocationsByCode(filtered);
-  }, [locations, columnFilters, statusFilter]);
+  }, [locations, columnFilters, statusFilter, arrangeFilter]);
 
   const handleCreate = useCallback(
     async (draft: LocationDraft) => {
@@ -488,6 +498,8 @@ export function ItemLocationsPage() {
       key: "storage",
       label: "Thuộc kho",
       width: 220,
+      filterKind: "select",
+      filterOptions: storageFilterOptions,
       render: (row) => storageNameById.get(row.storageId) ?? row.storageId,
     },
     {
@@ -505,6 +517,11 @@ export function ItemLocationsPage() {
       key: "arrange",
       label: "Xếp hàng hóa",
       width: 140,
+      filterKind: "select",
+      filterOptions: [
+        { value: "arranged", label: "Đã xếp" },
+        { value: "unarranged", label: "Chưa xếp" },
+      ],
       render: (row) =>
         row.hasItems ? (
           "Đã xếp"
@@ -516,6 +533,11 @@ export function ItemLocationsPage() {
       key: "status",
       label: "Trạng thái",
       width: 160,
+      filterKind: "select",
+      filterOptions: [
+        { value: "active", label: STATUS_LABEL.ACTIVE },
+        { value: "inactive", label: STATUS_LABEL.INACTIVE },
+      ],
       render: (row) =>
         row.isActive ? STATUS_LABEL.ACTIVE : STATUS_LABEL.INACTIVE,
     },
@@ -527,6 +549,7 @@ export function ItemLocationsPage() {
         ...(columnFilters as unknown as Record<string, ColumnFilter>),
         storage: { mode: "equals" as ColumnFilterMode, value: storageFilter },
         status: { mode: "equals" as ColumnFilterMode, value: statusFilter },
+        arrange: { mode: "equals" as ColumnFilterMode, value: arrangeFilter },
       },
       onModeChange: (key: string, mode: ColumnFilterMode) => {
         if (!FILTER_KEYS.includes(key as FilterKey)) return;
@@ -545,6 +568,10 @@ export function ItemLocationsPage() {
           setStatusFilter(value as "" | "active" | "inactive");
           return;
         }
+        if (key === "arrange") {
+          setArrangeFilter(value as "" | "arranged" | "unarranged");
+          return;
+        }
         if (!FILTER_KEYS.includes(key as FilterKey)) return;
         setColumnFilters((prev) => ({
           ...prev,
@@ -552,7 +579,7 @@ export function ItemLocationsPage() {
         }));
       },
     }),
-    [columnFilters, storageFilter, statusFilter],
+    [columnFilters, storageFilter, statusFilter, arrangeFilter],
   );
 
   return (
