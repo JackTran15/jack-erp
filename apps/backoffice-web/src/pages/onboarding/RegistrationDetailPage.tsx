@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { Button } from "@erp/ui";
 import { hasAnyPermission } from "../../lib/permissions";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
   useRegistration,
   RegistrationStatus,
@@ -20,12 +22,28 @@ const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
-const STATUS_COLORS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "#e6a817",
-  [RegistrationStatus.APPROVED]: "#2e7d32",
-  [RegistrationStatus.REJECTED]: "#c62828",
-  [RegistrationStatus.RESUBMITTED]: "#1565c0",
-};
+function getStatusClassName(status: RegistrationStatus): string {
+  if (status === RegistrationStatus.APPROVED) {
+    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+  }
+  if (status === RegistrationStatus.REJECTED) {
+    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+  }
+  if (status === RegistrationStatus.RESUBMITTED) {
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+  }
+  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+}
+
+function StatusBadge({ status }: { status: RegistrationStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 export function RegistrationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,21 +98,34 @@ export function RegistrationDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: 24 }}>
-        <p>Đang tải…</p>
-      </div>
+      <AdminPageShell>
+        <div className="p-6 text-sm text-muted-foreground">Đang tải...</div>
+      </AdminPageShell>
     );
   }
 
   if (error || !record) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Chi tiết đăng ký</h2>
-        <p style={{ color: "#c62828" }}>{error ?? "Không tìm thấy"}</p>
-        <button type="button" onClick={() => navigate(-1)} style={{ cursor: "pointer" }}>
+      <AdminPageShell>
+        <div className="p-6">
+          <div className="max-w-xl rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Chi tiết đăng ký
+            </h1>
+            <p className="mt-2 text-sm font-medium text-destructive">
+              {error ?? "Không tìm thấy"}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              onClick={() => navigate(-1)}
+            >
           Quay lại
-        </button>
-      </div>
+            </Button>
+          </div>
+        </div>
+      </AdminPageShell>
     );
   }
 
@@ -152,188 +183,155 @@ export function RegistrationDetailPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 700 }}>
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        style={{ marginBottom: 16, cursor: "pointer" }}
-      >
-        &larr; Quay lại
-      </button>
-
-      <h2>Chi tiết đăng ký {typeName}</h2>
-
-      <div
-        style={{
-          border: "1px solid #ccc",
-          borderRadius: 8,
-          padding: 20,
-          marginBottom: 20,
-        }}
-      >
-        <p>
-          <strong>Mã:</strong> {record.id}
-        </p>
-        <p>
-          <strong>Loại:</strong> {typeName}
-        </p>
-        <p>
-          <strong>Trạng thái:</strong>{" "}
-          <span
-            style={{ color: STATUS_COLORS[record.status], fontWeight: 600 }}
-          >
-            {STATUS_LABELS[record.status]}
-          </span>
-        </p>
-        {record.rejectionReason && (
-          <p>
-            <strong>Lý do từ chối:</strong> {record.rejectionReason}
-          </p>
-        )}
-
-        <h3>Dữ liệu đăng ký</h3>
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <tbody>
-            {requestDataEntries.map(([key, value]) => (
-              <tr key={key} style={{ borderBottom: "1px solid #eee" }}>
-                <td
-                  style={{ padding: "6px 12px 6px 0", fontWeight: 500 }}
-                >
-                  {key}
-                </td>
-                <td style={{ padding: "6px 0" }}>{String(value ?? "—")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div
-        style={{
-          border: "1px solid #ccc",
-          borderRadius: 8,
-          padding: 20,
-          marginBottom: 20,
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Dòng thời gian</h3>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {timeline.map((event) => (
-            <li
-              key={event.label}
-              style={{
-                padding: "8px 0",
-                borderLeft: "2px solid #1565c0",
-                paddingLeft: 16,
-                marginBottom: 4,
-              }}
-            >
-              <strong>{event.label}</strong>
-              <br />
-              <span style={{ fontSize: 14, color: "#555" }}>
-                {new Date(event.date).toLocaleString("vi-VN")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {error && <p style={{ color: "#c62828" }}>{error}</p>}
-
-      {canApprove && !rejectMode && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            disabled={actionLoading}
-            onClick={handleApprove}
-            style={{
-              padding: "8px 20px",
-              cursor: actionLoading ? "not-allowed" : "pointer",
-              backgroundColor: "#2e7d32",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              fontWeight: 600,
-            }}
-          >
-            {actionLoading ? "Đang duyệt…" : "Duyệt"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setRejectMode(true)}
-            style={{
-              padding: "8px 20px",
-              cursor: "pointer",
-              backgroundColor: "#c62828",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              fontWeight: 600,
-            }}
-          >
-            Từ chối
-          </button>
-        </div>
-      )}
-
-      {canApprove && rejectMode && (
-        <div
-          style={{
-            border: "1px solid #ccc",
-            borderRadius: 8,
-            padding: 20,
-          }}
-        >
-          <h3 style={{ marginTop: 0 }}>Từ chối đăng ký</h3>
-          <label>
-            <span
-              style={{ display: "block", marginBottom: 4, fontWeight: 500 }}
-            >
-              Lý do (bắt buộc, tối thiểu 5 ký tự)
-            </span>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={4}
-              style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-            />
-          </label>
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button
-              type="button"
-              disabled={rejectReason.length < 5 || actionLoading}
-              onClick={handleReject}
-              style={{
-                padding: "8px 16px",
-                cursor:
-                  rejectReason.length < 5 ? "not-allowed" : "pointer",
-                backgroundColor: "#c62828",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-              }}
-            >
-              {actionLoading ? "Đang từ chối…" : "Xác nhận từ chối"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejectMode(false);
-                setRejectReason("");
-              }}
-              style={{
-                padding: "8px 16px",
-                cursor: "pointer",
-                border: "1px solid #ccc",
-                borderRadius: 4,
-                background: "none",
-              }}
-            >
-              Huỷ
-            </button>
+    <AdminPageShell>
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Chi tiết đăng ký {typeName}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Kiểm tra thông tin yêu cầu trước khi phê duyệt hoặc từ chối.
+            </p>
           </div>
+          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            Quay lại
+          </Button>
         </div>
-      )}
-    </div>
+
+        <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="border border-border bg-card p-4">
+            <div className="mb-4 grid gap-3 border-b border-border pb-4 text-sm md:grid-cols-3">
+              <div className="grid gap-1">
+                <span className="font-medium text-muted-foreground">Mã</span>
+                <span className="break-all text-foreground">{record.id}</span>
+              </div>
+              <div className="grid gap-1">
+                <span className="font-medium text-muted-foreground">Loại</span>
+                <span className="text-foreground">{typeName}</span>
+              </div>
+              <div className="grid gap-1">
+                <span className="font-medium text-muted-foreground">Trạng thái</span>
+                <span>
+                  <StatusBadge status={record.status} />
+                </span>
+              </div>
+            </div>
+
+            {record.rejectionReason && (
+              <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                <span className="font-semibold">Lý do từ chối:</span>{" "}
+                {record.rejectionReason}
+              </div>
+            )}
+
+            <h2 className="text-base font-semibold text-foreground">
+              Dữ liệu đăng ký
+            </h2>
+            <div className="mt-3 overflow-hidden border border-border">
+              <table className="w-full border-collapse text-sm">
+                <tbody>
+                  {requestDataEntries.map(([key, value]) => (
+                    <tr key={key} className="border-b border-border last:border-0">
+                      <td className="w-56 bg-muted/50 px-4 py-2.5 font-medium text-muted-foreground">
+                        {key}
+                      </td>
+                      <td className="px-4 py-2.5 text-foreground">
+                        {String(value ?? "—")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside className="grid content-start gap-4">
+            <section className="border border-border bg-card p-4">
+              <h2 className="text-base font-semibold text-foreground">
+                Dòng thời gian
+              </h2>
+              <ol className="mt-4 space-y-3">
+                {timeline.map((event) => (
+                  <li key={event.label} className="border-l-2 border-primary pl-4">
+                    <div className="text-sm font-semibold text-foreground">
+                      {event.label}
+                    </div>
+                    <div className="mt-0.5 text-sm text-muted-foreground">
+                      {new Date(event.date).toLocaleString("vi-VN")}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            {(error || canApprove) && (
+              <section className="border border-border bg-card p-4">
+                <h2 className="text-base font-semibold text-foreground">Thao tác</h2>
+                {error && (
+                  <p className="mt-3 text-sm font-medium text-destructive">
+                    {error}
+                  </p>
+                )}
+
+                {canApprove && !rejectMode && (
+                  <div className="mt-4 grid gap-2">
+                    <Button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleApprove}
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      {actionLoading ? "Đang duyệt…" : "Duyệt"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => setRejectMode(true)}
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
+                )}
+
+                {canApprove && rejectMode && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-foreground">
+                      Lý do (bắt buộc, tối thiểu 5 ký tự)
+                      <textarea
+                        className="mt-2 min-h-28 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        rows={4}
+                      />
+                    </label>
+                    <div className="mt-3 grid gap-2">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={rejectReason.length < 5 || actionLoading}
+                        onClick={handleReject}
+                      >
+                        {actionLoading ? "Đang từ chối…" : "Xác nhận từ chối"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setRejectMode(false);
+                          setRejectReason("");
+                        }}
+                      >
+                        Huỷ
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+          </aside>
+        </div>
+      </div>
+    </AdminPageShell>
   );
 }
