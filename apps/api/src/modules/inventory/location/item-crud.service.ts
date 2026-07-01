@@ -261,9 +261,12 @@ export class InventoryItemCrudService extends BaseCrudService<
       }
     }
 
-    const productId = await this.resolveProductIdForUpdate(id, normalized, actor);
-    if (productId && this.hasProductLevelPatch(normalized)) {
-      return this.updateProductWithVariants(productId, normalized, actor);
+    const productRepo = this.dataSource.getRepository(ProductEntity);
+    const isProductUuid = await productRepo.exist({
+      where: { id, organizationId: actor.organizationId },
+    });
+    if (isProductUuid && this.hasProductLevelPatch(normalized)) {
+      return this.updateProductWithVariants(id, normalized, actor);
     }
 
     // Only reconcile nested collections that were explicitly provided — a patch
@@ -692,28 +695,6 @@ export class InventoryItemCrudService extends BaseCrudService<
     return { productId: product.id, itemsCreated };
   }
 
-  /** Route id may be a product UUID (list) or a variant item UUID (deep link). */
-  private async resolveProductIdForUpdate(
-    id: string,
-    payload: Record<string, any>,
-    actor: ActorContext,
-  ): Promise<string | null> {
-    if (typeof payload._productId === 'string') {
-      return payload._productId;
-    }
-
-    const productRepo = this.dataSource.getRepository(ProductEntity);
-    const productExists = await productRepo.exist({
-      where: { id, organizationId: actor.organizationId },
-    });
-    if (productExists) return id;
-
-    const item = await this.repository.findOne({
-      where: { id, organizationId: actor.organizationId },
-      select: { id: true, productId: true },
-    });
-    return item?.productId ?? null;
-  }
 
   private hasProductLevelPatch(payload: Record<string, any>): boolean {
     return (

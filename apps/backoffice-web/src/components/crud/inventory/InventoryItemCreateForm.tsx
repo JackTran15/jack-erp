@@ -329,7 +329,6 @@ export function InventoryItemCreateForm({
         if (existing) {
           next.push({
             ...existing,
-            name: variantName,
             unit: baseUnit,
             sku,
           });
@@ -340,13 +339,17 @@ export function InventoryItemCreateForm({
             saved && typeof saved.code === "string" && saved.code
               ? String(saved.code)
               : sku;
+          const savedName =
+            saved && typeof saved.name === "string" && saved.name
+              ? String(saved.name)
+              : variantName;
           next.push({
             id: `variant-${key}`,
             itemId:
               saved && typeof saved.id === "string" ? String(saved.id) : undefined,
             color,
             size,
-            name: variantName,
+            name: savedName,
             unit: baseUnit,
             sku: savedSku,
             purchasePrice:
