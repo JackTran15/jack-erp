@@ -1537,6 +1537,36 @@
         ]
       }
     },
+    "/payment-accounts": {
+      "get": {
+        "operationId": "PaymentAccountsController_list",
+        "parameters": [
+          {
+            "name": "method",
+            "required": false,
+            "in": "query",
+            "description": "Filter to a single payment method (cash/bank_transfer/card).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "bank_transfer",
+                "card"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active payment accounts for the current branch."
+          }
+        },
+        "summary": "List the active payment accounts for the actor's branch (POS checkout picker).",
+        "tags": [
+          "payment-accounts"
+        ]
+      }
+    },
     "/cash-receipts": {
       "post": {
         "operationId": "CashReceiptsController_create",
@@ -3413,36 +3443,6 @@
         },
         "tags": [
           "DocumentNumbering"
-        ]
-      }
-    },
-    "/payment-accounts": {
-      "get": {
-        "operationId": "PaymentAccountsController_list",
-        "parameters": [
-          {
-            "name": "method",
-            "required": false,
-            "in": "query",
-            "description": "Filter to a single payment method (cash/bank_transfer/card).",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "bank_transfer",
-                "card"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Active payment accounts for the current branch."
-          }
-        },
-        "summary": "List the active payment accounts for the actor's branch (POS checkout picker).",
-        "tags": [
-          "payment-accounts"
         ]
       }
     },
@@ -14119,6 +14119,37 @@
         ]
       }
     },
+    "/reports/invoices/detail": {
+      "get": {
+        "operationId": "InvoiceReportController_getInvoiceDetail",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Full invoice detail (line items + payments) for the drill-down dialog, by invoice code.",
+        "tags": [
+          "reports/invoices"
+        ]
+      }
+    },
     "/reports/invoices/templates": {
       "get": {
         "operationId": "InvoiceReportController_listTemplates",
@@ -17919,7 +17950,7 @@
           },
           "contraAccountId": {
             "type": "string",
-            "description": "Contra GL account for the whole voucher (per-header, e.g. 511/131/711).",
+            "description": "Optional contra GL account override. Normally the contra account is resolved\nserver-side from {@link purpose}; this is only honoured for cases where the\ncashier explicitly picks the offsetting account (e.g. a transfer destination).",
             "format": "uuid"
           },
           "totalAmount": {
@@ -17945,7 +17976,6 @@
         "required": [
           "voucherDate",
           "cashAccountId",
-          "contraAccountId",
           "totalAmount",
           "lines"
         ]
@@ -18336,7 +18366,7 @@
           },
           "contraAccountId": {
             "type": "string",
-            "description": "Contra GL account for the whole voucher (per-header, e.g. 331/811).",
+            "description": "Optional contra GL account override. Normally the contra account is resolved\nserver-side from {@link purpose}; this is only honoured for cases where the\ncashier explicitly picks the offsetting account (e.g. a transfer destination).",
             "format": "uuid"
           },
           "totalAmount": {
@@ -18362,7 +18392,6 @@
         "required": [
           "voucherDate",
           "cashAccountId",
-          "contraAccountId",
           "totalAmount",
           "lines"
         ]

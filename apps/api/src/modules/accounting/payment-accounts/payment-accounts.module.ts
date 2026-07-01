@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccountEntity } from '../coa/account.entity';
 import { PaymentAccountEntity } from './payment-account.entity';
 import { AccountingDefaultAccountEntity } from './accounting-default-account.entity';
 import { AccountResolverService } from './account-resolver.service';
 import { PaymentAccountsService } from './payment-accounts.service';
 import { PaymentAccountsController } from './payment-accounts.controller';
+import { DefaultAccountSeederService } from '../seeders/default-account.seeder';
 
 /**
  * Payment-account & default-account config module. Exposes
@@ -18,10 +20,15 @@ import { PaymentAccountsController } from './payment-accounts.controller';
     TypeOrmModule.forFeature([
       PaymentAccountEntity,
       AccountingDefaultAccountEntity,
+      AccountEntity,
     ]),
   ],
   controllers: [PaymentAccountsController],
-  providers: [AccountResolverService, PaymentAccountsService],
-  exports: [AccountResolverService],
+  providers: [
+    AccountResolverService,
+    PaymentAccountsService,
+    DefaultAccountSeederService,
+  ],
+  exports: [AccountResolverService, DefaultAccountSeederService],
 })
 export class PaymentAccountsModule {}

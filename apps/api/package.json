@@ -19,6 +19,7 @@
     "schema:drop": "typeorm-ts-node-commonjs schema:drop -d src/database/data-source.ts",
     "seed:inventory": "ts-node src/database/seeds/inventory.seed.ts",
     "seed:dev-admin": "ts-node src/database/seeds/inventory.seed.ts",
+    "seed:org": "ts-node src/database/seeds/org-baseline.seed.ts",
     "seed:sync-admin-permissions": "ts-node src/database/seeds/sync-admin-permissions.seed.ts",
     "seed:report-types": "ts-node src/database/seeds/report-types.seed.ts",
     "seed:demo": "ts-node src/database/seeds/inventory-demo.seed.ts",

@@ -26,7 +26,6 @@ function mapPartnerFields(detail: LedgerCashVoucherDetail) {
 export function ledgerDetailToCreateReceiptBody(
   detail: LedgerCashVoucherDetail,
   cashAccountId: string,
-  contraAccountId: string,
 ): CreateCashReceiptBody {
   const lines = detail.lines.map((l) => ({
     description: l.description,
@@ -45,7 +44,7 @@ export function ledgerDetailToCreateReceiptBody(
     reason: detail.reason,
     ...mapPartnerFields(detail),
     cashAccountId,
-    contraAccountId,
+    // contraAccountId omitted — resolved server-side from the purpose.
     totalAmount,
     lines,
   };
@@ -79,7 +78,6 @@ export function ledgerDetailToDebtCollectionBody(
 export function ledgerDetailToCreatePaymentBody(
   detail: LedgerCashVoucherDetail,
   cashAccountId: string,
-  contraAccountId: string,
 ): CreateCashPaymentBody {
   const lines = detail.lines.map((l) => ({
     description: l.description,
@@ -95,7 +93,9 @@ export function ledgerDetailToCreatePaymentBody(
     reason: detail.reason,
     ...mapPartnerFields(detail),
     cashAccountId,
-    contraAccountId: detail.transferAccountId || contraAccountId,
+    // contraAccountId omitted — resolved server-side from the purpose. NOTE:
+    // transfer sub-options (cash→bank, branch transfer) currently resolve by
+    // purpose too; booking them against the destination account is follow-up.
     totalAmount,
     lines,
   };

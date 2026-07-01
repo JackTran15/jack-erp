@@ -525,6 +525,23 @@ export interface paths {
         patch: operations["CoaController_update"];
         trace?: never;
     };
+    "/payment-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the active payment accounts for the actor's branch (POS checkout picker). */
+        get: operations["PaymentAccountsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash-receipts": {
         parameters: {
             query?: never;
@@ -1105,23 +1122,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["DocumentNumberingController_generate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payment-accounts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List the active payment accounts for the actor's branch (POS checkout picker). */
-        get: operations["PaymentAccountsController_list"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4709,6 +4709,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/invoices/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Full invoice detail (line items + payments) for the drill-down dialog, by invoice code. */
+        get: operations["InvoiceReportController_getInvoiceDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/invoices/templates": {
         parameters: {
             query?: never;
@@ -5738,9 +5755,11 @@ export interface components {
             cashAccountId: string;
             /**
              * Format: uuid
-             * @description Contra GL account for the whole voucher (per-header, e.g. 511/131/711).
+             * @description Optional contra GL account override. Normally the contra account is resolved
+             *     server-side from {@link purpose}; this is only honoured for cases where the
+             *     cashier explicitly picks the offsetting account (e.g. a transfer destination).
              */
-            contraAccountId: string;
+            contraAccountId?: string;
             /** @description Denormalized total — must equal sum(lines.amount). */
             totalAmount: number;
             attachmentIds?: string[];
@@ -5872,9 +5891,11 @@ export interface components {
             cashAccountId: string;
             /**
              * Format: uuid
-             * @description Contra GL account for the whole voucher (per-header, e.g. 331/811).
+             * @description Optional contra GL account override. Normally the contra account is resolved
+             *     server-side from {@link purpose}; this is only honoured for cases where the
+             *     cashier explicitly picks the offsetting account (e.g. a transfer destination).
              */
-            contraAccountId: string;
+            contraAccountId?: string;
             /** @description Denormalized total — must equal sum(lines.amount). */
             totalAmount: number;
             attachmentIds?: string[];
@@ -10851,6 +10872,27 @@ export interface operations {
             };
         };
     };
+    PaymentAccountsController_list: {
+        parameters: {
+            query?: {
+                /** @description Filter to a single payment method (cash/bank_transfer/card). */
+                method?: "cash" | "bank_transfer" | "card";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active payment accounts for the current branch. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     CashReceiptsController_list: {
         parameters: {
             query?: {
@@ -11920,27 +11962,6 @@ export interface operations {
                 content: {
                     "application/json": string;
                 };
-            };
-        };
-    };
-    PaymentAccountsController_list: {
-        parameters: {
-            query?: {
-                /** @description Filter to a single payment method (cash/bank_transfer/card). */
-                method?: "cash" | "bank_transfer" | "card";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Active payment accounts for the current branch. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -18251,6 +18272,27 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    InvoiceReportController_getInvoiceDetail: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

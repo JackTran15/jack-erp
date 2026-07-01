@@ -19,6 +19,8 @@ import {
   CashVoucherStatus,
 } from '../enums';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { CashReceiptEntity } from './cash-receipt.entity';
 import { CashReceiptLineEntity } from './cash-receipt-line.entity';
 import { CreateCashReceiptDto } from './dto/create-cash-receipt.dto';
@@ -42,6 +44,8 @@ export interface CashReceiptCreateAndPostArgs {
   partnerName?: string;
   partnerAddress?: string;
   payerName?: string;
+  staffId?: string;
+  attachmentIds?: string[];
   reason?: string;
   description?: string;
   categoryId?: string;
@@ -65,6 +69,21 @@ export interface ReverseResult {
   reversal: CashReceiptEntity;
 }
 
+/**
+ * Contra (offsetting) GL account role per receipt purpose. A manually-created
+ * receipt posts DR cash / CR contra, where the contra account is resolved from
+ * this role via {@link AccountResolverService}.
+ */
+const RECEIPT_PURPOSE_TO_ROLE: Record<
+  CashReceiptPurpose,
+  AccountingDefaultAccountRole
+> = {
+  [CashReceiptPurpose.OTHER]: AccountingDefaultAccountRole.OTHER_INCOME,
+  [CashReceiptPurpose.OTHER_INCOME]: AccountingDefaultAccountRole.OTHER_INCOME,
+  [CashReceiptPurpose.POS_SALE]: AccountingDefaultAccountRole.REVENUE,
+  [CashReceiptPurpose.DEBT_COLLECTION]: AccountingDefaultAccountRole.RECEIVABLE,
+};
+
 /** Derived link back to the source document that auto-created the voucher. */
 export interface SourceLink {
   sourceType: string;
@@ -85,6 +104,7 @@ export class CashReceiptsService {
     private readonly cashService: CashService,
     private readonly docNumbering: DocumentNumberingService,
     private readonly partnerResolver: PartnerResolverService,
+    private readonly accountResolver: AccountResolverService,
     private readonly debtCollectionSaga: DebtCollectionSagaService,
   ) {}
 
@@ -92,44 +112,63 @@ export class CashReceiptsService {
   // CRUD (DRAFT lifecycle)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Create a manual cash receipt and post it to the ledger immediately (no DRAFT
+   * stage). The contra account is resolved server-side from the voucher purpose
+   * (DR cash / CR contra); an explicit `contraAccountId` is honoured only as an
+   * override. Movement + journal entry + POSTED voucher are written atomically.
+   * Corrections are made via {@link reverse}, not edits.
+   */
   async create(
     dto: CreateCashReceiptDto,
     actor: ActorContext,
   ): Promise<CashReceiptEntity> {
     this.assertTotalMatchesLines(dto.totalAmount, dto.lines);
+    const purpose = dto.purpose ?? CashReceiptPurpose.OTHER;
 
     return this.dataSource.transaction(async (manager) => {
       await this.assertCashAccount(manager, dto.cashAccountId, actor.organizationId);
-      // Validate the polymorphic partner exists (snapshot is frozen at post).
-      await this.partnerResolver.resolve(
+      // Validate the polymorphic partner exists and snapshot its name/address.
+      const partner = await this.partnerResolver.resolve(
         manager,
         dto.partnerType,
         dto.partnerId,
         actor.organizationId,
       );
+      const contraAccountId = await this.accountResolver.resolveContraAccount(
+        RECEIPT_PURPOSE_TO_ROLE[purpose],
+        actor,
+        dto.contraAccountId,
+      );
 
-      const receipt = manager.create(CashReceiptEntity, {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-        documentNumber: dto.documentNumber ?? undefined,
-        voucherDate: dto.voucherDate,
-        status: CashVoucherStatus.DRAFT,
-        purpose: dto.purpose ?? CashReceiptPurpose.OTHER,
-        partnerType: dto.partnerType,
-        partnerId: dto.partnerId,
-        payerName: dto.payerName,
-        reason: dto.reason,
-        staffId: dto.staffId,
-        cashAccountId: dto.cashAccountId,
-        contraAccountId: dto.contraAccountId,
-        totalAmount: dto.totalAmount,
-        attachmentIds: dto.attachmentIds ?? [],
-      });
-      const saved = await manager.save(receipt);
+      const { voucherId } = await this.createAndPostInternalInTx(
+        {
+          purpose,
+          cashAccountId: dto.cashAccountId,
+          contraAccountId,
+          amount: dto.totalAmount,
+          actor,
+          voucherDate: dto.voucherDate,
+          referenceType: CashReceiptReferenceType.MANUAL,
+          partnerType: dto.partnerType,
+          partnerId: dto.partnerId,
+          partnerName: partner?.name ?? undefined,
+          partnerAddress: partner?.address ?? undefined,
+          payerName: dto.payerName,
+          staffId: dto.staffId,
+          attachmentIds: dto.attachmentIds ?? [],
+          reason: dto.reason,
+          lines: dto.lines.map((l) => ({
+            description: l.description,
+            amount: l.amount,
+            categoryId: l.categoryId,
+            referenceNote: l.referenceNote,
+          })),
+        },
+        manager,
+      );
 
-      await this.insertLines(manager, saved.id, actor, dto.lines);
-      return this.getByIdInTx(manager, saved.id, actor.organizationId);
+      return this.getByIdInTx(manager, voucherId, actor.organizationId);
     });
   }
 
@@ -554,6 +593,8 @@ export class CashReceiptsService {
       partnerNameSnapshot: args.partnerName,
       partnerAddressSnapshot: args.partnerAddress,
       payerName: args.payerName,
+      staffId: args.staffId,
+      attachmentIds: args.attachmentIds ?? [],
       reason: args.reason,
       referenceType: args.referenceType,
       referenceId: args.referenceId,

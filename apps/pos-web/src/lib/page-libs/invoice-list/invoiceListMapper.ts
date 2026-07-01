@@ -2,6 +2,7 @@ import type {
   InvoiceListRow,
   InvoiceRow,
 } from "@erp/pos/interfaces/invoice.interface";
+import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 
 /** Thông tin khách dùng để enrich mã/tên/SĐT trên bảng (từ `customerService.get`). */
 export interface InvoiceListRowCustomer {
@@ -13,13 +14,13 @@ export interface InvoiceListRowCustomer {
 /**
  * `InvoiceRow` (`GET /invoices`) → dòng hiển thị bảng "Danh sách hóa đơn".
  * `customer` enrich riêng vì endpoint danh sách chỉ trả `customerId`.
- * `amount` hiển thị âm cho đơn trả (quy ước hiển thị, dễ chỉnh nếu BE đổi sign).
+ * `amount` có dấu: RETURN/EXCHANGE dùng `netAmount` (âm = hoàn tiền khách), còn lại `amountDue`
+ * (xem `getInvoiceSignedTotal`).
  */
 export function mapInvoiceToListRow(
   inv: InvoiceRow,
   customer: InvoiceListRowCustomer | null,
 ): InvoiceListRow {
-  const due = Number(inv.amountDue) || 0;
   return {
     id: inv.id,
     code: inv.code,
@@ -31,7 +32,7 @@ export function mapInvoiceToListRow(
     customerCode: customer?.code ?? "",
     customerName: customer?.name ?? "",
     customerPhone: customer?.phone ?? "",
-    amount: inv.type === "RETURN" ? -due : due,
+    amount: getInvoiceSignedTotal(inv),
     note: inv.note ?? "",
   };
 }

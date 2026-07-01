@@ -113,8 +113,8 @@ describe('Cash Vouchers Phase 2 — Expense auto-create (E2E)', () => {
       .expect(201);
     cashAccountId = accRes.body.id;
 
-    // Top up the register so the expense can be paid in cash.
-    const r = await request(app.getHttpServer())
+    // Top up the register (auto-posted) so the expense can be paid in cash.
+    await request(app.getHttpServer())
       .post('/cash-receipts')
       .set(headers())
       .send({
@@ -124,10 +124,6 @@ describe('Cash Vouchers Phase 2 — Expense auto-create (E2E)', () => {
         totalAmount: 1000000,
         lines: [{ description: 'Nạp quỹ', amount: 1000000 }],
       })
-      .expect(201);
-    await request(app.getHttpServer())
-      .post(`/cash-receipts/${r.body.id}/post`)
-      .set(headers())
       .expect(201);
   }, 120000);
 

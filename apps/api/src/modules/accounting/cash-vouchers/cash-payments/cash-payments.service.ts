@@ -19,6 +19,8 @@ import {
   CashVoucherStatus,
 } from '../enums';
 import { PartnerResolverService } from '../shared/partner-resolver.service';
+import { AccountResolverService } from '../../payment-accounts/account-resolver.service';
+import { AccountingDefaultAccountRole } from '../../payment-accounts/enums';
 import { CashPaymentEntity } from './cash-payment.entity';
 import { CashPaymentLineEntity } from './cash-payment-line.entity';
 import { CreateCashPaymentDto } from './dto/create-cash-payment.dto';
@@ -41,6 +43,8 @@ export interface CashPaymentCreateAndPostArgs {
   partnerName?: string;
   partnerAddress?: string;
   payeeName?: string;
+  staffId?: string;
+  attachmentIds?: string[];
   reason?: string;
   description?: string;
   categoryId?: string;
@@ -63,6 +67,23 @@ export interface ReversePaymentResult {
   reversal: CashPaymentEntity;
 }
 
+/**
+ * Contra (offsetting) GL account role per payment purpose. A manually-created
+ * payment posts DR contra / CR cash, where the contra account is resolved from
+ * this role via {@link AccountResolverService}.
+ */
+const PAYMENT_PURPOSE_TO_ROLE: Record<
+  CashPaymentPurpose,
+  AccountingDefaultAccountRole
+> = {
+  [CashPaymentPurpose.SUPPLIER_PAYMENT]: AccountingDefaultAccountRole.PAYABLE,
+  [CashPaymentPurpose.PURCHASE]: AccountingDefaultAccountRole.PAYABLE,
+  [CashPaymentPurpose.EXPENSE]: AccountingDefaultAccountRole.EXPENSE,
+  [CashPaymentPurpose.SALARY]: AccountingDefaultAccountRole.EXPENSE,
+  [CashPaymentPurpose.OTHER]: AccountingDefaultAccountRole.EXPENSE,
+  [CashPaymentPurpose.REFUND]: AccountingDefaultAccountRole.REVENUE,
+};
+
 /** Derived link back to the source document that auto-created the voucher. */
 export interface PaymentSourceLink {
   sourceType: string;
@@ -83,6 +104,7 @@ export class CashPaymentsService {
     private readonly cashService: CashService,
     private readonly docNumbering: DocumentNumberingService,
     private readonly partnerResolver: PartnerResolverService,
+    private readonly accountResolver: AccountResolverService,
     private readonly supplierDebtPaymentSaga: SupplierDebtPaymentSagaService,
   ) {}
 
@@ -90,43 +112,63 @@ export class CashPaymentsService {
   // CRUD (DRAFT lifecycle)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Create a manual cash payment and post it to the ledger immediately (no DRAFT
+   * stage). The contra account is resolved server-side from the voucher purpose
+   * (DR contra / CR cash); an explicit `contraAccountId` is honoured only as an
+   * override (e.g. a transfer destination). Movement + journal entry + POSTED
+   * voucher are written atomically; insufficient balance fails the whole create.
+   * Corrections are made via {@link reverse}, not edits.
+   */
   async create(
     dto: CreateCashPaymentDto,
     actor: ActorContext,
   ): Promise<CashPaymentEntity> {
     this.assertTotalMatchesLines(dto.totalAmount, dto.lines);
+    const purpose = dto.purpose ?? CashPaymentPurpose.OTHER;
 
     return this.dataSource.transaction(async (manager) => {
       await this.assertCashAccount(manager, dto.cashAccountId, actor.organizationId);
-      await this.partnerResolver.resolve(
+      const partner = await this.partnerResolver.resolve(
         manager,
         dto.partnerType,
         dto.partnerId,
         actor.organizationId,
       );
+      const contraAccountId = await this.accountResolver.resolveContraAccount(
+        PAYMENT_PURPOSE_TO_ROLE[purpose],
+        actor,
+        dto.contraAccountId,
+      );
 
-      const payment = manager.create(CashPaymentEntity, {
-        organizationId: actor.organizationId,
-        branchId: actor.branchId,
-        createdBy: actor.userId,
-        documentNumber: dto.documentNumber ?? undefined,
-        voucherDate: dto.voucherDate,
-        status: CashVoucherStatus.DRAFT,
-        purpose: dto.purpose ?? CashPaymentPurpose.OTHER,
-        partnerType: dto.partnerType,
-        partnerId: dto.partnerId,
-        payeeName: dto.payeeName,
-        reason: dto.reason,
-        staffId: dto.staffId,
-        cashAccountId: dto.cashAccountId,
-        contraAccountId: dto.contraAccountId,
-        totalAmount: dto.totalAmount,
-        attachmentIds: dto.attachmentIds ?? [],
-      });
-      const saved = await manager.save(payment);
+      const { voucherId } = await this.createAndPostInternalInTx(
+        {
+          purpose,
+          cashAccountId: dto.cashAccountId,
+          contraAccountId,
+          amount: dto.totalAmount,
+          actor,
+          voucherDate: dto.voucherDate,
+          referenceType: CashPaymentReferenceType.MANUAL,
+          partnerType: dto.partnerType,
+          partnerId: dto.partnerId,
+          partnerName: partner?.name ?? undefined,
+          partnerAddress: partner?.address ?? undefined,
+          payeeName: dto.payeeName,
+          staffId: dto.staffId,
+          attachmentIds: dto.attachmentIds ?? [],
+          reason: dto.reason,
+          lines: dto.lines.map((l) => ({
+            description: l.description,
+            amount: l.amount,
+            categoryId: l.categoryId,
+            referenceNote: l.referenceNote,
+          })),
+        },
+        manager,
+      );
 
-      await this.insertLines(manager, saved.id, actor, dto.lines);
-      return this.getByIdInTx(manager, saved.id, actor.organizationId);
+      return this.getByIdInTx(manager, voucherId, actor.organizationId);
     });
   }
 
@@ -544,6 +586,8 @@ export class CashPaymentsService {
       partnerNameSnapshot: args.partnerName,
       partnerAddressSnapshot: args.partnerAddress,
       payeeName: args.payeeName,
+      staffId: args.staffId,
+      attachmentIds: args.attachmentIds ?? [],
       reason: args.reason,
       referenceType: args.referenceType,
       referenceId: args.referenceId,
