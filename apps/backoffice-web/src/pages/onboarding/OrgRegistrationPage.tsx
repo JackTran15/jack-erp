@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { Button } from "@erp/ui";
 import { hasPermission } from "../../lib/permissions";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
   useRegistration,
   RegistrationStatus,
@@ -16,12 +18,28 @@ const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
-const STATUS_COLORS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "#e6a817",
-  [RegistrationStatus.APPROVED]: "#2e7d32",
-  [RegistrationStatus.REJECTED]: "#c62828",
-  [RegistrationStatus.RESUBMITTED]: "#1565c0",
-};
+function getStatusClassName(status: RegistrationStatus): string {
+  if (status === RegistrationStatus.APPROVED) {
+    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+  }
+  if (status === RegistrationStatus.REJECTED) {
+    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+  }
+  if (status === RegistrationStatus.RESUBMITTED) {
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+  }
+  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+}
+
+function StatusBadge({ status }: { status: RegistrationStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 export function OrgRegistrationPage() {
   const { submitOrgRegistration } = useRegistration();
@@ -39,12 +57,18 @@ export function OrgRegistrationPage() {
 
   if (!hasPermission(PERMISSION)) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Đăng ký tổ chức</h2>
-        <p style={{ color: "#c62828" }}>
-          Bạn không có quyền gửi đăng ký tổ chức.
-        </p>
-      </div>
+      <AdminPageShell>
+        <div className="p-6">
+          <div className="max-w-xl rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Đăng ký tổ chức
+            </h1>
+            <p className="mt-2 text-sm font-medium text-destructive">
+              Bạn không có quyền gửi đăng ký tổ chức.
+            </p>
+          </div>
+        </div>
+      </AdminPageShell>
     );
   }
 
@@ -70,145 +94,147 @@ export function OrgRegistrationPage() {
 
   if (result) {
     return (
-      <div style={{ padding: 24 }}>
-        <h2>Đăng ký tổ chức</h2>
-        <div
-          style={{
-            border: "1px solid #ccc",
-            borderRadius: 8,
-            padding: 20,
-            maxWidth: 500,
-          }}
-        >
-          <h3>Đã gửi yêu cầu</h3>
-          <p>
-            <strong>Mã:</strong> {result.id}
-          </p>
-          <p>
-            <strong>Trạng thái:</strong>{" "}
-            <span style={{ color: STATUS_COLORS[result.status], fontWeight: 600 }}>
-              {STATUS_LABELS[result.status]}
-            </span>
-          </p>
-          <p>
-            <strong>Gửi lúc:</strong>{" "}
-            {new Date(result.createdAt).toLocaleString("vi-VN")}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setResult(null);
-              setForm({
-                organizationName: "",
-                contactEmail: "",
-                contactPhone: "",
-                ownerName: "",
-                ownerEmail: "",
-              });
-            }}
-            style={{ marginTop: 12, padding: "8px 16px", cursor: "pointer" }}
-          >
-            Gửi thêm yêu cầu
-          </button>
+      <AdminPageShell>
+        <div className="flex flex-col p-4">
+          <div className="mb-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Đăng ký tổ chức
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Gửi yêu cầu tạo tổ chức mới trong hệ thống.
+            </p>
+          </div>
+
+          <div className="border border-border bg-card p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-foreground">
+                Đã gửi yêu cầu
+              </h2>
+              <StatusBadge status={result.status} />
+            </div>
+            <dl className="grid gap-4 text-sm md:grid-cols-[minmax(0,2fr)_minmax(160px,1fr)]">
+              <div className="grid gap-1">
+                <dt className="font-medium text-muted-foreground">Mã</dt>
+                <dd className="break-all text-foreground">{result.id}</dd>
+              </div>
+              <div className="grid gap-1">
+                <dt className="font-medium text-muted-foreground">Gửi lúc</dt>
+                <dd className="text-foreground">
+                  {new Date(result.createdAt).toLocaleString("vi-VN")}
+                </dd>
+              </div>
+            </dl>
+            <Button
+              type="button"
+              className="mt-4"
+              onClick={() => {
+                setResult(null);
+                setForm({
+                  organizationName: "",
+                  contactEmail: "",
+                  contactPhone: "",
+                  ownerName: "",
+                  ownerEmail: "",
+                });
+              }}
+            >
+              Gửi thêm yêu cầu
+            </Button>
+          </div>
         </div>
-      </div>
+      </AdminPageShell>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Đăng ký tổ chức</h2>
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          maxWidth: 500,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-        }}
-      >
-        <label>
-          <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Tên tổ chức *
-          </span>
-          <input
-            type="text"
-            required
-            minLength={2}
-            maxLength={200}
-            value={form.organizationName}
-            onChange={(e) => handleChange("organizationName", e.target.value)}
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-          />
-        </label>
+    <AdminPageShell>
+      <div className="flex flex-col p-4">
+        <div className="mb-3">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Đăng ký tổ chức
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nhập thông tin liên hệ và chủ sở hữu để gửi yêu cầu phê duyệt.
+          </p>
+        </div>
 
-        <label>
-          <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Email liên hệ *
-          </span>
-          <input
-            type="email"
-            required
-            value={form.contactEmail}
-            onChange={(e) => handleChange("contactEmail", e.target.value)}
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-          />
-        </label>
-
-        <label>
-          <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Điện thoại liên hệ
-          </span>
-          <input
-            type="tel"
-            maxLength={30}
-            value={form.contactPhone}
-            onChange={(e) => handleChange("contactPhone", e.target.value)}
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-          />
-        </label>
-
-        <label>
-          <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Tên chủ sở hữu *
-          </span>
-          <input
-            type="text"
-            required
-            minLength={2}
-            value={form.ownerName}
-            onChange={(e) => handleChange("ownerName", e.target.value)}
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-          />
-        </label>
-
-        <label>
-          <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-            Email chủ sở hữu *
-          </span>
-          <input
-            type="email"
-            required
-            value={form.ownerEmail}
-            onChange={(e) => handleChange("ownerEmail", e.target.value)}
-            style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
-          />
-        </label>
-
-        {error && <p style={{ color: "#c62828", margin: 0 }}>{error}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            padding: "10px 20px",
-            cursor: submitting ? "not-allowed" : "pointer",
-            fontWeight: 600,
-          }}
+        <form
+          onSubmit={handleSubmit}
+          className="grid max-w-5xl gap-4 border border-border bg-card p-4 md:grid-cols-2"
         >
-          {submitting ? "Đang gửi…" : "Gửi đăng ký"}
-        </button>
-      </form>
-    </div>
+          <label className="grid gap-1 text-sm font-medium text-foreground">
+            Tên tổ chức *
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="text"
+              required
+              minLength={2}
+              maxLength={200}
+              value={form.organizationName}
+              onChange={(e) => handleChange("organizationName", e.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-foreground">
+            Email liên hệ *
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="email"
+              required
+              value={form.contactEmail}
+              onChange={(e) => handleChange("contactEmail", e.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-foreground">
+            Điện thoại liên hệ
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="tel"
+              maxLength={30}
+              value={form.contactPhone}
+              onChange={(e) => handleChange("contactPhone", e.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-foreground">
+            Tên chủ sở hữu *
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="text"
+              required
+              minLength={2}
+              value={form.ownerName}
+              onChange={(e) => handleChange("ownerName", e.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-foreground">
+            Email chủ sở hữu *
+            <input
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="email"
+              required
+              value={form.ownerEmail}
+              onChange={(e) => handleChange("ownerEmail", e.target.value)}
+            />
+          </label>
+
+          {error && (
+            <p className="m-0 text-sm font-medium text-destructive md:col-span-2">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="justify-self-start md:col-span-2"
+          >
+            {submitting ? "Đang gửi…" : "Gửi đăng ký"}
+          </Button>
+        </form>
+      </div>
+    </AdminPageShell>
   );
 }

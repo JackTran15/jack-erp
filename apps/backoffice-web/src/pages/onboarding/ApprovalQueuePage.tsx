@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { AppModal, Button } from "@erp/ui";
 import { hasAnyPermission } from "../../lib/permissions";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
+import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
   useRegistration,
   RegistrationStatus,
@@ -23,13 +25,6 @@ const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
-const STATUS_COLORS: Record<RegistrationStatus, string> = {
-  [RegistrationStatus.PENDING_APPROVAL]: "#e6a817",
-  [RegistrationStatus.APPROVED]: "#2e7d32",
-  [RegistrationStatus.REJECTED]: "#c62828",
-  [RegistrationStatus.RESUBMITTED]: "#1565c0",
-};
-
 const TYPE_LABELS: Record<RegistrationType, string> = {
   [RegistrationType.ORGANIZATION]: "Tổ chức",
   [RegistrationType.BRANCH]: "Chi nhánh",
@@ -37,6 +32,29 @@ const TYPE_LABELS: Record<RegistrationType, string> = {
 
 type TypeFilter = "all" | "org" | "branch";
 type StatusFilter = "all" | RegistrationStatus;
+
+function getStatusClassName(status: RegistrationStatus): string {
+  if (status === RegistrationStatus.APPROVED) {
+    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+  }
+  if (status === RegistrationStatus.REJECTED) {
+    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+  }
+  if (status === RegistrationStatus.RESUBMITTED) {
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+  }
+  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+}
+
+function StatusBadge({ status }: { status: RegistrationStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 export function ApprovalQueuePage() {
   const navigate = useNavigate();
@@ -53,6 +71,19 @@ export function ApprovalQueuePage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const canAccess = hasAnyPermission(...PERMISSIONS);
+  const isPending = (status: RegistrationStatus) =>
+    status === RegistrationStatus.PENDING_APPROVAL ||
+    status === RegistrationStatus.RESUBMITTED;
+  const summary = useMemo(() => {
+    const pending = data.filter((row) => isPending(row.status)).length;
+    const approved = data.filter(
+      (row) => row.status === RegistrationStatus.APPROVED,
+    ).length;
+    const rejected = data.filter(
+      (row) => row.status === RegistrationStatus.REJECTED,
+    ).length;
+    return { pending, approved, rejected, total: data.length };
+  }, [data]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -99,19 +130,21 @@ export function ApprovalQueuePage() {
 
   if (!canAccess) {
     return (
-      <div style={{ padding: 24, maxWidth: 520 }}>
-        <h2 style={{ marginTop: 0 }}>Hàng đợi phê duyệt</h2>
-        <p style={{ color: "#667085", lineHeight: 1.6 }}>
-          Bạn chưa được cấp quyền phê duyệt đăng ký tổ chức hoặc chi nhánh. Vui lòng
-          liên hệ quản trị viên hệ thống.
-        </p>
-      </div>
+      <AdminPageShell>
+        <div className="p-6">
+          <div className="max-w-xl rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Hàng đợi phê duyệt
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Bạn chưa được cấp quyền phê duyệt đăng ký tổ chức hoặc chi nhánh. Vui
+              lòng liên hệ quản trị viên hệ thống.
+            </p>
+          </div>
+        </div>
+      </AdminPageShell>
     );
   }
-
-  const isPending = (status: RegistrationStatus) =>
-    status === RegistrationStatus.PENDING_APPROVAL ||
-    status === RegistrationStatus.RESUBMITTED;
 
   const handleApprove = async (record: RegistrationRequestRecord) => {
     setActionLoading(record.id);
@@ -152,208 +185,196 @@ export function ApprovalQueuePage() {
   };
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Hàng đợi phê duyệt</h2>
+    <AdminPageShell>
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Hàng đợi phê duyệt
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Theo dõi và xử lý các yêu cầu đăng ký tổ chức, chi nhánh.
+            </p>
+          </div>
+          <div className="grid grid-cols-4 overflow-hidden rounded-md border border-border text-sm">
+            <div className="border-r border-border px-3 py-2">
+              <div className="text-xs text-muted-foreground">Tất cả</div>
+              <div className="font-semibold text-foreground">{summary.total}</div>
+            </div>
+            <div className="border-r border-border px-3 py-2">
+              <div className="text-xs text-muted-foreground">Chờ duyệt</div>
+              <div className="font-semibold text-amber-700">{summary.pending}</div>
+            </div>
+            <div className="border-r border-border px-3 py-2">
+              <div className="text-xs text-muted-foreground">Đã duyệt</div>
+              <div className="font-semibold text-green-700">{summary.approved}</div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-xs text-muted-foreground">Từ chối</div>
+              <div className="font-semibold text-rose-700">{summary.rejected}</div>
+            </div>
+          </div>
+        </div>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-        <label>
-          Loại:{" "}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-          >
-            <option value="all">Tất cả</option>
-            <option value="org">Tổ chức</option>
-            <option value="branch">Chi nhánh</option>
-          </select>
-        </label>
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <label className="flex min-w-40 flex-col gap-1 text-sm font-medium text-foreground">
+            Loại
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+            >
+              <option value="all">Tất cả</option>
+              <option value="org">Tổ chức</option>
+              <option value="branch">Chi nhánh</option>
+            </select>
+          </label>
 
-        <label>
-          Trạng thái:{" "}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          >
-            <option value="all">Tất cả</option>
-            {Object.entries(STATUS_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          <label className="flex min-w-48 flex-col gap-1 text-sm font-medium text-foreground">
+            Trạng thái
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm font-normal outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            >
+              <option value="all">Tất cả</option>
+              {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-      {loading ? (
-        <p>Đang tải…</p>
-      ) : data.length === 0 ? (
-        <p>Không có yêu cầu đăng ký.</p>
-      ) : (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            textAlign: "left",
-          }}
-        >
-          <thead>
-            <tr style={{ borderBottom: "2px solid #ccc" }}>
-              <th style={{ padding: 8 }}>Loại</th>
-              <th style={{ padding: 8 }}>Tên</th>
-              <th style={{ padding: 8 }}>Trạng thái</th>
-              <th style={{ padding: 8 }}>Gửi lúc</th>
-              <th style={{ padding: 8 }}>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row) => {
-              const name =
-                row.type === RegistrationType.ORGANIZATION
-                  ? (row.requestData.organizationName as string) ?? "—"
-                  : (row.requestData.branchName as string) ?? "—";
+        <div className="min-h-0 flex-1 overflow-hidden border border-border bg-card">
+          {loading ? (
+            <div className="p-6 text-sm text-muted-foreground">Đang tải...</div>
+          ) : data.length === 0 ? (
+            <div className="flex h-40 items-center justify-center border-t border-border bg-muted/20 text-sm font-medium text-muted-foreground">
+              Không có yêu cầu đăng ký phù hợp với bộ lọc hiện tại.
+            </div>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <thead className="bg-muted/60 text-xs font-semibold uppercase text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3">Loại</th>
+                    <th className="px-4 py-3">Tên</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                    <th className="px-4 py-3">Gửi lúc</th>
+                    <th className="px-4 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((row) => {
+                    const name =
+                      row.type === RegistrationType.ORGANIZATION
+                        ? (row.requestData.organizationName as string) ?? "—"
+                        : (row.requestData.branchName as string) ?? "—";
 
-              return (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: "1px solid #eee",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => navigate(`/onboarding/approvals/${row.id}`, { state: row })}
-                >
-                  <td style={{ padding: 8 }}>{TYPE_LABELS[row.type]}</td>
-                  <td style={{ padding: 8 }}>{name}</td>
-                  <td style={{ padding: 8 }}>
-                    <span
-                      style={{
-                        color: STATUS_COLORS[row.status],
-                        fontWeight: 600,
-                      }}
-                    >
-                      {STATUS_LABELS[row.status]}
-                    </span>
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    {new Date(row.createdAt).toLocaleDateString("vi-VN")}
-                  </td>
-                  <td
-                    style={{ padding: 8 }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {isPending(row.status) && (
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          type="button"
-                          disabled={actionLoading === row.id}
-                          onClick={() => handleApprove(row)}
-                          style={{
-                            padding: "4px 12px",
-                            cursor: "pointer",
-                            backgroundColor: "#2e7d32",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                          }}
+                    return (
+                      <tr
+                        key={row.id}
+                        className="cursor-pointer border-b border-border transition-colors hover:bg-muted/40"
+                        onClick={() =>
+                          navigate(`/onboarding/approvals/${row.id}`, { state: row })
+                        }
+                      >
+                        <td className="px-4 py-2.5 font-medium text-foreground">
+                          {TYPE_LABELS[row.type]}
+                        </td>
+                        <td className="px-4 py-2.5 text-foreground">{name}</td>
+                        <td className="px-4 py-2.5">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground">
+                          {new Date(row.createdAt).toLocaleDateString("vi-VN")}
+                        </td>
+                        <td
+                          className="px-4 py-2.5"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {actionLoading === row.id
-                            ? "…"
-                            : "Duyệt"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectingId(row.id)}
-                          style={{
-                            padding: "4px 12px",
-                            cursor: "pointer",
-                            backgroundColor: "#c62828",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                          }}
-                        >
-                          Từ chối
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+                          {isPending(row.status) && (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={actionLoading === row.id}
+                                onClick={() => handleApprove(row)}
+                                className="bg-green-600 text-white hover:bg-green-700"
+                              >
+                                {actionLoading === row.id ? "..." : "Duyệt"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setRejectingId(row.id)}
+                              >
+                                Từ chối
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-      {rejectingId && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: 24,
-              borderRadius: 8,
-              minWidth: 360,
+        {rejectingId && (
+          <AppModal
+            open={Boolean(rejectingId)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setRejectingId(null);
+                setRejectReason("");
+              }
             }}
+            title="Từ chối đăng ký"
+            showFooter={false}
+            bodyStretch={false}
+            defaultWidth={440}
+            defaultHeight={280}
           >
-            <h3 style={{ marginTop: 0 }}>Từ chối đăng ký</h3>
-            <label>
-              <span style={{ display: "block", marginBottom: 4, fontWeight: 500 }}>
-                Lý do (bắt buộc, tối thiểu 5 ký tự)
-              </span>
+            <label className="block text-sm font-medium text-foreground">
+              Lý do (bắt buộc, tối thiểu 5 ký tự)
               <textarea
+                className="mt-2 min-h-28 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={4}
-                style={{ width: "100%", padding: 8, boxSizing: "border-box" }}
               />
             </label>
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
                 type="button"
+                variant="destructive"
                 disabled={
                   rejectReason.length < 5 || actionLoading === rejectingId
                 }
                 onClick={handleRejectSubmit}
-                style={{
-                  padding: "8px 16px",
-                  cursor:
-                    rejectReason.length < 5 ? "not-allowed" : "pointer",
-                  backgroundColor: "#c62828",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 4,
-                }}
               >
                 {actionLoading === rejectingId ? "Đang từ chối…" : "Xác nhận từ chối"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setRejectingId(null);
                   setRejectReason("");
                 }}
-                style={{
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  border: "1px solid #ccc",
-                  borderRadius: 4,
-                  background: "none",
-                }}
               >
                 Huỷ
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </AppModal>
+        )}
+      </div>
+    </AdminPageShell>
   );
 }
