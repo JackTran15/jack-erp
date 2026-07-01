@@ -1,17 +1,20 @@
 import {
+  IsArray,
+  IsEnum,
   IsInt,
   IsOptional,
   Max,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { GoodsReceiptPurpose } from "@erp/shared-interfaces";
 import {
   CompareFilterDto,
   DateRangeFilterDto,
   EnumFilterDto,
   StringFilterDto,
-} from '../../../../common/filters/filter.dto';
+} from "../../../../common/filters/filter.dto";
 
 /**
  * Server-side search request for the Nhập kho (goods receipt) list.
@@ -56,11 +59,23 @@ export class GoodsReceiptSearchV2Dto {
   @Type(() => StringFilterDto)
   reason?: StringFilterDto;
 
-  /** Loại chứng từ (purpose enum: OTHER | TRANSFER_IN) */
+  /** Loại chứng từ (purpose enum: PURCHASE | OTHER | TRANSFER_IN | STOCK_TAKE) */
   @IsOptional()
   @ValidateNested()
   @Type(() => EnumFilterDto)
   purpose?: EnumFilterDto;
+
+  /** Explicit purpose allow-list, used by separated Mua hàng / Kho hàng menus. */
+  @IsOptional()
+  @IsArray()
+  @IsEnum(GoodsReceiptPurpose, { each: true })
+  purposes?: GoodsReceiptPurpose[];
+
+  /** Purpose deny-list, used so Kho hàng does not show Mua hàng documents. */
+  @IsOptional()
+  @IsArray()
+  @IsEnum(GoodsReceiptPurpose, { each: true })
+  excludePurposes?: GoodsReceiptPurpose[];
 
   /** Ngày (received date range) */
   @IsOptional()

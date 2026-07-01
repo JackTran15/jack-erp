@@ -7,13 +7,15 @@ import {
   IsString,
   IsUUID,
   MaxLength,
-  ValidateIf,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { DocCounterpartyKind, GoodsReceiptPurpose } from '@erp/shared-interfaces';
-import { GoodsReceiptPaymentMethod } from '../goods-receipt.entity';
-import { GoodsReceiptLineDto } from './create-goods-receipt.dto';
+} from "class-validator";
+import { Type } from "class-transformer";
+import {
+  DocCounterpartyKind,
+  GoodsReceiptPurpose,
+} from "@erp/shared-interfaces";
+import { GoodsReceiptPaymentMethod } from "../goods-receipt.entity";
+import { GoodsReceiptLineDto } from "./create-goods-receipt.dto";
 
 /**
  * v2 goods-receipt creation. Adds the supplier/customer "Đối tượng" and relies
@@ -29,7 +31,6 @@ export class CreateGoodsReceiptV2Dto {
   @IsEnum(DocCounterpartyKind)
   counterpartyKind?: DocCounterpartyKind;
 
-  @ValidateIf((o) => o.counterpartyKind !== undefined)
   @IsUUID()
   counterpartyId?: string;
 
@@ -63,14 +64,14 @@ export class CreateGoodsReceiptV2Dto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   attachmentIds?: string[];
 
   @IsOptional()
   @IsEnum(GoodsReceiptPaymentMethod)
   paymentMethod?: GoodsReceiptPaymentMethod;
 
-  @ValidateIf((o) => o.paymentMethod === GoodsReceiptPaymentMethod.CASH)
+  @IsOptional()
   @IsUUID()
   cashAccountId?: string;
 

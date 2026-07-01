@@ -1,17 +1,15 @@
-import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { IQueryHandler, QueryHandler } from "@nestjs/cqrs";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindOptionsWhere, Repository } from "typeorm";
 import {
   ItemCategoryTreeNodeDto,
   SearchItemCategoryTreeResponseDto,
-} from '../dto/search-item-category-tree.dto';
-import { ItemCategoryEntity } from '../item-category.entity';
-import { SearchItemCategoryTreeQuery } from './search-item-category-tree.query';
+} from "../dto/search-item-category-tree.dto";
+import { ItemCategoryEntity } from "../item-category.entity";
+import { SearchItemCategoryTreeQuery } from "./search-item-category-tree.query";
 
 @QueryHandler(SearchItemCategoryTreeQuery)
-export class SearchItemCategoryTreeHandler
-  implements IQueryHandler<SearchItemCategoryTreeQuery>
-{
+export class SearchItemCategoryTreeHandler implements IQueryHandler<SearchItemCategoryTreeQuery> {
   constructor(
     @InjectRepository(ItemCategoryEntity)
     private readonly repo: Repository<ItemCategoryEntity>,
@@ -26,7 +24,7 @@ export class SearchItemCategoryTreeHandler
     };
     if (dto.status) where.status = dto.status;
 
-    const all = await this.repo.find({ where, order: { name: 'ASC' } });
+    const all = await this.repo.find({ where, order: { name: "ASC" } });
     const byId = new Map(all.map((c) => [c.id, c]));
 
     const search = dto.search?.trim().toLowerCase();
@@ -55,16 +53,22 @@ export class SearchItemCategoryTreeHandler
     let roots = all.filter(isRoot).map(toNode);
 
     if (search) {
+      const prune = (
+        node: ItemCategoryTreeNodeDto,
+      ): ItemCategoryTreeNodeDto | null => {
+        const entity = byId.get(node.id);
+        const selfMatches = entity ? matches(entity) : false;
+        if (selfMatches) return node;
+
+        const children = node.children
+          .map(prune)
+          .filter((child): child is ItemCategoryTreeNodeDto => child != null);
+        if (children.length === 0) return null;
+        return { ...node, children };
+      };
       roots = roots
-        .map((node) => {
-          const rootMatches = matches(byId.get(node.id)!);
-          const keptChildren = rootMatches
-            ? node.children
-            : node.children.filter((ch) => matches(byId.get(ch.id)!));
-          return { ...node, children: keptChildren, rootMatches };
-        })
-        .filter((node) => node.rootMatches || node.children.length > 0)
-        .map(({ rootMatches: _omit, ...node }) => node);
+        .map(prune)
+        .filter((node): node is ItemCategoryTreeNodeDto => node != null);
     }
 
     return { data: roots };

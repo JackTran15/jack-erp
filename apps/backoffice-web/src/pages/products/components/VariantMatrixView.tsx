@@ -34,7 +34,7 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
 
       const attrs = Array.isArray(attrsRes.data)
         ? attrsRes.data
-        : (attrsRes.data as any).data ?? [];
+        : ((attrsRes.data as any).data ?? []);
       setAttributes(attrs);
 
       const items = itemsRes.data.data ?? [];
@@ -91,9 +91,10 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
     );
   }
 
-  const canRenderMatrix = attributes.length === 2
-    && attributes[0].options.length > 0
-    && attributes[1].options.length > 0;
+  const canRenderMatrix =
+    attributes.length === 2 &&
+    attributes[0].options.length > 0 &&
+    attributes[1].options.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -125,7 +126,9 @@ export function VariantMatrixView({ productId }: VariantMatrixViewProps) {
             disabled={generating || attributes.length === 0}
             onClick={() => setShowConfirm(true)}
           >
-            {generating && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+            {generating && (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            )}
             Sinh biến thể
           </Button>
         </div>
@@ -210,15 +213,10 @@ function MatrixTable({
                 const altLabel = `${colOpt.valueLabel} / ${rowOpt.valueLabel}`;
                 const variant =
                   variantMap.get(label) ?? variantMap.get(altLabel);
-                const qty = variant
-                  ? stockByItem.get(variant.id) ?? 0
-                  : null;
+                const qty = variant ? (stockByItem.get(variant.id) ?? 0) : null;
 
                 return (
-                  <td
-                    key={colOpt.id}
-                    className="px-3 py-2 text-center"
-                  >
+                  <td key={colOpt.id} className="px-3 py-2 text-center">
                     {variant ? (
                       <div>
                         <div className="text-xs font-mono text-muted-foreground">
@@ -259,16 +257,19 @@ function FlatTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full min-w-[760px] table-fixed border-collapse text-sm">
         <thead>
           <tr>
-            <th className="border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
-              Mã
+            <th className="w-44 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+              Mã SKU
             </th>
-            <th className="border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+            <th className="w-[280px] border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
+              Tên hàng hóa
+            </th>
+            <th className="w-40 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-semibold">
               Nhãn biến thể
             </th>
-            <th className="border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-right text-xs font-semibold">
+            <th className="w-32 border-b-2 border-gray-200 bg-gray-50 px-3 py-2.5 text-right text-xs font-semibold">
               Tồn kho
             </th>
           </tr>
@@ -276,8 +277,11 @@ function FlatTable({
         <tbody>
           {variants.map((v) => (
             <tr key={v.id} className="border-b border-gray-100">
-              <td className="px-3 py-2 font-mono text-xs">{v.code}</td>
-              <td className="px-3 py-2">{v.variantLabel}</td>
+              <td className="px-3 py-2 font-mono text-xs break-all">
+                {v.code}
+              </td>
+              <td className="px-3 py-2">{v.name || v.productName || "—"}</td>
+              <td className="px-3 py-2">{v.variantLabel || "—"}</td>
               <td className="px-3 py-2 text-right">
                 {stockByItem.get(v.id) ?? 0}
               </td>

@@ -11,6 +11,7 @@ export interface ProductVariantRow {
   name: string;
   unit: string;
   sku: string;
+  barcode: string;
   purchasePrice: string;
   sellPrice: string;
   initialStock: string;
@@ -40,7 +41,12 @@ function buildColorGroups(rows: ProductVariantRow[]): Map<number, number> {
   return firstIndexToSpan;
 }
 
-export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown }: Props) {
+export function ProductVariantsTable({
+  rows,
+  setRows,
+  onRemove,
+  onCopyPriceDown,
+}: Props) {
   const updateRow = (id: string, patch: Partial<ProductVariantRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
@@ -49,16 +55,23 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
 
   return (
     <div className="overflow-x-auto rounded-md border border-border">
-      <table className="w-full border-collapse text-xs">
+      <table className="w-full min-w-[1280px] table-fixed border-collapse text-xs">
         <thead className="bg-muted/50 uppercase">
           <tr>
-            <th className="w-24 px-2 py-2 text-center font-semibold">Ảnh</th>
-            <th className="px-2 py-2 text-left font-semibold">Tên hàng hóa</th>
-            <th className="w-24 px-2 py-2 text-left font-semibold">Đơn vị tính</th>
-            <th className="w-28 px-2 py-2 text-left font-semibold">Mã SKU</th>
-            <th className="w-28 px-2 py-2 text-right font-semibold">Giá mua</th>
-            <th className="w-40 px-2 py-2 text-right font-semibold">Giá bán</th>
-            <th className="w-32 px-2 py-2 text-right font-semibold">Tồn kho ban đầu</th>
+            <th className="w-20 px-2 py-2 text-center font-semibold">Ảnh</th>
+            <th className="w-[300px] px-2 py-2 text-left font-semibold">
+              Tên hàng hóa
+            </th>
+            <th className="w-24 px-2 py-2 text-left font-semibold">
+              Đơn vị tính
+            </th>
+            <th className="w-44 px-2 py-2 text-left font-semibold">Mã SKU</th>
+            <th className="w-40 px-2 py-2 text-left font-semibold">Mã vạch</th>
+            <th className="w-32 px-2 py-2 text-right font-semibold">Giá mua</th>
+            <th className="w-32 px-2 py-2 text-right font-semibold">Giá bán</th>
+            <th className="w-32 px-2 py-2 text-right font-semibold">
+              Tồn kho ban đầu
+            </th>
             <th className="w-10 px-1 py-2" />
             <th className="w-10 px-1 py-2" />
           </tr>
@@ -84,9 +97,11 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
                 )}
                 <td className="px-2 py-1.5">
                   <Input
-                    className="text-muted-foreground"
+                    className="w-full text-muted-foreground"
                     value={row.name}
-                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { name: e.target.value })
+                    }
                   />
                 </td>
                 <td className="px-2 py-1.5">
@@ -94,16 +109,30 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
                 </td>
                 <td className="px-2 py-1.5">
                   <Input
+                    className="w-full font-mono text-xs"
                     value={row.sku}
                     onChange={(e) => updateRow(row.id, { sku: e.target.value })}
                   />
                 </td>
                 <td className="px-2 py-1.5">
+                  <Input
+                    className="w-full font-mono text-xs"
+                    value={row.barcode}
+                    onChange={(e) =>
+                      updateRow(row.id, { barcode: e.target.value })
+                    }
+                  />
+                </td>
+                <td className="px-2 py-1.5">
                   <MoneyInput
                     className="text-right"
-                    value={row.purchasePrice === "" ? "" : Number(row.purchasePrice)}
+                    value={
+                      row.purchasePrice === "" ? "" : Number(row.purchasePrice)
+                    }
                     onChange={(v) =>
-                      updateRow(row.id, { purchasePrice: v === "" ? "" : String(v) })
+                      updateRow(row.id, {
+                        purchasePrice: v === "" ? "" : String(v),
+                      })
                     }
                   />
                 </td>
@@ -113,7 +142,9 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
                       className="flex-1 text-right"
                       value={row.sellPrice === "" ? "" : Number(row.sellPrice)}
                       onChange={(v) =>
-                        updateRow(row.id, { sellPrice: v === "" ? "" : String(v) })
+                        updateRow(row.id, {
+                          sellPrice: v === "" ? "" : String(v),
+                        })
                       }
                     />
                     <ScanBarcode
@@ -128,7 +159,9 @@ export function ProductVariantsTable({ rows, setRows, onRemove, onCopyPriceDown 
                     inputMode="decimal"
                     className="text-right"
                     value={row.initialStock}
-                    onChange={(e) => updateRow(row.id, { initialStock: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { initialStock: e.target.value })
+                    }
                   />
                 </td>
                 <td className="px-1 py-1.5 text-center">

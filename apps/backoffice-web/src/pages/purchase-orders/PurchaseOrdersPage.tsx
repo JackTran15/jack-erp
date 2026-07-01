@@ -9,7 +9,15 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Barcode,
+  Copy,
+  Eye,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -106,6 +114,7 @@ function orderTotal(o: PurchaseOrder): number {
 }
 
 function purchasePurposeLabel(purpose: PurchaseOrder["purpose"]): string {
+  if (purpose === "PURCHASE") return "Phiếu nhập hàng - Ghi nợ nhà cung cấp";
   if (purpose === "TRANSFER_IN") return "Phiếu nhập kho điều chuyển";
   if (purpose === "STOCK_TAKE") return "Phiếu nhập kho kiểm kê";
   return "Phiếu nhập kho khác";
@@ -121,13 +130,22 @@ function renderStatusBadge(status: PurchaseOrderStatus) {
         : "bg-muted text-muted-foreground";
 
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${className}`}>
+    <span
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${className}`}
+    >
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
-export function PurchaseOrdersPage() {
+type PurchaseOrdersPageMode = "inventory" | "purchase";
+
+export function PurchaseOrdersPage({
+  mode = "inventory",
+}: {
+  mode?: PurchaseOrdersPageMode;
+}) {
+  const isPurchaseMode = mode === "purchase";
   const location = useLocation();
   const navigate = useNavigate();
   const [records, setRecords] =
@@ -178,6 +196,11 @@ export function PurchaseOrdersPage() {
         pagination.page,
         pagination.pageSize,
       );
+      if (isPurchaseMode) {
+        body.purposes = ["PURCHASE"];
+      } else {
+        body.excludePurposes = ["PURCHASE"];
+      }
       const { data } = await apiClient.post<{
         data: PurchaseOrder[];
         total: number;
@@ -201,7 +224,7 @@ export function PurchaseOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination, columnFilters, period]);
+  }, [pagination, columnFilters, period, isPurchaseMode]);
 
   const loadProviders = useCallback(async () => {
     try {
@@ -438,7 +461,7 @@ export function PurchaseOrdersPage() {
   const columns: TableColumn<PurchaseOrder>[] = [
     {
       key: "date",
-      label: "Ngày",
+      label: isPurchaseMode ? "Ngày nhập" : "Ngày",
       width: 150,
       filterKind: "date-range",
       render: (row) =>
@@ -470,7 +493,7 @@ export function PurchaseOrdersPage() {
     },
     {
       key: "party",
-      label: "Đối tượng",
+      label: isPurchaseMode ? "Nhà cung cấp" : "Đối tượng",
       width: 180,
       render: (row) =>
         row.counterparty?.name ??
@@ -481,7 +504,7 @@ export function PurchaseOrdersPage() {
     },
     {
       key: "totalAmount",
-      label: "Tổng tiền",
+      label: isPurchaseMode ? "Thành tiền" : "Tổng tiền",
       width: 140,
       filterKind: "number-range",
       headerClassName: "text-right",
@@ -489,30 +512,47 @@ export function PurchaseOrdersPage() {
       footer: showTotalFooter ? formatMoneyInteger(totalSum) : undefined,
       render: (row) => formatMoneyInteger(orderTotal(row)),
     },
+    ...(isPurchaseMode
+      ? ([
+          {
+            key: "buyer",
+            label: "NV mua hàng",
+            width: 160,
+            render: (row: PurchaseOrder) => row.deliveredBy ?? "",
+          },
+        ] satisfies TableColumn<PurchaseOrder>[])
+      : []),
     {
       key: "description",
       label: "Diễn giải",
       render: (row) => row.description ?? "",
     },
-    {
-      key: "reason",
-      label: "Lý do",
-      width: 160,
-      render: (row) => row.reason ?? "",
-    },
-    {
-      key: "purpose",
-      label: "Loại chứng từ",
-      width: 200,
-      filterKind: "select",
-      filterPlaceholder: "Tất cả",
-      filterOptions: [
-        { value: "OTHER", label: "Phiếu nhập kho khác" },
-        { value: "TRANSFER_IN", label: "Phiếu nhập kho điều chuyển" },
-        { value: "STOCK_TAKE", label: "Phiếu nhập kho kiểm kê" },
-      ],
-      render: (row) => purchasePurposeLabel(row.purpose),
-    },
+    ...(isPurchaseMode
+      ? []
+      : ([
+          {
+            key: "reason",
+            label: "Lý do",
+            width: 160,
+            render: (row: PurchaseOrder) => row.reason ?? "",
+          },
+          {
+            key: "purpose",
+            label: "Loại chứng từ",
+            width: 200,
+            filterKind: "select",
+            filterPlaceholder: "Tất cả",
+            filterOptions: [
+              { value: "OTHER", label: "Phiếu nhập kho khác" },
+              {
+                value: "TRANSFER_IN",
+                label: "Phiếu nhập kho điều chuyển",
+              },
+              { value: "STOCK_TAKE", label: "Phiếu nhập kho kiểm kê" },
+            ],
+            render: (row: PurchaseOrder) => purchasePurposeLabel(row.purpose),
+          },
+        ] satisfies TableColumn<PurchaseOrder>[])),
     {
       key: "status",
       label: "Trạng thái",
@@ -576,8 +616,18 @@ export function PurchaseOrdersPage() {
   return (
     <>
       <DocumentListShell
-        title={<InventoryPageTitle>Nhập kho</InventoryPageTitle>}
-        tabs={<InventoryTabBar activeId="purchase-orders" />}
+        title={
+          isPurchaseMode ? (
+            "Nhập hàng"
+          ) : (
+            <InventoryPageTitle>Nhập kho</InventoryPageTitle>
+          )
+        }
+        tabs={
+          isPurchaseMode ? undefined : (
+            <InventoryTabBar activeId="purchase-orders" />
+          )
+        }
         toolbar={
           <PageToolbar
             items={toolbarItems}
@@ -613,6 +663,7 @@ export function PurchaseOrdersPage() {
           <DetailPanel
             order={selectedOrder}
             storageNameById={storageNameById}
+            isPurchaseMode={isPurchaseMode}
           />
         }
       >
@@ -620,7 +671,11 @@ export function PurchaseOrdersPage() {
           columns={columns}
           rows={records?.data ?? []}
           loading={loading}
-          emptyLabel="Chưa có phiếu nhập kho."
+          emptyLabel={
+            isPurchaseMode
+              ? "Chưa có phiếu nhập hàng."
+              : "Chưa có phiếu nhập kho."
+          }
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
           leadingColumn={{
@@ -670,6 +725,9 @@ export function PurchaseOrdersPage() {
           }
           autoOpenTransferPicker={autoOpenTransferPicker}
           autoSelectTransferOrder={autoSelectTransferOrder}
+          documentKind={
+            isPurchaseMode ? "purchase-import" : "warehouse-receipt"
+          }
         />
       )}
 
@@ -709,9 +767,11 @@ export function PurchaseOrdersPage() {
 function DetailPanel({
   order,
   storageNameById,
+  isPurchaseMode,
 }: {
   order: PurchaseOrder | null;
   storageNameById: Map<string, string>;
+  isPurchaseMode: boolean;
 }) {
   return (
     <div className="px-4 py-3">
@@ -727,7 +787,7 @@ function DetailPanel({
           Phiếu này chưa có dòng hàng.
         </p>
       ) : (
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full min-w-[1100px] border-collapse text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
               <th className="border-r px-2 py-1.5 text-left font-medium">
@@ -746,17 +806,38 @@ function DetailPanel({
                 Đơn vị tính
               </th>
               <th className="border-r px-2 py-1.5 text-right font-medium">
-                SL theo chứng từ
+                {isPurchaseMode ? "Số lượng" : "SL theo chứng từ"}
               </th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">
-                SL thực tế
-              </th>
+              {isPurchaseMode ? null : (
+                <th className="border-r px-2 py-1.5 text-right font-medium">
+                  SL thực tế
+                </th>
+              )}
               <th className="border-r px-2 py-1.5 text-right font-medium">
                 Đơn giá
               </th>
               <th className="border-r px-2 py-1.5 text-right font-medium">
                 Thành tiền
               </th>
+              {isPurchaseMode ? (
+                <>
+                  <th className="border-r px-2 py-1.5 text-right font-medium">
+                    % CK
+                  </th>
+                  <th className="border-r px-2 py-1.5 text-right font-medium">
+                    Tiền CK
+                  </th>
+                  <th className="border-r px-2 py-1.5 text-right font-medium">
+                    Thuế suất
+                  </th>
+                  <th className="border-r px-2 py-1.5 text-right font-medium">
+                    Tiền thuế
+                  </th>
+                  <th className="border-r px-2 py-1.5 text-right font-medium">
+                    Tiền thanh toán
+                  </th>
+                </>
+              ) : null}
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
             </tr>
           </thead>
@@ -788,15 +869,34 @@ function DetailPanel({
                   <td className="border-r px-2 py-1 text-right tabular-nums">
                     {Number(line.quantity)}
                   </td>
-                  <td className="border-r px-2 py-1 text-right tabular-nums">
-                    {Number(line.quantity)}
-                  </td>
+                  {isPurchaseMode ? null : (
+                    <td className="border-r px-2 py-1 text-right tabular-nums">
+                      {Number(line.quantity)}
+                    </td>
+                  )}
                   <td className="border-r px-2 py-1 text-right tabular-nums">
                     {formatMoneyInteger(Number(line.unitPrice))}
                   </td>
                   <td className="border-r px-2 py-1 text-right tabular-nums">
                     {formatMoneyInteger(lineSubtotal(line))}
                   </td>
+                  {isPurchaseMode ? (
+                    <>
+                      <td className="border-r px-2 py-1 text-right tabular-nums">
+                        0
+                      </td>
+                      <td className="border-r px-2 py-1 text-right tabular-nums">
+                        0
+                      </td>
+                      <td className="border-r px-2 py-1 text-right tabular-nums" />
+                      <td className="border-r px-2 py-1 text-right tabular-nums">
+                        0
+                      </td>
+                      <td className="border-r px-2 py-1 text-right tabular-nums">
+                        {formatMoneyInteger(lineSubtotal(line))}
+                      </td>
+                    </>
+                  ) : null}
                   <td className="px-2 py-1">{line.note ?? ""}</td>
                 </tr>
               );

@@ -4,10 +4,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Not, Repository } from 'typeorm';
-import { randomUUID } from 'crypto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, In, Not, Repository } from "typeorm";
+import { randomUUID } from "crypto";
 import {
   DocumentType,
   DomainEventType,
@@ -17,35 +17,38 @@ import {
   PaginatedResponse,
   PaginationQuery,
   StockMovementType,
-} from '@erp/shared-interfaces';
-import { ERP_TOPICS } from '@erp/shared-kafka-client';
-import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+} from "@erp/shared-interfaces";
+import { ERP_TOPICS } from "@erp/shared-kafka-client";
+import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import {
   RecordMovementParams,
   StockLedgerService,
-} from '../ledger/stock-ledger.service';
-import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
-import { EventPublisher } from '../../events/event-publisher.service';
-import { CashService } from '../../accounting/cash/cash.service';
-import { CashFundResolverService } from '../../accounting/cash/cash-fund-resolver.service';
-import { CashMovementType } from '../../accounting/cash/cash-movement.entity';
-import { JournalService } from '../../accounting/journal/journal.service';
-import { OutboxService } from '../../events/outbox/outbox.service';
-import { buildCashVoucherNeededEvent } from '../../events/outbox/deterministic-event';
+} from "../ledger/stock-ledger.service";
+import { DocumentNumberingService } from "../../document-numbering/document-numbering.service";
+import { EventPublisher } from "../../events/event-publisher.service";
+import { CashService } from "../../accounting/cash/cash.service";
+import { CashFundResolverService } from "../../accounting/cash/cash-fund-resolver.service";
+import { CashMovementType } from "../../accounting/cash/cash-movement.entity";
+import { JournalService } from "../../accounting/journal/journal.service";
+import { OutboxService } from "../../events/outbox/outbox.service";
+import { buildCashVoucherNeededEvent } from "../../events/outbox/deterministic-event";
 import {
   GoodsReceiptEntity,
   GoodsReceiptPaymentMethod,
-} from './goods-receipt.entity';
-import { GoodsReceiptLineEntity } from './goods-receipt-line.entity';
+} from "./goods-receipt.entity";
+import { GoodsReceiptLineEntity } from "./goods-receipt-line.entity";
 import {
   SupplierDebtEntity,
   SupplierDebtDocumentType,
   SupplierDebtStatus,
-} from '../supplier-debt/supplier-debt.entity';
-import { CreateGoodsReceiptDto, GoodsReceiptLineDto } from './dto/create-goods-receipt.dto';
-import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
-import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
-import { attachCounterparties } from '../location/services/counterparty-name.util';
+} from "../supplier-debt/supplier-debt.entity";
+import {
+  CreateGoodsReceiptDto,
+  GoodsReceiptLineDto,
+} from "./dto/create-goods-receipt.dto";
+import { UpdateGoodsReceiptDto } from "./dto/update-goods-receipt.dto";
+import { resolveDocCounterparty } from "../location/services/resolve-doc-counterparty.util";
+import { attachCounterparties } from "../location/services/counterparty-name.util";
 
 export interface GoodsReceiptQuery extends PaginationQuery {
   status?: GoodsReceiptStatus;
@@ -75,7 +78,10 @@ export class GoodsReceiptService {
 
   // ─── Create (DRAFT) ───────────────────────────────────────────────────────
 
-  async create(dto: CreateGoodsReceiptDto, actor: ActorContext): Promise<GoodsReceiptEntity> {
+  async create(
+    dto: CreateGoodsReceiptDto,
+    actor: ActorContext,
+  ): Promise<GoodsReceiptEntity> {
     this.validateBusinessRules(dto, actor.branchId);
     const counterparty = await resolveDocCounterparty(
       this.dataSource.manager,
@@ -140,7 +146,10 @@ export class GoodsReceiptService {
     } catch (err) {
       // Roll back the orphan DRAFT (lines FK has onDelete: CASCADE) so a failed
       // post leaves nothing persisted.
-      await this.receiptRepo.delete({ id: draft.id, organizationId: actor.organizationId });
+      await this.receiptRepo.delete({
+        id: draft.id,
+        organizationId: actor.organizationId,
+      });
       this.logger.warn(
         `Goods receipt ${draft.id} create+post failed; orphan DRAFT removed: ${
           err instanceof Error ? err.message : String(err)
@@ -153,9 +162,7 @@ export class GoodsReceiptService {
       ) {
         throw err;
       }
-      throw new BadRequestException(
-        'Không thể nhập kho. Vui lòng thử lại.',
-      );
+      throw new BadRequestException("Không thể nhập kho. Vui lòng thử lại.");
     }
   }
 
@@ -166,7 +173,11 @@ export class GoodsReceiptService {
     dto: UpdateGoodsReceiptDto,
     actor: ActorContext,
   ): Promise<GoodsReceiptEntity> {
-    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    const receipt = await this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+    );
     if (receipt.status !== GoodsReceiptStatus.DRAFT) {
       throw new ConflictException(
         `Chỉ có thể sửa phiếu ở trạng thái DRAFT (hiện tại: ${receipt.status})`,
@@ -174,7 +185,10 @@ export class GoodsReceiptService {
     }
 
     if (dto.purpose !== undefined) receipt.purpose = dto.purpose;
-    if (dto.counterpartyKind !== undefined || dto.counterpartyId !== undefined) {
+    if (
+      dto.counterpartyKind !== undefined ||
+      dto.counterpartyId !== undefined
+    ) {
       const counterparty = await resolveDocCounterparty(
         this.dataSource.manager,
         dto,
@@ -182,8 +196,7 @@ export class GoodsReceiptService {
       );
       // providerId column is nullable; clear it for customer/employee đối tượng.
       receipt.providerId = (counterparty.providerId ?? null) as unknown as
-        | string
-        | undefined;
+        string | undefined;
       receipt.counterpartyKind = counterparty.counterpartyKind;
       receipt.counterpartyId = counterparty.counterpartyId;
     } else if (dto.providerId !== undefined) {
@@ -193,11 +206,15 @@ export class GoodsReceiptService {
     if (dto.reason !== undefined) receipt.reason = dto.reason;
     if (dto.description !== undefined) receipt.description = dto.description;
     if (dto.referenceId !== undefined) receipt.referenceId = dto.referenceId;
-    if (dto.referenceType !== undefined) receipt.referenceType = dto.referenceType;
-    if (dto.sourceBranchId !== undefined) receipt.sourceBranchId = dto.sourceBranchId;
-    if (dto.receivedAt !== undefined) receipt.receivedAt = new Date(dto.receivedAt);
+    if (dto.referenceType !== undefined)
+      receipt.referenceType = dto.referenceType;
+    if (dto.sourceBranchId !== undefined)
+      receipt.sourceBranchId = dto.sourceBranchId;
+    if (dto.receivedAt !== undefined)
+      receipt.receivedAt = new Date(dto.receivedAt);
     if (dto.locationId !== undefined) receipt.locationId = dto.locationId;
-    if (dto.attachmentIds !== undefined) receipt.attachmentIds = dto.attachmentIds;
+    if (dto.attachmentIds !== undefined)
+      receipt.attachmentIds = dto.attachmentIds;
 
     // Re-validate combined state
     this.validateBusinessRules(
@@ -215,7 +232,12 @@ export class GoodsReceiptService {
     if (dto.lines) {
       await this.lineRepo.delete({ goodsReceiptId: receipt.id });
       receipt.lines = dto.lines.map((l) =>
-        this.makeLine(l, receipt.organizationId, receipt.branchId, actor.userId),
+        this.makeLine(
+          l,
+          receipt.organizationId,
+          receipt.branchId,
+          actor.userId,
+        ),
       );
     }
 
@@ -227,13 +249,17 @@ export class GoodsReceiptService {
   // ─── Soft cancel (DRAFT only) ─────────────────────────────────────────────
 
   async cancel(id: string, actor: ActorContext): Promise<void> {
-    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    const receipt = await this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+    );
     if (
       receipt.status === GoodsReceiptStatus.CANCELLED ||
       receipt.status === GoodsReceiptStatus.REVERSED
     ) {
       throw new ConflictException(
-        `Phiếu đã ${receipt.status === GoodsReceiptStatus.CANCELLED ? 'huỷ' : 'đảo bút'}, không thể xoá lại`,
+        `Phiếu đã ${receipt.status === GoodsReceiptStatus.CANCELLED ? "huỷ" : "đảo bút"}, không thể xoá lại`,
       );
     }
 
@@ -241,7 +267,7 @@ export class GoodsReceiptService {
       const branchId = receipt.branchId ?? actor.branchId;
       if (!branchId) {
         throw new BadRequestException(
-          'Không xác định được chi nhánh để đảo bút tồn kho',
+          "Không xác định được chi nhánh để đảo bút tồn kho",
         );
       }
       const entries = await this.dataSource.transaction(async (manager) => {
@@ -252,7 +278,7 @@ export class GoodsReceiptService {
           organizationId: receipt.organizationId,
           movementType: StockMovementType.ADJUSTMENT_DECREASE,
           quantity: -Number(line.quantity),
-          referenceType: 'GOODS_RECEIPT',
+          referenceType: "GOODS_RECEIPT",
           referenceId: receipt.id,
           notes: `Huỷ phiếu nhập kho ${receipt.documentNumber ?? receipt.id}`,
           actorContext: actor,
@@ -277,7 +303,7 @@ export class GoodsReceiptService {
             );
             if (paid.length > 0) {
               throw new ConflictException(
-                'Không thể huỷ phiếu nhập: công nợ NCC đã có thanh toán',
+                "Không thể huỷ phiếu nhập: công nợ NCC đã có thanh toán",
               );
             }
             await manager.delete(SupplierDebtEntity, debtRows[0].id);
@@ -297,19 +323,25 @@ export class GoodsReceiptService {
   // ─── Post (DRAFT → POSTED, atomic) ────────────────────────────────────────
 
   async post(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
+    const receipt = await this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+    );
     if (receipt.status !== GoodsReceiptStatus.DRAFT) {
       throw new ConflictException(
         `Chỉ có thể duyệt phiếu DRAFT (hiện tại: ${receipt.status})`,
       );
     }
     if (!receipt.lines || receipt.lines.length === 0) {
-      throw new BadRequestException('Phiếu nhập kho không có dòng hàng');
+      throw new BadRequestException("Phiếu nhập kho không có dòng hàng");
     }
 
     const branchId = receipt.branchId ?? actor.branchId;
     if (!branchId) {
-      throw new BadRequestException('Không xác định được chi nhánh để hạch toán tồn kho');
+      throw new BadRequestException(
+        "Không xác định được chi nhánh để hạch toán tồn kho",
+      );
     }
 
     // documentNumber is now assigned at create-time. Reuse it on post so the
@@ -354,7 +386,7 @@ export class GoodsReceiptService {
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
-          '156',
+          "156",
         );
         cashContraAccountId = inventoryAccountId;
         const res = await this.cashService.recordMovement(
@@ -375,18 +407,18 @@ export class GoodsReceiptService {
         // CREDIT: DR inventory (156) / CR payable (331), no cash movement.
         if (!receipt.providerId) {
           throw new BadRequestException(
-            'Phiếu nhập kho công nợ phải có nhà cung cấp',
+            "Phiếu nhập kho công nợ phải có nhà cung cấp",
           );
         }
         const inventoryAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
-          '156',
+          "156",
         );
         const payableAccountId = await this.resolveAccountId(
           manager,
           receipt.organizationId,
-          '331',
+          "331",
         );
         const entry = await this.journalService.post(
           {
@@ -398,14 +430,14 @@ export class GoodsReceiptService {
                 accountId: inventoryAccountId,
                 debitAmount: total,
                 creditAmount: 0,
-                description: 'Inventory (debit)',
+                description: "Inventory (debit)",
                 lineOrder: 1,
               },
               {
                 accountId: payableAccountId,
                 debitAmount: 0,
                 creditAmount: total,
-                description: 'Payable (credit)',
+                description: "Payable (credit)",
                 lineOrder: 2,
               },
             ],
@@ -452,7 +484,7 @@ export class GoodsReceiptService {
         organizationId: receipt.organizationId,
         movementType,
         quantity: Number(line.quantity),
-        referenceType: 'GOODS_RECEIPT',
+        referenceType: "GOODS_RECEIPT",
         referenceId: receipt.id,
         notes: `Phiếu nhập kho ${documentNumber}`,
         actorContext: actor,
@@ -468,7 +500,7 @@ export class GoodsReceiptService {
           manager,
           ERP_TOPICS.CASH_VOUCHER_NEEDED_GOODS_RECEIPT,
           buildCashVoucherNeededEvent({
-            sourceType: 'GOODS_RECEIPT',
+            sourceType: "GOODS_RECEIPT",
             sourceId: receipt.id,
             sourceDocumentNumber: documentNumber,
             amount: total,
@@ -476,10 +508,10 @@ export class GoodsReceiptService {
             contraAccountId: cashContraAccountId!,
             cashMovementId,
             journalEntryId,
-            partnerType: receipt.providerId ? 'SUPPLIER' : 'OTHER',
+            partnerType: receipt.providerId ? "SUPPLIER" : "OTHER",
             partnerId: receipt.providerId,
             description: `Goods receipt ${documentNumber}`,
-            categoryCode: 'CHI_MUA_HANG',
+            categoryCode: "CHI_MUA_HANG",
             organizationId: receipt.organizationId,
             branchId,
             actorId: actor.userId,
@@ -512,13 +544,15 @@ export class GoodsReceiptService {
       },
     });
 
-    this.logger.log(`Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`);
+    this.logger.log(
+      `Goods receipt ${id} posted as ${documentNumber} by ${actor.userId}`,
+    );
     return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
   /** Resolve an account id by code within an org (for inventory/payable contra). */
   private async resolveAccountId(
-    manager: import('typeorm').EntityManager,
+    manager: import("typeorm").EntityManager,
     organizationId: string,
     code: string,
   ): Promise<string> {
@@ -537,13 +571,25 @@ export class GoodsReceiptService {
   // ─── Read ─────────────────────────────────────────────────────────────────
 
   async getById(id: string, actor: ActorContext): Promise<GoodsReceiptEntity> {
-    const receipt = await this.findOrFail(id, actor.organizationId, actor.branchId);
-    await attachCounterparties(this.receiptRepo.manager, [receipt], actor.organizationId);
+    const receipt = await this.findOrFail(
+      id,
+      actor.organizationId,
+      actor.branchId,
+    );
+    await attachCounterparties(
+      this.receiptRepo.manager,
+      [receipt],
+      actor.organizationId,
+    );
     return receipt;
   }
 
-  async list(query: GoodsReceiptQuery): Promise<PaginatedResponse<GoodsReceiptEntity>> {
-    const where: Record<string, unknown> = { organizationId: query.organizationId };
+  async list(
+    query: GoodsReceiptQuery,
+  ): Promise<PaginatedResponse<GoodsReceiptEntity>> {
+    const where: Record<string, unknown> = {
+      organizationId: query.organizationId,
+    };
     if (query.status) {
       where.status = query.status;
     } else {
@@ -562,8 +608,8 @@ export class GoodsReceiptService {
       skip: (page - 1) * pageSize,
       take: pageSize,
       order: query.sortBy
-        ? { [query.sortBy]: query.sortOrder ?? 'asc' }
-        : { receivedAt: 'DESC' },
+        ? { [query.sortBy]: query.sortOrder ?? "asc" }
+        : { receivedAt: "DESC" },
     });
 
     return { data, total, page, pageSize };
@@ -579,7 +625,8 @@ export class GoodsReceiptService {
     const receipt = await this.receiptRepo.findOne({
       where: { id, organizationId, ...(branchId ? { branchId } : {}) },
     });
-    if (!receipt) throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
+    if (!receipt)
+      throw new NotFoundException(`Phiếu nhập kho ${id} không tìm thấy`);
     return receipt;
   }
 
@@ -588,35 +635,44 @@ export class GoodsReceiptService {
     currentBranchId?: string,
   ): void {
     if (
-      dto.purpose === GoodsReceiptPurpose.OTHER &&
+      dto.purpose === GoodsReceiptPurpose.PURCHASE &&
       !dto.providerId &&
       !dto.counterpartyId
     ) {
-      throw new BadRequestException('Cần chọn đối tượng khi mục đích là "Khác"');
+      throw new BadRequestException("Phiếu nhập hàng mua phải có nhà cung cấp");
+    }
+    if (
+      dto.purpose === GoodsReceiptPurpose.PURCHASE &&
+      dto.counterpartyKind &&
+      dto.counterpartyKind !== "supplier"
+    ) {
+      throw new BadRequestException(
+        "Phiếu nhập hàng mua chỉ được chọn nhà cung cấp",
+      );
     }
     if (dto.purpose === GoodsReceiptPurpose.TRANSFER_IN) {
       if (currentBranchId && dto.sourceBranchId === currentBranchId) {
         throw new BadRequestException(
-          'Cửa hàng nguồn phải khác cửa hàng hiện tại',
+          "Cửa hàng nguồn phải khác cửa hàng hiện tại",
         );
       }
       // referenceId / referenceType strictly required per design doc when a transfer doc exists;
       // we relax this to "warn-but-allow" while stock-transfer module isn't wired to UI.
       if (!dto.sourceBranchId && !dto.referenceId) {
         throw new BadRequestException(
-          'Phiếu điều chuyển cần chi nhánh nguồn hoặc tham chiếu phiếu điều chuyển',
+          "Phiếu điều chuyển cần chi nhánh nguồn hoặc tham chiếu phiếu điều chuyển",
         );
       }
     }
     if (!dto.lines || dto.lines.length === 0) {
-      throw new BadRequestException('Phiếu phải có ít nhất một dòng hàng');
+      throw new BadRequestException("Phiếu phải có ít nhất một dòng hàng");
     }
     for (const line of dto.lines) {
       if (Number(line.quantity) <= 0) {
-        throw new BadRequestException('Số lượng phải lớn hơn 0');
+        throw new BadRequestException("Số lượng phải lớn hơn 0");
       }
       if (Number(line.unitPrice) < 0) {
-        throw new BadRequestException('Đơn giá không được âm');
+        throw new BadRequestException("Đơn giá không được âm");
       }
     }
   }
