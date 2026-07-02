@@ -9,11 +9,13 @@ import { Repository, DataSource, Not } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
   CustomerStatus,
+  DocumentType,
   DomainEventType,
   ScopingPolicy,
   DeletionPolicy,
   CrudEntityConfig,
 } from '@erp/shared-interfaces';
+import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { BaseCrudService, CrudOperation } from '../crud/base-crud.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
@@ -38,6 +40,7 @@ export class CustomerService extends BaseCrudService<
     private readonly cardRepository: Repository<MembershipCardEntity>,
     protected readonly dataSource: DataSource,
     private readonly eventPublisher: EventPublisher,
+    private readonly docNumbering: DocumentNumberingService,
   ) {
     super(dataSource);
   }
@@ -104,6 +107,9 @@ export class CustomerService extends BaseCrudService<
     payload: CreateCustomerDto,
     actor: ActorContext,
   ): Promise<CreateCustomerDto> {
+    if (!payload.code?.trim()) {
+      payload.code = await this.docNumbering.generate(DocumentType.CUSTOMER, actor.branchId, actor);
+    }
     await this.checkDuplicates(payload.email, payload.phone, actor.organizationId);
     return payload;
   }

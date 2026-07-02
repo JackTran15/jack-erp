@@ -89,6 +89,8 @@ export function InventoryItemCreateForm({
   mode = "create",
   initialRecord,
   onCancel,
+  onSaveMode,
+  suppressSkuAutoFill = false,
 }: Props) {
   const navigate = useNavigate();
   const isEdit = mode === "edit";
@@ -122,7 +124,8 @@ export function InventoryItemCreateForm({
   const removedVariantKeys = useRef<Set<string>>(new Set());
 
   // SKU tự sinh từ tên hàng hóa cho đến khi user sửa tay. Xóa trống → sinh lại.
-  const skuTouchedRef = useRef(false);
+  // suppressSkuAutoFill=true (clone mode) marks as touched from the start to block auto-fill.
+  const skuTouchedRef = useRef(suppressSkuAutoFill);
 
   const editableFieldsByKey = useMemo(
     () => new Map(editableFields.map((f) => [f.key, f])),
@@ -166,22 +169,22 @@ export function InventoryItemCreateForm({
     return [...merged];
   }, [unitsQuery.data, addedUnits, values.unit]);
 
-  // Saved per-variant rows (edit mode), keyed by "color__size", to hydrate the
+  // Saved per-variant rows (edit or clone mode), keyed by "color__size", to hydrate the
   // variant table with persisted prices / SKU / barcode.
   const savedVariantsByKey = useMemo(() => {
     const m = new Map<string, Record<string, unknown>>();
-    if (isEdit && initialRecord && Array.isArray(initialRecord.variants)) {
+    if (initialRecord && Array.isArray(initialRecord.variants)) {
       for (const v of initialRecord.variants as Record<string, unknown>[]) {
         m.set(`${String(v.color ?? "")}__${String(v.size ?? "")}`, v);
       }
     }
     return m;
-  }, [isEdit, initialRecord]);
+  }, [initialRecord]);
 
-  // ─── Hydrate extras / conversion units / providers in edit mode (once) ─────
+  // ─── Hydrate extras / conversion units / providers from initialRecord (once) ─
   const hydratedRef = useRef(false);
   useEffect(() => {
-    if (!isEdit || hydratedRef.current || !initialRecord) return;
+    if (hydratedRef.current || !initialRecord) return;
     hydratedRef.current = true;
     const rec = initialRecord;
     setExtras((prev) => ({
@@ -223,7 +226,7 @@ export function InventoryItemCreateForm({
       });
       if (rows.length) setProviderRows(rows);
     }
-  }, [isEdit, initialRecord]);
+  }, [initialRecord]);
 
   // ─── Sync local state into the parent `values` payload (DTO keys) ──────────
   useEffect(() => {
@@ -942,11 +945,15 @@ export function InventoryItemCreateForm({
           ))}
         </div>
 
-        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+        <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={extras.showOnPos}
-            onChange={(e) => updateExtras("showOnPos", e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              updateExtras("showOnPos", checked);
+              setValues((prev) => ({ ...prev, isPosVisible: checked }));
+            }}
             className="h-4 w-4 rounded border border-input accent-primary"
           />
           Hiển thị trên màn hình bán hàng
@@ -1370,6 +1377,7 @@ export function InventoryItemCreateForm({
       <InventoryItemActionBar
         isSaving={isSaving}
         onCancel={onCancel ?? (() => navigate(`/admin/${entityKey}`))}
+        onSaveMode={onSaveMode ?? (() => {})}
       />
 
       <ItemCategoryCreateDialog

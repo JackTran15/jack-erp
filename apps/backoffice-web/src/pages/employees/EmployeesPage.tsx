@@ -238,6 +238,36 @@ export function EmployeesPage() {
     [createUser, editingId, formMode, refetch, updateUser],
   );
 
+  const handleSaveAndAddNew = useCallback(
+    async (draft: EmployeeFormDraft, context: EmployeeFormSaveContext) => {
+      try {
+        if (formMode === "create") {
+          await createUser.mutateAsync(draft);
+          toast.success("Đã thêm người dùng mới.");
+        } else if (editingId) {
+          const snapshot = context.loadedUser;
+          const previous = snapshot
+            ? {
+                roleIds: snapshot.roleIds,
+                branchIds: snapshot.branchIds,
+                isActive: snapshot.isActive,
+              }
+            : undefined;
+          const payload = draftToUserUpdatePayload(draft, previous);
+          await updateUser.mutateAsync(payload);
+          toast.success("Đã cập nhật người dùng.");
+        }
+        setEditingId(null);
+        setFormMode("create");
+        setFormInitialDraft(undefined);
+        void refetch();
+      } catch (err) {
+        toast.error(getIamErrorMessage(err, "Không lưu được người dùng."));
+      }
+    },
+    [createUser, editingId, formMode, refetch, updateUser],
+  );
+
   const handleDeactivate = useCallback(async () => {
     if (!confirmDeactivate) return;
     try {
@@ -422,6 +452,7 @@ export function EmployeesPage() {
           setFormInitialDraft(undefined);
         }}
         onSave={(draft, context) => void handleSave(draft, context)}
+        onSaveAndAddNew={(draft, context) => void handleSaveAndAddNew(draft, context)}
       />
 
       {confirmDeactivate && (

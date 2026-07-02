@@ -1,5 +1,6 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DocumentNumberingModule } from '../document-numbering/document-numbering.module';
 import { EntityRegistryService } from '../crud/entity-registry.service';
 import { CustomerEntity } from './customer.entity';
 import { CustomerGroupEntity } from './customer-group.entity';
@@ -32,6 +33,7 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
 
 @Module({
   imports: [
+    DocumentNumberingModule,
     TypeOrmModule.forFeature([
       CustomerEntity,
       CustomerGroupEntity,

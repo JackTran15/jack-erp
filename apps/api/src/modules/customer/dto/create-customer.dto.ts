@@ -40,10 +40,10 @@ export class CreateMembershipCardInlineDto {
 }
 
 export class CreateCustomerDto {
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(50)
-  code: string;
+  code?: string;
 
   @IsString()
   @MinLength(1)

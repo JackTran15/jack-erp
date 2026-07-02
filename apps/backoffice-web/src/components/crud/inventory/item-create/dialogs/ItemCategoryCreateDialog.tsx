@@ -149,13 +149,13 @@ export function ItemCategoryCreateDialog({
 
         {tab === "general" ? (
           <div className="grid gap-3">
-            <FormField label="Mã nhóm hàng hóa" htmlFor="cat-code" required>
+            <FormField layout="horizontal" label="Mã nhóm hàng hóa" htmlFor="cat-code" required>
               <Input id="cat-code" value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
             </FormField>
-            <FormField label="Tên nhóm hàng hóa" htmlFor="cat-name" required>
+            <FormField layout="horizontal" label="Tên nhóm hàng hóa" htmlFor="cat-name" required>
               <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} />
             </FormField>
-            <FormField label="Thuộc nhóm" htmlFor="cat-parent">
+            <FormField layout="horizontal" label="Thuộc nhóm" htmlFor="cat-parent">
               <select
                 id="cat-parent"
                 className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
@@ -170,10 +170,10 @@ export function ItemCategoryCreateDialog({
                 ))}
               </select>
             </FormField>
-            <FormField label="Mô tả" htmlFor="cat-desc">
+            <FormField layout="horizontal" label="Mô tả" htmlFor="cat-desc">
               <Textarea
                 id="cat-desc"
-                rows={4}
+                rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />

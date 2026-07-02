@@ -76,7 +76,7 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
   const isOrg = type === "organization";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Type toggle */}
       <RadioGroup<ProviderType>
         name="supplier-type"
@@ -88,24 +88,16 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
         onChange={(v) => set("type", v)}
       />
 
-      {/* Basic info */}
-      <div>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Thông tin cơ bản
-        </h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Code — read-only on create, actual value on edit */}
+      {/* Two-column outer layout: basic info left, bank + contact right */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* LEFT — basic info */}
+        <div className="grid gap-3 md:grid-cols-2">
           <FormField label="Mã nhà cung cấp" htmlFor="sup-code">
             <Input id="sup-code" value={codeDisplay} disabled />
           </FormField>
 
           {isOrg ? (
-            <FormField
-              label="Tên nhà cung cấp"
-              htmlFor="sup-name"
-              required
-              error={errors.name}
-            >
+            <FormField label="Tên nhà cung cấp" htmlFor="sup-name" required error={errors.name}>
               <Input
                 id="sup-name"
                 value={String(values.name ?? "")}
@@ -161,7 +153,6 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
             />
           </FormField>
 
-          {/* Group picker */}
           <FormField label="Nhóm nhà cung cấp" htmlFor="sup-group">
             <SearchListingInput<GroupItem>
               inputId="sup-group"
@@ -208,7 +199,6 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
             />
           </FormField>
 
-          {/* Individual-only: CMND */}
           {!isOrg && (
             <>
               <FormField label="Số CMND" htmlFor="sup-idcard" error={errors.idCardNumber}>
@@ -236,120 +226,123 @@ export function SupplierCreateForm({ values, setValues, errors, setErrors }: Pro
             </>
           )}
         </div>
-      </div>
 
-      {/* Bank info */}
-      <div>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Thông tin ngân hàng
-        </h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Ngân hàng" htmlFor="sup-bank">
-            <Input
-              id="sup-bank"
-              value={String(values.bankName ?? "")}
-              onChange={(e) => set("bankName", e.target.value)}
-            />
-          </FormField>
-          <FormField label="Số tài khoản" htmlFor="sup-bankacct">
-            <Input
-              id="sup-bankacct"
-              value={String(values.bankAccountNumber ?? "")}
-              onChange={(e) => set("bankAccountNumber", e.target.value)}
-            />
-          </FormField>
-          <FormField label="Chi nhánh NH" htmlFor="sup-bankbranch">
-            <Input
-              id="sup-bankbranch"
-              value={String(values.bankBranch ?? "")}
-              onChange={(e) => set("bankBranch", e.target.value)}
-            />
-          </FormField>
-        </div>
-      </div>
-
-      {/* Contact person (organization-only) */}
-      {isOrg && (
-        <div>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Thông tin người liên hệ
-          </h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="Họ và tên" htmlFor="sup-cname">
-              <div className="flex gap-2">
-                <select
-                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={String(values.contactTitle ?? "")}
-                  onChange={(e) => set("contactTitle", e.target.value)}
-                >
-                  <option value="">--</option>
-                  {SALUTATION_OPTIONS.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
+        {/* RIGHT — bank info + contact person + flags */}
+        <div className="space-y-4">
+          {/* Bank info */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Thông tin ngân hàng
+            </p>
+            <div className="grid gap-3">
+              <FormField label="Ngân hàng" htmlFor="sup-bank">
                 <Input
-                  id="sup-cname"
-                  className="flex-1"
-                  value={String(values.contactName ?? "")}
-                  onChange={(e) => set("contactName", e.target.value)}
+                  id="sup-bank"
+                  value={String(values.bankName ?? "")}
+                  onChange={(e) => set("bankName", e.target.value)}
                 />
-              </div>
-            </FormField>
-            <FormField label="Email" htmlFor="sup-cemail">
-              <Input
-                id="sup-cemail"
-                type="email"
-                value={String(values.contactEmail ?? "")}
-                onChange={(e) => set("contactEmail", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Điện thoại" htmlFor="sup-cphone">
-              <Input
-                id="sup-cphone"
-                value={String(values.contactPhone ?? "")}
-                onChange={(e) => set("contactPhone", e.target.value)}
-              />
-            </FormField>
-            <FormField label="Chức danh" htmlFor="sup-cposition">
-              <Input
-                id="sup-cposition"
-                value={String(values.contactPosition ?? "")}
-                onChange={(e) => set("contactPosition", e.target.value)}
-              />
-            </FormField>
-            <div className="md:col-span-2">
-              <FormField label="Địa chỉ" htmlFor="sup-caddress">
+              </FormField>
+              <FormField label="Số tài khoản" htmlFor="sup-bankacct">
                 <Input
-                  id="sup-caddress"
-                  value={String(values.contactAddress ?? "")}
-                  onChange={(e) => set("contactAddress", e.target.value)}
+                  id="sup-bankacct"
+                  value={String(values.bankAccountNumber ?? "")}
+                  onChange={(e) => set("bankAccountNumber", e.target.value)}
+                />
+              </FormField>
+              <FormField label="Chi nhánh NH" htmlFor="sup-bankbranch">
+                <Input
+                  id="sup-bankbranch"
+                  value={String(values.bankBranch ?? "")}
+                  onChange={(e) => set("bankBranch", e.target.value)}
                 />
               </FormField>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Flags */}
-      <div className="flex flex-wrap gap-6">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={Boolean(values.isCustomer)}
-            onChange={(e) => set("isCustomer", e.target.checked)}
-            className="h-4 w-4 rounded border border-input accent-primary"
-          />
-          Là khách hàng
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={values.isActive === undefined ? true : Boolean(values.isActive)}
-            onChange={(e) => set("isActive", e.target.checked)}
-            className="h-4 w-4 rounded border border-input accent-primary"
-          />
-          Đang theo dõi
-        </label>
+          {/* Contact person (organization-only) */}
+          {isOrg && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Người liên hệ
+              </p>
+              <div className="grid gap-3">
+                <FormField label="Họ và tên" htmlFor="sup-cname">
+                  <div className="flex gap-2">
+                    <select
+                      className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={String(values.contactTitle ?? "")}
+                      onChange={(e) => set("contactTitle", e.target.value)}
+                    >
+                      <option value="">--</option>
+                      {SALUTATION_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                    <Input
+                      id="sup-cname"
+                      className="flex-1"
+                      value={String(values.contactName ?? "")}
+                      onChange={(e) => set("contactName", e.target.value)}
+                    />
+                  </div>
+                </FormField>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormField label="Email" htmlFor="sup-cemail">
+                    <Input
+                      id="sup-cemail"
+                      type="email"
+                      value={String(values.contactEmail ?? "")}
+                      onChange={(e) => set("contactEmail", e.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Điện thoại" htmlFor="sup-cphone">
+                    <Input
+                      id="sup-cphone"
+                      value={String(values.contactPhone ?? "")}
+                      onChange={(e) => set("contactPhone", e.target.value)}
+                    />
+                  </FormField>
+                </div>
+                <FormField label="Chức danh" htmlFor="sup-cposition">
+                  <Input
+                    id="sup-cposition"
+                    value={String(values.contactPosition ?? "")}
+                    onChange={(e) => set("contactPosition", e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Địa chỉ" htmlFor="sup-caddress">
+                  <Input
+                    id="sup-caddress"
+                    value={String(values.contactAddress ?? "")}
+                    onChange={(e) => set("contactAddress", e.target.value)}
+                  />
+                </FormField>
+              </div>
+            </div>
+          )}
+
+          {/* Flags */}
+          <div className="flex flex-wrap gap-6 pt-1">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(values.isCustomer)}
+                onChange={(e) => set("isCustomer", e.target.checked)}
+                className="h-4 w-4 rounded border border-input accent-primary"
+              />
+              Là khách hàng
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={values.isActive === undefined ? true : Boolean(values.isActive)}
+                onChange={(e) => set("isActive", e.target.checked)}
+                className="h-4 w-4 rounded border border-input accent-primary"
+              />
+              Đang theo dõi
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   );

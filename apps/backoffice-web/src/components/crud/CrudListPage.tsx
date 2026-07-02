@@ -628,6 +628,18 @@ export function CrudListPage({
     }
   };
 
+  const handleCreateAndAddNewSubmit = async (data: Record<string, unknown>) => {
+    try {
+      await createMutation.mutateAsync(data);
+      toast.success(`Đã tạo ${config.displayName}.`);
+      void refetchRecords();
+      // Dialog stays open; CrudFormDialog resets its own state after this resolves.
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err));
+      throw err;
+    }
+  };
+
   const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
     setColumnFilters((prev) => ({
       ...prev,
@@ -676,6 +688,11 @@ export function CrudListPage({
 
   const openDuplicateDialog = () => {
     if (!selectedRecord) return;
+    if (entityKey === "inventory-items") {
+      const id = String(selectedRecord[config?.idField ?? "id"] ?? "");
+      navigate(`/admin/inventory-items/new`, { state: { cloneFromId: id } });
+      return;
+    }
     setDuplicateSnapshot({ ...selectedRecord });
   };
 
@@ -900,6 +917,7 @@ export function CrudListPage({
           config={config}
           record={null}
           onSubmit={handleCreateSubmit}
+          onSaveAndAddNew={isCategoryTree ? handleCreateAndAddNewSubmit : undefined}
           onClose={() => setCreateDialogOpen(false)}
         />
       )}

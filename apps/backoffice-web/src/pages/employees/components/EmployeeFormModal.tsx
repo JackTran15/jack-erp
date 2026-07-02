@@ -47,6 +47,7 @@ interface EmployeeFormModalProps {
   initialDraft?: EmployeeFormDraft;
   onClose: () => void;
   onSave: (draft: EmployeeFormDraft, context: EmployeeFormSaveContext) => void;
+  onSaveAndAddNew?: (draft: EmployeeFormDraft, context: EmployeeFormSaveContext) => void;
 }
 
 function EmployeeFormLoadingOverlay() {
@@ -80,6 +81,7 @@ export function EmployeeFormModal({
   initialDraft,
   onClose,
   onSave,
+  onSaveAndAddNew,
 }: EmployeeFormModalProps) {
   const [activeTab, setActiveTab] = useState<EmployeeFormTabEnum>(
     EmployeeFormTabEnum.BASIC,
@@ -143,6 +145,18 @@ export function EmployeeFormModal({
       return;
     }
     onSave(draft, { loadedUser });
+  };
+
+  const handleSaveAndAddNew = () => {
+    if (!onSaveAndAddNew) return;
+    const error = validateEmployeeDraft(draft, isEdit, {
+      changePassword: isEdit && changePassword,
+    });
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    onSaveAndAddNew(draft, { loadedUser });
   };
 
   const title = isEdit ? "Sửa nhân viên" : "Thêm mới Nhân viên";
@@ -222,15 +236,17 @@ export function EmployeeFormModal({
               <Save className="mr-1 h-4 w-4" />
               Lưu
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleSave}
-              disabled={!formReady}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Lưu và thêm mới
-            </Button>
+            {onSaveAndAddNew && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveAndAddNew}
+                disabled={!formReady}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Lưu và thêm mới
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={onClose}>
               <X className="mr-1 h-4 w-4" />
               Hủy bỏ

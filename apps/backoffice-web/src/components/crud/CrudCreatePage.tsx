@@ -1,11 +1,13 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@erp/ui";
+import { Plus } from "lucide-react";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
-import { useCrudConfig, useCrudCreate } from "./useCrudApi";
+import { useCrudConfig, useCrudCreate, useCrudRecord } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
+import type { InventoryItemSaveMode } from "./inventory/item-create/InventoryItemActionBar";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
@@ -13,13 +15,29 @@ import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
 import { isNotFoundHttpError } from "../../lib/not-found-http-error";
 import { HttpErrorView } from "../../pages/errors/HttpErrorPage";
 
+/** Fields stripped when cloning an inventory item (must be unique per item). */
+const CLONE_STRIP_FIELDS = new Set(["code", "sku", "barcode", "id", "createdAt", "updatedAt"]);
+
+function stripCloneFields(source: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(source)) {
+    if (!CLONE_STRIP_FIELDS.has(k)) result[k] = v;
+  }
+  return result;
+}
+
 export function CrudCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { entityKey } = useParams<{ entityKey: string }>();
 
+  // cloneFromId is set when navigating from list "Nhân bản" or edit page "Lưu và nhân bản".
+  const cloneFromId = (location.state as Record<string, unknown> | null)?.cloneFromId as string | undefined;
+
   const { data: config, isLoading, error } = useCrudConfig(entityKey!);
   const createMutation = useCrudCreate(entityKey!);
+  // Fetch the full record when cloning from an existing item (list or edit page).
+  const cloneSourceQuery = useCrudRecord(entityKey!, cloneFromId, Boolean(cloneFromId && entityKey));
 
   const editableFields = useMemo(
     () =>
@@ -35,20 +53,58 @@ export function CrudCreatePage() {
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // formKey forces InventoryItemCreateForm to remount after save-and-new / save-and-clone.
+  const [formKey, setFormKey] = useState(0);
+  // suppressSkuAutoFill=true after clone so the form doesn't auto-generate the old SKU from name.
+  const [suppressSkuAutoFill, setSuppressSkuAutoFill] = useState(Boolean(cloneFromId));
+  // initialRecord for clone mode — passed to form so it seeds unitRows/providerRows/extras.
+  const [cloneInitialRecord, setCloneInitialRecord] = useState<Record<string, unknown> | undefined>(undefined);
 
-  useEffect(() => {
-    if (!config) return;
+  const saveModeRef = useRef<InventoryItemSaveMode>("save");
+  const cloneAppliedRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const buildDefaults = useCallback(() => {
     const defaults: Record<string, unknown> = {};
     editableFields.forEach((field) => {
       defaults[field.key] = field.type === "boolean" ? false : "";
     });
-    setValues(defaults);
-  }, [config, editableFields]);
+    // Default isActive to true for entities where "active" is the expected initial state.
+    if (entityKey === "inventory-items" || entityKey === "inventory-providers") {
+      defaults.isActive = true;
+    }
+    return defaults;
+  }, [editableFields, entityKey]);
 
-  if (isLoading) {
+  // Set form defaults when config loads — skip if we're about to seed from a clone source.
+  useEffect(() => {
+    if (!config) return;
+    if (cloneFromId) return; // Clone data will be applied by the next effect once fetched.
+    setValues(buildDefaults());
+  }, [config, buildDefaults, cloneFromId]);
+
+  // Seed values + initialRecord from the fetched clone source (list / edit-page clone).
+  // cloneAppliedRef prevents re-seeding if deps fire more than once.
+  useEffect(() => {
+    const source = cloneSourceQuery.data;
+    if (!source || cloneAppliedRef.current) return;
+    cloneAppliedRef.current = true;
+    const stripped = stripCloneFields(source);
+    setValues(stripped);
+    setCloneInitialRecord(source);
+    setSuppressSkuAutoFill(true);
+  }, [cloneSourceQuery.data]);
+
+  // Sets save mode then programmatically submits the form — mode is guaranteed set before handleSubmit.
+  const handleSaveMode = useCallback((mode: InventoryItemSaveMode) => {
+    saveModeRef.current = mode;
+    formRef.current?.requestSubmit();
+  }, []);
+
+  if (isLoading || (cloneFromId && cloneSourceQuery.isLoading)) {
     return (
       <AdminPageShell>
-        <p>Loading…</p>
+        <p>Đang tải…</p>
       </AdminPageShell>
     );
   }
@@ -111,7 +167,27 @@ export function CrudCreatePage() {
     try {
       await createMutation.mutateAsync(payload);
       toast.success(`Đã tạo ${config.displayName}.`);
-      navigate(`/admin/${entityKey}`, { replace: true });
+
+      const mode = saveModeRef.current;
+      saveModeRef.current = "save";
+
+      if (mode === "save-and-new") {
+        setValues(buildDefaults());
+        setErrors({});
+        setSuppressSkuAutoFill(false);
+        setCloneInitialRecord(undefined);
+        setFormKey((k) => k + 1);
+      } else if (mode === "save-and-clone") {
+        // Use submitted payload as clone source (has all nested data: units, providers etc.)
+        const stripped = stripCloneFields(payload);
+        setValues(stripped);
+        setCloneInitialRecord(payload); // full payload so form can hydrate nested rows
+        setErrors({});
+        setSuppressSkuAutoFill(true);
+        setFormKey((k) => k + 1);
+      } else {
+        navigate(`/admin/${entityKey}`, { replace: true });
+      }
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
     }
@@ -133,6 +209,18 @@ export function CrudCreatePage() {
             >
               Huỷ
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={createMutation.isPending}
+              onClick={() => {
+                saveModeRef.current = "save-and-new";
+                formRef.current?.requestSubmit();
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Lưu và thêm mới
+            </Button>
             <Button type="submit" form="crud-create-form" disabled={createMutation.isPending}>
               {createMutation.isPending ? "Đang lưu…" : "Lưu"}
             </Button>
@@ -141,9 +229,10 @@ export function CrudCreatePage() {
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
-        <form id="crud-create-form" onSubmit={handleSubmit}>
+        <form id="crud-create-form" ref={formRef} onSubmit={handleSubmit}>
           {entityKey === "inventory-items" ? (
             <InventoryItemCreateForm
+              key={formKey}
               editableFields={editableFields}
               values={values}
               setValues={setValues}
@@ -151,6 +240,9 @@ export function CrudCreatePage() {
               setErrors={setErrors}
               entityKey={entityKey!}
               isSaving={createMutation.isPending}
+              onSaveMode={handleSaveMode}
+              suppressSkuAutoFill={suppressSkuAutoFill}
+              initialRecord={cloneInitialRecord}
             />
           ) : entityKey === "inventory-providers" ? (
             <SupplierCreateForm
