@@ -8,7 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { CustomerStatus } from '@erp/shared-interfaces';
 import { CustomerEntity } from './customer.entity';
-import { MembershipCardEntity } from './membership-card.entity';
+import { MembershipCardEntity, MembershipTier } from './membership-card.entity';
 import { CustomerService } from './customer.service';
 import { EventPublisher } from '../events/event-publisher.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
@@ -50,6 +50,11 @@ describe('CustomerService', () => {
     createQueryRunner: jest.Mock;
     transaction: jest.Mock;
   };
+  let membershipCardRepo: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+  };
 
   let mockQueryRunner: {
     connect: jest.Mock;
@@ -84,7 +89,7 @@ describe('CustomerService', () => {
       transaction: jest.fn(),
     };
 
-    const membershipCardRepo = {
+    membershipCardRepo = {
       findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((dto) => ({ id: 'card-new', ...dto })),
       save: jest.fn((entity) => Promise.resolve(entity)),
@@ -101,6 +106,80 @@ describe('CustomerService', () => {
     }).compile();
 
     service = module.get(CustomerService);
+  });
+
+  // =========================================================================
+  // create – auto silver membership card
+  // =========================================================================
+  describe('create (membership card)', () => {
+    it('auto-issues a provisional silver card when membershipCard is omitted', async () => {
+      customerRepo.findOne.mockResolvedValue(null);
+
+      let savedCard: Partial<MembershipCardEntity> | undefined;
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const manager = {
+          create: jest.fn((Entity, dto) => {
+            if (Entity === CustomerEntity) return { id: 'cust-new', ...dto };
+            return dto;
+          }),
+          save: jest.fn(async (entity) => {
+            if ('customerId' in entity) savedCard = entity;
+            return entity;
+          }),
+          findOne: jest.fn().mockResolvedValue(null),
+        };
+        return cb(manager);
+      });
+
+      await service.create({ code: 'KH000001', name: 'Jane Doe', phone: '0901234567' }, actor);
+
+      expect(savedCard).toEqual(
+        expect.objectContaining({
+          customerId: 'cust-new',
+          tier: MembershipTier.SILVER,
+          points: 0,
+          isActive: true,
+        }),
+      );
+      expect(savedCard?.cardNumber).toMatch(/^MC/);
+    });
+
+    it('respects an explicit tier when membershipCard is provided', async () => {
+      customerRepo.findOne.mockResolvedValue(null);
+
+      let savedCard: Partial<MembershipCardEntity> | undefined;
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const manager = {
+          create: jest.fn((Entity, dto) => {
+            if (Entity === CustomerEntity) return { id: 'cust-new', ...dto };
+            return dto;
+          }),
+          save: jest.fn(async (entity) => {
+            if ('customerId' in entity) savedCard = entity;
+            return entity;
+          }),
+          findOne: jest.fn().mockResolvedValue(null),
+        };
+        return cb(manager);
+      });
+
+      await service.create(
+        {
+          code: 'KH000002',
+          name: 'VIP Guest',
+          phone: '0901234568',
+          membershipCard: { cardNumber: 'MCVIP001', tier: MembershipTier.GOLD },
+        },
+        actor,
+      );
+
+      expect(savedCard).toEqual(
+        expect.objectContaining({
+          cardNumber: 'MCVIP001',
+          tier: MembershipTier.GOLD,
+        }),
+      );
+    });
   });
 
   // =========================================================================

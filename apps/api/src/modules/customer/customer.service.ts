@@ -20,7 +20,11 @@ import { BaseCrudService, CrudOperation } from '../crud/base-crud.service';
 import { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { EventPublisher } from '../events/event-publisher.service';
 import { CustomerEntity } from './customer.entity';
-import { MembershipCardEntity, MembershipTier } from './membership-card.entity';
+import { MembershipCardEntity } from './membership-card.entity';
+import {
+  DEFAULT_NEW_CUSTOMER_MEMBERSHIP_TIER,
+  generateMembershipCardNumber,
+} from './membership-card.utils';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto';
 
 export const CUSTOMER_SERVICE_TOKEN = 'CustomerService';
@@ -66,32 +70,33 @@ export class CustomerService extends BaseCrudService<
       });
       saved = await manager.save(entity);
 
-      if (membershipCard) {
-        const duplicate = await manager.findOne(MembershipCardEntity, {
-          where: { cardNumber: membershipCard.cardNumber, organizationId: actor.organizationId },
-        });
-        if (duplicate) {
-          throw new ConflictException(
-            `Membership card number "${membershipCard.cardNumber}" already exists in this organization`,
-          );
-        }
-
-        const today = new Date().toISOString().slice(0, 10);
-        const card = manager.create(MembershipCardEntity, {
-          organizationId: actor.organizationId,
-          customerId: saved.id,
-          cardNumber: membershipCard.cardNumber,
-          tier: membershipCard.tier ?? MembershipTier.NONE,
-          points: 0,
-          issuedAt: new Date(membershipCard.issuedAt ?? today),
-          expiresAt: membershipCard.expiresAt ? new Date(membershipCard.expiresAt) : undefined,
-          lomasCardNumber: membershipCard.lomasCardNumber,
-          lomasTier: membershipCard.lomasTier,
-          isActive: true,
-          createdBy: actor.userId,
-        });
-        await manager.save(card);
+      const today = new Date().toISOString().slice(0, 10);
+      const cardNumber =
+        membershipCard?.cardNumber?.trim() ||
+        generateMembershipCardNumber(actor.organizationId);
+      const duplicate = await manager.findOne(MembershipCardEntity, {
+        where: { cardNumber, organizationId: actor.organizationId },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          `Membership card number "${cardNumber}" already exists in this organization`,
+        );
       }
+
+      const card = manager.create(MembershipCardEntity, {
+        organizationId: actor.organizationId,
+        customerId: saved.id,
+        cardNumber,
+        tier: membershipCard?.tier ?? DEFAULT_NEW_CUSTOMER_MEMBERSHIP_TIER,
+        points: 0,
+        issuedAt: new Date(membershipCard?.issuedAt ?? today),
+        expiresAt: membershipCard?.expiresAt ? new Date(membershipCard.expiresAt) : undefined,
+        lomasCardNumber: membershipCard?.lomasCardNumber,
+        lomasTier: membershipCard?.lomasTier,
+        isActive: true,
+        createdBy: actor.userId,
+      });
+      await manager.save(card);
     });
 
     this.logger.log(`Created customer id=${saved!.id} (org=${actor.organizationId})`);

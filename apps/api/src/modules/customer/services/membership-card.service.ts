@@ -12,6 +12,7 @@ import { PointHistoryEntity, PointType } from '../point-history.entity';
 import { IssueMembershipCardDto } from '../dto/issue-membership-card.dto';
 import { AdjustPointsDto } from '../dto/adjust-points.dto';
 import { POINT_EARN_VND_PER_POINT } from '../loyalty.constants';
+import { generateMembershipCardNumber } from '../membership-card.utils';
 
 @Injectable()
 export class MembershipCardService {
@@ -35,7 +36,7 @@ export class MembershipCardService {
       throw new ConflictException('An active membership card already exists for this customer');
     }
 
-    const cardNumber = `MC${actor.organizationId.slice(0, 2).toUpperCase()}${String(Date.now()).slice(-6)}`;
+    const cardNumber = generateMembershipCardNumber(actor.organizationId);
 
     const card = this.cardRepo.create({
       organizationId: actor.organizationId,

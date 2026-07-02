@@ -11,10 +11,14 @@ import {
 import {
   useCreateCustomer,
   useCustomer,
+  useMembershipCardTypes,
   useUpdateCustomer,
 } from "@erp/pos/hooks/react-query/use-query-customer";
 import { useCustomerGroups } from "@erp/pos/hooks/react-query/use-query-customer-group";
-import { generateCustomerCode } from "@erp/pos/lib/common/customerUtils";
+import {
+  generateCustomerCode,
+  generateMembershipCardCode,
+} from "@erp/pos/lib/common/customerUtils";
 import type { CustomerDetail } from "@erp/pos/interfaces/customer.interface";
 import type { CustomerGroupRow } from "@erp/pos/interfaces/customer-group.interface";
 import { CustomerGroupCreateDialog } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CustomerGroupCreateDialog/CustomerGroupCreateDialog";
@@ -30,6 +34,7 @@ import { BasicInfoSection } from "@erp/pos/components/page-components/Checkout/C
 import { MembershipSection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/MembershipSection/MembershipSection";
 import { CompanySection } from "@erp/pos/components/page-components/Checkout/CheckoutDialogs/CustomerCreateDialog/CompanySection/CompanySection";
 import type { CustomerDialogMode } from "@erp/pos/types/customer.type";
+import { MembershipTierEnum } from "@erp/pos/types/customer.type";
 import type {
   CustomerFormValues,
   CustomerSelectOption,
@@ -101,6 +106,8 @@ function buildInitialValues(
       name: customer?.name ?? seed.name,
       phone: customer?.phone ?? seed.phone,
       email: customer?.email ?? "",
+      cardCode: customer?.cardCode ?? generateMembershipCardCode(),
+      cardTier: customer?.cardTier ?? MembershipTierEnum.SILVER,
     };
   }
   return { ...EMPTY_VALUES, ...(customer ?? {}) };
@@ -153,6 +160,14 @@ export function CustomerForm({
   const { data: customerRaw } = useCustomer(editingId);
 
   const { data: customerGroupsData } = useCustomerGroups();
+  const { data: membershipCardTypes = [] } = useMembershipCardTypes();
+  const resolvedCardTiers = useMemo<CustomerSelectOption[]>(
+    () =>
+      cardTiers.length > 0
+        ? cardTiers
+        : membershipCardTypes.map((t) => ({ value: t.tier, label: t.name })),
+    [cardTiers, membershipCardTypes],
+  );
   const customerGroupsFromQuery = useMemo<CustomerSelectOption[]>(
     () =>
       (customerGroupsData ?? []).map((g) => ({ value: g.id, label: g.name })),
@@ -327,7 +342,7 @@ export function CustomerForm({
               manager: managerId,
               note: noteId,
             }}
-            cardTiers={cardTiers}
+            cardTiers={resolvedCardTiers}
             customerGroups={mergedCustomerGroups}
             accountManagers={accountManagers}
             onChange={setField}

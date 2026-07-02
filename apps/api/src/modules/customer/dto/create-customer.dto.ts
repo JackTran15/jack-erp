@@ -14,9 +14,10 @@ import { Gender } from '../customer.entity';
 import { MembershipTier } from '../membership-card.entity';
 
 export class CreateMembershipCardInlineDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  cardNumber: string;
+  cardNumber?: string;
 
   @IsOptional()
   @IsEnum(MembershipTier)

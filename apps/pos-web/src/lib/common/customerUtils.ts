@@ -28,3 +28,9 @@ export function generateCustomerCode(): string {
   const seq = String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
   return `KH${seq}`;
 }
+
+/** Preview membership card number for the create-customer form (BE may regenerate). */
+export function generateMembershipCardCode(): string {
+  const seq = String(Date.now()).slice(-6);
+  return `MC${seq}`;
+}
