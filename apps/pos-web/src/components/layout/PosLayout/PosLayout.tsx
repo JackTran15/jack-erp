@@ -226,8 +226,8 @@ export function PosLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
-      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 h-12 gap-3 bg-white px-3">
+    <div className="flex h-[100dvh] w-full flex-col bg-gray-100 text-gray-900 overflow-hidden">
+      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 gap-2 bg-white px-3">
         <div className="flex items-center gap-2">
           <div onClick={() => navigate("/")} className="cursor-pointer">
             <PosLogo />
@@ -257,7 +257,7 @@ export function PosLayout() {
           />
         )}
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 py-2">
           <PosLocationIndicator />
           <PosIconButton
             ref={notificationsTriggerRef}
