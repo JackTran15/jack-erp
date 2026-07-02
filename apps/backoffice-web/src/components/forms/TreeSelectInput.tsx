@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Input, ScrollArea } from "@erp/ui";
+import { Input } from "@erp/ui";
 import { erpApi, requireErpData } from "../../lib/erp-api";
 import type { PaginatedResponse } from "@erp/shared-interfaces";
 
@@ -285,7 +285,7 @@ export function TreeSelectInput({
               {query ? "Không tìm thấy." : "Không có nhóm nào."}
             </div>
           ) : (
-            <ScrollArea className="max-h-64">
+            <div className="max-h-64 overflow-y-auto overscroll-contain">
               <ul role="listbox" className="py-1">
                 {displayNodes.map((node) => (
                   <li
@@ -310,7 +310,7 @@ export function TreeSelectInput({
                   </li>
                 ))}
               </ul>
-            </ScrollArea>
+            </div>
           )}
         </div>
       )}
