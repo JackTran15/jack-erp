@@ -6,6 +6,7 @@ import {
   BaseDataTable,
   type TableColumn,
 } from "../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../components/status/StatusBadge";
 import { downloadLocationErrorRowsExcel } from "./import-location.api";
 import type { ImportJob, LocationImportJobRow } from "./import-location.types";
 
@@ -51,9 +52,9 @@ function buildColumns(): TableColumn<ReviewRow>[] {
       label: "Tình trạng",
       width: 300,
       render: (r) => (
-        <span className={r.isError ? "text-destructive" : "text-foreground"}>
+        <StatusBadge variant={r.isError ? "danger" : "success"}>
           {r.statusLabel}
-        </span>
+        </StatusBadge>
       ),
     },
   ];

@@ -10,7 +10,6 @@ import type { FieldDefinition } from "@erp/shared-interfaces";
 import { toast } from "sonner";
 import {
   Button,
-  Badge,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -61,6 +60,7 @@ import {
 import { flattenCategoryTree, collectParentIds } from "./itemCategoryTree";
 import { useItemCategoryTree } from "./useItemCategoryTree";
 import { useCrudListReturnState } from "./useCrudListReturnState";
+import { ActiveStatusBadge } from "../status/StatusBadge";
 
 /** Entity keys that open create/edit as a dialog instead of navigating to a new page. */
 const DIALOG_MODE_ENTITIES = new Set([
@@ -128,7 +128,10 @@ export function CrudListPage({
     new Set(),
   );
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editSnapshot, setEditSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [editSnapshot, setEditSnapshot] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<Record<
     string,
@@ -232,17 +235,17 @@ export function CrudListPage({
     { search: treeSearch || undefined },
     isCategoryTree && Boolean(config),
   );
-  const treeNodes = useMemo(
-    () => treeQuery.data?.data ?? [],
-    [treeQuery.data],
-  );
+  const treeNodes = useMemo(() => treeQuery.data?.data ?? [], [treeQuery.data]);
   // When searching, the returned tree is already pruned to matches — show it
   // fully expanded so every match is visible regardless of collapse state.
   const treeVisibleRows = useMemo(
     () => flattenCategoryTree(treeNodes, treeSearch ? undefined : collapsedIds),
     [treeNodes, collapsedIds, treeSearch],
   );
-  const treeAllRows = useMemo(() => flattenCategoryTree(treeNodes), [treeNodes]);
+  const treeAllRows = useMemo(
+    () => flattenCategoryTree(treeNodes),
+    [treeNodes],
+  );
   const categoryTreeRecords = useMemo(
     () => ({
       data: treeAllRows,
@@ -321,7 +324,14 @@ export function CrudListPage({
         return applyColumnFilter(comparable, filter);
       }),
     );
-  }, [records?.data, config?.fields, columnFilters, v2, isCategoryTree, treeVisibleRows]);
+  }, [
+    records?.data,
+    config?.fields,
+    columnFilters,
+    v2,
+    isCategoryTree,
+    treeVisibleRows,
+  ]);
 
   useEffect(() => {
     const visibleIds = new Set(
@@ -373,11 +383,7 @@ export function CrudListPage({
           // maps to a v2 DTO field; date fields use the from/to range cell.
           const v2Kind = v2?.fields[field.key];
           let filterKind:
-            | "symbol"
-            | "select"
-            | "date-range"
-            | "number-range"
-            | "none";
+            "symbol" | "select" | "date-range" | "number-range" | "none";
           let filterOptions = selectOptions;
           if (v2) {
             if (!v2Kind) {
@@ -640,7 +646,10 @@ export function CrudListPage({
     }
   };
 
-  const handleColumnFilterModeChange = (fieldKey: string, mode: ColumnFilterMode) => {
+  const handleColumnFilterModeChange = (
+    fieldKey: string,
+    mode: ColumnFilterMode,
+  ) => {
     setColumnFilters((prev) => ({
       ...prev,
       [fieldKey]: {
@@ -917,7 +926,9 @@ export function CrudListPage({
           config={config}
           record={null}
           onSubmit={handleCreateSubmit}
-          onSaveAndAddNew={isCategoryTree ? handleCreateAndAddNewSubmit : undefined}
+          onSaveAndAddNew={
+            isCategoryTree ? handleCreateAndAddNewSubmit : undefined
+          }
           onClose={() => setCreateDialogOpen(false)}
         />
       )}
@@ -997,15 +1008,11 @@ function formatCell(
   if (entityKey === "inventory-items" && field.key === "isActive") {
     const enabled = Boolean(value);
     return (
-      <span
-        className={
-          enabled
-            ? "inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-950/50 dark:text-green-300"
-            : "inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-        }
-      >
-        {enabled ? "Đang hoạt động" : "Ngừng kinh doanh"}
-      </span>
+      <ActiveStatusBadge
+        active={enabled}
+        activeLabel="Đang hoạt động"
+        inactiveLabel="Ngừng kinh doanh"
+      />
     );
   }
   if (field.type === "boolean") {

@@ -5,6 +5,7 @@ import type { ToolbarItem } from "@erp/ui";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { TableActionHeader } from "../../components/layout/TableActionHeader";
 import { CrudRecordDialog } from "../../components/crud/CrudRecordDialog";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
 import type { PaginatedResponse } from "@erp/shared-interfaces";
 
@@ -28,9 +29,7 @@ interface TreeNode extends GroupRow {
 
 function buildTree(rows: GroupRow[]): TreeNode[] {
   const map = new Map<string, TreeNode>();
-  rows.forEach((r) =>
-    map.set(r.id, { ...r, children: [], depth: 0 }),
-  );
+  rows.forEach((r) => map.set(r.id, { ...r, children: [], depth: 0 }));
   const roots: TreeNode[] = [];
   map.forEach((node) => {
     const parent = node.parentGroupId ? map.get(node.parentGroupId) : undefined;
@@ -38,15 +37,15 @@ function buildTree(rows: GroupRow[]): TreeNode[] {
     else roots.push(node);
   });
   const setDepth = (nodes: TreeNode[], d: number) =>
-    nodes.forEach((n) => { n.depth = d; setDepth(n.children, d + 1); });
+    nodes.forEach((n) => {
+      n.depth = d;
+      setDepth(n.children, d + 1);
+    });
   setDepth(roots, 0);
   return roots;
 }
 
-function flattenVisible(
-  nodes: TreeNode[],
-  expanded: Set<string>,
-): TreeNode[] {
+function flattenVisible(nodes: TreeNode[], expanded: Set<string>): TreeNode[] {
   const result: TreeNode[] = [];
   const walk = (ns: TreeNode[]) => {
     ns.forEach((n) => {
@@ -61,7 +60,10 @@ function flattenVisible(
 function collectAllIds(nodes: TreeNode[]): string[] {
   const ids: string[] = [];
   const walk = (ns: TreeNode[]) =>
-    ns.forEach((n) => { ids.push(n.id); walk(n.children); });
+    ns.forEach((n) => {
+      ids.push(n.id);
+      walk(n.children);
+    });
   walk(nodes);
   return ids;
 }
@@ -88,8 +90,14 @@ export function ProviderGroupListPage() {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogRecordId, setDialogRecordId] = useState<string | null>(null);
-  const openCreate = () => { setDialogRecordId(null); setDialogOpen(true); };
-  const openEdit = (id: string) => { setDialogRecordId(id); setDialogOpen(true); };
+  const openCreate = () => {
+    setDialogRecordId(null);
+    setDialogOpen(true);
+  };
+  const openEdit = (id: string) => {
+    setDialogRecordId(id);
+    setDialogOpen(true);
+  };
 
   // Fetch flat list of all groups
   const { data, isLoading, refetch } = useQuery({
@@ -263,14 +271,20 @@ export function ProviderGroupListPage() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
+                <td
+                  colSpan={4}
+                  className="px-3 py-4 text-center text-muted-foreground"
+                >
                   Đang tải…
                 </td>
               </tr>
             )}
             {!isLoading && visibleNodes.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
+                <td
+                  colSpan={4}
+                  className="px-3 py-4 text-center text-muted-foreground"
+                >
                   Không có dữ liệu.
                 </td>
               </tr>
@@ -339,9 +353,11 @@ export function ProviderGroupListPage() {
 
                   {/* Status */}
                   <td className="px-3 py-2">
-                    <span className={hasChildren ? "font-semibold" : ""}>
-                      {statusLabel(node.isActive)}
-                    </span>
+                    <ActiveStatusBadge
+                      active={node.isActive}
+                      activeLabel={statusLabel(true)}
+                      inactiveLabel={statusLabel(false)}
+                    />
                   </td>
                 </tr>
               );

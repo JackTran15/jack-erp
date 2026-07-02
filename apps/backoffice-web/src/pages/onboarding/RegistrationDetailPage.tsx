@@ -4,6 +4,10 @@ import { Button } from "@erp/ui";
 import { hasAnyPermission } from "../../lib/permissions";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
+  StatusBadge as AppStatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
+import {
   useRegistration,
   RegistrationStatus,
   RegistrationType,
@@ -22,26 +26,24 @@ const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
-function getStatusClassName(status: RegistrationStatus): string {
+function getStatusVariant(status: RegistrationStatus): StatusBadgeVariant {
   if (status === RegistrationStatus.APPROVED) {
-    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+    return "success";
   }
   if (status === RegistrationStatus.REJECTED) {
-    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+    return "danger";
   }
   if (status === RegistrationStatus.RESUBMITTED) {
-    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+    return "info";
   }
-  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+  return "warning";
 }
 
 function StatusBadge({ status }: { status: RegistrationStatus }) {
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
-    >
+    <AppStatusBadge variant={getStatusVariant(status)}>
       {STATUS_LABELS[status]}
-    </span>
+    </AppStatusBadge>
   );
 }
 
@@ -121,7 +123,7 @@ export function RegistrationDetailPage() {
               className="mt-4"
               onClick={() => navigate(-1)}
             >
-          Quay lại
+              Quay lại
             </Button>
           </div>
         </div>
@@ -211,7 +213,9 @@ export function RegistrationDetailPage() {
                 <span className="text-foreground">{typeName}</span>
               </div>
               <div className="grid gap-1">
-                <span className="font-medium text-muted-foreground">Trạng thái</span>
+                <span className="font-medium text-muted-foreground">
+                  Trạng thái
+                </span>
                 <span>
                   <StatusBadge status={record.status} />
                 </span>
@@ -232,7 +236,10 @@ export function RegistrationDetailPage() {
               <table className="w-full border-collapse text-sm">
                 <tbody>
                   {requestDataEntries.map(([key, value]) => (
-                    <tr key={key} className="border-b border-border last:border-0">
+                    <tr
+                      key={key}
+                      className="border-b border-border last:border-0"
+                    >
                       <td className="w-56 bg-muted/50 px-4 py-2.5 font-medium text-muted-foreground">
                         {key}
                       </td>
@@ -253,7 +260,10 @@ export function RegistrationDetailPage() {
               </h2>
               <ol className="mt-4 space-y-3">
                 {timeline.map((event) => (
-                  <li key={event.label} className="border-l-2 border-primary pl-4">
+                  <li
+                    key={event.label}
+                    className="border-l-2 border-primary pl-4"
+                  >
                     <div className="text-sm font-semibold text-foreground">
                       {event.label}
                     </div>
@@ -267,7 +277,9 @@ export function RegistrationDetailPage() {
 
             {(error || canApprove) && (
               <section className="border border-border bg-card p-4">
-                <h2 className="text-base font-semibold text-foreground">Thao tác</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Thao tác
+                </h2>
                 {error && (
                   <p className="mt-3 text-sm font-medium text-destructive">
                     {error}

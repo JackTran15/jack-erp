@@ -16,6 +16,7 @@ import {
 } from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
   DEFAULT_PAGINATION,
@@ -23,14 +24,11 @@ import {
   type ColumnFilterMode,
   type PaginationStateDto,
 } from "../../components/table/pagination.dto";
-import {
-  columnToStringFilter,
-} from "../../components/crud/crudV2Search";
+import { columnToStringFilter } from "../../components/crud/crudV2Search";
 import { useDebouncedValue } from "../../lib/use-debounced-value";
 import { hasPermission } from "../../lib/permissions";
 import {
   draftToUserUpdatePayload,
-  formatAccountStatus,
   formatIamDateTime,
   getIamErrorMessage,
   joinFullName,
@@ -81,8 +79,7 @@ function resolveEmployeeSearchBody(
     code: columnToStringFilter(columnFilters.code),
     fullName: columnToStringFilter(columnFilters.fullName),
     email: columnToStringFilter(columnFilters.email),
-    isActive:
-      status === "true" ? true : status === "false" ? false : undefined,
+    isActive: status === "true" ? true : status === "false" ? false : undefined,
   };
 }
 
@@ -347,7 +344,7 @@ export function EmployeesPage() {
       width: 140,
       filterKind: "select",
       filterOptions: STATUS_FILTER_OPTIONS,
-      render: (row) => formatAccountStatus(row.isActive),
+      render: (row) => <ActiveStatusBadge active={row.isActive} />,
     },
     {
       key: "lastLoginAt",
@@ -452,7 +449,9 @@ export function EmployeesPage() {
           setFormInitialDraft(undefined);
         }}
         onSave={(draft, context) => void handleSave(draft, context)}
-        onSaveAndAddNew={(draft, context) => void handleSaveAndAddNew(draft, context)}
+        onSaveAndAddNew={(draft, context) =>
+          void handleSaveAndAddNew(draft, context)
+        }
       />
 
       {confirmDeactivate && (

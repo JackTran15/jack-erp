@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { formatClientError } from "@erp/api-client";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
-import { Badge, Button } from "@erp/ui";
+import { Button } from "@erp/ui";
 import { productsApi, type Product } from "../../api/products";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import { ProductForm } from "./components/ProductForm";
 import { AttributeDefinitionsForm } from "./components/AttributeDefinitionsForm";
 import { VariantMatrixView } from "./components/VariantMatrixView";
@@ -103,9 +104,11 @@ export function ProductDetailPage() {
           </button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold">{product.name}</h1>
-            <Badge variant={product.isActive ? "default" : "secondary"}>
-              {product.isActive ? "Hoạt động" : "Ngừng"}
-            </Badge>
+            <ActiveStatusBadge
+              active={product.isActive}
+              activeLabel="Đang hoạt động"
+              inactiveLabel="Ngừng kinh doanh"
+            />
           </div>
           {product.description && (
             <p className="mt-1 text-sm text-muted-foreground">
@@ -156,9 +159,7 @@ export function ProductDetailPage() {
         <AttributeDefinitionsForm productId={product.id} />
       )}
 
-      {activeTab === "variants" && (
-        <VariantMatrixView productId={product.id} />
-      )}
+      {activeTab === "variants" && <VariantMatrixView productId={product.id} />}
 
       {confirmDelete && (
         <ConfirmActionModal

@@ -3,8 +3,10 @@ import { Search, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Input } from "./input";
 
-export interface SearchInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> {
+export interface SearchInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "type" | "onChange"
+> {
   value: string;
   onValueChange: (value: string) => void;
   onClear?: () => void;
@@ -17,7 +19,8 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <Input
           ref={ref}
-          type="search"
+          type="text"
+          role="searchbox"
           className="pl-9 pr-9"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}

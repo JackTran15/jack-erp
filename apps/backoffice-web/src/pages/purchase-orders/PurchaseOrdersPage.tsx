@@ -31,6 +31,10 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import {
+  StatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -122,20 +126,10 @@ function purchasePurposeLabel(purpose: PurchaseOrder["purpose"]): string {
 
 function renderStatusBadge(status: PurchaseOrderStatus) {
   const isCancelled = status === "CANCELLED" || status === "REVERSED";
-  const className =
-    status === "POSTED"
-      ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"
-      : isCancelled
-        ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-        : "bg-muted text-muted-foreground";
+  const variant: StatusBadgeVariant =
+    status === "POSTED" ? "success" : isCancelled ? "danger" : "neutral";
 
-  return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${className}`}
-    >
-      {STATUS_LABEL[status]}
-    </span>
-  );
+  return <StatusBadge variant={variant}>{STATUS_LABEL[status]}</StatusBadge>;
 }
 
 type PurchaseOrdersPageMode = "inventory" | "purchase";

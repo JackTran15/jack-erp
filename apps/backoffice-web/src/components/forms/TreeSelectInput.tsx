@@ -55,7 +55,9 @@ function buildTree(items: RawItem[], excludeId?: string): TreeNode[] {
   if (excludeId) {
     const addDescendants = (id: string) => {
       excluded.add(id);
-      items.filter((i) => i.parentGroupId === id).forEach((c) => addDescendants(c.id));
+      items
+        .filter((i) => i.parentGroupId === id)
+        .forEach((c) => addDescendants(c.id));
     };
     addDescendants(excludeId);
   }
@@ -96,7 +98,11 @@ function flatten(nodes: TreeNode[]): TreeNode[] {
   return result;
 }
 
-function filterTree(nodes: TreeNode[], q: string, ancestorMatched = false): TreeNode[] {
+function filterTree(
+  nodes: TreeNode[],
+  q: string,
+  ancestorMatched = false,
+): TreeNode[] {
   return nodes.flatMap((node) => {
     const selfMatched = matchesSearch(node, q);
     const includeDescendants = ancestorMatched || selfMatched;
@@ -207,7 +213,9 @@ export function TreeSelectInput({
 
   const hydrateParents = useCallback(
     async (items: RawItem[], existing: RawItem[]): Promise<RawItem[]> => {
-      const map = new Map([...existing, ...items].map((item) => [item.id, item]));
+      const map = new Map(
+        [...existing, ...items].map((item) => [item.id, item]),
+      );
       const parents: RawItem[] = [];
 
       for (const item of items) {
@@ -228,48 +236,47 @@ export function TreeSelectInput({
     [fetchRecord],
   );
 
-  const loadPage = useCallback(async (
-    pageToLoad: number,
-    queryToLoad: string,
-    replace: boolean,
-  ) => {
-    const seq = ++requestSeqRef.current;
-    setLoading(true);
-    try {
-      const params: { page: number; pageSize: number; search?: string } = {
-        page: pageToLoad,
-        pageSize: PAGE_SIZE,
-      };
-      if (queryToLoad) params.search = queryToLoad;
+  const loadPage = useCallback(
+    async (pageToLoad: number, queryToLoad: string, replace: boolean) => {
+      const seq = ++requestSeqRef.current;
+      setLoading(true);
+      try {
+        const params: { page: number; pageSize: number; search?: string } = {
+          page: pageToLoad,
+          pageSize: PAGE_SIZE,
+        };
+        if (queryToLoad) params.search = queryToLoad;
 
-      const res = await requireErpData(
-        await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
-          "/admin/entities/{entityKey}/records",
-          { params: { path: { entityKey }, query: params } },
-        ),
-      );
-      if (seq !== requestSeqRef.current) return;
+        const res = await requireErpData(
+          await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
+            "/admin/entities/{entityKey}/records",
+            { params: { path: { entityKey }, query: params } },
+          ),
+        );
+        if (seq !== requestSeqRef.current) return;
 
-      const pageItems = res.data.map(mapRecord);
-      const baseItems = replace ? [] : allItemsRef.current;
-      const parentItems = await hydrateParents(pageItems, baseItems);
-      if (seq !== requestSeqRef.current) return;
+        const pageItems = res.data.map(mapRecord);
+        const baseItems = replace ? [] : allItemsRef.current;
+        const parentItems = await hydrateParents(pageItems, baseItems);
+        if (seq !== requestSeqRef.current) return;
 
-      setAllItems((prev) =>
-        mergeItems(replace ? [] : prev, [...parentItems, ...pageItems]),
-      );
-      setPaging((prev) => ({
-        page: pageToLoad,
-        total: res.total,
-        loaded: replace ? res.data.length : prev.loaded + res.data.length,
-        query: queryToLoad,
-      }));
-    } catch {
-      // silently fail — dropdown stays empty
-    } finally {
-      if (seq === requestSeqRef.current) setLoading(false);
-    }
-  }, [entityKey, hydrateParents]);
+        setAllItems((prev) =>
+          mergeItems(replace ? [] : prev, [...parentItems, ...pageItems]),
+        );
+        setPaging((prev) => ({
+          page: pageToLoad,
+          total: res.total,
+          loaded: replace ? res.data.length : prev.loaded + res.data.length,
+          query: queryToLoad,
+        }));
+      } catch {
+        // silently fail — dropdown stays empty
+      } finally {
+        if (seq === requestSeqRef.current) setLoading(false);
+      }
+    },
+    [entityKey, hydrateParents],
+  );
 
   const query = inputText.trim();
 
@@ -360,7 +367,7 @@ export function TreeSelectInput({
       <div className="relative flex items-center">
         <Input
           id={id}
-          type="search"
+          type="text"
           value={inputText}
           placeholder={placeholder}
           disabled={disabled}
@@ -391,14 +398,16 @@ export function TreeSelectInput({
       {showDropdown && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
           {loading && paging.page === 0 ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Đang tải…</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              Đang tải…
+            </div>
           ) : displayNodes.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               {query ? "Không tìm thấy." : "Không có nhóm nào."}
             </div>
           ) : (
             <div
-              className="h-64 overflow-y-auto overscroll-contain"
+              className="max-h-64 overflow-y-auto overscroll-contain"
               onScroll={handleDropdownScroll}
             >
               <ul role="listbox" className="py-1">
@@ -409,7 +418,9 @@ export function TreeSelectInput({
                     aria-selected={node.id === value}
                     className={[
                       "cursor-pointer px-3 py-1.5 text-sm",
-                      node.id === value ? "bg-primary/10 font-medium" : "hover:bg-muted",
+                      node.id === value
+                        ? "bg-primary/10 font-medium"
+                        : "hover:bg-muted",
                     ].join(" ")}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -419,14 +430,16 @@ export function TreeSelectInput({
                     <span className="whitespace-pre font-mono text-xs text-muted-foreground">
                       {indentPrefix(node.depth)}
                     </span>
-                    <span className="text-xs text-muted-foreground">{node.code}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {node.code}
+                    </span>
                     {" · "}
                     <span>{node.name}</span>
                   </li>
                 ))}
                 {loading || hasMore ? (
                   <li className="px-3 py-2 text-xs text-muted-foreground">
-                    {loading ? "Đang tải thêm…" : "Cuộn xuống để tải thêm"}
+                    {loading ? "Đang tải thêm…" : ""}
                   </li>
                 ) : null}
               </ul>

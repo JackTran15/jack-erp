@@ -22,7 +22,6 @@ import {
 import {
   DocCounterpartyKind,
   DocumentType,
-  DocCounterpartyKind,
   ExportTransferOrderLine,
   ExportTransferOrderRequest,
   ImportTransferOrderLine,

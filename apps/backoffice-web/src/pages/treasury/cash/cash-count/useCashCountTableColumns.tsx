@@ -1,18 +1,13 @@
-import { Badge } from "@erp/ui";
 import { useMemo } from "react";
 import type { TableColumn } from "../../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../../components/status/StatusBadge";
 import { VoucherLink } from "../../documents";
 import {
   CASH_COUNT_STATUS_FILTER_OPTIONS,
   CASH_COUNT_STATUS_LABEL,
 } from "./cash-count.constants";
-import {
-  LEDGER_CASH_VI_DATE,
-} from "../../ledger-cash/ledger-cash.constants";
-import {
-  CashCountStatusEnum,
-  type CashCountRecord,
-} from "./cash-count.types";
+import { LEDGER_CASH_VI_DATE } from "../../ledger-cash/ledger-cash.constants";
+import { CashCountStatusEnum, type CashCountRecord } from "./cash-count.types";
 
 export function useCashCountTableColumns(
   onOpenRecord: (record: CashCountRecord) => void,
@@ -66,10 +61,8 @@ export function useCashCountTableColumns(
         render: (r) => {
           const label = CASH_COUNT_STATUS_LABEL[r.status];
           const variant =
-            r.status === CashCountStatusEnum.PROCESSED
-              ? "default"
-              : "secondary";
-          return <Badge variant={variant}>{label}</Badge>;
+            r.status === CashCountStatusEnum.PROCESSED ? "success" : "neutral";
+          return <StatusBadge variant={variant}>{label}</StatusBadge>;
         },
       },
     ],
