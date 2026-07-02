@@ -53,6 +53,7 @@ interface PosFastStockTransferPickerState {
   ) => void;
   findProduct: (itemId: string) => PosCatalogLine | null;
   clearProductCache: () => void;
+  resetPickerState: () => void;
 
   syncFromLines: (lines: ReadonlyArray<TempWarehouseLine>) => void;
 }
@@ -98,6 +99,15 @@ export const usePosFastStockTransferPickerStore =
     findProduct: (itemId) => get().productsByItemId[itemId] ?? null,
 
     clearProductCache: () => set({ productsByItemId: {} }),
+
+    resetPickerState: () =>
+      set({
+        carriersById: {},
+        carrierToolbar: initialCarrierToolbar(),
+        productsByItemId: {},
+        catalogDirection: "warehouse",
+        productToolbar: initialProductToolbar(),
+      }),
 
     syncFromLines: (lines) => {
       const carriers = collectCarriersFromLines(lines);
