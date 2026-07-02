@@ -3,6 +3,10 @@ import { Button } from "@erp/ui";
 import { hasPermission } from "../../lib/permissions";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
+  StatusBadge as AppStatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
+import {
   useRegistration,
   RegistrationStatus,
   type SubmitOrgRegistrationData,
@@ -18,26 +22,24 @@ const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.RESUBMITTED]: "Đã gửi lại",
 };
 
-function getStatusClassName(status: RegistrationStatus): string {
+function getStatusVariant(status: RegistrationStatus): StatusBadgeVariant {
   if (status === RegistrationStatus.APPROVED) {
-    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+    return "success";
   }
   if (status === RegistrationStatus.REJECTED) {
-    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+    return "danger";
   }
   if (status === RegistrationStatus.RESUBMITTED) {
-    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+    return "info";
   }
-  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+  return "warning";
 }
 
 function StatusBadge({ status }: { status: RegistrationStatus }) {
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
-    >
+    <AppStatusBadge variant={getStatusVariant(status)}>
       {STATUS_LABELS[status]}
-    </span>
+    </AppStatusBadge>
   );
 }
 
@@ -72,7 +74,10 @@ export function OrgRegistrationPage() {
     );
   }
 
-  const handleChange = (field: keyof SubmitOrgRegistrationData, value: string) => {
+  const handleChange = (
+    field: keyof SubmitOrgRegistrationData,
+    value: string,
+  ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 

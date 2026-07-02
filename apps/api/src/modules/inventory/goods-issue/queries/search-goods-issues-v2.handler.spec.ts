@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { GoodsIssueStatus } from '@erp/shared-interfaces';
+import { DocCounterpartyKind, GoodsIssueStatus } from '@erp/shared-interfaces';
 import { StringOperator, CompareOperator } from '../../../../common/filters/filter.dto';
+import { CustomerEntity } from '../../../customer/customer.entity';
+import { UserEntity } from '../../../auth/user.entity';
 import { GoodsIssueEntity } from '../goods-issue.entity';
 import { SearchGoodsIssuesV2Handler } from './search-goods-issues-v2.handler';
 import { SearchGoodsIssuesV2Query } from './search-goods-issues-v2.query';
@@ -29,12 +31,23 @@ function makeQb(result: [unknown[], number]) {
 
 describe('SearchGoodsIssuesV2Handler', () => {
   let handler: SearchGoodsIssuesV2Handler;
-  let repo: { createQueryBuilder: jest.Mock };
+  let repo: { createQueryBuilder: jest.Mock; manager: { find: jest.Mock } };
   let qb: ReturnType<typeof makeQb>;
 
   async function build(rows: unknown[], total = rows.length) {
     qb = makeQb([rows, total]);
-    repo = { createQueryBuilder: jest.fn(() => qb) };
+    repo = {
+      createQueryBuilder: jest.fn(() => qb),
+      manager: {
+        find: jest.fn(async (entity: unknown) => {
+          if (entity === CustomerEntity)
+            return [{ id: 'cust-1', code: 'KH001', name: 'Khach A' }];
+          if (entity === UserEntity)
+            return [{ id: 'emp-1', firstName: 'Nguyen', lastName: 'Van A' }];
+          return [];
+        }),
+      },
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SearchGoodsIssuesV2Handler,
@@ -83,6 +96,29 @@ describe('SearchGoodsIssuesV2Handler', () => {
     expect(result.total).toBe(12);
     expect(result.page).toBe(2);
     expect(result.limit).toBe(10);
+  });
+
+  it('inlines resolved customer and employee names for the party column', async () => {
+    const rows = [
+      {
+        id: 'gi-customer',
+        counterpartyKind: DocCounterpartyKind.CUSTOMER,
+        counterpartyId: 'cust-1',
+        lines: [],
+      },
+      {
+        id: 'gi-employee',
+        counterpartyKind: DocCounterpartyKind.EMPLOYEE,
+        counterpartyId: 'emp-1',
+        lines: [],
+      },
+    ];
+    await build(rows);
+
+    const result = await handler.execute(new SearchGoodsIssuesV2Query({}, actor));
+
+    expect(result.data[0].counterparty?.name).toBe('Khach A');
+    expect(result.data[1].counterparty?.name).toBe('Nguyen Van A');
   });
 
   it('applies the party (COALESCE), notes and totalAmount filters', async () => {

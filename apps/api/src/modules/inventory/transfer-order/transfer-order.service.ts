@@ -92,6 +92,8 @@ export interface CreateAndConfirmTransferExportDto {
   locationId: string;
   targetBranchId: string;
   providerId?: string;
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
   reason?: string;
   notes?: string;
   deliverer?: string;
@@ -246,6 +248,8 @@ export class TransferOrderService {
       reason: dto.reason,
       notes: dto.notes,
       providerId: dto.providerId,
+      counterpartyKind: dto.counterpartyKind,
+      counterpartyId: dto.counterpartyId,
       deliverer: dto.deliverer,
       references: dto.references,
       occurredAt: dto.occurredAt,
@@ -784,6 +788,8 @@ export class TransferOrderService {
         // Carry the goods-issue form's header fields onto the spawned issue so
         // the export leg round-trips Đối tượng / Người giao / Tham chiếu / Ngày.
         providerId: dto.providerId,
+        counterpartyKind: dto.counterpartyKind,
+        counterpartyId: dto.counterpartyId,
         deliverer: dto.deliverer,
         references: dto.references,
         occurredAt: dto.occurredAt,

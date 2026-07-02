@@ -18,6 +18,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { StatusBadge } from "../../components/status/StatusBadge";
 import {
   BaseDataTable,
   type TableColumn,
@@ -349,7 +350,13 @@ export function TransferInPage() {
             label: "Đã nhập kho",
           },
         ],
-        render: (row) => receiveStatusLabel(row),
+        render: (row) => (
+          <StatusBadge
+            variant={row.importGoodsReceiptId ? "success" : "neutral"}
+          >
+            {receiveStatusLabel(row)}
+          </StatusBadge>
+        ),
       },
     ],
     [openExportView],

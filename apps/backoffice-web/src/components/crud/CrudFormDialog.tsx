@@ -360,6 +360,9 @@ export function CrudFormDialog({
     : isEdit
       ? "Lưu"
       : "Lưu";
+  const isItemCategory = config.entityKey === "inventory-item-categories";
+  const defaultWidth = isItemCategory ? 720 : 560;
+  const defaultHeight = isItemCategory ? 560 : 460;
 
   return (
     <AppModal
@@ -368,8 +371,14 @@ export function CrudFormDialog({
         if (!open) onClose();
       }}
       title={title}
-      defaultWidth={560}
-      defaultHeight={460}
+      description={
+        isDuplicate
+          ? "Dữ liệu đã được sao chép từ bản ghi đã chọn. Hãy chỉnh các trường bắt buộc (ví dụ mã, SKU) nếu trùng trước khi lưu."
+          : undefined
+      }
+      defaultWidth={defaultWidth}
+      defaultHeight={defaultHeight}
+      bodyClassName={isItemCategory ? "overflow-visible" : undefined}
       footer={
         <div className="flex items-center justify-between">
           <button

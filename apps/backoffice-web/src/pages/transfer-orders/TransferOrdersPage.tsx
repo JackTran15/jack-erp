@@ -49,6 +49,10 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import {
+  StatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -73,6 +77,13 @@ const STATUS_LABEL: Record<TOStatus, string> = {
   IN_PROGRESS: "Đang thực hiện",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
+};
+
+const STATUS_VARIANT: Record<TOStatus, StatusBadgeVariant> = {
+  DRAFT: "neutral",
+  IN_PROGRESS: "warning",
+  COMPLETED: "success",
+  CANCELLED: "danger",
 };
 
 interface TransferOrderLine {
@@ -247,7 +258,6 @@ export function TransferOrdersPage() {
     return map;
   }, [storages]);
 
-
   const getOrderId = useCallback((order: TransferOrder) => order.id, []);
   const {
     selectedId,
@@ -399,7 +409,11 @@ export function TransferOrdersPage() {
       key: "status",
       label: "Trạng thái",
       width: 140,
-      render: (row) => STATUS_LABEL[row.status],
+      render: (row) => (
+        <StatusBadge variant={STATUS_VARIANT[row.status]}>
+          {STATUS_LABEL[row.status]}
+        </StatusBadge>
+      ),
     },
   ];
 

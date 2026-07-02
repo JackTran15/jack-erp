@@ -1,6 +1,10 @@
 import { formatMoneyInteger } from "@erp/ui";
 import { useMemo } from "react";
 import type { TableColumn } from "../../../../components/table/BaseDataTable";
+import {
+  StatusBadge,
+  type StatusBadgeVariant,
+} from "../../../../components/status/StatusBadge";
 import { VoucherLink } from "../../documents";
 import {
   LEDGER_CASH_VI_DATE,
@@ -16,10 +20,10 @@ import {
 } from "../../cash-vouchers.types";
 import { RECEIPT_CASH_DOCUMENT_TYPE_FILTER_OPTIONS } from "./receipt-cash.constants";
 
-const STATUS_BADGE_CLASS: Record<CashVoucherStatus, string> = {
-  [CashVoucherStatus.DRAFT]: "bg-gray-100 text-gray-700",
-  [CashVoucherStatus.POSTED]: "bg-green-100 text-green-700",
-  [CashVoucherStatus.REVERSED]: "bg-amber-100 text-amber-700",
+const STATUS_BADGE_VARIANT: Record<CashVoucherStatus, StatusBadgeVariant> = {
+  [CashVoucherStatus.DRAFT]: "neutral",
+  [CashVoucherStatus.POSTED]: "success",
+  [CashVoucherStatus.REVERSED]: "warning",
 };
 
 export function useReceiptCashTableColumns(
@@ -58,19 +62,16 @@ export function useReceiptCashTableColumns(
           value: o.label,
           label: o.label,
         })),
-        render: (r) =>
-          receiptPaymentDocumentTypeLabel(r.kind, r.referenceType),
+        render: (r) => receiptPaymentDocumentTypeLabel(r.kind, r.referenceType),
       },
       {
         key: "status",
         label: "Trạng thái",
         width: 120,
         render: (r) => (
-          <span
-            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[r.status]}`}
-          >
+          <StatusBadge variant={STATUS_BADGE_VARIANT[r.status]}>
             {CASH_VOUCHER_STATUS_LABEL[r.status]}
-          </span>
+          </StatusBadge>
         ),
       },
       {

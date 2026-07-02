@@ -7,6 +7,7 @@ import {
 } from "@erp/shared-interfaces";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
 import type { TableColumn } from "../../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../../components/status/StatusBadge";
 import { downloadStockTakeImportErrors } from "./import-stock-take.api";
 import type {
   StockTakeImportJob,
@@ -113,9 +114,9 @@ function buildColumns(
       label: "Tình trạng",
       width: 300,
       render: (row) => (
-        <span className={row.isError ? "text-destructive" : "text-foreground"}>
+        <StatusBadge variant={row.isError ? "danger" : "success"}>
           {row.statusLabel}
-        </span>
+        </StatusBadge>
       ),
     },
   );

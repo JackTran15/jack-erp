@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Badge,
   DocumentListShell,
   formatMoneyInteger,
   PageToolbar,
@@ -10,7 +9,15 @@ import {
   type PeriodValue,
   type ToolbarItem,
 } from "@erp/ui";
-import { Barcode, Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Barcode,
+  Copy,
+  Eye,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../lib/api-axios";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
@@ -24,6 +31,10 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import {
+  StatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -77,10 +88,13 @@ const GI_SEARCH: V2SearchConfig = {
 };
 
 function emptyColumnFilters(): Record<FilterKey, ColumnFilter> {
-  return FILTER_KEYS.reduce((acc, k) => {
-    acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
-    return acc;
-  }, {} as Record<FilterKey, ColumnFilter>);
+  return FILTER_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = { mode: DEFAULT_COLUMN_FILTER_MODE, value: "" };
+      return acc;
+    },
+    {} as Record<FilterKey, ColumnFilter>,
+  );
 }
 
 function lineSubtotal(l: {
@@ -105,35 +119,33 @@ function issueTotal(o: GoodsIssue): number {
 }
 
 function renderStatusBadge(status: GoodsIssueStatus) {
-  const className =
+  const variant: StatusBadgeVariant =
     status === "POSTED"
-      ? "gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+      ? "success"
       : status === "CANCELLED"
-        ? "gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
-        : "gap-1.5 border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300";
-  const dotClassName =
-    status === "POSTED"
-      ? "bg-emerald-500"
-      : status === "CANCELLED"
-        ? "bg-rose-500"
-        : "bg-slate-400";
+        ? "danger"
+        : "neutral";
 
-  return (
-    <Badge variant="outline" className={className}>
-      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dotClassName}`} />
-      {STATUS_LABELS[status]}
-    </Badge>
+  return <StatusBadge variant={variant}>{STATUS_LABELS[status]}</StatusBadge>;
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
   );
 }
 
 export function GoodsIssuePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [records, setRecords] = useState<PaginatedResponse<GoodsIssue> | null>(null);
+  const [records, setRecords] = useState<PaginatedResponse<GoodsIssue> | null>(
+    null,
+  );
   const [customers, setCustomers] = useState<InventoryProvider[]>([]);
   const [storages, setStorages] = useState<InventoryStorage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [period, setPeriod] = useState<PeriodValue>(() => {
     const range = resolvePeriodRange("this_month");
     return { preset: "this_month", ...range };
@@ -142,7 +154,9 @@ export function GoodsIssuePage() {
     useState<Record<FilterKey, ColumnFilter>>(emptyColumnFilters);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [dialogMode, setDialogMode] = useState<"create" | "edit" | "view" | null>(null);
+  const [dialogMode, setDialogMode] = useState<
+    "create" | "edit" | "view" | null
+  >(null);
   const [editingIssue, setEditingIssue] = useState<GoodsIssue | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<GoodsIssue | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<GoodsIssue | null>(null);
@@ -178,7 +192,12 @@ export function GoodsIssuePage() {
       });
     } catch (err) {
       toast.error(getUserFacingApiErrorMessage(err));
-      setRecords({ data: [], total: 0, page: 1, pageSize: pagination.pageSize });
+      setRecords({
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: pagination.pageSize,
+      });
     } finally {
       setLoading(false);
     }
@@ -186,9 +205,9 @@ export function GoodsIssuePage() {
 
   const loadCustomers = useCallback(async () => {
     try {
-      const { data } = await apiClient.get<PaginatedResponse<InventoryProvider>>(
-        "/inventory/providers?page=1&pageSize=200",
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<InventoryProvider>
+      >("/inventory/providers?page=1&pageSize=200");
       setCustomers(data.data);
     } catch {
       // best-effort; row will fall back to id if name is missing
@@ -362,7 +381,12 @@ export function GoodsIssuePage() {
       onClick: () => selectedIssue && setConfirmDelete(selectedIssue),
     },
     { id: "sep1", type: "separator" },
-    { id: "reload", label: "Nạp", icon: RefreshCw, onClick: () => void loadRecords() },
+    {
+      id: "reload",
+      label: "Nạp",
+      icon: RefreshCw,
+      onClick: () => void loadRecords(),
+    },
     {
       id: "split",
       label: "Chia hàng",
@@ -426,13 +450,17 @@ export function GoodsIssuePage() {
       width: 180,
       render: (row) => {
         // Prefer the resolved counterparty (covers NCC/KH/NV). Then the explicit
-        // provider pick, the targetBranch for TRANSFER_OUT, and finally the
-        // page-level name cache / legacy customer name.
+        // provider pick. For transfer rows with legacy/malformed providerId,
+        // fall back to targetBranch before considering raw ids.
         if (row.counterparty?.name) return row.counterparty.name;
         if (row.provider?.name) return row.provider.name;
+        if (row.purpose === "TRANSFER_OUT" && row.targetBranch?.name)
+          return row.targetBranch.name;
         if (row.providerId)
-          return customerNameById.get(row.providerId) ?? row.providerId;
-        if (row.purpose === "TRANSFER_OUT") return row.targetBranch?.name ?? "—";
+          return (
+            customerNameById.get(row.providerId) ??
+            (isUuidLike(row.providerId) ? "—" : row.providerId)
+          );
         return row.customerName ?? "—";
       },
     },
@@ -478,7 +506,8 @@ export function GoodsIssuePage() {
 
   // Any filter edit resets to page 1 so the server result starts from the top.
   const resetPage = useCallback(
-    () => setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
+    () =>
+      setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 })),
     [],
   );
 
@@ -549,14 +578,23 @@ export function GoodsIssuePage() {
             page={pagination.page}
             pageSize={pagination.pageSize}
             total={records?.total ?? 0}
-            onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+            onPageChange={(p) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
             onPageSizeChange={(nextPageSize) =>
-              setPagination((prev) => ({ ...prev, page: 1, pageSize: nextPageSize }))
+              setPagination((prev) => ({
+                ...prev,
+                page: 1,
+                pageSize: nextPageSize,
+              }))
             }
           />
         }
         detailPanel={
-          <DetailPanel issue={selectedIssue} storageNameById={storageNameById} />
+          <DetailPanel
+            issue={selectedIssue}
+            storageNameById={storageNameById}
+          />
         }
       >
         <BaseDataTable
@@ -574,7 +612,9 @@ export function GoodsIssuePage() {
                 type="checkbox"
                 aria-label="Chọn dòng"
                 checked={selectedId === row.id}
-                onChange={() => setSelectedId(selectedId === row.id ? null : row.id)}
+                onChange={() =>
+                  setSelectedId(selectedId === row.id ? null : row.id)
+                }
                 onClick={(e) => e.stopPropagation()}
               />
             ),
@@ -602,7 +642,9 @@ export function GoodsIssuePage() {
           }}
           onEdit={() => setDialogMode("edit")}
           onVoid={editingIssue ? () => setConfirmVoid(editingIssue) : undefined}
-          onRequestDelete={editingIssue ? () => setConfirmDelete(editingIssue) : undefined}
+          onRequestDelete={
+            editingIssue ? () => setConfirmDelete(editingIssue) : undefined
+          }
         />
       )}
 
@@ -648,44 +690,71 @@ function DetailPanel({
         Chi tiết
       </div>
       {!issue ? (
-        <p className="text-sm text-muted-foreground">Chọn một phiếu để xem chi tiết.</p>
+        <p className="text-sm text-muted-foreground">
+          Chọn một phiếu để xem chi tiết.
+        </p>
       ) : issue.lines.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Phiếu này chưa có dòng hàng.</p>
+        <p className="text-sm text-muted-foreground">
+          Phiếu này chưa có dòng hàng.
+        </p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
-              <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Kho</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Vị trí</th>
-              <th className="border-r px-2 py-1.5 text-left font-medium">Đơn vị tính</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Số lượng</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Đơn giá</th>
-              <th className="border-r px-2 py-1.5 text-right font-medium">Thành tiền</th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Mã SKU
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Tên hàng hóa
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Kho
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Vị trí
+              </th>
+              <th className="border-r px-2 py-1.5 text-left font-medium">
+                Đơn vị tính
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Số lượng
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Đơn giá
+              </th>
+              <th className="border-r px-2 py-1.5 text-right font-medium">
+                Thành tiền
+              </th>
               <th className="px-2 py-1.5 text-left font-medium">Ghi chú</th>
             </tr>
           </thead>
           <tbody>
             {issue.lines.map((line) => {
-              const itemCode = line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
+              const itemCode =
+                line.item?.code ?? line.itemCode ?? line.itemId.slice(0, 8);
               const itemName = line.item?.name ?? line.itemName ?? "—";
               const unitLabel = line.item?.unit ?? line.unit ?? "—";
               // Each line has its own bin — read from the line's location, not
               // the header (lines can be issued from different warehouses).
               const storageId = line.location?.storageId;
               const storageName = storageId
-                ? storageNameById.get(storageId) ?? storageId.slice(0, 8)
+                ? (storageNameById.get(storageId) ?? storageId.slice(0, 8))
                 : "—";
               const binCode = line.location?.code ?? "—";
               return (
                 <tr key={line.id} className="border-b">
-                  <td className="border-r px-2 py-1 font-mono text-xs">{itemCode}</td>
+                  <td className="border-r px-2 py-1 font-mono text-xs">
+                    {itemCode}
+                  </td>
                   <td className="border-r px-2 py-1">{itemName}</td>
                   <td className="border-r px-2 py-1">{storageName}</td>
-                  <td className="border-r px-2 py-1 font-mono text-xs">{binCode}</td>
+                  <td className="border-r px-2 py-1 font-mono text-xs">
+                    {binCode}
+                  </td>
                   <td className="border-r px-2 py-1">{unitLabel}</td>
-                  <td className="border-r px-2 py-1 text-right tabular-nums">{Number(line.quantity)}</td>
+                  <td className="border-r px-2 py-1 text-right tabular-nums">
+                    {Number(line.quantity)}
+                  </td>
                   <td className="border-r px-2 py-1 text-right tabular-nums">
                     {formatMoneyInteger(Number(line.unitPrice ?? 0))}
                   </td>

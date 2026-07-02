@@ -173,6 +173,18 @@ class ExportTransferOrderDto {
   @IsUUID()
   providerId?: string;
 
+  /** Đối tượng kind selected on the goods-issue form. */
+  @ApiPropertyOptional({ enum: DocCounterpartyKind })
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  /** Id of the provider / customer / employee, per counterpartyKind. */
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
+
   /** Người giao (free-text deliverer name). */
   @ApiPropertyOptional()
   @IsOptional()

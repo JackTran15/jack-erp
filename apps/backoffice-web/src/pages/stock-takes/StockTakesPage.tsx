@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   AppModal,
   Button,
-  cn,
   DocumentListShell,
   PageToolbar,
   PeriodFilter,
@@ -34,6 +33,7 @@ import {
   InventoryPageTitle,
   InventoryTabBar,
 } from "../../components/document/inventoryTabs";
+import { StatusBadge } from "../../components/status/StatusBadge";
 import { useDocumentListSelection } from "../../components/document/useDocumentListSelection";
 import {
   DEFAULT_COLUMN_FILTER_MODE,
@@ -159,7 +159,10 @@ export function StockTakesPage() {
     return m;
   }, [storages]);
 
-  const getStockTakeId = useCallback((stockTake: StockTake) => stockTake.id, []);
+  const getStockTakeId = useCallback(
+    (stockTake: StockTake) => stockTake.id,
+    [],
+  );
   const {
     selectedId,
     setSelectedId,
@@ -245,12 +248,15 @@ export function StockTakesPage() {
   }, [selectStockTake, selected, selectedDetail?.id]);
 
   /** Fetch a single stock-take (with full lines) when opening for view/edit. */
-  const openForEdit = useCallback(async (id: string) => {
-    const data = await selectStockTake(id);
-    if (data) {
-      setEditing(data);
-    }
-  }, [selectStockTake]);
+  const openForEdit = useCallback(
+    async (id: string) => {
+      const data = await selectStockTake(id);
+      if (data) {
+        setEditing(data);
+      }
+    },
+    [selectStockTake],
+  );
 
   useEffect(() => {
     const openDocumentId = (
@@ -467,24 +473,20 @@ export function StockTakesPage() {
       filterPlaceholder: "Tất cả",
       render: (r) => {
         const noVariance =
-          r.status === "POSTED" &&
-          !r.generatedReceiptId &&
-          !r.generatedIssueId;
+          r.status === "POSTED" && !r.generatedReceiptId && !r.generatedIssueId;
         const label = r.mergedIntoId
           ? "Đã gộp"
           : noVariance
             ? "Không có chênh lệch"
             : STATUS_LABEL[r.status];
-        return (
-          <span
-            className={cn(
-              r.status === "POSTED" && !noVariance && "text-emerald-600",
-              r.mergedIntoId && "text-primary",
-            )}
-          >
-            {label}
-          </span>
-        );
+        const variant = r.mergedIntoId
+          ? "primary"
+          : r.status === "POSTED"
+            ? "success"
+            : r.status === "CANCELLED"
+              ? "danger"
+              : "neutral";
+        return <StatusBadge variant={variant}>{label}</StatusBadge>;
       },
     },
     {
@@ -644,9 +646,7 @@ export function StockTakesPage() {
             setSelectedIds([]);
             await loadRecords();
           }}
-          onOpenStockTakeReference={(id) =>
-            void openStockTakeReference(id)
-          }
+          onOpenStockTakeReference={(id) => void openStockTakeReference(id)}
         />
       ) : editing ? (
         <StockTakeFormDialog
@@ -674,11 +674,9 @@ export function StockTakesPage() {
               : (st) => {
                   setEditing(null);
                   setConfirmProcess(st);
-              }
+                }
           }
-          onOpenStockTakeReference={(id) =>
-            void openStockTakeReference(id)
-          }
+          onOpenStockTakeReference={(id) => void openStockTakeReference(id)}
         />
       ) : null}
 

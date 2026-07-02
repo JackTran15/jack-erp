@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ItemStorageLocationEntity } from './item-storage-location.entity';
@@ -34,6 +34,17 @@ export class ItemStorageLocationService {
     locationId: string,
     actor: ActorContext,
   ): Promise<void> {
+    const targetLocation = await this.findLocationInStorage(
+      locationId,
+      storageId,
+      actor,
+    );
+    if (!targetLocation) {
+      throw new BadRequestException(
+        'Vị trí không thuộc kho đang chọn hoặc không thuộc chi nhánh hiện tại',
+      );
+    }
+
     // The database constraint is one mapping per item + storage. Legacy rows
     // may have branch_id NULL, so branch access is enforced through locations.
     const existing = await this.islRepo.findOne({
@@ -44,12 +55,26 @@ export class ItemStorageLocationService {
       },
     });
 
-    if (existing) return;
+    if (existing) {
+      const existingLocation = await this.findLocationInStorage(
+        existing.locationId,
+        storageId,
+        actor,
+      );
+      if (existingLocation) return;
+
+      existing.locationId = targetLocation.id;
+      await this.islRepo.save(existing);
+      this.logger.warn(
+        `Repaired item ${itemId} preferred location for storage ${storageId}: ${locationId}`,
+      );
+      return;
+    }
 
     const mapping = this.islRepo.create({
       itemId,
       storageId,
-      locationId,
+      locationId: targetLocation.id,
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
@@ -74,8 +99,9 @@ export class ItemStorageLocationService {
       where: {
         id: locationId,
         organizationId: actor.organizationId,
-        branchId: actor.branchId,
+        ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
       },
+      relations: { storage: true },
     });
     if (!location) return;
 
@@ -139,7 +165,7 @@ export class ItemStorageLocationService {
     });
     if (!mapping) return null;
     const location = await this.locationRepo.findOne({
-      where: { id: mapping.locationId, organizationId },
+      where: { id: mapping.locationId, storageId, organizationId },
     });
     return location ? { locationId: location.id, code: location.code } : null;
   }
@@ -150,6 +176,17 @@ export class ItemStorageLocationService {
     locationId: string,
     actor: ActorContext,
   ): Promise<ItemStorageLocationEntity> {
+    const targetLocation = await this.findLocationInStorage(
+      locationId,
+      storageId,
+      actor,
+    );
+    if (!targetLocation) {
+      throw new BadRequestException(
+        'Vị trí không thuộc kho đang chọn hoặc không thuộc chi nhánh hiện tại',
+      );
+    }
+
     // Match the database uniqueness key and reuse legacy branch_id NULL rows.
     const existing = await this.islRepo.findOne({
       where: {
@@ -160,19 +197,35 @@ export class ItemStorageLocationService {
     });
 
     if (existing) {
-      existing.locationId = locationId;
+      existing.locationId = targetLocation.id;
       return this.islRepo.save(existing);
     }
 
     const mapping = this.islRepo.create({
       itemId,
       storageId,
-      locationId,
+      locationId: targetLocation.id,
       organizationId: actor.organizationId,
       branchId: actor.branchId,
       createdBy: actor.userId,
     });
     return this.islRepo.save(mapping);
+  }
+
+  private findLocationInStorage(
+    locationId: string,
+    storageId: string,
+    actor: ActorContext,
+  ): Promise<LocationEntity | null> {
+    return this.locationRepo.findOne({
+      where: {
+        id: locationId,
+        storageId,
+        organizationId: actor.organizationId,
+        ...(actor.branchId ? { storage: { branchId: actor.branchId } } : {}),
+      },
+      relations: { storage: true },
+    });
   }
 
   /**

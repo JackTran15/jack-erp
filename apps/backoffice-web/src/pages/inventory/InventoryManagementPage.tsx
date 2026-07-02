@@ -45,10 +45,7 @@ import {
   type V2SearchConfig,
 } from "../../components/crud/crudV2Search";
 import { useDebouncedValue } from "../../lib/use-debounced-value";
-import {
-  useItemCategoryOptions,
-  useStorageOptions,
-} from "../../hooks/use-filter-options";
+import { useStorageOptions } from "../../hooks/use-filter-options";
 import {
   DEFAULT_ADVANCED_FILTERS,
   StockSummaryFilterDialog,
@@ -155,9 +152,6 @@ export function InventoryManagementPage() {
     useState<StockSummaryExportVariant | null>(null);
 
   const { options: storageOptions } = useStorageOptions({ withAll: false });
-  const { options: categoryOptions } = useItemCategoryOptions({
-    withAll: false,
-  });
 
   const query = useMemo<StockSummaryQuery>(
     () => ({
@@ -519,7 +513,6 @@ export function InventoryManagementPage() {
         onCancel={() => setFilterDialogOpen(false)}
         onApply={applyAdvanced}
         storageOptions={storageOptions}
-        categoryOptions={categoryOptions}
       />
       <StockDetailDrawer
         item={selectedItem}

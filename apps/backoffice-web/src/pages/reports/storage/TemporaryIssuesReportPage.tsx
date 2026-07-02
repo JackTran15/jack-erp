@@ -7,6 +7,7 @@ import {
   type FilterField,
 } from "./_shared";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../components/status/StatusBadge";
 import {
   listTemporaryWarehouseOutGoods,
   type InventoryReportFilters,
@@ -33,9 +34,19 @@ const STATUS_OPTIONS = [
 
 export function TemporaryIssuesReportPage() {
   const filterFields: FilterField[] = [
-    { key: "group", label: "Nhóm hàng hóa", type: "select", options: GROUP_OPTIONS },
+    {
+      key: "group",
+      label: "Nhóm hàng hóa",
+      type: "select",
+      options: GROUP_OPTIONS,
+    },
     { key: "period", label: "Kỳ báo cáo", type: "period" },
-    { key: "shift", label: "Ca làm việc", type: "select", options: SHIFT_OPTIONS },
+    {
+      key: "shift",
+      label: "Ca làm việc",
+      type: "select",
+      options: SHIFT_OPTIONS,
+    },
   ];
 
   const num = "text-right tabular-nums";
@@ -43,19 +54,69 @@ export function TemporaryIssuesReportPage() {
     { key: "sku", label: "Mã SKU", width: 140, render: (r) => r.sku },
     { key: "name", label: "Tên hàng hóa", width: 220, render: (r) => r.name },
     { key: "unit", label: "Đơn vị tính", width: 100, render: (r) => r.unit },
-    { key: "location", label: "Mã vị trí", width: 120, render: (r) => r.location },
-    { key: "date", label: "Ngày xuất", width: 130, render: (r) => r.date, filterKind: "date" },
-    { key: "time", label: "Giờ xuất", width: 120, render: (r) => r.time, filterKind: "time" },
-    { key: "staff", label: "Nhân viên xuất", width: 160, render: (r) => r.staff },
-    { key: "outQty", label: "SL xuất", width: 90, headerClassName: "text-right", className: num, render: (r) => r.outQty },
-    { key: "returnQty", label: "SL trả", width: 90, headerClassName: "text-right", className: num, render: (r) => r.returnQty },
-    { key: "saleQty", label: "SL bán", width: 90, headerClassName: "text-right", className: num, render: (r) => r.saleQty },
-    { key: "remainingQty", label: "SL tồn", width: 90, headerClassName: "text-right", className: num, render: (r) => r.remainingQty },
+    {
+      key: "location",
+      label: "Mã vị trí",
+      width: 120,
+      render: (r) => r.location,
+    },
+    {
+      key: "date",
+      label: "Ngày xuất",
+      width: 130,
+      render: (r) => r.date,
+      filterKind: "date",
+    },
+    {
+      key: "time",
+      label: "Giờ xuất",
+      width: 120,
+      render: (r) => r.time,
+      filterKind: "time",
+    },
+    {
+      key: "staff",
+      label: "Nhân viên xuất",
+      width: 160,
+      render: (r) => r.staff,
+    },
+    {
+      key: "outQty",
+      label: "SL xuất",
+      width: 90,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.outQty,
+    },
+    {
+      key: "returnQty",
+      label: "SL trả",
+      width: 90,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.returnQty,
+    },
+    {
+      key: "saleQty",
+      label: "SL bán",
+      width: 90,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.saleQty,
+    },
+    {
+      key: "remainingQty",
+      label: "SL tồn",
+      width: 90,
+      headerClassName: "text-right",
+      className: num,
+      render: (r) => r.remainingQty,
+    },
     {
       key: "status",
       label: "Trạng thái",
       width: 170,
-      render: (r) => r.status,
+      render: (r) => <StatusBadge variant="neutral">{r.status}</StatusBadge>,
       filterKind: "select",
       filterOptions: STATUS_OPTIONS,
     },
@@ -63,7 +124,8 @@ export function TemporaryIssuesReportPage() {
       key: "invoice",
       label: "Hóa đơn bán",
       width: 130,
-      render: (r) => (r.invoice ? <span className="text-primary">{r.invoice}</span> : ""),
+      render: (r) =>
+        r.invoice ? <span className="text-primary">{r.invoice}</span> : "",
     },
   ];
 
@@ -86,7 +148,10 @@ export function TemporaryIssuesReportPage() {
       storageKey="reports/storage/temporary-issues"
       filterFields={filterFields}
       buildSubtitle={(values) => [
-        { label: "Nhóm hàng hóa", value: resolveLabel(filterFields[0]!, values) },
+        {
+          label: "Nhóm hàng hóa",
+          value: resolveLabel(filterFields[0]!, values),
+        },
         { label: "Ca làm việc", value: resolveLabel(filterFields[2]!, values) },
       ]}
       columns={columns}

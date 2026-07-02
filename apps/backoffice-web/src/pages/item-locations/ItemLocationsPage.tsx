@@ -30,6 +30,7 @@ import {
   BaseDataTable,
   type TableColumn,
 } from "../../components/table/BaseDataTable";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import { ConfirmActionModal } from "../../components/table/ConfirmActionModal";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import {
@@ -538,8 +539,12 @@ export function ItemLocationsPage() {
         { value: "active", label: STATUS_LABEL.ACTIVE },
         { value: "inactive", label: STATUS_LABEL.INACTIVE },
       ],
-      render: (row) =>
-        row.isActive ? STATUS_LABEL.ACTIVE : STATUS_LABEL.INACTIVE,
+      render: (row) => (
+        <ActiveStatusBadge
+          active={row.isActive}
+          inactiveLabel={STATUS_LABEL.INACTIVE}
+        />
+      ),
     },
   ];
 

@@ -7,6 +7,7 @@ import {
 } from "@erp/shared-interfaces";
 import type { ImportJobRow, ImportReviewRow } from "./import-inventory.types";
 import { TableColumn } from "../../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../../components/status/StatusBadge";
 
 const RIGHT_ALIGN_FIELDS = new Set<InventoryImportExcelField>([
   InventoryImportExcelField.COST_PRICE,
@@ -114,9 +115,9 @@ function buildStatusColumn(): TableColumn<ImportReviewRow> {
     label: "Tình trạng",
     width: 300,
     render: (row) => (
-      <span className={row.isError ? "text-destructive" : "text-foreground"}>
+      <StatusBadge variant={row.isError ? "danger" : "success"}>
         {row.statusLabel}
-      </span>
+      </StatusBadge>
     ),
   };
 }

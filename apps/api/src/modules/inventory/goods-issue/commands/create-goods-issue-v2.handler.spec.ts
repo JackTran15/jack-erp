@@ -107,4 +107,34 @@ describe('CreateGoodsIssueV2Handler', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('accepts an active employee counterparty', async () => {
+    const { handler, manager, service } = makeHandler({
+      items: [{ id: 'v1', productId: 'p1' }],
+      counterparty: { id: 'emp1', isActive: true },
+    });
+
+    await handler.execute(
+      new CreateGoodsIssueV2Command(
+        {
+          locationId: 'L1',
+          counterpartyKind: DocCounterpartyKind.EMPLOYEE,
+          counterpartyId: 'emp1',
+          lines: [line('v1', 'L1')],
+        } as never,
+        actor,
+      ),
+    );
+
+    const mapped = (service.create as jest.Mock).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(mapped.providerId).toBeUndefined();
+    expect(manager.update).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: 'gi1' },
+      { counterpartyKind: DocCounterpartyKind.EMPLOYEE, counterpartyId: 'emp1' },
+    );
+  });
 });

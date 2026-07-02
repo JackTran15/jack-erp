@@ -4,8 +4,12 @@ import { formatClientError } from "@erp/api-client";
 import { AppModal, Button, Input } from "@erp/ui";
 import { apiClient } from "../../lib/api-axios";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import {
   DEFAULT_PAGINATION,
   type PaginationStateDto,
@@ -80,17 +84,19 @@ const DEFAULT_FORM: RuleFormState = {
 };
 
 export function DocumentNumberingPage() {
-  const [records, setRecords] = useState<PaginatedResponse<DocumentNumberRule> | null>(
-    null,
-  );
+  const [records, setRecords] =
+    useState<PaginatedResponse<DocumentNumberRule> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [documentTypeFilter, setDocumentTypeFilter] = useState<string>("");
   const [branchIdFilterInput, setBranchIdFilterInput] = useState("");
   const [branchIdFilter, setBranchIdFilter] = useState("");
-  const [editingRule, setEditingRule] = useState<DocumentNumberRule | null>(null);
+  const [editingRule, setEditingRule] = useState<DocumentNumberRule | null>(
+    null,
+  );
   const [showForm, setShowForm] = useState(false);
 
   const loadRules = useCallback(async () => {
@@ -110,9 +116,9 @@ export function DocumentNumberingPage() {
         params.set("branchId", branchIdFilter.trim());
       }
 
-      const { data } = await apiClient.get<PaginatedResponse<DocumentNumberRule>>(
-        `/document-number-rules?${params.toString()}`,
-      );
+      const { data } = await apiClient.get<
+        PaginatedResponse<DocumentNumberRule>
+      >(`/document-number-rules?${params.toString()}`);
       setRecords(data);
       setError(null);
     } catch (err: unknown) {
@@ -163,9 +169,7 @@ export function DocumentNumberingPage() {
         key: "format",
         label: "Mẫu số",
         render: (row) => (
-          <span className="font-mono text-xs">
-            {buildFormatPreview(row)}
-          </span>
+          <span className="font-mono text-xs">{buildFormatPreview(row)}</span>
         ),
       },
       {
@@ -177,13 +181,10 @@ export function DocumentNumberingPage() {
         key: "isActive",
         label: "Trạng thái",
         render: (row) => (
-          <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${
-              row.isActive ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {row.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
-          </span>
+          <ActiveStatusBadge
+            active={row.isActive}
+            inactiveLabel="Ngưng hoạt động"
+          />
         ),
       },
       {
@@ -397,7 +398,11 @@ function DocumentNumberRuleModal({
       className="max-w-[620px]"
     >
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-      <form ref={formRef} className="flex flex-col gap-3" onSubmit={(e) => void handleSubmit(e)}>
+      <form
+        ref={formRef}
+        className="flex flex-col gap-3"
+        onSubmit={(e) => void handleSubmit(e)}
+      >
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">Loại chứng từ</label>
@@ -521,7 +526,10 @@ function DocumentNumberRuleModal({
             type="checkbox"
             checked={form.includeDate}
             onChange={(event) =>
-              setForm((prev) => ({ ...prev, includeDate: event.target.checked }))
+              setForm((prev) => ({
+                ...prev,
+                includeDate: event.target.checked,
+              }))
             }
             className="h-4 w-4 rounded border border-input"
           />

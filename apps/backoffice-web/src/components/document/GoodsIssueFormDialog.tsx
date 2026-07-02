@@ -739,7 +739,10 @@ export function GoodsIssueFormDialog({
           `/inventory/transfer-orders/${sourceTransferOrderId}/export`,
           {
             notes: notes || undefined,
-            providerId: customerId || undefined,
+            providerId:
+              counterpartyKind === "supplier" ? customerId || undefined : undefined,
+            counterpartyKind: counterpartyKind || undefined,
+            counterpartyId: customerId || undefined,
             deliverer: deliveryPerson || undefined,
             references: references.length ? references : undefined,
             occurredAt: combineDateTime(docDate, docTime),
@@ -750,7 +753,10 @@ export function GoodsIssueFormDialog({
         await apiClient.post("/inventory/transfer-orders/direct-export", {
           locationId: headerLocationId,
           targetBranchId,
-          providerId: customerId || undefined,
+          providerId:
+            counterpartyKind === "supplier" ? customerId || undefined : undefined,
+          counterpartyKind: counterpartyKind || undefined,
+          counterpartyId: customerId || undefined,
           notes: notes || undefined,
           deliverer: deliveryPerson || undefined,
           references: references.length ? references : undefined,

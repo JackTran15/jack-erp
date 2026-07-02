@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppModal } from "@erp/ui";
-import { BaseDataTable, type TableColumn } from "../../../../components/table/BaseDataTable";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../../../components/table/BaseDataTable";
+import { StatusBadge } from "../../../../components/status/StatusBadge";
 import { ImportFilePicker } from "../import/ImportFilePicker";
 import { ImportWizardFooter } from "../import/ImportWizardFooter";
 import { ImportWizardStepper } from "../import/ImportWizardStepper";
@@ -95,7 +105,9 @@ export function DocumentLineImportDialog({
         const pendingJobId = job?.id;
         reset();
         if (pendingJobId) {
-          void cancelDocumentLineImport(kind, pendingJobId).catch(() => undefined);
+          void cancelDocumentLineImport(kind, pendingJobId).catch(
+            () => undefined,
+          );
         }
       }
       onOpenChange(nextOpen);
@@ -211,7 +223,9 @@ export function DocumentLineImportDialog({
             ? row.normalizedData?.[column.normalizedKey]
             : undefined;
           return String(
-            normalizedValue ?? (column.rawKey ? row.rawData[column.rawKey] : "") ?? "",
+            normalizedValue ??
+              (column.rawKey ? row.rawData[column.rawKey] : "") ??
+              "",
           );
         },
       })),
@@ -220,17 +234,17 @@ export function DocumentLineImportDialog({
         label: "Tình trạng",
         width: 340,
         render: (row) => (
-          <span
-            className={
+          <StatusBadge
+            variant={
               row.status === ImportRowStatus.ERROR
-                ? "text-destructive"
+                ? "danger"
                 : row.warningMessages?.length
-                  ? "text-amber-700"
-                  : ""
+                  ? "warning"
+                  : "success"
             }
           >
             {row.statusLabel}
-          </span>
+          </StatusBadge>
         ),
       },
     ],
@@ -301,7 +315,10 @@ export function DocumentLineImportDialog({
               <p className="text-sm font-medium">{description}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>Nhập Mã SKU hoặc Mã vạch và Số lượng.</li>
-                <li>Dữ liệu hợp lệ được đưa vào chứng từ đang mở và chưa tự động lưu.</li>
+                <li>
+                  Dữ liệu hợp lệ được đưa vào chứng từ đang mở và chưa tự động
+                  lưu.
+                </li>
                 <li>Khuyến nghị mỗi chứng từ không quá 200 hàng hóa.</li>
               </ul>
             </section>
@@ -325,11 +342,14 @@ export function DocumentLineImportDialog({
                 file={file}
                 onFileChange={setFile}
                 validateFile={(picked) => {
-                  const supported = [".xlsx", ".xls", ".csv"].some((extension) =>
-                    picked.name.toLowerCase().endsWith(extension),
+                  const supported = [".xlsx", ".xls", ".csv"].some(
+                    (extension) =>
+                      picked.name.toLowerCase().endsWith(extension),
                   );
                   if (!supported) {
-                    toast.error("Tệp nhập khẩu phải có định dạng Excel hoặc CSV.");
+                    toast.error(
+                      "Tệp nhập khẩu phải có định dạng Excel hoặc CSV.",
+                    );
                   }
                   return supported;
                 }}
@@ -346,7 +366,8 @@ export function DocumentLineImportDialog({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Hợp lệ <strong className="text-green-700">{job.validRows}</strong>
+                Hợp lệ{" "}
+                <strong className="text-green-700">{job.validRows}</strong>
               </span>
               {job.errorRows > 0 ? (
                 <span>

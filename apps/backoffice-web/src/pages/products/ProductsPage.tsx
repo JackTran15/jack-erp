@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatClientError } from "@erp/api-client";
 import { Plus } from "lucide-react";
-import { AppModal, Badge, type ToolbarItem } from "@erp/ui";
-import { BaseDataTable, type TableColumn } from "../../components/table/BaseDataTable";
+import { AppModal, type ToolbarItem } from "@erp/ui";
+import {
+  BaseDataTable,
+  type TableColumn,
+} from "../../components/table/BaseDataTable";
 import { PaginationControls } from "../../components/table/PaginationControls";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import { TableActionHeader } from "../../components/layout/TableActionHeader";
+import { ActiveStatusBadge } from "../../components/status/StatusBadge";
 import { resolveBackofficeBreadcrumbs } from "../../components/layout/breadcrumbs";
 import {
   DEFAULT_PAGINATION,
@@ -21,10 +25,13 @@ import { ProductForm } from "./components/ProductForm";
 
 export function ProductsPage() {
   const navigate = useNavigate();
-  const [records, setRecords] = useState<PaginatedResponse<Product> | null>(null);
+  const [records, setRecords] = useState<PaginatedResponse<Product> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationStateDto>(DEFAULT_PAGINATION);
+  const [pagination, setPagination] =
+    useState<PaginationStateDto>(DEFAULT_PAGINATION);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
@@ -53,9 +60,7 @@ export function ProductsPage() {
     {
       key: "name",
       label: "Tên sản phẩm",
-      render: (row) => (
-        <span className="font-medium">{row.name}</span>
-      ),
+      render: (row) => <span className="font-medium">{row.name}</span>,
     },
     {
       key: "description",
@@ -70,9 +75,11 @@ export function ProductsPage() {
       key: "isActive",
       label: "Trạng thái",
       render: (row) => (
-        <Badge variant={row.isActive ? "default" : "secondary"}>
-          {row.isActive ? "Hoạt động" : "Ngừng"}
-        </Badge>
+        <ActiveStatusBadge
+          active={row.isActive}
+          activeLabel="Đang hoạt động"
+          inactiveLabel="Ngừng kinh doanh"
+        />
       ),
     },
     {

@@ -1,3 +1,5 @@
+import { DocCounterpartyKind } from "./counterparty-kind";
+
 export enum StockMovementType {
   SALE_ISSUE = "SALE_ISSUE",
   RETURN_IN = "RETURN_IN",
@@ -509,6 +511,10 @@ export interface ExportTransferOrderRequest {
   notes?: string;
   /** Đối tượng (counterparty provider) selected on the goods-issue form. */
   providerId?: string;
+  /** Đối tượng kind selected on the goods-issue form. */
+  counterpartyKind?: DocCounterpartyKind;
+  /** Id of the provider / customer / employee, per counterpartyKind. */
+  counterpartyId?: string;
   /** Người giao (free-text deliverer name). */
   deliverer?: string;
   /** Tham chiếu — FE-supplied reference codes (e.g. the source LDC number). */

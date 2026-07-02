@@ -6,6 +6,10 @@ import { hasAnyPermission } from "../../lib/permissions";
 import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { AdminPageShell } from "../../components/layout/AdminPageShell";
 import {
+  StatusBadge as AppStatusBadge,
+  type StatusBadgeVariant,
+} from "../../components/status/StatusBadge";
+import {
   useRegistration,
   RegistrationStatus,
   RegistrationType,
@@ -13,10 +17,7 @@ import {
   type RegistrationFilters,
 } from "../../hooks/useRegistration";
 
-const PERMISSIONS = [
-  "org.registration.approve",
-  "branch.registration.approve",
-];
+const PERMISSIONS = ["org.registration.approve", "branch.registration.approve"];
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
   [RegistrationStatus.PENDING_APPROVAL]: "Chờ phê duyệt",
@@ -33,26 +34,24 @@ const TYPE_LABELS: Record<RegistrationType, string> = {
 type TypeFilter = "all" | "org" | "branch";
 type StatusFilter = "all" | RegistrationStatus;
 
-function getStatusClassName(status: RegistrationStatus): string {
+function getStatusVariant(status: RegistrationStatus): StatusBadgeVariant {
   if (status === RegistrationStatus.APPROVED) {
-    return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300";
+    return "success";
   }
   if (status === RegistrationStatus.REJECTED) {
-    return "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300";
+    return "danger";
   }
   if (status === RegistrationStatus.RESUBMITTED) {
-    return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
+    return "info";
   }
-  return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+  return "warning";
 }
 
 function StatusBadge({ status }: { status: RegistrationStatus }) {
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${getStatusClassName(status)}`}
-    >
+    <AppStatusBadge variant={getStatusVariant(status)}>
       {STATUS_LABELS[status]}
-    </span>
+    </AppStatusBadge>
   );
 }
 
@@ -137,8 +136,8 @@ export function ApprovalQueuePage() {
               Hàng đợi phê duyệt
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Bạn chưa được cấp quyền phê duyệt đăng ký tổ chức hoặc chi nhánh. Vui
-              lòng liên hệ quản trị viên hệ thống.
+              Bạn chưa được cấp quyền phê duyệt đăng ký tổ chức hoặc chi nhánh.
+              Vui lòng liên hệ quản trị viên hệ thống.
             </p>
           </div>
         </div>
@@ -199,19 +198,27 @@ export function ApprovalQueuePage() {
           <div className="grid grid-cols-4 overflow-hidden rounded-md border border-border text-sm">
             <div className="border-r border-border px-3 py-2">
               <div className="text-xs text-muted-foreground">Tất cả</div>
-              <div className="font-semibold text-foreground">{summary.total}</div>
+              <div className="font-semibold text-foreground">
+                {summary.total}
+              </div>
             </div>
             <div className="border-r border-border px-3 py-2">
               <div className="text-xs text-muted-foreground">Chờ duyệt</div>
-              <div className="font-semibold text-amber-700">{summary.pending}</div>
+              <div className="font-semibold text-amber-700">
+                {summary.pending}
+              </div>
             </div>
             <div className="border-r border-border px-3 py-2">
               <div className="text-xs text-muted-foreground">Đã duyệt</div>
-              <div className="font-semibold text-green-700">{summary.approved}</div>
+              <div className="font-semibold text-green-700">
+                {summary.approved}
+              </div>
             </div>
             <div className="px-3 py-2">
               <div className="text-xs text-muted-foreground">Từ chối</div>
-              <div className="font-semibold text-rose-700">{summary.rejected}</div>
+              <div className="font-semibold text-rose-700">
+                {summary.rejected}
+              </div>
             </div>
           </div>
         </div>
@@ -270,15 +277,17 @@ export function ApprovalQueuePage() {
                   {data.map((row) => {
                     const name =
                       row.type === RegistrationType.ORGANIZATION
-                        ? (row.requestData.organizationName as string) ?? "—"
-                        : (row.requestData.branchName as string) ?? "—";
+                        ? ((row.requestData.organizationName as string) ?? "—")
+                        : ((row.requestData.branchName as string) ?? "—");
 
                     return (
                       <tr
                         key={row.id}
                         className="cursor-pointer border-b border-border transition-colors hover:bg-muted/40"
                         onClick={() =>
-                          navigate(`/onboarding/approvals/${row.id}`, { state: row })
+                          navigate(`/onboarding/approvals/${row.id}`, {
+                            state: row,
+                          })
                         }
                       >
                         <td className="px-4 py-2.5 font-medium text-foreground">
@@ -359,7 +368,9 @@ export function ApprovalQueuePage() {
                 }
                 onClick={handleRejectSubmit}
               >
-                {actionLoading === rejectingId ? "Đang từ chối…" : "Xác nhận từ chối"}
+                {actionLoading === rejectingId
+                  ? "Đang từ chối…"
+                  : "Xác nhận từ chối"}
               </Button>
               <Button
                 type="button"

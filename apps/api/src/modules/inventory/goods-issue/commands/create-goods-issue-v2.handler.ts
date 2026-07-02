@@ -7,6 +7,7 @@ import { assertProductUniformLocation } from '../../location/services/product-lo
 import { ItemEntity } from '../../location/item.entity';
 import { ProviderEntity } from '../../location/provider.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
+import { UserEntity } from '../../../auth/user.entity';
 import { GoodsIssueEntity } from '../goods-issue.entity';
 import {
   CreateGoodsIssueDto,
@@ -112,12 +113,19 @@ export class CreateGoodsIssueV2Handler
       if (!provider) {
         throw new BadRequestException('Supplier counterparty not found in organization');
       }
-    } else {
+    } else if (dto.counterpartyKind === DocCounterpartyKind.CUSTOMER) {
       const customer = await manager.findOne(CustomerEntity, {
         where: { id: dto.counterpartyId, organizationId: orgId },
       });
       if (!customer) {
         throw new BadRequestException('Customer counterparty not found in organization');
+      }
+    } else {
+      const employee = await manager.findOne(UserEntity, {
+        where: { id: dto.counterpartyId, organizationId: orgId, isActive: true },
+      });
+      if (!employee) {
+        throw new BadRequestException('Employee counterparty not found in organization');
       }
     }
   }
