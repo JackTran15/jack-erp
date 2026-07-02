@@ -2,7 +2,10 @@ import {
   CustomerGenderEnum,
   MembershipTierEnum,
 } from "@erp/pos/types/customer.type";
-import { phoneDigitsOnly } from "@erp/pos/lib/common/customerUtils";
+import {
+  generateMembershipCardCode,
+  phoneDigitsOnly,
+} from "@erp/pos/lib/common/customerUtils";
 import type {
   CreateCustomerBody,
   CreateMembershipCardInlineBody,
@@ -106,11 +109,11 @@ function parseMembershipTier(
 
 function buildMembershipCard(
   values: CustomerFormValues,
-): CreateMembershipCardInlineBody | undefined {
-  const cardNumber = values.cardCode?.trim();
-  if (!cardNumber) return undefined;
-  const tier = parseMembershipTier(values.cardTier);
-  return tier ? { cardNumber, tier } : { cardNumber };
+): CreateMembershipCardInlineBody {
+  const cardNumber = values.cardCode?.trim() || generateMembershipCardCode();
+  const tier =
+    parseMembershipTier(values.cardTier) ?? MembershipTierEnum.SILVER;
+  return { cardNumber, tier };
 }
 
 /**
@@ -178,8 +181,7 @@ export function buildCreateBody(values: CustomerFormValues): CreateCustomerBody 
 
   applyOptionalCustomerFields(body, values);
 
-  const membershipCard = buildMembershipCard(values);
-  if (membershipCard) body.membershipCard = membershipCard;
+  body.membershipCard = buildMembershipCard(values);
 
   return body;
 }
