@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TransferOrderModule } from '../transfer-order/transfer-order.module';
 import { StockLedgerModule } from '../ledger/stock-ledger.module';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
@@ -26,6 +27,7 @@ import { PostGoodsIssueV2Handler } from './commands/post-goods-issue-v2.handler'
     ]),
     StockLedgerModule,
     DocumentNumberingModule,
+    forwardRef(() => TransferOrderModule),
   ],
   controllers: [
     GoodsIssueController,

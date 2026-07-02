@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,6 +26,7 @@ import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { resolveDocCounterparty } from '../location/services/resolve-doc-counterparty.util';
 import { attachCounterparties } from '../location/services/counterparty-name.util';
+import { TransferOrderService } from '../transfer-order/transfer-order.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 
@@ -85,6 +88,8 @@ export class GoodsIssueService {
     private readonly dataSource: DataSource,
     private readonly ledgerService: StockLedgerService,
     private readonly documentNumberingService: DocumentNumberingService,
+    @Inject(forwardRef(() => TransferOrderService))
+    private readonly transferOrderService: TransferOrderService,
   ) {}
 
   async create(dto: CreateGoodsIssueDto, actor: ActorContext): Promise<GoodsIssueEntity> {
@@ -264,7 +269,11 @@ export class GoodsIssueService {
     return this.findOrFail(id, actor.organizationId, actor.branchId);
   }
 
-  async cancel(id: string, actor: ActorContext): Promise<GoodsIssueEntity> {
+  async cancel(
+    id: string,
+    actor: ActorContext,
+    options: { cascadeTransferOrder?: boolean } = {},
+  ): Promise<GoodsIssueEntity> {
     const gi = await this.findOrFail(id, actor.organizationId, actor.branchId);
 
     if (gi.status === GoodsIssueStatus.CANCELLED) {
@@ -300,6 +309,22 @@ export class GoodsIssueService {
     gi.status = GoodsIssueStatus.CANCELLED;
     const saved = await this.giRepo.save(gi);
     this.logger.log(`Goods issue ${id} cancelled by ${actor.userId}`);
+
+    // When this issue is the export leg of a transfer order, deleting it must
+    // also roll back the transfer: reverse the destination goods receipt (if the
+    // order was already imported) and soft-delete the order. Skip when the
+    // transfer-order cancel path drives the reversal itself, to avoid a loop.
+    if (
+      options.cascadeTransferOrder !== false &&
+      gi.referenceType === GoodsIssueReferenceType.TRANSFER_ORDER &&
+      gi.referenceId
+    ) {
+      await this.transferOrderService.cancelFromExportIssue(
+        gi.referenceId,
+        actor,
+      );
+    }
+
     return saved;
   }
 

@@ -93,6 +93,17 @@ export class CreateExchangeInvoiceService {
       });
       const saved = await manager.save(entity);
 
+      // Returned stock is credited back to the showroom, mirroring how a sale
+      // deducts from the showroom — never to the storage warehouse the FE may
+      // have sent (the quick path defaults to the highest-stock location).
+      const returnItemIds = [...new Set(dto.returnLines.map((l) => l.itemId))];
+      const returnShowroomLocations = await resolveBranchItemLocations(
+        manager,
+        returnItemIds,
+        actor,
+        { showroomOnly: true },
+      );
+
       const returnItems = dto.returnLines.map((line, index) =>
         manager.create(InvoiceItemEntity, {
           organizationId: actor.organizationId,
@@ -100,7 +111,8 @@ export class CreateExchangeInvoiceService {
           createdBy: actor.userId,
           invoiceId: saved.id,
           itemId: line.itemId,
-          locationId: line.locationId,
+          locationId:
+            returnShowroomLocations.get(line.itemId) ?? line.locationId,
           itemCode: line.itemCode,
           itemName: line.itemName,
           unit: line.unit,
