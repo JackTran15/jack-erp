@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppModal } from "@erp/ui";
 import { useQuery } from "@tanstack/react-query";
+import { TreeSelectInput } from "../../../components/forms/TreeSelectInput";
 import {
   getStockSummaryFilterOptions,
   type StockStateFilter,
@@ -38,7 +39,6 @@ interface Props {
   onCancel: () => void;
   onApply: (next: StockSummaryAdvancedFilters) => void;
   storageOptions: { value: string; label: string }[];
-  categoryOptions: { value: string; label: string }[];
 }
 
 export function StockSummaryFilterDialog({
@@ -47,7 +47,6 @@ export function StockSummaryFilterDialog({
   onCancel,
   onApply,
   storageOptions,
-  categoryOptions,
 }: Props) {
   const [draft, setDraft] = useState<StockSummaryAdvancedFilters>(initial);
 
@@ -103,19 +102,13 @@ export function StockSummaryFilterDialog({
         <label htmlFor="ssfd-category" className="text-foreground">
           Nhóm hàng hóa
         </label>
-        <select
-          id="ssfd-category"
-          className="h-9 rounded border border-input bg-background px-2"
+        <TreeSelectInput
+          inputId="ssfd-category"
           value={draft.categoryId}
-          onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
-        >
-          <option value="">Tất cả nhóm hàng</option>
-          {categoryOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onChange={(categoryId) => setDraft({ ...draft, categoryId })}
+          entityKey="inventory-item-categories"
+          placeholder="Tất cả nhóm hàng"
+        />
 
         <label htmlFor="ssfd-movementFrom" className="text-foreground">
           Phát sinh tồn từ ngày

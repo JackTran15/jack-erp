@@ -2,7 +2,7 @@ import { AppModal, Button, Input, MoneyInput } from "@erp/ui";
 import { ChevronDown, ChevronRight, Search, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useCrudRecords } from "../../crud";
+import { TreeSelectInput } from "../../forms/TreeSelectInput";
 import { PaginationControls } from "../../table/PaginationControls";
 import { QuickEntryDialog } from "./QuickEntryDialog";
 import {
@@ -138,16 +138,6 @@ export function ProductSelectDialog({
   const variantCache = useRef<Map<string, ProductVariantRow[]>>(new Map());
   // Accumulate full data for every item rendered, so confirm can return rich rows
   const itemDataById = useRef<Map<string, SelectedProduct>>(new Map());
-
-  const categoriesQuery = useCrudRecords(
-    "inventory-item-categories",
-    { page: 1, pageSize: 100, sortBy: "name", sortOrder: "asc" },
-    categoryFilter,
-  );
-  const categories = (categoriesQuery.data?.data ?? []) as Record<
-    string,
-    unknown
-  >[];
 
   const groupsQuery = useProductGroups({
     page,
@@ -539,22 +529,18 @@ export function ProductSelectDialog({
         {/* Filters */}
         <div className="flex shrink-0 items-center gap-2">
           {categoryFilter && (
-            <select
-              className="h-9 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm"
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value);
-                setPage(1);
-              }}
-              aria-label="Lọc theo nhóm hàng hóa"
-            >
-              <option value="">— Tất cả nhóm —</option>
-              {categories.map((c) => (
-                <option key={String(c.id)} value={String(c.id)}>
-                  {String(c.name)}
-                </option>
-              ))}
-            </select>
+            <div className="w-[260px]">
+              <TreeSelectInput
+                inputId="product-select-category"
+                placeholder="Tất cả nhóm"
+                value={categoryId}
+                onChange={(selectedId) => {
+                  setCategoryId(selectedId);
+                  setPage(1);
+                }}
+                entityKey="inventory-item-categories"
+              />
+            </div>
           )}
           <Input
             type="search"

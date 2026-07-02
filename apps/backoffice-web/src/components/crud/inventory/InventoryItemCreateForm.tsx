@@ -11,6 +11,7 @@ import {
 import { ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { CrudFieldInput } from "../CrudFieldInput";
 import { LookupField } from "../../forms/LookupField";
+import { TreeSelectInput } from "../../forms/TreeSelectInput";
 
 import {
   COMMISSION_METHOD_OPTIONS,
@@ -42,7 +43,6 @@ import { InventoryItemActionBar } from "./item-create/InventoryItemActionBar";
 import { Tabs } from "../../tabs/Tabs";
 import {
   useBrands,
-  useItemCategories,
   useItemUnits,
 } from "./item-create/hooks";
 import {
@@ -104,7 +104,6 @@ export function InventoryItemCreateForm({
 
   // Locally-created master rows, merged into the select options so a just-created
   // value is selectable immediately (before the list query refetches).
-  const [addedCategories, setAddedCategories] = useState<Option[]>([]);
   const [addedBrands, setAddedBrands] = useState<Option[]>([]);
   const [addedUnits, setAddedUnits] = useState<string[]>([]);
 
@@ -130,22 +129,8 @@ export function InventoryItemCreateForm({
   );
 
   // ─── Master-data option lists (Nhóm hàng hóa / Thương hiệu / Đơn vị tính) ──
-  const categoriesQuery = useItemCategories("", true);
   const brandsQuery = useBrands("", true);
   const unitsQuery = useItemUnits("", true);
-
-  const categoryOptions = useMemo<Option[]>(() => {
-    const data = (categoriesQuery.data?.data ?? []) as Record<
-      string,
-      unknown
-    >[];
-    const base = data.map((r) => ({
-      id: String(r.id ?? ""),
-      name: String(r.name ?? ""),
-    }));
-    const seen = new Set(base.map((o) => o.id));
-    return [...base, ...addedCategories.filter((o) => !seen.has(o.id))];
-  }, [categoriesQuery.data, addedCategories]);
 
   const brandOptions = useMemo<Option[]>(() => {
     const data = (brandsQuery.data?.data ?? []) as Record<string, unknown>[];
@@ -455,7 +440,6 @@ export function InventoryItemCreateForm({
 
   // ─── Master-data selection handlers ────────────────────────────────────────
   const onCategoryCreated = (cat: CategoryPick) => {
-    setAddedCategories((prev) => [...prev, { id: cat.id, name: cat.name }]);
     setValues((prev) => ({
       ...prev,
       categoryId: cat.id,
@@ -679,40 +663,45 @@ export function InventoryItemCreateForm({
               layout="horizontal"
               labelWidth="10rem"
             >
-              <LookupField<Option>
-                inputId="create-category"
-                placeholder="Nhập để tìm kiếm"
-                value={String(values.categoryName ?? "")}
-                onValueChange={(text) =>
-                  setValues((prev) => ({
-                    ...prev,
-                    categoryName: text,
-                    categoryId: "",
-                  }))
-                }
-                onSelect={(opt) => {
-                  setValues((prev) => ({
-                    ...prev,
-                    categoryId: opt.id,
-                    categoryName: opt.name,
-                  }));
-                  setErrors((prev) => {
-                    const next = { ...prev };
-                    delete next.categoryId;
-                    return next;
-                  });
-                }}
-                search={(q) =>
-                  Promise.resolve(
-                    categoryOptions.filter((o) =>
-                      o.name.toLowerCase().includes(q.trim().toLowerCase()),
-                    ),
-                  )
-                }
-                itemKey={(o) => o.id}
-                renderItem={(o) => o.name}
-                onCreateNew={() => setCategoryCreateOpen(true)}
-              />
+              <div className="flex items-stretch">
+                <div className="min-w-0 flex-1">
+                  <TreeSelectInput
+                    inputId="create-category"
+                    placeholder="Nhập để tìm kiếm"
+                    value={String(values.categoryId ?? "")}
+                    onChange={(selectedId) => {
+                      setValues((prev) => ({
+                        ...prev,
+                        categoryId: selectedId,
+                        categoryName: selectedId ? prev.categoryName : "",
+                      }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.categoryId;
+                        return next;
+                      });
+                    }}
+                    onSelectItem={(item) => {
+                      setValues((prev) => ({
+                        ...prev,
+                        categoryId: item.id,
+                        categoryName: item.name,
+                      }));
+                    }}
+                    entityKey="inventory-item-categories"
+                    disabled={isSaving}
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label="Thêm mới"
+                  disabled={isSaving}
+                  onClick={() => setCategoryCreateOpen(true)}
+                  className="-ml-px flex items-center justify-center rounded-r-md border border-input bg-background px-2 text-primary hover:bg-accent disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </FormField>
 
             {/* Thương hiệu — searchable brandId picker; search icon = list, + = create */}

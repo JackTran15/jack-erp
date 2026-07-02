@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppModal, Button, FormField, Input, Textarea } from "@erp/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useCreateItemCategory, useItemCategories } from "../hooks";
+import { TreeSelectInput } from "../../../../forms/TreeSelectInput";
+import { useCreateItemCategory } from "../hooks";
 import { getUserFacingApiErrorMessage } from "../../../../../lib/user-facing-api-error";
 
 export interface CategoryPick {
@@ -56,12 +57,6 @@ export function ItemCategoryCreateDialog({
   const [commissions, setCommissions] = useState<CommissionDraft[]>([]);
 
   const createCategory = useCreateItemCategory();
-  const parentsQuery = useItemCategories("", open);
-
-  const parentOptions = useMemo(() => {
-    const data = (parentsQuery.data?.data ?? []) as Record<string, unknown>[];
-    return data.map((r) => ({ id: String(r.id ?? ""), name: String(r.name ?? "") }));
-  }, [parentsQuery.data]);
 
   useEffect(() => {
     if (open) {
@@ -120,6 +115,7 @@ export function ItemCategoryCreateDialog({
       title="Thêm mới nhóm hàng hóa"
       defaultWidth={720}
       defaultHeight={560}
+      bodyClassName="overflow-visible"
       saveLabel={createCategory.isPending ? "Đang lưu…" : "Lưu"}
       saveDisabled={createCategory.isPending || !code.trim() || !name.trim()}
       onSave={save}
@@ -156,19 +152,14 @@ export function ItemCategoryCreateDialog({
               <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} />
             </FormField>
             <FormField label="Thuộc nhóm" htmlFor="cat-parent">
-              <select
-                id="cat-parent"
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              <TreeSelectInput
+                inputId="cat-parent"
                 value={parentGroupId}
-                onChange={(e) => setParentGroupId(e.target.value)}
-              >
-                <option value="">— Không —</option>
-                {parentOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setParentGroupId}
+                entityKey="inventory-item-categories"
+                placeholder="Chọn nhóm cha"
+                disabled={createCategory.isPending}
+              />
             </FormField>
             <FormField label="Mô tả" htmlFor="cat-desc">
               <Textarea

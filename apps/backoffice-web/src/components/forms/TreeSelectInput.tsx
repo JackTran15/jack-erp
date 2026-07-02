@@ -4,6 +4,7 @@ import {
   useId,
   useRef,
   useState,
+  type UIEvent,
 } from "react";
 import { Input } from "@erp/ui";
 import { erpApi, requireErpData } from "../../lib/erp-api";
@@ -22,6 +23,13 @@ interface TreeNode extends RawItem {
   depth: number;
 }
 
+interface PagingState {
+  page: number;
+  total: number;
+  loaded: number;
+  query: string;
+}
+
 export interface TreeSelectInputProps {
   /** The selected item's UUID (empty string = nothing selected). */
   value: string;
@@ -36,6 +44,7 @@ export interface TreeSelectInputProps {
   error?: string;
   disabled?: boolean;
   inputId?: string;
+  onSelectItem?: (item: RawItem) => void;
 }
 
 // ─── Tree helpers ────────────────────────────────────────────────────────────
@@ -116,6 +125,26 @@ function indentPrefix(depth: number): string {
   return "  ".repeat(depth * 2) + "— ";
 }
 
+function mapRecord(r: Record<string, unknown>): RawItem {
+  return {
+    id: String(r.id ?? ""),
+    code: String(r.code ?? ""),
+    name: String(r.name ?? ""),
+    parentGroupId: r.parentGroupId ? String(r.parentGroupId) : undefined,
+    isActive: r.isActive !== false,
+  };
+}
+
+function mergeItems(current: RawItem[], next: RawItem[]): RawItem[] {
+  const map = new Map(current.map((item) => [item.id, item]));
+  for (const item of next) {
+    if (item.id) map.set(item.id, item);
+  }
+  return [...map.values()];
+}
+
+const PAGE_SIZE = 8;
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function TreeSelectInput({
@@ -129,63 +158,130 @@ export function TreeSelectInput({
   error,
   disabled,
   inputId,
+  onSelectItem,
 }: TreeSelectInputProps) {
   const fallbackId = useId();
   const id = inputId ?? fallbackId;
 
   const wrapRef = useRef<HTMLDivElement>(null);
+  const requestSeqRef = useRef(0);
+  const allItemsRef = useRef<RawItem[]>([]);
   const [open, setOpen] = useState(false);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [allItems, setAllItems] = useState<RawItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [paging, setPaging] = useState<PagingState>({
+    page: 0,
+    total: 0,
+    loaded: 0,
+    query: "",
+  });
+
+  useEffect(() => {
+    allItemsRef.current = allItems;
+  }, [allItems]);
 
   // Reset when entityKey changes so stale data from a previous entity isn't shown
   useEffect(() => {
-    setLoaded(false);
+    setPaging({ page: 0, total: 0, loaded: 0, query: "" });
     setAllItems([]);
     setInputText("");
   }, [entityKey]);
 
-  // Load all pages once per entityKey so the dropdown is not capped by the
-  // generic records page size when there are more parent-group options.
-  const loadItems = useCallback(async () => {
-    if (loaded) return;
-    setLoading(true);
-    try {
-      const pageSize = 100;
-      let page = 1;
-      let total = Number.POSITIVE_INFINITY;
-      const rows: Record<string, unknown>[] = [];
-
-      while (rows.length < total) {
-        const res = await requireErpData(
-          await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
-            "/admin/entities/{entityKey}/records",
-            { params: { path: { entityKey }, query: { page, pageSize } } },
+  const fetchRecord = useCallback(
+    async (recordId: string): Promise<RawItem | null> => {
+      try {
+        const record = await requireErpData(
+          await erpApi.GET<Record<string, unknown>>(
+            "/admin/entities/{entityKey}/records/{id}",
+            { params: { path: { entityKey, id: recordId } } },
           ),
         );
-        rows.push(...res.data);
-        total = res.total;
-        if (res.data.length === 0) break;
-        page += 1;
+        return mapRecord(record);
+      } catch {
+        return null;
+      }
+    },
+    [entityKey],
+  );
+
+  const hydrateParents = useCallback(
+    async (items: RawItem[], existing: RawItem[]): Promise<RawItem[]> => {
+      const map = new Map([...existing, ...items].map((item) => [item.id, item]));
+      const parents: RawItem[] = [];
+
+      for (const item of items) {
+        let parentId = item.parentGroupId;
+        const visited = new Set<string>();
+        while (parentId && !map.has(parentId) && !visited.has(parentId)) {
+          visited.add(parentId);
+          const parent = await fetchRecord(parentId);
+          if (!parent) break;
+          parents.push(parent);
+          map.set(parent.id, parent);
+          parentId = parent.parentGroupId;
+        }
       }
 
-      const items = rows.map((r) => ({
-        id: String(r.id ?? ""),
-        code: String(r.code ?? ""),
-        name: String(r.name ?? ""),
-        parentGroupId: r.parentGroupId ? String(r.parentGroupId) : undefined,
-        isActive: r.isActive !== false,
+      return parents;
+    },
+    [fetchRecord],
+  );
+
+  const loadPage = useCallback(async (
+    pageToLoad: number,
+    queryToLoad: string,
+    replace: boolean,
+  ) => {
+    const seq = ++requestSeqRef.current;
+    setLoading(true);
+    try {
+      const params: { page: number; pageSize: number; search?: string } = {
+        page: pageToLoad,
+        pageSize: PAGE_SIZE,
+      };
+      if (queryToLoad) params.search = queryToLoad;
+
+      const res = await requireErpData(
+        await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
+          "/admin/entities/{entityKey}/records",
+          { params: { path: { entityKey }, query: params } },
+        ),
+      );
+      if (seq !== requestSeqRef.current) return;
+
+      const pageItems = res.data.map(mapRecord);
+      const baseItems = replace ? [] : allItemsRef.current;
+      const parentItems = await hydrateParents(pageItems, baseItems);
+      if (seq !== requestSeqRef.current) return;
+
+      setAllItems((prev) =>
+        mergeItems(replace ? [] : prev, [...parentItems, ...pageItems]),
+      );
+      setPaging((prev) => ({
+        page: pageToLoad,
+        total: res.total,
+        loaded: replace ? res.data.length : prev.loaded + res.data.length,
+        query: queryToLoad,
       }));
-      setAllItems(items);
-      setLoaded(true);
     } catch {
       // silently fail — dropdown stays empty
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
-  }, [entityKey, loaded]);
+  }, [entityKey, hydrateParents]);
+
+  const query = inputText.trim();
+
+  useEffect(() => {
+    if (!open || disabled) return;
+    setAllItems([]);
+    setPaging({ page: 0, total: 0, loaded: 0, query });
+    const t = window.setTimeout(() => {
+      void loadPage(1, query, true);
+    }, 180);
+    return () => window.clearTimeout(t);
+  }, [disabled, loadPage, open, query]);
 
   // Sync display text when value changes externally (edit prefill)
   useEffect(() => {
@@ -193,10 +289,19 @@ export function TreeSelectInput({
       setInputText("");
       return;
     }
-    if (allItems.length === 0) return;
-    const found = allItems.find((i) => i.id === value);
-    if (found) setInputText(`${found.code} · ${found.name}`);
-  }, [value, allItems]);
+    const found = allItemsRef.current.find((i) => i.id === value);
+    if (found) {
+      setInputText(`${found.code} · ${found.name}`);
+      return;
+    }
+    void (async () => {
+      const item = await fetchRecord(value);
+      if (!item) return;
+      const parents = await hydrateParents([item], allItemsRef.current);
+      setAllItems((prev) => mergeItems(prev, [...parents, item]));
+      setInputText(`${item.code} · ${item.name}`);
+    })();
+  }, [fetchRecord, hydrateParents, value]);
 
   // Close on outside click
   useEffect(() => {
@@ -213,17 +318,25 @@ export function TreeSelectInput({
   const handleFocus = () => {
     if (!disabled) {
       setOpen(true);
-      void loadItems();
     }
   };
 
   const tree = buildTree(allItems, excludeId);
-  const query = inputText.trim();
   const displayTree = query.length >= 1 ? filterTree(tree, query) : tree;
   const displayNodes = flatten(displayTree);
+  const hasMore = paging.query === query && paging.loaded < paging.total;
+
+  const handleDropdownScroll = (event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    const nearBottom =
+      target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+    if (!nearBottom || loading || !hasMore) return;
+    void loadPage(paging.page + 1, query, false);
+  };
 
   const handleSelect = (node: TreeNode) => {
     onChange(node.id);
+    onSelectItem?.(node);
     setInputText(`${node.code} · ${node.name}`);
     setOpen(false);
   };
@@ -257,7 +370,6 @@ export function TreeSelectInput({
           onChange={(e) => {
             setInputText(e.target.value);
             if (!open) setOpen(true);
-            if (!loaded) void loadItems();
             if (e.target.value === "") onChange("");
           }}
           onFocus={handleFocus}
@@ -278,14 +390,17 @@ export function TreeSelectInput({
 
       {showDropdown && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
-          {loading && !loaded ? (
+          {loading && paging.page === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">Đang tải…</div>
           ) : displayNodes.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               {query ? "Không tìm thấy." : "Không có nhóm nào."}
             </div>
           ) : (
-            <div className="max-h-64 overflow-y-auto overscroll-contain">
+            <div
+              className="h-64 overflow-y-auto overscroll-contain"
+              onScroll={handleDropdownScroll}
+            >
               <ul role="listbox" className="py-1">
                 {displayNodes.map((node) => (
                   <li
@@ -309,6 +424,11 @@ export function TreeSelectInput({
                     <span>{node.name}</span>
                   </li>
                 ))}
+                {loading || hasMore ? (
+                  <li className="px-3 py-2 text-xs text-muted-foreground">
+                    {loading ? "Đang tải thêm…" : "Cuộn xuống để tải thêm"}
+                  </li>
+                ) : null}
               </ul>
             </div>
           )}
