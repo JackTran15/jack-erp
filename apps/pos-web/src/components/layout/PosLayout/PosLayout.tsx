@@ -18,7 +18,6 @@ import {
   useDraftInvoicesQuery,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { InvoiceTabBar } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTabBar/InvoiceTabBar";
 import type {
   DraftInvoice,
@@ -29,6 +28,7 @@ import {
   readPinnedItems,
   writePinnedItems,
 } from "@erp/pos/lib/common/localstorage";
+import { resetAppState } from "@erp/pos/lib/common/reset-app-state";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { authService } from "@erp/pos/services/auth.service";
 import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
@@ -85,8 +85,6 @@ export function PosLayout() {
     [],
   );
 
-  const clearBranch = usePosBranchStore((s) => s.clearBranch);
-  const resetSession = usePosCheckoutSessionStore((s) => s.resetSession);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const posSessionId = usePosCheckoutSessionStore((s) => s.posSessionId);
@@ -223,8 +221,7 @@ export function PosLayout() {
 
   const handleLogout = () => {
     authService.clearSession();
-    clearBranch();
-    resetSession();
+    resetAppState();
     navigate("/dang-nhap", { replace: true });
   };
 

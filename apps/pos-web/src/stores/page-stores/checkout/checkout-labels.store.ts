@@ -25,6 +25,7 @@ interface PosCheckoutLabelsState {
     patch: Partial<Pick<LabelTag, "name" | "color">>,
   ) => void;
   deleteLabel: (id: string) => void;
+  resetLabels: () => void;
 }
 
 function generateLabelId(): string {
@@ -60,5 +61,7 @@ export const usePosCheckoutLabelsStore = create<PosCheckoutLabelsState>()(
       set((state) => ({
         labels: state.labels.filter((l) => l.id !== id),
       })),
+
+    resetLabels: () => set({ labels: initialLabels() }),
   }),
 );

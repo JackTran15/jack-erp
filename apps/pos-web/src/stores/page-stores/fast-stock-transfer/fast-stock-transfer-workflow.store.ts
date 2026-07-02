@@ -59,6 +59,7 @@ interface PosFastStockTransferWorkflowState {
 
   setPollSessionId: (sessionId: string | null) => void;
   resetWorkflow: () => void;
+  resetWorkflowAll: () => void;
 }
 
 export const usePosFastStockTransferWorkflowStore =
@@ -197,5 +198,19 @@ export const usePosFastStockTransferWorkflowStore =
         editingRowId: null,
         editableDraft: null,
         toolbarDraft: { ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT },
+      }),
+
+    // Khác resetWorkflow (giữ direction/filters/pollSessionId cho flow sau
+    // chuyển kho): đưa TOÀN BỘ state về initial — dùng khi reset app state.
+    resetWorkflowAll: () =>
+      set({
+        direction: TempWarehouseDirection.WAREHOUSE_TO_SHOWROOM,
+        filters: { ...EMPTY_FAST_STOCK_TRANSFER_FILTERS },
+        toolbarDraft: { ...EMPTY_FAST_STOCK_TRANSFER_TOOLBAR_DRAFT },
+        transferSelectedByLineId: {},
+        hiddenLineIds: [],
+        editingRowId: null,
+        editableDraft: null,
+        pollSessionId: null,
       }),
   }));
