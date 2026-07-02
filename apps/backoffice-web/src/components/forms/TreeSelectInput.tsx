@@ -87,6 +87,22 @@ function flatten(nodes: TreeNode[]): TreeNode[] {
   return result;
 }
 
+function filterTree(nodes: TreeNode[], q: string, ancestorMatched = false): TreeNode[] {
+  return nodes.flatMap((node) => {
+    const selfMatched = matchesSearch(node, q);
+    const includeDescendants = ancestorMatched || selfMatched;
+    const children = includeDescendants
+      ? node.children.map((child) => ({
+          ...child,
+          children: filterTree(child.children, q, true),
+        }))
+      : filterTree(node.children, q, false);
+
+    if (!selfMatched && children.length === 0 && !ancestorMatched) return [];
+    return [{ ...node, children }];
+  });
+}
+
 function matchesSearch(node: TreeNode, q: string): boolean {
   const lower = q.toLowerCase();
   return (
@@ -131,18 +147,31 @@ export function TreeSelectInput({
     setInputText("");
   }, [entityKey]);
 
-  // Load all items once per entityKey
+  // Load all pages once per entityKey so the dropdown is not capped by the
+  // generic records page size when there are more parent-group options.
   const loadItems = useCallback(async () => {
     if (loaded) return;
     setLoading(true);
     try {
-      const res = await requireErpData(
-        await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
-          "/admin/entities/{entityKey}/records",
-          { params: { path: { entityKey }, query: { page: 1, pageSize: 100 } } },
-        ),
-      );
-      const items = res.data.map((r) => ({
+      const pageSize = 100;
+      let page = 1;
+      let total = Number.POSITIVE_INFINITY;
+      const rows: Record<string, unknown>[] = [];
+
+      while (rows.length < total) {
+        const res = await requireErpData(
+          await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
+            "/admin/entities/{entityKey}/records",
+            { params: { path: { entityKey }, query: { page, pageSize } } },
+          ),
+        );
+        rows.push(...res.data);
+        total = res.total;
+        if (res.data.length === 0) break;
+        page += 1;
+      }
+
+      const items = rows.map((r) => ({
         id: String(r.id ?? ""),
         code: String(r.code ?? ""),
         name: String(r.name ?? ""),
@@ -189,13 +218,9 @@ export function TreeSelectInput({
   };
 
   const tree = buildTree(allItems, excludeId);
-  const flat = flatten(tree);
-
   const query = inputText.trim();
-  const displayNodes: (TreeNode & { isFiltered?: boolean })[] =
-    query.length >= 1
-      ? flat.filter((n) => matchesSearch(n, query)).map((n) => ({ ...n, isFiltered: true }))
-      : flat;
+  const displayTree = query.length >= 1 ? filterTree(tree, query) : tree;
+  const displayNodes = flatten(displayTree);
 
   const handleSelect = (node: TreeNode) => {
     onChange(node.id);
@@ -277,7 +302,7 @@ export function TreeSelectInput({
                     }}
                   >
                     <span className="whitespace-pre font-mono text-xs text-muted-foreground">
-                      {node.isFiltered ? "" : indentPrefix(node.depth)}
+                      {indentPrefix(node.depth)}
                     </span>
                     <span className="text-xs text-muted-foreground">{node.code}</span>
                     {" · "}
