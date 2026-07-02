@@ -2,13 +2,17 @@ import { Button, cn } from "@erp/ui";
 import { Copy, Plus, Save, X } from "lucide-react";
 import { useLayout } from "../../../layout/LayoutContext";
 
+export type InventoryItemSaveMode = "save" | "save-and-clone" | "save-and-new";
+
 interface InventoryItemActionBarProps {
   isSaving: boolean;
   onCancel: () => void;
+  /** Called with the chosen mode; parent is responsible for triggering form submission. */
+  onSaveMode: (mode: InventoryItemSaveMode) => void;
 }
 
 /** Fixed bottom action bar (below content area after sidebar). */
-export function InventoryItemActionBar({ isSaving, onCancel }: InventoryItemActionBarProps) {
+export function InventoryItemActionBar({ isSaving, onCancel, onSaveMode }: InventoryItemActionBarProps) {
   const { sidebarCollapsed } = useLayout();
 
   return (
@@ -18,15 +22,15 @@ export function InventoryItemActionBar({ isSaving, onCancel }: InventoryItemActi
         sidebarCollapsed ? "left-[60px]" : "left-60",
       )}
     >
-      <Button type="submit" disabled={isSaving}>
+      <Button type="button" disabled={isSaving} onClick={() => onSaveMode("save")}>
         <Save className="mr-1.5 h-4 w-4" />
         {isSaving ? "Đang lưu…" : "Lưu"}
       </Button>
-      <Button type="submit" variant="outline" disabled={isSaving} title="Lưu rồi mở lại biểu mẫu nhân bản (sắp ra mắt)">
+      <Button type="button" variant="outline" disabled={isSaving} onClick={() => onSaveMode("save-and-clone")}>
         <Copy className="mr-1.5 h-4 w-4" />
         Lưu và nhân bản
       </Button>
-      <Button type="submit" variant="outline" disabled={isSaving} title="Lưu rồi mở biểu mẫu trống (sắp ra mắt)">
+      <Button type="button" variant="outline" disabled={isSaving} onClick={() => onSaveMode("save-and-new")}>
         <Plus className="mr-1.5 h-4 w-4" />
         Lưu và thêm mới
       </Button>

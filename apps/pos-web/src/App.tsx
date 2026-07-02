@@ -1,7 +1,8 @@
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
+import { queryClient } from "@erp/pos/lib/common/query-client";
 import { PosRequireAuth } from "./components/common/PosRequireAuth/PosRequireAuth";
 import { PosRequireBranch } from "./components/common/PosRequireBranch/PosRequireBranch";
 import { PosLayout } from "./components/layout/PosLayout/PosLayout";
@@ -13,17 +14,7 @@ import { PosLoginPage } from "./pages/PosLoginPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
 import { UiCatalogPage } from "./pages/UiCatalogPage";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 0,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-// 
+//
 // Fix query
 // Fix số tiền ko reset đúng
 

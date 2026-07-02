@@ -111,6 +111,7 @@ export function useCrudCreate(entityKey: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
+      void qc.invalidateQueries({ queryKey: ["crud-v2", entityKey] });
       if (entityKey === "inventory-item-categories") {
         void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
       }

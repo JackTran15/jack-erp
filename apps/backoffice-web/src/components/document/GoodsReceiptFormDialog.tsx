@@ -964,7 +964,11 @@ export function PurchaseOrderFormDialog({
               unitPrice: Number(l.unitPrice),
               note: l.notes || undefined,
             })),
-            providerId: providerId || undefined,
+            // Route Đối tượng through the validated counterparty path (same as
+            // the normal receipt payload above); a bare providerId would bypass
+            // validation and can violate the goods_receipts provider FK.
+            counterpartyKind: counterpartyKind || undefined,
+            counterpartyId: providerId || undefined,
             deliverer: deliveryPerson || undefined,
             references: references.length ? references : undefined,
             occurredAt: receivedAtIso,

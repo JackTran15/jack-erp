@@ -103,14 +103,10 @@ export function InvoiceLineItemRow({
       className={cn(
         "cursor-pointer align-top text-sm text-gray-900 transition-colors",
         isReturnQuantityUi
-          ? selected
-            ? "bg-[#f7d9dd]"
-            : "bg-[#fcf1f2] hover:bg-[#f8e4e6]"
+          ? "bg-[#fcf1f2]"
           : selected
             ? "bg-indigo-50"
-            : oversell
-              ? "bg-red-50 hover:bg-red-100/60"
-              : "bg-white hover:bg-gray-50",
+            : "bg-white hover:bg-gray-50",
       )}
     >
       <td className="w-10 px-3 py-2 text-center text-gray-500">{index}</td>
@@ -160,8 +156,22 @@ export function InvoiceLineItemRow({
           onKeyDown={handleQtyKeyDown}
           displayValue={displayQty}
           onChangeRaw={(raw) => updateQty(line.lineId, raw)}
-          onBumpDown={locked ? undefined : () => bumpQty(line.lineId, -1)}
-          onBumpUp={locked ? undefined : () => bumpQty(line.lineId, 1)}
+          onBumpDown={
+            locked
+              ? undefined
+              : () => {
+                  selectLine(line);
+                  bumpQty(line.lineId, -1);
+                }
+          }
+          onBumpUp={
+            locked
+              ? undefined
+              : () => {
+                  selectLine(line);
+                  bumpQty(line.lineId, 1);
+                }
+          }
           bumpDownDisabled={line.qty <= 1}
           bumpUpDisabled={isReturnQuantityUi ? line.qty >= line.maxQty : false}
           disabled={locked}

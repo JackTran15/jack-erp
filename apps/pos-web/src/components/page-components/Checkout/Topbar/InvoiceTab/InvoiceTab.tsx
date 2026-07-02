@@ -31,7 +31,7 @@ export function InvoiceTab({
   return (
     <div
       className={cn(
-        "group relative flex h-9 items-center gap-1.5 rounded-t-md px-3 text-[14px] transition-colors",
+        "group relative flex h-10 items-center gap-1.5 rounded-t-md px-3 text-[14px] transition-colors",
         isActive
           ? "bg-white text-gray-900 font-medium shadow-[0_-1px_0_#E5E7EB_inset]"
           : "bg-gray-100 text-gray-700 hover:bg-gray-200/70",

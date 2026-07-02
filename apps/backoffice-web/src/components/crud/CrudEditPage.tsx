@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@erp/ui";
@@ -6,6 +6,7 @@ import { getUserFacingApiErrorMessage } from "../../lib/user-facing-api-error";
 import { useCrudConfig, useCrudRecord, useCrudUpdate } from "./useCrudApi";
 import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
+import type { InventoryItemSaveMode } from "./inventory/item-create/InventoryItemActionBar";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
@@ -55,6 +56,14 @@ export function CrudEditPage() {
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const saveModeRef = useRef<InventoryItemSaveMode>("save");
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handleSaveMode = useCallback((mode: InventoryItemSaveMode) => {
+    saveModeRef.current = mode;
+    formRef.current?.requestSubmit();
+  }, []);
 
   useEffect(() => {
     if (!record) return;
@@ -161,7 +170,20 @@ export function CrudEditPage() {
     try {
       await updateMutation.mutateAsync({ id, body: payload });
       toast.success(`Đã cập nhật ${config.displayName}.`);
-      if (entityKey === "inventory-items" || listReturnRef.current) {
+
+      const mode = saveModeRef.current;
+      saveModeRef.current = "save";
+
+      if (entityKey === "inventory-items") {
+        if (mode === "save-and-clone") {
+          // Navigate with only the ID — CrudCreatePage fetches the full record via useCrudRecord.
+          navigate(`/admin/inventory-items/new`, { state: { cloneFromId: id } });
+        } else if (mode === "save-and-new") {
+          navigate(`/admin/inventory-items/new`);
+        } else {
+          navigateBackToList();
+        }
+      } else if (listReturnRef.current) {
         navigateBackToList();
       } else {
         navigate(`/admin/${entityKey}/${id}`, { replace: true });
@@ -191,7 +213,7 @@ export function CrudEditPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
-        <form id="crud-edit-form" onSubmit={(e) => void handleSubmit(e)}>
+        <form id="crud-edit-form" ref={formRef} onSubmit={(e) => void handleSubmit(e)}>
           {entityKey === "inventory-providers" ? (
             <SupplierCreateForm
               editableFields={editableFields}
@@ -214,6 +236,7 @@ export function CrudEditPage() {
               mode="edit"
               initialRecord={record}
               onCancel={navigateBackToList}
+              onSaveMode={handleSaveMode}
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

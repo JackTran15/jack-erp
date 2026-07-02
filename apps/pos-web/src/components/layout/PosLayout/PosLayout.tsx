@@ -18,7 +18,6 @@ import {
   useDraftInvoicesQuery,
 } from "@erp/pos/hooks/react-query/use-query-invoice";
 import { usePosCheckoutSessionStore } from "@erp/pos/stores/common/checkout-session.store";
-import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { InvoiceTabBar } from "@erp/pos/components/page-components/Checkout/Topbar/InvoiceTabBar/InvoiceTabBar";
 import type {
   DraftInvoice,
@@ -29,6 +28,7 @@ import {
   readPinnedItems,
   writePinnedItems,
 } from "@erp/pos/lib/common/localstorage";
+import { resetAppState } from "@erp/pos/lib/common/reset-app-state";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 import { authService } from "@erp/pos/services/auth.service";
 import { useCurrentUserQuery } from "@erp/pos/hooks/react-query/use-query-user";
@@ -85,8 +85,6 @@ export function PosLayout() {
     [],
   );
 
-  const clearBranch = usePosBranchStore((s) => s.clearBranch);
-  const resetSession = usePosCheckoutSessionStore((s) => s.resetSession);
   const sessions = usePosCheckoutSessionStore((s) => s.sessions);
   const activeSessionId = usePosCheckoutSessionStore((s) => s.activeSessionId);
   const posSessionId = usePosCheckoutSessionStore((s) => s.posSessionId);
@@ -223,14 +221,13 @@ export function PosLayout() {
 
   const handleLogout = () => {
     authService.clearSession();
-    clearBranch();
-    resetSession();
+    resetAppState();
     navigate("/dang-nhap", { replace: true });
   };
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-100 text-gray-900">
-      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 h-12 gap-3 bg-white px-3">
+    <div className="flex h-[100dvh] w-full flex-col bg-gray-100 text-gray-900 overflow-hidden">
+      <header className="sticky top-0 z-10 flex items-center border-b border-gray-200 gap-2 bg-white px-3">
         <div className="flex items-center gap-2">
           <div onClick={() => navigate("/")} className="cursor-pointer">
             <PosLogo />
@@ -260,7 +257,7 @@ export function PosLayout() {
           />
         )}
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 py-2">
           <PosLocationIndicator />
           <PosIconButton
             ref={notificationsTriggerRef}

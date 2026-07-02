@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import type { CrudEntityConfig, FieldDefinition } from "@erp/shared-interfaces";
 import { AppModal, Button, Input, MoneyInput, Textarea } from "@erp/ui";
-import { HelpCircle, Save, X } from "lucide-react";
+import { HelpCircle, Plus, Save, X } from "lucide-react";
 import { apiClient } from "../../lib/api-axios";
 import { formatCrudEnumOption } from "../../lib/crud-display";
 import { SearchListingInput } from "../forms/SearchListingInput";
@@ -187,6 +187,8 @@ interface CrudFormDialogProps {
   record: Record<string, unknown> | null;
   duplicateSource?: Record<string, unknown> | null;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  /** When provided, shows a "Lưu và thêm mới" button. After save, form resets and stays open. */
+  onSaveAndAddNew?: (data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }
 
@@ -233,6 +235,7 @@ export function CrudFormDialog({
   record,
   duplicateSource = null,
   onSubmit,
+  onSaveAndAddNew,
   onClose,
 }: CrudFormDialogProps) {
   const isEdit = record !== null;
@@ -311,7 +314,24 @@ export function CrudFormDialog({
       delete payload[config.idField];
       delete payload.createdAt;
       delete payload.updatedAt;
-      await onSubmit(payload);
+      const mode = saveModeRef.current;
+      saveModeRef.current = "save";
+      if (mode === "save-and-new" && onSaveAndAddNew) {
+        await onSaveAndAddNew(payload);
+        // Reset form to empty state for next entry
+        const next = buildInitialValues(editableFields, null, null);
+        editableFields.forEach((f) => {
+          if (config.entityKey === "inventory-item-categories" && f.key === "status" && !next[f.key]) {
+            next[f.key] = "ACTIVE";
+          }
+          const searchConfig = getSearchFieldConfig(config.entityKey, f.key);
+          if (searchConfig) next[f.key] = { id: "", label: "" };
+        });
+        setValues(next);
+        setErrors({});
+      } else {
+        await onSubmit(payload);
+      }
     } catch {
       return;
     } finally {
@@ -319,7 +339,15 @@ export function CrudFormDialog({
     }
   };
 
+  const saveModeRef = useRef<"save" | "save-and-new">("save");
+
   const handleSave = () => {
+    saveModeRef.current = "save";
+    formRef.current?.requestSubmit();
+  };
+
+  const handleSaveAndAddNew = () => {
+    saveModeRef.current = "save-and-new";
     formRef.current?.requestSubmit();
   };
 
@@ -370,6 +398,12 @@ export function CrudFormDialog({
               <Save className="mr-1.5 h-4 w-4" />
               {saveLabel}
             </Button>
+            {onSaveAndAddNew && !isEdit && (
+              <Button type="button" variant="outline" disabled={submitting} onClick={handleSaveAndAddNew}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Lưu và thêm mới
+              </Button>
+            )}
             <Button type="button" variant="outline" disabled={submitting} onClick={onClose}>
               <X className="mr-1.5 h-4 w-4" />
               Hủy bỏ

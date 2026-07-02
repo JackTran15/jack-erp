@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { resetAppState } from "@erp/pos/lib/common/reset-app-state";
 import { authService } from "@erp/pos/services/auth.service";
 
 const DEFAULT_DEV_ORG_ID = "10000000-0000-4000-8000-000000000001";
@@ -50,6 +51,7 @@ export function PosLoginPage() {
         email: email.trim(),
         password,
       });
+      resetAppState();
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng nhập thất bại.");

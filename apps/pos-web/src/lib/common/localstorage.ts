@@ -30,3 +30,8 @@ export function writePinnedItems(items: PosMenuItem[]) {
     JSON.stringify(items.map((item) => item.id)),
   );
 }
+
+export function clearPinnedItems(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(APP_HEADER_PINNED_STORAGE_KEY);
+}

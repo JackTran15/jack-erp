@@ -43,4 +43,8 @@ export interface InventoryItemCreateFormProps {
   initialRecord?: Record<string, unknown>;
   /** When set, overrides default cancel navigation (e.g. restore list paging). */
   onCancel?: () => void;
+  /** Called when a save button is clicked, before the form submits. */
+  onSaveMode?: (mode: "save" | "save-and-clone" | "save-and-new") => void;
+  /** When true, prevents the form from auto-filling SKU/code from name (used in clone mode). */
+  suppressSkuAutoFill?: boolean;
 }

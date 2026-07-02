@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import {
   DocCounterpartyKind,
   GoodsIssuePurpose,
@@ -34,6 +34,7 @@ describe('TransferOrderService', () => {
   let balanceQb: Record<string, jest.Mock>;
   let giRepo: Record<string, jest.Mock>;
   let branchRepo: Record<string, jest.Mock>;
+  let storageRepo: Record<string, jest.Mock>;
   let goodsIssueService: Record<string, jest.Mock>;
   let goodsReceiptService: Record<string, jest.Mock>;
 
@@ -98,12 +99,17 @@ describe('TransferOrderService', () => {
     branchRepo = {
       find: jest.fn().mockResolvedValue([]),
     };
+    storageRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     goodsIssueService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'gi-1' }),
       cancel: jest.fn().mockResolvedValue({ id: 'gi-1' }),
     };
     goodsReceiptService = {
       createAndPost: jest.fn().mockResolvedValue({ id: 'gr-1' }),
+      cancel: jest.fn().mockResolvedValue(undefined),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -117,7 +123,7 @@ describe('TransferOrderService', () => {
         },
         { provide: getRepositoryToken(GoodsIssueEntity), useValue: giRepo },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
-        { provide: getRepositoryToken(StorageEntity), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(StorageEntity), useValue: storageRepo },
         {
           provide: DataSource,
           useValue: {
@@ -492,6 +498,14 @@ describe('TransferOrderService', () => {
       toRepo.findOne.mockResolvedValueOnce(
         baseOrder({ status: TransferOrderStatus.COMPLETED }),
       );
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-unassigned',
+          isActive: true,
+          storageId: 'storage-B',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
 
       await service.confirmImport('to-1', actorDest, { destinationStorageId: 'storage-B' });
 
@@ -529,16 +543,29 @@ describe('TransferOrderService', () => {
         baseOrder({ status: TransferOrderStatus.COMPLETED }),
       );
 
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-unassigned',
+          isActive: true,
+          storageId: 'storage-B',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
+
       await service.confirmImport('to-1', actorDest, {
         destinationStorageId: 'storage-B',
-        providerId: 'prov-1',
+        counterpartyKind: DocCounterpartyKind.SUPPLIER,
+        counterpartyId: 'prov-1',
         deliverer: 'Jack Jack',
         references: ['XK000007'],
         occurredAt: '2026-06-08T15:24:00.000Z',
       });
 
       const grDto = goodsReceiptService.createAndPost.mock.calls[0][0];
-      expect(grDto.providerId).toBe('prov-1');
+      // Đối tượng is routed through the validated counterparty path, not a raw
+      // providerId (which would bypass validation and can violate the FK).
+      expect(grDto.counterpartyKind).toBe(DocCounterpartyKind.SUPPLIER);
+      expect(grDto.counterpartyId).toBe('prov-1');
       expect(grDto.deliveredBy).toBe('Jack Jack');
       expect(grDto.references).toEqual(['XK000007']);
       expect(grDto.receivedAt).toBe('2026-06-08T15:24:00.000Z');
@@ -552,6 +579,14 @@ describe('TransferOrderService', () => {
         baseOrder({ status: TransferOrderStatus.COMPLETED }),
       );
       locationRepo.findOne.mockResolvedValue({ id: 'loc-X', storageId: 'storage-Z' });
+      locationRepo.find.mockResolvedValue([
+        {
+          id: 'loc-X',
+          isActive: true,
+          storageId: 'storage-Z',
+          storage: { branchId: 'branch-B' },
+        },
+      ]);
 
       await service.confirmImport('to-1', actorDest, {
         lines: [{ itemId: 'item-1', locationId: 'loc-X', quantity: 2, unitPrice: 5 }],
@@ -610,7 +645,10 @@ describe('TransferOrderService', () => {
           where: expect.objectContaining({
             organizationId: 'org-1',
             destinationBranchId: 'branch-B',
-            status: TransferOrderStatus.IN_PROGRESS,
+            status: In([
+              TransferOrderStatus.IN_PROGRESS,
+              TransferOrderStatus.COMPLETED,
+            ]),
           }),
         }),
       );
@@ -662,7 +700,9 @@ describe('TransferOrderService', () => {
         }),
       );
       await service.cancel('to-1', actorSource);
-      expect(goodsIssueService.cancel).toHaveBeenCalledWith('gi-1', actorSource);
+      expect(goodsIssueService.cancel).toHaveBeenCalledWith('gi-1', actorSource, {
+        cascadeTransferOrder: false,
+      });
       expect(toRepo.softDelete).toHaveBeenCalledWith('to-1');
     });
 
@@ -681,6 +721,48 @@ describe('TransferOrderService', () => {
       await expect(service.cancel('to-1', actorDest)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('cancelFromExportIssue', () => {
+    it('reverses the destination receipt and soft-deletes a COMPLETED order', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({
+          status: TransferOrderStatus.COMPLETED,
+          importGoodsReceiptId: 'gr-1',
+        }),
+      );
+
+      await service.cancelFromExportIssue('to-1', actorSource);
+
+      // Receipt is reversed from the destination branch, not the source.
+      expect(goodsReceiptService.cancel).toHaveBeenCalledWith(
+        'gr-1',
+        expect.objectContaining({ branchId: 'branch-B' }),
+      );
+      expect(toRepo.softDelete).toHaveBeenCalledWith('to-1');
+    });
+
+    it('soft-deletes an IN_PROGRESS order without reversing a receipt', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ status: TransferOrderStatus.IN_PROGRESS }),
+      );
+
+      await service.cancelFromExportIssue('to-1', actorSource);
+
+      expect(goodsReceiptService.cancel).not.toHaveBeenCalled();
+      expect(toRepo.softDelete).toHaveBeenCalledWith('to-1');
+    });
+
+    it('is a no-op for an already-cancelled order (idempotent guard)', async () => {
+      toRepo.findOne.mockResolvedValue(
+        baseOrder({ status: TransferOrderStatus.CANCELLED }),
+      );
+
+      await service.cancelFromExportIssue('to-1', actorSource);
+
+      expect(goodsReceiptService.cancel).not.toHaveBeenCalled();
+      expect(toRepo.softDelete).not.toHaveBeenCalled();
     });
   });
 });

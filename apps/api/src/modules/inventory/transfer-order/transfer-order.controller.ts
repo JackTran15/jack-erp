@@ -89,7 +89,20 @@ class ImportTransferOrderDto {
   @IsUUID()
   destinationStorageId?: string;
 
-  /** Đối tượng (counterparty provider) carried onto the spawned receipt. */
+  /**
+   * Đối tượng carried onto the spawned receipt. Routed through the goods-receipt
+   * counterparty resolver: supplier → provider_id, customer/employee →
+   * counterparty columns only. Sending a bare providerId (legacy) bypasses
+   * validation and can violate the provider FK, so prefer these two fields.
+   */
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
+
   @IsOptional()
   @IsUUID()
   providerId?: string;
