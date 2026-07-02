@@ -21,6 +21,7 @@ import {
   ReturnInvoiceLineDto,
   ReturnInvoiceMode,
 } from '../dto/create-return-invoice.dto';
+import { resolveBranchItemLocations } from './resolve-branch-item-locations';
 import { ReturnEligibilityService } from './return-eligibility.service';
 
 @Injectable()
@@ -94,6 +95,17 @@ export class CreateReturnInvoiceService {
       });
       const saved = await manager.save(entity);
 
+      // Returned stock is credited back to the showroom, mirroring how a sale
+      // deducts from the showroom — never to the storage warehouse the FE may
+      // have sent (the quick path defaults to the highest-stock location).
+      const itemIds = [...new Set(dto.lines.map((l) => l.itemId))];
+      const showroomLocations = await resolveBranchItemLocations(
+        manager,
+        itemIds,
+        actor,
+        { showroomOnly: true },
+      );
+
       const items = dto.lines.map((line, index) =>
         manager.create(InvoiceItemEntity, {
           organizationId: actor.organizationId,
@@ -101,7 +113,7 @@ export class CreateReturnInvoiceService {
           createdBy: actor.userId,
           invoiceId: saved.id,
           itemId: line.itemId,
-          locationId: line.locationId,
+          locationId: showroomLocations.get(line.itemId) ?? line.locationId,
           itemCode: line.itemCode,
           itemName: line.itemName,
           unit: line.unit,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentNumberingModule } from '../../document-numbering/document-numbering.module';
 import { BranchEntity } from '../../branch/branch.entity';
@@ -25,7 +25,7 @@ import { TransferOrderController } from './transfer-order.controller';
       StorageEntity,
     ]),
     DocumentNumberingModule,
-    GoodsIssueModule,
+    forwardRef(() => GoodsIssueModule),
     GoodsReceiptModule,
   ],
   controllers: [TransferOrderController],

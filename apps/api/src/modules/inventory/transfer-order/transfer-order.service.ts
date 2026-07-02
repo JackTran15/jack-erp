@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -18,6 +20,7 @@ import {
   Repository,
 } from "typeorm";
 import {
+  DocCounterpartyKind,
   DocumentType,
   ExportTransferOrderLine,
   ExportTransferOrderRequest,
@@ -58,7 +61,13 @@ export interface ConfirmImportDto {
   lines?: ImportTransferOrderLine[];
   /** Destination warehouse (Kho nhận) — fallback when `lines` is omitted. */
   destinationStorageId?: string;
-  /** Đối tượng (counterparty provider) carried onto the spawned receipt. */
+  /**
+   * Đối tượng carried onto the spawned receipt. Routed through the goods-receipt
+   * counterparty resolver: supplier → provider_id, customer/employee →
+   * counterparty columns only. `providerId` remains for legacy callers.
+   */
+  counterpartyKind?: DocCounterpartyKind;
+  counterpartyId?: string;
   providerId?: string;
   /** Người giao (free-text deliverer name). */
   deliverer?: string;
@@ -134,6 +143,7 @@ export class TransferOrderService {
     private readonly storageRepo: Repository<StorageEntity>,
     private readonly dataSource: DataSource,
     private readonly documentNumberingService: DocumentNumberingService,
+    @Inject(forwardRef(() => GoodsIssueService))
     private readonly goodsIssueService: GoodsIssueService,
     private readonly goodsReceiptService: GoodsReceiptService,
   ) {}
@@ -1088,7 +1098,11 @@ export class TransferOrderService {
           locationId: lines[0].locationId,
           // Carry the goods-receipt form's header fields onto the spawned receipt
           // so the import leg round-trips Đối tượng / Người giao / Tham chiếu.
-          providerId: dto.providerId,
+          // Route Đối tượng through the counterparty resolver (supplier →
+          // provider_id, customer/employee → counterparty cols); a bare
+          // providerId would bypass validation and violate the provider FK.
+          counterpartyKind: dto.counterpartyKind,
+          counterpartyId: dto.counterpartyId,
           deliveredBy: dto.deliverer,
           references: dto.references,
           lines,
@@ -1318,8 +1332,12 @@ export class TransferOrderService {
       to.exportGoodsIssueId
     ) {
       // Reverse the export — GoodsIssue.cancel posts an ADJUSTMENT_INCREASE that
-      // restores the source-branch stock.
-      await this.goodsIssueService.cancel(to.exportGoodsIssueId, actor);
+      // restores the source-branch stock. cascadeTransferOrder=false because we
+      // are the one cancelling this order; otherwise the issue would cascade
+      // back here in a loop.
+      await this.goodsIssueService.cancel(to.exportGoodsIssueId, actor, {
+        cascadeTransferOrder: false,
+      });
       to.cancelledAt = new Date();
       to.cancelledBy = actor.userId;
     }
@@ -1328,6 +1346,47 @@ export class TransferOrderService {
     await this.toRepo.save(to);
     await this.toRepo.softDelete(to.id);
     this.logger.log(`Transfer order ${id} cancelled`);
+  }
+
+  /**
+   * Reverse a transfer order because its export goods issue was deleted. Called
+   * from GoodsIssueService.cancel — the export issue's own stock is already
+   * reversed by that caller, so we only roll back the import leg (if the order
+   * was completed) and soft-delete the order. Idempotent: a transfer order that
+   * is already cancelled is skipped, which also guards against re-entrancy.
+   */
+  async cancelFromExportIssue(
+    toId: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const to = await this.findOrFail(toId, actor.organizationId);
+    if (to.status === TransferOrderStatus.CANCELLED) {
+      return;
+    }
+
+    // A completed transfer already posted the destination goods receipt; reverse
+    // it from the destination branch so its incoming stock is rolled back too.
+    // GoodsReceipt.cancel tolerates a resulting negative balance (transfer-in
+    // carries no supplier debt), so this always succeeds.
+    if (to.importGoodsReceiptId) {
+      const destActor: ActorContext = {
+        ...actor,
+        branchId: to.destinationBranchId,
+      };
+      await this.goodsReceiptService.cancel(
+        to.importGoodsReceiptId,
+        destActor,
+      );
+    }
+
+    to.status = TransferOrderStatus.CANCELLED;
+    to.cancelledAt = new Date();
+    to.cancelledBy = actor.userId;
+    await this.toRepo.save(to);
+    await this.toRepo.softDelete(to.id);
+    this.logger.log(
+      `Transfer order ${toId} cancelled via export goods issue deletion`,
+    );
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

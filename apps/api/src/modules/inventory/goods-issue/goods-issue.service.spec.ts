@@ -4,7 +4,9 @@ import { DataSource } from 'typeorm';
 import {
   DocCounterpartyKind,
   GoodsIssuePurpose,
+  GoodsIssueReferenceType,
   GoodsIssueStatus,
+  StockMovementType,
 } from '@erp/shared-interfaces';
 import { GoodsIssueService } from './goods-issue.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
@@ -12,6 +14,7 @@ import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
+import { TransferOrderService } from '../transfer-order/transfer-order.service';
 
 describe('GoodsIssueService', () => {
   let service: GoodsIssueService;
@@ -19,6 +22,7 @@ describe('GoodsIssueService', () => {
   let branchRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, any>;
   let ledgerService: Record<string, jest.Mock>;
+  let transferOrderService: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -52,6 +56,9 @@ describe('GoodsIssueService', () => {
       recordBatchMovements: jest.fn().mockResolvedValue([{ id: 'ledger-1' }]),
       publishMovementEvents: jest.fn().mockResolvedValue(undefined),
     };
+    transferOrderService = {
+      cancelFromExportIssue: jest.fn().mockResolvedValue(undefined),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +75,7 @@ describe('GoodsIssueService', () => {
           provide: DocumentNumberingService,
           useValue: { generate: jest.fn().mockResolvedValue('XK000001') },
         },
+        { provide: TransferOrderService, useValue: transferOrderService },
       ],
     }).compile();
 
@@ -225,6 +233,62 @@ describe('GoodsIssueService', () => {
       expect(ledgerService.publishMovementEvents).toHaveBeenCalledWith([
         { id: 'ledger-1' },
       ]);
+    });
+  });
+
+  describe('cancel — transfer order cascade', () => {
+    const postedTransferIssue = {
+      id: 'gi-1',
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      documentNumber: 'XK000001',
+      status: GoodsIssueStatus.POSTED,
+      referenceType: GoodsIssueReferenceType.TRANSFER_ORDER,
+      referenceId: 'to-1',
+      lines: [
+        { itemId: 'item-1', locationId: 'loc-A', quantity: 2, unitPrice: '1000' },
+      ],
+    };
+
+    it('reverses source stock and cascades to the linked transfer order', async () => {
+      giRepo.findOne.mockResolvedValue({ ...postedTransferIssue });
+
+      await service.cancel('gi-1', actor);
+
+      expect(ledgerService.recordBatchMovements).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            itemId: 'item-1',
+            quantity: 2,
+            movementType: StockMovementType.ADJUSTMENT_INCREASE,
+          }),
+        ]),
+        expect.anything(),
+      );
+      expect(transferOrderService.cancelFromExportIssue).toHaveBeenCalledWith(
+        'to-1',
+        actor,
+      );
+    });
+
+    it('does not cascade when cascadeTransferOrder is false', async () => {
+      giRepo.findOne.mockResolvedValue({ ...postedTransferIssue });
+
+      await service.cancel('gi-1', actor, { cascadeTransferOrder: false });
+
+      expect(transferOrderService.cancelFromExportIssue).not.toHaveBeenCalled();
+    });
+
+    it('does not cascade for an issue not linked to a transfer order', async () => {
+      giRepo.findOne.mockResolvedValue({
+        ...postedTransferIssue,
+        referenceType: null,
+        referenceId: null,
+      });
+
+      await service.cancel('gi-1', actor);
+
+      expect(transferOrderService.cancelFromExportIssue).not.toHaveBeenCalled();
     });
   });
 
