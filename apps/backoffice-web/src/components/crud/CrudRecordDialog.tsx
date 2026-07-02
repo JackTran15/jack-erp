@@ -422,7 +422,6 @@ export function CrudRecordDialog({
                     id="dialog-storage-code"
                     type="text"
                     value={isEdit ? String(record?.code ?? "") : ""}
-                    placeholder={isEdit ? undefined : "Tự động sinh khi lưu"}
                     disabled
                   />
                 </FormField>
@@ -451,9 +450,7 @@ export function CrudRecordDialog({
                       Loại kho
                     </span>
                     <span className="text-sm leading-snug">
-                      {record?.isMainStorage
-                        ? "Bán hàng (Kho bán hàng mặc định chương trình tự sinh)"
-                        : "Kho lưu trữ"}
+                      {record?.isMainStorage ? "Bán hàng" : "Kho lưu trữ"}
                     </span>
                   </div>
                 )}

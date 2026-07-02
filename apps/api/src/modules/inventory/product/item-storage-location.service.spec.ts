@@ -44,6 +44,7 @@ describe('ItemStorageLocationService', () => {
 
   describe('validateAndAssign', () => {
     it('creates a mapping keyed by item when none exists', async () => {
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-1', storageId: 'storage-1' });
       islRepo.findOne.mockResolvedValue(null);
 
       await service.validateAndAssign('item-1', 'storage-1', 'loc-1', actor);
@@ -56,10 +57,34 @@ describe('ItemStorageLocationService', () => {
 
     it('keeps the existing mapping (idempotent first-write)', async () => {
       islRepo.findOne.mockResolvedValue({ id: 'isl-1', locationId: 'loc-existing' });
+      locationRepo.findOne.mockResolvedValueOnce({
+        id: 'loc-new',
+        storageId: 'storage-1',
+      });
+      locationRepo.findOne.mockResolvedValueOnce({
+        id: 'loc-existing',
+        storageId: 'storage-1',
+      });
 
       await service.validateAndAssign('item-1', 'storage-1', 'loc-new', actor);
 
       expect(islRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('repairs an existing mapping when it points outside the storage', async () => {
+      const existing = { id: 'isl-1', locationId: 'loc-showroom' };
+      islRepo.findOne.mockResolvedValue(existing);
+      locationRepo.findOne.mockResolvedValueOnce({
+        id: 'loc-warehouse',
+        storageId: 'storage-1',
+      });
+      locationRepo.findOne.mockResolvedValueOnce(null);
+
+      await service.validateAndAssign('item-1', 'storage-1', 'loc-warehouse', actor);
+
+      expect(islRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'isl-1', locationId: 'loc-warehouse' }),
+      );
     });
   });
 
@@ -95,6 +120,7 @@ describe('ItemStorageLocationService', () => {
 
   describe('setLocation', () => {
     it('overwrites the location of an existing mapping', async () => {
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-new', storageId: 'storage-1' });
       islRepo.findOne.mockResolvedValue({ id: 'isl-1', locationId: 'loc-old' });
 
       const result = await service.setLocation('item-1', 'storage-1', 'loc-new', actor);
@@ -103,6 +129,7 @@ describe('ItemStorageLocationService', () => {
     });
 
     it('creates a mapping when none exists', async () => {
+      locationRepo.findOne.mockResolvedValue({ id: 'loc-1', storageId: 'storage-1' });
       islRepo.findOne.mockResolvedValue(null);
 
       await service.setLocation('item-1', 'storage-1', 'loc-1', actor);
@@ -111,6 +138,16 @@ describe('ItemStorageLocationService', () => {
         expect.objectContaining({ itemId: 'item-1', storageId: 'storage-1', locationId: 'loc-1' }),
       );
       expect(islRepo.save).toHaveBeenCalled();
+    });
+
+    it('rejects a location outside the selected storage', async () => {
+      locationRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.setLocation('item-1', 'storage-1', 'loc-showroom', actor),
+      ).rejects.toThrow(/Vị trí không thuộc kho/);
+
+      expect(islRepo.save).not.toHaveBeenCalled();
     });
   });
 
@@ -143,10 +180,28 @@ describe('ItemStorageLocationService', () => {
       const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
 
       expect(result).toEqual({ locationId: 'loc-1', code: 'A-01' });
+      expect(locationRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'loc-1',
+            storageId: 'storage-1',
+            organizationId: 'org-1',
+          }),
+        }),
+      );
     });
 
     it('returns null when the item has no mapping', async () => {
       islRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when the mapped location is not in the requested storage', async () => {
+      islRepo.findOne.mockResolvedValue({ locationId: 'loc-showroom' });
+      locationRepo.findOne.mockResolvedValue(null);
 
       const result = await service.resolveAssignedLocation('item-1', 'storage-1', 'org-1');
 
