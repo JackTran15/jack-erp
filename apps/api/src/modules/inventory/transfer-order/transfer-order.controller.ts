@@ -27,7 +27,7 @@ import {
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { TransferOrderStatus } from "@erp/shared-interfaces";
+import { DocCounterpartyKind, TransferOrderStatus } from "@erp/shared-interfaces";
 import {
   Actor,
   ActorContext,
@@ -159,6 +159,18 @@ class ExportTransferOrderDto {
   @IsOptional()
   @IsUUID()
   providerId?: string;
+
+  /** Đối tượng kind selected on the goods-issue form. */
+  @ApiPropertyOptional({ enum: DocCounterpartyKind })
+  @IsOptional()
+  @IsEnum(DocCounterpartyKind)
+  counterpartyKind?: DocCounterpartyKind;
+
+  /** Id of the provider / customer / employee, per counterpartyKind. */
+  @ApiPropertyOptional({ format: "uuid" })
+  @IsOptional()
+  @IsUUID()
+  counterpartyId?: string;
 
   /** Người giao (free-text deliverer name). */
   @ApiPropertyOptional()

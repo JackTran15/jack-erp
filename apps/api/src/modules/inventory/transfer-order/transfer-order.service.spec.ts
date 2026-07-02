@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
+  DocCounterpartyKind,
   GoodsIssuePurpose,
   GoodsIssueReferenceType,
   GoodsReceiptPurpose,
@@ -19,6 +20,7 @@ import { TransferOrderEntity } from './transfer-order.entity';
 import { LocationEntity } from '../location/location.entity';
 import { StockBalanceEntity } from '../ledger/stock-balance.entity';
 import { GoodsIssueEntity } from '../goods-issue/goods-issue.entity';
+import { StorageEntity } from '../location/storage.entity';
 import { BranchEntity } from '../../branch/branch.entity';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { GoodsIssueService } from '../goods-issue/goods-issue.service';
@@ -115,6 +117,7 @@ describe('TransferOrderService', () => {
         },
         { provide: getRepositoryToken(GoodsIssueEntity), useValue: giRepo },
         { provide: getRepositoryToken(BranchEntity), useValue: branchRepo },
+        { provide: getRepositoryToken(StorageEntity), useValue: { findOne: jest.fn() } },
         {
           provide: DataSource,
           useValue: {
@@ -342,7 +345,8 @@ describe('TransferOrderService', () => {
 
       await service.confirmExport('to-1', actorSource, {
         notes: 'n',
-        providerId: 'prov-1',
+        counterpartyKind: DocCounterpartyKind.CUSTOMER,
+        counterpartyId: 'cust-1',
         deliverer: 'Jack Jack',
         references: ['LDC000004'],
         occurredAt: '2026-06-08T15:24:00.000Z',
@@ -350,7 +354,9 @@ describe('TransferOrderService', () => {
       });
 
       const giDto = goodsIssueService.createAndPost.mock.calls[0][0];
-      expect(giDto.providerId).toBe('prov-1');
+      expect(giDto.providerId).toBeUndefined();
+      expect(giDto.counterpartyKind).toBe(DocCounterpartyKind.CUSTOMER);
+      expect(giDto.counterpartyId).toBe('cust-1');
       expect(giDto.deliverer).toBe('Jack Jack');
       expect(giDto.references).toEqual(['LDC000004']);
       expect(giDto.occurredAt).toBe('2026-06-08T15:24:00.000Z');

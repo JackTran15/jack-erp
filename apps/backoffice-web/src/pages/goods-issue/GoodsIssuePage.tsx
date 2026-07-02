@@ -126,6 +126,12 @@ function renderStatusBadge(status: GoodsIssueStatus) {
   );
 }
 
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export function GoodsIssuePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -426,13 +432,17 @@ export function GoodsIssuePage() {
       width: 180,
       render: (row) => {
         // Prefer the resolved counterparty (covers NCC/KH/NV). Then the explicit
-        // provider pick, the targetBranch for TRANSFER_OUT, and finally the
-        // page-level name cache / legacy customer name.
+        // provider pick. For transfer rows with legacy/malformed providerId,
+        // fall back to targetBranch before considering raw ids.
         if (row.counterparty?.name) return row.counterparty.name;
         if (row.provider?.name) return row.provider.name;
+        if (row.purpose === "TRANSFER_OUT" && row.targetBranch?.name)
+          return row.targetBranch.name;
         if (row.providerId)
-          return customerNameById.get(row.providerId) ?? row.providerId;
-        if (row.purpose === "TRANSFER_OUT") return row.targetBranch?.name ?? "—";
+          return (
+            customerNameById.get(row.providerId) ??
+            (isUuidLike(row.providerId) ? "—" : row.providerId)
+          );
         return row.customerName ?? "—";
       },
     },
