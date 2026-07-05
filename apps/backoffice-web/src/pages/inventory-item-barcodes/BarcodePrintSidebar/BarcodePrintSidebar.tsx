@@ -32,6 +32,8 @@ const STANDARD_HELPER: Record<BarcodeStandard, string> = {
 interface Props {
   /** Dòng đầu tiên đã chọn hàng — nguồn dữ liệu cho tem xem trước. */
   previewRow: BarcodeLabelRow | null;
+  /** Mã chi nhánh in trên tem. */
+  branchCode: string;
   printing: boolean;
   onPrint: () => void;
   onCancel: () => void;
@@ -40,14 +42,13 @@ interface Props {
 /** Sidebar cấu hình in tem: mẫu tem, thông tin bổ sung, chuẩn in, khổ giấy, xem trước, hành động. */
 export function BarcodePrintSidebar({
   previewRow,
+  branchCode,
   printing,
   onPrint,
   onCancel,
 }: Props) {
   const standard = useBarcodePrintSettingsStore((s) => s.standard);
   const setStandard = useBarcodePrintSettingsStore((s) => s.setStandard);
-  const showUnit = useBarcodePrintSettingsStore((s) => s.showUnit);
-  const setShowUnit = useBarcodePrintSettingsStore((s) => s.setShowUnit);
 
   return (
     <aside className="flex w-[370px] shrink-0 flex-col overflow-hidden rounded-md border bg-background">
@@ -71,21 +72,6 @@ export function BarcodePrintSidebar({
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-bold text-foreground">
-            Thông tin bổ sung
-          </p>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 shrink-0 accent-primary"
-              checked={showUnit}
-              onChange={(e) => setShowUnit(e.target.checked)}
-            />
-            Đơn vị tính
-          </label>
-        </div>
-
-        <div>
           <p className="flex items-center gap-1.5 text-sm font-bold text-foreground">
             In theo chuẩn
             <HelpCircle
@@ -106,7 +92,7 @@ export function BarcodePrintSidebar({
 
         <PaperCustomizationSection />
 
-        <BarcodeLabelPreview row={previewRow} />
+        <BarcodeLabelPreview row={previewRow} branchCode={branchCode} />
 
         <p className="text-xs text-muted-foreground">
           Khi in, chọn tỉ lệ 100% (không "Fit to page") để tem đúng kích thước.

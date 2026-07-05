@@ -5,6 +5,8 @@ import { erpApi, requireErpData } from "../../lib/erp-api";
 export interface BranchOption {
   id: string;
   name: string;
+  /** Mã chi nhánh (vd "CM") — backend chưa có cột này trên BranchEntity, sẽ tự có khi được bổ sung. */
+  code?: string;
 }
 
 interface BranchListResponse {

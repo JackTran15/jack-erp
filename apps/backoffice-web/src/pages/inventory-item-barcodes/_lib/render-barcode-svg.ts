@@ -41,16 +41,28 @@ export function renderBarcodeSvg(
 ): string | null {
   if (!value) return null;
   const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const barWidth = options?.barWidth ?? 1.4;
   try {
     JsBarcode(el, value, {
       format: resolveBarcodeFormat(value, standard),
       displayValue: false,
-      margin: 0,
+      // Quiet zone chuẩn Code 128: ≥10 module trắng mỗi bên (nằm trong
+      // viewBox nên giữ đúng tỉ lệ khi scale vào khung tem).
+      marginLeft: barWidth * 10,
+      marginRight: barWidth * 10,
+      marginTop: 0,
+      marginBottom: 0,
       height: options?.height ?? 40,
-      width: options?.barWidth ?? 1.4,
+      width: barWidth,
     });
   } catch {
     return null;
   }
+  // Bỏ kích thước cố định và cho phép kéo dãn tự do: CSS width/height 100%
+  // sẽ đưa vạch chiếm trọn vùng barcode của tem (vạch cao hơn = dễ quét hơn;
+  // scale ngang tuyến tính không phá tỉ lệ vạch).
+  el.removeAttribute("width");
+  el.removeAttribute("height");
+  el.setAttribute("preserveAspectRatio", "none");
   return el.outerHTML;
 }

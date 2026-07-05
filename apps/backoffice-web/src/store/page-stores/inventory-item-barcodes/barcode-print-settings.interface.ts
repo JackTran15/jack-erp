@@ -18,11 +18,8 @@ export interface BarcodePaperConfig {
 
 export interface BarcodePrintSettingsState {
   standard: BarcodeStandard;
-  /** In "Đơn vị tính" lên tem. */
-  showUnit: boolean;
   paper: BarcodePaperConfig;
   setStandard: (standard: BarcodeStandard) => void;
-  setShowUnit: (showUnit: boolean) => void;
   setPaper: (patch: Partial<BarcodePaperConfig>) => void;
   resetPaper: () => void;
 }

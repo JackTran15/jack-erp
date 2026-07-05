@@ -7,10 +7,8 @@ export const useBarcodePrintSettingsStore = create<BarcodePrintSettingsState>()(
   persist(
     (set) => ({
       standard: "CODE128",
-      showUnit: false,
       paper: DEFAULT_PAPER_CONFIG,
       setStandard: (standard) => set({ standard }),
-      setShowUnit: (showUnit) => set({ showUnit }),
       setPaper: (patch) =>
         set((state) => ({ paper: { ...state.paper, ...patch } })),
       resetPaper: () => set({ paper: DEFAULT_PAPER_CONFIG }),
@@ -19,7 +17,6 @@ export const useBarcodePrintSettingsStore = create<BarcodePrintSettingsState>()(
       name: "bo-barcode-print-settings",
       partialize: (state) => ({
         standard: state.standard,
-        showUnit: state.showUnit,
         paper: state.paper,
       }),
     },

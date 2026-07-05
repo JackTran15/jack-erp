@@ -11,6 +11,7 @@ import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
 import { useBarcodePrintSettingsStore } from "../../store/page-stores/inventory-item-barcodes/barcode-print-settings.store";
+import { useMyBranches } from "../../hooks/iam/useBranches";
 import {
   isEmptyRow,
   makeEmptyRow,
@@ -68,7 +69,6 @@ export function InventoryItemBarcodesPage() {
   const focusedRowIdRef = useRef<string | null>(null);
 
   const standard = useBarcodePrintSettingsStore((s) => s.standard);
-  const showUnit = useBarcodePrintSettingsStore((s) => s.showUnit);
   const paper = useBarcodePrintSettingsStore((s) => s.paper);
 
   // ─── Reference data ────────────────────────────────────────────────
@@ -87,6 +87,14 @@ export function InventoryItemBarcodesPage() {
   const storageNameById = useMemo(
     () => new Map((storages ?? []).map((s) => [s.id, s.name])),
     [storages],
+  );
+
+  // Mã chi nhánh in trên tem: đọc từ branch đang chọn; BranchEntity chưa có
+  // cột `code` nên tạm fallback "MT" cho tới khi backend bổ sung.
+  const { data: myBranches } = useMyBranches();
+  const branchCode = useMemo(
+    () => myBranches?.find((b) => b.id === branchId)?.code || "MT",
+    [myBranches, branchId],
   );
 
   // ─── Row mutations ─────────────────────────────────────────────────
@@ -388,14 +396,15 @@ export function InventoryItemBarcodesPage() {
     try {
       const html = renderBarcodeLabelsHtml(printable, {
         standard,
-        showUnit,
         paper,
+        printedAt: new Date(),
+        branchCode,
       });
       await printBarcodeLabels(html);
     } finally {
       setPrinting(false);
     }
-  }, [rows, standard, showUnit, paper]);
+  }, [rows, standard, paper, branchCode]);
 
   return (
     <div className="flex min-h-0 w-full flex-1 gap-2.5 overflow-hidden">
@@ -495,6 +504,7 @@ export function InventoryItemBarcodesPage() {
       {/* ─── Sidebar phải: cấu hình in ─────────────────────────────── */}
       <BarcodePrintSidebar
         previewRow={previewRow}
+        branchCode={branchCode}
         printing={printing}
         onPrint={handlePrint}
         onCancel={handleCancel}
