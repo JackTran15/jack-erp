@@ -1,0 +1,75 @@
+import JsBarcode from "jsbarcode";
+import { useEffect, useRef } from "react";
+import type { BarcodeLabelRow } from "../../_lib/barcode-label-row.type";
+import {
+  isValidEan13,
+  resolveBarcodeFormat,
+} from "../../_lib/render-barcode-svg";
+import { useBarcodePrintSettingsStore } from "../../../../store/page-stores/inventory-item-barcodes/barcode-print-settings.store";
+
+const priceFormatter = new Intl.NumberFormat("vi-VN");
+
+/** Dữ liệu mẫu khi bảng chưa có hàng nào (theo spec màn hình). */
+const SAMPLE = {
+  sku: "VTT01-DE-XS",
+  locationCode: "G29.04",
+  unit: "MT",
+  sellingPrice: 189000,
+};
+
+interface Props {
+  /** Dòng đầu tiên đã chọn hàng — null thì dùng dữ liệu mẫu. */
+  row: BarcodeLabelRow | null;
+}
+
+/** "Xem trước": một tem live theo cấu hình chuẩn in + thông tin bổ sung. */
+export function BarcodeLabelPreview({ row }: Props) {
+  const standard = useBarcodePrintSettingsStore((s) => s.standard);
+  const showUnit = useBarcodePrintSettingsStore((s) => s.showUnit);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const data = row ?? SAMPLE;
+  const ean13Fallback = standard === "EAN13" && !isValidEan13(data.sku);
+
+  useEffect(() => {
+    if (!svgRef.current || !data.sku) return;
+    try {
+      JsBarcode(svgRef.current, data.sku, {
+        format: resolveBarcodeFormat(data.sku, standard),
+        displayValue: false,
+        margin: 0,
+        height: 40,
+        width: 1.4,
+      });
+    } catch {
+      // Giá trị không vẽ được — giữ SVG trống.
+    }
+  }, [data.sku, standard]);
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-bold text-foreground">Xem trước</p>
+      <div className="flex items-center justify-center rounded border border-border bg-background py-6">
+        {/* Tem mô phỏng bản in nhiệt: luôn đen trên trắng, bất kể theme. */}
+        <div className="flex h-[90px] w-[190px] flex-col border-[1.5px] border-black bg-white px-1.5 py-1 text-black">
+          <div className="flex items-center justify-between text-[11px] font-bold leading-tight">
+            <span className="truncate">{data.sku}</span>
+            <span className="ml-2 shrink-0">{data.locationCode}</span>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center py-0.5">
+            <svg ref={svgRef} className="h-full w-full" />
+          </div>
+          <div className="flex items-center justify-between text-[11px] font-bold leading-tight">
+            <span>Giá: {priceFormatter.format(data.sellingPrice)}đ</span>
+            {showUnit ? <span className="ml-2 shrink-0">{data.unit}</span> : null}
+          </div>
+        </div>
+      </div>
+      {ean13Fallback ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Mã không hợp lệ với chuẩn EAN-13 — tem sẽ được in bằng Code 128.
+        </p>
+      ) : null}
+    </div>
+  );
+}
