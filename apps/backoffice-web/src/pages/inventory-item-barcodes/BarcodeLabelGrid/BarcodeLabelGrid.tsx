@@ -44,6 +44,8 @@ interface Props {
   onCopyRow: (rowId: string) => void;
   onDeleteRow: (rowId: string) => void;
   onRowFocus: (rowId: string) => void;
+  /** Mở dialog "Chọn hàng hóa" (icon kính lúp trong ô SKU / Ctrl+F3). */
+  onOpenProductPicker: () => void;
 }
 
 /** Bảng hàng hoá in tem — cấu hình cột trên LineItemGrid. */
@@ -60,6 +62,7 @@ export function BarcodeLabelGrid({
   onCopyRow,
   onDeleteRow,
   onRowFocus,
+  onOpenProductPicker,
 }: Props) {
   // Nhiều dòng chưa chọn hàng có thể cùng render LookupField — chỉ dòng cuối
   // (dòng nhập liệu) mang id làm target cho phím tắt Ctrl+Insert / Ctrl+F3.
@@ -115,6 +118,7 @@ export function BarcodeLabelGrid({
                 onValueChange={(text) => onSkuTextChange(row.rowId, text)}
                 onSelect={(item) => onSelectItem(row.rowId, item)}
                 search={searchItems}
+                onSearchButtonClick={onOpenProductPicker}
                 itemKey={(item) => item.id}
                 renderItem={(item) => item.name}
                 renderMeta={(item) => `${item.code} · ${item.unit}`}
@@ -249,6 +253,7 @@ export function BarcodeLabelGrid({
     [
       lastRowIndex,
       onCopyRow,
+      onOpenProductPicker,
       onQuantityChange,
       onRowFocus,
       onScanSubmit,

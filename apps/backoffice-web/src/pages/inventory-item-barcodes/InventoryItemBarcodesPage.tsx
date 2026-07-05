@@ -3,6 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, HelpCircle, LayoutGrid, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  ProductSelectDialog,
+  type ProductSelectResult,
+} from "../../components/shared/product-select/ProductSelectDialog";
 import { useTrailingEmptyRow } from "../../hooks/useTrailingEmptyRow";
 import { apiClient } from "../../lib/api-axios";
 import { getActiveBranch } from "../../lib/auth-storage";
@@ -60,6 +64,7 @@ export function InventoryItemBarcodesPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [scanMode, setScanMode] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const focusedRowIdRef = useRef<string | null>(null);
 
   const standard = useBarcodePrintSettingsStore((s) => s.standard);
@@ -94,28 +99,51 @@ export function InventoryItemBarcodesPage() {
     [],
   );
 
-  const resolveRowLocation = useCallback(
-    async (rowId: string, itemId: string) => {
+  /** Resolve Kho/Vị trí gợi ý cho một loạt row vừa thêm — một call duy nhất. */
+  const resolveRowsLocations = useCallback(
+    async (entries: Array<{ rowId: string; itemId: string }>) => {
+      if (!entries.length) return;
+      const clearLoading = () => {
+        const rowIds = new Set(entries.map((e) => e.rowId));
+        setRows((prev) =>
+          prev.map((r) =>
+            rowIds.has(r.rowId) ? { ...r, locationLoading: false } : r,
+          ),
+        );
+      };
       const activeBranch = getActiveBranch();
       if (!activeBranch) {
-        patchRow(rowId, { locationLoading: false });
+        clearLoading();
         return;
       }
       try {
-        const [resolved] = await resolveItemLocations([itemId], activeBranch);
-        patchRow(rowId, {
-          storageId: resolved?.storageId ?? "",
-          storageName: storageNameById.get(resolved?.storageId ?? "") ?? "",
-          locationId: resolved?.locationId ?? "",
-          locationCode: resolved?.locationCode ?? "",
-          locationLoading: false,
-        });
+        const resolved = await resolveItemLocations(
+          entries.map((e) => e.itemId),
+          activeBranch,
+        );
+        const byItemId = new Map(resolved.map((r) => [r.itemId, r]));
+        const itemIdByRowId = new Map(entries.map((e) => [e.rowId, e.itemId]));
+        setRows((prev) =>
+          prev.map((row) => {
+            const itemId = itemIdByRowId.get(row.rowId);
+            if (!itemId) return row;
+            const match = byItemId.get(itemId);
+            return {
+              ...row,
+              storageId: match?.storageId ?? "",
+              storageName: storageNameById.get(match?.storageId ?? "") ?? "",
+              locationId: match?.locationId ?? "",
+              locationCode: match?.locationCode ?? "",
+              locationLoading: false,
+            };
+          }),
+        );
       } catch {
-        patchRow(rowId, { locationLoading: false });
+        clearLoading();
         toast.warning("Không lấy được Kho/Vị trí gợi ý cho hàng hóa vừa thêm");
       }
     },
-    [patchRow, storageNameById],
+    [storageNameById],
   );
 
   const handleSelectItem = useCallback(
@@ -136,9 +164,9 @@ export function InventoryItemBarcodesPage() {
             : r,
         ),
       );
-      void resolveRowLocation(rowId, item.id);
+      void resolveRowsLocations([{ rowId, itemId: item.id }]);
     },
-    [resolveRowLocation],
+    [resolveRowsLocations],
   );
 
   const searchItems = useCallback(
@@ -175,6 +203,47 @@ export function InventoryItemBarcodesPage() {
       }
     },
     [handleSelectItem],
+  );
+
+  /** Thêm các dòng chọn từ dialog "Chọn hàng hóa" (pattern GoodsReceiptFormDialog). */
+  const addRowsFromPicker = useCallback(
+    (result: ProductSelectResult) => {
+      const existing = new Set(
+        rows.map((r) => r.itemId).filter(Boolean),
+      );
+      const fresh: BarcodeLabelRow[] = result.lines
+        .filter((s) => s.itemId && !existing.has(s.itemId))
+        .map((s) => ({
+          rowId: crypto.randomUUID(),
+          itemId: s.itemId,
+          sku: s.sku,
+          name: s.name,
+          unit: s.unit ?? "",
+          sellingPrice:
+            Number(s.unitPrice) > 0
+              ? Number(s.unitPrice)
+              : Number(s.sellingPrice ?? 0) || 0,
+          storageId: "",
+          storageName: "",
+          locationId: "",
+          locationCode: "",
+          quantity: s.quantity > 0 ? s.quantity : 1,
+          locationLoading: true,
+        }));
+      if (!fresh.length) return;
+      // Chèn trước dòng trống cuối để dòng nhập liệu luôn nằm cuối bảng.
+      setRows((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && isEmptyRow(last)) {
+          return [...prev.slice(0, -1), ...fresh, last];
+        }
+        return [...prev, ...fresh];
+      });
+      void resolveRowsLocations(
+        fresh.map((r) => ({ rowId: r.rowId, itemId: r.itemId })),
+      );
+    },
+    [rows, resolveRowsLocations],
   );
 
   const handleCopyRow = useCallback((rowId: string) => {
@@ -223,9 +292,15 @@ export function InventoryItemBarcodesPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.ctrlKey) return;
-      if (e.key === "Insert" || e.key === "F3") {
+      if (e.key === "Insert") {
         e.preventDefault();
         focusSkuInput();
+        return;
+      }
+      if (e.key === "F3") {
+        // "Tìm kiếm nâng cao" — mở dialog Chọn hàng hóa.
+        e.preventDefault();
+        setProductPickerOpen(true);
         return;
       }
       if (e.key === "Delete") {
@@ -404,6 +479,7 @@ export function InventoryItemBarcodesPage() {
             onCopyRow={handleCopyRow}
             onDeleteRow={handleDeleteRow}
             onRowFocus={handleRowFocus}
+            onOpenProductPicker={() => setProductPickerOpen(true)}
           />
         </div>
 
@@ -423,6 +499,17 @@ export function InventoryItemBarcodesPage() {
         onPrint={handlePrint}
         onCancel={handleCancel}
       />
+
+      {productPickerOpen ? (
+        <ProductSelectDialog
+          open
+          onOpenChange={setProductPickerOpen}
+          showQuantityPrice
+          defaultUnitPriceSource="sellingPrice"
+          defaultQuantity={1}
+          onConfirm={addRowsFromPicker}
+        />
+      ) : null}
     </div>
   );
 }
