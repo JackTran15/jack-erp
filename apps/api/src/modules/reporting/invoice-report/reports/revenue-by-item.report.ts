@@ -154,6 +154,7 @@ export class RevenueByItemReport implements ReportDefinition {
         itemCategory: meta?.category ?? null,
         brand: meta?.brand ?? null,
         unit: li.unit ?? null,
+        direction: li.direction,
         quantity: Number(li.quantity ?? 0),
         unitPrice: Number(li.unitPrice ?? 0),
         lineDiscount: Number(li.lineDiscount ?? 0),

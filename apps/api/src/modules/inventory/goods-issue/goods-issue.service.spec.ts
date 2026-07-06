@@ -15,6 +15,7 @@ import { BranchEntity } from '../../branch/branch.entity';
 import { StockLedgerService } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { TransferOrderService } from '../transfer-order/transfer-order.service';
+import { RbacService } from '../../rbac/rbac.service';
 
 describe('GoodsIssueService', () => {
   let service: GoodsIssueService;
@@ -23,6 +24,7 @@ describe('GoodsIssueService', () => {
   let dataSource: Record<string, any>;
   let ledgerService: Record<string, jest.Mock>;
   let transferOrderService: Record<string, jest.Mock>;
+  let rbacService: Record<string, jest.Mock>;
 
   const actor = {
     userId: 'user-1',
@@ -59,6 +61,11 @@ describe('GoodsIssueService', () => {
     transferOrderService = {
       cancelFromExportIssue: jest.fn().mockResolvedValue(undefined),
     };
+    // Default: actor holds every purpose permission so unrelated create() tests
+    // are unaffected; the enforcement block below overrides per-case.
+    rbacService = {
+      hasPermission: jest.fn().mockResolvedValue(true),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -76,6 +83,7 @@ describe('GoodsIssueService', () => {
           useValue: { generate: jest.fn().mockResolvedValue('XK000001') },
         },
         { provide: TransferOrderService, useValue: transferOrderService },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
 
@@ -191,6 +199,85 @@ describe('GoodsIssueService', () => {
 
       expect(branchRepo.findOne).not.toHaveBeenCalled();
       expect(giRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create — purpose permission enforcement', () => {
+    it('rejects DISPOSAL when the actor lacks inventory.goods-issue.disposal', async () => {
+      rbacService.hasPermission.mockResolvedValue(false);
+
+      await expect(
+        service.create(
+          {
+            locationId: 'loc-A01',
+            purpose: GoodsIssuePurpose.DISPOSAL,
+            lines: [{ itemId: 'item-1', quantity: 1 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Missing permission for goods issue purpose DISPOSAL');
+
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        actor.userId,
+        actor.organizationId,
+        'inventory.goods-issue.disposal',
+      );
+      expect(giRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects OTHER when the actor lacks inventory.goods-issue.other-issue', async () => {
+      rbacService.hasPermission.mockResolvedValue(false);
+
+      await expect(
+        service.create(
+          {
+            locationId: 'loc-A01',
+            purpose: GoodsIssuePurpose.OTHER,
+            lines: [{ itemId: 'item-1', quantity: 1 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Missing permission for goods issue purpose OTHER');
+
+      expect(rbacService.hasPermission).toHaveBeenCalledWith(
+        actor.userId,
+        actor.organizationId,
+        'inventory.goods-issue.other-issue',
+      );
+      expect(giRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows TRANSFER_OUT without any special key (base guard only)', async () => {
+      rbacService.hasPermission.mockResolvedValue(false);
+
+      await service.create(
+        {
+          locationId: 'loc-A01',
+          purpose: GoodsIssuePurpose.TRANSFER_OUT,
+          targetBranchId: 'branch-B',
+          lines: [{ itemId: 'item-1', quantity: 1 }],
+        },
+        actor,
+      );
+
+      // TRANSFER_OUT is never gated, so the permission service is not consulted.
+      expect(rbacService.hasPermission).not.toHaveBeenCalled();
+      expect(giRepo.save).toHaveBeenCalled();
+    });
+
+    it('creates a DISPOSAL issue once the disposal key is granted', async () => {
+      rbacService.hasPermission.mockResolvedValue(true);
+
+      await service.create(
+        {
+          locationId: 'loc-A01',
+          purpose: GoodsIssuePurpose.DISPOSAL,
+          lines: [{ itemId: 'item-1', quantity: 1 }],
+        },
+        actor,
+      );
+
+      expect(giRepo.save).toHaveBeenCalled();
     });
   });
 

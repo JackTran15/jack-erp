@@ -2,10 +2,35 @@ import { ForbiddenException } from '@nestjs/common';
 import { ReportStoreScope } from '@erp/shared-interfaces';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
-import { InvoiceStatus } from '../../pos/entities/invoice.entity';
+import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
 import { InvoiceReportFilterDto } from './dto/invoice-report-filter.dto';
 
 export const CONSOLIDATED_PERMISSION = 'reporting.invoice.consolidated.read';
+
+/**
+ * Sign an invoice's header money contribution by type so returns net instead of
+ * inflating report totals: RETURN subtracts, SALE and EXCHANGE add. (EXCHANGE's
+ * goods are netted separately via `signedGoods`; its header money — e.g. the
+ * extra collected — stays positive, and any cash refund is netted downstream.)
+ */
+export function invoiceTypeSign(type: InvoiceType): number {
+  return type === InvoiceType.RETURN ? -1 : 1;
+}
+
+/**
+ * Net goods contribution of one invoice, equal to Σ(OUT lineTotal) −
+ * Σ(IN lineTotal): SALE = +subtotal, RETURN = −subtotal, EXCHANGE = netAmount
+ * (newSubtotal − returnSubtotal), which nets the swap without re-summing lines.
+ */
+export function signedGoods(inv: {
+  type: InvoiceType;
+  subtotal: number;
+  netAmount: number;
+}): number {
+  return inv.type === InvoiceType.EXCHANGE
+    ? Number(inv.netAmount ?? 0)
+    : invoiceTypeSign(inv.type) * Number(inv.subtotal ?? 0);
+}
 
 /**
  * Resolve the branch ids a report query must filter on.

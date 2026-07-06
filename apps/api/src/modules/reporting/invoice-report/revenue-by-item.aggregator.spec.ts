@@ -5,6 +5,7 @@ import {
   itemGroupCellValue,
   RevenueByItemRowInput,
 } from './revenue-by-item.aggregator';
+import { ItemDirection } from '../../pos/entities/invoice-item.entity';
 
 const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput => ({
   itemId: 'it1',
@@ -17,6 +18,7 @@ const row = (over: Partial<RevenueByItemRowInput> = {}): RevenueByItemRowInput =
   itemCategory: 'Category 1',
   brand: 'Brand A',
   unit: 'pcs',
+  direction: ItemDirection.OUT,
   quantity: 2,
   unitPrice: 1000,
   lineDiscount: 100,
@@ -41,6 +43,35 @@ describe('aggregateByItem', () => {
       discount: 150,
       total: 4850,
     });
+  });
+
+  it('nets an IN (return) line against OUT for the same item', () => {
+    // SALE qty 3 / total 300k, RETURN qty 1 / total 100k → net qty 2 / 200k.
+    const out = aggregateByItem(
+      [
+        row({ direction: ItemDirection.OUT, quantity: 3, unitPrice: 100, lineDiscount: 0, lineTotal: 300 }),
+        row({ direction: ItemDirection.IN, quantity: 1, unitPrice: 100, lineDiscount: 0, lineTotal: 100 }),
+      ],
+      'item',
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      quantity: 2,
+      goods: 200,
+      total: 200,
+    });
+  });
+
+  it('nets a mixed EXCHANGE (OUT new + IN returned) via direction', () => {
+    // Exchange: new line OUT 750k, returned line IN 500k → net goods 250k.
+    const out = aggregateByItem(
+      [
+        row({ direction: ItemDirection.OUT, quantity: 1, unitPrice: 750, lineDiscount: 0, lineTotal: 750 }),
+        row({ direction: ItemDirection.IN, quantity: 1, unitPrice: 500, lineDiscount: 0, lineTotal: 500 }),
+      ],
+      'item',
+    );
+    expect(out[0]).toMatchObject({ quantity: 0, goods: 250, total: 250 });
   });
 
   it('keeps distinct items separate', () => {

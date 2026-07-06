@@ -52,6 +52,8 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'inventory.goods-issue.approve': 'Duyệt phiếu xuất kho',
   'inventory.goods-issue.post': 'Ghi sổ phiếu xuất kho',
   'inventory.goods-issue.cancel': 'Hủy phiếu xuất kho',
+  'inventory.goods-issue.other-issue': 'Tạo phiếu xuất kho mục đích khác',
+  'inventory.goods-issue.disposal': 'Tạo phiếu xuất kho hủy hàng',
   'goods_receipt.read': 'Xem phiếu nhập kho',
   'goods_receipt.write': 'Tạo/sửa/hủy phiếu nhập kho',
   'goods_receipt.post': 'Ghi nhận nhập kho (hoàn tất phiếu nhập)',
