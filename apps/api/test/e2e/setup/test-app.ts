@@ -125,6 +125,7 @@ export async function seedBaseData(
     'inventory.adjustment.create', 'inventory.adjustment.read',
     'inventory.adjustment.submit', 'inventory.adjustment.approve',
     'inventory.adjustment.post', 'inventory.adjustment.cancel',
+    'inventory.reports.read',
     'pos.session.manage', 'pos.session.approve_variance',
     'pos.sale.create', 'pos.return.create', 'pos.exchange.create',
     'pos.invoice.read', 'pos.invoice.write',

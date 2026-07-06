@@ -162,8 +162,9 @@ const tableConfig: ReportTableConfig = { summaryLabel: "Tổng", columns };
 export const single_tableRegistryReportInventoryInOutStockSummary = tableConfig;
 export const chain_tableRegistryReportInventoryInOutStockSummary = tableConfig;
 
-const filterLines = [
-  REPORT_FILTERS_LINE.STORE,
+// SINGLE (chi nhánh): cửa hàng cố định theo header → không có dòng Cửa hàng;
+// CHAIN (chuỗi): thêm dòng Cửa hàng multi-select ở đầu.
+const singleFilterLines = [
   REPORT_FILTERS_LINE.WAREHOUSE,
   REPORT_FILTERS_LINE.PRODUCT_GROUP,
   REPORT_FILTERS_LINE.STATISTIC_BY,
@@ -171,6 +172,7 @@ const filterLines = [
   REPORT_FILTERS_LINE.REPORT_PERIOD,
   REPORT_FILTERS_LINE.RANGE_DATE,
 ];
+const chainFilterLines = [REPORT_FILTERS_LINE.STORE, ...singleFilterLines];
 
-export const single_filterRegistryReportInventoryInOutStockSummary = filterLines;
-export const chain_filterRegistryReportInventoryInOutStockSummary = filterLines;
+export const single_filterRegistryReportInventoryInOutStockSummary = singleFilterLines;
+export const chain_filterRegistryReportInventoryInOutStockSummary = chainFilterLines;

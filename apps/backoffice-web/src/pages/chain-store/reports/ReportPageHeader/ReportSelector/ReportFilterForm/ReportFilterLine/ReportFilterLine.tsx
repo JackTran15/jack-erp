@@ -3,17 +3,13 @@ import {
   ReportFilterOptionType,
   STAT_BY_OPTIONS,
   STAT_DATE_TYPE_OPTIONS,
+  type ReportFilterOption,
 } from "@erp/shared-interfaces";
 import {
   REPORT_FILTERS_LINE,
   REPORT_FILTERS_LINE_METADATA,
 } from "../../../../../../../constants/reports/report-filters.constant";
 import { useReportStore } from "../../../../../../../store/page-stores/report/report.context";
-import {
-  warehouseOptions,
-  workShiftOptions,
-  receivingStoreOptions,
-} from "../../_mock/report-inventory-filter.mock";
 import { ComboAllocationCheckbox } from "./ComboAllocationCheckbox/ComboAllocationCheckbox";
 import { SourceStoreField } from "./SourceStoreField/SourceStoreField";
 import { StoreScopeField } from "./StoreScopeField/StoreScopeField";
@@ -22,12 +18,20 @@ import { PeriodSelect } from "./PeriodSelect/PeriodSelect";
 import { DateRangeField } from "./DateRangeField/DateRangeField";
 import { StatisticByBranchCheckbox } from "./StatisticByBranchCheckbox/StatisticByBranchCheckbox";
 import { InvoiceStatusMultiSelect } from "./InvoiceStatusMultiSelect/InvoiceStatusMultiSelect";
+import { TreeSelectInput } from "../../../../../../../components/forms/TreeSelectInput";
 import { RemoteSelectField } from "./RemoteSelectField/RemoteSelectField";
 import { ReportSelectField } from "./ReportSelectField/ReportSelectField";
+import { WarehouseSelectField } from "./WarehouseSelectField/WarehouseSelectField";
 
 interface Props {
   line: REPORT_FILTERS_LINE;
 }
+
+// "Ca làm việc" — giá trị tĩnh (line hiện chưa bật cho report nào).
+const WORK_SHIFT_OPTIONS: ReportFilterOption[] = [
+  { value: "morning", label: "Ca sáng" },
+  { value: "afternoon", label: "Ca chiều" },
+];
 
 function capitalize(text: string): string {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -144,43 +148,46 @@ export function ReportFilterLine({ line }: Props) {
         );
       case REPORT_FILTERS_LINE.WAREHOUSE:
         return (
-          <ReportSelectField
+          <WarehouseSelectField
             value={filters[REPORT_FILTERS_LINE.WAREHOUSE] ?? ""}
-            options={warehouseOptions}
-            placeholder="Tất cả kho"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.WAREHOUSE, v)
             }
           />
         );
       case REPORT_FILTERS_LINE.PRODUCT_GROUP:
+        // Select nhóm hàng hóa dùng chung, có phân cấp cha/con (rỗng = tất cả nhóm).
         return (
-          <RemoteSelectField
-            type={ReportFilterOptionType.PRODUCT_GROUP}
+          <TreeSelectInput
             value={filters[REPORT_FILTERS_LINE.PRODUCT_GROUP] ?? ""}
-            placeholder="Tất cả nhóm"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_GROUP, v)
             }
+            entityKey="inventory-item-categories"
+            placeholder="Tất cả nhóm"
+            allOptionLabel="Tất cả nhóm"
+            inputClassName="h-9 text-xs"
           />
         );
       case REPORT_FILTERS_LINE.PRODUCT_TYPE:
+        // Có default ("product") → không cần option placeholder (tránh trùng "Hàng hóa").
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.PRODUCT_TYPE] ?? "product"}
             options={PRODUCT_TYPE_OPTIONS}
-            placeholder="Hàng hóa"
+            hidePlaceholder
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.PRODUCT_TYPE, v)
             }
           />
         );
       case REPORT_FILTERS_LINE.STATISTIC_BY:
+        // Có default ("item") → không cần option placeholder (tránh trùng "Hàng hóa").
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.STATISTIC_BY] ?? "item"}
             options={STAT_BY_OPTIONS}
-            placeholder="Hàng hóa"
+            hidePlaceholder
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.STATISTIC_BY, v)
             }
@@ -208,7 +215,7 @@ export function ReportFilterLine({ line }: Props) {
         return (
           <ReportSelectField
             value={filters[REPORT_FILTERS_LINE.WORK_SHIFT] ?? ""}
-            options={workShiftOptions}
+            options={WORK_SHIFT_OPTIONS}
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.WORK_SHIFT, v)
@@ -237,12 +244,19 @@ export function ReportFilterLine({ line }: Props) {
           />
         );
       case REPORT_FILTERS_LINE.SOURCE_STORE:
-        return <SourceStoreField />;
+        return (
+          <SourceStoreField
+            value={filters[REPORT_FILTERS_LINE.SOURCE_STORE] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.SOURCE_STORE, v)
+            }
+          />
+        );
       case REPORT_FILTERS_LINE.RECEIVING_STORE:
         return (
-          <ReportSelectField
+          <RemoteSelectField
+            type={ReportFilterOptionType.STORE}
             value={filters[REPORT_FILTERS_LINE.RECEIVING_STORE] ?? ""}
-            options={receivingStoreOptions}
             placeholder="Tất cả"
             onChange={(v) =>
               actions.setFilterValue(REPORT_FILTERS_LINE.RECEIVING_STORE, v)

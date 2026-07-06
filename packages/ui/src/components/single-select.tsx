@@ -15,6 +15,8 @@ export interface SingleSelectProps {
   onValueChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Extra classes for the dropdown option rows (e.g. "text-xs" for dense filters). */
+  contentClassName?: string;
   disabled?: boolean;
 }
 
@@ -24,6 +26,7 @@ function SingleSelect({
   onValueChange,
   placeholder = "Chọn…",
   className,
+  contentClassName,
   disabled,
 }: SingleSelectProps) {
   const [open, setOpen] = React.useState(false);
@@ -58,13 +61,14 @@ function SingleSelect({
                 className={cn(
                   "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent",
                   selected && "bg-accent/50",
+                  contentClassName,
                 )}
                 onClick={() => {
                   onValueChange(opt.value);
                   setOpen(false);
                 }}
               >
-                <span>{opt.label}</span>
+                <span className="min-w-0 truncate text-left">{opt.label}</span>
                 {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
               </button>
             );

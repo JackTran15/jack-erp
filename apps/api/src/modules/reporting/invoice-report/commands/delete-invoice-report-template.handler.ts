@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InvoiceReportTemplateEntity } from '../invoice-report-template.entity';
+import { ReportTemplateEntity } from '../../report-core/report-template.entity';
 import { DeleteInvoiceReportTemplateCommand } from './delete-invoice-report-template.command';
 
 @CommandHandler(DeleteInvoiceReportTemplateCommand)
@@ -10,8 +10,8 @@ export class DeleteInvoiceReportTemplateHandler
   implements ICommandHandler<DeleteInvoiceReportTemplateCommand>
 {
   constructor(
-    @InjectRepository(InvoiceReportTemplateEntity)
-    private readonly repo: Repository<InvoiceReportTemplateEntity>,
+    @InjectRepository(ReportTemplateEntity)
+    private readonly repo: Repository<ReportTemplateEntity>,
   ) {}
 
   async execute({

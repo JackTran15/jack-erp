@@ -47,6 +47,8 @@ export function StoreScopeField({ value, onChange }: Props) {
           value={value.storeIds}
           onValueChange={(ids) => onChange({ scope: "group", storeIds: ids })}
           placeholder="Chọn cửa hàng…"
+          className="text-xs"
+          contentClassName="text-xs"
         />
       ) : null}
     </div>

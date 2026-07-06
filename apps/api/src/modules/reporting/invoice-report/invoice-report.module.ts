@@ -22,7 +22,7 @@ import { CreateInvoiceReportTemplateHandler } from './commands/create-invoice-re
 import { DeleteInvoiceReportTemplateHandler } from './commands/delete-invoice-report-template.handler';
 import { UpdateInvoiceReportTemplateHandler } from './commands/update-invoice-report-template.handler';
 import { InvoiceReportController } from './invoice-report.controller';
-import { InvoiceReportTemplateEntity } from './invoice-report-template.entity';
+import { ReportTemplateEntity } from '../report-core/report-template.entity';
 import { ReportTypeEntity } from './report-type.entity';
 import { ReportTypeSyncService } from './report-type-sync.service';
 import { GetInvoiceDetailHandler } from './queries/get-invoice-detail.handler';
@@ -43,7 +43,7 @@ import { RevenueByItemReport } from './reports/revenue-by-item.report';
     CqrsModule,
     RbacModule,
     TypeOrmModule.forFeature([
-      InvoiceReportTemplateEntity,
+      ReportTemplateEntity,
       ReportTypeEntity,
       InvoiceEntity,
       InvoicePaymentEntity,

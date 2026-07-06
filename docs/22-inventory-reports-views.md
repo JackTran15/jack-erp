@@ -6,6 +6,28 @@ Tài liệu này mô tả kiến trúc 7 báo cáo kho hàng (`/reports/storage/
 
 ---
 
+## 0. Contract v2 (EPIC-06072026) — surface hiện hành cho chain-store ReportPage
+
+Từ 07/2026, 8 báo cáo kho có **contract 3-API registry-driven** giống báo cáo bán hàng (EPIC-24062026), phục vụ FE generic `pages/chain-store/reports/ReportPage`:
+
+| Endpoint | Mô tả |
+|---|---|
+| `GET /reports/inventory/columns?reportType=` | Column catalog giàu metadata (VI label, band, filterKind, filterOptions, align, pinned, width, summaryLabel). Report #5 pivot trả **cột động** `branch.qty.<branchId>` per branch của org. |
+| `POST /reports/inventory/search` | `{reportType, columns[], filters, columnFilters[], page, limit}` → `{rows (keyed theo field), totals (trên TOÀN BỘ rows sau filter), total}` |
+| `GET /reports/inventory/filter-options?type=` | Dropdown thật: `store`, `warehouse` (storages), `productGroup`, `brand`, `unit`, `statBy`, `productType` |
+| `GET/POST/PATCH/DELETE /reports/inventory/templates[/:id]` | Lưu cấu hình "Hiển thị cột" `{col, displayName, visible, frozen, order}` — bảng **`report_templates`** (rename từ `invoice_report_templates`, dùng chung với invoice reports), validate theo catalog từng reportType |
+
+- **Backend**: `apps/api/src/modules/inventory-reports/` — `report/inventory-report-definition.ts` (`InventoryReportRegistry`), `report/reports/*.report.ts` (8 definitions, backendKey `inventory-*`), `inventory-report-v2.controller.ts` + CQRS handlers. Core generic dùng chung với invoice: `apps/api/src/modules/reporting/report-core/`.
+- **Data engines tái dùng nguyên** (mục 4 bên dưới): StockPeriodService, DocumentDetailService, StockBalancePivotService, TransferReportService, TempWarehouseReportService. Cache Redis 45s ở search handler.
+- **VI labels/bands**: `packages/shared-interfaces/src/inventory-report/` (per-report maps — cùng key cột có label khác nhau giữa các báo cáo).
+- **Permission**: tái dùng `inventory.reports.read`. Scope: org-wide khi `filters.store` absent/`all` (parity legacy); `scope:"group"` validate storeIds thuộc org.
+- **Lưu ý số liệu**: báo cáo #6 (NX điều chuyển) v2 sửa bug mapping cũ của FE — `inOutDiffQty/Value` giờ lấy từ `qtyInOutDifference/valueInOutDifference` (trước đây nhầm `qtyDifference`) → số hiển thị thay đổi (đúng).
+- **E2E**: `apps/api/test/e2e/inventory-report-v2.e2e-spec.ts`.
+
+**Surface legacy bên dưới (GET endpoints + trang `/reports/storage/*`) GIỮ NGUYÊN** — sẽ dọn ở epic riêng sau khi contract v2 soak.
+
+---
+
 ## 1. Phạm vi
 
 7 báo cáo trên sidebar **Báo cáo → Kho hàng**:

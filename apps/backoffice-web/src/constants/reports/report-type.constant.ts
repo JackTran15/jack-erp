@@ -184,6 +184,8 @@ export const REPORT_TYPE_PURCHASES_METADATA = {
 export const REPORT_TYPE_INVENTORY_METADATA = {
   [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_SUMMARY]: {
     label: 'Tổng hợp nhập xuất tồn kho',
+    backendKey: 'inventory-stock-summary',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportInventoryInOutStockSummary,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportInventoryInOutStockSummary,
@@ -195,6 +197,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   },
   [REPORT_TYPE_INVENTORY.WAREHOUSE_VOUCHER_DETAIL_LIST]: {
     label: 'Bảng kê chi tiết phiếu nhập xuất kho',
+    backendKey: 'inventory-document-detail',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportWarehouseVoucherDetailList,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportWarehouseVoucherDetailList,
@@ -206,6 +210,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   },
   [REPORT_TYPE_INVENTORY.INVENTORY_IN_OUT_STOCK_QUANTITY_DETAIL]: {
     label: 'Chi tiết số lượng nhập xuất tồn kho',
+    backendKey: 'inventory-stock-quantity-detail',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportInventoryInOutStockQuantityDetail,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportInventoryInOutStockQuantityDetail,
@@ -217,6 +223,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   },
   [REPORT_TYPE_INVENTORY.STORE_INVENTORY_IN_OUT_STOCK_SUMMARY]: {
     label: 'Tổng hợp nhập xuất tồn kho theo cửa hàng',
+    backendKey: 'inventory-stock-summary-by-store',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportStoreInventoryInOutStockSummary,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportStoreInventoryInOutStockSummary,
@@ -228,6 +236,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   },
   [REPORT_TYPE_INVENTORY.STOCK_QUANTITY_BY_STORE]: {
     label: 'Số lượng tồn kho theo cửa hàng',
+    backendKey: 'inventory-stock-by-store-pivot',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportStockQuantityByStore,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportStockQuantityByStore,
@@ -241,6 +251,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   // [REPORT_TYPE_INVENTORY.STOCK_BELOW_MINIMUM_LEVEL]: { label: 'Hàng hóa có tồn kho dưới mức tối thiểu' },
   [REPORT_TYPE_INVENTORY.TRANSFER_IN_OUT_SUMMARY]: {
     label: 'Tổng hợp nhập xuất điều chuyển',
+    backendKey: 'inventory-transfer-summary',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferInOutSummary,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferInOutSummary,
@@ -252,6 +264,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   },
   [REPORT_TYPE_INVENTORY.TRANSFERRED_GOODS_SUMMARY_BY_STORE]: {
     label: 'Tổng hợp hàng hóa đã điều chuyển theo cửa hàng',
+    backendKey: 'inventory-transfer-by-store',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportTransferredGoodsSummaryByStore,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportTransferredGoodsSummaryByStore,
@@ -264,6 +278,8 @@ export const REPORT_TYPE_INVENTORY_METADATA = {
   // [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_TRANSFER_SUMMARY]: { label: 'Tổng hợp điều chuyển kho tạm' },
   [REPORT_TYPE_INVENTORY.TEMPORARY_WAREHOUSE_OUT_GOODS]: {
     label: 'Hàng hóa xuất kho tạm',
+    backendKey: 'inventory-temp-warehouse-out',
+    backendSource: 'inventory' as const,
     filterConfig: {
       [STORE_TYPE.SINGLE]: single_filterRegistryReportTemporaryWarehouseOutGoods,
       [STORE_TYPE.CHAIN]: chain_filterRegistryReportTemporaryWarehouseOutGoods,
@@ -314,6 +330,13 @@ export function getReportTypeLabel(reportType: string): string {
 // Khóa report type phía backend (kebab) — undefined nếu type chưa được BE hỗ trợ.
 export function getReportBackendKey(reportType: string): string | undefined {
   return REPORT_TYPE_METADATA[reportType]?.backendKey;
+}
+
+// Domain backend của report type — chọn bộ endpoint (invoice vs inventory).
+export function getReportBackendSource(
+  reportType: string,
+): "invoice" | "inventory" {
+  return REPORT_TYPE_METADATA[reportType]?.backendSource ?? "invoice";
 }
 
 // Các dòng filter của report type đang chọn theo loại view (dòng chọn báo cáo "TYPE"
