@@ -45,7 +45,9 @@ import {
   applyBranchScope,
   applyInvoiceStatusFilter,
   CONSOLIDATED_PERMISSION,
+  invoiceTypeSign,
   resolveBranchIds,
+  signedGoods,
   statDateColumn,
 } from '../report-query.util';
 import { ReportDefinition } from '../report-definition';
@@ -205,16 +207,20 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     const rows: InvoiceRowInput[] = invoiceRows
       .map((i) => {
         const customer = i.customerId ? customerById.get(i.customerId) : undefined;
+        // Sign each invoice row's money by type so a RETURN contributes negative
+        // amounts and the footer nets; goods use the net line value (EXCHANGE = net).
+        const sign = invoiceTypeSign(i.type);
+        const rawByAccount: Record<string, number> = pay.byAccount.get(i.id) ?? {};
         return {
           id: i.id,
           issuedAt: i.issuedAt!,
           code: i.code,
           status: i.status,
-          subtotal: Number(i.subtotal ?? 0),
-          discountAmount: Number(i.discountAmount ?? 0),
-          pointsDiscountAmount: Number(i.pointsDiscountAmount ?? 0),
-          totalPaid: Number(i.totalPaid ?? 0),
-          amountDue: Number(i.amountDue ?? 0),
+          subtotal: signedGoods(i),
+          discountAmount: sign * Number(i.discountAmount ?? 0),
+          pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
+          totalPaid: sign * Number(i.totalPaid ?? 0),
+          amountDue: sign * Number(i.amountDue ?? 0),
           note: i.note ?? null,
           customerName: customer?.name ?? null,
           customerPhone: customer?.phone ?? null,
@@ -223,10 +229,12 @@ export class InvoiceOrderListingReport implements ReportDefinition {
             ? salespersonById.get(i.salespersonId) ?? null
             : null,
           storeCode: i.branchId ? storeById.get(i.branchId) ?? null : null,
-          cash: pay.cash.get(i.id) ?? 0,
-          bankTransfer: pay.bank.get(i.id) ?? 0,
-          voucher: voucherByInvoice.get(i.id) ?? 0,
-          byAccount: pay.byAccount.get(i.id) ?? {},
+          cash: sign * (pay.cash.get(i.id) ?? 0),
+          bankTransfer: sign * (pay.bank.get(i.id) ?? 0),
+          voucher: sign * (voucherByInvoice.get(i.id) ?? 0),
+          byAccount: Object.fromEntries(
+            Object.entries(rawByAccount).map(([k, v]) => [k, sign * v]),
+          ),
         };
       })
       .sort((a, b) => {

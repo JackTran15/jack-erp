@@ -8,6 +8,7 @@ import {
   ItemRevenueField,
   ItemRevenueRelation,
 } from './invoice-item-revenue.columns';
+import { ItemDirection } from '../../pos/entities/invoice-item.entity';
 
 /**
  * One invoice LINE ITEM, with its parent invoice header fields and all relations
@@ -27,6 +28,8 @@ export interface InvoiceItemRowInput {
   itemCode: string;
   itemName: string;
   unit: string;
+  /** Line movement direction — OUT adds to the footer total, IN subtracts. */
+  direction: ItemDirection;
   quantity: number;
   unitPrice: number;
   lineDiscount: number;
@@ -163,8 +166,17 @@ export function buildItemTotals(
       !NON_SUMMABLE.has(col) &&
       (type === ReportColumnDataType.CURRENCY ||
         type === ReportColumnDataType.NUMBER);
+    // Footer nets returns/exchanges: OUT lines add, IN (return leg) subtract.
     out[col] = summable
-      ? round2(rows.reduce((sum, r) => sum + Number(itemCellValue(col, r) ?? 0), 0))
+      ? round2(
+          rows.reduce(
+            (sum, r) =>
+              sum +
+              (r.direction === ItemDirection.IN ? -1 : 1) *
+                Number(itemCellValue(col, r) ?? 0),
+            0,
+          ),
+        )
       : null;
   }
   return out;

@@ -1373,3 +1373,28 @@ flowchart LR
   S1["SDS-01 BE fix precedence + spec (DONE)"] -.dropped.-> S2["SDS-02 E2E (DROPPED)"]
 ```
 
+### EPIC-05072026 Inventory & report corrections (items #3, #8, #10)
+
+- [EPIC-05072026 Inventory & report corrections](./epics/EPIC-05072026-inventory-report-corrections.md)
+- Batch of three independent correctness fixes. **#3** Phân quyền phiếu xuất: "Xuất khác" (OTHER) và "Hủy hàng" (DISPOSAL) chỉ account có quyền mới tạo được; "Điều chuyển" (TRANSFER_OUT) luôn mở. `PermissionGuard` không đọc được `dto.purpose` → inject `RbacService` kiểm tra trong create handler (giống precedent ở `reporting.service.ts`). **#8** Đổi trả — dòng "Mua thêm" (exchange new lines) đang trừ **kho lưu trữ** thay vì showroom: `create-exchange-invoice.service.ts` thiếu `{ showroomOnly: true }` + precedence sai (`line.locationId ?? resolved`). Đây là dòng còn sót của cùng lỗi đã fix cho path SALE ở [EPIC-27062026](#epic-27062026-pos-bán-hàng--sale_issue-phải-trừ-tại-showroom-sửa-double-trừ-kho-lưu-trữ). **#10** Báo cáo chưa trừ đơn đổi/trả → doanh thu lệch: 4 report cộng dương mọi hóa đơn, bỏ qua `InvoiceType.RETURN/EXCHANGE` và line `ItemDirection.IN`. Sửa: net theo **line direction** (OUT `+`, IN `−`) trong aggregators in-memory. **RPT-03** khép nốt phần tiền: hoàn tiền mặt cho đơn đổi/trả **không** ghi vào `invoice_payments` (chỉ ghi khi khách trả thêm) → cột `Tiền mặt`/`Thực thu` trên `daily-sales-summary` vẫn để nguyên tổng gộp; lấy hoàn tiền từ `refundedAmount`/`refundMethod` trên header hóa đơn để trừ. Không migration, không `openapi:generate` (chỉ đổi giá trị tính toán). Legacy dashboard (`reporting.service.ts`, bảng không tồn tại) **out of scope**.
+
+| Ticket                                                                                  | Mô tả                                                                    |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [TKT-GIP-01](./tickets/TKT-GIP-01-seed-goods-issue-purpose-permissions.md)              | Seed 2 permission keys (`other-issue`, `disposal`) + role grants         |
+| [TKT-GIP-02](./tickets/TKT-GIP-02-enforce-goods-issue-purpose-permission.md)            | BE: body-based purpose permission check (v2 + legacy create paths)       |
+| [TKT-GIP-03](./tickets/TKT-GIP-03-fe-filter-goods-issue-purpose.md)                     | FE: lọc option "Mục đích xuất kho" theo `hasPermission`                   |
+| [TKT-EXL-01](./tickets/TKT-EXL-01-fix-exchange-new-line-showroom.md)                    | BE: exchange new-line resolve showroom (`showroomOnly` + đảo precedence)  |
+| [TKT-RPT-01](./tickets/TKT-RPT-01-net-returns-line-grain-reports.md)                    | BE: net returns line-grain reports (revenue-by-item, item-revenue-detail) |
+| [TKT-RPT-02](./tickets/TKT-RPT-02-net-returns-header-grain-reports.md)                  | BE: net returns header-grain reports (daily-summary, order-listing)       |
+| [TKT-RPT-03](./tickets/TKT-RPT-03-net-cash-refunds-daily-sales-summary.md)              | BE: net **cash refunds** (Tiền mặt/Thực thu) on daily-sales-summary        |
+
+```mermaid
+flowchart LR
+  G1["GIP-01 Seed perms"] --> G2["GIP-02 BE enforce"]
+  G2 --> G3["GIP-03 FE filter"]
+  E1["EXL-01 Exchange location (standalone)"]
+  R1["RPT-01 Line reports"]
+  R2["RPT-02 Header reports"]
+  R2 --> R3["RPT-03 Cash-refund netting"]
+```
+

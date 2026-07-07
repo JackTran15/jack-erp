@@ -224,6 +224,7 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           itemCode: li.itemCode,
           itemName: li.itemName,
           unit: li.unit,
+          direction: li.direction,
           quantity: Number(li.quantity ?? 0),
           unitPrice: Number(li.unitPrice ?? 0),
           lineDiscount: Number(li.lineDiscount ?? 0),

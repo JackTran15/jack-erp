@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ReportColumnDataType } from '@erp/shared-interfaces';
+import { InvoiceType } from '../../../pos/entities/invoice.entity';
 import { InvoiceOrderListingReport } from './invoice-order-listing.report';
 
 const ACC = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -216,6 +217,46 @@ describe('InvoiceOrderListingReport.buildData', () => {
     expect(totals['payment.cash']).toBe(18000000);
     expect(totals['date']).toBeNull();
     expect(totals['customer']).toBeNull();
+  });
+
+  it('nets a RETURN invoice — negative row money and a netted footer', async () => {
+    const report = makeReport({
+      invoices: [
+        inv(), // SALE: subtotal 20m, discount 2m, totalPaid 18m
+        inv({
+          id: 'i2',
+          code: 'HD000002',
+          issuedAt: new Date('2026-06-04T09:00:00Z'),
+          type: InvoiceType.RETURN,
+          subtotal: 5000000,
+          discountAmount: 0,
+          totalPaid: 5000000,
+          amountDue: 5000000,
+          customerId: 'c2',
+          salespersonId: undefined,
+        }),
+      ],
+      payments: [
+        { invoiceId: 'i1', paymentMethod: 'cash', amount: 18000000, accountId: ACC },
+        { invoiceId: 'i2', paymentMethod: 'cash', amount: 5000000, accountId: ACC },
+      ],
+    });
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'revenue.goods', 'revenue.total', 'payment.cash'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+
+    const returnRow = result.rows.find((r) => r.invoiceCode === 'HD000002')!;
+    expect(returnRow['revenue.goods']).toBe(-5000000);
+    expect(returnRow['revenue.total']).toBe(-5000000);
+    expect(returnRow['payment.cash']).toBe(-5000000);
+    // Footer nets the return out: goods 20m − 5m, revenue 18m − 5m, cash 18m − 5m.
+    expect(result.totals!['revenue.goods']).toBe(15000000);
+    expect(result.totals!['revenue.total']).toBe(13000000);
+    expect(result.totals!['payment.cash']).toBe(13000000);
   });
 
   it('applies per-column filter post-build and recomputes totals', async () => {
