@@ -46,6 +46,8 @@ export interface PosMenuItem {
   Icon: ComponentType<IconProps>;
   /** Present ⇒ click navigates here; otherwise click is a close-only no-op. */
   route?: string;
+  /** Present ⇒ click opens this absolute URL in a new tab (e.g. ERP backoffice). */
+  externalUrl?: string;
   badge?: "new";
   /** When true, the popover renders a pin icon at the top-right of the tile. */
   pinnable?: boolean;

@@ -4,10 +4,14 @@ import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { LayoutContext } from "./LayoutContext";
 import { RouteAccessGuard } from "./RouteAccessGuard";
+import { useIncomingBranchHandoff } from "../../hooks/iam/useIncomingBranchHandoff";
 
 export function BackofficeLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toggleSidebar = () => setSidebarCollapsed((prev) => !prev);
+
+  // Áp dụng chi nhánh truyền từ POS (?branchId=) khi vừa vào ERP.
+  useIncomingBranchHandoff();
 
   return (
     <LayoutContext.Provider value={{ sidebarCollapsed, toggleSidebar }}>

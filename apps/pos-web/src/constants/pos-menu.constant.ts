@@ -19,6 +19,7 @@ import {
   type IconProps,
 } from "@erp/pos/components/common/PosIcons/PosIcons";
 import { PosMenuItem } from "@erp/pos/components/layout/PosLayout/PosLayout";
+import { resolveBackofficeWebUrl } from "@erp/pos/lib/common/backoffice-url";
 
 export const APP_MENU_ITEMS: PosMenuItem[] = [
   {
@@ -106,6 +107,7 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Trang quản lý",
     iconBgColor: "#7C6FF0",
     Icon: BrandMarkIcon,
+    externalUrl: resolveBackofficeWebUrl(),
   },
   {
     id: "thiet-lap-hien-thi",
