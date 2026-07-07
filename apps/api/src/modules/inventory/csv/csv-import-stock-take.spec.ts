@@ -60,6 +60,7 @@ describe("CsvImportService STOCK_TAKE validation", () => {
       {} as never,
       stockTakeImporter as never,
       {} as never,
+      { incImportRows: jest.fn(), incImportJob: jest.fn() } as never,
     );
 
     const result = await service.validate(

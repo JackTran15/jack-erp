@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthModule } from './modules/health/health.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { CrudModule } from './modules/crud/crud.module';
 import { CommonModule } from './common/common.module';
@@ -73,6 +74,7 @@ import { CounterpartyModule } from './modules/counterparty/counterparty.module';
     ScheduleModule.forRoot(),
 
     HealthModule,
+    MetricsModule,
     RedisModule,
     CrudModule,
     CommonModule,

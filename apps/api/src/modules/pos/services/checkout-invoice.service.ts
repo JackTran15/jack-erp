@@ -41,6 +41,7 @@ import { InvoiceDebtService } from './invoice-debt.service';
 import { PromotionApplyService } from '../../promotion/promotion-apply.service';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
 import { computeAmountDue } from './invoice-amount.util';
+import { MetricsService } from '../../metrics/metrics.service';
 
 /** POS payment method → payment-account config method. Values are identical
  * strings; this map keeps the two enums decoupled at the type level. */
@@ -78,9 +79,26 @@ export class CheckoutInvoiceService {
     private readonly accountResolver: AccountResolverService,
     private readonly cashFundResolver: CashFundResolverService,
     private readonly membershipCardService: MembershipCardService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async checkout(
+    id: string,
+    dto: CheckoutInvoiceDto,
+    actor: ActorContext,
+  ): Promise<InvoiceEntity> {
+    const start = Date.now();
+    try {
+      const result = await this.runCheckout(id, dto, actor);
+      this.metrics.observeCheckout('success', (Date.now() - start) / 1000);
+      return result;
+    } catch (err) {
+      this.metrics.observeCheckout('error', (Date.now() - start) / 1000);
+      throw err;
+    }
+  }
+
+  private async runCheckout(
     id: string,
     dto: CheckoutInvoiceDto,
     actor: ActorContext,

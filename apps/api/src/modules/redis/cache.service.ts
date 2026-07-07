@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 const NAMESPACE = 'cache';
 const DEFAULT_TTL_SECONDS = 300;
@@ -8,7 +9,10 @@ const DEFAULT_TTL_SECONDS = 300;
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
 
-  constructor(private readonly redis: RedisService) {}
+  constructor(
+    private readonly redis: RedisService,
+    private readonly metrics: MetricsService,
+  ) {}
 
   private buildKeySegment(namespace: string, key: string): string {
     return `${namespace}:${key}`;
@@ -24,10 +28,12 @@ export class CacheService {
     const cached = await this.redis.get(NAMESPACE, segment);
 
     if (cached !== null) {
+      this.metrics.incCacheHit();
       this.logger.debug(`Cache hit: ${NAMESPACE}:${segment}`);
       return JSON.parse(cached) as T;
     }
 
+    this.metrics.incCacheMiss();
     this.logger.debug(`Cache miss: ${NAMESPACE}:${segment}`);
     const value = await fetchFn();
     await this.redis.setex(

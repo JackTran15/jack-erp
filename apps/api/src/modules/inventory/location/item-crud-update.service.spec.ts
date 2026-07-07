@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricsService } from '../../metrics/metrics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { InventoryItemCrudService } from './item-crud.service';
@@ -74,6 +75,7 @@ describe('InventoryItemCrudService.update (nested reconcile)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InventoryItemCrudService,
+        { provide: MetricsService, useValue: { incCacheHit() {}, incCacheMiss() {}, observeCheckout() {}, incImportRows() {}, incImportJob() {}, observeKafkaPublish() {}, incKafkaPublishError() {}, observeHttp() {} } },
         { provide: getRepositoryToken(ItemEntity), useValue: repo },
         { provide: getRepositoryToken(ItemCategoryEntity), useValue: repoMock() },
         { provide: getRepositoryToken(BrandEntity), useValue: brandRepo },

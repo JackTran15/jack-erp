@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { MetricsService } from '../metrics/metrics.service';
 import {
   BadRequestException,
   ConflictException,
@@ -97,6 +98,7 @@ describe('CustomerService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: MetricsService, useValue: { incCacheHit() {}, incCacheMiss() {}, observeCheckout() {}, incImportRows() {}, incImportJob() {}, observeKafkaPublish() {}, incKafkaPublishError() {}, observeHttp() {} } },
         CustomerService,
         { provide: getRepositoryToken(CustomerEntity), useValue: customerRepo },
         { provide: getRepositoryToken(MembershipCardEntity), useValue: membershipCardRepo },

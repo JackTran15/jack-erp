@@ -28,6 +28,7 @@ import {
 import { ActorContext } from "../../../common/decorators/actor-context.decorator";
 import { applyWorkbookFont } from "../../../common/utils/excel-workbook-font.util";
 import { WebSocketEmitterService } from "../../websocket/websocket-emitter.service";
+import { MetricsService } from "../../metrics/metrics.service";
 import { InventoryLocationService } from "../location/inventory-location.service";
 import { ItemEntity } from "../location/item.entity";
 import { ItemProviderEntity } from "../location/item-provider.entity";
@@ -109,6 +110,7 @@ export class CsvImportService {
     private readonly workbookService: InventoryImportWorkbookService,
     private readonly excelImportStockTakeService: ExcelImportStockTakeService,
     private readonly excelImportGoodsReceiptService: ExcelImportGoodsReceiptService,
+    private readonly metrics: MetricsService,
     private readonly excelImportDocumentLinesService?: ExcelImportDocumentLinesService,
   ) {}
 
@@ -359,6 +361,8 @@ export class CsvImportService {
       job.status = ImportJobStatus.COMMITTED;
       await this.jobRepo.save(job);
       this.emitStatusChanged(job);
+      this.metrics.incImportRows('success', itemsCommitted);
+      this.metrics.incImportJob('success');
     } catch (error) {
       this.logger.error(
         `Import job ${job.id} commit failed: ${(error as Error).message}`,
@@ -367,6 +371,8 @@ export class CsvImportService {
       job.status = ImportJobStatus.FAILED;
       await this.jobRepo.save(job);
       this.emitStatusChanged(job);
+      this.metrics.incImportRows('failure', job.validRows ?? 0);
+      this.metrics.incImportJob('failure');
       throw error;
     }
 

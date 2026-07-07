@@ -14,6 +14,7 @@ import {
   publishBatch as kafkaPublishBatch,
 } from '@erp/shared-kafka-client';
 import { resolveKafkaConfig } from './kafka-config';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class EventPublisher implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +22,10 @@ export class EventPublisher implements OnModuleInit, OnModuleDestroy {
   private kafka: Kafka;
   private producer: Producer;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly metrics: MetricsService,
+  ) {
     const { clientId, brokers, ssl, sasl } = resolveKafkaConfig(this.config);
 
     this.kafka = createKafkaClient({ clientId, brokers, ssl, sasl });
@@ -57,12 +61,30 @@ export class EventPublisher implements OnModuleInit, OnModuleDestroy {
   }
 
   async publish<T>(topic: string, event: DomainEvent<T>, key?: string): Promise<void> {
-    await publishEvent(this.producer, topic, event, key);
+    const start = Date.now();
+    try {
+      await publishEvent(this.producer, topic, event, key);
+      this.metrics.observeKafkaPublish(topic, (Date.now() - start) / 1000);
+    } catch (err) {
+      this.metrics.incKafkaPublishError(topic);
+      throw err;
+    }
   }
 
   async publishBatch(
     messages: { topic: string; event: DomainEvent<any>; key?: string }[],
   ): Promise<void> {
-    await kafkaPublishBatch(this.producer, messages);
+    const start = Date.now();
+    try {
+      await kafkaPublishBatch(this.producer, messages);
+      for (const { topic } of messages) {
+        this.metrics.observeKafkaPublish(topic, (Date.now() - start) / 1000);
+      }
+    } catch (err) {
+      for (const { topic } of messages) {
+        this.metrics.incKafkaPublishError(topic);
+      }
+      throw err;
+    }
   }
 }
